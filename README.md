@@ -23,7 +23,7 @@ Login inicial: **usuário** `admin` · **senha** `admin` (é o administrador do
 sistema — troque a senha depois de entrar). O administrador cria os demais
 usuários e define o que cada um pode fazer.
 
-Detalhes de instalação, ferramentas e contrato de API estão nos READMEs de
+Detalhes de instalação, ferramentas e contrato de API estão nos .md de
 cada pasta.
 
 ## Documentação do projeto
