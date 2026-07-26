@@ -1,0 +1,16 @@
+{
+  "name": "remoteifes-server",
+  "version": "3.0.0",
+  "description": "Servidor (API + banco de dados) do projeto RemoteIFES",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.6",
+    "express": "^4.21.2"
+  }
+}
