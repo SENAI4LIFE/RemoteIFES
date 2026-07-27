@@ -6,7 +6,17 @@ API + banco SQLite. Fica entre a interface web e os ESP32 de cada sala.
 
 - **Node.js** 22.13 ou mais recente ([nodejs.org](https://nodejs.org))
   - Windows: instalador `.msi` do site oficial, ou `winget install OpenJS.NodeJS.LTS`
-  - Linux (Ubuntu): `sudo apt install nodejs npm` ou [nodesource](https://github.com/nodesource/distributions)
+  - Linux (Ubuntu): via [nodesource](https://github.com/nodesource/distributions) — o `apt install nodejs npm` padrão do Ubuntu instala a versão 18.x, que é antiga demais para este projeto:
+```bash
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+```
+  - Alternativa (recomendada se for alternar entre versões do Node): [nvm](https://github.com/nvm-sh/nvm)
+```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    nvm install 22
+    nvm use 22
+```
 
 O banco usa o módulo `node:sqlite`, nativo do Node — não há dependência
 binária (`.node`) para compilar ou aprovar, o que evita bloqueios de
