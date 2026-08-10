@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RemoteIFES</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <span class="brand">RemoteIFES</span>
+    <div class="topbar-right">
+      <span id="userTag" class="user-tag hidden"></span>
+      <button id="logoutBtn" class="link-btn hidden">Sair</button>
+    </div>
+  </header>
+
+  <main id="app">
+
+    <section id="screen-login" class="screen">
+      <form id="loginForm" class="card">
+        <h1 id="loginTitulo">Entrar</h1>
+        <p id="loginHint" class="hint">Use o login do RemoteIFES.</p>
+
+        <div class="login-type-row">
+          <button type="button" class="login-type-btn active" data-tipo="normal">Usuário</button>
+          <button type="button" class="login-type-btn" data-tipo="admin">Administrador</button>
+        </div>
+
+        <label for="username" id="usernameLabel">Usuário</label>
+        <input type="text" id="username" required autocomplete="username" />
+        <label for="password">Senha</label>
+        <input type="password" id="password" required autocomplete="current-password" />
+        <button type="submit">Entrar</button>
+        <p id="loginError" class="error hidden"></p>
+      </form>
+    </section>
+
+    <div id="mainApp" class="hidden">
+
+      <section id="screen-location" class="screen tab-content">
+        <div class="screen-head">
+          <h1>Selecione o ambiente</h1>
+        </div>
+
+        <div class="card">
+          <label>Bloco</label>
+          <div class="choice-row" id="blocoChoices">
+            <button type="button" class="choice-btn" data-bloco="A">Bloco A</button>
+            <button type="button" class="choice-btn" data-bloco="B">Bloco B</button>
+          </div>
+
+          <label>Andar</label>
+          <div class="choice-row" id="andarChoices">
+            <button type="button" class="choice-btn" data-andar="1">1º andar</button>
+            <button type="button" class="choice-btn" data-andar="2">2º andar</button>
+            <button type="button" class="choice-btn" data-andar="3">3º andar</button>
+          </div>
+
+          <button type="button" id="verSalasBtn" class="btn btn-on btn-block" disabled>Ver salas</button>
+        </div>
+      </section>
+
+      <section id="screen-rooms" class="screen hidden tab-content">
+        <div class="screen-head">
+          <button id="backToLocationBtn" class="link-btn">&larr; Bloco/Andar</button>
+          <h1 id="roomsTitle">Salas</h1>
+        </div>
+        <ul id="roomList" class="room-list"></ul>
+        <p id="roomsEmpty" class="hint hidden">Nenhuma sala disponível no momento.</p>
+      </section>
+
+      <section id="screen-panel" class="screen hidden tab-content">
+        <div class="screen-head">
+          <button id="backBtn" class="link-btn">&larr; Salas</button>
+          <h1 id="panelRoomName">Sala</h1>
+        </div>
+
+        <div id="lockBanner" class="lock-banner hidden"></div>
+
+        <div class="card status-card">
+          <div class="status-row">
+            <span class="status-label">Conexão do dispositivo</span>
+            <span id="conexaoValue" class="status-badge">—</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">Ar-condicionado</span>
+            <span id="statusValue" class="status-badge">—</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">Temperatura ambiente</span>
+            <span id="tempValue" class="status-value">— °C</span>
+          </div>
+        </div>
+
+        <div class="card controls-card">
+          <div class="power-row">
+            <button id="btnOn" class="btn btn-on">Ligar</button>
+            <button id="btnOff" class="btn btn-off">Desligar</button>
+          </div>
+
+          <div class="temp-set-row">
+            <span class="status-label">Ajustar para</span>
+            <button id="tempDown" class="btn-round" aria-label="Diminuir temperatura">&minus;</button>
+            <span id="tempTarget">23°C</span>
+            <button id="tempUp" class="btn-round" aria-label="Aumentar temperatura">+</button>
+          </div>
+        </div>
+
+        <p id="panelError" class="error hidden"></p>
+        <p id="panelAvisoOffline" class="device-warning hidden">
+          O dispositivo está offline — o comando foi salvo, mas ainda não há confirmação de que o ESP32 o recebeu.
+        </p>
+      </section>
+
+      <section id="screen-agenda" class="screen hidden tab-content">
+        <div class="screen-head">
+          <h1>Agendamentos</h1>
+        </div>
+
+        <div class="card">
+          <label for="agendaSala">Sala</label>
+          <select id="agendaSala"></select>
+
+          <label>Dias da semana</label>
+          <div class="choice-row week-days" id="agendaDias">
+            <button type="button" class="choice-btn" data-dia="1">Seg</button>
+            <button type="button" class="choice-btn" data-dia="2">Ter</button>
+            <button type="button" class="choice-btn" data-dia="3">Qua</button>
+            <button type="button" class="choice-btn" data-dia="4">Qui</button>
+            <button type="button" class="choice-btn" data-dia="5">Sex</button>
+            <button type="button" class="choice-btn" data-dia="6">Sáb</button>
+            <button type="button" class="choice-btn" data-dia="0">Dom</button>
+          </div>
+
+          <label>Repetição</label>
+          <div class="repeticao-row">
+            <button type="button" class="choice-btn active" data-repeticao="semanal">Toda semana</button>
+            <button type="button" class="choice-btn" data-repeticao="unica">Só esta semana</button>
+          </div>
+          <div id="agendaDataUnicaRow" class="hidden">
+            <label for="agendaDataUnica">Nessa data</label>
+            <input type="date" id="agendaDataUnica" />
+          </div>
+
+          <div class="two-col">
+            <div>
+              <label for="agendaHoraInicio">Ligar às</label>
+              <input type="time" id="agendaHoraInicio" value="07:00" />
+            </div>
+            <div>
+              <label for="agendaHoraFim">Desligar às</label>
+              <input type="time" id="agendaHoraFim" value="18:00" />
+            </div>
+          </div>
+
+          <label for="agendaTemperatura">Temperatura</label>
+          <input type="number" id="agendaTemperatura" min="16" max="30" value="23" />
+
+          <label>O que fazer neste horário</label>
+          <label class="checkbox-label"><input type="radio" name="agendaModo" value="reserva" /> Apenas reservar a sala</label>
+          <label class="checkbox-label"><input type="radio" name="agendaModo" value="ligar_completo" checked /> Reservar e ligar durante todo o período</label>
+          <label class="checkbox-label"><input type="radio" name="agendaModo" value="ligar_intervalo" /> Reservar e ligar apenas em um intervalo</label>
+
+          <div id="agendaIntervaloRow" class="two-col hidden">
+            <div>
+              <label for="agendaLigarInicio">Ligar às</label>
+              <input type="time" id="agendaLigarInicio" value="07:00" />
+            </div>
+            <div>
+              <label for="agendaLigarFim">Desligar às</label>
+              <input type="time" id="agendaLigarFim" value="09:00" />
+            </div>
+          </div>
+
+          <button type="button" id="criarAgendaBtn" class="btn btn-on btn-block">Criar agendamento</button>
+          <p id="agendaError" class="error hidden"></p>
+        </div>
+
+        <ul id="agendaList" class="room-list"></ul>
+        <p id="agendaEmpty" class="hint hidden">Nenhum agendamento cadastrado para esta sala.</p>
+      </section>
+
+      <section id="screen-grade" class="screen hidden tab-content">
+        <div class="screen-head">
+          <h1>Grade semanal</h1>
+        </div>
+        <div class="card">
+          <label for="gradeSala">Sala</label>
+          <select id="gradeSala"></select>
+        </div>
+        <div class="mapa-legenda grade-legenda">
+          <span><i class="mapa-cell grade-cor-desligado"></i> desligado</span>
+          <span><i class="mapa-cell grade-cor-agendado"></i> agendado</span>
+          <span><i class="mapa-cell grade-cor-ligado"></i> ligado</span>
+        </div>
+        <div class="grade-scroll">
+          <table id="gradeTabela" class="grade-tabela"></table>
+        </div>
+      </section>
+
+      <section id="screen-admin" class="screen hidden tab-content">
+        <div class="screen-head">
+          <h1>Administração</h1>
+        </div>
+
+        <div class="admin-subtabs">
+          <button type="button" class="admin-subtab-btn active" data-sub="usuarios">Usuários</button>
+          <button type="button" class="admin-subtab-btn" data-sub="ativos">Ativos</button>
+          <button type="button" class="admin-subtab-btn" data-sub="sessoes">Sessões</button>
+          <button type="button" class="admin-subtab-btn" data-sub="logs">Logs</button>
+          <button type="button" class="admin-subtab-btn" data-sub="dispositivos">Dispositivos</button>
+          <button type="button" class="admin-subtab-btn" data-sub="mapa">Mapa</button>
+          <button type="button" class="admin-subtab-btn" data-sub="config">Configurações</button>
+        </div>
+
+        <div id="adminSub-usuarios" class="admin-sub">
+          <div class="card">
+            <h2>Novo usuário</h2>
+            <label for="novoUsuarioLogin">Login</label>
+            <input type="text" id="novoUsuarioLogin" />
+            <label for="novoUsuarioNome">Nome</label>
+            <input type="text" id="novoUsuarioNome" />
+            <label for="novoUsuarioSenha">Senha inicial</label>
+            <input type="password" id="novoUsuarioSenha" />
+            <label class="checkbox-label">
+              <input type="checkbox" id="novoUsuarioControlar" checked /> Pode controlar salas
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="novoUsuarioAgendar" checked /> Pode criar agendamentos
+            </label>
+            <label class="checkbox-label hidden" id="novoUsuarioAdminLabel">
+              <input type="checkbox" id="novoUsuarioAdmin" /> Conceder permissão de administrador
+            </label>
+            <button type="button" id="criarUsuarioBtn" class="btn btn-on btn-block">Criar usuário</button>
+            <p id="usuarioError" class="error hidden"></p>
+          </div>
+          <ul id="usuariosList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-ativos" class="admin-sub hidden">
+          <ul id="ativosList" class="room-list"></ul>
+          <p id="ativosEmpty" class="hint hidden">Nenhum usuário acessou o sistema ainda.</p>
+        </div>
+
+        <div id="adminSub-sessoes" class="admin-sub hidden">
+          <div class="card">
+            <label for="sessoesFiltroData">Filtrar por data</label>
+            <input type="date" id="sessoesFiltroData" />
+            <div class="two-col">
+              <button type="button" id="sessoesApagarData" class="link-btn danger">Apagar histórico da data</button>
+              <button type="button" id="sessoesApagarTudo" class="link-btn danger">Apagar todo o histórico</button>
+            </div>
+          </div>
+          <ul id="sessoesList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-logs" class="admin-sub hidden">
+          <div class="card">
+            <label for="logsFiltroData">Filtrar por data</label>
+            <input type="date" id="logsFiltroData" />
+            <div class="two-col">
+              <button type="button" id="logsApagarData" class="link-btn danger">Apagar logs da data</button>
+              <button type="button" id="logsApagarTudo" class="link-btn danger">Apagar todos os logs</button>
+            </div>
+          </div>
+          <ul id="logsList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-dispositivos" class="admin-sub hidden">
+          <div class="card">
+            <label for="dispositivosFiltroData">Filtrar por data</label>
+            <input type="date" id="dispositivosFiltroData" />
+          </div>
+          <ul id="dispositivosList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-mapa" class="admin-sub hidden">
+          <div class="mapa-legenda">
+            <span><i class="mapa-cell mapa-offline"></i> offline</span>
+            <span><i class="mapa-cell mapa-online-desligado"></i> online, desligado</span>
+            <span><i class="mapa-cell mapa-online-ligado"></i> online, ligado</span>
+            <span><i class="mapa-cell mapa-reservada"></i> reservada agora</span>
+          </div>
+          <div id="mapaGrid" class="mapa-grid"></div>
+        </div>
+
+        <div id="adminSub-config" class="admin-sub hidden">
+          <div class="card">
+            <h2>Sessão por inatividade</h2>
+            <p class="hint">
+              Tempo de inatividade até deslogar automaticamente um usuário
+              (evita que o app fique aberto e "online" indefinidamente). Deixe em
+              branco para indefinido — não desloga por tempo. Vale para todos os
+              usuários.
+            </p>
+            <label for="cfgTimeoutInatividade">Tempo de inatividade (minutos)</label>
+            <input type="number" id="cfgTimeoutInatividade" min="1" placeholder="indefinido (sugestão: 15)" />
+
+            <label class="checkbox-label">
+              <input type="checkbox" id="cfgAdminSujeitoTimeout" /> Aplicar este timer também para administradores
+            </label>
+            <p class="hint">Desligado por padrão — administradores ficam isentos do timer de inatividade.</p>
+
+            <label for="cfgPopupAviso">Aviso antes de deslogar (segundos)</label>
+            <input type="number" id="cfgPopupAviso" min="10" value="60" />
+          </div>
+
+          <div class="card">
+            <h2>Presença online</h2>
+            <label for="cfgLimiarOnline">Considerar usuário "online" por até (minutos sem uso)</label>
+            <input type="number" id="cfgLimiarOnline" min="1" value="5" />
+          </div>
+
+          <button type="button" id="salvarConfigBtn" class="btn btn-on btn-block">Salvar configurações</button>
+          <p id="configError" class="error hidden"></p>
+          <p id="configSavedHint" class="config-saved-hint hidden">Configurações salvas.</p>
+        </div>
+      </section>
+
+      <nav class="tabbar">
+        <button type="button" class="tab-btn" data-tab="salas">Salas</button>
+        <button type="button" class="tab-btn" data-tab="agenda">Agendamentos</button>
+        <button type="button" class="tab-btn" data-tab="grade">Grade</button>
+        <button type="button" class="tab-btn hidden" data-tab="admin" id="adminTabBtn">Admin</button>
+      </nav>
+
+    </div>
+
+  </main>
+
+  <div id="idleModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h2>Sessão prestes a expirar</h2>
+      <p>Por inatividade, sua sessão será encerrada em:</p>
+      <div class="modal-countdown" id="idleCountdown">01:00</div>
+      <p>Isso evita que o app fique aberto e marcado como "online" sem ninguém acompanhando.</p>
+      <div class="modal-actions">
+        <button type="button" id="idleContinuarBtn" class="btn btn-on">Continuar conectado</button>
+        <button type="button" id="idleSairBtn" class="btn btn-off">Sair agora</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/state.js"></script>
+  <script src="js/tempo.js"></script>
+  <script src="js/rooms-data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/idle-timer.js"></script>
+  <script src="js/screens/login.js"></script>
+  <script src="js/screens/location.js"></script>
+  <script src="js/screens/rooms.js"></script>
+  <script src="js/screens/panel.js"></script>
+  <script src="js/screens/schedule.js"></script>
+  <script src="js/screens/grade.js"></script>
+  <script src="js/screens/admin.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
