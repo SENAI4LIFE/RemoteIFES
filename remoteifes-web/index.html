@@ -211,6 +211,7 @@
           <button type="button" class="admin-subtab-btn" data-sub="sessoes">Sessões</button>
           <button type="button" class="admin-subtab-btn" data-sub="logs">Logs</button>
           <button type="button" class="admin-subtab-btn" data-sub="dispositivos">Dispositivos</button>
+          <button type="button" class="admin-subtab-btn" data-sub="acessos">Acessos ESP32</button>
           <button type="button" class="admin-subtab-btn" data-sub="mapa">Mapa</button>
           <button type="button" class="admin-subtab-btn" data-sub="config">Configurações</button>
         </div>
@@ -274,6 +275,18 @@
             <input type="date" id="dispositivosFiltroData" />
           </div>
           <ul id="dispositivosList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-acessos" class="admin-sub hidden">
+          <div class="card">
+            <label for="acessosFiltroData">Filtrar por data</label>
+            <input type="date" id="acessosFiltroData" />
+            <div class="two-col">
+              <button type="button" id="acessosApagarData" class="link-btn danger">Apagar acessos da data</button>
+              <button type="button" id="acessosApagarTudo" class="link-btn danger">Apagar todos os acessos</button>
+            </div>
+          </div>
+          <ul id="acessosList" class="room-list"></ul>
         </div>
 
         <div id="adminSub-mapa" class="admin-sub hidden">
