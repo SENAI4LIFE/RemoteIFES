@@ -48,4 +48,39 @@ router.post("/dispositivo/heartbeat", exigirDispositivo, (req, res) => {
   }
 });
 
+router.post("/dispositivo/acesso", exigirDispositivo, (req, res) => {
+  const { sala, userAgent } = req.body;
+  if (!sala || typeof sala !== "string") {
+    return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
+  }
+  if (userAgent !== undefined && typeof userAgent !== "string") {
+    return res.status(400).json({ ok: false, erro: "userAgent deve ser texto" });
+  }
+
+  try {
+    const ip = req.body.ip && typeof req.body.ip === "string" ? req.body.ip : req.ip;
+    salasService.registrarAcessoEsp(sala, { ip, userAgent });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.post("/dispositivo/comando", exigirDispositivo, (req, res) => {
+  const { sala, cmd, valor } = req.body;
+  if (!sala || typeof sala !== "string") {
+    return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
+  }
+  if (!cmd || typeof cmd !== "string") {
+    return res.status(400).json({ ok: false, erro: "cmd é obrigatório" });
+  }
+
+  try {
+    salasService.registrarComandoDispositivo(sala, cmd, valor);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
 module.exports = router;

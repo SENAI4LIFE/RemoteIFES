@@ -68,6 +68,14 @@ function criarSchema() {
       criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS esp_acessos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sala TEXT NOT NULL REFERENCES salas(sala),
+      ip TEXT,
+      userAgent TEXT,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS sessoes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       token TEXT NOT NULL UNIQUE,
