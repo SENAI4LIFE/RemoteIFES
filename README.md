@@ -50,7 +50,7 @@ Smartphone/PC (rede da sala)          Navegador (professor/técnico/admin)
    ┌─────────────┐   heartbeat / acesso   ┌──────────────────┐
    │   ESP32     │ ─────────────────────▶ │ remoteifes-server │◀── login/API
    │ (webserver  │        comando         │   (Node + SQLite) │
-   │  local, IR) │ ─────────────────────▶ │                    │
+   │  local, IR) │ ─────────────────────▶ │                   │
    └─────────────┘                        └──────────────────┘
 ```
 
@@ -65,7 +65,7 @@ contexto institucional completo do projeto.
 | `salas`                    | código, bloco, andar, estado online/ligado, temperatura, último heartbeat                  |
 | `esp_eventos`              | histórico de online/offline reportado por cada ESP32                                       |
 | `esp_acessos`              | quem (IP/User-Agent) acessou a página local de cada ESP32 e quando                         |
-| `agendamentos` / `agendamentos_execucoes` | reservas por sala e execuções automáticas do agendador               |
+| `agendamentos` / `agendamentos_execucoes` | reservas por sala e execuções automáticas do agendador                      |
 | `comandos_log`             | comandos manuais, automáticos (agenda) e locais (`origem: esp32_local`) por sala           |
 | `sessoes`                  | tokens de sessão ativos/encerrados dos usuários da interface web                           |
 | `configuracoes`            | parâmetros ajustáveis pelo admin (timeout, aviso de popup, limiar de "online")             |
