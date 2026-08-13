@@ -180,6 +180,19 @@ const Api = {
     return chamar(`/admin/dispositivos${query ? `?${query}` : ""}`, { headers: headersComToken() });
   },
 
+  async listarAcessosEsp({ sala, data } = {}) {
+    const params = new URLSearchParams();
+    if (sala) params.set("sala", sala);
+    if (data) params.set("data", data);
+    const query = params.toString();
+    return chamar(`/admin/acessos${query ? `?${query}` : ""}`, { headers: headersComToken() });
+  },
+
+  async apagarAcessosEsp(data) {
+    const query = data ? `?data=${encodeURIComponent(data)}` : "";
+    return chamar(`/admin/acessos${query}`, { method: "DELETE", headers: headersComToken() });
+  },
+
   async ping() {
     return chamar("/ping", { method: "POST", headers: headersComToken() });
   },

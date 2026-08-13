@@ -215,6 +215,54 @@ function apagarLogs({ data } = {}) {
   }
 }
 
+function registrarComandoDispositivo(sala, cmd, valor) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+  if (typeof cmd !== "string" || !cmd) throw new Error("cmd é obrigatório");
+
+  registrarLog({
+    usuario: null,
+    sala,
+    cmd,
+    valor,
+    origem: "esp32_local",
+  });
+}
+
+function registrarAcessoEsp(sala, { ip, userAgent } = {}) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+
+  db.prepare(`
+    INSERT INTO esp_acessos (sala, ip, userAgent)
+    VALUES (?, ?, ?)
+  `).run(sala, ip || null, userAgent || null);
+}
+
+function listarAcessosEsp({ sala, data, limite = 300 } = {}) {
+  let query = "SELECT * FROM esp_acessos WHERE 1=1";
+  const params = [];
+  if (sala) {
+    query += " AND sala = ?";
+    params.push(sala);
+  }
+  if (data) {
+    query += " AND date(criadoEm) = ?";
+    params.push(data);
+  }
+  query += " ORDER BY criadoEm DESC LIMIT ?";
+  params.push(limite);
+  return db.prepare(query).all(...params);
+}
+
+function apagarAcessosEsp({ data } = {}) {
+  if (data) {
+    db.prepare("DELETE FROM esp_acessos WHERE date(criadoEm) = ?").run(data);
+  } else {
+    db.prepare("DELETE FROM esp_acessos").run();
+  }
+}
+
 module.exports = {
   listar,
   buscar,
@@ -227,4 +275,8 @@ module.exports = {
   marcarOnline,
   verificarTimeouts,
   listarEventosEsp,
+  registrarComandoDispositivo,
+  registrarAcessoEsp,
+  listarAcessosEsp,
+  apagarAcessosEsp,
 };

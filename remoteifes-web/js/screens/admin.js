@@ -209,6 +209,22 @@ const Admin = {
     });
   },
 
+  async carregarAcessos(data) {
+    const list = document.getElementById("acessosList");
+    list.innerHTML = "";
+    const acessos = await Api.listarAcessosEsp({ data });
+    acessos.forEach((a) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div>
+          <div class="room-name">${a.sala}</div>
+          <div class="room-sub">${a.ip || "IP desconhecido"} · ${Tempo.formatarDataHora(a.criadoEm)}</div>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  },
+
   async carregarMapa() {
     const grid = document.getElementById("mapaGrid");
     grid.innerHTML = "";
@@ -286,6 +302,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "sessoes") await Admin.carregarSessoes();
     if (sub === "logs") await Admin.carregarLogs();
     if (sub === "dispositivos") await Admin.carregarDispositivos();
+    if (sub === "acessos") await Admin.carregarAcessos();
     if (sub === "mapa") await Admin.carregarMapa();
     if (sub === "config") await Admin.carregarConfiguracoes();
   });
@@ -347,6 +364,27 @@ document.getElementById("logsApagarTudo").addEventListener("click", async () => 
 
 document.getElementById("dispositivosFiltroData").addEventListener("change", (e) => {
   Admin.carregarDispositivos(e.target.value || undefined);
+});
+
+document.getElementById("acessosFiltroData").addEventListener("change", (e) => {
+  Admin.carregarAcessos(e.target.value || undefined);
+});
+
+document.getElementById("acessosApagarData").addEventListener("click", async () => {
+  const data = document.getElementById("acessosFiltroData").value;
+  if (!data) {
+    alert("selecione uma data para apagar os acessos daquele dia");
+    return;
+  }
+  if (!confirm(`Apagar todos os acessos do dia ${data}?`)) return;
+  await Api.apagarAcessosEsp(data);
+  await Admin.carregarAcessos(data);
+});
+
+document.getElementById("acessosApagarTudo").addEventListener("click", async () => {
+  if (!confirm("Apagar TODOS os acessos ao webserver dos ESP32? Esta ação não pode ser desfeita.")) return;
+  await Api.apagarAcessosEsp();
+  await Admin.carregarAcessos(document.getElementById("acessosFiltroData").value || undefined);
 });
 
 document.getElementById("sessoesApagarData").addEventListener("click", async () => {

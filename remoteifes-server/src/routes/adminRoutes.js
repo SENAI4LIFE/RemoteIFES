@@ -130,6 +130,23 @@ router.get("/admin/dispositivos", (req, res) => {
   res.json(salasService.listarEventosEsp({ sala, data }));
 });
 
+router.get("/admin/acessos", (req, res) => {
+  const data = parseData(req, res);
+  if (data === null) return;
+  const sala = req.query.sala;
+  if (sala !== undefined && typeof sala !== "string") {
+    return res.status(400).json({ ok: false, erro: "sala inválida" });
+  }
+  res.json(salasService.listarAcessosEsp({ sala, data }));
+});
+
+router.delete("/admin/acessos", (req, res) => {
+  const data = parseData(req, res);
+  if (data === null) return;
+  salasService.apagarAcessosEsp({ data });
+  res.json({ ok: true });
+});
+
 router.get("/admin/configuracoes", (req, res) => {
   res.json({ ok: true, configuracoes: configuracoesService.obter() });
 });
