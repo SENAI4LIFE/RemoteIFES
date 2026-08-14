@@ -5,7 +5,7 @@ const {
   jaExecutadoHoje,
 } = require("../services/agendamentosService");
 const { encerrarSessoesAbandonadas } = require("../services/tokenService");
-const { horaAtualBrasilia, diaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
+const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 
 const VERIFICACAO_MS = 60 * 1000;
 const VERIFICACAO_TIMEOUT_MS = 30 * 1000;
@@ -13,11 +13,10 @@ const VERIFICACAO_SESSOES_MS = 15 * 60 * 1000;
 
 function verificarAgendamentos() {
   const hora = horaAtualBrasilia();
-  const dia = diaAtualBrasilia();
   const dataISO = dataAtualBrasiliaISO();
 
   for (const ag of listarAtivosParaAgendador()) {
-    if (!agendamentoOcorreHoje(ag, dia, dataISO)) continue;
+    if (!agendamentoOcorreHoje(ag, dataISO)) continue;
 
     if (ag.modo === "reserva") continue;
 

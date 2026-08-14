@@ -3,7 +3,24 @@ const { buscar: buscarSala } = require("./salasService");
 const { dataAtualBrasiliaISO } = require("../utils/tempo");
 
 const MODOS_VALIDOS = ["reserva", "ligar_completo", "ligar_intervalo"];
-const REPETICOES_VALIDAS = ["semanal", "unica"];
+const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function paraSaida(a) {
+  return {
+    id: a.id,
+    sala: a.sala,
+    usuarioNome: a.usuarioNome,
+    usuarioLogin: a.usuarioLogin,
+    data: a.data,
+    horaInicio: a.horaInicio,
+    horaFim: a.horaFim,
+    temperatura: a.temperatura,
+    modo: a.modo,
+    ligarInicio: a.ligarInicio,
+    ligarFim: a.ligarFim,
+    ativo: !!a.ativo,
+  };
+}
 
 function listar({ sala, usuarioId } = {}) {
   let query = `
@@ -21,24 +38,9 @@ function listar({ sala, usuarioId } = {}) {
     query += " AND a.usuarioId = ?";
     params.push(usuarioId);
   }
-  query += " ORDER BY a.horaInicio";
+  query += " ORDER BY a.data, a.horaInicio";
 
-  return db.prepare(query).all(...params).map((a) => ({
-    id: a.id,
-    sala: a.sala,
-    usuarioNome: a.usuarioNome,
-    usuarioLogin: a.usuarioLogin,
-    diasSemana: JSON.parse(a.diasSemana),
-    horaInicio: a.horaInicio,
-    horaFim: a.horaFim,
-    temperatura: a.temperatura,
-    modo: a.modo,
-    ligarInicio: a.ligarInicio,
-    ligarFim: a.ligarFim,
-    ativo: !!a.ativo,
-    repeticao: a.repeticao || "semanal",
-    dataUnica: a.dataUnica || null,
-  }));
+  return db.prepare(query).all(...params).map(paraSaida);
 }
 
 function salasComAgendamentoAtivo() {
@@ -52,73 +54,39 @@ function salasComAgendamentoAtivo() {
   return resultado;
 }
 
-function diaSemanaDeData(dataISO) {
-  const [ano, mes, dia] = dataISO.split("-").map(Number);
-  return new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay();
-}
-
-function diasDoAgendamento(ag) {
-  if (ag.repeticao === "unica") return [diaSemanaDeData(ag.dataUnica)];
-  return JSON.parse(ag.diasSemana);
-}
-
 function validarConflito(sala, novoAg, ignorarId = null) {
   const existentes = db.prepare(`
-    SELECT * FROM agendamentos WHERE sala = ? AND ativo = 1 ${ignorarId ? "AND id != ?" : ""}
-  `).all(...(ignorarId ? [sala, ignorarId] : [sala]));
-
-  const diasNovo = novoAg.repeticao === "unica"
-    ? [diaSemanaDeData(novoAg.dataUnica)]
-    : novoAg.diasSemana;
+    SELECT * FROM agendamentos WHERE sala = ? AND ativo = 1 AND data = ? ${ignorarId ? "AND id != ?" : ""}
+  `).all(...(ignorarId ? [sala, novoAg.data, ignorarId] : [sala, novoAg.data]));
 
   for (const ag of existentes) {
-    if (ag.repeticao === "unica" && novoAg.repeticao === "unica" && ag.dataUnica !== novoAg.dataUnica) {
-      continue;
-    }
-
-    const diasExistentes = diasDoAgendamento(ag);
-    const temDiaEmComum = diasExistentes.some((d) => diasNovo.includes(d));
-    if (!temDiaEmComum) continue;
-
     const sobrepoe = novoAg.horaInicio < ag.horaFim && novoAg.horaFim > ag.horaInicio;
     if (sobrepoe) {
-      const quando = ag.repeticao === "unica" ? `em ${ag.dataUnica}` : "toda semana";
-      throw new Error(`conflito com outro agendamento já existente nesta sala (${ag.horaInicio}–${ag.horaFim}, ${quando})`);
+      throw new Error(`conflito com outro agendamento já existente nesta sala em ${ag.data} (${ag.horaInicio}–${ag.horaFim})`);
     }
   }
 }
 
-function criar({ sala, usuarioId, diasSemana, horaInicio, horaFim, temperatura, modo, ligarInicio, ligarFim, repeticao, dataUnica }) {
+function criar({ sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, ligarInicio, ligarFim }) {
   const salaRow = buscarSala(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
-  const repeticaoFinal = repeticao && REPETICOES_VALIDAS.includes(repeticao) ? repeticao : "semanal";
-
-  let diasSemanaFinal;
-  let dataUnicaFinal = null;
-
-  if (repeticaoFinal === "unica") {
-    if (!dataUnica || !/^\d{4}-\d{2}-\d{2}$/.test(dataUnica)) {
-      throw new Error("informe uma data válida (AAAA-MM-DD) para um agendamento de uma única semana");
-    }
-    if (dataUnica < dataAtualBrasiliaISO()) {
-      throw new Error("a data do agendamento não pode ser no passado");
-    }
-    dataUnicaFinal = dataUnica;
-    diasSemanaFinal = [diaSemanaDeData(dataUnica)];
-  } else {
-    if (!Array.isArray(diasSemana) || diasSemana.length === 0) {
-      throw new Error("selecione ao menos um dia da semana");
-    }
-    diasSemanaFinal = diasSemana;
+  if (!data || !DATA_REGEX.test(data)) {
+    throw new Error("informe uma data válida (AAAA-MM-DD) para o agendamento");
+  }
+  if (data < dataAtualBrasiliaISO()) {
+    throw new Error("a data do agendamento não pode ser no passado");
   }
 
   if (!horaInicio || !horaFim || horaInicio >= horaFim) {
     throw new Error("horário inválido: início deve ser antes do fim");
   }
+
+  const configuracoesService = require("./configuracoesService");
+  const { minima, maxima } = configuracoesService.limitesTemperatura();
   const temp = Number(temperatura);
-  if (Number.isNaN(temp) || temp < 16 || temp > 30) {
-    throw new Error("temperatura deve estar entre 16 e 30");
+  if (Number.isNaN(temp) || temp < minima || temp > maxima) {
+    throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
   }
 
   const modoFinal = modo && MODOS_VALIDOS.includes(modo) ? modo : "ligar_completo";
@@ -136,18 +104,12 @@ function criar({ sala, usuarioId, diasSemana, horaInicio, horaFim, temperatura, 
     ligarFimFinal = ligarFim;
   }
 
-  validarConflito(sala, {
-    repeticao: repeticaoFinal,
-    dataUnica: dataUnicaFinal,
-    diasSemana: diasSemanaFinal,
-    horaInicio,
-    horaFim,
-  });
+  validarConflito(sala, { data, horaInicio, horaFim });
 
   const info = db.prepare(`
-    INSERT INTO agendamentos (sala, usuarioId, diasSemana, horaInicio, horaFim, temperatura, modo, ligarInicio, ligarFim, ativo, repeticao, dataUnica)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-  `).run(sala, usuarioId, JSON.stringify(diasSemanaFinal), horaInicio, horaFim, temp, modoFinal, ligarInicioFinal, ligarFimFinal, repeticaoFinal, dataUnicaFinal);
+    INSERT INTO agendamentos (sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, ligarInicio, ligarFim, ativo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `).run(sala, usuarioId, data, horaInicio, horaFim, temp, modoFinal, ligarInicioFinal, ligarFimFinal);
 
   return db.prepare("SELECT * FROM agendamentos WHERE id = ?").get(info.lastInsertRowid);
 }

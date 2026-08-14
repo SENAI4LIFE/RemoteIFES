@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const salasService = require("../services/salasService");
+const presetsService = require("../services/presetsService");
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ function exigirDispositivo(req, res, next) {
 }
 
 router.post("/dispositivo/heartbeat", exigirDispositivo, (req, res) => {
-  const { sala, ligado, temperatura } = req.body;
+  const { sala, ligado, temperatura, mac, ip } = req.body;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
   }
@@ -41,7 +42,8 @@ router.post("/dispositivo/heartbeat", exigirDispositivo, (req, res) => {
     if (ligado !== undefined) estadoReportado.ligado = ligado;
     if (temperatura !== undefined) estadoReportado.temperatura = temperatura;
 
-    const resultado = salasService.marcarOnline(sala, estadoReportado);
+    const ipReportado = typeof ip === "string" && ip ? ip : req.ip;
+    const resultado = salasService.marcarOnline(sala, estadoReportado, mac, ipReportado);
     res.json({ ok: true, sala: resultado });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
@@ -78,6 +80,34 @@ router.post("/dispositivo/comando", exigirDispositivo, (req, res) => {
   try {
     salasService.registrarComandoDispositivo(sala, cmd, valor);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.get("/dispositivo/preset", exigirDispositivo, (req, res) => {
+  const { sala } = req.query;
+  if (!sala || typeof sala !== "string") {
+    return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
+  }
+  const salaRow = salasService.buscar(sala);
+  if (!salaRow) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
+
+  const preset = salaRow.presetId
+    ? presetsService.buscarPorId(salaRow.presetId)
+    : presetsService.presetPadrao();
+
+  res.json({ ok: true, preset });
+});
+
+router.post("/dispositivo/preset", exigirDispositivo, (req, res) => {
+  const { nome, funcoes, sala } = req.body || {};
+  try {
+    const preset = presetsService.criarOuAtualizarViaDispositivo({ nome, funcoes });
+    if (sala && typeof sala === "string") {
+      salasService.definirPreset(sala, preset.id);
+    }
+    res.json({ ok: true, preset });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
   }

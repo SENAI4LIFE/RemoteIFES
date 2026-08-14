@@ -265,17 +265,6 @@ button.btn:disabled {
   margin-bottom: 4px;
 }
 
-.choice-row.week-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-}
-.choice-row.week-days .choice-btn {
-  padding: 8px 2px;
-  font-size: 12px;
-  text-align: center;
-}
-
 .choice-btn {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -427,6 +416,42 @@ button.btn:disabled {
 .mapa-legenda span { display: flex; align-items: center; gap: 6px; }
 .mapa-legenda i.mapa-cell { width: 18px; height: 18px; border-radius: 4px; }
 
+.salas-mapa {
+  height: 260px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+}
+.mapa-marker {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+}
+
+.superadmin-only.hidden { display: none; }
+
+.mac-row, .preset-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mac-row input, .preset-row select {
+  margin-top: 4px;
+}
+.preset-funcao-tag {
+  display: inline-block;
+  background: var(--ifes-green-soft);
+  color: var(--ifes-green-dark);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  margin: 2px 4px 0 0;
+}
+
 .session-timer {
   font-size: 12px;
   font-weight: 600;
@@ -479,9 +504,6 @@ button.btn:disabled {
 }
 .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
 .modal-actions .btn { flex: 1; }
-
-.repeticao-row { display: flex; gap: 8px; margin: 8px 0 4px; }
-.repeticao-row .choice-btn { flex: 1; }
 
 .config-saved-hint {
   color: var(--ifes-green-dark);

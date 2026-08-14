@@ -35,7 +35,6 @@ router.post("/login", limitarLogin, (req, res) => {
     isAdmin,
     isSuperAdmin: registro.nivel === usuariosService.NIVEL_SUPERADMIN,
     podeControlar: !!registro.podeControlar,
-    podeAgendar: !!registro.podeAgendar,
 
     timeoutInatividadeMinutos: configuracoesService.timeoutEfetivoParaUsuario(isAdmin),
     popupAvisoSegundos: config.popupAvisoSegundos,
@@ -55,7 +54,6 @@ router.get("/me", exigirLogin, (req, res) => {
     isAdmin,
     isSuperAdmin: usuario.nivel === usuariosService.NIVEL_SUPERADMIN,
     podeControlar: !!usuario.podeControlar,
-    podeAgendar: !!usuario.podeAgendar,
     timeoutInatividadeMinutos: configuracoesService.timeoutEfetivoParaUsuario(isAdmin),
     popupAvisoSegundos: config.popupAvisoSegundos,
   });
