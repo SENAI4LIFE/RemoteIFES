@@ -10,9 +10,26 @@ function criarSchema() {
       isAdmin INTEGER NOT NULL DEFAULT 0,
       nivel INTEGER NOT NULL DEFAULT 1,
       podeControlar INTEGER NOT NULL DEFAULT 1,
-      podeAgendar INTEGER NOT NULL DEFAULT 1,
       ativo INTEGER NOT NULL DEFAULT 1,
       criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS presets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL UNIQUE,
+      padrao INTEGER NOT NULL DEFAULT 0,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS preset_funcoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      presetId INTEGER NOT NULL REFERENCES presets(id) ON DELETE CASCADE,
+      chave TEXT NOT NULL,
+      rotulo TEXT NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'numero',
+      opcoes TEXT,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(presetId, chave)
     );
 
     CREATE TABLE IF NOT EXISTS salas (
@@ -25,6 +42,10 @@ function criarSchema() {
       temperatura REAL NOT NULL DEFAULT 24,
       temperaturaAlvo INTEGER NOT NULL DEFAULT 23,
       ipEsp32 TEXT,
+      mac TEXT,
+      presetId INTEGER REFERENCES presets(id),
+      latitude REAL,
+      longitude REAL,
       ultimoHeartbeat TEXT,
       atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -40,7 +61,7 @@ function criarSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sala TEXT NOT NULL REFERENCES salas(sala),
       usuarioId INTEGER NOT NULL REFERENCES usuarios(id),
-      diasSemana TEXT NOT NULL,
+      data TEXT NOT NULL,
       horaInicio TEXT NOT NULL,
       horaFim TEXT NOT NULL,
       temperatura INTEGER NOT NULL,
@@ -89,10 +110,13 @@ function criarSchema() {
       chave TEXT PRIMARY KEY,
       valor TEXT
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL;
   `);
 
   migrarColunasUsuarios();
   migrarColunasAgendamentos();
+  migrarColunasSalas();
 }
 
 function migrarColunasUsuarios() {
@@ -108,15 +132,44 @@ function migrarColunasUsuarios() {
       db.exec(`UPDATE usuarios SET senha = '' WHERE senha IS NOT NULL AND senha != ''`);
     }
   }
+  if (colunas.includes("podeAgendar")) {
+    try {
+      db.exec(`ALTER TABLE usuarios DROP COLUMN podeAgendar`);
+    } catch (erro) {}
+  }
 }
 
 function migrarColunasAgendamentos() {
   const colunas = db.prepare(`PRAGMA table_info(agendamentos)`).all().map((c) => c.name);
-  if (!colunas.includes("repeticao")) {
-    db.exec(`ALTER TABLE agendamentos ADD COLUMN repeticao TEXT NOT NULL DEFAULT 'semanal'`);
+  if (!colunas.includes("data")) {
+    db.exec(`ALTER TABLE agendamentos ADD COLUMN data TEXT`);
+    if (colunas.includes("dataUnica")) {
+      db.exec(`UPDATE agendamentos SET data = dataUnica WHERE dataUnica IS NOT NULL`);
+    }
+    db.exec(`DELETE FROM agendamentos WHERE data IS NULL`);
   }
-  if (!colunas.includes("dataUnica")) {
-    db.exec(`ALTER TABLE agendamentos ADD COLUMN dataUnica TEXT`);
+  for (const antiga of ["diasSemana", "repeticao", "dataUnica"]) {
+    if (colunas.includes(antiga)) {
+      try {
+        db.exec(`ALTER TABLE agendamentos DROP COLUMN ${antiga}`);
+      } catch (erro) {}
+    }
+  }
+}
+
+function migrarColunasSalas() {
+  const colunas = db.prepare(`PRAGMA table_info(salas)`).all().map((c) => c.name);
+  if (!colunas.includes("mac")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN mac TEXT`);
+  }
+  if (!colunas.includes("presetId")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN presetId INTEGER REFERENCES presets(id)`);
+  }
+  if (!colunas.includes("latitude")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN latitude REAL`);
+  }
+  if (!colunas.includes("longitude")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN longitude REAL`);
   }
 }
 

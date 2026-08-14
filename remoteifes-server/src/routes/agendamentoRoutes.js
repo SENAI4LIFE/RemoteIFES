@@ -1,15 +1,16 @@
 const express = require("express");
-const { exigirLogin, exigirPermissao } = require("../middlewares/auth");
+const { exigirLogin, exigirAdmin } = require("../middlewares/auth");
 const agendamentosService = require("../services/agendamentosService");
 
 const router = express.Router();
+router.use("/agendamentos", exigirLogin, exigirAdmin);
 
-router.get("/agendamentos", exigirLogin, (req, res) => {
+router.get("/agendamentos", (req, res) => {
   const { sala } = req.query;
   res.json(agendamentosService.listar({ sala }));
 });
 
-router.post("/agendamentos", exigirLogin, exigirPermissao("podeAgendar"), (req, res) => {
+router.post("/agendamentos", (req, res) => {
   try {
     const ag = agendamentosService.criar({ ...req.body, usuarioId: req.usuario.id });
     res.json({ ok: true, agendamento: ag });
@@ -27,7 +28,7 @@ function parseId(req, res) {
   return id;
 }
 
-router.patch("/agendamentos/:id", exigirLogin, (req, res) => {
+router.patch("/agendamentos/:id", (req, res) => {
   const id = parseId(req, res);
   if (id === null) return;
   try {
@@ -38,7 +39,7 @@ router.patch("/agendamentos/:id", exigirLogin, (req, res) => {
   }
 });
 
-router.delete("/agendamentos/:id", exigirLogin, (req, res) => {
+router.delete("/agendamentos/:id", (req, res) => {
   const id = parseId(req, res);
   if (id === null) return;
   try {

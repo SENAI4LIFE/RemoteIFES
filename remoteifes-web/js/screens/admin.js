@@ -24,7 +24,7 @@ const Admin = {
           <div class="room-sub">
             @${u.usuario}
             ${!u.ativo ? "· desativado" : ""}
-            ${!u.isAdmin ? `· controlar: ${u.podeControlar ? "sim" : "não"} · agendar: ${u.podeAgendar ? "sim" : "não"}` : ""}
+            ${!u.isAdmin ? `· controlar: ${u.podeControlar ? "sim" : "não"}` : ""}
           </div>
         </div>
         <div class="agenda-actions">
@@ -35,7 +35,6 @@ const Admin = {
           ${podeGerenciarAtivoAdmin ? `<button type="button" class="link-btn toggle-ativo-admin">${u.ativo ? "desativar" : "reativar"}</button>` : ""}
           ${!u.isAdmin ? `
             <button type="button" class="link-btn toggle-controlar">${u.podeControlar ? "revogar controle" : "conceder controle"}</button>
-            <button type="button" class="link-btn toggle-agendar">${u.podeAgendar ? "revogar agenda" : "conceder agenda"}</button>
             <button type="button" class="link-btn toggle-ativo">${u.ativo ? "desativar" : "reativar"}</button>
             <button type="button" class="link-btn danger remover-usuario">remover</button>
           ` : ""}
@@ -93,10 +92,6 @@ const Admin = {
       if (!u.isAdmin) {
         li.querySelector(".toggle-controlar").addEventListener("click", async () => {
           await Api.atualizarUsuario(u.id, { podeControlar: !u.podeControlar });
-          await this.carregarUsuarios();
-        });
-        li.querySelector(".toggle-agendar").addEventListener("click", async () => {
-          await Api.atualizarUsuario(u.id, { podeAgendar: !u.podeAgendar });
           await this.carregarUsuarios();
         });
         li.querySelector(".toggle-ativo").addEventListener("click", async () => {
@@ -248,6 +243,106 @@ const Admin = {
     document.getElementById("cfgAdminSujeitoTimeout").checked = !!cfg.adminSujeitoTimeout;
     document.getElementById("cfgPopupAviso").value = cfg.popupAvisoSegundos;
     document.getElementById("cfgLimiarOnline").value = cfg.limiarOnlineMinutos;
+
+    if (state.isSuperAdmin) {
+      document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
+      document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
+      document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
+      document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
+    }
+  },
+
+  async carregarMacs() {
+    const list = document.getElementById("macsList");
+    list.innerHTML = "";
+    const salas = await Api.listarSalasAdmin();
+    const presets = await Api.listarPresets();
+
+    salas.forEach((s) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="mac-row" style="width:100%">
+          <div class="room-name">${s.sala} — ${s.nome} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
+          <label>Endereço MAC do ESP32</label>
+          <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${s.mac || ""}" />
+          <label>Preset em uso</label>
+          <select class="preset-select">
+            <option value="">(nenhum — usa o padrão)</option>
+            ${presets.map((p) => `<option value="${p.id}" ${s.presetId === p.id ? "selected" : ""}>${p.nome}${p.padrao ? " (padrão)" : ""}</option>`).join("")}
+          </select>
+          <div class="two-col">
+            <button type="button" class="link-btn salvar-mac">salvar MAC</button>
+            ${s.ipEsp32 ? `<button type="button" class="link-btn acessar-esp32">acessar interface do ESP32</button>` : `<span class="hint">IP ainda não reportado</span>`}
+          </div>
+          <p class="error hidden mac-error"></p>
+        </div>
+      `;
+
+      li.querySelector(".salvar-mac").addEventListener("click", async () => {
+        const errorEl = li.querySelector(".mac-error");
+        errorEl.classList.add("hidden");
+        const mac = li.querySelector(".mac-input").value.trim();
+        const resp = await Api.cadastrarMac(s.sala, mac || null);
+        if (!resp.ok) {
+          errorEl.textContent = resp.erro || "não foi possível salvar o MAC";
+          errorEl.classList.remove("hidden");
+        }
+      });
+
+      li.querySelector(".preset-select").addEventListener("change", async (e) => {
+        const errorEl = li.querySelector(".mac-error");
+        errorEl.classList.add("hidden");
+        const presetId = e.target.value ? Number(e.target.value) : null;
+        const resp = await Api.definirPresetDaSala(s.sala, presetId);
+        if (!resp.ok) {
+          errorEl.textContent = resp.erro || "não foi possível definir o preset";
+          errorEl.classList.remove("hidden");
+        }
+      });
+
+      const acessarBtn = li.querySelector(".acessar-esp32");
+      if (acessarBtn) {
+        acessarBtn.addEventListener("click", async () => {
+          const resp = await Api.acessarEsp32(s.sala);
+          if (!resp.ok) {
+            alert(resp.erro || "não foi possível obter o endereço do ESP32");
+            return;
+          }
+          window.open(resp.url, "_blank", "noopener");
+        });
+      }
+
+      list.appendChild(li);
+    });
+  },
+
+  async carregarPresets() {
+    const list = document.getElementById("presetsList");
+    list.innerHTML = "";
+    const presets = await Api.listarPresets();
+
+    presets.forEach((p) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div>
+          <div class="room-name">${p.nome} ${p.padrao ? "· padrão" : ""}</div>
+          <div class="room-sub">
+            ${p.funcoes.map((f) => `<span class="preset-funcao-tag">${f.rotulo}</span>`).join("") || "sem funções cadastradas"}
+          </div>
+        </div>
+        ${!p.padrao ? `<button type="button" class="link-btn danger remover-preset">remover</button>` : ""}
+      `;
+      const removerBtn = li.querySelector(".remover-preset");
+      if (removerBtn) {
+        removerBtn.addEventListener("click", async () => {
+          if (!confirm(`Remover o preset "${p.nome}"? As salas que o utilizam voltarão ao preset padrão.`)) return;
+          const resp = await Api.removerPreset(p.id);
+          if (!resp.ok) alert(resp.erro || "não foi possível remover o preset");
+          await Admin.carregarPresets();
+        });
+      }
+      list.appendChild(li);
+    });
   },
 };
 
@@ -260,7 +355,6 @@ document.getElementById("criarUsuarioBtn").addEventListener("click", async () =>
     nome: document.getElementById("novoUsuarioNome").value.trim(),
     senha: document.getElementById("novoUsuarioSenha").value,
     podeControlar: document.getElementById("novoUsuarioControlar").checked,
-    podeAgendar: document.getElementById("novoUsuarioAgendar").checked,
     isAdmin: state.isSuperAdmin && document.getElementById("novoUsuarioAdmin").checked,
   };
 
@@ -304,6 +398,8 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "dispositivos") await Admin.carregarDispositivos();
     if (sub === "acessos") await Admin.carregarAcessos();
     if (sub === "mapa") await Admin.carregarMapa();
+    if (sub === "macs") await Admin.carregarMacs();
+    if (sub === "presets") await Admin.carregarPresets();
     if (sub === "config") await Admin.carregarConfiguracoes();
   });
 });
@@ -322,6 +418,16 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     limiarOnlineMinutos: Number(document.getElementById("cfgLimiarOnline").value),
   };
 
+  if (state.isSuperAdmin) {
+    dados.temperaturaMinima = Number(document.getElementById("cfgTemperaturaMinima").value);
+    dados.temperaturaMaxima = Number(document.getElementById("cfgTemperaturaMaxima").value);
+    dados.modoTeste = document.getElementById("cfgModoTeste").checked;
+    dados.redesAutorizadas = document.getElementById("cfgRedesAutorizadas").value
+      .split("\n")
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+
   const resp = await Api.atualizarConfiguracoes(dados);
   if (!resp.ok) {
     errorEl.textContent = resp.erro || "não foi possível salvar as configurações";
@@ -335,6 +441,25 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     ? null
     : resp.configuracoes.timeoutInatividadeMinutos;
   IdleTimer.iniciar(timeoutEfetivo, resp.configuracoes.popupAvisoSegundos);
+});
+
+document.getElementById("criarPresetBtn").addEventListener("click", async () => {
+  const errorEl = document.getElementById("presetError");
+  errorEl.classList.add("hidden");
+  const nome = document.getElementById("novoPresetNome").value.trim();
+  if (!nome) {
+    errorEl.textContent = "informe o nome do preset";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  const resp = await Api.criarPreset(nome);
+  if (!resp.ok) {
+    errorEl.textContent = resp.erro || "não foi possível criar o preset";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  document.getElementById("novoPresetNome").value = "";
+  await Admin.carregarPresets();
 });
 
 document.getElementById("sessoesFiltroData").addEventListener("change", (e) => {

@@ -1,5 +1,5 @@
-const DIAS_ORDEM = [1, 2, 3, 4, 5, 6, 0];
 const gradeSalaSelect = document.getElementById("gradeSala");
+const gradeDataInput = document.getElementById("gradeData");
 
 const PERIODOS = [
   { inicio: "07:00", fim: "07:50" },
@@ -22,6 +22,11 @@ function periodoCoberto(periodo, inicio, fim) {
   return periodo.inicio >= inicio && periodo.inicio < fim;
 }
 
+function hojeISO() {
+  const agora = new Date();
+  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
+}
+
 const Grade = {
   async aoAbrir() {
     if (gradeSalaSelect.dataset.carregado !== "1") {
@@ -31,36 +36,30 @@ const Grade = {
         .join("");
       gradeSalaSelect.dataset.carregado = "1";
     }
+    if (!gradeDataInput.value) gradeDataInput.value = hojeISO();
     await this.renderizar();
   },
 
   async renderizar() {
     const sala = gradeSalaSelect.value;
-    if (!sala) return;
+    const data = gradeDataInput.value;
+    if (!sala || !data) return;
 
-    const agendamentos = (await Api.listarAgendamentos(sala)).filter((a) => a.ativo);
+    const agendamentos = (await Api.listarAgendamentos(sala)).filter((a) => a.ativo && a.data === data);
     const tabela = document.getElementById("gradeTabela");
 
-    let html = "<thead><tr><th>Horário</th>";
-    DIAS_ORDEM.forEach((d) => (html += `<th>${DIA_NOME[d]}</th>`));
-    html += "</tr></thead><tbody>";
+    let html = `<thead><tr><th>Horário</th><th>${data.split("-").reverse().join("/")}</th></tr></thead><tbody>`;
 
     PERIODOS.forEach((periodo) => {
-      html += `<tr><td class="grade-hora">${periodo.inicio}–${periodo.fim}</td>`;
-      DIAS_ORDEM.forEach((dia) => {
-        const ag = agendamentos.find(
-          (a) => a.diasSemana.includes(dia) && periodoCoberto(periodo, a.horaInicio, a.horaFim)
-        );
-        if (!ag) {
-          html += `<td class="grade-cell grade-cell-desligado"></td>`;
-          return;
-        }
-        const ligando = ag.modo === "ligar_completo"
-          || (ag.modo === "ligar_intervalo" && periodoCoberto(periodo, ag.ligarInicio, ag.ligarFim));
-        const classe = ligando ? "grade-cell grade-cell-ligado" : "grade-cell grade-cell-agendado";
-        html += `<td class="${classe}" title="${ag.usuarioNome} · ${ag.horaInicio}–${ag.horaFim}">${ag.usuarioNome}</td>`;
-      });
-      html += "</tr>";
+      const ag = agendamentos.find((a) => periodoCoberto(periodo, a.horaInicio, a.horaFim));
+      if (!ag) {
+        html += `<tr><td class="grade-hora">${periodo.inicio}–${periodo.fim}</td><td class="grade-cell grade-cell-desligado"></td></tr>`;
+        return;
+      }
+      const ligando = ag.modo === "ligar_completo"
+        || (ag.modo === "ligar_intervalo" && periodoCoberto(periodo, ag.ligarInicio, ag.ligarFim));
+      const classe = ligando ? "grade-cell grade-cell-ligado" : "grade-cell grade-cell-agendado";
+      html += `<tr><td class="grade-hora">${periodo.inicio}–${periodo.fim}</td><td class="${classe}" title="${ag.usuarioNome} · ${ag.horaInicio}–${ag.horaFim}">${ag.usuarioNome}</td></tr>`;
     });
 
     html += "</tbody>";
@@ -69,3 +68,4 @@ const Grade = {
 };
 
 gradeSalaSelect.addEventListener("change", () => Grade.renderizar());
+gradeDataInput.addEventListener("change", () => Grade.renderizar());

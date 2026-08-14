@@ -1,9 +1,10 @@
 const express = require("express");
-const { exigirLogin, exigirAdmin } = require("../middlewares/auth");
+const { exigirLogin, exigirAdmin, exigirSuperAdmin } = require("../middlewares/auth");
 const usuariosService = require("../services/usuariosService");
 const salasService = require("../services/salasService");
 const tokenService = require("../services/tokenService");
 const configuracoesService = require("../services/configuracoesService");
+const presetsService = require("../services/presetsService");
 
 const router = express.Router();
 router.use("/admin", exigirLogin, exigirAdmin);
@@ -23,11 +24,11 @@ router.get("/admin/usuarios", (req, res) => {
 
 router.post("/admin/usuarios", (req, res) => {
   try {
-    const { usuario, senha, nome, podeControlar, podeAgendar, isAdmin } = req.body;
+    const { usuario, senha, nome, podeControlar, isAdmin } = req.body;
     if (!usuario || !senha || !nome) {
       return res.status(400).json({ ok: false, erro: "usuário, senha e nome são obrigatórios" });
     }
-    const novo = usuariosService.criar({ usuario, senha, nome, podeControlar, podeAgendar, isAdmin }, req.usuario);
+    const novo = usuariosService.criar({ usuario, senha, nome, podeControlar, isAdmin }, req.usuario);
     res.json({ ok: true, usuario: novo });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
@@ -147,14 +148,107 @@ router.delete("/admin/acessos", (req, res) => {
   res.json({ ok: true });
 });
 
+router.get("/admin/salas", (req, res) => {
+  const salas = salasService.listar();
+  res.json(
+    salas.map((s) => ({
+      sala: s.sala,
+      nome: s.nome,
+      bloco: s.bloco,
+      andar: s.andar,
+      online: !!s.online,
+      ligado: !!s.ligado,
+      ipEsp32: s.ipEsp32,
+      mac: s.mac,
+      presetId: s.presetId,
+    }))
+  );
+});
+
 router.get("/admin/configuracoes", (req, res) => {
   res.json({ ok: true, configuracoes: configuracoesService.obter() });
 });
 
 router.patch("/admin/configuracoes", (req, res) => {
   try {
-    const configuracoes = configuracoesService.validarEAtualizar(req.body || {});
+    const configuracoes = configuracoesService.validarEAtualizar(req.body || {}, req.usuario);
     res.json({ ok: true, configuracoes });
+  } catch (err) {
+    res.status(err.permissao ? 403 : 400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.patch("/admin/salas/:sala/mac", exigirSuperAdmin, (req, res) => {
+  try {
+    const sala = salasService.cadastrarMac(req.params.sala, req.body.mac);
+    res.json({ ok: true, sala });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.patch("/admin/salas/:sala/preset", exigirSuperAdmin, (req, res) => {
+  try {
+    const sala = salasService.definirPreset(req.params.sala, req.body.presetId);
+    res.json({ ok: true, sala });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.get("/admin/salas/:sala/acessar-esp32", exigirSuperAdmin, (req, res) => {
+  const sala = salasService.buscar(req.params.sala);
+  if (!sala) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
+  if (!sala.ipEsp32) {
+    return res.status(404).json({ ok: false, erro: "esta sala ainda não reportou um IP de ESP32" });
+  }
+  res.json({ ok: true, sala: sala.sala, ip: sala.ipEsp32, url: `http://${sala.ipEsp32}/` });
+});
+
+router.get("/admin/presets", (req, res) => {
+  res.json(presetsService.listar());
+});
+
+router.post("/admin/presets", exigirSuperAdmin, (req, res) => {
+  try {
+    const preset = presetsService.criar(req.body || {});
+    res.json({ ok: true, preset });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.delete("/admin/presets/:id", exigirSuperAdmin, (req, res) => {
+  try {
+    presetsService.remover(Number(req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.post("/admin/presets/:id/funcoes", exigirSuperAdmin, (req, res) => {
+  try {
+    const preset = presetsService.adicionarFuncao(Number(req.params.id), req.body || {});
+    res.json({ ok: true, preset });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.patch("/admin/presets/funcoes/:funcaoId", exigirSuperAdmin, (req, res) => {
+  try {
+    const preset = presetsService.atualizarFuncao(Number(req.params.funcaoId), req.body || {});
+    res.json({ ok: true, preset });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.delete("/admin/presets/funcoes/:funcaoId", exigirSuperAdmin, (req, res) => {
+  try {
+    const preset = presetsService.removerFuncao(Number(req.params.funcaoId));
+    res.json({ ok: true, preset });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
   }

@@ -25,6 +25,7 @@ const unsigned long SERVER_HEARTBEAT_INTERVAL = 7000;
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
 const char SERVER_ACESSO_PATH[] = "/dispositivo/acesso";
 const char SERVER_COMANDO_PATH[] = "/dispositivo/comando";
+const char SERVER_PRESET_PATH[] = "/dispositivo/preset";
 
 enum DeviceMode {
   MODE_OPERATION = 0,
@@ -60,14 +61,18 @@ void handleRoot();
 void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
 void handleIRCapture();
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency);
-void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo);
+void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing);
 void readSensorsAndBroadcast();
 bool sendHttpPost(const String& url, const String& payload);
 void sendHeartbeat();
 void reportAccess(const String& ip, const String& userAgent);
 void reportComando(const String& cmd, const String& valor);
+void requestAssignedPreset();
+void savePresetToServer(const String& nome, const String& funcoesSpec);
+String buildFuncoesJsonFromSpec(const String& funcoesSpec);
 String buildRawArrayJson(const uint16_t* rawArray, uint16_t length);
 bool configuracaoValida();
+bool jsonBoolAt(const String& msg, int keyIdx);
 
 void setup() {
   Serial.begin(115200);
@@ -117,6 +122,7 @@ void setup() {
     server.begin();
     webSocket.begin();
     webSocket.onEvent(handleWebSocketEvent);
+    requestAssignedPreset();
   }
 }
 
@@ -282,17 +288,48 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
         int tempIdx = msg.indexOf("\"temp\":");
         int powerIdx = msg.indexOf("\"power\":");
         int turboIdx = msg.indexOf("\"turbo\":");
+        int fanIdx = msg.indexOf("\"fan\":\"");
+        int swingIdx = msg.indexOf("\"swing\":");
 
         if (protoIdx != -1 && tempIdx != -1) {
           int protocolNum = msg.substring(protoIdx + 11, msg.indexOf(",", protoIdx)).toInt();
           float temp = msg.substring(tempIdx + 7, msg.indexOf(",", tempIdx)).toFloat();
-          bool power = msg.indexOf("true", powerIdx) != -1;
-          bool turbo = msg.indexOf("true", turboIdx) != -1;
+          bool power = jsonBoolAt(msg, powerIdx);
+          bool turbo = turboIdx != -1 && jsonBoolAt(msg, turboIdx);
+          bool temSwing = swingIdx != -1 && jsonBoolAt(msg, swingIdx);
 
-          sendKnownACState((decode_type_t)protocolNum, temp, power, turbo);
+          String fan = "";
+          if (fanIdx != -1) {
+            int fanValStart = fanIdx + 7;
+            int fanValEnd = msg.indexOf("\"", fanValStart);
+            if (fanValEnd != -1) fan = msg.substring(fanValStart, fanValEnd);
+          }
+
+          sendKnownACState((decode_type_t)protocolNum, temp, power, turbo, fan, temSwing);
           lastKnownPower = power;
-          reportComando("controle_nativo", "protocolo=" + String(protocolNum) + ";temp=" + String(temp, 1) + ";power=" + String(power ? "on" : "off") + ";turbo=" + String(turbo ? "on" : "off"));
+          reportComando("controle_nativo", "protocolo=" + String(protocolNum) + ";temp=" + String(temp, 1) + ";power=" + String(power ? "on" : "off") + ";turbo=" + String(turbo ? "on" : "off") + (fan.length() ? (";fan=" + fan) : ""));
           if (isCapturing) irrecv.enableIRIn();
+        }
+      }
+      else if (msg.indexOf("get_preset") >= 0) {
+        requestAssignedPreset();
+      }
+      else if (msg.indexOf("save_preset") >= 0) {
+        int nomeIdx = msg.indexOf("\"name\":\"");
+        int funcoesIdx = msg.indexOf("\"funcoes\":\"");
+        if (nomeIdx != -1) {
+          int nomeStart = nomeIdx + 8;
+          int nomeEnd = msg.indexOf("\"", nomeStart);
+          String nome = msg.substring(nomeStart, nomeEnd);
+
+          String funcoesSpec = "";
+          if (funcoesIdx != -1) {
+            int funcoesStart = funcoesIdx + 11;
+            int funcoesEnd = msg.indexOf("\"", funcoesStart);
+            funcoesSpec = msg.substring(funcoesStart, funcoesEnd);
+          }
+
+          savePresetToServer(nome, funcoesSpec);
         }
       }
       else if (msg.indexOf("reset_wifi") >= 0) {
@@ -346,14 +383,22 @@ void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency) {
   irsend.sendRaw(rawData, length, frequency);
 }
 
-void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo) {
+void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing) {
   if (!universalAC.isProtocolSupported(protocol)) return;
   universalAC.next.protocol = protocol;
   universalAC.next.power = power;
   universalAC.next.degrees = temp;
   universalAC.next.mode = stdAc::opmode_t::kCool;
-  universalAC.next.fanspeed = turbo ? stdAc::fanspeed_t::kMax : stdAc::fanspeed_t::kAuto;
   universalAC.next.turbo = turbo;
+
+  if (fan == "low") universalAC.next.fanspeed = stdAc::fanspeed_t::kLow;
+  else if (fan == "medio") universalAC.next.fanspeed = stdAc::fanspeed_t::kMedium;
+  else if (fan == "alto") universalAC.next.fanspeed = stdAc::fanspeed_t::kHigh;
+  else if (fan == "max" || turbo) universalAC.next.fanspeed = stdAc::fanspeed_t::kMax;
+  else universalAC.next.fanspeed = stdAc::fanspeed_t::kAuto;
+
+  universalAC.next.swingv = swing ? stdAc::swingv_t::kAuto : stdAc::swingv_t::kOff;
+
   universalAC.sendAc();
 }
 
@@ -402,6 +447,20 @@ String jsonEscape(const String& valor) {
   return escaped;
 }
 
+bool jsonBoolAt(const String& msg, int keyIdx) {
+  if (keyIdx == -1) return false;
+  int colonIdx = msg.indexOf(":", keyIdx);
+  if (colonIdx == -1) return false;
+  int commaIdx = msg.indexOf(",", colonIdx);
+  int braceIdx = msg.indexOf("}", colonIdx);
+  int endIdx;
+  if (commaIdx == -1) endIdx = braceIdx;
+  else if (braceIdx == -1) endIdx = commaIdx;
+  else endIdx = min(commaIdx, braceIdx);
+  if (endIdx == -1) endIdx = msg.length();
+  return msg.substring(colonIdx, endIdx).indexOf("true") != -1;
+}
+
 void sendHeartbeat() {
   if (!configuracaoValida()) return;
 
@@ -412,6 +471,8 @@ void sendHeartbeat() {
   if (!isnan(temp)) {
     payload += ",\"temperatura\":" + String(temp, 1);
   }
+  payload += ",\"mac\":\"" + WiFi.macAddress() + "\"";
+  payload += ",\"ip\":\"" + WiFi.localIP().toString() + "\"";
   payload += "}";
 
   String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_HEARTBEAT_PATH;
@@ -442,6 +503,71 @@ void reportComando(const String& cmd, const String& valor) {
 
   String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_COMANDO_PATH;
   sendHttpPost(url, payload);
+}
+
+String buildFuncoesJsonFromSpec(const String& funcoesSpec) {
+  String json = "[";
+  int fromIdx = 0;
+  bool first = true;
+  while (fromIdx <= (int)funcoesSpec.length()) {
+    int semiIdx = funcoesSpec.indexOf(";", fromIdx);
+    String entry = semiIdx == -1 ? funcoesSpec.substring(fromIdx) : funcoesSpec.substring(fromIdx, semiIdx);
+
+    if (entry.length() > 0) {
+      int pipe1 = entry.indexOf("|");
+      int pipe2 = entry.indexOf("|", pipe1 + 1);
+      if (pipe1 != -1 && pipe2 != -1) {
+        String chave = entry.substring(0, pipe1);
+        String rotulo = entry.substring(pipe1 + 1, pipe2);
+        String tipo = entry.substring(pipe2 + 1);
+
+        if (!first) json += ",";
+        json += "{\"chave\":\"" + jsonEscape(chave) + "\",\"rotulo\":\"" + jsonEscape(rotulo) + "\",\"tipo\":\"" + jsonEscape(tipo) + "\"}";
+        first = false;
+      }
+    }
+
+    if (semiIdx == -1) break;
+    fromIdx = semiIdx + 1;
+  }
+  json += "]";
+  return json;
+}
+
+void savePresetToServer(const String& nome, const String& funcoesSpec) {
+  if (!configuracaoValida()) return;
+
+  String payload = "{\"sala\":\"" + jsonEscape(salaId) + "\"";
+  payload += ",\"nome\":\"" + jsonEscape(nome) + "\"";
+  payload += ",\"funcoes\":" + buildFuncoesJsonFromSpec(funcoesSpec);
+  payload += "}";
+
+  String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_PRESET_PATH;
+  bool ok = sendHttpPost(url, payload);
+  webSocket.broadcastTXT("{\"type\":\"preset_saved\",\"ok\":" + String(ok ? "true" : "false") + "}");
+}
+
+bool sendHttpGet(const String& url, String& responseOut) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("x-device-token", deviceToken);
+  int statusCode = http.GET();
+  responseOut = http.getString();
+  http.end();
+
+  return statusCode >= 200 && statusCode < 300;
+}
+
+void requestAssignedPreset() {
+  if (!configuracaoValida()) return;
+
+  String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_PRESET_PATH + "?sala=" + salaId;
+  String response;
+  if (sendHttpGet(url, response)) {
+    webSocket.broadcastTXT("{\"type\":\"assigned_preset\",\"data\":" + response + "}");
+  }
 }
 
 String buildRawArrayJson(const uint16_t* rawArray, uint16_t length) {

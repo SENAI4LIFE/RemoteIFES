@@ -26,6 +26,15 @@ function exigirAdmin(req, res, next) {
   next();
 }
 
+const NIVEL_SUPERADMIN = 3;
+
+function exigirSuperAdmin(req, res, next) {
+  if (!req.usuario || req.usuario.nivel !== NIVEL_SUPERADMIN) {
+    return res.status(403).json({ ok: false, erro: "apenas o administrador principal" });
+  }
+  next();
+}
+
 function exigirPermissao(campo) {
   return (req, res, next) => {
     if (req.usuario.isAdmin || req.usuario[campo]) return next();
@@ -33,4 +42,4 @@ function exigirPermissao(campo) {
   };
 }
 
-module.exports = { exigirLogin, exigirAdmin, exigirPermissao };
+module.exports = { exigirLogin, exigirAdmin, exigirSuperAdmin, exigirPermissao };

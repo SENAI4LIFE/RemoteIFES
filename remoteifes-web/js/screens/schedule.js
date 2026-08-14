@@ -1,13 +1,3 @@
-const DIA_NOME = {
-  0: "Dom",
-  1: "Seg",
-  2: "Ter",
-  3: "Qua",
-  4: "Qui",
-  5: "Sex",
-  6: "Sáb",
-};
-
 const MODO_NOME = {
   reserva: "apenas reserva",
   ligar_completo: "liga no período todo",
@@ -16,10 +6,6 @@ const MODO_NOME = {
 
 const agendaSalaSelect = document.getElementById("agendaSala");
 const agendaIntervaloRow = document.getElementById("agendaIntervaloRow");
-const agendaDataUnicaRow = document.getElementById("agendaDataUnicaRow");
-const agendaDiasWrapper = document.getElementById("agendaDias");
-
-let agendaRepeticaoSelecionada = "semanal";
 
 const Schedule = {
   async aoAbrir() {
@@ -53,21 +39,18 @@ const Schedule = {
     empty.classList.add("hidden");
 
     agendamentos.forEach((a) => {
-      const dias = a.diasSemana.map((d) => DIA_NOME[d]).join(", ");
       const souDono = a.usuarioLogin === state.usuario;
       const podeGerenciar = souDono || state.isAdmin;
       const detalheModo = a.modo === "ligar_intervalo"
         ? `${MODO_NOME[a.modo]} (${a.ligarInicio}–${a.ligarFim})`
         : MODO_NOME[a.modo] || MODO_NOME.ligar_completo;
-      const detalheRepeticao = a.repeticao === "unica"
-        ? `somente em ${a.dataUnica ? a.dataUnica.split("-").reverse().join("/") : "?"}`
-        : "toda semana";
+      const dataFormatada = a.data.split("-").reverse().join("/");
 
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${a.sala} · ${a.horaInicio}–${a.horaFim}</div>
-          <div class="room-sub">${dias} · ${detalheRepeticao} · ${a.temperatura}°C · ${detalheModo} · por ${a.usuarioNome}${souDono ? " (você)" : ""}</div>
+          <div class="room-name">${a.sala} · ${dataFormatada} · ${a.horaInicio}–${a.horaFim}</div>
+          <div class="room-sub">${a.temperatura}°C · ${detalheModo} · por ${a.usuarioNome}${souDono ? " (você)" : ""}</div>
         </div>
         <div class="agenda-actions">
           ${podeGerenciar ? `<button type="button" class="link-btn agenda-toggle">${a.ativo ? "desativar" : "ativar"}</button>` : ""}
@@ -91,35 +74,9 @@ const Schedule = {
 
 agendaSalaSelect.addEventListener("change", () => Schedule.carregarAgendamentos());
 
-document.querySelectorAll("#agendaDias .choice-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const dia = Number(btn.dataset.dia);
-    const indice = state.agendaDiasSelecionados.indexOf(dia);
-    if (indice === -1) {
-      state.agendaDiasSelecionados.push(dia);
-      btn.classList.add("active");
-    } else {
-      state.agendaDiasSelecionados.splice(indice, 1);
-      btn.classList.remove("active");
-    }
-  });
-});
-
 document.querySelectorAll('input[name="agendaModo"]').forEach((radio) => {
   radio.addEventListener("change", () => {
     agendaIntervaloRow.classList.toggle("hidden", radio.value !== "ligar_intervalo" || !radio.checked);
-  });
-});
-
-document.querySelectorAll('[data-repeticao]').forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll('[data-repeticao]').forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    agendaRepeticaoSelecionada = btn.dataset.repeticao;
-
-    const ehUnica = agendaRepeticaoSelecionada === "unica";
-    agendaDataUnicaRow.classList.toggle("hidden", !ehUnica);
-    agendaDiasWrapper.classList.toggle("hidden", ehUnica);
   });
 });
 
@@ -128,33 +85,24 @@ document.getElementById("criarAgendaBtn").addEventListener("click", async () => 
   errorEl.classList.add("hidden");
 
   const modo = document.querySelector('input[name="agendaModo"]:checked').value;
+  const data = document.getElementById("agendaData").value;
+
+  if (!data) {
+    errorEl.textContent = "selecione a data do agendamento";
+    errorEl.classList.remove("hidden");
+    return;
+  }
 
   const dados = {
     sala: agendaSalaSelect.value,
+    data,
     horaInicio: document.getElementById("agendaHoraInicio").value,
     horaFim: document.getElementById("agendaHoraFim").value,
     temperatura: Number(document.getElementById("agendaTemperatura").value),
     modo,
     ligarInicio: modo === "ligar_intervalo" ? document.getElementById("agendaLigarInicio").value : undefined,
     ligarFim: modo === "ligar_intervalo" ? document.getElementById("agendaLigarFim").value : undefined,
-    repeticao: agendaRepeticaoSelecionada,
   };
-
-  if (agendaRepeticaoSelecionada === "unica") {
-    dados.dataUnica = document.getElementById("agendaDataUnica").value;
-    if (!dados.dataUnica) {
-      errorEl.textContent = "selecione a data do agendamento";
-      errorEl.classList.remove("hidden");
-      return;
-    }
-  } else {
-    dados.diasSemana = state.agendaDiasSelecionados;
-    if (dados.diasSemana.length === 0) {
-      errorEl.textContent = "selecione ao menos um dia da semana";
-      errorEl.classList.remove("hidden");
-      return;
-    }
-  }
 
   const resp = await Api.criarAgendamento(dados);
   if (!resp.ok) {
@@ -163,8 +111,6 @@ document.getElementById("criarAgendaBtn").addEventListener("click", async () => 
     return;
   }
 
-  document.querySelectorAll("#agendaDias .choice-btn").forEach((btn) => btn.classList.remove("active"));
-  state.agendaDiasSelecionados = [];
-  document.getElementById("agendaDataUnica").value = "";
+  document.getElementById("agendaData").value = "";
   await Schedule.carregarAgendamentos();
 });

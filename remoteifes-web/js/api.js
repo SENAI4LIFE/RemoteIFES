@@ -1,4 +1,4 @@
-const SERVER_URL = "http://localhost:8080";
+const SERVER_URL = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || "http://localhost:8080";
 const CHAVE_TOKEN = "remoteifes_token";
 
 let authToken = localStorage.getItem(CHAVE_TOKEN) || null;
@@ -207,5 +207,57 @@ const Api = {
       headers: headersComToken({ "Content-Type": "application/json" }),
       body: JSON.stringify(dados),
     });
+  },
+
+  async listarSalasAdmin() {
+    return chamar("/admin/salas", { headers: headersComToken() });
+  },
+
+  async cadastrarMac(sala, mac) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/mac`, {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ mac }),
+    });
+  },
+
+  async definirPresetDaSala(sala, presetId) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/preset`, {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ presetId }),
+    });
+  },
+
+  async acessarEsp32(sala) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/acessar-esp32`, { headers: headersComToken() });
+  },
+
+  async listarPresets() {
+    return chamar("/admin/presets", { headers: headersComToken() });
+  },
+
+  async criarPreset(nome) {
+    return chamar("/admin/presets", {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ nome }),
+    });
+  },
+
+  async removerPreset(id) {
+    return chamar(`/admin/presets/${id}`, { method: "DELETE", headers: headersComToken() });
+  },
+
+  async adicionarFuncaoPreset(presetId, dados) {
+    return chamar(`/admin/presets/${presetId}/funcoes`, {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify(dados),
+    });
+  },
+
+  async removerFuncaoPreset(funcaoId) {
+    return chamar(`/admin/presets/funcoes/${funcaoId}`, { method: "DELETE", headers: headersComToken() });
   },
 };

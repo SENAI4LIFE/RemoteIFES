@@ -38,12 +38,16 @@ function aplicarSessaoLogada(resp) {
   state.isSuperAdmin = resp.isSuperAdmin;
   state.nivel = resp.nivel;
   state.podeControlar = resp.podeControlar;
-  state.podeAgendar = resp.podeAgendar;
 
   document.getElementById("userTag").textContent = resp.isAdmin ? `${resp.nome} (admin)` : resp.nome;
   document.getElementById("userTag").classList.remove("hidden");
   document.getElementById("logoutBtn").classList.remove("hidden");
   document.getElementById("adminTabBtn").classList.toggle("hidden", !resp.isAdmin);
+  document.getElementById("agendaTabBtn").classList.toggle("hidden", !resp.isAdmin);
+  document.getElementById("gradeTabBtn").classList.toggle("hidden", !resp.isAdmin);
+  document.querySelectorAll(".superadmin-only").forEach((el) => {
+    el.classList.toggle("hidden", !resp.isSuperAdmin);
+  });
 
   document.getElementById("screen-login").classList.add("hidden");
   document.getElementById("mainApp").classList.remove("hidden");
@@ -96,7 +100,6 @@ function realizarLogout() {
   state.isSuperAdmin = false;
   state.nivel = 1;
   state.podeControlar = false;
-  state.podeAgendar = false;
   state.bloco = null;
   state.andar = null;
   state.salaAtual = null;
@@ -104,6 +107,9 @@ function realizarLogout() {
   document.getElementById("userTag").classList.add("hidden");
   document.getElementById("logoutBtn").classList.add("hidden");
   document.getElementById("adminTabBtn").classList.add("hidden");
+  document.getElementById("agendaTabBtn").classList.add("hidden");
+  document.getElementById("gradeTabBtn").classList.add("hidden");
+  document.querySelectorAll(".superadmin-only").forEach((el) => el.classList.add("hidden"));
   document.getElementById("mainApp").classList.add("hidden");
   document.getElementById("screen-login").classList.remove("hidden");
   document.getElementById("loginForm").reset();

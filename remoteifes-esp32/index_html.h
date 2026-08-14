@@ -315,6 +315,42 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
     </section>
 
+    <section id="screen-presets" class="screen tab-content hidden">
+      <div class="screen-head">
+        <h1>Presets</h1>
+        <p class="hint">Cadastre presets de ar-condicionado (funcoes configuraveis) e envie para o servidor central.</p>
+      </div>
+
+      <div class="card">
+        <h2>Preset atribuido a esta sala</h2>
+        <div class="data-box" id="assignedPresetBox">Carregando...</div>
+        <button type="button" class="btn" style="margin-top:10px;" onclick="requestAssignedPreset()">Atualizar</button>
+      </div>
+
+      <div class="card">
+        <h2>Cadastrar novo preset</h2>
+        <label for="presetNomeInput">Nome do preset</label>
+        <input type="text" id="presetNomeInput" placeholder="Ex: Padrao com ventilacao" />
+
+        <label for="presetFuncaoChave">Chave da funcao (letras/numeros/underscore)</label>
+        <input type="text" id="presetFuncaoChave" placeholder="Ex: velocidade" />
+        <label for="presetFuncaoRotulo">Rotulo exibido</label>
+        <input type="text" id="presetFuncaoRotulo" placeholder="Ex: Velocidade do ventilador" />
+        <label for="presetFuncaoTipo">Tipo</label>
+        <select id="presetFuncaoTipo">
+          <option value="numero">Numero</option>
+          <option value="booleano">Sim/Nao</option>
+          <option value="selecao">Selecao</option>
+        </select>
+        <button type="button" class="btn" onclick="addPresetFuncaoDraft()">Adicionar funcao ao preset</button>
+
+        <div id="presetFuncoesDraftList" style="margin-top:10px;"></div>
+
+        <button type="button" class="btn" style="margin-top:14px;" onclick="salvarPresetNoServidor()">Salvar preset no servidor</button>
+        <div class="data-box" id="presetSaveStatus" style="margin-top:8px;"></div>
+      </div>
+    </section>
+
   </main>
 
   <nav class="tabbar">
@@ -322,6 +358,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <button type="button" class="tab-btn" onclick="switchTab('screen-status', this)">Status</button>
     <button type="button" class="tab-btn" onclick="switchTab('screen-import', this)">Exportar JSON</button>
     <button type="button" class="tab-btn" onclick="switchTab('screen-remote', this)">Termostato</button>
+    <button type="button" class="tab-btn" onclick="switchTab('screen-presets', this)">Presets</button>
   </nav>
 
   <script>
@@ -334,6 +371,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const byId = (id) => document.getElementById(id);
 
     let activeState = { power: false, temp: 22, turbo: false };
+    let presetFuncoesDraft = [];
+    let presetAtribuido = null;
 
     const defaultProfile = () => ({
       profile_name: "Ar-Condicionado Sala",
@@ -374,6 +413,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       ws.onopen = () => {
         byId('wifiValue').innerText = 'Conectado';
         byId('statusBadge').className = 'status-badge online';
+        requestAssignedPreset();
       };
 
       ws.onclose = () => {
@@ -421,6 +461,17 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
             }
 
             handleCalibrationBranch(lastCapturedIsKnown, lastCapturedProtocol, lastCapturedProtocolId);
+          }
+
+          if (data.type === 'assigned_preset') {
+            presetAtribuido = data.data && data.data.preset ? data.data.preset : null;
+            renderAssignedPreset();
+          }
+
+          if (data.type === 'preset_saved') {
+            byId('presetSaveStatus').innerText = data.ok ? 'Preset salvo no servidor com sucesso.' : 'Falha ao salvar o preset no servidor.';
+            byId('presetSaveStatus').style.color = data.ok ? '#135d33' : '#b91c1c';
+            if (data.ok) requestAssignedPreset();
           }
         } catch (e) {
           console.error("Erro no WebSocket:", e);
@@ -533,7 +584,9 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
           protocol: currentProfile.protocol_id,
           temp: activeState.temp,
           power: activeState.power,
-          turbo: activeState.turbo
+          turbo: activeState.turbo,
+          fan: activeState.fan || "auto",
+          swing: !!activeState.swing
         };
         ws.send(JSON.stringify(payload));
       } else {
@@ -552,6 +605,65 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         } else {
           alert(`Sinal RAW para "${targetKey}" ainda nao foi gravado!`);
         }
+      }
+    }
+
+    function requestAssignedPreset() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "get_preset" }));
+      }
+    }
+
+    function renderAssignedPreset() {
+      const box = byId('assignedPresetBox');
+      if (!box) return;
+      if (!presetAtribuido) {
+        box.innerText = "Nenhum preset atribuido a esta sala ainda.";
+        return;
+      }
+      const funcoesTxt = (presetAtribuido.funcoes || []).map((f) => f.rotulo).join(", ") || "sem funcoes";
+      box.innerText = `${presetAtribuido.nome} — funcoes: ${funcoesTxt}`;
+    }
+
+    function addPresetFuncaoDraft() {
+      const chave = byId('presetFuncaoChave').value.trim();
+      const rotulo = byId('presetFuncaoRotulo').value.trim();
+      const tipo = byId('presetFuncaoTipo').value;
+      if (!chave || !rotulo) {
+        alert("Preencha a chave e o rotulo da funcao.");
+        return;
+      }
+      presetFuncoesDraft.push({ chave, rotulo, tipo });
+      byId('presetFuncaoChave').value = "";
+      byId('presetFuncaoRotulo').value = "";
+      renderPresetFuncoesDraft();
+    }
+
+    function renderPresetFuncoesDraft() {
+      const list = byId('presetFuncoesDraftList');
+      list.innerHTML = presetFuncoesDraft.map((f, i) =>
+        `<div class="data-box">${f.rotulo} (${f.chave} · ${f.tipo}) <button type="button" class="btn btn-off" style="width:auto; padding:4px 10px; margin:0 0 0 8px;" onclick="removerPresetFuncaoDraft(${i})">remover</button></div>`
+      ).join("");
+    }
+
+    function removerPresetFuncaoDraft(i) {
+      presetFuncoesDraft.splice(i, 1);
+      renderPresetFuncoesDraft();
+    }
+
+    function salvarPresetNoServidor() {
+      const nome = byId('presetNomeInput').value.trim();
+      if (!nome) {
+        alert("Informe o nome do preset.");
+        return;
+      }
+      if (presetFuncoesDraft.length === 0) {
+        alert("Adicione ao menos uma funcao ao preset.");
+        return;
+      }
+      const funcoesSpec = presetFuncoesDraft.map((f) => `${f.chave}|${f.rotulo}|${f.tipo}`).join(";");
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: "save_preset", name: nome, funcoes: funcoesSpec }));
       }
     }
 

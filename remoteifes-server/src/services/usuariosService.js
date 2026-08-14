@@ -15,7 +15,6 @@ function paraSaida(u) {
     isAdmin: u.nivel >= NIVEL_ADMIN,
     isSuperAdmin: u.nivel === NIVEL_SUPERADMIN,
     podeControlar: !!u.podeControlar,
-    podeAgendar: !!u.podeAgendar,
     ativo: !!u.ativo,
     criadoEm: u.criadoEm,
   };
@@ -33,7 +32,7 @@ function buscarPorId(id) {
   return db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(id);
 }
 
-function criar({ usuario, senha, nome, podeControlar, podeAgendar, isAdmin }, requisitante) {
+function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
   const existente = buscarPorUsuario(usuario);
   if (existente) throw new Error("já existe um usuário com esse login");
 
@@ -46,21 +45,21 @@ function criar({ usuario, senha, nome, podeControlar, podeAgendar, isAdmin }, re
   const nivel = isAdmin ? NIVEL_ADMIN : NIVEL_USUARIO;
   const senhaHash = bcrypt.hashSync(senha, 10);
   const info = db.prepare(`
-    INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, podeAgendar, ativo)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(usuario, senhaHash, nome, nivel >= NIVEL_ADMIN ? 1 : 0, nivel, podeControlar ? 1 : 0, podeAgendar ? 1 : 0);
+    INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
+    VALUES (?, ?, ?, ?, ?, ?, 1)
+  `).run(usuario, senhaHash, nome, nivel >= NIVEL_ADMIN ? 1 : 0, nivel, podeControlar ? 1 : 0);
 
   return paraSaida(buscarPorId(info.lastInsertRowid));
 }
 
-function atualizarPermissoes(id, { podeControlar, podeAgendar, ativo, isAdmin }, requisitante) {
+function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   if (usuario.nivel === NIVEL_SUPERADMIN) {
     throw new Error("não é possível alterar o nível do administrador principal");
   }
 
-  if (usuario.nivel === NIVEL_ADMIN && (ativo !== undefined || podeControlar !== undefined || podeAgendar !== undefined)) {
+  if (usuario.nivel === NIVEL_ADMIN && (ativo !== undefined || podeControlar !== undefined)) {
     if (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN) {
       throw new Error("apenas o administrador principal pode alterar outro administrador");
     }
@@ -85,14 +84,12 @@ function atualizarPermissoes(id, { podeControlar, podeAgendar, ativo, isAdmin },
   db.prepare(`
     UPDATE usuarios
     SET podeControlar = COALESCE(?, podeControlar),
-        podeAgendar = COALESCE(?, podeAgendar),
         ativo = COALESCE(?, ativo),
         nivel = ?,
         isAdmin = ?
     WHERE id = ?
   `).run(
     podeControlar === undefined ? null : (podeControlar ? 1 : 0),
-    podeAgendar === undefined ? null : (podeAgendar ? 1 : 0),
     ativo === undefined ? null : (ativo ? 1 : 0),
     novoNivel,
     novoNivel >= NIVEL_ADMIN ? 1 : 0,

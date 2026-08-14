@@ -50,6 +50,8 @@ async function refreshStatus() {
     aplicarAvisoOffline(!status.online && status.ligado);
 
     state.tempAlvo = status.temperaturaAlvo;
+    state.tempMinima = status.temperaturaMinima;
+    state.tempMaxima = status.temperaturaMaxima;
     document.getElementById("tempTarget").textContent = `${status.temperaturaAlvo}°C`;
 
     aplicarBloqueio(status);
@@ -80,7 +82,8 @@ document.getElementById("btnOff").addEventListener("click", async () => {
 });
 
 document.getElementById("tempUp").addEventListener("click", async () => {
-  const novoAlvo = Math.min(30, state.tempAlvo + 1);
+  const max = state.tempMaxima ?? 30;
+  const novoAlvo = Math.min(max, state.tempAlvo + 1);
   const resp = await Api.enviarComando(state.salaAtual, "temperatura", novoAlvo);
   if (resp.ok) {
     state.tempAlvo = novoAlvo;
@@ -89,7 +92,8 @@ document.getElementById("tempUp").addEventListener("click", async () => {
 });
 
 document.getElementById("tempDown").addEventListener("click", async () => {
-  const novoAlvo = Math.max(16, state.tempAlvo - 1);
+  const min = state.tempMinima ?? 16;
+  const novoAlvo = Math.max(min, state.tempAlvo - 1);
   const resp = await Api.enviarComando(state.salaAtual, "temperatura", novoAlvo);
   if (resp.ok) {
     state.tempAlvo = novoAlvo;
