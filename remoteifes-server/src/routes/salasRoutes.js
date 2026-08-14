@@ -25,6 +25,8 @@ router.get("/salas", exigirLogin, (req, res) => {
       online: !!s.online,
       ligado: !!s.ligado,
       agendadaAgora: !!agendadas[s.sala],
+      latitude: s.latitude,
+      longitude: s.longitude,
     }))
   );
 });

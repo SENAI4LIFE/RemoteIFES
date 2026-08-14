@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RemoteIFES</title>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 </head>
 <body>
 
@@ -69,6 +70,12 @@
         </div>
         <ul id="roomList" class="room-list"></ul>
         <p id="roomsEmpty" class="hint hidden">Nenhuma sala disponível no momento.</p>
+
+        <div class="card">
+          <h2>Mapa do campus</h2>
+          <p class="hint">Toque em um marcador para abrir o painel da sala.</p>
+          <div id="salasMapa" class="salas-mapa"></div>
+        </div>
       </section>
 
       <section id="screen-panel" class="screen hidden tab-content">
@@ -123,26 +130,8 @@
           <label for="agendaSala">Sala</label>
           <select id="agendaSala"></select>
 
-          <label>Dias da semana</label>
-          <div class="choice-row week-days" id="agendaDias">
-            <button type="button" class="choice-btn" data-dia="1">Seg</button>
-            <button type="button" class="choice-btn" data-dia="2">Ter</button>
-            <button type="button" class="choice-btn" data-dia="3">Qua</button>
-            <button type="button" class="choice-btn" data-dia="4">Qui</button>
-            <button type="button" class="choice-btn" data-dia="5">Sex</button>
-            <button type="button" class="choice-btn" data-dia="6">Sáb</button>
-            <button type="button" class="choice-btn" data-dia="0">Dom</button>
-          </div>
-
-          <label>Repetição</label>
-          <div class="repeticao-row">
-            <button type="button" class="choice-btn active" data-repeticao="semanal">Toda semana</button>
-            <button type="button" class="choice-btn" data-repeticao="unica">Só esta semana</button>
-          </div>
-          <div id="agendaDataUnicaRow" class="hidden">
-            <label for="agendaDataUnica">Nessa data</label>
-            <input type="date" id="agendaDataUnica" />
-          </div>
+          <label for="agendaData">Data (agendamento diário)</label>
+          <input type="date" id="agendaData" />
 
           <div class="two-col">
             <div>
@@ -184,11 +173,13 @@
 
       <section id="screen-grade" class="screen hidden tab-content">
         <div class="screen-head">
-          <h1>Grade semanal</h1>
+          <h1>Grade do dia</h1>
         </div>
         <div class="card">
           <label for="gradeSala">Sala</label>
           <select id="gradeSala"></select>
+          <label for="gradeData">Data</label>
+          <input type="date" id="gradeData" />
         </div>
         <div class="mapa-legenda grade-legenda">
           <span><i class="mapa-cell grade-cor-desligado"></i> desligado</span>
@@ -213,6 +204,8 @@
           <button type="button" class="admin-subtab-btn" data-sub="dispositivos">Dispositivos</button>
           <button type="button" class="admin-subtab-btn" data-sub="acessos">Acessos ESP32</button>
           <button type="button" class="admin-subtab-btn" data-sub="mapa">Mapa</button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs">ESP32 / MACs</button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets">Presets</button>
           <button type="button" class="admin-subtab-btn" data-sub="config">Configurações</button>
         </div>
 
@@ -227,9 +220,6 @@
             <input type="password" id="novoUsuarioSenha" />
             <label class="checkbox-label">
               <input type="checkbox" id="novoUsuarioControlar" checked /> Pode controlar salas
-            </label>
-            <label class="checkbox-label">
-              <input type="checkbox" id="novoUsuarioAgendar" checked /> Pode criar agendamentos
             </label>
             <label class="checkbox-label hidden" id="novoUsuarioAdminLabel">
               <input type="checkbox" id="novoUsuarioAdmin" /> Conceder permissão de administrador
@@ -299,6 +289,23 @@
           <div id="mapaGrid" class="mapa-grid"></div>
         </div>
 
+        <div id="adminSub-macs" class="admin-sub hidden">
+          <p class="hint">Cadastro dos ESP32 autorizados por sala (identificados por endereço MAC) e escolha do preset utilizado em cada sala. Apenas o administrador principal pode alterar.</p>
+          <ul id="macsList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-presets" class="admin-sub hidden">
+          <div class="card">
+            <h2>Novo preset</h2>
+            <label for="novoPresetNome">Nome</label>
+            <input type="text" id="novoPresetNome" />
+            <button type="button" id="criarPresetBtn" class="btn btn-on btn-block">Criar preset</button>
+            <p id="presetError" class="error hidden"></p>
+          </div>
+          <p class="hint">O preset padrão possui apenas a função de temperatura. Novas funções (velocidade, oscilação, modo turbo, etc.) são cadastradas diretamente pela própria ESP32, a partir da sala em que o dispositivo está instalado.</p>
+          <ul id="presetsList" class="room-list"></ul>
+        </div>
+
         <div id="adminSub-config" class="admin-sub hidden">
           <div class="card">
             <h2>Sessão por inatividade</h2>
@@ -326,6 +333,31 @@
             <input type="number" id="cfgLimiarOnline" min="1" value="5" />
           </div>
 
+          <div class="card superadmin-only hidden" id="cfgCriticoCard">
+            <h2>Configurações críticas (administrador principal)</h2>
+            <p class="hint">Estas opções alteram o comportamento global do sistema e só podem ser alteradas pelo administrador principal.</p>
+
+            <label>Limite de temperatura permitido</label>
+            <div class="two-col">
+              <div>
+                <label for="cfgTemperaturaMinima">Mínima (°C)</label>
+                <input type="number" id="cfgTemperaturaMinima" min="16" max="30" value="23" />
+              </div>
+              <div>
+                <label for="cfgTemperaturaMaxima">Máxima (°C)</label>
+                <input type="number" id="cfgTemperaturaMaxima" min="16" max="30" value="25" />
+              </div>
+            </div>
+
+            <label class="checkbox-label">
+              <input type="checkbox" id="cfgModoTeste" /> Modo de teste (permite acesso fora da rede do IFES)
+            </label>
+            <p class="hint">Em produção, o acesso é restrito à rede do IFES. Ative o modo de teste temporariamente para testar fora da rede institucional.</p>
+
+            <label for="cfgRedesAutorizadas">Redes autorizadas (uma por linha, formato CIDR, ex: 10.0.0.0/8)</label>
+            <textarea id="cfgRedesAutorizadas" rows="3" placeholder="10.0.0.0/8"></textarea>
+          </div>
+
           <button type="button" id="salvarConfigBtn" class="btn btn-on btn-block">Salvar configurações</button>
           <p id="configError" class="error hidden"></p>
           <p id="configSavedHint" class="config-saved-hint hidden">Configurações salvas.</p>
@@ -334,8 +366,8 @@
 
       <nav class="tabbar">
         <button type="button" class="tab-btn" data-tab="salas">Salas</button>
-        <button type="button" class="tab-btn" data-tab="agenda">Agendamentos</button>
-        <button type="button" class="tab-btn" data-tab="grade">Grade</button>
+        <button type="button" class="tab-btn hidden" data-tab="agenda" id="agendaTabBtn">Agendamentos</button>
+        <button type="button" class="tab-btn hidden" data-tab="grade" id="gradeTabBtn">Grade</button>
         <button type="button" class="tab-btn hidden" data-tab="admin" id="adminTabBtn">Admin</button>
       </nav>
 
@@ -356,7 +388,9 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="js/state.js"></script>
+  <script src="js/config.js"></script>
   <script src="js/tempo.js"></script>
   <script src="js/rooms-data.js"></script>
   <script src="js/api.js"></script>

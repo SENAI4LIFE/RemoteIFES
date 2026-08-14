@@ -1,5 +1,6 @@
 const db = require("../config/database");
-const { horaAtualBrasilia, diaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
+const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
+const configuracoesService = require("./configuracoesService");
 
 const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura"];
 const TIMEOUT_OFFLINE_MS = 90 * 1000;
@@ -27,9 +28,13 @@ function registrarEventoEsp(sala, status) {
   db.prepare(`INSERT INTO esp_eventos (sala, status) VALUES (?, ?)`).run(sala, status);
 }
 
-function marcarOnline(sala, estadoReportado = {}) {
+function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
+
+  if (salaRow.mac && mac && salaRow.mac.toLowerCase() !== String(mac).toLowerCase()) {
+    throw new Error("MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala");
+  }
 
   if (!salaRow.online) registrarEventoEsp(sala, "online");
 
@@ -42,14 +47,45 @@ function marcarOnline(sala, estadoReportado = {}) {
       ultimoHeartbeat = datetime('now'),
       atualizadoEm = datetime('now'),
       ligado = COALESCE(?, ligado),
-      temperatura = COALESCE(?, temperatura)
+      temperatura = COALESCE(?, temperatura),
+      ipEsp32 = COALESCE(?, ipEsp32)
     WHERE sala = ?
   `).run(
     temLigado ? (estadoReportado.ligado ? 1 : 0) : null,
     temTemperatura ? Number(estadoReportado.temperatura) : null,
+    ip || null,
     sala
   );
 
+  return buscar(sala);
+}
+
+function cadastrarMac(sala, mac) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+
+  const macLimpo = mac ? String(mac).trim().toUpperCase() : null;
+  if (macLimpo && !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(macLimpo)) {
+    throw new Error("MAC inválido (use o formato AA:BB:CC:DD:EE:FF)");
+  }
+
+  if (macLimpo) {
+    const emUso = db.prepare(`SELECT sala FROM salas WHERE mac = ? AND sala != ?`).get(macLimpo, sala);
+    if (emUso) throw new Error(`este MAC já está cadastrado para a sala ${emUso.sala}`);
+  }
+
+  db.prepare(`UPDATE salas SET mac = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(macLimpo, sala);
+  return buscar(sala);
+}
+
+function definirPreset(sala, presetId) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+
+  db.prepare(`UPDATE salas SET presetId = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(
+    presetId === null || presetId === undefined ? null : Number(presetId),
+    sala
+  );
   return buscar(sala);
 }
 
@@ -80,17 +116,11 @@ function listarEventosEsp({ sala, data } = {}) {
   return db.prepare(query).all(...params);
 }
 
-function agendamentoOcorreHoje(ag, dia, dataISO) {
-  if (ag.repeticao === "unica") {
-    return ag.dataUnica === dataISO;
-  }
-
-  const dias = JSON.parse(ag.diasSemana);
-  return dias.includes(dia);
+function agendamentoOcorreHoje(ag, dataISO) {
+  return ag.data === dataISO;
 }
 
 function bloqueioAtivo(sala) {
-  const dia = diaAtualBrasilia();
   const hora = horaAtualBrasilia();
   const dataISO = dataAtualBrasiliaISO();
 
@@ -102,7 +132,7 @@ function bloqueioAtivo(sala) {
   `).all(sala);
 
   for (const ag of agendamentos) {
-    if (!agendamentoOcorreHoje(ag, dia, dataISO)) continue;
+    if (!agendamentoOcorreHoje(ag, dataISO)) continue;
     if (hora >= ag.horaInicio && hora <= ag.horaFim) {
       return {
         agendamentoId: ag.id,
@@ -133,6 +163,8 @@ function statusCompleto(sala, requisitante) {
     ligado: !!salaRow.ligado,
     temperatura: salaRow.temperatura,
     temperaturaAlvo: salaRow.temperaturaAlvo,
+    temperaturaMinima: configuracoesService.limitesTemperatura().minima,
+    temperaturaMaxima: configuracoesService.limitesTemperatura().maxima,
     bloqueio: bloqueio
       ? {
           usuarioNome: bloqueio.usuarioNome,
@@ -173,8 +205,9 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
     db.prepare(`UPDATE salas SET ligado = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
   } else if (cmd === "temperatura") {
     const temp = Number(valor);
-    if (Number.isNaN(temp) || temp < 16 || temp > 30) {
-      throw new Error("temperatura deve estar entre 16 e 30");
+    const { minima, maxima } = configuracoesService.limitesTemperatura();
+    if (Number.isNaN(temp) || temp < minima || temp > maxima) {
+      throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
     }
     db.prepare(`UPDATE salas SET temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
   }
@@ -279,4 +312,6 @@ module.exports = {
   registrarAcessoEsp,
   listarAcessosEsp,
   apagarAcessosEsp,
+  cadastrarMac,
+  definirPreset,
 };
