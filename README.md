@@ -1,8 +1,26 @@
 # RemoteIFES
 
-Sistema de controle remoto de ar-condicionado para as salas do IFES, com painel web, agendamento diário, presets configuráveis por ESP32 e um servidor central em Node.js.
+Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web, agendamento diário, presets configuráveis por ESP32 e um servidor central em Node.js.
 
-## Arquitetura
+## Sumário
+
+- [Visão Geral](#visão-geral)
+- [Papéis e Permissões](#papéis-e-permissões)
+- [Agendamentos](#agendamentos)
+- [Presets de Ar-Condicionado](#presets-de-ar-condicionado)
+- [Restrição de Rede](#restrição-de-rede)
+- [Interface Web dos ESP32](#interface-web-dos-esp32)
+- [Requisitos](#requisitos)
+- [Instalação Rápida](#instalação-rápida)
+- [Instalação Detalhada](#instalação-detalhada)
+- [Configuração](#configuração)
+- [Deploy](#deploy)
+- [Domínio Próprio e HTTPS](#domínio-próprio-e-https)
+- [Uso da API do GitHub](#uso-da-api-do-github)
+- [Estrutura de Pastas](#estrutura-de-pastas)
+- [Solução de Problemas](#solução-de-problemas)
+
+## Visão Geral
 
 O projeto é dividido em três partes independentes:
 
@@ -12,13 +30,13 @@ remoteifes-server/   API central (Node.js + Express + SQLite), roda em um servid
 remoteifes-esp32/    Firmware Arduino/ESP32 instalado em cada sala, ao lado do ar-condicionado
 ```
 
-### Fluxo geral
+Fluxo geral:
 
 1. Cada sala possui um **ESP32** com receptor/emissor de infravermelho, conectado à rede Wi-Fi local. O ESP32 aprende o protocolo IR do ar-condicionado, envia comandos e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP, autenticado por um token de dispositivo (`DEVICE_TOKEN`).
 2. O **servidor central** (`remoteifes-server`) mantém o banco de dados (SQLite), a lógica de autenticação, permissões, agendamentos, presets e configurações globais. Ele expõe uma API REST usada tanto pelo frontend web quanto pelos ESP32.
 3. O **frontend** (`remoteifes-web`) é um site estático (sem framework de build) que fala com o servidor central via `fetch`. É hospedado no GitHub Pages e pode ser servido em um domínio próprio.
 
-### Papéis e permissões
+## Papéis e Permissões
 
 O sistema tem três níveis de usuário:
 
@@ -30,11 +48,11 @@ O sistema tem três níveis de usuário:
 
 Todas as permissões são impostas no backend (não apenas escondidas na interface): rotas administrativas exigem `exigirAdmin`, e as rotas/campos críticos exigem `exigirSuperAdmin`.
 
-### Agendamentos
+## Agendamentos
 
 Agendamentos são **diários**: cada agendamento vale para uma única data (sem recorrência semanal). Apenas administradores podem criar, listar e gerenciar agendamentos — usuários comuns não têm acesso a essa funcionalidade, nem na interface nem na API.
 
-### Presets de ar-condicionado
+## Presets de Ar-Condicionado
 
 Presets descrevem quais **funções** um ar-condicionado suporta (temperatura, velocidade do ventilador, oscilação, modo turbo, etc.). A estrutura é extensível: uma função é apenas uma linha na tabela `preset_funcoes` (chave, rótulo, tipo, opções), então novas funções não exigem alterar código — apenas cadastrar a função em um preset.
 
@@ -42,21 +60,44 @@ Presets descrevem quais **funções** um ar-condicionado suporta (temperatura, v
 - Novas funções são criadas e associadas a um preset diretamente pela interface web do próprio ESP32 (aba "Presets" na página local do dispositivo), que sincroniza a definição com o servidor central.
 - O administrador principal decide quais presets existem, edita/remove funções e escolhe qual preset cada sala/ESP32 utiliza (`Admin > ESP32 / MACs`).
 
-### Restrição de rede
+## Restrição de Rede
 
 Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas (rede do IFES), configuradas pelo administrador principal em CIDR (ex.: `10.0.0.0/8`). Existe um **modo de teste**, também configurável apenas pelo administrador principal, que permite acesso de fora da rede autorizada — útil durante testes e homologação. Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada.
 
-### Interface web dos ESP32
+## Interface Web dos ESP32
 
 Cada ESP32 expõe sua própria interface de configuração local (aprendizado de IR, calibração, presets). O administrador principal pode acessar essa interface a partir de uma subpágina própria em `Admin > ESP32 / MACs`, que mostra o IP mais recente reportado pelo dispositivo e abre a interface local em uma nova aba. Esse acesso é restrito ao administrador principal tanto na interface quanto no backend.
 
-## Instalação
+## Requisitos
 
-### Pré-requisitos
+### Software
 
 - Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental)
-- Um ESP32 com suporte a IR (biblioteca [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266)) para cada sala, com um sensor DHT opcional para leitura de temperatura
+- Arduino IDE ou PlatformIO, com suporte à placa ESP32, para compilar o firmware
+- Bibliotecas Arduino: [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266), `WebSockets` (Links2004) e, se for usar leitura de temperatura, `DHT sensor library`
+
+### Hardware
+
 - Um servidor (VM, Raspberry Pi, etc.) para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32
+- Um ESP32 com receptor/emissor infravermelho por sala, com um sensor DHT opcional para leitura de temperatura
+
+## Instalação Rápida
+
+```bash
+cd remoteifes-server
+npm run setup
+npm start
+```
+
+`npm run setup` instala as dependências, cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista) e gera automaticamente um `DEVICE_TOKEN` aleatório. O banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
+
+- 18 salas de exemplo (ajuste conforme a realidade do campus, ou insira as salas reais diretamente no banco)
+- Um usuário `admin` com senha aleatória impressa no console (ou definida via `SENHA_ADMIN_INICIAL` em `.env`)
+- O preset padrão, com a função de temperatura configurada entre 23 °C e 25 °C
+
+Rodar `npm run setup` novamente não sobrescreve um `.env` já existente.
+
+## Instalação Detalhada
 
 ### Servidor central
 
@@ -64,14 +105,10 @@ Cada ESP32 expõe sua própria interface de configuração local (aprendizado de
 cd remoteifes-server
 npm install
 cp .env.example .env
-# edite o .env conforme a seção "Configuração" abaixo
 npm start
 ```
 
-O servidor cria e popula o banco SQLite automaticamente na primeira execução (`remoteifes-server/data/`), incluindo:
-- 18 salas de exemplo (ajuste conforme a realidade do campus, ou insira as salas reais diretamente no banco)
-- Um usuário `admin` com senha aleatória impressa no console (ou definida via `SENHA_ADMIN_INICIAL`)
-- O preset padrão, com a função de temperatura configurada entre 23 °C e 25 °C
+Edite `.env` conforme a seção [Configuração](#configuração) antes de colocar o servidor em produção — em especial `DEVICE_TOKEN` (que `npm run setup` já gera automaticamente) e, quando `NODE_ENV=production`, `CORS_ORIGIN`.
 
 ### Frontend
 
@@ -79,7 +116,7 @@ O servidor cria e popula o banco SQLite automaticamente na primeira execução (
 
 ### Firmware ESP32
 
-Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com a placa ESP32 selecionada. Bibliotecas necessárias: `IRremoteESP8266`, `WebSockets` (Links2004), `DHT sensor library` (se usar sensor de temperatura). No primeiro boot, o ESP32 sobe um ponto de acesso Wi-Fi próprio para receber as credenciais da rede local e o endereço do servidor central; depois disso, ele se conecta normalmente à rede da sala.
+Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com a placa ESP32 selecionada e as bibliotecas listadas em [Requisitos](#requisitos) instaladas. No primeiro boot, o ESP32 sobe um ponto de acesso Wi-Fi próprio para receber as credenciais da rede local e o endereço do servidor central; depois disso, ele se conecta normalmente à rede da sala.
 
 ## Configuração
 
@@ -90,7 +127,7 @@ Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com 
 | `NODE_ENV` | `development` ou `production`. Em produção, ativa a restrição de rede e o CORS restrito |
 | `PORTA` | Porta HTTP do servidor (padrão 8080) |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` |
-| `DEVICE_TOKEN` | Token secreto usado pelos ESP32 para autenticar chamadas ao servidor (`x-device-token`) |
+| `DEVICE_TOKEN` | Token secreto usado pelos ESP32 para autenticar chamadas ao servidor (`x-device-token`); gerado automaticamente por `npm run setup` |
 | `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot |
 
 Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx/Caddy, ou um serviço com TLS gerenciado), já que os aparelhos móveis e o GitHub Pages exigem conteúdo servido por HTTPS.
@@ -132,7 +169,7 @@ O repositório inclui um workflow (`.github/workflows/deploy-pages.yml`) que pub
 2. Edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção.
 3. Faça o push — o workflow publica automaticamente.
 
-### Domínio próprio (custom domain)
+## Domínio Próprio e HTTPS
 
 Para servir o frontend em um domínio próprio via GitHub Pages:
 
@@ -147,17 +184,18 @@ Com o frontend e o servidor central ambos em HTTPS e domínios próprios, o sist
 
 Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita a hospedagem de código-fonte e à publicação estática do frontend via GitHub Pages, orquestrada pelo workflow de Actions (`actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`). Não é necessário nenhum token de API do GitHub além do `GITHUB_TOKEN` padrão que o Actions já injeta automaticamente no workflow para publicar o Pages.
 
-## Estrutura de pastas
+## Estrutura de Pastas
 
 ```
 remoteifes-server/
+  setup.sh        instalação e configuração automatizadas (dependências, .env, DEVICE_TOKEN)
   src/
     config/       conexão com o banco SQLite
     db/           schema e seed
     middlewares/  autenticação, permissões, restrição de rede
     routes/       rotas HTTP (login, salas, comandos, agendamentos, admin, dispositivo)
     services/     regras de negócio (usuários, salas, agendamentos, presets, configurações)
-    scheduler/     verificação periódica de agendamentos e timeouts
+    scheduler/    verificação periódica de agendamentos e timeouts
     utils/        funções auxiliares (data/hora, rate limiting, faixas de rede)
 
 remoteifes-web/
@@ -171,3 +209,11 @@ remoteifes-esp32/
   remoteifes_esp32.ino   firmware principal (Wi-Fi, IR, WebSocket, comunicação com o servidor)
   index_html.h            interface web local do dispositivo (aprendizado de IR, termostato, presets)
 ```
+
+## Solução de Problemas
+
+- **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
+- **ESP32 não aparece como online**: verifique se o `DEVICE_TOKEN` configurado no firmware é idêntico ao do `.env` do servidor, e se o ESP32 consegue alcançar o endereço/porta do servidor pela rede local.
+- **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / MACs`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
+- **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`.
+- **Frontend não fala com o servidor depois do deploy**: confirme `serverUrl` em `remoteifes-web/js/config.js` e se `CORS_ORIGIN` no servidor inclui o domínio do frontend publicado.
