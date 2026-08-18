@@ -229,7 +229,19 @@ const Admin = {
       const estado = !s.online ? "offline" : (s.ligado ? "online-ligado" : "online-desligado");
       div.className = `mapa-cell mapa-${estado}${s.agendadaAgora ? " mapa-reservada" : ""}`;
       div.title = `${s.sala} — ${s.online ? (s.ligado ? "online, ligado" : "online, desligado") : "offline (comando enviado pode ainda não ter sido confirmado pelo dispositivo)"}${s.agendadaAgora ? " · reservada agora" : ""}`;
-      div.textContent = s.sala;
+      // Salas combinadas (ex.: "B-105-B-106", dois códigos unidos por um traço) são exibidas
+      // em duas linhas, sem o traço do meio, em vez do texto corrido.
+      const combinada = s.sala.match(/^([A-Za-z]+-\d+[a-z]?)-([A-Za-z]+-\d+[a-z]?)$/);
+      if (combinada) {
+        div.classList.add("mapa-cell-dupla");
+        const l1 = document.createElement("span");
+        l1.textContent = combinada[1];
+        const l2 = document.createElement("span");
+        l2.textContent = combinada[2];
+        div.append(l1, l2);
+      } else {
+        div.textContent = s.sala;
+      }
       grid.appendChild(div);
     });
   },
@@ -403,17 +415,21 @@ const Admin = {
 
     detectados.forEach((d) => {
       const li = document.createElement("li");
+      li.className = "detectado-card";
       li.innerHTML = `
-        <div style="width:100%">
-          <div class="room-name">${d.mac}</div>
-          <div class="room-sub">IP: ${d.ip || "desconhecido"} · sala reportada: ${d.sala || "—"} · visto pela última vez: ${Tempo.formatarDataHora(d.ultimaDeteccao)}</div>
-          <div class="two-col" style="margin-top:8px">
-            <select class="vincular-sala-select">
-              <option value="">selecionar sala para vincular</option>
-              ${salas.map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`).join("")}
-            </select>
-            <button type="button" class="link-btn vincular-detectado">vincular</button>
-          </div>
+        <div class="detectado-card-head">
+          <span class="detectado-dot"></span>
+          <span class="room-name">${d.mac}</span>
+        </div>
+        <div class="room-sub">IP: ${d.ip || "desconhecido"}</div>
+        <div class="room-sub">Sala reportada: ${d.sala || "—"}</div>
+        <div class="room-sub">Visto por último: ${Tempo.formatarDataHora(d.ultimaDeteccao)}</div>
+        <select class="vincular-sala-select">
+          <option value="">selecionar sala para vincular</option>
+          ${salas.map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`).join("")}
+        </select>
+        <div class="detectado-card-actions">
+          <button type="button" class="link-btn vincular-detectado">vincular</button>
           <button type="button" class="link-btn danger remover-detectado">descartar</button>
         </div>
       `;
@@ -465,7 +481,7 @@ const Admin = {
     });
 
     Floorplan.create(container, tabsContainer, {
-      fitToWidth: false,
+      fitToWidth: true,
       onSelect: (sala) => {
         container.querySelectorAll(".room.selectable").forEach((el) => el.classList.remove("fp-admin-highlight"));
         const alvo = container.querySelector(`.room.selectable[data-sala="${sala}"]`);
@@ -687,4 +703,14 @@ document.getElementById("sessoesApagarTudo").addEventListener("click", async () 
   if (!confirm("Apagar TODO o histórico de sessões? Esta ação não pode ser desfeita.")) return;
   await Api.apagarHistoricoSessoes();
   await Admin.carregarSessoes(document.getElementById("sessoesFiltroData").value || undefined);
+});
+
+document.getElementById("macsHelpBtn").addEventListener("click", () => {
+  document.getElementById("macsHelpModal").classList.remove("hidden");
+});
+document.getElementById("macsHelpCloseBtn").addEventListener("click", () => {
+  document.getElementById("macsHelpModal").classList.add("hidden");
+});
+document.getElementById("macsHelpModal").addEventListener("click", (e) => {
+  if (e.target.id === "macsHelpModal") e.target.classList.add("hidden");
 });

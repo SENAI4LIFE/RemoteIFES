@@ -10,7 +10,7 @@
 
   function lerEscalaSalva() {
     const salvo = parseFloat(localStorage.getItem(CHAVE));
-    return Number.isFinite(salvo) ? salvo : 1;
+    return Number.isFinite(salvo) ? salvo : MIN;
   }
 
   function salvarEscala(escala) {
@@ -42,7 +42,7 @@
     decreaseBtn.addEventListener("click", () => ajustar(-PASSO));
     increaseBtn.addEventListener("click", () => ajustar(PASSO));
     resetBtn.addEventListener("click", () => {
-      escalaAtual = 1;
+      escalaAtual = MIN;
       aplicarEscala(escalaAtual);
       salvarEscala(escalaAtual);
     });
