@@ -571,7 +571,10 @@
         </div>
 
         <div id="adminSub-macs" class="admin-sub hidden">
-          <p class="hint">Cadastro dos ESP32 autorizados por sala (identificados por endereço MAC), escolha do preset e controle de acesso por sala. Apenas o administrador principal pode alterar MAC/preset.</p>
+          <p class="hint">
+            Cadastro de ESP32 por sala.
+            <button type="button" id="macsHelpBtn" class="help-icon-btn" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+          </p>
 
           <div class="card admin-fp-picker">
             <h2>Selecionar sala pela planta baixa</h2>
@@ -585,7 +588,7 @@
           <div class="card" id="detectadosCard">
             <h2>ESP32 detectados na rede</h2>
             <p class="hint">Dispositivos que já entraram em contato com o servidor mas ainda não estão vinculados a nenhuma sala cadastrada.</p>
-            <ul id="detectadosList" class="room-list"></ul>
+            <ul id="detectadosList" class="detectados-grid"></ul>
             <p id="detectadosEmpty" class="hint hidden">Nenhum ESP32 não vinculado detectado no momento.</p>
           </div>
 
@@ -701,6 +704,22 @@
       <div class="modal-actions">
         <button type="button" id="idleContinuarBtn" class="btn btn-on">Continuar conectado</button>
         <button type="button" id="idleSairBtn" class="btn btn-off">Sair agora</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="macsHelpModal" class="modal-overlay hidden">
+    <div class="modal-card help-modal-card">
+      <h2>Como usar: ESP32 / Salas</h2>
+      <ul class="help-list">
+        <li><strong>Detectados na rede</strong> — ESP32 que já entraram em contato com o servidor mas ainda não estão vinculados a nenhuma sala.</li>
+        <li><strong>Vincular à sala</strong> — associe um ESP32 (pelo endereço MAC) à sala onde ele está instalado.</li>
+        <li><strong>Preset</strong> — escolha qual conjunto de funções do ar-condicionado (temperatura, velocidade, modo etc.) a sala usa.</li>
+        <li><strong>Acesso por sala</strong> — defina quais usuários podem controlar cada sala.</li>
+        <li><strong>Permissão</strong> — apenas o administrador principal pode alterar o MAC ou o preset de uma sala.</li>
+      </ul>
+      <div class="modal-actions">
+        <button type="button" id="macsHelpCloseBtn" class="btn btn-on">Entendi</button>
       </div>
     </div>
   </div>
