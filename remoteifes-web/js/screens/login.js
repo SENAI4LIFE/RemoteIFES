@@ -143,6 +143,6 @@ window.addEventListener("app:sessao-expirada", () => {
   Api.logout();
   realizarLogout({ manterTela: true });
   const errorEl = document.getElementById("loginError");
-  errorEl.textContent = "sua sessão expirou por inatividade — entre novamente";
+  errorEl.textContent = "sua sessão expirou por inatividade: entre novamente";
   errorEl.classList.remove("hidden");
 });
