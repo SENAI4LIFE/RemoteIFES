@@ -12,7 +12,7 @@
   --warn: #8a6d1a;
   --warn-soft: #fbf3d9;
   --radius: 10px;
-  --a11y-zoom: 1;
+  --a11y-zoom: 0.85;
 }
 
 * { box-sizing: border-box; }
@@ -196,6 +196,35 @@ button.btn:disabled {
 
 .room-name { font-weight: 500; display: flex; align-items: center; gap: 8px; }
 .room-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+.detectados-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.detectado-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.detectado-card:hover { border-color: var(--ifes-green); }
+.detectado-card-head { display: flex; align-items: center; gap: 8px; }
+.detectado-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex-shrink: 0;
+}
+.detectado-card .vincular-sala-select { margin-top: 8px; font-size: 13px; }
+.detectado-card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
 
 .schedule-badge {
   font-size: 11px;
@@ -456,11 +485,14 @@ button.btn:disabled {
   font-size: 11px;
   font-weight: 600;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  line-height: 1.15;
   color: #fff;
   border: 2px solid transparent;
 }
+.mapa-cell-dupla { font-size: 9px; }
 .mapa-offline { background: #9aa39d; }
 .mapa-online-desligado { background: #3f7fbf; }
 .mapa-online-ligado { background: var(--ifes-green); }
@@ -549,6 +581,29 @@ button.btn:disabled {
 .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
 .modal-actions .btn { flex: 1; }
 
+.help-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--ifes-green);
+  background: var(--ifes-green-soft);
+  color: var(--ifes-green-dark);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.help-modal-card { max-width: 460px; text-align: left; }
+.help-list { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.help-list li { font-size: 13.5px; color: var(--text-muted); line-height: 1.4; }
+.help-list strong { color: var(--text); }
+
 .config-saved-hint {
   color: var(--ifes-green-dark);
   font-size: 13px;
@@ -558,6 +613,9 @@ button.btn:disabled {
 .floorplan-scope { font-family: Arial, Helvetica, sans-serif; color: #111; }
 .floorplan-scope h2 { font-size: 15px; margin: 0 0 10px 2px; color: var(--text); }
 .floorplan-scope .plan-wrap { overflow-x: auto; overflow-y: hidden; background: #fff; border: 1px solid #ccc; border-radius: var(--radius); padding: 10px; }
+/* Na tela "Plantas Baixas" o fitToWidth() sempre encolhe o mapa para caber na largura
+   disponível, então a planta completa já fica visível — o scroll horizontal é desnecessário. */
+#screen-floorplan .floorplan-scope .plan-wrap { overflow-x: hidden; }
 .floorplan-scope .plan { position: relative; }
 .floorplan-scope .room {
   position: absolute;
@@ -821,19 +879,28 @@ button.btn:disabled {
   #app:has(#screen-floorplan:not(.hidden)) { max-width: 940px; }
 }
 
+/* Largura fixa e única para TODAS as abas de Administração — evita que a barra lateral
+   ("Usuários", "Ativos" etc.) se desloque ao trocar de aba conforme o conteúdo da direita
+   muda de tamanho. O valor cobre até o conteúdo mais largo (o seletor de planta baixa em
+   "ESP32 / Salas"), então todas as abas têm espaço suficiente à direita. */
 #app:has(#screen-admin:not(.hidden)) { max-width: 720px; }
+
+@media (min-width: 940px) {
+  #app:has(#screen-admin:not(.hidden)) {
+    max-width: 940px;
+    margin-left: max(12px, calc((100vw - 940px) / 2 - 40px));
+    margin-right: auto;
+  }
+}
 
 .admin-fp-picker { margin-bottom: 16px; }
 .admin-fp-picker .fp-scale-outer {
-  max-height: 60vh;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y pinch-zoom;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 6px;
 }
-.admin-fp-picker .floorplan-scope .plan-wrap { overflow: visible; border: none; padding: 0; }
+.admin-fp-picker .floorplan-scope .plan-wrap { overflow: hidden; border: none; padding: 0; }
 .admin-fp-picker .floorplan-scope .room.selectable { cursor: pointer; }
 
 .a11y-widget {
