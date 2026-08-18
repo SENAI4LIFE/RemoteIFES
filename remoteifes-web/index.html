@@ -426,7 +426,7 @@
           <select id="agendaSala"></select>
 
           <label for="agendaData">Data (agendamento diário)</label>
-          <input type="date" id="agendaData" />
+          <input type="text" id="agendaData" readonly disabled />
 
           <div class="two-col">
             <div>
@@ -817,19 +817,21 @@
         </div>
       </div>
 
-      <div class="a11y-group">
-        <span class="a11y-panel-label">Fonte para dislexia</span>
-        <button type="button" id="a11yDyslexicToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
-      </div>
+      <div class="a11y-toggles-row">
+        <div class="a11y-group">
+          <span class="a11y-panel-label">Dislexia</span>
+          <button type="button" id="a11yDyslexicToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
+        </div>
 
-      <div class="a11y-group">
-        <span class="a11y-panel-label">Destaque de links</span>
-        <button type="button" id="a11yLinkHighlightToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
-      </div>
+        <div class="a11y-group">
+          <span class="a11y-panel-label">Links</span>
+          <button type="button" id="a11yLinkHighlightToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
+        </div>
 
-      <div class="a11y-group">
-        <span class="a11y-panel-label">Alto contraste</span>
-        <button type="button" id="a11yContrastToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
+        <div class="a11y-group">
+          <span class="a11y-panel-label">Contraste</span>
+          <button type="button" id="a11yContrastToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
+        </div>
       </div>
 
       <button type="button" id="a11yResetAllBtn" class="a11y-reset-all-btn">Redefinir tudo</button>

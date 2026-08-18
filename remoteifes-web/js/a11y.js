@@ -107,6 +107,8 @@
     function abrirPainel() {
       panel.classList.remove("hidden");
       toggleBtn.setAttribute("aria-expanded", "true");
+      const helpFabPanel = document.getElementById("helpFabPanel");
+      if (helpFabPanel) helpFabPanel.classList.add("hidden");
     }
 
     function fecharPainel() {
@@ -231,6 +233,8 @@
     if (helpFabToggle && helpFabPanel) {
       helpFabToggle.addEventListener("click", (e) => {
         e.stopPropagation();
+        const abrindo = helpFabPanel.classList.contains("hidden");
+        if (abrindo) fecharPainel();
         helpFabPanel.classList.toggle("hidden");
       });
       if (helpFabClose) {
