@@ -266,7 +266,10 @@ const Admin = {
 
   async carregarMacs() {
     const list = document.getElementById("macsList");
+    const searchInput = document.getElementById("macsSearchInput");
     list.innerHTML = "";
+    searchInput.value = "";
+    document.getElementById("macsListEmpty").classList.add("hidden");
     const salas = await Api.listarSalasAdmin();
     const presets = await Api.listarPresets();
     const usuarios = await Api.listarUsuarios();
@@ -400,6 +403,26 @@ const Admin = {
     this.carregarMacsFloorplan();
   },
 
+  filtrarMacsList(query) {
+    const normalizar = (texto) => texto
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+    const termo = normalizar(query);
+    const itens = document.querySelectorAll("#macsList > li");
+    let visiveis = 0;
+
+    itens.forEach((li) => {
+      const corresponde = termo === "" || normalizar(li.textContent).includes(termo);
+      li.classList.toggle("hidden", !corresponde);
+      if (corresponde) visiveis++;
+    });
+
+    document.getElementById("macsListEmpty").classList.toggle("hidden", visiveis !== 0 || termo === "");
+  },
+
   async carregarDetectados() {
     const list = document.getElementById("detectadosList");
     const empty = document.getElementById("detectadosEmpty");
@@ -486,6 +509,11 @@ const Admin = {
         container.querySelectorAll(".room.selectable").forEach((el) => el.classList.remove("fp-admin-highlight"));
         const alvo = container.querySelector(`.room.selectable[data-sala="${sala}"]`);
         if (alvo) alvo.classList.add("fp-admin-highlight");
+        const searchInput = document.getElementById("macsSearchInput");
+        if (searchInput.value !== "") {
+          searchInput.value = "";
+          this.filtrarMacsList("");
+        }
         const card = document.getElementById(`macCard-${sala}`);
         if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
       },
@@ -705,12 +733,6 @@ document.getElementById("sessoesApagarTudo").addEventListener("click", async () 
   await Admin.carregarSessoes(document.getElementById("sessoesFiltroData").value || undefined);
 });
 
-document.getElementById("macsHelpBtn").addEventListener("click", () => {
-  document.getElementById("macsHelpModal").classList.remove("hidden");
-});
-document.getElementById("macsHelpCloseBtn").addEventListener("click", () => {
-  document.getElementById("macsHelpModal").classList.add("hidden");
-});
-document.getElementById("macsHelpModal").addEventListener("click", (e) => {
-  if (e.target.id === "macsHelpModal") e.target.classList.add("hidden");
+document.getElementById("macsSearchInput").addEventListener("input", (e) => {
+  Admin.filtrarMacsList(e.target.value);
 });
