@@ -39,7 +39,7 @@
       </div>
       <div class="portal-footer">
         <img src="assets/ifes-logo.png" alt="Instituto Federal do Espírito Santo" />
-        <span>Instituto Federal do Espírito Santo — controle de ar-condicionado do campus.</span>
+        <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
       </div>
     </section>
 
@@ -375,7 +375,7 @@
         </div>
 
         <div id="lockBanner" class="lock-banner hidden"></div>
-        <p id="panelSomenteLeitura" class="device-warning hidden">Você tem apenas visualização desta sala — não possui permissão para controlá-la.</p>
+        <p id="panelSomenteLeitura" class="device-warning hidden">Você tem apenas visualização desta sala: não possui permissão para controlá-la.</p>
 
         <div class="card status-card">
           <div class="status-row">
@@ -408,7 +408,7 @@
 
         <p id="panelError" class="error hidden"></p>
         <p id="panelAvisoOffline" class="device-warning hidden">
-          O dispositivo está offline — o comando foi salvo, mas ainda não há confirmação de que o ESP32 o recebeu.
+          O dispositivo está offline: o comando foi salvo, mas ainda não há confirmação de que o ESP32 o recebeu.
         </p>
       </section>
 
@@ -678,7 +678,7 @@
                 <p class="config-list-desc">
                   Tempo de inatividade até deslogar automaticamente um usuário
                   (evita que o app fique aberto e "online" indefinidamente). Deixe em
-                  branco para indefinido — não desloga por tempo. Vale para todos os
+                  branco para indefinido: não desloga por tempo. Vale para todos os
                   usuários.
                 </p>
                 <div class="config-list-body">
@@ -688,7 +688,7 @@
                   <label class="checkbox-label">
                     <input type="checkbox" id="cfgAdminSujeitoTimeout" /> Aplicar este timer também para administradores
                   </label>
-                  <p class="hint">Desligado por padrão — administradores ficam isentos do timer de inatividade.</p>
+                  <p class="hint">Desligado por padrão: administradores ficam isentos do timer de inatividade.</p>
 
                   <label for="cfgPopupAviso">Aviso antes de deslogar (segundos)</label>
                   <input type="number" id="cfgPopupAviso" min="10" value="60" />
@@ -781,14 +781,70 @@
   </div>
 
   <div id="a11yWidget" class="a11y-widget">
-    <button type="button" id="a11yToggleBtn" class="a11y-toggle-btn" aria-label="Acessibilidade: ajustar tamanho do texto" title="Acessibilidade">A±</button>
-    <div id="a11yPanel" class="a11y-panel hidden">
-      <span class="a11y-panel-label">Tamanho do texto</span>
-      <div class="a11y-panel-row">
-        <button type="button" id="a11yDecreaseBtn" class="a11y-step-btn" aria-label="Diminuir tamanho do texto">A&minus;</button>
-        <button type="button" id="a11yResetBtn" class="a11y-step-btn a11y-reset-btn" aria-label="Tamanho padrão do texto">A</button>
-        <button type="button" id="a11yIncreaseBtn" class="a11y-step-btn" aria-label="Aumentar tamanho do texto">A+</button>
+    <button type="button" id="a11yToggleBtn" class="a11y-toggle-btn" aria-label="Abrir painel de acessibilidade" title="Acessibilidade">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 2a2.2 2.2 0 1 1 0 4.4A2.2 2.2 0 0 1 12 2Zm8.6 5.6-5.7 1.1v3l1.9 8.6-2 .5-1.7-7.4h-1.2L10.2 21l-2-.5 1.9-8.6v-3L4.4 7.6 3.9 5.7l7.4 1.5h1.4l7.4-1.5.5 1.9Z"/></svg>
+    </button>
+    <div id="a11yPanel" class="a11y-panel hidden" role="dialog" aria-label="Acessibilidade">
+      <div class="a11y-panel-header">
+        <span class="a11y-panel-title">Acessibilidade</span>
+        <button type="button" id="a11yCloseBtn" class="a11y-close-btn" aria-label="Fechar painel de acessibilidade">&times;</button>
       </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Tamanho do texto</span>
+        <div class="a11y-panel-row">
+          <button type="button" id="a11yFontDecreaseBtn" class="a11y-step-btn" aria-label="Diminuir tamanho do texto">A&minus;</button>
+          <button type="button" id="a11yFontResetBtn" class="a11y-step-btn a11y-reset-btn" aria-label="Tamanho padrão do texto">A</button>
+          <button type="button" id="a11yFontIncreaseBtn" class="a11y-step-btn" aria-label="Aumentar tamanho do texto">A+</button>
+        </div>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Espaçamento entre letras</span>
+        <div class="a11y-panel-row">
+          <button type="button" id="a11ySpacingDecreaseBtn" class="a11y-step-btn" aria-label="Diminuir espaçamento entre letras">&minus;</button>
+          <button type="button" id="a11ySpacingResetBtn" class="a11y-step-btn a11y-reset-btn" aria-label="Espaçamento padrão">Padrão</button>
+          <button type="button" id="a11ySpacingIncreaseBtn" class="a11y-step-btn" aria-label="Aumentar espaçamento entre letras">+</button>
+        </div>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Altura da linha</span>
+        <div class="a11y-panel-row">
+          <button type="button" id="a11yLineDecreaseBtn" class="a11y-step-btn" aria-label="Diminuir altura da linha">&minus;</button>
+          <button type="button" id="a11yLineResetBtn" class="a11y-step-btn a11y-reset-btn" aria-label="Altura de linha padrão">Padrão</button>
+          <button type="button" id="a11yLineIncreaseBtn" class="a11y-step-btn" aria-label="Aumentar altura da linha">+</button>
+        </div>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Fonte para dislexia</span>
+        <button type="button" id="a11yDyslexicToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Destaque de links</span>
+        <button type="button" id="a11yLinkHighlightToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Alto contraste</span>
+        <button type="button" id="a11yContrastToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
+      </div>
+
+      <button type="button" id="a11yResetAllBtn" class="a11y-reset-all-btn">Redefinir tudo</button>
+    </div>
+  </div>
+
+  <div id="helpFabWidget" class="help-fab-widget">
+    <button type="button" id="helpFabToggleBtn" class="help-fab-btn" aria-label="Abrir ajuda" title="Ajuda">?</button>
+    <div id="helpFabPanel" class="help-fab-panel hidden" role="dialog" aria-label="Ajuda">
+      <div class="a11y-panel-header">
+        <span class="a11y-panel-title">Precisa de ajuda?</span>
+        <button type="button" id="helpFabCloseBtn" class="a11y-close-btn" aria-label="Fechar ajuda">&times;</button>
+      </div>
+      <p class="help-fab-text">Toque no ícone <strong>?</strong> ao lado de cada título de tela para instruções específicas daquela página.</p>
+      <p class="help-fab-text">Dúvidas gerais sobre o RemoteIFES podem ser tratadas com a equipe responsável pelo sistema no seu campus.</p>
     </div>
   </div>
 

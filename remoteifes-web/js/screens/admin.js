@@ -29,6 +29,7 @@ const Admin = {
         </div>
         <div class="agenda-actions">
           ${podeVerOuTrocarSenha ? `<button type="button" class="link-btn trocar-senha">trocar senha</button>` : ""}
+          ${podeEditar ? `<button type="button" class="link-btn trocar-nome">trocar nome</button>` : ""}
           ${podeEditar ? `<button type="button" class="link-btn trocar-login">trocar login</button>` : ""}
           ${podePromover ? `<button type="button" class="link-btn conceder-admin">conceder admin</button>` : ""}
           ${podeRebaixar ? `<button type="button" class="link-btn danger revogar-admin">revogar admin</button>` : ""}
@@ -51,6 +52,17 @@ const Admin = {
       }
 
       if (podeEditar) {
+        li.querySelector(".trocar-nome").addEventListener("click", async () => {
+          const novoNome = prompt(`Novo nome para ${u.nome}:`, u.nome);
+          if (!novoNome) return;
+          const resp = await Api.trocarNomeUsuario(u.id, novoNome.trim());
+          if (!resp.ok) {
+            alert(resp.erro || "não foi possível trocar o nome");
+            return;
+          }
+          await this.carregarUsuarios();
+        });
+
         li.querySelector(".trocar-login").addEventListener("click", async () => {
           const novoLogin = prompt(`Novo login para ${u.nome}:`, u.usuario);
           if (!novoLogin) return;
@@ -285,7 +297,7 @@ const Admin = {
           <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${s.mac || ""}" />
           <label>Preset em uso</label>
           <select class="preset-select">
-            <option value="">(nenhum — usa o padrão)</option>
+            <option value="">(nenhum: usa o padrão)</option>
             ${presets.map((p) => `<option value="${p.id}" ${s.presetId === p.id ? "selected" : ""}>${p.nome}${p.padrao ? " (padrão)" : ""}</option>`).join("")}
           </select>
           <div class="two-col">

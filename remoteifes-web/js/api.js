@@ -125,6 +125,14 @@ const Api = {
     });
   },
 
+  async trocarNomeUsuario(id, novoNome) {
+    return chamar(`/admin/usuarios/${id}/nome`, {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ novoNome }),
+    });
+  },
+
   async trocarLoginUsuario(id, novoLogin) {
     return chamar(`/admin/usuarios/${id}/login`, {
       method: "PATCH",
