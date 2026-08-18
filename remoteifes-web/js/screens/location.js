@@ -23,8 +23,8 @@ document.querySelectorAll("#andarChoices .choice-btn").forEach((btn) => {
 });
 
 verSalasBtn.addEventListener("click", async () => {
-  await loadRooms(state.bloco, state.andar);
   showScreen("rooms");
+  await loadRooms(state.bloco, state.andar);
 });
 
 document.getElementById("backToLocationBtn").addEventListener("click", () => {

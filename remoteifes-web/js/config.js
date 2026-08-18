@@ -1,3 +1,3 @@
 window.RemoteIFESConfig = {
-  serverUrl: "https://api.remoteifes.exemplo.br",
+  serverUrl: "http://localhost:8080",
 };

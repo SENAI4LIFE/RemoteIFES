@@ -257,9 +257,12 @@ const Admin = {
     list.innerHTML = "";
     const salas = await Api.listarSalasAdmin();
     const presets = await Api.listarPresets();
+    const usuarios = await Api.listarUsuarios();
+    const usuariosControlaveis = usuarios.filter((u) => !u.isAdmin);
 
-    salas.forEach((s) => {
+    for (const s of salas) {
       const li = document.createElement("li");
+      li.id = `macCard-${s.sala}`;
       li.innerHTML = `
         <div class="mac-row" style="width:100%">
           <div class="room-name">${s.sala} — ${s.nome} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
@@ -275,6 +278,20 @@ const Admin = {
             ${s.ipEsp32 ? `<button type="button" class="link-btn acessar-esp32">acessar interface do ESP32</button>` : `<span class="hint">IP ainda não reportado</span>`}
           </div>
           <p class="error hidden mac-error"></p>
+
+          <label class="checkbox-label">
+            <input type="checkbox" class="acesso-restrito-check" ${s.acessoRestrito ? "checked" : ""} /> Restringir controle desta sala a usuários específicos
+          </label>
+          <div class="acesso-usuarios-area ${s.acessoRestrito ? "" : "hidden"}">
+            <label>Conceder acesso de controle a</label>
+            <div class="two-col">
+              <select class="acesso-usuario-select">
+                ${usuariosControlaveis.map((u) => `<option value="${u.id}">${u.nome} (@${u.usuario})</option>`).join("")}
+              </select>
+              <button type="button" class="link-btn conceder-acesso-sala">conceder</button>
+            </div>
+            <ul class="room-list acesso-usuarios-list"></ul>
+          </div>
         </div>
       `;
 
@@ -312,7 +329,150 @@ const Admin = {
         });
       }
 
+      const acessoArea = li.querySelector(".acesso-usuarios-area");
+      const acessoLista = li.querySelector(".acesso-usuarios-list");
+
+      const renderAcessoUsuarios = (usuariosComAcesso) => {
+        acessoLista.innerHTML = "";
+        if (usuariosComAcesso.length === 0) {
+          const vazio = document.createElement("li");
+          vazio.innerHTML = `<div class="room-sub">nenhum usuário com acesso concedido ainda</div>`;
+          acessoLista.appendChild(vazio);
+          return;
+        }
+        usuariosComAcesso.forEach((u) => {
+          const item = document.createElement("li");
+          item.innerHTML = `
+            <div class="room-name">${u.nome} <span class="room-sub">@${u.usuario}</span></div>
+            <button type="button" class="link-btn danger revogar-acesso-sala">revogar</button>
+          `;
+          item.querySelector(".revogar-acesso-sala").addEventListener("click", async () => {
+            const resp = await Api.revogarAcessoSala(s.sala, u.id);
+            if (resp.ok) renderAcessoUsuarios(resp.usuarios);
+          });
+          acessoLista.appendChild(item);
+        });
+      };
+
+      if (s.acessoRestrito) {
+        const usuariosComAcesso = await Api.listarAcessoSala(s.sala);
+        renderAcessoUsuarios(usuariosComAcesso);
+      }
+
+      li.querySelector(".acesso-restrito-check").addEventListener("change", async (e) => {
+        const restrito = e.target.checked;
+        const resp = await Api.definirAcessoRestrito(s.sala, restrito);
+        if (!resp.ok) {
+          alert(resp.erro || "não foi possível alterar a restrição de acesso");
+          e.target.checked = !restrito;
+          return;
+        }
+        acessoArea.classList.toggle("hidden", !restrito);
+        if (restrito) {
+          const usuariosComAcesso = await Api.listarAcessoSala(s.sala);
+          renderAcessoUsuarios(usuariosComAcesso);
+        }
+      });
+
+      li.querySelector(".conceder-acesso-sala").addEventListener("click", async () => {
+        const select = li.querySelector(".acesso-usuario-select");
+        if (!select.value) return;
+        const resp = await Api.concederAcessoSala(s.sala, Number(select.value));
+        if (resp.ok) renderAcessoUsuarios(resp.usuarios);
+      });
+
       list.appendChild(li);
+    }
+
+    await this.carregarDetectados();
+    this.carregarMacsFloorplan();
+  },
+
+  async carregarDetectados() {
+    const list = document.getElementById("detectadosList");
+    const empty = document.getElementById("detectadosEmpty");
+    list.innerHTML = "";
+    const detectados = await Api.listarDetectados();
+    const salas = await Api.listarSalasAdmin();
+
+    if (!Array.isArray(detectados) || detectados.length === 0) {
+      empty.classList.remove("hidden");
+      return;
+    }
+    empty.classList.add("hidden");
+
+    detectados.forEach((d) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div style="width:100%">
+          <div class="room-name">${d.mac}</div>
+          <div class="room-sub">IP: ${d.ip || "desconhecido"} · sala reportada: ${d.sala || "—"} · visto pela última vez: ${Tempo.formatarDataHora(d.ultimaDeteccao)}</div>
+          <div class="two-col" style="margin-top:8px">
+            <select class="vincular-sala-select">
+              <option value="">selecionar sala para vincular</option>
+              ${salas.map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`).join("")}
+            </select>
+            <button type="button" class="link-btn vincular-detectado">vincular</button>
+          </div>
+          <button type="button" class="link-btn danger remover-detectado">descartar</button>
+        </div>
+      `;
+
+      li.querySelector(".vincular-detectado").addEventListener("click", async () => {
+        const select = li.querySelector(".vincular-sala-select");
+        if (!select.value) {
+          alert("selecione a sala de destino");
+          return;
+        }
+        const resp = await Api.cadastrarMac(select.value, d.mac);
+        if (!resp.ok) {
+          alert(resp.erro || "não foi possível vincular o ESP32 à sala");
+          return;
+        }
+        await Api.removerDetectado(d.mac);
+        await Admin.carregarMacs();
+      });
+
+      li.querySelector(".remover-detectado").addEventListener("click", async () => {
+        await Api.removerDetectado(d.mac);
+        await Admin.carregarDetectados();
+      });
+
+      list.appendChild(li);
+    });
+  },
+
+  carregarMacsFloorplan() {
+    const container = document.getElementById("macsFpInner");
+    const tabsContainer = document.getElementById("macsFpTabs");
+    if (!container || container.dataset.montado === "1") return;
+
+    const origem = document.getElementById("fpScaleInner");
+    if (!origem) return;
+
+    container.innerHTML = origem.innerHTML;
+    container.dataset.montado = "1";
+
+    const origemTabs = document.querySelectorAll("#screen-floorplan .fp-tab-btn");
+    tabsContainer.innerHTML = "";
+    origemTabs.forEach((btn) => {
+      const clone = document.createElement("button");
+      clone.type = "button";
+      clone.className = btn.className;
+      clone.dataset.fpSection = btn.dataset.fpSection;
+      clone.textContent = btn.textContent;
+      tabsContainer.appendChild(clone);
+    });
+
+    Floorplan.create(container, tabsContainer, {
+      fitToWidth: false,
+      onSelect: (sala) => {
+        container.querySelectorAll(".room.selectable").forEach((el) => el.classList.remove("fp-admin-highlight"));
+        const alvo = container.querySelector(`.room.selectable[data-sala="${sala}"]`);
+        if (alvo) alvo.classList.add("fp-admin-highlight");
+        const card = document.getElementById(`macCard-${sala}`);
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+      },
     });
   },
 

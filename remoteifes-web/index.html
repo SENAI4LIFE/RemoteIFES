@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RemoteIFES</title>
   <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 </head>
 <body>
 
   <header class="topbar">
-    <span class="brand">RemoteIFES</span>
+    <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
+      <img src="assets/remoteifes-logo.png" alt="RemoteIFES" />
+    </button>
     <div class="topbar-right">
       <span id="userTag" class="user-tag hidden"></span>
       <button id="logoutBtn" class="link-btn hidden">Sair</button>
@@ -19,23 +20,55 @@
 
   <main id="app">
 
-    <section id="screen-login" class="screen">
-      <form id="loginForm" class="card">
-        <h1 id="loginTitulo">Entrar</h1>
-        <p id="loginHint" class="hint">Use o login do RemoteIFES.</p>
-
-        <div class="login-type-row">
-          <button type="button" class="login-type-btn active" data-tipo="normal">Usuário</button>
-          <button type="button" class="login-type-btn" data-tipo="admin">Administrador</button>
+    <section id="screen-portal" class="screen">
+      <div class="portal-wrap">
+        <div class="portal-welcome">
+          <p class="portal-eyebrow">BEM-VINDO AO</p>
+          <h1>REMOTEIFES</h1>
         </div>
+        <div class="portal-options">
+          <div class="portal-option" data-tipo="normal">
+            <span class="portal-option-icon">👤</span>
+            <span class="portal-option-label">USUÁRIO</span>
+          </div>
+          <div class="portal-option" data-tipo="admin">
+            <span class="portal-option-icon">🛠️</span>
+            <span class="portal-option-label">ADMINISTRADOR</span>
+          </div>
+        </div>
+      </div>
+      <div class="portal-footer">
+        <img src="assets/ifes-logo.png" alt="Instituto Federal do Espírito Santo" />
+        <span>Instituto Federal do Espírito Santo — controle de ar-condicionado do campus.</span>
+      </div>
+    </section>
 
-        <label for="username" id="usernameLabel">Usuário</label>
-        <input type="text" id="username" required autocomplete="username" />
-        <label for="password">Senha</label>
-        <input type="password" id="password" required autocomplete="current-password" />
-        <button type="submit">Entrar</button>
-        <p id="loginError" class="error hidden"></p>
-      </form>
+    <section id="screen-login" class="screen hidden">
+      <div class="login-wrap">
+        <form id="loginForm" class="card login-card">
+          <button type="button" id="loginVoltarBtn" class="link-btn login-back">&larr; Trocar tipo de acesso</button>
+          <h2 id="loginTitulo">Entrar</h2>
+          <p id="loginHint" class="hint">Use o login do RemoteIFES.</p>
+
+          <label for="username" id="usernameLabel">Usuário</label>
+          <input type="text" id="username" required autocomplete="username" />
+          <label for="password">Senha</label>
+          <input type="password" id="password" required autocomplete="current-password" />
+          <button type="submit">Entrar</button>
+          <p id="loginError" class="error hidden"></p>
+        </form>
+
+        <div class="login-info">
+          <h2>OPÇÕES DO SISTEMA</h2>
+          <p class="hint">O RemoteIFES liga, desliga e agenda o ar-condicionado das salas do campus direto pelo navegador.</p>
+          <ul>
+            <li><span class="icon-badge">🗺️</span>Salas</li>
+            <li><span class="icon-badge">📅</span>Agenda</li>
+            <li><span class="icon-badge">📊</span>Grade</li>
+            <li><span class="icon-badge">⚙️</span>Admin</li>
+          </ul>
+        </div>
+      </div>
     </section>
 
     <div id="mainApp" class="hidden">
@@ -60,6 +93,256 @@
           </div>
 
           <button type="button" id="verSalasBtn" class="btn btn-on btn-block" disabled>Ver salas</button>
+          <button type="button" id="verPlantaBtn" class="btn btn-off btn-block">Ver planta baixa</button>
+        </div>
+      </section>
+
+      <section id="screen-floorplan" class="screen hidden tab-content">
+        <div class="screen-head">
+          <h1>Plantas baixas</h1>
+          <button type="button" id="floorplanListBtn" class="link-btn">Ver como lista</button>
+        </div>
+        <p class="hint">Toque em uma sala colorida no mapa para abrir o painel de controle. Salas sem cor não possuem ar-condicionado controlado pelo sistema.</p>
+
+        <div class="fp-legenda mapa-legenda">
+          <span><i class="mapa-cell mapa-offline"></i> offline</span>
+          <span><i class="mapa-cell mapa-online-desligado"></i> online, desligado</span>
+          <span><i class="mapa-cell mapa-online-ligado"></i> online, ligado</span>
+          <span><i class="mapa-cell mapa-reservada"></i> reservada agora</span>
+        </div>
+
+        <div class="fp-tabs">
+          <button type="button" class="fp-tab-btn active" data-fp-section="a-terreo">Bloco A · Térreo</button>
+          <button type="button" class="fp-tab-btn" data-fp-section="a-2pav">Bloco A · 2º</button>
+          <button type="button" class="fp-tab-btn" data-fp-section="a-3pav">Bloco A · 3º</button>
+          <button type="button" class="fp-tab-btn" data-fp-section="b-terreo">Bloco B · Térreo</button>
+          <button type="button" class="fp-tab-btn" data-fp-section="b-2pav">Bloco B · 2º</button>
+          <button type="button" class="fp-tab-btn" data-fp-section="b-3pav">Bloco B · 3º</button>
+        </div>
+
+        <div class="fp-scale-outer">
+          <div class="fp-scale-inner floorplan-scope" id="fpScaleInner">
+
+<div class="fp-section hidden" id="fp-a-terreo" data-fp-section="a-terreo">
+<h2>BLOCO A - TÉRREO</h2>
+<div class="plan-wrap"><div class="plan" style="width:1330px;height:470px">
+<div style="position:absolute;left:40px;top:230px;width:1.5px;height:25px;background:#000;z-index:5"></div>
+<div class="room selectable" data-sala="A-112" style="left:40px;top:90px;width:150px;height:140px"><span class="num">A-112</span><span class="name">EQUIPE DE LIMPEZA</span></div>
+<div class="room selectable" data-sala="A-111" style="left:190px;top:90px;width:140px;height:140px"><span class="num">A-111</span><span class="name">CGP</span></div>
+<div class="room selectable" data-sala="A-110" style="left:330px;top:90px;width:130px;height:140px"><span class="num">A-110</span></div>
+<div class="room selectable" data-sala="A-109" style="left:460px;top:90px;width:110px;height:140px"><span class="num">A-109</span><span class="name">CRA</span></div>
+<div class="room selectable" data-sala="A-108" style="left:570px;top:90px;width:120px;height:140px"><span class="num">A-108</span><span class="name">CTI</span></div>
+<div class="room" style="left:690px;top:90px;width:80px;height:330px;border:none;border-top:1.5px solid #000;border-bottom:1.5px solid #000;background:transparent"><span class="blue name" style="writing-mode:vertical-rl">CIRCULAÇÃO</span><span class="blue name" style="margin-top:220px">ENTRADA</span></div>
+<div style="position:absolute;left:40px;top:418.5px;width:650px;height:1.5px;background:#000"></div>
+<div style="position:absolute;left:770px;top:418.5px;width:195px;height:1.5px;background:#000"></div>
+<div class="room selectable" data-sala="A-107" style="left:770px;top:90px;width:155px;height:140px"><span class="num">A-107</span><span class="name">LABORATÓRIO DE INFORMÁTICA II</span></div>
+<div class="room selectable" data-sala="A-106" style="left:925px;top:90px;width:125px;height:140px"><span class="num">A-106</span><span class="name">LABORATÓRIO DE INFORMÁTICA I</span></div>
+<div class="room selectable" data-sala="A-103b" style="left:1050px;top:90px;width:70px;height:140px"><span class="num">A-103b</span><span class="name">ENFERMARIA</span></div>
+<div class="room" style="left:1088px;top:195px;width:32px;height:35px"><span class="name tiny">WC</span></div>
+<div class="room selectable" data-sala="A-103a" style="left:1120px;top:90px;width:60px;height:190px"><span class="num">A-103a</span><span class="name">CAM</span></div>
+<div class="room" style="left:1180px;top:195px;width:70px;height:120px"><span class="name">ESCADAS</span><span class="red name" style="writing-mode:vertical-rl;align-self:flex-start">SAÍDA</span></div>
+<div class="room" style="left:1250px;top:195px;width:60px;height:120px"><span class="name" style="writing-mode:vertical-rl">SUBESTAÇÃO</span></div>
+<div class="corridor" style="left:40px;top:230px;width:1140px;height:50px">CORREDOR</div>
+<div class="room" style="left:40px;top:255px;width:150px;height:165px"><span class="name">CANTINA</span></div>
+<div class="room" style="left:190px;top:290px;width:270px;height:105px"><span class="name" style="margin-bottom:8px">RAMPA</span></div>
+<div style="position:absolute;left:220px;top:342.5px;width:210px;height:1.5px;background:#000"></div>
+<div class="room" style="left:220px;top:365px;width:110px;height:30px"><span class="red name">Mat. Limpeza</span></div>
+<div class="room" style="left:330px;top:365px;width:130px;height:30px"><span class="red name">Dep. Jardinagem</span></div>
+<div class="room selectable" data-sala="A-15" style="left:460px;top:290px;width:110px;height:105px"><span class="num">A-15</span><span class="name">WC MASC.</span></div>
+<div class="room selectable" data-sala="A-14" style="left:570px;top:290px;width:120px;height:105px"><span class="num">A-14</span><span class="name">WC FEM.</span></div>
+<div class="room" style="left:754px;top:360px;width:32px;height:35px"><span class="name">ELEV.</span></div>
+<div class="room selectable" data-sala="A-12" style="left:786px;top:290px;width:99px;height:105px"><span class="red name">Dep. TI</span><span class="num">A-12</span><span class="name">ESCADAS</span></div>
+<div class="room selectable" data-sala="A-105" style="left:905px;top:290px;width:60px;height:130px"><span class="num">A-105</span><span class="name">NAPNE</span></div>
+<div class="room selectable" data-sala="A-104" style="left:965px;top:290px;width:85px;height:130px"><span class="num">A-104</span><span class="name">CRA</span></div>
+<div class="room selectable" data-sala="A-103a" style="left:1070px;top:250px;width:110px;height:100px"><span class="name">CAM</span></div>
+<div class="room selectable" data-sala="A-104" style="left:1050px;top:350px;width:130px;height:70px"><span class="name">CRA (Arquivo)</span></div>
+<div class="ext vert" style="left:6px;top:150px;width:16px;height:260px;transform:rotate(180deg)">ÁREA DO PING PONG E ESTACIONAMENTO</div>
+<div class="ext" style="left:190px;top:436px;width:700px;text-align:center;font-style:italic">ÁREA EXTERNA DE ENTRADA COM JARDINS</div>
+</div></div>
+</div>
+
+<div class="fp-section hidden" id="fp-a-2pav" data-fp-section="a-2pav">
+<h2>BLOCO A - 2º PAV.</h2>
+<div class="plan-wrap"><div class="plan" style="width:1330px;height:470px">
+<div class="room selectable" data-sala="A-209" style="left:40px;top:90px;width:150px;height:100px"><span class="num">A-209</span><span class="name">SALA DE MULTIMÍDIA</span></div>
+<div class="room selectable" data-sala="A-210" style="left:40px;top:190px;width:130px;height:100px"><span class="num">A-210</span><span class="name">CAE</span></div>
+<div class="room selectable" data-sala="A-208" style="left:190px;top:90px;width:140px;height:140px"><span class="num">A-208</span></div>
+<div class="room selectable" data-sala="A-207" style="left:330px;top:90px;width:120px;height:140px"><span class="num">A-207</span></div>
+<div class="room selectable" data-sala="A-206" style="left:450px;top:90px;width:130px;height:140px"><span class="num">A-206</span></div>
+<div class="room selectable" data-sala="A-205" style="left:580px;top:90px;width:130px;height:140px"><span class="num">A-205</span></div>
+<div class="room selectable" data-sala="A-204" style="left:710px;top:90px;width:130px;height:140px"><span class="num">A-204</span></div>
+<div class="room selectable" data-sala="A-202" style="left:840px;top:90px;width:160px;height:140px"><span class="num">A-202</span></div>
+<div class="room selectable" data-sala="A-201a" style="left:1000px;top:90px;width:180px;height:140px"><span class="num">A-201a</span></div>
+<div class="room" style="left:1180px;top:195px;width:70px;height:120px"><span class="name">ESCADAS</span><span class="red name" style="writing-mode:vertical-rl;align-self:flex-start">SAÍDA</span></div>
+<div class="corridor" style="left:40px;top:230px;width:1140px;height:50px">CORREDOR</div>
+<div class="room selectable" data-sala="A-211" style="left:40px;top:290px;width:150px;height:130px"><span class="num">A-211</span></div>
+<div class="room" style="left:190px;top:290px;width:270px;height:105px"><span class="name" style="margin-bottom:8px">RAMPA</span></div>
+<div style="position:absolute;left:220px;top:342.5px;width:210px;height:1.5px;background:#000"></div>
+<div class="room selectable" data-sala="A-24" style="left:460px;top:290px;width:110px;height:105px"><span class="num">A-24</span><span class="name">WC MASC.</span></div>
+<div class="room selectable" data-sala="A-23" style="left:570px;top:290px;width:120px;height:105px"><span class="num">A-23</span><span class="name">WC FEM.</span></div>
+<div class="room" style="left:690px;top:360px;width:32px;height:35px"><span class="num tiny">A-22</span><span class="name tiny">WC MASC.</span></div>
+<div class="room" style="left:722px;top:360px;width:32px;height:35px"><span class="num tiny">A-21</span><span class="name tiny">WC FEM.</span></div>
+<div class="room" style="left:754px;top:360px;width:32px;height:35px"><span class="name">ELEV.</span></div>
+<div class="room" style="left:786px;top:290px;width:99px;height:105px"><span class="name">ESCADAS</span></div>
+<div class="room selectable" data-sala="A-203" style="left:885px;top:290px;width:145px;height:130px"><span class="num">A-203</span><span class="name">LABORATÓRIO DE INFORMÁTICA III</span></div>
+<div class="room selectable" data-sala="A-201d" style="left:1030px;top:290px;width:70px;height:130px"><span class="num">A-201d</span><span class="name">NAPNE</span></div>
+<div class="corridor" style="left:1100px;top:290px;width:10px;height:130px"></div>
+<div style="position:absolute;left:1100px;top:420px;width:10px;height:1.5px;background:#000"></div>
+<div style="position:absolute;left:1100px;top:418.5px;width:10px;height:1.5px;background:#000;z-index:5"></div>
+<div class="room selectable" data-sala="A-201b" style="left:1110px;top:290px;width:70px;height:65px"><span class="num tiny">A-201b</span><span class="name tiny">TÁTICA JR.</span></div>
+<div class="room selectable" data-sala="A-201c" style="left:1110px;top:355px;width:70px;height:65px"><span class="num">A-201c</span></div>
+</div></div>
+</div>
+
+<div class="fp-section hidden" id="fp-a-3pav" data-fp-section="a-3pav">
+<h2>BLOCO A - 3º PAV.</h2>
+<div class="plan-wrap"><div class="plan" style="width:1330px;height:470px">
+<div style="position:absolute;left:40px;top:250px;width:1.5px;height:40px;background:#000;z-index:5"></div>
+<div class="room selectable" data-sala="A-313" style="left:40px;top:90px;width:150px;height:160px"><span class="num">A-313</span><span class="name">LABORATÓRIO DE QUÍMICA</span></div>
+<div class="room selectable" data-sala="A-312" style="left:190px;top:90px;width:140px;height:140px"><span class="num">A-312</span><span class="name">LABORATÓRIO DE FÍSICA</span></div>
+<div class="room selectable" data-sala="A-311" style="left:330px;top:90px;width:130px;height:140px"><span class="num">A-311</span><span class="name">LABORATÓRIO DE BIOLOGIA</span></div>
+<div class="room selectable" data-sala="A-310" style="left:460px;top:90px;width:130px;height:140px"><span class="num">A-310</span></div>
+<div class="room selectable" data-sala="A-309" style="left:590px;top:90px;width:150px;height:140px"><span class="num">A-309</span></div>
+<div class="room selectable" data-sala="A-306" style="left:740px;top:90px;width:145px;height:140px"><span class="num">A-306</span></div>
+<div class="room selectable" data-sala="A-306b" style="left:885px;top:90px;width:115px;height:140px"><span class="num">A-306</span><span class="name tiny">CLC, CEF, COC, CCO (DIAPL)</span></div>
+<div class="room selectable" data-sala="A-304" style="left:1000px;top:90px;width:90px;height:140px"><span class="num">A-304</span><span class="name">DIREN COGE</span></div>
+<div class="room selectable" data-sala="A-302" style="left:1090px;top:90px;width:90px;height:140px"><span class="num">A-302</span><span class="name">DG GABDG</span></div>
+<div class="room" style="left:1180px;top:195px;width:70px;height:120px"><span class="name">ESCADAS</span><span class="red name" style="writing-mode:vertical-rl;align-self:flex-start">SAÍDA</span></div>
+<div class="corridor" style="left:40px;top:230px;width:1140px;height:50px">CORREDOR</div>
+<div class="room selectable" data-sala="A-314" style="left:40px;top:290px;width:150px;height:130px"><span class="num">A-314</span><span class="name">COOP</span></div>
+<div class="room" style="left:190px;top:290px;width:270px;height:105px"><span class="name" style="margin-bottom:8px">RAMPA</span></div>
+<div style="position:absolute;left:220px;top:342.5px;width:210px;height:1.5px;background:#000"></div>
+<div class="room selectable" data-sala="A-36" style="left:460px;top:290px;width:110px;height:105px"><span class="num">A-36</span><span class="name">WC MASC.</span></div>
+<div class="room selectable" data-sala="A-35" style="left:570px;top:290px;width:120px;height:105px"><span class="num">A-35</span><span class="name">WC FEM.</span></div>
+<div class="room" style="left:690px;top:360px;width:32px;height:35px"><span class="num tiny">A-34</span><span class="name tiny">WC MASC.</span></div>
+<div class="room" style="left:722px;top:360px;width:32px;height:35px"><span class="num tiny">A-33</span><span class="name tiny">WC FEM.</span></div>
+<div class="room" style="left:754px;top:360px;width:32px;height:35px"><span class="name">ELEV.</span></div>
+<div class="room" style="left:786px;top:290px;width:99px;height:105px"><span class="name">ESCADAS</span></div>
+<div class="room selectable" data-sala="A-31" style="left:885px;top:290px;width:59px;height:130px"><span class="num">A-31</span><span class="name">COZINHA</span></div>
+<div class="room selectable" data-sala="A-307" style="left:944px;top:290px;width:59px;height:130px"><span class="num">A-307</span><span class="name tiny">LABORATÓRIO DE INFORMÁTICA CAD</span></div>
+<div class="room selectable" data-sala="A-305" style="left:1003px;top:290px;width:59px;height:130px"><span class="num">A-305</span><span class="name">DIAPL</span></div>
+<div class="room selectable" data-sala="A-303" style="left:1062px;top:290px;width:59px;height:130px"><span class="num">A-303</span><span class="name tiny">DPPGE</span></div>
+<div class="room selectable" data-sala="A-301" style="left:1121px;top:290px;width:59px;height:130px"><span class="num tiny">A-301</span><span class="name tiny">COORD. DE ADM.</span></div>
+</div></div>
+</div>
+
+<div class="fp-section hidden" id="fp-b-terreo" data-fp-section="b-terreo">
+<h2>BLOCO B - TÉRREO</h2>
+<div class="plan-wrap"><div class="plan" style="width:1350px;height:520px">
+<div class="ext" style="left:380px;top:55px;width:890px;text-align:center">ÁREA DE GRAMADO, CAMPO, QUADRA E ORQUIDÁRIO</div>
+<div class="room selectable" data-sala="B-113" style="left:40px;top:90px;width:220px;height:390px;padding-top:170px"><span class="num">B-113</span><span class="name">LABORATÓRIO DE FABRICAÇÃO</span></div>
+<div class="room" style="left:160px;top:90px;width:100px;height:190px;z-index:5"></div>
+<div class="corridor" style="left:260px;top:50px;width:120px;height:210px"></div>
+<div class="room" style="left:260px;top:20px;width:120px;height:70px"><span class="name">ESCADAS</span><span class="red name" style="margin-top:auto">SAÍDA</span></div>
+<div class="room selectable" data-sala="B-111" style="left:350px;top:90px;width:190px;height:140px"><span class="num">B-111</span><span class="name">LABORATÓRIO ENSAIOS DESTRUTIVOS</span></div>
+<div class="room selectable" data-sala="B-109" style="left:540px;top:90px;width:160px;height:140px"><span class="num">B-109</span><span class="name">LABORATÓRIO ENSAIO NÃO-DESTRUTIVOS</span></div>
+<div class="room selectable" data-sala="B-104" style="left:700px;top:90px;width:150px;height:140px"><span class="num">B-104</span><span class="name">LABORATÓRIO HIDRÁULICA</span></div>
+<div class="room selectable" data-sala="B-103" style="left:850px;top:90px;width:140px;height:140px"><span class="num">B-103</span><span class="name">LABORATÓRIO DE MÁQUINAS TÉRMICAS</span></div>
+<div class="room selectable" data-sala="B-102" style="left:990px;top:90px;width:280px;height:140px"><span class="num">B-102</span><span class="name">LABORATÓRIO MÁQUINAS TÉRMICAS E DE FLUXO</span></div>
+<div class="room" style="left:1270px;top:185px;width:70px;height:120px"><span class="name">ESCADAS</span><span class="red name" style="writing-mode:vertical-rl;align-self:flex-start">SAÍDA</span></div>
+<div class="corridor" style="left:380px;top:230px;width:890px;height:50px">CORREDOR</div>
+<div class="corridor" style="left:260px;top:260px;width:90px;height:220px"></div>
+<div class="room" style="left:378px;top:320px;width:32px;height:35px;z-index:5"><span class="name">ELEV.</span></div>
+<div class="room" style="left:350px;top:320px;width:60px;height:100px"><span class="red name">Dep. TI</span><span class="name">DEPÓSITO</span></div>
+<div class="room" style="left:350px;top:420px;width:60px;height:60px"><span class="name">WC FEM.</span></div>
+<div class="room selectable" data-sala="B-110" style="left:410px;top:280px;width:70px;height:140px;z-index:5"><span class="name">LABORATÓRIO DE MECÂNICA</span></div>
+<div class="room selectable" data-sala="B-110" style="left:410px;top:380px;width:250px;height:100px"><span class="num">B-110</span><span class="name">LABORATÓRIO DE MECÂNICA</span></div>
+<div class="room selectable" data-sala="B-112" style="left:540px;top:280px;width:120px;height:100px;z-index:5"><span class="num">B-112</span><span class="name">COORDENAÇÃO DO MECÂNICA</span></div>
+<div class="room selectable" data-sala="B-108-B-107" style="left:660px;top:280px;width:190px;height:200px"><span class="num">B-108/B-107</span><span class="name">LABORATÓRIO METROLOGIA</span></div>
+<div class="room" style="left:850px;top:280px;width:50px;height:100px"><span class="name">ESCADAS</span></div>
+<div class="room selectable" data-sala="B-100" style="left:850px;top:380px;width:50px;height:100px"><span class="num tiny">B-100</span><span class="name tiny">APOIO</span></div>
+<div class="room selectable" data-sala="B-105-B-106" style="left:900px;top:280px;width:250px;height:200px"><span class="num">B-105/B-106</span><span class="name">LABORATÓRIO PREPARAÇÃO MOTOS</span></div>
+<div class="room selectable" data-sala="B-101" style="left:1150px;top:280px;width:120px;height:200px"><span class="num">B-101</span><span class="name tiny">ALMOXARIFADO E PATRIMÔNIO (CPMS) - (DIAPL)</span></div>
+<div class="room" style="left:260px;top:260px;width:120px;height:220px;border:none;border-bottom:1.5px solid #000;background:transparent"></div>
+<div class="room" style="left:228px;top:385px;width:60px;height:95px;z-index:10"><span class="name">WC MASC.</span></div>
+<div class="room" style="left:228px;top:315px;width:32px;height:35px;z-index:10"><span class="name tiny">WC FEM.</span></div>
+<div class="room" style="left:228px;top:350px;width:32px;height:35px;z-index:10"><span class="name tiny">WC MASC.</span></div>
+<div class="ext vert" style="left:6px;top:150px;width:16px;height:300px;transform:rotate(180deg)">ÁREA EXTERNA DA ACADEMIA E DO ESTACIONAMENTO</div>
+</div></div>
+</div>
+
+<div class="fp-section hidden" id="fp-b-2pav" data-fp-section="b-2pav">
+<h2>BLOCO B - 2º PAV.</h2>
+<div class="plan-wrap"><div class="plan" style="width:1350px;height:520px">
+<div class="room selectable" data-sala="B-207" style="left:160px;top:90px;width:100px;height:190px;z-index:5"><span class="num">B-207</span><span class="name">LABORATÓRIO INSTALAÇÕES ELÉTRICAS</span></div>
+<div class="corridor" style="left:260px;top:50px;width:120px;height:210px"></div>
+<div class="room" style="left:260px;top:20px;width:120px;height:70px"><span class="name">ESCADAS</span><span class="red name" style="margin-top:auto">SAÍDA</span></div>
+<div class="room selectable" data-sala="B-206" style="left:350px;top:90px;width:170px;height:140px"><span class="num">B-206</span><span class="name">SALA TÉCNICA</span></div>
+<div class="room selectable" data-sala="B-205" style="left:520px;top:90px;width:160px;height:140px"><span class="num">B-205</span><span class="name">LABORATÓRIO ELETRICIDADE E ELETRÔNICA</span></div>
+<div class="room selectable" data-sala="B-204" style="left:680px;top:90px;width:160px;height:140px"><span class="num">B-204</span><span class="name">LABORATÓRIO COMANDOS MÁQUINAS ELÉTRICAS</span></div>
+<div class="room selectable" data-sala="B-203" style="left:840px;top:90px;width:140px;height:140px"><span class="num">B-203</span><span class="name">LABORATÓRIO ELETRÔNICA DIGITAL</span></div>
+<div class="room selectable" data-sala="B-202" style="left:980px;top:90px;width:140px;height:140px"><span class="num">B-202</span><span class="name">LABORATÓRIO ELETRÔNICA DE POTÊNCIA</span></div>
+<div class="room selectable" data-sala="B-201" style="left:1120px;top:90px;width:150px;height:140px"><span class="num">B-201</span><span class="name">LABORATÓRIO AUTOMAÇÃO</span></div>
+<div class="room" style="left:1270px;top:185px;width:70px;height:120px"><span class="name">ESCADAS</span><span class="red name" style="writing-mode:vertical-rl;align-self:flex-start">SAÍDA</span></div>
+<div class="corridor" style="left:380px;top:230px;width:890px;height:50px">CORREDOR</div>
+<div class="room selectable" data-sala="B-206b" style="left:40px;top:90px;width:220px;height:390px;padding-top:170px"><span class="num">B-206</span><span class="name">LAB. SOLDA</span></div>
+<div class="corridor" style="left:260px;top:260px;width:95px;height:110px"></div>
+<div class="room selectable" data-sala="B-212" style="left:410px;top:280px;width:60px;height:110px"><span class="name" style="writing-mode:vertical-rl;margin:0">EQUIP. TI</span></div>
+<div class="room" style="left:470px;top:280px;width:120px;height:90px"><span class="name">COZINHA</span></div>
+<div class="room code selectable" data-sala="B2016" style="left:590px;top:280px;width:100px;height:90px"><span class="name">B16</span></div>
+<div class="room code selectable" data-sala="B2014" style="left:710px;top:280px;width:60px;height:90px"><span class="name">B14</span></div>
+<div class="room code selectable" data-sala="B2012" style="left:770px;top:280px;width:60px;height:90px"><span class="name">B12</span></div>
+<div class="room code selectable" data-sala="B2010" style="left:830px;top:280px;width:60px;height:90px"><span class="name">B10</span></div>
+<div class="room code selectable" data-sala="B208" style="left:890px;top:280px;width:60px;height:90px"><span class="name">B08</span></div>
+<div class="room code selectable" data-sala="B206" style="left:950px;top:280px;width:60px;height:90px"><span class="name">B06</span></div>
+<div class="room code selectable" data-sala="B204" style="left:1030px;top:280px;width:120px;height:90px"><span class="name">B04</span></div>
+<div class="room code selectable" data-sala="B202" style="left:1150px;top:280px;width:120px;height:60px"><span class="name">B02</span></div>
+<div class="corridor" style="left:260px;top:390px;width:95px;height:90px"></div>
+<div class="room" style="left:350px;top:320px;width:60px;height:100px"><span class="name">ESCADAS</span></div>
+<div class="room" style="left:378px;top:320px;width:32px;height:35px;z-index:5"><span class="name">ELEV.</span></div>
+<div class="room" style="left:350px;top:420px;width:60px;height:60px"><span class="name">WC FEM.</span></div>
+<div class="room" style="left:410px;top:390px;width:80px;height:90px"><span class="name">WC MASC.</span></div>
+<div class="room" style="left:490px;top:390px;width:40px;height:90px"><span class="name">WC FEM.</span></div>
+<div class="room code selectable" data-sala="B2017" style="left:530px;top:390px;width:83px;height:90px"><span class="name">B17</span></div>
+<div class="room code selectable" data-sala="B2015" style="left:613px;top:390px;width:83px;height:90px"><span class="name">B15</span></div>
+<div class="room code selectable" data-sala="B2013" style="left:696px;top:390px;width:83px;height:90px"><span class="name">B13</span></div>
+<div class="room code selectable" data-sala="B2011" style="left:779px;top:390px;width:83px;height:90px"><span class="name">B11</span></div>
+<div class="room code selectable" data-sala="B200" style="left:862px;top:390px;width:63px;height:90px"><span class="name">B00</span></div>
+<div class="room code selectable" data-sala="B207" style="left:925px;top:390px;width:83px;height:90px"><span class="name">B07</span></div>
+<div class="room code selectable" data-sala="B205" style="left:1008px;top:390px;width:83px;height:90px"><span class="name">B05</span></div>
+<div class="room code selectable" data-sala="B203" style="left:1091px;top:390px;width:83px;height:90px"><span class="name">B03</span></div>
+<div class="room code selectable" data-sala="B201" style="left:1174px;top:390px;width:96px;height:90px"><span class="name">B01</span></div>
+<div class="room" style="left:1270px;top:340px;width:35px;height:50px"><span class="name">sacada</span></div>
+<div class="room" style="left:260px;top:260px;width:120px;height:220px;border:none;border-bottom:1.5px solid #000;background:transparent"></div>
+<div class="room" style="left:228px;top:385px;width:60px;height:95px;z-index:10"><span class="name">WC MASC.</span></div>
+<div class="room" style="left:228px;top:315px;width:32px;height:35px;z-index:10"><span class="name tiny">WC FEM.</span></div>
+<div class="room" style="left:228px;top:350px;width:32px;height:35px;z-index:10"><span class="name tiny">WC MASC.</span></div>
+</div></div>
+</div>
+
+<div class="fp-section hidden" id="fp-b-3pav" data-fp-section="b-3pav">
+<h2>BLOCO B - 3º PAV.</h2>
+<div class="plan-wrap"><div class="plan" style="width:1350px;height:520px">
+<div class="room selectable" data-sala="B-300" style="left:40px;top:90px;width:220px;height:390px"><span class="name">BIBLIOTECA</span></div>
+<div class="corridor" style="left:260px;top:50px;width:120px;height:210px"></div>
+<div class="room" style="left:260px;top:20px;width:120px;height:70px"><span class="name">ESCADAS</span><span class="red name" style="margin-top:auto">SAÍDA</span></div>
+<div class="room selectable" data-sala="B-309" style="left:350px;top:90px;width:190px;height:140px"><span class="num">B-309</span><span class="name">LABORATÓRIO DE INTELIGÊNCIA ARTIFICIAL</span></div>
+<div class="room selectable" data-sala="B-307" style="left:540px;top:90px;width:160px;height:140px"><span class="num">B-307</span><span class="name">LABORATÓRIO DE PROJETOS APLICADOS</span></div>
+<div class="room selectable" data-sala="B-305" style="left:700px;top:90px;width:150px;height:140px"><span class="num">B-305</span><span class="name">LABORATÓRIO DE EXPERIMENTOS</span></div>
+<div class="room selectable" data-sala="B-302" style="left:850px;top:90px;width:420px;height:140px"><span class="num">B-302</span><span class="name">AUDITÓRIO</span></div>
+<div class="room" style="left:1270px;top:185px;width:70px;height:120px"><span class="name">ESCADAS</span><span class="red name" style="writing-mode:vertical-rl;align-self:flex-start">SAÍDA</span></div>
+<div class="corridor" style="left:380px;top:230px;width:890px;height:50px">CORREDOR</div>
+<div class="corridor" style="left:260px;top:260px;width:95px;height:220px"></div>
+<div class="room" style="left:350px;top:320px;width:60px;height:100px"><span class="name">ESCADAS</span></div>
+<div class="room" style="left:378px;top:320px;width:32px;height:35px;z-index:5"><span class="name">ELEV.</span></div>
+<div class="room" style="left:350px;top:420px;width:60px;height:60px"><span class="name">WC FEM.</span></div>
+<div class="room selectable" data-sala="B-208" style="left:410px;top:280px;width:160px;height:200px"><span class="num">B-208</span><span class="name">SALA DE CONVIVÊNCIA DOS SERVIDORES</span></div>
+<div class="room selectable" data-sala="B-306" style="left:570px;top:280px;width:180px;height:200px"><span class="num">B-306</span><span class="name">LAB. ESTUDOS AVANÇADOS (LABSEA)</span></div>
+<div class="room selectable" data-sala="B-304" style="left:750px;top:280px;width:160px;height:200px"><span class="num">B-304</span><span class="name">LAB. DE REDES (AXOLAB)</span></div>
+<div class="room selectable" data-sala="B-303" style="left:910px;top:280px;width:180px;height:200px"><span class="num">B-303</span><span class="name">LAB. MÁQUINAS ELÉTRICAS</span></div>
+<div class="room selectable" data-sala="B-301" style="left:1090px;top:280px;width:180px;height:200px"><span class="num">B-301</span><span class="name">LAB. FONTES RENOVÁVEIS E SISTEMAS DE ENERGIA</span></div>
+<div class="ext" style="left:570px;top:485px;width:180px;text-align:center">B-306</div>
+<div class="ext" style="left:750px;top:485px;width:160px;text-align:center">B-304</div>
+<div class="ext" style="left:910px;top:485px;width:180px;text-align:center">B-303</div>
+<div class="ext" style="left:1090px;top:485px;width:180px;text-align:center">B-301</div>
+<div class="room" style="left:260px;top:260px;width:120px;height:220px;border:none;border-bottom:1.5px solid #000;background:transparent"><span class="blue name">CIRCULAÇÃO</span></div>
+<div class="room" style="left:228px;top:385px;width:60px;height:95px;z-index:10"><span class="name">WC MASC.</span></div>
+<div class="room" style="left:228px;top:315px;width:32px;height:35px;z-index:10"><span class="name tiny">WC FEM.</span></div>
+<div class="room" style="left:228px;top:350px;width:32px;height:35px;z-index:10"><span class="name tiny">WC MASC.</span></div>
+</div></div>
+</div>
+
+          </div>
         </div>
       </section>
 
@@ -70,12 +353,6 @@
         </div>
         <ul id="roomList" class="room-list"></ul>
         <p id="roomsEmpty" class="hint hidden">Nenhuma sala disponível no momento.</p>
-
-        <div class="card">
-          <h2>Mapa do campus</h2>
-          <p class="hint">Toque em um marcador para abrir o painel da sala.</p>
-          <div id="salasMapa" class="salas-mapa"></div>
-        </div>
       </section>
 
       <section id="screen-panel" class="screen hidden tab-content">
@@ -85,6 +362,7 @@
         </div>
 
         <div id="lockBanner" class="lock-banner hidden"></div>
+        <p id="panelSomenteLeitura" class="device-warning hidden">Você tem apenas visualização desta sala — não possui permissão para controlá-la.</p>
 
         <div class="card status-card">
           <div class="status-row">
@@ -196,19 +474,21 @@
           <h1>Administração</h1>
         </div>
 
+        <div class="admin-layout">
         <div class="admin-subtabs">
-          <button type="button" class="admin-subtab-btn active" data-sub="usuarios">Usuários</button>
-          <button type="button" class="admin-subtab-btn" data-sub="ativos">Ativos</button>
-          <button type="button" class="admin-subtab-btn" data-sub="sessoes">Sessões</button>
-          <button type="button" class="admin-subtab-btn" data-sub="logs">Logs</button>
-          <button type="button" class="admin-subtab-btn" data-sub="dispositivos">Dispositivos</button>
-          <button type="button" class="admin-subtab-btn" data-sub="acessos">Acessos ESP32</button>
-          <button type="button" class="admin-subtab-btn" data-sub="mapa">Mapa</button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs">ESP32 / MACs</button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets">Presets</button>
-          <button type="button" class="admin-subtab-btn" data-sub="config">Configurações</button>
+          <button type="button" class="admin-subtab-btn active" data-sub="usuarios"><span class="admin-subtab-icon">👥</span>Usuários</button>
+          <button type="button" class="admin-subtab-btn" data-sub="ativos"><span class="admin-subtab-icon">🟢</span>Ativos</button>
+          <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span>Sessões</button>
+          <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span>Logs</button>
+          <button type="button" class="admin-subtab-btn" data-sub="dispositivos"><span class="admin-subtab-icon">📡</span>Dispositivos</button>
+          <button type="button" class="admin-subtab-btn" data-sub="acessos"><span class="admin-subtab-icon">🔑</span>Acessos ESP32</button>
+          <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span>Mapa</button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span>ESP32 / MACs</button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets"><span class="admin-subtab-icon">🎛️</span>Presets</button>
+          <button type="button" class="admin-subtab-btn" data-sub="config"><span class="admin-subtab-icon">⚙️</span>Configurações</button>
         </div>
 
+        <div class="admin-content">
         <div id="adminSub-usuarios" class="admin-sub">
           <div class="card">
             <h2>Novo usuário</h2>
@@ -290,7 +570,24 @@
         </div>
 
         <div id="adminSub-macs" class="admin-sub hidden">
-          <p class="hint">Cadastro dos ESP32 autorizados por sala (identificados por endereço MAC) e escolha do preset utilizado em cada sala. Apenas o administrador principal pode alterar.</p>
+          <p class="hint">Cadastro dos ESP32 autorizados por sala (identificados por endereço MAC), escolha do preset e controle de acesso por sala. Apenas o administrador principal pode alterar MAC/preset.</p>
+
+          <div class="card admin-fp-picker">
+            <h2>Selecionar sala pela planta baixa</h2>
+            <p class="hint">Toque em uma sala no mapa para localizá-la na lista abaixo.</p>
+            <div class="fp-tabs" id="macsFpTabs"></div>
+            <div class="fp-scale-outer">
+              <div class="fp-scale-inner floorplan-scope" id="macsFpInner"></div>
+            </div>
+          </div>
+
+          <div class="card" id="detectadosCard">
+            <h2>ESP32 detectados na rede</h2>
+            <p class="hint">Dispositivos que já entraram em contato com o servidor mas ainda não estão vinculados a nenhuma sala cadastrada.</p>
+            <ul id="detectadosList" class="room-list"></ul>
+            <p id="detectadosEmpty" class="hint hidden">Nenhum ESP32 não vinculado detectado no momento.</p>
+          </div>
+
           <ul id="macsList" class="room-list"></ul>
         </div>
 
@@ -307,60 +604,79 @@
         </div>
 
         <div id="adminSub-config" class="admin-sub hidden">
-          <div class="card">
-            <h2>Sessão por inatividade</h2>
-            <p class="hint">
-              Tempo de inatividade até deslogar automaticamente um usuário
-              (evita que o app fique aberto e "online" indefinidamente). Deixe em
-              branco para indefinido — não desloga por tempo. Vale para todos os
-              usuários.
-            </p>
-            <label for="cfgTimeoutInatividade">Tempo de inatividade (minutos)</label>
-            <input type="number" id="cfgTimeoutInatividade" min="1" placeholder="indefinido (sugestão: 15)" />
+          <div class="config-list">
+            <div class="config-list-item">
+              <div class="config-list-icon">⏱️</div>
+              <div class="config-list-content">
+                <div class="config-list-title">Sessão por inatividade</div>
+                <p class="config-list-desc">
+                  Tempo de inatividade até deslogar automaticamente um usuário
+                  (evita que o app fique aberto e "online" indefinidamente). Deixe em
+                  branco para indefinido — não desloga por tempo. Vale para todos os
+                  usuários.
+                </p>
+                <div class="config-list-body">
+                  <label for="cfgTimeoutInatividade">Tempo de inatividade (minutos)</label>
+                  <input type="number" id="cfgTimeoutInatividade" min="1" placeholder="indefinido (sugestão: 15)" />
 
-            <label class="checkbox-label">
-              <input type="checkbox" id="cfgAdminSujeitoTimeout" /> Aplicar este timer também para administradores
-            </label>
-            <p class="hint">Desligado por padrão — administradores ficam isentos do timer de inatividade.</p>
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfgAdminSujeitoTimeout" /> Aplicar este timer também para administradores
+                  </label>
+                  <p class="hint">Desligado por padrão — administradores ficam isentos do timer de inatividade.</p>
 
-            <label for="cfgPopupAviso">Aviso antes de deslogar (segundos)</label>
-            <input type="number" id="cfgPopupAviso" min="10" value="60" />
-          </div>
-
-          <div class="card">
-            <h2>Presença online</h2>
-            <label for="cfgLimiarOnline">Considerar usuário "online" por até (minutos sem uso)</label>
-            <input type="number" id="cfgLimiarOnline" min="1" value="5" />
-          </div>
-
-          <div class="card superadmin-only hidden" id="cfgCriticoCard">
-            <h2>Configurações críticas (administrador principal)</h2>
-            <p class="hint">Estas opções alteram o comportamento global do sistema e só podem ser alteradas pelo administrador principal.</p>
-
-            <label>Limite de temperatura permitido</label>
-            <div class="two-col">
-              <div>
-                <label for="cfgTemperaturaMinima">Mínima (°C)</label>
-                <input type="number" id="cfgTemperaturaMinima" min="16" max="30" value="23" />
-              </div>
-              <div>
-                <label for="cfgTemperaturaMaxima">Máxima (°C)</label>
-                <input type="number" id="cfgTemperaturaMaxima" min="16" max="30" value="25" />
+                  <label for="cfgPopupAviso">Aviso antes de deslogar (segundos)</label>
+                  <input type="number" id="cfgPopupAviso" min="10" value="60" />
+                </div>
               </div>
             </div>
 
-            <label class="checkbox-label">
-              <input type="checkbox" id="cfgModoTeste" /> Modo de teste (permite acesso fora da rede do IFES)
-            </label>
-            <p class="hint">Em produção, o acesso é restrito à rede do IFES. Ative o modo de teste temporariamente para testar fora da rede institucional.</p>
+            <div class="config-list-item">
+              <div class="config-list-icon">🟢</div>
+              <div class="config-list-content">
+                <div class="config-list-title">Presença online</div>
+                <p class="config-list-desc">Define por quanto tempo sem uso um usuário ainda é considerado online no sistema.</p>
+                <div class="config-list-body">
+                  <label for="cfgLimiarOnline">Considerar usuário "online" por até (minutos sem uso)</label>
+                  <input type="number" id="cfgLimiarOnline" min="1" value="5" />
+                </div>
+              </div>
+            </div>
 
-            <label for="cfgRedesAutorizadas">Redes autorizadas (uma por linha, formato CIDR, ex: 10.0.0.0/8)</label>
-            <textarea id="cfgRedesAutorizadas" rows="3" placeholder="10.0.0.0/8"></textarea>
+            <div class="config-list-item superadmin-only hidden" id="cfgCriticoCard">
+              <div class="config-list-icon">🔒</div>
+              <div class="config-list-content">
+                <div class="config-list-title">Configurações críticas (administrador principal)</div>
+                <p class="config-list-desc">Estas opções alteram o comportamento global do sistema e só podem ser alteradas pelo administrador principal.</p>
+                <div class="config-list-body">
+                  <label>Limite de temperatura permitido</label>
+                  <div class="two-col">
+                    <div>
+                      <label for="cfgTemperaturaMinima">Mínima (°C)</label>
+                      <input type="number" id="cfgTemperaturaMinima" min="16" max="30" value="23" />
+                    </div>
+                    <div>
+                      <label for="cfgTemperaturaMaxima">Máxima (°C)</label>
+                      <input type="number" id="cfgTemperaturaMaxima" min="16" max="30" value="25" />
+                    </div>
+                  </div>
+
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfgModoTeste" /> Modo de teste (permite acesso fora da rede do IFES)
+                  </label>
+                  <p class="hint">Em produção, o acesso é restrito à rede do IFES. Ative o modo de teste temporariamente para testar fora da rede institucional.</p>
+
+                  <label for="cfgRedesAutorizadas">Redes autorizadas (uma por linha, formato CIDR, ex: 10.0.0.0/8)</label>
+                  <textarea id="cfgRedesAutorizadas" rows="3" placeholder="10.0.0.0/8"></textarea>
+                </div>
+              </div>
+            </div>
           </div>
 
           <button type="button" id="salvarConfigBtn" class="btn btn-on btn-block">Salvar configurações</button>
           <p id="configError" class="error hidden"></p>
           <p id="configSavedHint" class="config-saved-hint hidden">Configurações salvas.</p>
+        </div>
+        </div>
         </div>
       </section>
 
@@ -388,7 +704,18 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <div id="a11yWidget" class="a11y-widget">
+    <button type="button" id="a11yToggleBtn" class="a11y-toggle-btn" aria-label="Acessibilidade: ajustar tamanho do texto" title="Acessibilidade">A±</button>
+    <div id="a11yPanel" class="a11y-panel hidden">
+      <span class="a11y-panel-label">Tamanho do texto</span>
+      <div class="a11y-panel-row">
+        <button type="button" id="a11yDecreaseBtn" class="a11y-step-btn" aria-label="Diminuir tamanho do texto">A&minus;</button>
+        <button type="button" id="a11yResetBtn" class="a11y-step-btn a11y-reset-btn" aria-label="Tamanho padrão do texto">A</button>
+        <button type="button" id="a11yIncreaseBtn" class="a11y-step-btn" aria-label="Aumentar tamanho do texto">A+</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/state.js"></script>
   <script src="js/config.js"></script>
   <script src="js/tempo.js"></script>
@@ -396,8 +723,11 @@
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script src="js/idle-timer.js"></script>
+  <script src="js/a11y.js"></script>
   <script src="js/screens/login.js"></script>
   <script src="js/screens/location.js"></script>
+  <script src="js/floorplan.js"></script>
+  <script src="js/screens/floorplan.js"></script>
   <script src="js/screens/rooms.js"></script>
   <script src="js/screens/panel.js"></script>
   <script src="js/screens/schedule.js"></script>

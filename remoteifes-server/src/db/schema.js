@@ -46,8 +46,25 @@ function criarSchema() {
       presetId INTEGER REFERENCES presets(id),
       latitude REAL,
       longitude REAL,
+      acessoRestrito INTEGER NOT NULL DEFAULT 0,
       ultimoHeartbeat TEXT,
       atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sala_acessos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sala TEXT NOT NULL REFERENCES salas(sala),
+      usuarioId INTEGER NOT NULL REFERENCES usuarios(id),
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(sala, usuarioId)
+    );
+
+    CREATE TABLE IF NOT EXISTS esp_detectados (
+      mac TEXT PRIMARY KEY,
+      ip TEXT,
+      sala TEXT,
+      primeiraDeteccao TEXT NOT NULL DEFAULT (datetime('now')),
+      ultimaDeteccao TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS esp_eventos (
@@ -170,6 +187,9 @@ function migrarColunasSalas() {
   }
   if (!colunas.includes("longitude")) {
     db.exec(`ALTER TABLE salas ADD COLUMN longitude REAL`);
+  }
+  if (!colunas.includes("acessoRestrito")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN acessoRestrito INTEGER NOT NULL DEFAULT 0`);
   }
 }
 
