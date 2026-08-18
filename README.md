@@ -195,13 +195,13 @@ O script `npm run setup` usa `bash` e não roda no Windows. Nesse caso, faça ma
 
 ```powershell
 
-cd remoteifes-server
+    cd remoteifes-server
 
-npm install
+    npm install
 
-copy .env.example .env
+    copy .env.example .env
 
-npm start
+    npm start
 
 ```
 
