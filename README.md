@@ -2,7 +2,7 @@
 
 Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web, agendamento diário, presets configuráveis por ESP32 e um servidor central em Node.js.
 
-## Sumário
+## Sumário Teste
 
 - [Visão Geral](#visão-geral)
 - [Papéis e Permissões](#papéis-e-permissões)
