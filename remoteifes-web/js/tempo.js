@@ -1,6 +1,16 @@
 
 
 const Tempo = {
+  dataAtualBrasiliaISO() {
+    const formatador = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return formatador.format(new Date());
+  },
+
   formatarDataHora(datetimeUtcSqlite) {
     if (!datetimeUtcSqlite) return "—";
     const data = new Date(datetimeUtcSqlite.replace(" ", "T") + "Z");

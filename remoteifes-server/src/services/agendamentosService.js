@@ -74,8 +74,8 @@ function criar({ sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, 
   if (!data || !DATA_REGEX.test(data)) {
     throw new Error("informe uma data válida (AAAA-MM-DD) para o agendamento");
   }
-  if (data < dataAtualBrasiliaISO()) {
-    throw new Error("a data do agendamento não pode ser no passado");
+  if (data !== dataAtualBrasiliaISO()) {
+    throw new Error("o agendamento só pode ser feito para o dia atual");
   }
 
   if (!horaInicio || !horaFim || horaInicio >= horaFim) {

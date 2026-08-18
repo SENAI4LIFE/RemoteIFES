@@ -7,8 +7,11 @@ const MODO_NOME = {
 const agendaSalaSelect = document.getElementById("agendaSala");
 const agendaIntervaloRow = document.getElementById("agendaIntervaloRow");
 
+const agendaDataInput = document.getElementById("agendaData");
+
 const Schedule = {
   async aoAbrir() {
+    agendaDataInput.value = Tempo.dataAtualBrasiliaISO().split("-").reverse().join("/");
     await this.carregarSalas();
     await this.carregarAgendamentos();
   },
@@ -85,13 +88,7 @@ document.getElementById("criarAgendaBtn").addEventListener("click", async () => 
   errorEl.classList.add("hidden");
 
   const modo = document.querySelector('input[name="agendaModo"]:checked').value;
-  const data = document.getElementById("agendaData").value;
-
-  if (!data) {
-    errorEl.textContent = "selecione a data do agendamento";
-    errorEl.classList.remove("hidden");
-    return;
-  }
+  const data = Tempo.dataAtualBrasiliaISO();
 
   const dados = {
     sala: agendaSalaSelect.value,
@@ -111,6 +108,5 @@ document.getElementById("criarAgendaBtn").addEventListener("click", async () => 
     return;
   }
 
-  document.getElementById("agendaData").value = "";
   await Schedule.carregarAgendamentos();
 });
