@@ -43,7 +43,10 @@ router.post("/dispositivo/heartbeat", exigirDispositivo, (req, res) => {
     if (temperatura !== undefined) estadoReportado.temperatura = temperatura;
 
     const ipReportado = typeof ip === "string" && ip ? ip : req.ip;
-    const resultado = salasService.marcarOnline(sala, estadoReportado, mac, ipReportado);
+    const resultado = salasService.heartbeatDispositivo(sala, estadoReportado, mac, ipReportado);
+    if (resultado.pendente) {
+      return res.status(202).json({ ok: true, pendente: true, mensagem: "sala não cadastrada; dispositivo detectado e aguardando vinculação pelo administrador" });
+    }
     res.json({ ok: true, sala: resultado });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });

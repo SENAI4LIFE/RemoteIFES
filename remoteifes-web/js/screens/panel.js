@@ -7,11 +7,16 @@ async function openRoom(sala, nome) {
 
 function aplicarBloqueio(dados) {
   const banner = document.getElementById("lockBanner");
-  const controlesDesabilitados = dados.travadaParaMim;
+  const controlesDesabilitados = dados.travadaParaMim || dados.podeControlarEsta === false;
 
   ["btnOn", "btnOff", "tempUp", "tempDown"].forEach((id) => {
     document.getElementById(id).disabled = controlesDesabilitados;
   });
+
+  const avisoSomenteLeitura = document.getElementById("panelSomenteLeitura");
+  if (avisoSomenteLeitura) {
+    avisoSomenteLeitura.classList.toggle("hidden", dados.podeControlarEsta !== false);
+  }
 
   if (dados.bloqueio && !dados.bloqueio.souEu) {
     banner.textContent = `Sala reservada por ${dados.bloqueio.usuarioNome} até ${dados.bloqueio.horaFim} (agendamento ativo)`;

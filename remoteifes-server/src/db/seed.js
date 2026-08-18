@@ -4,41 +4,29 @@ const db = require("../config/database");
 const presetsService = require("../services/presetsService");
 const configuracoesService = require("../services/configuracoesService");
 
-const BLOCOS = ["A", "B"];
-const ANDARES = [1, 2, 3];
-const SALAS_POR_ANDAR = 3;
-
-const CAMPUS_LATITUDE = -20.6809;
-const CAMPUS_LONGITUDE = -40.4967;
+const SALAS_CAMPUS = require("./salasCampus");
 
 function popularSalas() {
-  const total = db.prepare("SELECT COUNT(*) AS n FROM salas").get().n;
-  if (total > 0) return;
-
   const inserir = db.prepare(`
-    INSERT INTO salas (sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo, latitude, longitude)
-    VALUES (?, ?, ?, ?, 0, 0, 24, 23, ?, ?)
+    INSERT OR IGNORE INTO salas (sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo)
+    VALUES (?, ?, ?, ?, 0, 0, 24, 23)
   `);
 
+  let criadas = 0;
   db.exec("BEGIN");
   try {
-    BLOCOS.forEach((bloco, blocoIdx) => {
-      ANDARES.forEach((andar) => {
-        for (let n = 1; n <= SALAS_POR_ANDAR; n++) {
-          const codigo = `${bloco}${andar}0${n}`;
-          const nome = `Sala ${codigo}`;
-          const latitude = CAMPUS_LATITUDE + blocoIdx * 0.0006 + (andar - 1) * 0.00012;
-          const longitude = CAMPUS_LONGITUDE + (n - 1) * 0.00018;
-          inserir.run(codigo, nome, bloco, andar, latitude, longitude);
-        }
-      });
+    SALAS_CAMPUS.forEach((s) => {
+      const resultado = inserir.run(s.codigo, s.nome, s.bloco, s.andar);
+      if (resultado.changes > 0) criadas += 1;
     });
     db.exec("COMMIT");
   } catch (erro) {
     db.exec("ROLLBACK");
     throw erro;
   }
-  console.log(`Seed: ${BLOCOS.length * ANDARES.length * SALAS_POR_ANDAR} salas criadas (todas offline).`);
+  if (criadas > 0) {
+    console.log(`Seed: ${criadas} salas criadas a partir da planta baixa do campus (todas offline).`);
+  }
 }
 
 function popularAdmin() {
