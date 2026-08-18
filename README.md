@@ -138,7 +138,7 @@ Depois abra o arquivo `.env` gerado e defina um valor para `DEVICE_TOKEN` (qualq
 **Em ambos os casos**, o banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
 
 - 70 salas reais do campus, extraídas da planta baixa (Bloco A e B, todos os pavimentos), todas offline até que os ESP32 correspondentes comecem a reportar
-- Um usuário `admin` com senha aleatória impressa no console (ou definida via `SENHA_ADMIN_INICIAL` em `.env`)
+- Um usuário `admin` com senha aleatória impressa no console (ou definida via `SENHA_ADMIN_INICIAL` em `.env`) — isso só acontece quando o `admin` ainda não existe no banco; se o banco já veio populado no clone, use `npm run reset-admin` (veja [Solução de Problemas](#solução-de-problemas))
 - O preset padrão, com a função de temperatura configurada entre 23 °C e 25 °C
 
 ## Instalação Detalhada
@@ -285,3 +285,4 @@ remoteifes-esp32/
 - **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Admin > ESP32 / Salas` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala.
 - **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`.
 - **Frontend não fala com o servidor depois do deploy**: confirme `serverUrl` em `remoteifes-web/js/config.js` e se `CORS_ORIGIN` no servidor inclui o domínio do frontend publicado.
+- **Senha inicial do admin não aparece no console após clonar**: a mensagem só é impressa quando o usuário `admin` é criado pela primeira vez no banco. Se `remoteifes-server/data/remoteifes.db` já veio junto no clone (por exemplo, commitado antes de existir um `.gitignore`), o `admin` já existe e a criação é pulada silenciosamente. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou presets já cadastrados; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.
