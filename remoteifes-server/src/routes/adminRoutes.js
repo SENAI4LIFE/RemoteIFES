@@ -9,8 +9,8 @@ const presetsService = require("../services/presetsService");
 const router = express.Router();
 router.use("/admin", exigirLogin, exigirAdmin);
 
-function parseId(req, res) {
-  const id = Number(req.params.id);
+function parseId(req, res, paramName = "id") {
+  const id = Number(req.params[paramName]);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ ok: false, erro: "id inválido" });
     return null;
@@ -161,8 +161,53 @@ router.get("/admin/salas", (req, res) => {
       ipEsp32: s.ipEsp32,
       mac: s.mac,
       presetId: s.presetId,
+      acessoRestrito: !!s.acessoRestrito,
     }))
   );
+});
+
+router.get("/admin/esp32/detectados", exigirSuperAdmin, (req, res) => {
+  res.json(salasService.listarDetectados());
+});
+
+router.delete("/admin/esp32/detectados/:mac", exigirSuperAdmin, (req, res) => {
+  try {
+    salasService.removerDetectado(req.params.mac);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.patch("/admin/salas/:sala/acesso-restrito", (req, res) => {
+  try {
+    const sala = salasService.definirAcessoRestrito(req.params.sala, !!req.body.restrito);
+    res.json({ ok: true, sala });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.get("/admin/salas/:sala/acesso", (req, res) => {
+  res.json(salasService.listarUsuariosComAcesso(req.params.sala));
+});
+
+router.post("/admin/salas/:sala/acesso/:usuarioId", (req, res) => {
+  const usuarioId = parseId(req, res, "usuarioId");
+  if (usuarioId === null) return;
+  try {
+    const usuarios = salasService.concederAcesso(req.params.sala, usuarioId);
+    res.json({ ok: true, usuarios });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.delete("/admin/salas/:sala/acesso/:usuarioId", (req, res) => {
+  const usuarioId = parseId(req, res, "usuarioId");
+  if (usuarioId === null) return;
+  const usuarios = salasService.revogarAcesso(req.params.sala, usuarioId);
+  res.json({ ok: true, usuarios });
 });
 
 router.get("/admin/configuracoes", (req, res) => {

@@ -27,6 +27,8 @@ router.get("/salas", exigirLogin, (req, res) => {
       agendadaAgora: !!agendadas[s.sala],
       latitude: s.latitude,
       longitude: s.longitude,
+      acessoRestrito: !!s.acessoRestrito,
+      podeControlarEsta: salasService.usuarioPodeControlarSala(req.usuario, s.sala),
     }))
   );
 });

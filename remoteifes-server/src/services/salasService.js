@@ -28,6 +28,48 @@ function registrarEventoEsp(sala, status) {
   db.prepare(`INSERT INTO esp_eventos (sala, status) VALUES (?, ?)`).run(sala, status);
 }
 
+function registrarDeteccaoEsp(mac, ip, sala = null) {
+  if (!mac) return;
+  const macLimpo = String(mac).trim().toUpperCase();
+  if (!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(macLimpo)) return;
+
+  const existente = db.prepare(`SELECT mac FROM esp_detectados WHERE mac = ?`).get(macLimpo);
+  if (existente) {
+    db.prepare(`
+      UPDATE esp_detectados SET ip = COALESCE(?, ip), sala = ?, ultimaDeteccao = datetime('now')
+      WHERE mac = ?
+    `).run(ip || null, sala, macLimpo);
+  } else {
+    db.prepare(`
+      INSERT INTO esp_detectados (mac, ip, sala) VALUES (?, ?, ?)
+    `).run(macLimpo, ip || null, sala);
+  }
+}
+
+function listarDetectados() {
+  return db.prepare(`
+    SELECT d.* FROM esp_detectados d
+    LEFT JOIN salas s ON s.mac = d.mac
+    WHERE s.mac IS NULL
+    ORDER BY d.ultimaDeteccao DESC
+  `).all();
+}
+
+function removerDetectado(mac) {
+  const macLimpo = mac ? String(mac).trim().toUpperCase() : null;
+  if (!macLimpo) throw new Error("MAC inválido");
+  db.prepare(`DELETE FROM esp_detectados WHERE mac = ?`).run(macLimpo);
+}
+
+function heartbeatDispositivo(sala, estadoReportado, mac, ip) {
+  registrarDeteccaoEsp(mac, ip, sala);
+  const salaRow = buscar(sala);
+  if (!salaRow) {
+    return { pendente: true };
+  }
+  return marcarOnline(sala, estadoReportado, mac, ip);
+}
+
 function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
@@ -76,6 +118,55 @@ function cadastrarMac(sala, mac) {
 
   db.prepare(`UPDATE salas SET mac = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(macLimpo, sala);
   return buscar(sala);
+}
+
+function definirAcessoRestrito(sala, restrito) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+  db.prepare(`UPDATE salas SET acessoRestrito = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(
+    restrito ? 1 : 0,
+    sala
+  );
+  return buscar(sala);
+}
+
+function listarUsuariosComAcesso(sala) {
+  return db.prepare(`
+    SELECT u.id, u.usuario, u.nome
+    FROM sala_acessos sa
+    JOIN usuarios u ON u.id = sa.usuarioId
+    WHERE sa.sala = ?
+    ORDER BY u.nome
+  `).all(sala);
+}
+
+function concederAcesso(sala, usuarioId) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+  db.prepare(`INSERT OR IGNORE INTO sala_acessos (sala, usuarioId) VALUES (?, ?)`).run(sala, usuarioId);
+  return listarUsuariosComAcesso(sala);
+}
+
+function revogarAcesso(sala, usuarioId) {
+  db.prepare(`DELETE FROM sala_acessos WHERE sala = ? AND usuarioId = ?`).run(sala, usuarioId);
+  return listarUsuariosComAcesso(sala);
+}
+
+function usuarioTemAcessoSala(usuarioId, sala) {
+  const registro = db.prepare(`SELECT id FROM sala_acessos WHERE sala = ? AND usuarioId = ?`).get(sala, usuarioId);
+  return !!registro;
+}
+
+function usuarioPodeControlarSala(usuario, sala) {
+  if (!usuario) return false;
+  if (usuario.isAdmin) return true;
+  if (!usuario.podeControlar) return false;
+
+  const salaRow = buscar(sala);
+  if (!salaRow) return false;
+  if (!salaRow.acessoRestrito) return true;
+
+  return usuarioTemAcessoSala(usuario.id, sala);
 }
 
 function definirPreset(sala, presetId) {
@@ -165,6 +256,8 @@ function statusCompleto(sala, requisitante) {
     temperaturaAlvo: salaRow.temperaturaAlvo,
     temperaturaMinima: configuracoesService.limitesTemperatura().minima,
     temperaturaMaxima: configuracoesService.limitesTemperatura().maxima,
+    acessoRestrito: !!salaRow.acessoRestrito,
+    podeControlarEsta: usuarioPodeControlarSala(requisitante, sala),
     bloqueio: bloqueio
       ? {
           usuarioNome: bloqueio.usuarioNome,
@@ -193,6 +286,10 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   if (!salaRow) throw new Error("sala não encontrada");
 
   if (origem === "manual" && usuario && !usuario.isAdmin) {
+    if (!usuarioPodeControlarSala(usuario, sala)) {
+      throw new Error("você não tem permissão para controlar esta sala");
+    }
+
     const bloqueio = bloqueioAtivo(sala);
     if (bloqueio && bloqueio.usuarioId !== usuario.id) {
       throw new Error(`sala reservada por agendamento de ${bloqueio.usuarioNome} até ${bloqueio.horaFim}`);
@@ -314,4 +411,14 @@ module.exports = {
   apagarAcessosEsp,
   cadastrarMac,
   definirPreset,
+  definirAcessoRestrito,
+  listarUsuariosComAcesso,
+  concederAcesso,
+  revogarAcesso,
+  usuarioTemAcessoSala,
+  usuarioPodeControlarSala,
+  registrarDeteccaoEsp,
+  listarDetectados,
+  removerDetectado,
+  heartbeatDispositivo,
 };

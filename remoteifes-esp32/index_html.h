@@ -281,6 +281,17 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
         <label for="carrierHz">Frequencia da Portadora (Hz)</label>
         <input type="number" id="carrierHz" value="38000" oninput="updateProfileJSON()" />
+
+        <label>Sala configurada</label>
+        <input type="text" id="infoSala" value="—" readonly />
+
+        <label>Endereco MAC deste ESP32</label>
+        <input type="text" id="infoMac" value="—" readonly />
+
+        <label>Endereco IP na rede</label>
+        <input type="text" id="infoIp" value="—" readonly />
+
+        <p class="hint">Use o endereco MAC acima para vincular este dispositivo a uma sala no painel de administracao (ESP32 / Salas), caso ele ainda nao apareca automaticamente na lista de dispositivos detectados.</p>
       </div>
 
       <div class="card">
@@ -753,7 +764,19 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       updateThermostatUI();
       byId('modeValue').innerText = 'OPERATION';
       byId('statusModeValue').innerText = 'OPERATION';
+      carregarInfoDispositivo();
     };
+
+    function carregarInfoDispositivo() {
+      fetch('/info')
+        .then((r) => r.json())
+        .then((info) => {
+          byId('infoSala').value = info.sala || '—';
+          byId('infoMac').value = info.mac || '—';
+          byId('infoIp').value = info.ip || '—';
+        })
+        .catch(() => {});
+    }
   </script>
 </body>
 </html>

@@ -21,15 +21,25 @@ function aplicarTextoLogin(tipo) {
   document.getElementById("loginForm").classList.toggle("login-form-admin", tipo === "admin");
 }
 
-document.querySelectorAll(".login-type-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".login-type-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    tipoLoginSelecionado = btn.dataset.tipo;
-    document.getElementById("username").value = "";
-    aplicarTextoLogin(tipoLoginSelecionado);
-  });
+function mostrarPortal() {
+  document.getElementById("mainApp").classList.add("hidden");
+  document.getElementById("screen-login").classList.add("hidden");
+  document.getElementById("screen-portal").classList.remove("hidden");
+}
+
+function mostrarLogin(tipo) {
+  document.getElementById("screen-portal").classList.add("hidden");
+  document.getElementById("screen-login").classList.remove("hidden");
+  document.getElementById("username").value = "";
+  tipoLoginSelecionado = tipo;
+  aplicarTextoLogin(tipo);
+}
+
+document.querySelectorAll(".portal-option").forEach((el) => {
+  el.addEventListener("click", () => mostrarLogin(el.dataset.tipo));
 });
+
+document.getElementById("loginVoltarBtn").addEventListener("click", mostrarPortal);
 
 function aplicarSessaoLogada(resp) {
   state.usuario = resp.usuario;
@@ -49,6 +59,7 @@ function aplicarSessaoLogada(resp) {
     el.classList.toggle("hidden", !resp.isSuperAdmin);
   });
 
+  document.getElementById("screen-portal").classList.add("hidden");
   document.getElementById("screen-login").classList.add("hidden");
   document.getElementById("mainApp").classList.remove("hidden");
 
@@ -92,7 +103,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   switchTab("salas");
 });
 
-function realizarLogout() {
+function realizarLogout({ manterTela = false } = {}) {
   IdleTimer.parar();
   state.usuario = null;
   state.nome = null;
@@ -111,13 +122,15 @@ function realizarLogout() {
   document.getElementById("gradeTabBtn").classList.add("hidden");
   document.querySelectorAll(".superadmin-only").forEach((el) => el.classList.add("hidden"));
   document.getElementById("mainApp").classList.add("hidden");
-  document.getElementById("screen-login").classList.remove("hidden");
   document.getElementById("loginForm").reset();
 
-  document.querySelectorAll(".login-type-btn").forEach((b) => b.classList.remove("active"));
-  document.querySelector('.login-type-btn[data-tipo="normal"]').classList.add("active");
-  tipoLoginSelecionado = "normal";
-  aplicarTextoLogin("normal");
+  if (manterTela) {
+    mostrarLogin(tipoLoginSelecionado);
+  } else {
+    mostrarPortal();
+    tipoLoginSelecionado = "normal";
+    aplicarTextoLogin("normal");
+  }
 }
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
@@ -126,9 +139,9 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 });
 
 window.addEventListener("app:sessao-expirada", () => {
-  if (!state.usuario) return; 
+  if (!state.usuario) return;
   Api.logout();
-  realizarLogout();
+  realizarLogout({ manterTela: true });
   const errorEl = document.getElementById("loginError");
   errorEl.textContent = "sua sessão expirou por inatividade — entre novamente";
   errorEl.classList.remove("hidden");

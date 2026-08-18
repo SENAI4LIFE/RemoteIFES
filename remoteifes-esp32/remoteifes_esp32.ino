@@ -51,6 +51,12 @@ unsigned long lastHeartbeat = 0;
 bool lastKnownPower = false;
 DeviceMode currentMode = MODE_OPERATION;
 
+bool wifiConectadoAnteriormente = true;
+unsigned long wifiDesconectadoDesde = 0;
+unsigned long ultimaTentativaReconexao = 0;
+const unsigned long INTERVALO_RECONEXAO = 15000;
+const unsigned long TEMPO_MAXIMO_SEM_WIFI_PARA_REINICIAR = 300000;
+
 String salaId;
 String serverHost;
 int serverPort = 0;
@@ -58,6 +64,7 @@ String deviceToken;
 
 void startAPMode();
 void handleRoot();
+void handleInfo();
 void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
 void handleIRCapture();
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency);
@@ -68,6 +75,7 @@ void sendHeartbeat();
 void reportAccess(const String& ip, const String& userAgent);
 void reportComando(const String& cmd, const String& valor);
 void requestAssignedPreset();
+void gerenciarConexaoWifi();
 void savePresetToServer(const String& nome, const String& funcoesSpec);
 String buildFuncoesJsonFromSpec(const String& funcoesSpec);
 String buildRawArrayJson(const uint16_t* rawArray, uint16_t length);
@@ -93,6 +101,8 @@ void setup() {
   if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
 
     int attempts = 0;
@@ -119,6 +129,7 @@ void setup() {
     const char* headerKeys[] = { "User-Agent" };
     server.collectHeaders(headerKeys, 1);
     server.on("/", handleRoot);
+    server.on("/info", handleInfo);
     server.begin();
     webSocket.begin();
     webSocket.onEvent(handleWebSocketEvent);
@@ -131,6 +142,8 @@ void loop() {
     dnsServer.processNextRequest();
     server.handleClient();
   } else {
+    gerenciarConexaoWifi();
+
     server.handleClient();
     webSocket.loop();
 
@@ -144,7 +157,7 @@ void loop() {
       readSensorsAndBroadcast();
     }
 
-    if (currentMillis - lastHeartbeat >= SERVER_HEARTBEAT_INTERVAL) {
+    if (currentMillis - lastHeartbeat >= SERVER_HEARTBEAT_INTERVAL && WiFi.status() == WL_CONNECTED) {
       lastHeartbeat = currentMillis;
       sendHeartbeat();
     }
@@ -153,6 +166,41 @@ void loop() {
 
 bool configuracaoValida() {
   return salaId.length() > 0 && serverHost.length() > 0 && serverPort > 0 && deviceToken.length() > 0;
+}
+
+void gerenciarConexaoWifi() {
+  unsigned long agora = millis();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiConectadoAnteriormente) {
+      Serial.println("Wi-Fi reconectado.");
+      Serial.print("IP: ");
+      Serial.println(WiFi.localIP());
+      webSocket.begin();
+      webSocket.onEvent(handleWebSocketEvent);
+      requestAssignedPreset();
+    }
+    wifiConectadoAnteriormente = true;
+    wifiDesconectadoDesde = 0;
+    return;
+  }
+
+  if (wifiConectadoAnteriormente) {
+    Serial.println("Wi-Fi desconectado. Tentando reconectar...");
+    wifiDesconectadoDesde = agora;
+  }
+  wifiConectadoAnteriormente = false;
+
+  if (wifiDesconectadoDesde != 0 && agora - wifiDesconectadoDesde >= TEMPO_MAXIMO_SEM_WIFI_PARA_REINICIAR) {
+    Serial.println("Sem Wi-Fi por tempo prolongado. Reiniciando o dispositivo.");
+    ESP.restart();
+  }
+
+  if (agora - ultimaTentativaReconexao >= INTERVALO_RECONEXAO) {
+    ultimaTentativaReconexao = agora;
+    Serial.println("Tentando WiFi.reconnect()...");
+    WiFi.reconnect();
+  }
 }
 
 void startAPMode() {
@@ -206,6 +254,16 @@ void startAPMode() {
 void handleRoot() {
   server.send_P(200, "text/html", INDEX_HTML);
   reportAccess(server.client().remoteIP().toString(), server.header("User-Agent"));
+}
+
+void handleInfo() {
+  String json = "{";
+  json += "\"sala\":\"" + salaId + "\",";
+  json += "\"mac\":\"" + WiFi.macAddress() + "\",";
+  json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
+  json += "\"servidor\":\"" + serverHost + ":" + String(serverPort) + "\"";
+  json += "}";
+  server.send(200, "application/json", json);
 }
 
 void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {

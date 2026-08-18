@@ -2,10 +2,12 @@
 
 Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web, agendamento diário, presets configuráveis por ESP32 e um servidor central em Node.js.
 
-## Sumário Teste
+## Sumário
 
 - [Visão Geral](#visão-geral)
 - [Papéis e Permissões](#papéis-e-permissões)
+- [Plantas Baixas e Seleção de Salas](#plantas-baixas-e-seleção-de-salas)
+- [Controle de Acesso por Sala](#controle-de-acesso-por-sala)
 - [Agendamentos](#agendamentos)
 - [Presets de Ar-Condicionado](#presets-de-ar-condicionado)
 - [Restrição de Rede](#restrição-de-rede)
@@ -48,6 +50,29 @@ O sistema tem três níveis de usuário:
 
 Todas as permissões são impostas no backend (não apenas escondidas na interface): rotas administrativas exigem `exigirAdmin`, e as rotas/campos críticos exigem `exigirSuperAdmin`.
 
+## Plantas Baixas e Seleção de Salas
+
+A aba **Salas** exibe por padrão a planta baixa real do campus (Bloco A e Bloco B, térreo/2º/3º pavimentos), com abas para alternar entre os seis setores. Cada sala com ar-condicionado controlado pelo sistema aparece destacada e colorida conforme seu estado:
+
+- cinza: offline (sem ESP32 reportando)
+- azul: online, desligado
+- verde: online, ligado
+- contorno amarelo: com agendamento ativo no momento
+
+Qualquer usuário autenticado pode visualizar a planta e o estado de todas as salas — isso inclui salas às quais o usuário não tem permissão de controle, que aparecem marcadas como "visualização" e cujos controles ficam desabilitados no painel. Um botão "Ver como lista" alterna para a navegação tradicional por bloco/andar (`Bloco → Andar → Sala`), preservada para quem preferir esse fluxo.
+
+As 70 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio.
+
+## Controle de Acesso por Sala
+
+Além da permissão geral "pode controlar" (nível de usuário), o administrador principal pode restringir salas individuais em `Admin > ESP32 / Salas`:
+
+1. Marcar uma sala como **acesso restrito** impede que qualquer usuário comum a controle, mesmo com a permissão geral ativa — exceto os usuários explicitamente autorizados para aquela sala.
+2. Usuários autorizados são concedidos/revogados individualmente, por sala, na mesma tela.
+3. Administradores (níveis 2 e 3) sempre podem controlar qualquer sala, independentemente de restrição.
+
+A verificação é feita no backend (`aplicarComando`), então mesmo chamadas diretas à API respeitam a restrição — a interface apenas reflete o estado (desabilitando os controles e mostrando um aviso de "somente leitura") para dar feedback imediato ao usuário.
+
 ## Agendamentos
 
 Agendamentos são **diários**: cada agendamento vale para uma única data (sem recorrência semanal). Apenas administradores podem criar, listar e gerenciar agendamentos — usuários comuns não têm acesso a essa funcionalidade, nem na interface nem na API.
@@ -66,7 +91,11 @@ Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de I
 
 ## Interface Web dos ESP32
 
-Cada ESP32 expõe sua própria interface de configuração local (aprendizado de IR, calibração, presets). O administrador principal pode acessar essa interface a partir de uma subpágina própria em `Admin > ESP32 / MACs`, que mostra o IP mais recente reportado pelo dispositivo e abre a interface local em uma nova aba. Esse acesso é restrito ao administrador principal tanto na interface quanto no backend.
+Cada ESP32 expõe sua própria interface de configuração local (aprendizado de IR, calibração, presets), incluindo uma seção "Informações do Aparelho" que mostra a sala configurada, o endereço MAC e o IP atual do dispositivo — útil para conferência visual direta no equipamento. O administrador principal pode acessar essa interface a partir de uma subpágina própria em `Admin > ESP32 / Salas`, que mostra o IP mais recente reportado pelo dispositivo e abre a interface local em uma nova aba. Esse acesso é restrito ao administrador principal tanto na interface quanto no backend.
+
+### Detecção automática de ESP32 na rede
+
+Todo ESP32 que envia um heartbeat ao servidor — mesmo que a sala ainda não esteja vinculada a ele — é registrado automaticamente. Em `Admin > ESP32 / Salas`, a seção "ESP32 detectados na rede" lista esses dispositivos (MAC, IP, última vez visto) e permite vincular cada um a uma sala existente com um único clique, sem precisar digitar o MAC manualmente. Um seletor de planta baixa no topo da mesma página permite localizar rapidamente o cartão de configuração de qualquer sala clicando nela no mapa.
 
 ## Requisitos
 
@@ -83,23 +112,40 @@ Cada ESP32 expõe sua própria interface de configuração local (aprendizado de
 
 ## Instalação Rápida
 
+**macOS/Linux:**
+
 ```bash
 cd remoteifes-server
 npm run setup
 npm start
 ```
 
-`npm run setup` instala as dependências, cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista) e gera automaticamente um `DEVICE_TOKEN` aleatório. O banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
+`npm run setup` instala as dependências, cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista) e gera automaticamente um `DEVICE_TOKEN` aleatório. Rodar `npm run setup` novamente não sobrescreve um `.env` já existente.
 
-- 18 salas de exemplo (ajuste conforme a realidade do campus, ou insira as salas reais diretamente no banco)
+**Windows (PowerShell/CMD):**
+
+O script `npm run setup` usa `bash` e não roda no Windows. Nesse caso, faça manualmente:
+
+```powershell
+cd remoteifes-server
+npm install
+copy .env.example .env
+npm start
+```
+
+Depois abra o arquivo `.env` gerado e defina um valor para `DEVICE_TOKEN` (qualquer string aleatória, ex.: `DEVICE_TOKEN=troque-por-um-valor-aleatorio`) — esse é o token usado pelos ESP32 para autenticar com o servidor, então precisa ficar igual no firmware de cada dispositivo.
+
+**Em ambos os casos**, o banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
+
+- 70 salas reais do campus, extraídas da planta baixa (Bloco A e B, todos os pavimentos), todas offline até que os ESP32 correspondentes comecem a reportar
 - Um usuário `admin` com senha aleatória impressa no console (ou definida via `SENHA_ADMIN_INICIAL` em `.env`)
 - O preset padrão, com a função de temperatura configurada entre 23 °C e 25 °C
-
-Rodar `npm run setup` novamente não sobrescreve um `.env` já existente.
 
 ## Instalação Detalhada
 
 ### Servidor central
+
+**macOS/Linux:**
 
 ```bash
 cd remoteifes-server
@@ -108,7 +154,16 @@ cp .env.example .env
 npm start
 ```
 
-Edite `.env` conforme a seção [Configuração](#configuração) antes de colocar o servidor em produção — em especial `DEVICE_TOKEN` (que `npm run setup` já gera automaticamente) e, quando `NODE_ENV=production`, `CORS_ORIGIN`.
+**Windows (PowerShell/CMD):**
+
+```powershell
+cd remoteifes-server
+npm install
+copy .env.example .env
+npm start
+```
+
+Edite `.env` conforme a seção [Configuração](#configuração) antes de colocar o servidor em produção — em especial `DEVICE_TOKEN` (gerado automaticamente pelo `npm run setup` no macOS/Linux; no Windows, defina manualmente como descrito acima) e, quando `NODE_ENV=production`, `CORS_ORIGIN`.
 
 ### Frontend
 
@@ -143,12 +198,14 @@ Estas configurações são armazenadas no banco (tabela `configuracoes`) e só p
 
 Administradores comuns podem visualizar essas configurações, mas não alterá-las.
 
-### ESP32 por MAC e presets (via `Admin > ESP32 / MACs`)
+### ESP32 por MAC e presets (via `Admin > ESP32 / Salas`)
 
-O administrador principal cadastra o endereço MAC de cada ESP32 autorizado para uma sala. Isso faz duas coisas:
+O administrador principal cadastra o endereço MAC de cada ESP32 autorizado para uma sala — manualmente ou vinculando um dispositivo já detectado na rede (veja [Detecção automática de ESP32 na rede](#interface-web-dos-esp32)). Isso faz duas coisas:
 
 1. Impede que um ESP32 não autorizado assuma a identidade de uma sala: se a sala já tem um MAC cadastrado, o servidor rejeita heartbeats de qualquer outro MAC.
 2. Permite escolher, por sala, qual preset de ar-condicionado está em uso.
+
+Na mesma tela, o administrador também define se uma sala tem **acesso restrito** e quais usuários específicos podem controlá-la — veja [Controle de Acesso por Sala](#controle-de-acesso-por-sala).
 
 ## Deploy
 
@@ -163,15 +220,20 @@ O servidor central roda como um processo Node.js comum. Recomenda-se:
 
 ### Frontend no GitHub Pages
 
-O repositório inclui um workflow (`.github/workflows/deploy-pages.yml`) que publica `remoteifes-web` no GitHub Pages a cada push na branch `main` que alterar essa pasta. Para ativar:
+O repositório inclui um workflow (`.github/workflows/deploy-pages.yml`) que publica `remoteifes-web` no GitHub Pages a cada push na branch `main` que alterar essa pasta. Passo a passo para ativar:
 
-1. Em **Settings > Pages** do repositório, selecione a origem "GitHub Actions".
-2. Edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção.
-3. Faça o push — o workflow publica automaticamente.
+1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
+2. No repositório, vá em **Settings > Pages**.
+3. Em "Build and deployment", campo "Source", selecione **GitHub Actions** (não "Deploy from a branch").
+4. Edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção (não use `localhost` aqui — esse endereço só funciona na sua própria máquina).
+5. Faça commit e push dessa alteração na branch `main` — o workflow roda automaticamente e publica o site.
+6. Acompanhe o progresso em **Actions**, na aba do workflow "Deploy Pages". Quando o job terminar com sucesso, volte em **Settings > Pages**: o endereço público do site aparece no topo da página, no formato `https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`.
+
+Esse é o link que você compartilha com os usuários para acessar o sistema pelo navegador.
 
 ## Domínio Próprio e HTTPS
 
-Para servir o frontend em um domínio próprio via GitHub Pages:
+Para servir o frontend em um domínio próprio (em vez do endereço `github.io` padrão) via GitHub Pages:
 
 1. Crie um arquivo `remoteifes-web/CNAME` contendo apenas o domínio desejado (ex.: `remoteifes.ifes.edu.br`), ou configure o campo "Custom domain" em **Settings > Pages**.
 2. Aponte um registro `CNAME` (ou `A`, se for domínio raiz) do seu DNS para o GitHub Pages, conforme a [documentação oficial do GitHub](https://docs.github.com/pages/configuring-a-custom-domain-for-your-github-pages-site).
@@ -191,7 +253,7 @@ remoteifes-server/
   setup.sh        instalação e configuração automatizadas (dependências, .env, DEVICE_TOKEN)
   src/
     config/       conexão com o banco SQLite
-    db/           schema e seed
+    db/           schema, seed e a lista de salas reais do campus (salasCampus.js)
     middlewares/  autenticação, permissões, restrição de rede
     routes/       rotas HTTP (login, salas, comandos, agendamentos, admin, dispositivo)
     services/     regras de negócio (usuários, salas, agendamentos, presets, configurações)
@@ -200,7 +262,8 @@ remoteifes-server/
 
 remoteifes-web/
   js/
-    screens/      lógica de cada tela (login, salas, painel, agendamentos, grade, admin)
+    screens/      lógica de cada tela (login, salas, planta baixa, painel, agendamentos, grade, admin)
+    floorplan.js  componente reutilizável de planta baixa (usado na tela de salas e no painel do admin)
     api.js        chamadas HTTP à API central
     config.js     endereço do servidor central (editar para cada ambiente/domínio)
     state.js      estado da sessão atual no navegador
@@ -214,6 +277,9 @@ remoteifes-esp32/
 
 - **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
 - **ESP32 não aparece como online**: verifique se o `DEVICE_TOKEN` configurado no firmware é idêntico ao do `.env` do servidor, e se o ESP32 consegue alcançar o endereço/porta do servidor pela rede local.
-- **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / MACs`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
+- **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / Salas`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
+- **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: a sala reportada no heartbeat não existe (ou foi digitada errado) durante a configuração inicial do dispositivo; vincule o MAC detectado a uma sala existente em `Admin > ESP32 / Salas`, ou reconfigure o ESP32 com o código de sala correto.
+- **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 15s e reinicia sozinho após 5 minutos sem rede; se isso persistir, verifique o sinal Wi-Fi no local ou se o roteiro/AP mudou de canal ou senha.
+- **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Admin > ESP32 / Salas` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala.
 - **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`.
 - **Frontend não fala com o servidor depois do deploy**: confirme `serverUrl` em `remoteifes-web/js/config.js` e se `CORS_ORIGIN` no servidor inclui o domínio do frontend publicado.

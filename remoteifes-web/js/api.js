@@ -260,4 +260,38 @@ const Api = {
   async removerFuncaoPreset(funcaoId) {
     return chamar(`/admin/presets/funcoes/${funcaoId}`, { method: "DELETE", headers: headersComToken() });
   },
+
+  async listarDetectados() {
+    return chamar("/admin/esp32/detectados", { headers: headersComToken() });
+  },
+
+  async removerDetectado(mac) {
+    return chamar(`/admin/esp32/detectados/${encodeURIComponent(mac)}`, { method: "DELETE", headers: headersComToken() });
+  },
+
+  async definirAcessoRestrito(sala, restrito) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/acesso-restrito`, {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ restrito }),
+    });
+  },
+
+  async listarAcessoSala(sala) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/acesso`, { headers: headersComToken() });
+  },
+
+  async concederAcessoSala(sala, usuarioId) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/acesso/${usuarioId}`, {
+      method: "POST",
+      headers: headersComToken(),
+    });
+  },
+
+  async revogarAcessoSala(sala, usuarioId) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/acesso/${usuarioId}`, {
+      method: "DELETE",
+      headers: headersComToken(),
+    });
+  },
 };
