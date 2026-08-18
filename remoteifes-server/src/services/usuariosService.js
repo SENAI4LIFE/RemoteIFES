@@ -101,6 +101,19 @@ function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante
   return paraSaida(buscarPorId(id));
 }
 
+function trocarNome(id, novoNome, requisitante) {
+  const usuario = buscarPorId(id);
+  if (!usuario) throw new Error("usuário não encontrado");
+  if (usuario.nivel === NIVEL_SUPERADMIN && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
+    throw new Error("apenas o administrador principal pode alterar o próprio nome");
+  }
+  if (!novoNome || !novoNome.trim()) throw new Error("informe o novo nome");
+
+  const nomeLimpo = novoNome.trim();
+  db.prepare(`UPDATE usuarios SET nome = ? WHERE id = ?`).run(nomeLimpo, id);
+  return paraSaida(buscarPorId(id));
+}
+
 function trocarLogin(id, novoLogin, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
@@ -148,6 +161,7 @@ module.exports = {
   buscarPorId,
   criar,
   atualizarPermissoes,
+  trocarNome,
   trocarLogin,
   trocarSenha,
   remover,

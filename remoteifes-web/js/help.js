@@ -10,7 +10,7 @@ const HelpContent = {
   planta: {
     titulo: "Como usar: Planta baixa",
     itens: [
-      { titulo: "Salas coloridas", texto: "Possuem ar-condicionado controlado pelo sistema — toque para abrir o painel de controle." },
+      { titulo: "Salas coloridas", texto: "Possuem ar-condicionado controlado pelo sistema: toque para abrir o painel de controle." },
       { titulo: "Salas sem cor", texto: "Não possuem dispositivo cadastrado ainda." },
       { titulo: "Legenda", texto: "Offline (sem contato recente), online desligado, online ligado, e reservada agora (agendamento ativo)." },
       { titulo: "Abas", texto: "Alternam entre os blocos e andares disponíveis." },
@@ -58,6 +58,7 @@ const HelpContent = {
     titulo: "Como usar: Usuários",
     itens: [
       { titulo: "Novo usuário", texto: "Cria um login com senha inicial; a permissão de controlar salas pode ser marcada na criação." },
+      { titulo: "Trocar nome", texto: "Qualquer administrador pode alterar o nome de exibição de um usuário." },
       { titulo: "Conceder/revogar admin", texto: "Somente o administrador principal pode promover ou rebaixar outros administradores." },
       { titulo: "Controlar salas", texto: "Define se o usuário pode ligar/desligar e ajustar temperatura, além de apenas visualizar." },
       { titulo: "Desativar", texto: "Impede o login do usuário sem apagar seu histórico." },
@@ -74,7 +75,7 @@ const HelpContent = {
     titulo: "Como usar: Sessões",
     itens: [
       { titulo: "Filtrar por data", texto: "Mostra apenas as sessões iniciadas no dia escolhido." },
-      { titulo: "Apagar histórico", texto: "Remove os registros de sessão da data selecionada ou de todo o sistema — ação irreversível." },
+      { titulo: "Apagar histórico", texto: "Remove os registros de sessão da data selecionada ou de todo o sistema: ação irreversível." },
     ],
   },
   logs: {
@@ -82,7 +83,7 @@ const HelpContent = {
     itens: [
       { titulo: "O que é registrado", texto: "Cada comando de ligar, desligar ou ajuste de temperatura enviado a uma sala." },
       { titulo: "Origem", texto: "Indica se o comando veio de um usuário, de um agendamento ou do próprio sistema." },
-      { titulo: "Apagar logs", texto: "Remove os registros da data selecionada ou de todo o histórico — ação irreversível." },
+      { titulo: "Apagar logs", texto: "Remove os registros da data selecionada ou de todo o histórico: ação irreversível." },
     ],
   },
   dispositivos: {
@@ -97,7 +98,7 @@ const HelpContent = {
     itens: [
       { titulo: "O que é registrado", texto: "Cada requisição feita por um ESP32 ao servidor, com o IP de origem." },
       { titulo: "Uso", texto: "Útil para diagnosticar problemas de rede ou identificar dispositivos com comportamento incomum." },
-      { titulo: "Apagar acessos", texto: "Remove os registros da data selecionada ou de todo o histórico — ação irreversível." },
+      { titulo: "Apagar acessos", texto: "Remove os registros da data selecionada ou de todo o histórico: ação irreversível." },
     ],
   },
   mapa: {
@@ -131,7 +132,7 @@ const HelpContent = {
     itens: [
       { titulo: "Sessão por inatividade", texto: "Tempo sem uso até deslogar automaticamente; deixe em branco para nunca deslogar por tempo." },
       { titulo: "Presença online", texto: "Por quantos minutos sem uso um usuário ainda aparece como online no painel de Ativos." },
-      { titulo: "Configurações críticas", texto: "Limites de temperatura, modo de teste e redes autorizadas — visíveis apenas ao administrador principal." },
+      { titulo: "Configurações críticas", texto: "Limites de temperatura, modo de teste e redes autorizadas: visíveis apenas ao administrador principal." },
     ],
   },
 };
@@ -142,7 +143,7 @@ const Help = {
     if (!dados) return;
     document.getElementById("helpModalTitle").textContent = dados.titulo;
     document.getElementById("helpModalList").innerHTML = dados.itens
-      .map((item) => `<li><strong>${item.titulo}</strong> — ${item.texto}</li>`)
+      .map((item) => `<li><strong>${item.titulo}:</strong> ${item.texto}</li>`)
       .join("");
     document.getElementById("helpModal").classList.remove("hidden");
   },

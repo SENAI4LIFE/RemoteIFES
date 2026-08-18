@@ -46,6 +46,17 @@ router.patch("/admin/usuarios/:id", (req, res) => {
   }
 });
 
+router.patch("/admin/usuarios/:id/nome", (req, res) => {
+  const id = parseId(req, res);
+  if (id === null) return;
+  try {
+    const atualizado = usuariosService.trocarNome(id, req.body.novoNome, req.usuario);
+    res.json({ ok: true, usuario: atualizado });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
 router.patch("/admin/usuarios/:id/login", (req, res) => {
   const id = parseId(req, res);
   if (id === null) return;
