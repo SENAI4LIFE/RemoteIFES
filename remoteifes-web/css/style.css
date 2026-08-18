@@ -12,9 +12,10 @@
   --warn: #8a6d1a;
   --warn-soft: #fbf3d9;
   --radius: 10px;
-  --a11y-zoom: 0.85;
+  --a11y-zoom: 1;
   --a11y-letter-spacing: 0em;
   --a11y-line-height: 1.2;
+  --a11y-paragraph-width: none;
 }
 
 * { box-sizing: border-box; }
@@ -24,10 +25,44 @@ html { zoom: var(--a11y-zoom); }
 body { letter-spacing: var(--a11y-letter-spacing); }
 body, p, li, .room-sub, .help-list li { line-height: var(--a11y-line-height); }
 
+p, li, .room-sub, .help-list li { max-width: var(--a11y-paragraph-width); }
+
 body.a11y-dyslexic-font,
 body.a11y-dyslexic-font * {
   font-family: "Comic Sans MS", "Comic Sans", Verdana, sans-serif !important;
 }
+
+body.a11y-font-serif,
+body.a11y-font-serif * {
+  font-family: Georgia, "Times New Roman", Times, serif !important;
+}
+
+body.a11y-font-sans,
+body.a11y-font-sans * {
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+body.a11y-kerning-off,
+body.a11y-kerning-off * {
+  font-kerning: none !important;
+}
+
+img {
+  opacity: var(--a11y-image-opacity, 1);
+}
+
+body.a11y-font-color-on {
+  --text: var(--a11y-custom-font-color, var(--text));
+}
+
+p, li, .room-sub, .help-list li, .hint {
+  color: var(--a11y-custom-text-color, inherit);
+}
+
+body.a11y-align-left p, body.a11y-align-left li, body.a11y-align-left .hint, body.a11y-align-left .room-sub, body.a11y-align-left .help-list li { text-align: left !important; }
+body.a11y-align-center p, body.a11y-align-center li, body.a11y-align-center .hint, body.a11y-align-center .room-sub, body.a11y-align-center .help-list li { text-align: center !important; }
+body.a11y-align-right p, body.a11y-align-right li, body.a11y-align-right .hint, body.a11y-align-right .room-sub, body.a11y-align-right .help-list li { text-align: right !important; }
+body.a11y-align-justify p, body.a11y-align-justify li, body.a11y-align-justify .hint, body.a11y-align-justify .room-sub, body.a11y-align-justify .help-list li { text-align: justify !important; }
 
 body.a11y-link-highlight a,
 body.a11y-link-highlight .link-btn {
@@ -642,7 +677,7 @@ button.btn:disabled {
 
 .floorplan-scope { font-family: Arial, Helvetica, sans-serif; color: #111; }
 .floorplan-scope h2 { font-size: 15px; margin: 0 0 10px 2px; color: var(--text); }
-.floorplan-scope .plan-wrap { box-sizing: border-box; overflow-x: auto; overflow-y: hidden; background: #fff; border: 2px solid #ccc; border-radius: var(--radius); padding: 10px; }
+.floorplan-scope .plan-wrap { overflow-x: auto; overflow-y: hidden; background: #fff; border: 3px solid #ccc; border-radius: var(--radius); padding: 10px; }
 /* Na tela "Plantas Baixas" o fitToWidth() sempre encolhe o mapa para caber na largura
    disponível, então a planta completa já fica visível — o scroll horizontal é desnecessário. */
 #screen-floorplan .floorplan-scope .plan-wrap { overflow-x: hidden; }
@@ -901,12 +936,16 @@ button.btn:disabled {
 .readonly-badge { background: #e7e9ec; color: var(--text-muted); }
 
 #screen-floorplan.screen {
-  max-width: 900px;
+  max-width: 1320px;
   margin: 0 auto;
 }
 
 @media (min-width: 940px) {
-  #app:has(#screen-floorplan:not(.hidden)) { max-width: 940px; }
+  #app:has(#screen-floorplan:not(.hidden)) {
+    max-width: 1320px;
+    margin-left: max(12px, calc((100vw - 1320px) / 2));
+    margin-right: auto;
+  }
 }
 
 /* Largura fixa e única para TODAS as abas de Administração — evita que a barra lateral
@@ -965,18 +1004,20 @@ button.btn:disabled {
   padding: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   width: 280px;
+  max-height: 78vh;
+  overflow-y: auto;
 }
 .a11y-panel.hidden { display: none; }
 
 .a11y-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
-.a11y-panel-title { font-weight: 700; color: var(--text); font-size: 14px; }
+.a11y-panel-title { font-weight: 700; color: var(--text); font-size: 14px; flex: 1; }
 .a11y-close-btn {
   border: none;
   background: none;
@@ -989,7 +1030,6 @@ button.btn:disabled {
 .a11y-close-btn:hover { color: var(--text); }
 
 .a11y-group { margin-bottom: 8px; }
-.a11y-group:last-of-type { margin-bottom: 10px; }
 
 .a11y-panel-label {
   display: block;
@@ -1043,17 +1083,83 @@ button.btn:disabled {
 }
 
 .a11y-reset-all-btn {
-  width: 100%;
+  flex-shrink: 0;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
   border-radius: 8px;
-  padding: 8px 0;
-  font-size: 12.5px;
+  padding: 5px 8px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
 }
 .a11y-reset-all-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+.a11y-color-row { align-items: center; }
+.a11y-color-input {
+  width: 34px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.a11y-color-row .a11y-reset-btn { flex: 1; }
+
+.a11y-align-row .a11y-toggle-option-btn,
+.a11y-font-type-row .a11y-toggle-option-btn {
+  font-size: 11px;
+  padding: 6px 2px;
+}
+
+.a11y-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.a11y-slider-step {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.a11y-slider-step:hover { border-color: var(--ifes-green); }
+.a11y-slider {
+  flex: 1;
+  accent-color: var(--ifes-green);
+  height: 4px;
+  cursor: pointer;
+}
+.a11y-slider-value {
+  flex: 0 0 auto;
+  min-width: 30px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.a11y-slider-reset-btn {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ifes-green-dark);
+  border-radius: 8px;
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.a11y-slider-reset-btn:hover { border-color: var(--ifes-green); }
 
 .help-fab-widget {
   position: fixed;

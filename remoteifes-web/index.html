@@ -787,7 +787,33 @@
     <div id="a11yPanel" class="a11y-panel hidden" role="dialog" aria-label="Acessibilidade">
       <div class="a11y-panel-header">
         <span class="a11y-panel-title">Acessibilidade</span>
+        <button type="button" id="a11yResetAllBtn" class="a11y-reset-all-btn">Redefinir tudo</button>
         <button type="button" id="a11yCloseBtn" class="a11y-close-btn" aria-label="Fechar painel de acessibilidade">&times;</button>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Cor de fonte</span>
+        <div class="a11y-panel-row a11y-color-row">
+          <input type="color" id="a11yFontColorInput" class="a11y-color-input" value="#1f2b23" aria-label="Escolher cor de fonte">
+          <button type="button" id="a11yFontColorResetBtn" class="a11y-step-btn a11y-reset-btn">Redefinir</button>
+        </div>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Tipo de fonte</span>
+        <div class="a11y-panel-row a11y-font-type-row">
+          <button type="button" id="a11yFontTypeDefaultBtn" class="a11y-toggle-option-btn is-active" data-font-type="default">Redefinir</button>
+          <button type="button" id="a11yFontTypeSerifBtn" class="a11y-toggle-option-btn" data-font-type="serif">Serif</button>
+          <button type="button" id="a11yFontTypeSansBtn" class="a11y-toggle-option-btn" data-font-type="sans">Sans Serif</button>
+          <button type="button" id="a11yFontTypeDyslexicBtn" class="a11y-toggle-option-btn" data-font-type="dyslexic">Dislexia</button>
+        </div>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Font Kerning</span>
+        <div class="a11y-panel-row">
+          <button type="button" id="a11yKerningToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Desligar</button>
+        </div>
       </div>
 
       <div class="a11y-group">
@@ -800,29 +826,69 @@
       </div>
 
       <div class="a11y-group">
-        <span class="a11y-panel-label">Espaçamento entre letras</span>
-        <div class="a11y-panel-row">
-          <button type="button" id="a11ySpacingDecreaseBtn" class="a11y-step-btn" aria-label="Diminuir espaçamento entre letras">&minus;</button>
-          <button type="button" id="a11ySpacingResetBtn" class="a11y-step-btn a11y-reset-btn" aria-label="Espaçamento padrão">Padrão</button>
-          <button type="button" id="a11ySpacingIncreaseBtn" class="a11y-step-btn" aria-label="Aumentar espaçamento entre letras">+</button>
+        <span class="a11y-panel-label">Visibilidade da imagem</span>
+        <div class="a11y-slider-row">
+          <button type="button" id="a11yImageOpacityDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir visibilidade da imagem">&minus;</button>
+          <input type="range" id="a11yImageOpacitySlider" class="a11y-slider" min="0" max="100" step="10" value="100" aria-label="Visibilidade da imagem">
+          <span class="a11y-slider-value" id="a11yImageOpacityValue">100</span>
+          <button type="button" id="a11yImageOpacityIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar visibilidade da imagem">+</button>
         </div>
+        <button type="button" id="a11yImageOpacityResetBtn" class="a11y-slider-reset-btn">Redefinir</button>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Espaçamento entre letras</span>
+        <div class="a11y-slider-row">
+          <button type="button" id="a11ySpacingDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir espaçamento entre letras">&minus;</button>
+          <input type="range" id="a11ySpacingSlider" class="a11y-slider" min="0" max="0.15" step="0.01" value="0" aria-label="Espaçamento entre letras">
+          <span class="a11y-slider-value" id="a11ySpacingValue">0</span>
+          <button type="button" id="a11ySpacingIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar espaçamento entre letras">+</button>
+        </div>
+        <button type="button" id="a11ySpacingResetBtn" class="a11y-slider-reset-btn">Redefinir</button>
       </div>
 
       <div class="a11y-group">
         <span class="a11y-panel-label">Altura da linha</span>
-        <div class="a11y-panel-row">
-          <button type="button" id="a11yLineDecreaseBtn" class="a11y-step-btn" aria-label="Diminuir altura da linha">&minus;</button>
-          <button type="button" id="a11yLineResetBtn" class="a11y-step-btn a11y-reset-btn" aria-label="Altura de linha padrão">Padrão</button>
-          <button type="button" id="a11yLineIncreaseBtn" class="a11y-step-btn" aria-label="Aumentar altura da linha">+</button>
+        <div class="a11y-slider-row">
+          <button type="button" id="a11yLineDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir altura da linha">&minus;</button>
+          <input type="range" id="a11yLineSlider" class="a11y-slider" min="1.2" max="2.2" step="0.1" value="1.2" aria-label="Altura da linha">
+          <span class="a11y-slider-value" id="a11yLineValue">1.2</span>
+          <button type="button" id="a11yLineIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar altura da linha">+</button>
+        </div>
+        <button type="button" id="a11yLineResetBtn" class="a11y-slider-reset-btn">Redefinir</button>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Cor do texto</span>
+        <div class="a11y-panel-row a11y-color-row">
+          <input type="color" id="a11yTextColorInput" class="a11y-color-input" value="#1f2b23" aria-label="Escolher cor do texto">
+          <button type="button" id="a11yTextColorResetBtn" class="a11y-step-btn a11y-reset-btn">Redefinir</button>
+        </div>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Largura do parágrafo</span>
+        <div class="a11y-slider-row">
+          <button type="button" id="a11yParagraphDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir largura do parágrafo">&minus;</button>
+          <input type="range" id="a11yParagraphSlider" class="a11y-slider" min="0" max="4" step="1" value="0" aria-label="Largura do parágrafo">
+          <span class="a11y-slider-value" id="a11yParagraphValue">Padrão</span>
+          <button type="button" id="a11yParagraphIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar largura do parágrafo">+</button>
+        </div>
+        <button type="button" id="a11yParagraphResetBtn" class="a11y-slider-reset-btn">Redefinir</button>
+      </div>
+
+      <div class="a11y-group">
+        <span class="a11y-panel-label">Text Alignment</span>
+        <div class="a11y-panel-row a11y-align-row">
+          <button type="button" id="a11yAlignDefaultBtn" class="a11y-toggle-option-btn is-active" data-align="default">Redefinir</button>
+          <button type="button" id="a11yAlignLeftBtn" class="a11y-toggle-option-btn" data-align="left" aria-label="Alinhar à esquerda">Left</button>
+          <button type="button" id="a11yAlignCenterBtn" class="a11y-toggle-option-btn" data-align="center" aria-label="Centralizar">Center</button>
+          <button type="button" id="a11yAlignRightBtn" class="a11y-toggle-option-btn" data-align="right" aria-label="Alinhar à direita">Right</button>
+          <button type="button" id="a11yAlignJustifyBtn" class="a11y-toggle-option-btn" data-align="justify" aria-label="Justificar">Justify</button>
         </div>
       </div>
 
       <div class="a11y-toggles-row">
-        <div class="a11y-group">
-          <span class="a11y-panel-label">Dislexia</span>
-          <button type="button" id="a11yDyslexicToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
-        </div>
-
         <div class="a11y-group">
           <span class="a11y-panel-label">Links</span>
           <button type="button" id="a11yLinkHighlightToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
@@ -833,8 +899,6 @@
           <button type="button" id="a11yContrastToggleBtn" class="a11y-toggle-option-btn" aria-pressed="false">Ativar</button>
         </div>
       </div>
-
-      <button type="button" id="a11yResetAllBtn" class="a11y-reset-all-btn">Redefinir tudo</button>
     </div>
   </div>
 
