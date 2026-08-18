@@ -220,16 +220,17 @@ O servidor central roda como um processo Node.js comum. Recomenda-se:
 
 ### Frontend no GitHub Pages
 
-O repositório inclui um workflow (`.github/workflows/deploy-pages.yml`) que publica `remoteifes-web` no GitHub Pages a cada push na branch `main` que alterar essa pasta. Passo a passo para ativar:
+A publicação do `remoteifes-web` no GitHub Pages é manual (não há workflow de Actions no repositório). Passo a passo para publicar:
 
 1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
-2. No repositório, vá em **Settings > Pages**.
-3. Em "Build and deployment", campo "Source", selecione **GitHub Actions** (não "Deploy from a branch").
-4. Edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção (não use `localhost` aqui — esse endereço só funciona na sua própria máquina).
-5. Faça commit e push dessa alteração na branch `main` — o workflow roda automaticamente e publica o site.
-6. Acompanhe o progresso em **Actions**, na aba do workflow "Deploy Pages". Quando o job terminar com sucesso, volte em **Settings > Pages**: o endereço público do site aparece no topo da página, no formato `https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`.
+2. Edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção (não use `localhost` aqui — esse endereço só funciona na sua própria máquina).
+3. Faça commit e push dessa alteração na branch `main`.
+4. No repositório, vá em **Settings > Pages**.
+5. Em "Build and deployment", campo "Source", selecione **Deploy from a branch**.
+6. Em "Branch", selecione `main` e a pasta `/remoteifes-web`, depois clique em **Save**.
+7. Acompanhe o progresso na própria página de **Settings > Pages**. Quando a publicação terminar, o endereço público do site aparece no topo da página, no formato `https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`.
 
-Esse é o link que você compartilha com os usuários para acessar o sistema pelo navegador.
+Esse é o link que você compartilha com os usuários para acessar o sistema pelo navegador. Sempre que `remoteifes-web` for alterado, repita os passos 3 (commit/push) — o GitHub Pages republica automaticamente a partir da branch configurada a cada push, sem necessidade de repetir os passos 4–6.
 
 ## Domínio Próprio e HTTPS
 
@@ -244,7 +245,7 @@ Com o frontend e o servidor central ambos em HTTPS e domínios próprios, o sist
 
 ## Uso da API do GitHub
 
-Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita a hospedagem de código-fonte e à publicação estática do frontend via GitHub Pages, orquestrada pelo workflow de Actions (`actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`). Não é necessário nenhum token de API do GitHub além do `GITHUB_TOKEN` padrão que o Actions já injeta automaticamente no workflow para publicar o Pages.
+Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita a hospedagem de código-fonte e à publicação estática do frontend via GitHub Pages, configurada manualmente em **Settings > Pages** (branch `main`, pasta `/remoteifes-web`). Não é necessário nenhum token ou workflow de Actions para isso.
 
 ## Estrutura de Pastas
 
@@ -263,6 +264,7 @@ remoteifes-server/
 remoteifes-web/
   js/
     screens/      lógica de cada tela (login, salas, planta baixa, painel, agendamentos, grade, admin)
+    a11y.js       widget de acessibilidade (zoom da interface, botão flutuante, persiste escolha no localStorage)
     floorplan.js  componente reutilizável de planta baixa (usado na tela de salas e no painel do admin)
     api.js        chamadas HTTP à API central
     config.js     endereço do servidor central (editar para cada ambiente/domínio)
