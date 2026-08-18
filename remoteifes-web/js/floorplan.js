@@ -29,7 +29,8 @@ const Floorplan = {
           return;
         }
 
-        const availableWidth = wrap.clientWidth || naturalWidth;
+        const availableWidth = wrap.clientWidth;
+        if (!availableWidth) return;
 
         let scale = availableWidth / naturalWidth;
         if (scale > 1) scale = 1;
