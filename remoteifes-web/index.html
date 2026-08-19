@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RemoteIFES</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=3" />
 </head>
 <body>
 
@@ -21,25 +21,67 @@
   <main id="app">
 
     <section id="screen-portal" class="screen">
-      <div class="portal-wrap">
-        <div class="portal-welcome">
-          <p class="portal-eyebrow">BEM-VINDO AO</p>
-          <h1>REMOTEIFES</h1>
-        </div>
-        <div class="portal-options">
-          <div class="portal-option" data-tipo="normal">
-            <span class="portal-option-icon">👤</span>
-            <span class="portal-option-label">USUÁRIO</span>
+      <div class="portal-split">
+        <div class="portal-col-left">
+          <div class="portal-wrap">
+            <div class="portal-welcome">
+              <p class="portal-eyebrow">BEM-VINDO AO</p>
+              <h1>REMOTEIFES</h1>
+            </div>
+            <div class="portal-options">
+              <div class="portal-option" data-tipo="normal">
+                <span class="portal-option-icon">👤</span>
+                <span class="portal-option-label">USUÁRIO</span>
+              </div>
+              <div class="portal-option" data-tipo="admin">
+                <span class="portal-option-icon">🛠️</span>
+                <span class="portal-option-label">ADMINISTRADOR</span>
+              </div>
+            </div>
           </div>
-          <div class="portal-option" data-tipo="admin">
-            <span class="portal-option-icon">🛠️</span>
-            <span class="portal-option-label">ADMINISTRADOR</span>
+          <div class="portal-footer">
+            <img src="assets/ifes-logo.png" alt="Instituto Federal do Espírito Santo" />
+            <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
-      </div>
-      <div class="portal-footer">
-        <img src="assets/ifes-logo.png" alt="Instituto Federal do Espírito Santo" />
-        <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
+
+        <div class="portal-col-right">
+          <div class="portal-funcoes-head">
+            <h2>FUNÇÕES DO REMOTEIFES</h2>
+            <p class="hint">Conheça os recursos disponíveis no sistema.</p>
+          </div>
+          <div class="portal-funcoes-grid">
+            <button type="button" class="portal-funcao" data-funcao="salas">
+              <span class="portal-funcao-icon">🌡️</span>
+              <span class="portal-funcao-label">Salas</span>
+            </button>
+            <button type="button" class="portal-funcao" data-funcao="planta">
+              <span class="portal-funcao-icon">🏢</span>
+              <span class="portal-funcao-label">Planta Baixa</span>
+            </button>
+            <button type="button" class="portal-funcao" data-funcao="agenda">
+              <span class="portal-funcao-icon">🗓️</span>
+              <span class="portal-funcao-label">Agenda</span>
+            </button>
+            <button type="button" class="portal-funcao" data-funcao="grade">
+              <span class="portal-funcao-icon">📈</span>
+              <span class="portal-funcao-label">Grade</span>
+            </button>
+            <button type="button" class="portal-funcao" data-funcao="presets">
+              <span class="portal-funcao-icon">💨</span>
+              <span class="portal-funcao-label">Presets</span>
+            </button>
+            <button type="button" class="portal-funcao" data-funcao="admin">
+              <span class="portal-funcao-icon">🔧</span>
+              <span class="portal-funcao-label">Admin</span>
+            </button>
+          </div>
+          <div id="portalFuncaoDetalhe" class="portal-funcao-detalhe">
+            <span id="portalFuncaoDetalheIcon" class="portal-funcao-detalhe-icon">ℹ️</span>
+            <h3 id="portalFuncaoDetalheTitulo">Selecione uma função</h3>
+            <p id="portalFuncaoDetalheTexto">Toque em um dos ícones acima para ver do que se trata.</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -54,19 +96,17 @@
           <input type="text" id="username" required autocomplete="username" />
           <label for="password">Senha</label>
           <input type="password" id="password" required autocomplete="current-password" />
-          <button type="submit">Entrar</button>
+          <button type="submit" class="login-submit-btn">Entrar</button>
           <p id="loginError" class="error hidden"></p>
         </form>
 
         <div class="login-info">
-          <h2>OPÇÕES DO SISTEMA</h2>
-          <ul>
-            <li><span class="icon-badge">🗺️</span>Salas</li>
-            <li><span class="icon-badge">🏫</span>Planta Baixa</li>
-            <li><span class="icon-badge">📅</span>Agenda</li>
-            <li><span class="icon-badge">📊</span>Grade</li>
-            <li><span class="icon-badge">❄️</span>Presets</li>
-            <li><span class="icon-badge">⚙️</span>Admin</li>
+          <h2>ACESSO AO SISTEMA</h2>
+          <p class="login-info-lead">O login do RemoteIFES é próprio deste sistema, independente de outras plataformas do Ifes.</p>
+          <ul class="login-info-tips">
+            <li><span class="icon-badge">🔑</span>Usuário e senha criados pelo administrador do RemoteIFES.</li>
+            <li><span class="icon-badge">🔒</span>Acesso individual: não compartilhe suas credenciais.</li>
+            <li><span class="icon-badge">🆘</span>Problemas para entrar? Procure o administrador do sistema.</li>
           </ul>
         </div>
       </div>
@@ -930,6 +970,7 @@
   <script src="js/a11y.js"></script>
   <script src="js/help.js"></script>
   <script src="js/screens/login.js"></script>
+  <script src="js/screens/portal-funcoes.js"></script>
   <script src="js/screens/location.js"></script>
   <script src="js/floorplan.js"></script>
   <script src="js/screens/floorplan.js"></script>
