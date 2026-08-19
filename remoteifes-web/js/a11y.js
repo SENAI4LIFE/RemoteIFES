@@ -6,8 +6,7 @@
   const CHAVE_LINKS = "remoteifes_link_highlight";
   const CHAVE_CONTRASTE = "remoteifes_high_contrast";
   const CHAVE_FONT_TYPE = "remoteifes_font_type";
-  const CHAVE_KERNING = "remoteifes_kerning_off";
-  const CHAVE_IMAGEM_OPACIDADE = "remoteifes_image_opacity";
+  const CHAVE_IMAGEM_OCULTA = "remoteifes_hide_images";
   const CHAVE_FONT_COLOR = "remoteifes_font_color";
   const CHAVE_TEXT_COLOR = "remoteifes_text_color";
   const CHAVE_PARAGRAFO = "remoteifes_paragraph_width";
@@ -27,11 +26,6 @@
   const ALTURA_MAX = 2.2;
   const ALTURA_PASSO = 0.1;
   const ALTURA_PADRAO = 1.2;
-
-  const IMAGEM_OPACIDADE_MIN = 0;
-  const IMAGEM_OPACIDADE_MAX = 100;
-  const IMAGEM_OPACIDADE_PASSO = 10;
-  const IMAGEM_OPACIDADE_PADRAO = 100;
 
   const LARGURA_PARAGRAFO_PASSOS = ["none", "70ch", "60ch", "52ch", "44ch"];
   const LARGURA_PARAGRAFO_ROTULOS = ["Padrão", "70ch", "60ch", "52ch", "44ch"];
@@ -89,12 +83,8 @@
     else if (tipo === "sans") document.body.classList.add("a11y-font-sans");
   }
 
-  function aplicarKerning(desligado) {
-    document.body.classList.toggle("a11y-kerning-off", desligado);
-  }
-
-  function aplicarOpacidadeImagem(valor) {
-    document.documentElement.style.setProperty("--a11y-image-opacity", valor / 100);
+  function aplicarOcultarImagens(ativo) {
+    document.body.classList.toggle("a11y-hide-images", ativo);
   }
 
   function aplicarCorFonte(cor) {
@@ -133,12 +123,11 @@
   let linksAtivo = lerBooleano(CHAVE_LINKS);
   let contrasteAtivo = lerBooleano(CHAVE_CONTRASTE);
   let tipoFonte = lerTexto(CHAVE_FONT_TYPE, "default");
-  let kerningDesligado = lerBooleano(CHAVE_KERNING);
-  let opacidadeImagem = lerInteiro(CHAVE_IMAGEM_OPACIDADE, IMAGEM_OPACIDADE_PADRAO);
+  let imagensOcultas = lerBooleano(CHAVE_IMAGEM_OCULTA);
   let corFonte = lerTexto(CHAVE_FONT_COLOR, "");
   let corTexto = lerTexto(CHAVE_TEXT_COLOR, "");
   let larguraParagrafo = lerInteiro(CHAVE_PARAGRAFO, LARGURA_PARAGRAFO_PADRAO);
-  let alinhamento = lerTexto(CHAVE_ALINHAMENTO, "default");
+  let alinhamento = lerTexto(CHAVE_ALINHAMENTO, "left");
 
   aplicarFonte(escalaFonte);
   aplicarEspacamento(espacamento);
@@ -146,8 +135,7 @@
   aplicarTipoFonte(tipoFonte);
   aplicarDestaqueLinks(linksAtivo);
   aplicarContraste(contrasteAtivo);
-  aplicarKerning(kerningDesligado);
-  aplicarOpacidadeImagem(opacidadeImagem);
+  aplicarOcultarImagens(imagensOcultas);
   aplicarCorFonte(corFonte);
   aplicarCorTexto(corTexto);
   aplicarLarguraParagrafo(larguraParagrafo);
@@ -159,6 +147,8 @@
     const closeBtn = document.getElementById("a11yCloseBtn");
     if (!toggleBtn || !panel) return;
 
+    const fontSlider = document.getElementById("a11yFontSlider");
+    const fontValue = document.getElementById("a11yFontValue");
     const fontDecreaseBtn = document.getElementById("a11yFontDecreaseBtn");
     const fontIncreaseBtn = document.getElementById("a11yFontIncreaseBtn");
     const fontResetBtn = document.getElementById("a11yFontResetBtn");
@@ -175,11 +165,7 @@
     const lineIncreaseBtn = document.getElementById("a11yLineIncreaseBtn");
     const lineResetBtn = document.getElementById("a11yLineResetBtn");
 
-    const imageOpacitySlider = document.getElementById("a11yImageOpacitySlider");
-    const imageOpacityValue = document.getElementById("a11yImageOpacityValue");
-    const imageOpacityDecreaseBtn = document.getElementById("a11yImageOpacityDecreaseBtn");
-    const imageOpacityIncreaseBtn = document.getElementById("a11yImageOpacityIncreaseBtn");
-    const imageOpacityResetBtn = document.getElementById("a11yImageOpacityResetBtn");
+    const imageHideBtn = document.getElementById("a11yImageHideToggleBtn");
 
     const paragraphSlider = document.getElementById("a11yParagraphSlider");
     const paragraphValue = document.getElementById("a11yParagraphValue");
@@ -192,7 +178,6 @@
     const resetAllBtn = document.getElementById("a11yResetAllBtn");
 
     const fontTypeBtns = Array.from(document.querySelectorAll("#a11yPanel .a11y-font-type-row [data-font-type]"));
-    const kerningBtn = document.getElementById("a11yKerningToggleBtn");
 
     const fontColorInput = document.getElementById("a11yFontColorInput");
     const fontColorResetBtn = document.getElementById("a11yFontColorResetBtn");
@@ -213,40 +198,64 @@
       });
     }
 
+    function atualizarPreenchimentoSlider(input) {
+      if (!input) return;
+      const min = parseFloat(input.min) || 0;
+      const max = parseFloat(input.max) || 100;
+      const valor = parseFloat(input.value);
+      const percentual = max > min ? ((valor - min) / (max - min)) * 100 : 0;
+      input.style.setProperty("--a11y-slider-fill", `${percentual}%`);
+    }
+
+    function atualizarBotaoOcultarImagens() {
+      if (!imageHideBtn) return;
+      imageHideBtn.setAttribute("aria-pressed", String(imagensOcultas));
+      imageHideBtn.textContent = imagensOcultas ? "Mostrar Imagens" : "Ocultar Imagens";
+      imageHideBtn.classList.toggle("is-active", imagensOcultas);
+    }
+
+    function atualizarFontUI() {
+      if (fontSlider) {
+        fontSlider.value = escalaFonte;
+        atualizarPreenchimentoSlider(fontSlider);
+      }
+      if (fontValue) fontValue.textContent = `${Math.round(escalaFonte * 100)}%`;
+    }
+
     function atualizarSpacingUI() {
-      if (spacingSlider) spacingSlider.value = espacamento;
+      if (spacingSlider) {
+        spacingSlider.value = espacamento;
+        atualizarPreenchimentoSlider(spacingSlider);
+      }
       if (spacingValue) spacingValue.textContent = espacamento.toFixed(2).replace(/\.?0+$/, "") || "0";
     }
 
     function atualizarLineUI() {
-      if (lineSlider) lineSlider.value = altura;
+      if (lineSlider) {
+        lineSlider.value = altura;
+        atualizarPreenchimentoSlider(lineSlider);
+      }
       if (lineValue) lineValue.textContent = altura.toFixed(1);
     }
 
-    function atualizarImageOpacityUI() {
-      if (imageOpacitySlider) imageOpacitySlider.value = opacidadeImagem;
-      if (imageOpacityValue) imageOpacityValue.textContent = String(opacidadeImagem);
-    }
-
     function atualizarParagraphUI() {
-      if (paragraphSlider) paragraphSlider.value = larguraParagrafo;
+      if (paragraphSlider) {
+        paragraphSlider.value = larguraParagrafo;
+        atualizarPreenchimentoSlider(paragraphSlider);
+      }
       if (paragraphValue) paragraphValue.textContent = LARGURA_PARAGRAFO_ROTULOS[larguraParagrafo] || "Padrão";
     }
 
     atualizarBotaoToggle(linkHighlightBtn, linksAtivo);
     atualizarBotaoToggle(contrastBtn, contrasteAtivo);
+    atualizarBotaoOcultarImagens();
     atualizarGrupoExclusivo(fontTypeBtns, tipoFonte, "fontType");
     atualizarGrupoExclusivo(alignBtns, alinhamento, "align");
+    atualizarFontUI();
     atualizarSpacingUI();
     atualizarLineUI();
-    atualizarImageOpacityUI();
     atualizarParagraphUI();
 
-    if (kerningBtn) {
-      kerningBtn.setAttribute("aria-pressed", String(kerningDesligado));
-      kerningBtn.textContent = kerningDesligado ? "Ligar" : "Desligar";
-      kerningBtn.classList.toggle("is-active", kerningDesligado);
-    }
     if (fontColorInput) fontColorInput.value = corFonte || COR_PADRAO;
     if (textColorInput) textColorInput.value = corTexto || COR_PADRAO;
 
@@ -276,21 +285,18 @@
       }
     });
 
-    fontDecreaseBtn.addEventListener("click", () => {
-      escalaFonte = Math.min(FONTE_MAX, Math.max(FONTE_MIN, +(escalaFonte - FONTE_PASSO).toFixed(3)));
+    function definirFonte(valor) {
+      escalaFonte = Math.min(FONTE_MAX, Math.max(FONTE_MIN, +valor.toFixed(3)));
       aplicarFonte(escalaFonte);
       salvar(CHAVE_FONTE, escalaFonte);
-    });
-    fontIncreaseBtn.addEventListener("click", () => {
-      escalaFonte = Math.min(FONTE_MAX, Math.max(FONTE_MIN, +(escalaFonte + FONTE_PASSO).toFixed(3)));
-      aplicarFonte(escalaFonte);
-      salvar(CHAVE_FONTE, escalaFonte);
-    });
-    fontResetBtn.addEventListener("click", () => {
-      escalaFonte = FONTE_PADRAO;
-      aplicarFonte(escalaFonte);
-      salvar(CHAVE_FONTE, escalaFonte);
-    });
+      atualizarFontUI();
+    }
+    if (fontSlider) {
+      fontSlider.addEventListener("input", () => definirFonte(parseFloat(fontSlider.value)));
+    }
+    if (fontDecreaseBtn) fontDecreaseBtn.addEventListener("click", () => definirFonte(escalaFonte - FONTE_PASSO));
+    if (fontIncreaseBtn) fontIncreaseBtn.addEventListener("click", () => definirFonte(escalaFonte + FONTE_PASSO));
+    if (fontResetBtn) fontResetBtn.addEventListener("click", () => definirFonte(FONTE_PADRAO));
 
     function definirEspacamento(valor) {
       espacamento = Math.min(ESPACAMENTO_MAX, Math.max(ESPACAMENTO_MIN, +valor.toFixed(3)));
@@ -318,18 +324,14 @@
     if (lineIncreaseBtn) lineIncreaseBtn.addEventListener("click", () => definirAltura(altura + ALTURA_PASSO));
     if (lineResetBtn) lineResetBtn.addEventListener("click", () => definirAltura(ALTURA_PADRAO));
 
-    function definirOpacidadeImagem(valor) {
-      opacidadeImagem = Math.min(IMAGEM_OPACIDADE_MAX, Math.max(IMAGEM_OPACIDADE_MIN, Math.round(valor)));
-      aplicarOpacidadeImagem(opacidadeImagem);
-      salvar(CHAVE_IMAGEM_OPACIDADE, opacidadeImagem);
-      atualizarImageOpacityUI();
+    if (imageHideBtn) {
+      imageHideBtn.addEventListener("click", () => {
+        imagensOcultas = !imagensOcultas;
+        aplicarOcultarImagens(imagensOcultas);
+        salvar(CHAVE_IMAGEM_OCULTA, imagensOcultas ? 1 : 0);
+        atualizarBotaoOcultarImagens();
+      });
     }
-    if (imageOpacitySlider) {
-      imageOpacitySlider.addEventListener("input", () => definirOpacidadeImagem(parseFloat(imageOpacitySlider.value)));
-    }
-    if (imageOpacityDecreaseBtn) imageOpacityDecreaseBtn.addEventListener("click", () => definirOpacidadeImagem(opacidadeImagem - IMAGEM_OPACIDADE_PASSO));
-    if (imageOpacityIncreaseBtn) imageOpacityIncreaseBtn.addEventListener("click", () => definirOpacidadeImagem(opacidadeImagem + IMAGEM_OPACIDADE_PASSO));
-    if (imageOpacityResetBtn) imageOpacityResetBtn.addEventListener("click", () => definirOpacidadeImagem(IMAGEM_OPACIDADE_PADRAO));
 
     function definirLarguraParagrafo(indice) {
       larguraParagrafo = Math.min(LARGURA_PARAGRAFO_PASSOS.length - 1, Math.max(0, Math.round(indice)));
@@ -353,17 +355,6 @@
         atualizarGrupoExclusivo(fontTypeBtns, tipoFonte, "fontType");
       });
     });
-
-    if (kerningBtn) {
-      kerningBtn.addEventListener("click", () => {
-        kerningDesligado = !kerningDesligado;
-        aplicarKerning(kerningDesligado);
-        salvar(CHAVE_KERNING, kerningDesligado ? 1 : 0);
-        kerningBtn.setAttribute("aria-pressed", String(kerningDesligado));
-        kerningBtn.textContent = kerningDesligado ? "Ligar" : "Desligar";
-        kerningBtn.classList.toggle("is-active", kerningDesligado);
-      });
-    }
 
     if (fontColorInput) {
       fontColorInput.addEventListener("input", () => {
@@ -427,12 +418,11 @@
       linksAtivo = false;
       contrasteAtivo = false;
       tipoFonte = "default";
-      kerningDesligado = false;
-      opacidadeImagem = IMAGEM_OPACIDADE_PADRAO;
+      imagensOcultas = false;
       corFonte = "";
       corTexto = "";
       larguraParagrafo = LARGURA_PARAGRAFO_PADRAO;
-      alinhamento = "default";
+      alinhamento = "left";
 
       aplicarFonte(escalaFonte);
       aplicarEspacamento(espacamento);
@@ -440,8 +430,7 @@
       aplicarTipoFonte(tipoFonte);
       aplicarDestaqueLinks(linksAtivo);
       aplicarContraste(contrasteAtivo);
-      aplicarKerning(kerningDesligado);
-      aplicarOpacidadeImagem(opacidadeImagem);
+      aplicarOcultarImagens(imagensOcultas);
       aplicarCorFonte(corFonte);
       aplicarCorTexto(corTexto);
       aplicarLarguraParagrafo(larguraParagrafo);
@@ -454,8 +443,7 @@
       salvar(CHAVE_LINKS, 0);
       salvar(CHAVE_CONTRASTE, 0);
       salvar(CHAVE_FONT_TYPE, tipoFonte);
-      salvar(CHAVE_KERNING, 0);
-      salvar(CHAVE_IMAGEM_OPACIDADE, opacidadeImagem);
+      salvar(CHAVE_IMAGEM_OCULTA, 0);
       salvar(CHAVE_FONT_COLOR, "");
       salvar(CHAVE_TEXT_COLOR, "");
       salvar(CHAVE_PARAGRAFO, larguraParagrafo);
@@ -463,22 +451,17 @@
 
       atualizarBotaoToggle(linkHighlightBtn, false);
       atualizarBotaoToggle(contrastBtn, false);
+      atualizarBotaoOcultarImagens();
       atualizarGrupoExclusivo(fontTypeBtns, tipoFonte, "fontType");
       atualizarGrupoExclusivo(alignBtns, alinhamento, "align");
+      atualizarFontUI();
       atualizarSpacingUI();
       atualizarLineUI();
-      atualizarImageOpacityUI();
       atualizarParagraphUI();
-      if (kerningBtn) {
-        kerningBtn.setAttribute("aria-pressed", "false");
-        kerningBtn.textContent = "Desligar";
-        kerningBtn.classList.remove("is-active");
-      }
       if (fontColorInput) fontColorInput.value = COR_PADRAO;
       if (textColorInput) textColorInput.value = COR_PADRAO;
     });
 
-    // Widget de ajuda geral (bolha "?" fixa no canto inferior direito).
     const helpFabToggle = document.getElementById("helpFabToggleBtn");
     const helpFabPanel = document.getElementById("helpFabPanel");
     const helpFabClose = document.getElementById("helpFabCloseBtn");
