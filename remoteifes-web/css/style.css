@@ -156,12 +156,20 @@ body {
   .tabbar { max-width: 760px; }
 }
 
-#app:has(#screen-portal:not(.hidden)) { max-width: 620px; }
+#app:has(#screen-portal:not(.hidden)) { max-width: 640px; }
 @media (min-width: 700px) {
-  #app:has(#screen-portal:not(.hidden)) { max-width: 860px; }
+  #app:has(#screen-portal:not(.hidden)) { max-width: 890px; }
 }
 @media (min-width: 1000px) {
-  #app:has(#screen-portal:not(.hidden)) { max-width: 980px; }
+  #app:has(#screen-portal:not(.hidden)) { max-width: 1010px; }
+}
+
+#app:has(#screen-login:not(.hidden)) { max-width: 620px; }
+@media (min-width: 700px) {
+  #app:has(#screen-login:not(.hidden)) { max-width: 900px; }
+}
+@media (min-width: 1000px) {
+  #app:has(#screen-login:not(.hidden)) { max-width: 1020px; }
 }
 
 .screen.hidden { display: none; }
@@ -762,8 +770,8 @@ button.btn:disabled {
     flex-direction: row;
     align-items: stretch;
   }
-  .login-wrap .login-card { flex: 1.1; align-self: stretch; }
-  .login-wrap .login-info { flex: 1; align-self: stretch; }
+  .login-wrap .login-card { flex: 1; align-self: stretch; }
+  .login-wrap .login-info { flex: 1.1; align-self: stretch; min-width: 0; }
 }
 
 .portal-welcome {
@@ -1000,6 +1008,7 @@ button.btn:disabled {
   text-align: left;
   font-size: calc(12.5px * var(--a11y-font-scale));
   color: var(--text);
+  white-space: nowrap;
 }
 .login-info-tips .icon-badge {
   width: 34px;
