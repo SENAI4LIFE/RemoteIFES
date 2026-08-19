@@ -493,13 +493,19 @@ const Admin = {
     });
   },
 
+  _macsFpInstancia: null,
+
   carregarMacsFloorplan() {
     const container = document.getElementById("macsFpInner");
     const tabsContainer = document.getElementById("macsFpTabs");
-    if (!container || container.dataset.montado === "1") return;
+    if (!container) return;
+    if (container.dataset.montado === "1") {
+      if (this._macsFpInstancia) this._macsFpInstancia.fitToWidth();
+      return;
+    }
 
     const origem = document.getElementById("fpScaleInner");
-    if (!origem) return;
+    if (!origem || !tabsContainer) return;
 
     container.innerHTML = origem.innerHTML;
     container.dataset.montado = "1";
@@ -515,8 +521,9 @@ const Admin = {
       tabsContainer.appendChild(clone);
     });
 
-    Floorplan.create(container, tabsContainer, {
+    this._macsFpInstancia = Floorplan.create(container, tabsContainer, {
       fitToWidth: true,
+      enableZoom: true,
       onSelect: (sala) => {
         container.querySelectorAll(".room.selectable").forEach((el) => el.classList.remove("fp-admin-highlight"));
         const alvo = container.querySelector(`.room.selectable[data-sala="${sala}"]`);
@@ -530,6 +537,40 @@ const Admin = {
         if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
       },
     });
+
+    const zoomFocusBtn = document.getElementById("macsFpZoomFocusBtn");
+    const zoomInBtn = document.getElementById("macsFpZoomInBtn");
+    const zoomOutBtn = document.getElementById("macsFpZoomOutBtn");
+    const zoomResetBtn = document.getElementById("macsFpZoomResetBtn");
+    let zoomFocusArmed = false;
+
+    const atualizarZoomFocus = () => {
+      if (zoomFocusBtn) zoomFocusBtn.classList.toggle("is-active", zoomFocusArmed);
+    };
+
+    if (zoomFocusBtn) zoomFocusBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      zoomFocusArmed = !zoomFocusArmed;
+      atualizarZoomFocus();
+    });
+    if (zoomInBtn) zoomInBtn.addEventListener("click", () => this._macsFpInstancia.zoomIn());
+    if (zoomOutBtn) zoomOutBtn.addEventListener("click", () => this._macsFpInstancia.zoomOut());
+    if (zoomResetBtn) zoomResetBtn.addEventListener("click", () => {
+      zoomFocusArmed = false;
+      atualizarZoomFocus();
+      this._macsFpInstancia.resetZoom();
+    });
+
+    container.addEventListener("click", (event) => {
+      if (!zoomFocusArmed) return;
+      const wrap = event.target.closest(".plan-wrap");
+      if (!wrap) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this._macsFpInstancia.zoomToPoint(event.clientX, event.clientY);
+      zoomFocusArmed = false;
+      atualizarZoomFocus();
+    }, true);
   },
 
   async carregarPresets() {
