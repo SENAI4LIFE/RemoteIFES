@@ -57,6 +57,7 @@
   }
 
   function aplicarFonte(escala) {
+    document.documentElement.style.setProperty("--a11y-font-scale", escala);
     document.documentElement.style.setProperty("--a11y-zoom", escala);
   }
 
@@ -292,7 +293,8 @@
       atualizarFontUI();
     }
     if (fontSlider) {
-      fontSlider.addEventListener("input", () => definirFonte(parseFloat(fontSlider.value)));
+      fontSlider.addEventListener("input", () => atualizarPreenchimentoSlider(fontSlider));
+      fontSlider.addEventListener("change", () => definirFonte(parseFloat(fontSlider.value)));
     }
     if (fontDecreaseBtn) fontDecreaseBtn.addEventListener("click", () => definirFonte(escalaFonte - FONTE_PASSO));
     if (fontIncreaseBtn) fontIncreaseBtn.addEventListener("click", () => definirFonte(escalaFonte + FONTE_PASSO));
@@ -305,7 +307,8 @@
       atualizarSpacingUI();
     }
     if (spacingSlider) {
-      spacingSlider.addEventListener("input", () => definirEspacamento(parseFloat(spacingSlider.value)));
+      spacingSlider.addEventListener("input", () => atualizarPreenchimentoSlider(spacingSlider));
+      spacingSlider.addEventListener("change", () => definirEspacamento(parseFloat(spacingSlider.value)));
     }
     if (spacingDecreaseBtn) spacingDecreaseBtn.addEventListener("click", () => definirEspacamento(espacamento - ESPACAMENTO_PASSO));
     if (spacingIncreaseBtn) spacingIncreaseBtn.addEventListener("click", () => definirEspacamento(espacamento + ESPACAMENTO_PASSO));
@@ -318,7 +321,8 @@
       atualizarLineUI();
     }
     if (lineSlider) {
-      lineSlider.addEventListener("input", () => definirAltura(parseFloat(lineSlider.value)));
+      lineSlider.addEventListener("input", () => atualizarPreenchimentoSlider(lineSlider));
+      lineSlider.addEventListener("change", () => definirAltura(parseFloat(lineSlider.value)));
     }
     if (lineDecreaseBtn) lineDecreaseBtn.addEventListener("click", () => definirAltura(altura - ALTURA_PASSO));
     if (lineIncreaseBtn) lineIncreaseBtn.addEventListener("click", () => definirAltura(altura + ALTURA_PASSO));
@@ -340,7 +344,8 @@
       atualizarParagraphUI();
     }
     if (paragraphSlider) {
-      paragraphSlider.addEventListener("input", () => definirLarguraParagrafo(parseInt(paragraphSlider.value, 10)));
+      paragraphSlider.addEventListener("input", () => atualizarPreenchimentoSlider(paragraphSlider));
+      paragraphSlider.addEventListener("change", () => definirLarguraParagrafo(parseInt(paragraphSlider.value, 10)));
     }
     if (paragraphDecreaseBtn) paragraphDecreaseBtn.addEventListener("click", () => definirLarguraParagrafo(larguraParagrafo - 1));
     if (paragraphIncreaseBtn) paragraphIncreaseBtn.addEventListener("click", () => definirLarguraParagrafo(larguraParagrafo + 1));
