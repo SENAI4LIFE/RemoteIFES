@@ -3,6 +3,21 @@ const db = require("../config/database");
 const TIPOS_VALIDOS = ["numero", "booleano", "selecao"];
 const PRESET_PADRAO_NOME = "Padrão";
 
+const POSICOES_VALIDAS = [
+  "flank_esq",
+  "flank_dir",
+  "fan",
+  "grid_topo_1",
+  "grid_topo_2",
+  "grid_topo_3",
+  "grid_base_1",
+  "grid_base_2",
+  "grid_base_3",
+  "grid_base_4",
+  "grid_base_5",
+  "grid_base_6",
+];
+
 function paraSaidaFuncao(f) {
   return {
     id: f.id,
@@ -11,6 +26,7 @@ function paraSaidaFuncao(f) {
     tipo: f.tipo,
     opcoes: f.opcoes ? JSON.parse(f.opcoes) : null,
     ordem: f.ordem,
+    posicao: f.posicao || null,
   };
 }
 
@@ -63,6 +79,13 @@ function remover(id) {
   db.prepare(`DELETE FROM presets WHERE id = ?`).run(id);
 }
 
+function validarPosicao(posicao) {
+  if (posicao === undefined) return undefined;
+  if (posicao === null || posicao === "") return null;
+  if (!POSICOES_VALIDAS.includes(posicao)) throw new Error("posição inválida no controle");
+  return posicao;
+}
+
 function validarFuncao({ chave, rotulo, tipo, opcoes }) {
   if (!chave || !/^[a-z0-9_]+$/.test(chave)) {
     throw new Error("chave da função deve conter apenas letras minúsculas, números e underscore");
@@ -70,6 +93,14 @@ function validarFuncao({ chave, rotulo, tipo, opcoes }) {
   if (!rotulo || !rotulo.trim()) throw new Error("informe o rótulo da função");
   const tipoFinal = tipo && TIPOS_VALIDOS.includes(tipo) ? tipo : "numero";
   return { chave, rotulo: rotulo.trim(), tipo: tipoFinal, opcoes: opcoes ?? null };
+}
+
+function garantirPosicaoLivre(presetId, posicao, ignorarFuncaoId) {
+  if (!posicao) return;
+  const ocupante = db.prepare(`SELECT id FROM preset_funcoes WHERE presetId = ? AND posicao = ?`).get(presetId, posicao);
+  if (ocupante && ocupante.id !== ignorarFuncaoId) {
+    throw new Error("já existe uma função nessa posição do controle");
+  }
 }
 
 function adicionarFuncao(presetId, dados) {
@@ -80,11 +111,14 @@ function adicionarFuncao(presetId, dados) {
   const jaExiste = db.prepare(`SELECT 1 FROM preset_funcoes WHERE presetId = ? AND chave = ?`).get(presetId, chave);
   if (jaExiste) throw new Error("este preset já possui uma função com essa chave");
 
+  const posicao = validarPosicao(dados.posicao) || null;
+  garantirPosicaoLivre(presetId, posicao, null);
+
   const ordem = Number.isFinite(Number(dados.ordem)) ? Number(dados.ordem) : 0;
   db.prepare(`
-    INSERT INTO preset_funcoes (presetId, chave, rotulo, tipo, opcoes, ordem)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(presetId, chave, rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, ordem);
+    INSERT INTO preset_funcoes (presetId, chave, rotulo, tipo, opcoes, ordem, posicao)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(presetId, chave, rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, ordem, posicao);
 
   return buscarPorId(presetId);
 }
@@ -96,9 +130,13 @@ function atualizarFuncao(funcaoId, dados) {
   const { rotulo, tipo, opcoes } = validarFuncao({ ...funcao, ...dados, chave: funcao.chave });
   const ordem = dados.ordem !== undefined && Number.isFinite(Number(dados.ordem)) ? Number(dados.ordem) : funcao.ordem;
 
+  const posicaoInformada = validarPosicao(dados.posicao);
+  const posicao = posicaoInformada !== undefined ? posicaoInformada : funcao.posicao;
+  garantirPosicaoLivre(funcao.presetId, posicao, funcao.id);
+
   db.prepare(`
-    UPDATE preset_funcoes SET rotulo = ?, tipo = ?, opcoes = ?, ordem = ? WHERE id = ?
-  `).run(rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, ordem, funcaoId);
+    UPDATE preset_funcoes SET rotulo = ?, tipo = ?, opcoes = ?, ordem = ?, posicao = ? WHERE id = ?
+  `).run(rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, ordem, posicao, funcaoId);
 
   return buscarPorId(funcao.presetId);
 }
@@ -174,4 +212,5 @@ module.exports = {
   criarOuAtualizarViaDispositivo,
   seedPresetPadrao,
   presetPadrao,
+  POSICOES_VALIDAS,
 };

@@ -29,6 +29,7 @@ function criarSchema() {
       tipo TEXT NOT NULL DEFAULT 'numero',
       opcoes TEXT,
       ordem INTEGER NOT NULL DEFAULT 0,
+      posicao TEXT,
       UNIQUE(presetId, chave)
     );
 
@@ -151,6 +152,7 @@ function criarSchema() {
   migrarColunasUsuarios();
   migrarColunasAgendamentos();
   migrarColunasSalas();
+  migrarColunasPresetFuncoes();
 }
 
 function migrarColunasUsuarios() {
@@ -207,6 +209,16 @@ function migrarColunasSalas() {
   }
   if (!colunas.includes("acessoRestrito")) {
     db.exec(`ALTER TABLE salas ADD COLUMN acessoRestrito INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!colunas.includes("funcoesEstado")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN funcoesEstado TEXT NOT NULL DEFAULT '{}'`);
+  }
+}
+
+function migrarColunasPresetFuncoes() {
+  const colunas = db.prepare(`PRAGMA table_info(preset_funcoes)`).all().map((c) => c.name);
+  if (!colunas.includes("posicao")) {
+    db.exec(`ALTER TABLE preset_funcoes ADD COLUMN posicao TEXT`);
   }
 }
 

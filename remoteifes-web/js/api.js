@@ -269,8 +269,20 @@ const Api = {
     });
   },
 
+  async atualizarFuncaoPreset(funcaoId, dados) {
+    return chamar(`/admin/presets/funcoes/${funcaoId}`, {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify(dados),
+    });
+  },
+
   async removerFuncaoPreset(funcaoId) {
     return chamar(`/admin/presets/funcoes/${funcaoId}`, { method: "DELETE", headers: headersComToken() });
+  },
+
+  async listarPosicoesPreset() {
+    return chamar("/admin/presets/posicoes", { headers: headersComToken() });
   },
 
   async listarDetectados() {
