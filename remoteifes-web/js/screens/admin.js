@@ -271,6 +271,7 @@ const Admin = {
       document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
       document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
       document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
+      document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
     }
   },
 
@@ -692,9 +693,6 @@ const Admin = {
 };
 
 document.getElementById("criarUsuarioBtn").addEventListener("click", async () => {
-  const errorEl = document.getElementById("usuarioError");
-  errorEl.classList.add("hidden");
-
   const dados = {
     usuario: document.getElementById("novoUsuarioLogin").value.trim(),
     nome: document.getElementById("novoUsuarioNome").value.trim(),
@@ -704,15 +702,13 @@ document.getElementById("criarUsuarioBtn").addEventListener("click", async () =>
   };
 
   if (!dados.usuario || !dados.nome || !dados.senha) {
-    errorEl.textContent = "preencha usuário, nome e senha";
-    errorEl.classList.remove("hidden");
+    Toast.erro("preencha usuário, nome e senha");
     return;
   }
 
   const resp = await Api.criarUsuario(dados);
   if (!resp.ok) {
-    errorEl.textContent = resp.erro || "não foi possível criar o usuário";
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro || "não foi possível criar o usuário");
     return;
   }
 
@@ -751,9 +747,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
 });
 
 document.getElementById("salvarConfigBtn").addEventListener("click", async () => {
-  const errorEl = document.getElementById("configError");
   const savedEl = document.getElementById("configSavedHint");
-  errorEl.classList.add("hidden");
   savedEl.classList.add("hidden");
 
   const timeoutVal = document.getElementById("cfgTimeoutInatividade").value.trim();
@@ -772,12 +766,12 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
       .split("\n")
       .map((v) => v.trim())
       .filter(Boolean);
+    dados.modoManutencao = document.getElementById("cfgModoManutencao").checked;
   }
 
   const resp = await Api.atualizarConfiguracoes(dados);
   if (!resp.ok) {
-    errorEl.textContent = resp.erro || "não foi possível salvar as configurações";
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro || "não foi possível salvar as configurações");
     return;
   }
 
@@ -790,18 +784,14 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
 });
 
 document.getElementById("criarPresetBtn").addEventListener("click", async () => {
-  const errorEl = document.getElementById("presetError");
-  errorEl.classList.add("hidden");
   const nome = document.getElementById("novoPresetNome").value.trim();
   if (!nome) {
-    errorEl.textContent = "informe o nome do preset";
-    errorEl.classList.remove("hidden");
+    Toast.erro("informe o nome do preset");
     return;
   }
   const resp = await Api.criarPreset(nome);
   if (!resp.ok) {
-    errorEl.textContent = resp.erro || "não foi possível criar o preset";
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro || "não foi possível criar o preset");
     return;
   }
   document.getElementById("novoPresetNome").value = "";
@@ -896,14 +886,11 @@ document.getElementById("proprietariosAcessoRestritoCheck").addEventListener("ch
 document.getElementById("proprietariosConcederDonoBtn").addEventListener("click", async () => {
   const sala = document.getElementById("proprietariosSala").value;
   const select = document.getElementById("proprietariosDonoSelect");
-  const errorEl = document.getElementById("proprietariosDonoError");
-  errorEl.classList.add("hidden");
   if (!sala || !select.value) return;
 
   const resp = await Api.concederDonoSala(sala, Number(select.value));
   if (!resp.ok) {
-    errorEl.textContent = resp.erro || "não foi possível conceder a propriedade da sala";
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro || "não foi possível conceder a propriedade da sala");
     return;
   }
   await Admin.carregarProprietariosDaSala(sala);
