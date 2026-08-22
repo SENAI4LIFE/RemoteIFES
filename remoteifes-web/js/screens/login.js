@@ -35,9 +35,31 @@ function mostrarLogin(tipo) {
   aplicarTextoLogin(tipo);
 }
 
+function aplicarDisponibilidadePortalNormal(manutencaoAtiva) {
+  const opcaoNormal = document.querySelector('.portal-option[data-tipo="normal"]');
+  const aviso = document.getElementById("portalManutencaoAviso");
+  if (opcaoNormal) {
+    opcaoNormal.classList.toggle("portal-option-disabled", manutencaoAtiva);
+    opcaoNormal.setAttribute("aria-disabled", manutencaoAtiva ? "true" : "false");
+    opcaoNormal.title = manutencaoAtiva ? "Indisponível durante a manutenção do sistema" : "";
+  }
+  if (aviso) aviso.classList.toggle("hidden", !manutencaoAtiva);
+}
+
 document.querySelectorAll(".portal-option").forEach((el) => {
-  el.addEventListener("click", () => mostrarLogin(el.dataset.tipo));
+  el.addEventListener("click", () => {
+    if (el.classList.contains("portal-option-disabled")) return;
+    mostrarLogin(el.dataset.tipo);
+  });
 });
+
+window.addEventListener("app:manutencao-estado", (e) => {
+  aplicarDisponibilidadePortalNormal(!!(e.detail && e.detail.ativa));
+});
+
+if (typeof ServerStatus !== "undefined") {
+  aplicarDisponibilidadePortalNormal(ServerStatus.emManutencao());
+}
 
 document.getElementById("loginVoltarBtn").addEventListener("click", mostrarPortal);
 
@@ -64,12 +86,14 @@ function aplicarSessaoLogada(resp) {
 
   document.getElementById("screen-portal").classList.add("hidden");
   document.getElementById("screen-login").classList.add("hidden");
+  document.getElementById("screen-manutencao-acesso").classList.add("hidden");
   document.getElementById("mainApp").classList.remove("hidden");
 
   if (resp.isAdmin) Notificacoes.iniciar();
 
   IdleTimer.iniciar(resp.timeoutInatividadeMinutos, resp.popupAvisoSegundos);
   RTStatus.conectar();
+  if (typeof ServerStatus !== "undefined") ServerStatus.reconectarComTokenAtual();
 }
 
 async function restaurarSessaoSalva() {
@@ -91,7 +115,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
   const resp = await Api.login(usuario, senha);
   if (!resp.ok) {
-    Toast.erro(resp.erro || "não foi possível entrar");
+    Toast.erro(resp.manutencao ? "Manutenção: só administradores podem entrar agora." : (resp.erro || "não foi possível entrar"));
     return;
   }
 
@@ -113,6 +137,7 @@ function realizarLogout({ manterTela = false } = {}) {
   if (typeof ScreenFloorplan !== "undefined") ScreenFloorplan.aoFechar();
   Notificacoes.pararPolling();
   RTStatus.desconectar();
+  if (typeof ServerStatus !== "undefined") ServerStatus.reconectarComTokenAtual();
   state.usuario = null;
   state.nome = null;
   state.isAdmin = false;
