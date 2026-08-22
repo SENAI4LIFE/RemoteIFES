@@ -106,7 +106,14 @@ function parseData(req, res) {
 router.get("/admin/logs", (req, res) => {
   const data = parseData(req, res);
   if (data === null) return;
-  res.json(salasService.listarLogs({ data }));
+  const { sala, andar } = req.query;
+  if (sala !== undefined && typeof sala !== "string") {
+    return res.status(400).json({ ok: false, erro: "sala inválida" });
+  }
+  if (andar !== undefined && (typeof andar !== "string" || Number.isNaN(Number(andar)))) {
+    return res.status(400).json({ ok: false, erro: "andar inválido" });
+  }
+  res.json(salasService.listarLogs({ data, sala, andar }));
 });
 
 router.delete("/admin/logs", (req, res) => {

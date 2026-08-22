@@ -432,14 +432,22 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   };
 }
 
-function listarLogs({ data, limite = 300 } = {}) {
-  let query = "SELECT * FROM comandos_log WHERE 1=1";
+function listarLogs({ data, sala, andar, limite = 300 } = {}) {
+  let query = "SELECT comandos_log.* FROM comandos_log LEFT JOIN salas ON salas.sala = comandos_log.sala WHERE 1=1";
   const params = [];
   if (data) {
-    query += " AND date(criadoEm) = ?";
+    query += " AND date(comandos_log.criadoEm) = ?";
     params.push(data);
   }
-  query += " ORDER BY criadoEm DESC LIMIT ?";
+  if (sala) {
+    query += " AND comandos_log.sala = ?";
+    params.push(sala);
+  }
+  if (andar) {
+    query += " AND salas.andar = ?";
+    params.push(Number(andar));
+  }
+  query += " ORDER BY comandos_log.criadoEm DESC LIMIT ?";
   params.push(limite);
   return db.prepare(query).all(...params);
 }
