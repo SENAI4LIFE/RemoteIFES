@@ -1,5 +1,10 @@
 let _panelPararStatus = null;
 
+const _panelAplicarAvisoOfflineToast = Toast.criarAvisoDeEstado(
+  "panelAvisoOffline",
+  "O dispositivo está offline: o comando foi salvo, mas ainda não há confirmação de que o ESP32 o recebeu."
+);
+
 async function openRoom(sala, nome) {
   state.salaAtual = sala;
   document.getElementById("panelRoomName").textContent = `${sala} — ${nome}`;
@@ -49,12 +54,10 @@ function aplicarBloqueio(dados) {
 }
 
 function aplicarAvisoOffline(offlineMasLigado) {
-  document.getElementById("panelAvisoOffline").classList.toggle("hidden", !offlineMasLigado);
+  _panelAplicarAvisoOfflineToast(offlineMasLigado);
 }
 
 function aplicarStatusNoPainel(status) {
-  document.getElementById("panelError").classList.add("hidden");
-
   document.getElementById("tempValue").textContent = `${status.temperatura.toFixed(1)} °C`;
 
   const conexao = document.getElementById("conexaoValue");
@@ -76,24 +79,19 @@ function aplicarStatusNoPainel(status) {
 }
 
 async function refreshStatus() {
-  const errorEl = document.getElementById("panelError");
-  errorEl.classList.add("hidden");
   try {
     const status = await Api.statusSala(state.salaAtual);
     if (status.erro) throw new Error(status.erro);
     aplicarStatusNoPainel(status);
   } catch (err) {
-    errorEl.textContent = "não foi possível falar com o servidor";
-    errorEl.classList.remove("hidden");
+    Toast.erro("não foi possível falar com o servidor");
   }
 }
 
 document.getElementById("btnOn").addEventListener("click", async () => {
   const resp = await Api.enviarComando(state.salaAtual, "ligar");
   if (!resp.ok) {
-    const errorEl = document.getElementById("panelError");
-    errorEl.textContent = resp.erro;
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro);
   }
   await refreshStatus();
 });
@@ -101,9 +99,7 @@ document.getElementById("btnOn").addEventListener("click", async () => {
 document.getElementById("btnOff").addEventListener("click", async () => {
   const resp = await Api.enviarComando(state.salaAtual, "desligar");
   if (!resp.ok) {
-    const errorEl = document.getElementById("panelError");
-    errorEl.textContent = resp.erro;
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro);
   }
   await refreshStatus();
 });

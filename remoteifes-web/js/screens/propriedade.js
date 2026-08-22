@@ -85,15 +85,12 @@ document.getElementById("propriedadeSala").addEventListener("change", (e) => {
 document.getElementById("propriedadeConcederBtn").addEventListener("click", async () => {
   const sala = document.getElementById("propriedadeSala").value;
   const select = document.getElementById("propriedadeUsuarioSelect");
-  const errorEl = document.getElementById("propriedadeError");
-  errorEl.classList.add("hidden");
 
   if (!sala || !select.value) return;
 
   const resp = await Api.concederAcessoPropriedade(sala, Number(select.value));
   if (!resp.ok) {
-    errorEl.textContent = resp.erro || "não foi possível conceder o acesso";
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro || "não foi possível conceder o acesso");
     return;
   }
   ScreenPropriedade.renderUsuarios(sala, resp.usuarios);

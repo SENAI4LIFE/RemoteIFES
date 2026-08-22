@@ -4,9 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RemoteIFES</title>
-  <link rel="stylesheet" href="css/style.css?v=3" />
+  <link rel="stylesheet" href="css/style.css?v=6" />
 </head>
 <body>
+
+  <section id="screen-server-status" class="hidden">
+    <div class="server-status-card">
+      <div class="server-status-spinner" aria-hidden="true"></div>
+      <h2 id="serverStatusTitulo" class="server-status-title">Conectando ao RemoteIFES</h2>
+      <p id="serverStatusDesc" class="server-status-desc">Verificando a conexão com o servidor.</p>
+      <p id="serverStatusRetryTexto" class="server-status-retry-texto">Tentando reconexão…</p>
+      <button type="button" id="serverStatusRetryBtn" class="server-status-retry-btn">Tentar novamente agora</button>
+    </div>
+  </section>
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
@@ -111,7 +121,6 @@
           <label for="password">Senha</label>
           <input type="password" id="password" required autocomplete="current-password" />
           <button type="submit" class="login-submit-btn">Entrar</button>
-          <p id="loginError" class="error hidden"></p>
         </form>
 
         <div class="login-info">
@@ -498,7 +507,7 @@
         </div>
 
         <div id="lockBanner" class="lock-banner hidden"></div>
-        <p id="panelSomenteLeitura" class="device-warning hidden">Você tem apenas visualização desta sala: não possui permissão para controlá-la.</p>
+        <p id="panelSomenteLeitura" class="aviso-inline hidden">Você tem apenas visualização desta sala: não possui permissão para controlá-la.</p>
 
         <div class="ac-remote">
           <div class="ac-remote-body">
@@ -531,10 +540,6 @@
           </div>
         </div>
 
-        <p id="panelError" class="error hidden"></p>
-        <p id="panelAvisoOffline" class="device-warning hidden">
-          O dispositivo está offline: o comando foi salvo, mas ainda não há confirmação de que o ESP32 o recebeu.
-        </p>
       </section>
 
       <section id="screen-agenda" class="screen hidden tab-content">
@@ -584,7 +589,6 @@
           </div>
 
           <button type="button" id="criarAgendaBtn" class="btn btn-on btn-block">Criar agendamento</button>
-          <p id="agendaError" class="error hidden"></p>
         </div>
 
         <ul id="agendaList" class="room-list"></ul>
@@ -643,7 +647,6 @@
             <select id="propriedadeUsuarioSelect"></select>
             <button type="button" id="propriedadeConcederBtn" class="link-btn">conceder</button>
           </div>
-          <p id="propriedadeError" class="error hidden"></p>
         </div>
 
         <ul id="propriedadeUsuariosList" class="room-list"></ul>
@@ -691,7 +694,6 @@
               <input type="checkbox" id="novoUsuarioAdmin" /> Conceder permissão de administrador
             </label>
             <button type="button" id="criarUsuarioBtn" class="btn btn-on btn-block">Criar usuário</button>
-            <p id="usuarioError" class="error hidden"></p>
           </div>
           <ul id="usuariosList" class="room-list"></ul>
         </div>
@@ -790,7 +792,6 @@
               <select id="proprietariosDonoSelect"></select>
               <button type="button" id="proprietariosConcederDonoBtn" class="link-btn">tornar proprietário</button>
             </div>
-            <p id="proprietariosDonoError" class="error hidden"></p>
             <ul id="proprietariosDonosList" class="room-list"></ul>
             <p id="proprietariosDonosEmpty" class="hint hidden">nenhum proprietário atribuído a esta sala</p>
           </div>
@@ -866,7 +867,6 @@
             <label for="novoPresetNome">Nome</label>
             <input type="text" id="novoPresetNome" />
             <button type="button" id="criarPresetBtn" class="btn btn-on btn-block">Criar preset</button>
-            <p id="presetError" class="error hidden"></p>
           </div>
           <p class="hint">O preset padrão possui apenas a função de temperatura. Novas funções (velocidade, oscilação, modo turbo, etc.) são cadastradas diretamente pela própria ESP32, a partir da sala em que o dispositivo está instalado.</p>
           <ul id="presetsList" class="room-list"></ul>
@@ -940,13 +940,17 @@
 
                   <label for="cfgRedesAutorizadas">Redes autorizadas (uma por linha, formato CIDR, ex: 10.0.0.0/8)</label>
                   <textarea id="cfgRedesAutorizadas" rows="3" placeholder="10.0.0.0/8"></textarea>
+
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfgModoManutencao" /> Modo de manutenção (bloqueia o acesso e exibe aviso a todos os usuários)
+                  </label>
+                  <p class="hint">Enquanto ativo, a tela de status do servidor é exibida para todos, antes mesmo do login, informando que o sistema está em manutenção.</p>
                 </div>
               </div>
             </div>
           </div>
 
           <button type="button" id="salvarConfigBtn" class="btn btn-on btn-block">Salvar configurações</button>
-          <p id="configError" class="error hidden"></p>
           <p id="configSavedHint" class="config-saved-hint hidden">Configurações salvas.</p>
         </div>
         </div>
@@ -1113,6 +1117,8 @@
 
   <script src="js/state.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/toast.js"></script>
+  <script src="js/server-status.js"></script>
   <script src="js/tempo.js"></script>
   <script src="js/rooms-data.js"></script>
   <script src="js/api.js"></script>

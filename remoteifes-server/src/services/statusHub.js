@@ -11,6 +11,7 @@ let wss = null;
 const salaObservadaPorCliente = new WeakMap();
 
 function origemPermitida(origin) {
+  if ((process.env.NODE_ENV || "development") !== "production") return true;
   if (!origin) return true;
   const origensPermitidas = (process.env.CORS_ORIGIN || "")
     .split(",")
@@ -56,7 +57,17 @@ function enviar(ws, payload) {
   ws.send(JSON.stringify(payload));
 }
 
+function statusServidorPayload() {
+  return { tipo: "servidor", online: true, manutencao: configuracoesService.modoManutencaoAtivo() };
+}
+
+function enviarStatusServidor(ws) {
+  enviar(ws, statusServidorPayload());
+}
+
 function notificarCliente(ws) {
+  enviarStatusServidor(ws);
+  if (!ws.usuario) return;
   enviar(ws, { tipo: "salas", salas: montarSalas(ws.usuario) });
   const sala = salaObservadaPorCliente.get(ws);
   if (sala) {
@@ -72,6 +83,12 @@ function notificarTodos() {
   });
 }
 
+function notificarStatusServidorParaTodos() {
+  if (!wss) return;
+  const payload = statusServidorPayload();
+  wss.clients.forEach((ws) => enviar(ws, payload));
+}
+
 function iniciar(server) {
   const { WebSocketServer } = require("ws");
   wss = new WebSocketServer({ server, path: "/ws" });
@@ -85,12 +102,10 @@ function iniciar(server) {
     const url = new URL(req.url, "http://localhost");
     const token = url.searchParams.get("token");
     const usuario = token ? validarToken(token) : null;
-    if (!usuario) {
-      ws.close(4001, "não autenticado");
-      return;
-    }
-
-    ws.usuario = usuario;
+    // Sem token: conexão pública, usada pela tela de status do servidor
+    // (pré-login) para saber se o backend está no ar / em manutenção.
+    // Não fechamos mais a conexão nesse caso.
+    ws.usuario = usuario || null;
     ws.isAlive = true;
     ws.on("pong", () => {
       ws.isAlive = true;
@@ -134,6 +149,7 @@ function iniciar(server) {
   setInterval(notificarTodos, REBROADCAST_MS);
 
   salasService.eventos.on("mudanca", notificarTodos);
+  configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
 }
 
 module.exports = { iniciar };

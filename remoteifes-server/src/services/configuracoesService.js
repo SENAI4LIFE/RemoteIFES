@@ -1,4 +1,7 @@
+const EventEmitter = require("events");
 const db = require("../config/database");
+
+const eventos = new EventEmitter();
 
 const PADROES = {
   timeoutInatividadeMinutos: null,
@@ -10,12 +13,13 @@ const PADROES = {
   temperaturaMaxima: 25,
   modoTeste: true,
   redesAutorizadas: [],
+  modoManutencao: false,
 };
 
 const CHAVES_NUMERICAS_ANULAVEIS = ["timeoutInatividadeMinutos"];
 const CHAVES_NUMERICAS = ["popupAvisoSegundos", "limiarOnlineMinutos"];
 const CHAVES_BOOLEANAS = ["adminSujeitoTimeout"];
-const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste"];
+const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
 
@@ -43,6 +47,10 @@ function limitesTemperatura() {
 function acessoRestritoAtivo() {
   const cfg = obter();
   return { modoTeste: !!cfg.modoTeste, redesAutorizadas: cfg.redesAutorizadas || [] };
+}
+
+function modoManutencaoAtivo() {
+  return !!obter().modoManutencao;
 }
 
 function validarEAtualizar(patch, requisitante) {
@@ -126,7 +134,11 @@ function validarEAtualizar(patch, requisitante) {
     gravar.run(chave, JSON.stringify(proximo[chave]));
   }
 
-  return obter();
+  const configuracoes = obter();
+  if (Object.prototype.hasOwnProperty.call(patch, "modoManutencao")) {
+    eventos.emit("mudanca-manutencao", !!configuracoes.modoManutencao);
+  }
+  return configuracoes;
 }
 
 module.exports = {
@@ -135,5 +147,7 @@ module.exports = {
   timeoutEfetivoParaUsuario,
   limitesTemperatura,
   acessoRestritoAtivo,
+  modoManutencaoAtivo,
+  eventos,
   PADROES,
 };

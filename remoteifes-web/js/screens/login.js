@@ -88,19 +88,15 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const usuario = document.getElementById("username").value;
   const senha = document.getElementById("password").value;
-  const errorEl = document.getElementById("loginError");
-  errorEl.classList.add("hidden");
 
   const resp = await Api.login(usuario, senha);
   if (!resp.ok) {
-    errorEl.textContent = resp.erro || "não foi possível entrar";
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro || "não foi possível entrar");
     return;
   }
 
   if (tipoLoginSelecionado === "admin" && !resp.isAdmin) {
-    errorEl.textContent = "este usuário não tem privilégios de administrador";
-    errorEl.classList.remove("hidden");
+    Toast.erro("este usuário não tem privilégios de administrador");
     Api.logout();
     return;
   }
@@ -156,7 +152,5 @@ window.addEventListener("app:sessao-expirada", () => {
   if (!state.usuario) return;
   Api.logout();
   realizarLogout({ manterTela: true });
-  const errorEl = document.getElementById("loginError");
-  errorEl.textContent = "sua sessão expirou por inatividade: entre novamente";
-  errorEl.classList.remove("hidden");
+  Toast.erro("sua sessão expirou por inatividade: entre novamente");
 });
