@@ -160,9 +160,13 @@ const Api = {
     });
   },
 
-  async listarLogs(data) {
-    const query = data ? `?data=${encodeURIComponent(data)}` : "";
-    return chamar(`/admin/logs${query}`, { headers: headersComToken() });
+  async listarLogs({ data, sala, andar } = {}) {
+    const params = new URLSearchParams();
+    if (data) params.set("data", data);
+    if (sala) params.set("sala", sala);
+    if (andar) params.set("andar", andar);
+    const query = params.toString();
+    return chamar(`/admin/logs${query ? `?${query}` : ""}`, { headers: headersComToken() });
   },
 
   async apagarLogs(data) {
