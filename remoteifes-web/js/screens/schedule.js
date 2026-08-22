@@ -84,9 +84,6 @@ document.querySelectorAll('input[name="agendaModo"]').forEach((radio) => {
 });
 
 document.getElementById("criarAgendaBtn").addEventListener("click", async () => {
-  const errorEl = document.getElementById("agendaError");
-  errorEl.classList.add("hidden");
-
   const modo = document.querySelector('input[name="agendaModo"]:checked').value;
   const data = Tempo.dataAtualBrasiliaISO();
 
@@ -103,8 +100,7 @@ document.getElementById("criarAgendaBtn").addEventListener("click", async () => 
 
   const resp = await Api.criarAgendamento(dados);
   if (!resp.ok) {
-    errorEl.textContent = resp.erro || "não foi possível criar o agendamento";
-    errorEl.classList.remove("hidden");
+    Toast.erro(resp.erro || "não foi possível criar o agendamento");
     return;
   }
 
