@@ -3,6 +3,7 @@ const db = require("../config/database");
 const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 const configuracoesService = require("./configuracoesService");
 const notificacoesService = require("./notificacoesService");
+const presetsService = require("./presetsService");
 
 const eventos = new EventEmitter();
 
@@ -26,6 +27,46 @@ function listar({ bloco, andar } = {}) {
 
 function buscar(sala) {
   return db.prepare("SELECT * FROM salas WHERE sala = ?").get(sala);
+}
+
+function presetDaSala(salaRow) {
+  return salaRow.presetId ? presetsService.buscarPorId(salaRow.presetId) : presetsService.presetPadrao();
+}
+
+function funcoesEstadoDaSala(salaRow) {
+  try {
+    return salaRow.funcoesEstado ? JSON.parse(salaRow.funcoesEstado) : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function funcaoDaSalaPorChave(salaRow, chave) {
+  const preset = presetDaSala(salaRow);
+  if (!preset) return null;
+  return preset.funcoes.find((f) => f.chave === chave) || null;
+}
+
+function validarValorFuncao(funcao, valor) {
+  if (funcao.tipo === "booleano") {
+    if (typeof valor !== "boolean") throw new Error(`valor de "${funcao.rotulo}" deve ser verdadeiro ou falso`);
+    return valor;
+  }
+  if (funcao.tipo === "selecao") {
+    const opcoes = Array.isArray(funcao.opcoes) ? funcao.opcoes : null;
+    if (opcoes && opcoes.length > 0) {
+      if (!opcoes.includes(valor)) throw new Error(`valor inválido para "${funcao.rotulo}"`);
+      return valor;
+    }
+    if (typeof valor !== "boolean") throw new Error(`valor de "${funcao.rotulo}" deve ser verdadeiro ou falso`);
+    return valor;
+  }
+  const numero = Number(valor);
+  if (Number.isNaN(numero)) throw new Error(`valor de "${funcao.rotulo}" deve ser numérico`);
+  const opcoes = funcao.opcoes && typeof funcao.opcoes === "object" ? funcao.opcoes : {};
+  if (Number.isFinite(opcoes.min) && numero < opcoes.min) throw new Error(`valor de "${funcao.rotulo}" deve ser maior ou igual a ${opcoes.min}`);
+  if (Number.isFinite(opcoes.max) && numero > opcoes.max) throw new Error(`valor de "${funcao.rotulo}" deve ser menor ou igual a ${opcoes.max}`);
+  return numero;
 }
 
 function registrarEventoEsp(sala, status) {
@@ -300,6 +341,8 @@ function statusCompleto(sala, requisitante) {
     && bloqueio.usuarioId !== requisitante.id
     && !requisitante.isAdmin;
 
+  const preset = presetDaSala(salaRow);
+
   return {
     sala: salaRow.sala,
     nome: salaRow.nome,
@@ -311,6 +354,9 @@ function statusCompleto(sala, requisitante) {
     temperaturaMaxima: configuracoesService.limitesTemperatura().maxima,
     acessoRestrito: !!salaRow.acessoRestrito,
     podeControlarEsta: usuarioPodeControlarSala(requisitante, sala),
+    presetId: preset ? preset.id : null,
+    funcoes: preset ? preset.funcoes.filter((f) => f.chave !== "temperatura") : [],
+    funcoesEstado: funcoesEstadoDaSala(salaRow),
     bloqueio: bloqueio
       ? {
           usuarioNome: bloqueio.usuarioNome,
@@ -331,12 +377,14 @@ function registrarLog({ usuario, sala, cmd, valor, origem }) {
 }
 
 function aplicarComando(sala, cmd, valor, { usuario, origem }) {
-  if (!COMANDOS_VALIDOS.includes(cmd)) {
-    throw new Error("comando inválido");
-  }
-
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
+
+  const comandoBase = COMANDOS_VALIDOS.includes(cmd);
+  const funcaoExtra = comandoBase ? null : funcaoDaSalaPorChave(salaRow, cmd);
+  if (!comandoBase && !funcaoExtra) {
+    throw new Error("comando inválido");
+  }
 
   if (origem === "manual" && usuario && !usuario.isAdmin) {
     if (!usuarioPodeControlarSala(usuario, sala)) {
@@ -360,6 +408,11 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
       throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
     }
     db.prepare(`UPDATE salas SET temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
+  } else if (funcaoExtra) {
+    const valorValidado = validarValorFuncao(funcaoExtra, valor);
+    const estadoAtual = funcoesEstadoDaSala(salaRow);
+    estadoAtual[cmd] = valorValidado;
+    db.prepare(`UPDATE salas SET funcoesEstado = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(JSON.stringify(estadoAtual), sala);
   }
 
   registrarLog({

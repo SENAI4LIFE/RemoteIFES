@@ -8,7 +8,6 @@ const ServerStatus = (() => {
   const tela = document.getElementById("screen-server-status");
   const titulo = document.getElementById("serverStatusTitulo");
   const desc = document.getElementById("serverStatusDesc");
-  const retryTexto = document.getElementById("serverStatusRetryTexto");
   const retryBtn = document.getElementById("serverStatusRetryBtn");
 
   function wsUrl() {
@@ -19,16 +18,16 @@ const ServerStatus = (() => {
 
   function aplicarEstadoConectando() {
     tela.classList.remove("hidden");
-    titulo.textContent = "Conectando ao RemoteIFES";
-    desc.textContent = "Verificando a conexão com o servidor.";
-    retryTexto.textContent = "Tentando reconexão…";
+    titulo.textContent = "Sem conexão com o servidor";
+    desc.textContent = tentativas > 1
+      ? `Tentando reconectar… (tentativa ${tentativas})`
+      : "Tentando reconectar…";
   }
 
   function aplicarEstadoManutencao() {
     tela.classList.remove("hidden");
     titulo.textContent = "Sistema em manutenção";
-    desc.textContent = "O RemoteIFES está passando por uma manutenção programada.";
-    retryTexto.textContent = "Tente novamente em alguns instantes.";
+    desc.textContent = "O RemoteIFES está passando por uma manutenção programada. Tente novamente em alguns instantes.";
   }
 
   function esconderTela() {
@@ -83,7 +82,6 @@ const ServerStatus = (() => {
 
     ws.addEventListener("close", () => {
       ws = null;
-      aplicarEstadoConectando();
       agendarReconexao();
     });
 
@@ -95,14 +93,22 @@ const ServerStatus = (() => {
   function agendarReconexao() {
     if (reconectarTimeoutId) clearTimeout(reconectarTimeoutId);
     tentativas += 1;
+    aplicarEstadoConectando();
     const espera = Math.min(15000, 1000 * tentativas);
     reconectarTimeoutId = setTimeout(conectar, espera);
   }
 
   function tentarNovamente() {
+    if (retryBtn.disabled) return;
+    retryBtn.disabled = true;
+    retryBtn.textContent = "Tentando…";
     if (reconectarTimeoutId) clearTimeout(reconectarTimeoutId);
     tentativas = 0;
     conectar();
+    setTimeout(() => {
+      retryBtn.disabled = false;
+      retryBtn.textContent = "Tentar novamente agora";
+    }, 1200);
   }
 
   retryBtn.addEventListener("click", tentarNovamente);

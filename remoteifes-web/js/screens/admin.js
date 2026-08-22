@@ -1,3 +1,9 @@
+function escapeHtmlAdmin(texto) {
+  const div = document.createElement("div");
+  div.textContent = texto == null ? "" : String(texto);
+  return div.innerHTML;
+}
+
 const Admin = {
   async aoAbrir() {
     document.getElementById("novoUsuarioAdminLabel").classList.toggle("hidden", !state.isSuperAdmin);
@@ -579,12 +585,19 @@ const Admin = {
 
     presets.forEach((p) => {
       const li = document.createElement("li");
+      const inputId = `presetJsonInput-${p.id}`;
       li.innerHTML = `
         <div>
           <div class="room-name">${p.nome} ${p.padrao ? "· padrão" : ""}</div>
           <div class="room-sub">
             ${p.funcoes.map((f) => `<span class="preset-funcao-tag">${f.rotulo}</span>`).join("") || "sem funções cadastradas"}
           </div>
+          <div class="preset-upload-row">
+            <input type="file" id="${inputId}" accept="application/json,.json" />
+            <button type="button" class="preset-upload-btn carregar-json-preset">Carregar JSON</button>
+            <span class="preset-upload-hint">arquivo de preset registrado pela ESP</span>
+          </div>
+          <div class="preset-grid-editor"></div>
         </div>
         ${!p.padrao ? `<button type="button" class="link-btn danger remover-preset">remover</button>` : ""}
       `;
@@ -597,8 +610,164 @@ const Admin = {
           await Admin.carregarPresets();
         });
       }
+
+      const fileInput = li.querySelector(`#${inputId}`);
+      li.querySelector(".carregar-json-preset").addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", async () => {
+        const arquivo = fileInput.files && fileInput.files[0];
+        if (!arquivo) return;
+        try {
+          const texto = await arquivo.text();
+          const dados = JSON.parse(texto);
+          const funcoes = Array.isArray(dados) ? dados : dados.funcoes;
+          if (!Array.isArray(funcoes) || funcoes.length === 0) {
+            throw new Error("o arquivo não contém uma lista de funções válida");
+          }
+
+          let sucesso = 0;
+          let falhas = 0;
+          for (const f of funcoes) {
+            if (!f || !f.chave || f.chave === "temperatura") continue;
+            const payload = { chave: f.chave, rotulo: f.rotulo, tipo: f.tipo, opcoes: f.opcoes ?? null, ordem: f.ordem };
+            const existente = p.funcoes.find((pf) => pf.chave === f.chave);
+            const resp = existente
+              ? await Api.atualizarFuncaoPreset(existente.id, payload)
+              : await Api.adicionarFuncaoPreset(p.id, payload);
+            if (resp.ok) sucesso += 1;
+            else falhas += 1;
+          }
+
+          alert(`${sucesso} função(ões) carregada(s)${falhas ? `, ${falhas} com erro` : ""}.`);
+          await Admin.carregarPresets();
+        } catch (err) {
+          alert(err.message || "não foi possível ler o arquivo JSON");
+        } finally {
+          fileInput.value = "";
+        }
+      });
+
+      const funcoesPosicionaveis = p.funcoes.filter((f) => f.chave !== "temperatura");
+      if (funcoesPosicionaveis.length > 0) {
+        Admin.montarGridEditor(li.querySelector(".preset-grid-editor"), p, funcoesPosicionaveis);
+      }
+
       list.appendChild(li);
     });
+  },
+
+  SLOTS_CONTROLE: [
+    { posicao: "flank_esq", rotulo: "Flank esq.", area: "flank_esq" },
+    { posicao: "flank_dir", rotulo: "Flank dir.", area: "flank_dir" },
+    { posicao: "fan", rotulo: "Fan (steppers)", area: "fan" },
+    { posicao: "grid_topo_1", rotulo: "Topo 1", area: "grid_topo_1" },
+    { posicao: "grid_topo_2", rotulo: "Topo 2", area: "grid_topo_2" },
+    { posicao: "grid_topo_3", rotulo: "Topo 3", area: "grid_topo_3" },
+    { posicao: "grid_base_1", rotulo: "Base 1", area: "grid_base_1" },
+    { posicao: "grid_base_2", rotulo: "Base 2", area: "grid_base_2" },
+    { posicao: "grid_base_3", rotulo: "Base 3", area: "grid_base_3" },
+    { posicao: "grid_base_4", rotulo: "Base 4", area: "grid_base_4" },
+    { posicao: "grid_base_5", rotulo: "Base 5", area: "grid_base_5" },
+    { posicao: "grid_base_6", rotulo: "Base 6", area: "grid_base_6" },
+  ],
+
+  montarGridEditor(container, preset, funcoes) {
+    container.innerHTML = `
+      <div class="preset-grid-head">Posição dos botões no controle</div>
+      <p class="preset-grid-hint">Clique em um espaço do controle para escolher a função que aparece nele. Funções sem posição não aparecem no controle.</p>
+      <div class="preset-grid-visual"></div>
+      <p class="preset-grid-unassigned hidden"></p>
+    `;
+
+    const visual = container.querySelector(".preset-grid-visual");
+
+    Admin.SLOTS_CONTROLE.forEach((slot) => {
+      const funcaoNoSlot = funcoes.find((f) => f.posicao === slot.posicao) || null;
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "preset-grid-slot";
+      botao.style.gridArea = slot.area;
+      botao.dataset.posicao = slot.posicao;
+      botao.classList.toggle("preset-grid-slot-vazio", !funcaoNoSlot);
+      botao.innerHTML = `
+        <span class="preset-grid-slot-label">${slot.rotulo}</span>
+        <span class="preset-grid-slot-funcao">${funcaoNoSlot ? escapeHtmlAdmin(funcaoNoSlot.rotulo) : "vazio"}</span>
+      `;
+      botao.addEventListener("click", () => {
+        Admin.abrirEscolhaSlot(preset, funcoes, slot, funcaoNoSlot);
+      });
+      visual.appendChild(botao);
+    });
+
+    const semPosicao = funcoes.filter((f) => !f.posicao);
+    const avisoEl = container.querySelector(".preset-grid-unassigned");
+    if (semPosicao.length > 0) {
+      avisoEl.textContent = `Sem posição no controle: ${semPosicao.map((f) => f.rotulo).join(", ")}`;
+      avisoEl.classList.remove("hidden");
+    }
+  },
+
+  abrirEscolhaSlot(preset, funcoes, slot, funcaoAtual) {
+    const existente = document.querySelector(".preset-slot-popover");
+    if (existente) existente.remove();
+
+    const popover = document.createElement("div");
+    popover.className = "preset-slot-popover";
+    const opcoes = funcoes
+      .filter((f) => !f.posicao || f.posicao === slot.posicao)
+      .map(
+        (f) => `<button type="button" class="choice-btn preset-slot-opcao" data-funcao-id="${f.id}">${escapeHtmlAdmin(f.rotulo)}</button>`
+      )
+      .join("");
+
+    popover.innerHTML = `
+      <div class="preset-slot-popover-title">${slot.rotulo}</div>
+      <div class="choice-row">
+        ${opcoes || "<span class=\"hint\">nenhuma função disponível</span>"}
+        ${funcaoAtual ? `<button type="button" class="choice-btn preset-slot-limpar">deixar vazio</button>` : ""}
+      </div>
+      <button type="button" class="link-btn preset-slot-fechar">fechar</button>
+    `;
+
+    document.body.appendChild(popover);
+    let aoClicarFora;
+    const fechar = () => {
+      popover.remove();
+      if (aoClicarFora) document.removeEventListener("click", aoClicarFora);
+    };
+
+    popover.querySelectorAll(".preset-slot-opcao").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const funcaoId = Number(btn.dataset.funcaoId);
+        const resp = await Api.atualizarFuncaoPreset(funcaoId, { posicao: slot.posicao });
+        if (!resp.ok) {
+          Toast.erro(resp.erro || "não foi possível definir a posição");
+          return;
+        }
+        fechar();
+        await Admin.carregarPresets();
+      });
+    });
+
+    const limparBtn = popover.querySelector(".preset-slot-limpar");
+    if (limparBtn) {
+      limparBtn.addEventListener("click", async () => {
+        const resp = await Api.atualizarFuncaoPreset(funcaoAtual.id, { posicao: null });
+        if (!resp.ok) {
+          Toast.erro(resp.erro || "não foi possível remover a posição");
+          return;
+        }
+        fechar();
+        await Admin.carregarPresets();
+      });
+    }
+
+    popover.querySelector(".preset-slot-fechar").addEventListener("click", fechar);
+    setTimeout(() => {
+      aoClicarFora = (ev) => {
+        if (!popover.contains(ev.target)) fechar();
+      };
+      document.addEventListener("click", aoClicarFora);
+    }, 0);
   },
 
   async carregarProprietarios() {
