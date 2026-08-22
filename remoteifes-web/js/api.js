@@ -19,11 +19,16 @@ async function chamar(path, options = {}) {
     localStorage.removeItem(CHAVE_TOKEN);
     window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
   }
+  let data;
   try {
-    return await res.json();
+    data = await res.json();
   } catch (err) {
     return { ok: false, erro: `resposta inválida do servidor (status ${res.status})` };
   }
+  if (res.status === 503 && data && data.manutencao) {
+    window.dispatchEvent(new CustomEvent("app:manutencao-ativa"));
+  }
+  return data;
 }
 
 const Api = {

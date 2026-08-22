@@ -62,20 +62,36 @@ const SimpleWizard = {
     }
     empty.classList.add("hidden");
 
-    grid.innerHTML = "";
-    salas.forEach((s) => {
+    const existentes = new Map();
+    grid.querySelectorAll(".simple-tile-sala[data-sala]").forEach((tile) => existentes.set(tile.dataset.sala, tile));
+
+    salas.forEach((s, index) => {
+      let tile = existentes.get(s.sala);
+      if (!tile) {
+        tile = document.createElement("button");
+        tile.type = "button";
+        tile.dataset.sala = s.sala;
+        tile.innerHTML = `
+          <span class="simple-tile-icon">&#10052;&#65039;</span>
+          <span class="simple-tile-label"></span>
+          <span class="simple-tile-sub"></span>
+        `;
+        tile.addEventListener("click", () => openRoom(tile.dataset.sala, tile.dataset.nome));
+      } else {
+        existentes.delete(s.sala);
+      }
+      tile.dataset.nome = s.nome;
+
       const estado = s.online ? (s.ligado ? "is-ligado" : "is-desligado") : "is-offline";
-      const tile = document.createElement("button");
-      tile.type = "button";
       tile.className = `simple-tile simple-tile-sala ${estado}${s.agendadaAgora ? " is-reservada" : ""}`;
-      tile.innerHTML = `
-        <span class="simple-tile-icon">&#10052;&#65039;</span>
-        <span class="simple-tile-label">${s.sala}</span>
-        <span class="simple-tile-sub">${s.nome}${s.podeControlarEsta === false ? " · visualização" : ""}</span>
-      `;
-      tile.addEventListener("click", () => openRoom(s.sala, s.nome));
-      grid.appendChild(tile);
+      tile.querySelector(".simple-tile-label").textContent = s.sala;
+      tile.querySelector(".simple-tile-sub").textContent = `${s.nome}${s.podeControlarEsta === false ? " · visualização" : ""}`;
+
+      const referencia = grid.children[index];
+      if (referencia !== tile) grid.insertBefore(tile, referencia || null);
     });
+
+    existentes.forEach((tile) => tile.remove());
   },
 };
 

@@ -124,39 +124,56 @@ function aplicarEstadoVisual(botao, funcao) {
 
 function renderFlank(botao, funcao) {
   if (!funcao) {
-    botao.classList.add("hidden");
-    botao.dataset.disponivel = "0";
-    botao.disabled = true;
-    delete botao.dataset.chave;
-    botao.removeAttribute("aria-label");
-    botao.innerHTML = "";
+    if (botao.dataset.chave) {
+      botao.classList.add("hidden");
+      botao.dataset.disponivel = "0";
+      botao.disabled = true;
+      delete botao.dataset.chave;
+      botao.removeAttribute("aria-label");
+      botao.innerHTML = "";
+    }
     return;
+  }
+  if (botao.dataset.chave !== funcao.chave) {
+    botao.innerHTML = `<span class="ac-remote-grid-btn-label"></span>`;
   }
   botao.classList.remove("hidden");
   botao.dataset.disponivel = "1";
   botao.disabled = false;
   botao.dataset.chave = funcao.chave;
   botao.setAttribute("aria-label", funcao.rotulo);
-  botao.innerHTML = `<span class="ac-remote-grid-btn-label">${escapeHtml(funcao.rotulo)}</span>`;
+  botao.querySelector(".ac-remote-grid-btn-label").textContent = funcao.rotulo;
   aplicarEstadoVisual(botao, funcao);
 }
 
 function renderGrid(container, lista) {
-  container.innerHTML = "";
   const funcoesDisponiveis = (lista || []).filter(Boolean);
-  funcoesDisponiveis.forEach((funcao) => {
-    const botao = document.createElement("button");
-    botao.type = "button";
-    botao.className = "ac-remote-grid-btn";
-    botao.dataset.chave = funcao.chave;
-    botao.dataset.disponivel = "1";
-    botao.innerHTML = `
-      <span class="ac-remote-grid-btn-label">${escapeHtml(funcao.rotulo)}</span>
-      <span class="ac-remote-grid-btn-state"></span>
-    `;
+  const existentes = new Map();
+  container.querySelectorAll(".ac-remote-grid-btn[data-chave]").forEach((botao) => existentes.set(botao.dataset.chave, botao));
+
+  funcoesDisponiveis.forEach((funcao, index) => {
+    let botao = existentes.get(funcao.chave);
+    if (!botao) {
+      botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "ac-remote-grid-btn";
+      botao.dataset.chave = funcao.chave;
+      botao.dataset.disponivel = "1";
+      botao.innerHTML = `
+        <span class="ac-remote-grid-btn-label"></span>
+        <span class="ac-remote-grid-btn-state"></span>
+      `;
+    } else {
+      existentes.delete(funcao.chave);
+    }
+    botao.querySelector(".ac-remote-grid-btn-label").textContent = funcao.rotulo;
     aplicarEstadoVisual(botao, funcao);
-    container.appendChild(botao);
+
+    const referencia = container.children[index];
+    if (referencia !== botao) container.insertBefore(botao, referencia || null);
   });
+
+  existentes.forEach((botao) => botao.remove());
   container.classList.toggle("hidden", funcoesDisponiveis.length === 0);
 }
 
