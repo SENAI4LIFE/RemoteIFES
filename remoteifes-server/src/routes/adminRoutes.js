@@ -297,6 +297,10 @@ router.get("/admin/presets", (req, res) => {
   res.json(presetsService.listar());
 });
 
+router.get("/admin/presets/posicoes", exigirSuperAdmin, (req, res) => {
+  res.json(presetsService.POSICOES_VALIDAS);
+});
+
 router.post("/admin/presets", exigirSuperAdmin, (req, res) => {
   try {
     const preset = presetsService.criar(req.body || {});

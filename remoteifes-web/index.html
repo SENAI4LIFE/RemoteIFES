@@ -11,9 +11,8 @@
   <section id="screen-server-status" class="hidden">
     <div class="server-status-card">
       <div class="server-status-spinner" aria-hidden="true"></div>
-      <h2 id="serverStatusTitulo" class="server-status-title">Conectando ao RemoteIFES</h2>
-      <p id="serverStatusDesc" class="server-status-desc">Verificando a conexão com o servidor.</p>
-      <p id="serverStatusRetryTexto" class="server-status-retry-texto">Tentando reconexão…</p>
+      <h2 id="serverStatusTitulo" class="server-status-title">Sem conexão com o servidor</h2>
+      <p id="serverStatusDesc" class="server-status-desc">Tentando reconectar…</p>
       <button type="button" id="serverStatusRetryBtn" class="server-status-retry-btn">Tentar novamente agora</button>
     </div>
   </section>
@@ -510,33 +509,43 @@
         <p id="panelSomenteLeitura" class="aviso-inline hidden">Você tem apenas visualização desta sala: não possui permissão para controlá-la.</p>
 
         <div class="ac-remote">
-          <div class="ac-remote-body">
+          <div class="ac-remote-body" id="acRemoteBody">
             <div class="ac-remote-sensor"></div>
 
             <div class="ac-remote-display">
               <div class="ac-remote-display-top">
+                <span class="ac-remote-mode-label" id="modoValue">Off</span>
                 <span class="ac-remote-conn" title="Conexão do dispositivo"><span class="ac-remote-conn-dot"></span><span id="conexaoValue">—</span></span>
+              </div>
+              <div class="ac-remote-set-row">
+                <span class="ac-remote-set-label">SET</span>
                 <span id="statusValue" title="Estado do ar-condicionado">—</span>
               </div>
               <div class="ac-remote-temp-target" id="tempTarget">23°C</div>
               <div class="ac-remote-room-temp">Ambiente: <span id="tempValue">— °C</span></div>
             </div>
 
-            <div class="ac-remote-temp-controls">
-              <button id="tempUp" type="button" class="ac-remote-chevron" aria-label="Aumentar temperatura">&#9650;</button>
-              <button id="tempDown" type="button" class="ac-remote-chevron" aria-label="Diminuir temperatura">&#9660;</button>
+            <div class="ac-remote-row ac-remote-row-power">
+              <button id="btnFlankLeft" type="button" class="ac-remote-round-btn hidden" aria-label="Função extra"></button>
+              <button id="btnPower" type="button" class="ac-remote-power-btn" aria-label="Ligar ou desligar o ar-condicionado">
+                <span class="ac-remote-power-icon">&#9211;</span>
+              </button>
+              <button id="btnFlankRight" type="button" class="ac-remote-rect-btn hidden" aria-label="Função extra"></button>
+              <div class="ac-remote-stepper">
+                <button id="fanUp" type="button" class="ac-remote-chevron" aria-label="Aumentar velocidade do ventilador" disabled>&#9650;</button>
+                <span class="ac-remote-stepper-label">Fan</span>
+                <button id="fanDown" type="button" class="ac-remote-chevron" aria-label="Diminuir velocidade do ventilador" disabled>&#9660;</button>
+              </div>
+              <div class="ac-remote-stepper ac-remote-stepper-temp">
+                <button id="tempUp" type="button" class="ac-remote-chevron" aria-label="Aumentar temperatura"><span class="ac-remote-chevron-sign">+</span>&#9650;</button>
+                <span class="ac-remote-stepper-label">Temp</span>
+                <button id="tempDown" type="button" class="ac-remote-chevron" aria-label="Diminuir temperatura"><span class="ac-remote-chevron-sign">&minus;</span>&#9660;</button>
+              </div>
             </div>
 
-            <div class="ac-remote-power-row">
-              <button id="btnOn" type="button" class="ac-remote-power-btn ac-remote-power-on">
-                <span class="ac-remote-power-icon">&#9211;</span>
-                <span>Ligar</span>
-              </button>
-              <button id="btnOff" type="button" class="ac-remote-power-btn ac-remote-power-off">
-                <span class="ac-remote-power-icon">&#9211;</span>
-                <span>Desligar</span>
-              </button>
-            </div>
+            <div class="ac-remote-grid" id="acGridTopo"></div>
+
+            <div class="ac-remote-grid" id="acGridBase"></div>
           </div>
         </div>
 
@@ -868,7 +877,7 @@
             <input type="text" id="novoPresetNome" />
             <button type="button" id="criarPresetBtn" class="btn btn-on btn-block">Criar preset</button>
           </div>
-          <p class="hint">O preset padrão possui apenas a função de temperatura. Novas funções (velocidade, oscilação, modo turbo, etc.) são cadastradas diretamente pela própria ESP32, a partir da sala em que o dispositivo está instalado.</p>
+          <p class="hint">O preset padrão possui apenas a função de temperatura. Novas funções (velocidade, oscilação, modo turbo, etc.) são cadastradas diretamente pela própria ESP32, a partir da sala em que o dispositivo está instalado. Depois de cadastradas, escolha abaixo em qual botão do controle cada função aparece.</p>
           <ul id="presetsList" class="room-list"></ul>
         </div>
 
