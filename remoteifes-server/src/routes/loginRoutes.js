@@ -23,8 +23,12 @@ router.post("/login", limitarLogin, (req, res) => {
     return res.status(401).json({ ok: false, erro: "usuário ou senha inválidos" });
   }
 
-  const token = gerarToken(registro.id);
   const isAdmin = registro.nivel >= usuariosService.NIVEL_ADMIN;
+  if (!isAdmin && configuracoesService.modoManutencaoAtivo()) {
+    return res.status(503).json({ ok: false, erro: "sistema em manutenção: apenas administradores podem entrar no momento", manutencao: true });
+  }
+
+  const token = gerarToken(registro.id);
   const config = configuracoesService.obter();
 
   res.json({

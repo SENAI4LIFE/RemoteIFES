@@ -1,4 +1,7 @@
 const { validarToken } = require("../services/tokenService");
+const configuracoesService = require("../services/configuracoesService");
+
+const NIVEL_ADMIN = 2;
 
 function extrairToken(req) {
   const header = req.headers.authorization || "";
@@ -12,6 +15,10 @@ function exigirLogin(req, res, next) {
 
   if (!usuario) {
     return res.status(401).json({ ok: false, erro: "não autenticado" });
+  }
+
+  if (usuario.nivel < NIVEL_ADMIN && configuracoesService.modoManutencaoAtivo()) {
+    return res.status(503).json({ ok: false, erro: "sistema em manutenção", manutencao: true });
   }
 
   req.usuario = usuario;

@@ -26,23 +26,42 @@ function renderRooms(salasTodas) {
   }
   empty.classList.add("hidden");
 
-  list.innerHTML = "";
-  salas.forEach((s) => {
-    const li = document.createElement("li");
-    li.innerHTML = `
-      <div>
-        <div class="room-name">
-          ${s.sala}
-          ${s.agendadaAgora ? '<span class="schedule-badge" title="Agendamento ativo agora">agendada</span>' : ""}
-          ${s.podeControlarEsta === false ? '<span class="schedule-badge readonly-badge" title="Apenas visualização">visualização</span>' : ""}
+  const existentes = new Map();
+  list.querySelectorAll("li[data-sala]").forEach((li) => existentes.set(li.dataset.sala, li));
+
+  salas.forEach((s, index) => {
+    let li = existentes.get(s.sala);
+    if (!li) {
+      li = document.createElement("li");
+      li.dataset.sala = s.sala;
+      li.innerHTML = `
+        <div>
+          <div class="room-name"></div>
+          <div class="room-sub"></div>
         </div>
-        <div class="room-sub">${s.nome}${s.online && s.ligado ? " · ligado" : ""}</div>
-      </div>
-      <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span>
+        <span class="status-badge"></span>
+      `;
+      li.addEventListener("click", () => openRoom(li.dataset.sala, li.dataset.nome));
+    } else {
+      existentes.delete(s.sala);
+    }
+    li.dataset.nome = s.nome;
+
+    li.querySelector(".room-name").innerHTML = `
+      ${s.sala}
+      ${s.agendadaAgora ? '<span class="schedule-badge" title="Agendamento ativo agora">agendada</span>' : ""}
+      ${s.podeControlarEsta === false ? '<span class="schedule-badge readonly-badge" title="Apenas visualização">visualização</span>' : ""}
     `;
-    li.addEventListener("click", () => openRoom(s.sala, s.nome));
-    list.appendChild(li);
+    li.querySelector(".room-sub").textContent = `${s.nome}${s.online && s.ligado ? " · ligado" : ""}`;
+    const badge = li.querySelector(".status-badge");
+    badge.textContent = s.online ? "online" : "offline";
+    badge.className = `status-badge ${s.online ? "on" : "off"}`;
+
+    const referencia = list.children[index];
+    if (referencia !== li) list.insertBefore(li, referencia || null);
   });
+
+  existentes.forEach((li) => li.remove());
 }
 
 function iniciarAutoRefreshRooms(somenteSeJaCarregado) {

@@ -331,7 +331,7 @@ button.btn:disabled {
   flex-direction: column;
   gap: 8px;
   align-items: center;
-  width: min(92vw, 420px);
+  width: min(92vw, 460px);
   pointer-events: none;
 }
 .toast {
@@ -473,6 +473,7 @@ button.btn:disabled {
   border-radius: 999px;
   background: #eee;
   color: var(--text-muted);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 .status-badge.on { background: var(--ifes-green-soft); color: var(--ifes-green-dark); }
 .status-badge.off { background: #f1f1f1; color: var(--text-muted); }
@@ -723,6 +724,7 @@ button.btn:disabled {
   box-shadow: 0 3px 0 var(--border), 0 5px 10px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   text-align: center;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .ac-remote-grid-btn:hover:not(:disabled) { border-color: var(--ifes-green); }
 .ac-remote-grid-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--border); }
@@ -955,6 +957,7 @@ button.btn:disabled {
   text-align: center;
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.12);
   color: #fff;
+  transition: background-color 0.25s ease;
 }
 .simple-tile:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15); }
 
@@ -1547,8 +1550,10 @@ button.btn:disabled {
   padding: 24px;
   min-height: 140px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
 }
 .portal-eyebrow {
   color: var(--warn);
@@ -1558,6 +1563,54 @@ button.btn:disabled {
   margin: 0;
   text-align: center;
 }
+.portal-manutencao-aviso {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  border: 1px solid #f0c9c5;
+  color: var(--danger);
+  font-size: calc(13px * var(--a11y-font-scale));
+  font-weight: 600;
+  text-align: center;
+}
+.portal-manutencao-aviso.hidden { display: none; }
+
+.manutencao-acesso-wrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 24px;
+}
+.manutencao-acesso-card {
+  max-width: 380px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  background: var(--warn-soft);
+  border: 1px solid #e6d7a8;
+}
+.manutencao-acesso-emoji {
+  font-size: calc(32px * var(--a11y-font-scale));
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.manutencao-acesso-card h2 { color: var(--warn); }
+.manutencao-acesso-card label { text-align: left; }
+.manutencao-acesso-submit-btn {
+  width: 100%;
+  margin-top: 20px;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  font-size: calc(15px * var(--a11y-font-scale));
+  font-weight: 500;
+  padding: 12px;
+  background: var(--warn);
+  color: #fff;
+}
+.manutencao-acesso-submit-btn:hover { filter: brightness(0.92); }
+#manutencaoAcessoCancelarBtn { margin-top: 10px; align-self: center; }
 
 .portal-options {
   background: #ecdfba;
@@ -1576,6 +1629,8 @@ button.btn:disabled {
 }
 .portal-option:last-child { border-bottom: none; }
 .portal-option:hover { background: #f2e9d2; }
+.portal-option-disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+.portal-option-disabled:hover { background: none; }
 .portal-option-icon {
   width: 34px;
   height: 34px;
@@ -2258,6 +2313,42 @@ button.btn:disabled {
 @keyframes server-status-spin {
   to { transform: rotate(360deg); }
 }
+@keyframes server-status-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.server-status-emoji {
+  font-size: calc(40px * var(--a11y-font-scale));
+  line-height: 1;
+  margin-bottom: 18px;
+}
+.server-status-emoji.hidden { display: none; }
+.server-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: calc(12px * var(--a11y-font-scale));
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.server-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.server-status-dot-offline { background: var(--danger); animation: server-status-dot-pulse 1.4s ease-in-out infinite; }
+.server-status-dot-manutencao { background: var(--warn); }
+.server-status-acesso-admin {
+  margin-top: 4px;
+}
 .server-status-title {
   margin: 0 0 8px;
   color: var(--text);
@@ -2282,4 +2373,5 @@ button.btn:disabled {
 @media (prefers-reduced-motion: reduce) {
   .server-status-card { animation: none; }
   .server-status-spinner { animation: none; }
+  .server-status-dot-offline { animation: none; }
 }

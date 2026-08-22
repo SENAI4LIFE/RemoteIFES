@@ -4,15 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RemoteIFES</title>
-  <link rel="stylesheet" href="css/style.css?v=6" />
+  <link rel="stylesheet" href="css/style.css?v=7" />
 </head>
 <body>
 
   <section id="screen-server-status" class="hidden">
     <div class="server-status-card">
-      <div class="server-status-spinner" aria-hidden="true"></div>
+      <div class="server-status-spinner" id="serverStatusSpinner" aria-hidden="true"></div>
+      <div class="server-status-emoji hidden" id="serverStatusEmoji" aria-hidden="true"></div>
+      <div class="server-status-chip" id="serverStatusChip">
+        <span class="server-status-dot" id="serverStatusDot" aria-hidden="true"></span>
+        <span id="serverStatusChipLabel">Offline</span>
+      </div>
       <h2 id="serverStatusTitulo" class="server-status-title">Sem conexão com o servidor</h2>
-      <p id="serverStatusDesc" class="server-status-desc">Tentando reconectar…</p>
+      <p id="serverStatusDesc" class="server-status-desc">Tentativa de conexão nº 1</p>
+      <button type="button" id="serverStatusAcessoAdmin" class="link-btn hidden">Sou administrador</button>
     </div>
   </section>
 
@@ -49,6 +55,7 @@
           <div class="portal-wrap">
             <div class="portal-welcome">
               <p class="portal-eyebrow">BEM-VINDO</p>
+              <p id="portalManutencaoAviso" class="portal-manutencao-aviso hidden">🔧 Sistema em manutenção programada: no momento, apenas administradores conseguem entrar.</p>
             </div>
             <div class="portal-options">
               <div class="portal-option" data-tipo="normal">
@@ -130,6 +137,24 @@
             <li><span class="icon-badge">🆘</span>Problemas para entrar? Procure o administrador do sistema.</li>
           </ul>
         </div>
+      </div>
+    </section>
+
+    <section id="screen-manutencao-acesso" class="screen hidden">
+      <div class="manutencao-acesso-wrap">
+        <form id="manutencaoAcessoForm" class="card manutencao-acesso-card">
+          <span class="manutencao-acesso-emoji" aria-hidden="true">🔧</span>
+          <h2>Acesso de administrador</h2>
+          <p class="hint">O RemoteIFES está em manutenção programada. Enquanto ela durar, só é possível entrar com uma conta de administrador.</p>
+
+          <label for="manutencaoUsuario">Login de administrador</label>
+          <input type="text" id="manutencaoUsuario" required autocomplete="username" />
+          <label for="manutencaoSenha">Senha</label>
+          <input type="password" id="manutencaoSenha" required autocomplete="current-password" />
+
+          <button type="submit" class="manutencao-acesso-submit-btn">Entrar</button>
+          <button type="button" id="manutencaoAcessoCancelarBtn" class="link-btn">Cancelar</button>
+        </form>
       </div>
     </section>
 
@@ -954,9 +979,9 @@
                   <textarea id="cfgRedesAutorizadas" rows="3" placeholder="10.0.0.0/8"></textarea>
 
                   <label class="checkbox-label">
-                    <input type="checkbox" id="cfgModoManutencao" /> Modo de manutenção (bloqueia o acesso e exibe aviso a todos os usuários)
+                    <input type="checkbox" id="cfgModoManutencao" /> Modo de manutenção (bloqueia o acesso de usuários comuns e exibe aviso)
                   </label>
-                  <p class="hint">Enquanto ativo, a tela de status do servidor é exibida para todos, antes mesmo do login, informando que o sistema está em manutenção.</p>
+                  <p class="hint">Enquanto ativo, usuários comuns veem a tela de manutenção e não conseguem entrar nem usar o sistema. Administradores continuam com acesso normal.</p>
                 </div>
               </div>
             </div>

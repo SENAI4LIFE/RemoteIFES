@@ -6,6 +6,7 @@ const { ipAutorizado } = require("../utils/rede");
 
 const REBROADCAST_MS = 30 * 1000;
 const PING_MS = 30 * 1000;
+const NIVEL_ADMIN = 2;
 
 let wss = null;
 const salaObservadaPorCliente = new WeakMap();
@@ -57,12 +58,14 @@ function enviar(ws, payload) {
   ws.send(JSON.stringify(payload));
 }
 
-function statusServidorPayload() {
-  return { tipo: "servidor", online: true, manutencao: configuracoesService.modoManutencaoAtivo() };
+function statusServidorPayload(usuario) {
+  const manutencaoAtiva = configuracoesService.modoManutencaoAtivo();
+  const isAdmin = !!(usuario && usuario.nivel >= NIVEL_ADMIN);
+  return { tipo: "servidor", online: true, manutencao: manutencaoAtiva && !isAdmin };
 }
 
 function enviarStatusServidor(ws) {
-  enviar(ws, statusServidorPayload());
+  enviar(ws, statusServidorPayload(ws.usuario));
 }
 
 function notificarCliente(ws) {
@@ -85,8 +88,7 @@ function notificarTodos() {
 
 function notificarStatusServidorParaTodos() {
   if (!wss) return;
-  const payload = statusServidorPayload();
-  wss.clients.forEach((ws) => enviar(ws, payload));
+  wss.clients.forEach((ws) => enviar(ws, statusServidorPayload(ws.usuario)));
 }
 
 function iniciar(server) {
