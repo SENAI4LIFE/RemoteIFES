@@ -31,6 +31,10 @@ const Api = {
     return !!authToken;
   },
 
+  obterToken() {
+    return authToken;
+  },
+
   async me() {
     return chamar("/me", { headers: headersComToken() });
   },
@@ -301,5 +305,65 @@ const Api = {
       method: "DELETE",
       headers: headersComToken(),
     });
+  },
+
+  async listarDonosSala(sala) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/donos`, { headers: headersComToken() });
+  },
+
+  async concederDonoSala(sala, usuarioId) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/donos/${usuarioId}`, {
+      method: "POST",
+      headers: headersComToken(),
+    });
+  },
+
+  async revogarDonoSala(sala, usuarioId) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/donos/${usuarioId}`, {
+      method: "DELETE",
+      headers: headersComToken(),
+    });
+  },
+
+  async minhasSalasPropriedade() {
+    return chamar("/minhas-salas-propriedade", { headers: headersComToken() });
+  },
+
+  async listarCandidatosPropriedade(sala) {
+    return chamar(`/salas/${encodeURIComponent(sala)}/proprietario/candidatos`, { headers: headersComToken() });
+  },
+
+  async listarAcessoPropriedade(sala) {
+    return chamar(`/salas/${encodeURIComponent(sala)}/proprietario/acesso`, { headers: headersComToken() });
+  },
+
+  async concederAcessoPropriedade(sala, usuarioId) {
+    return chamar(`/salas/${encodeURIComponent(sala)}/proprietario/acesso/${usuarioId}`, {
+      method: "POST",
+      headers: headersComToken(),
+    });
+  },
+
+  async revogarAcessoPropriedade(sala, usuarioId) {
+    return chamar(`/salas/${encodeURIComponent(sala)}/proprietario/acesso/${usuarioId}`, {
+      method: "DELETE",
+      headers: headersComToken(),
+    });
+  },
+
+  async listarNotificacoes() {
+    return chamar("/admin/notificacoes", { headers: headersComToken() });
+  },
+
+  async contarNotificacoesNaoLidas() {
+    return chamar("/admin/notificacoes/contagem", { headers: headersComToken() });
+  },
+
+  async marcarNotificacaoLida(id) {
+    return chamar(`/admin/notificacoes/${id}/lida`, { method: "POST", headers: headersComToken() });
+  },
+
+  async marcarTodasNotificacoesLidas() {
+    return chamar("/admin/notificacoes/marcar-todas-lidas", { method: "POST", headers: headersComToken() });
   },
 };

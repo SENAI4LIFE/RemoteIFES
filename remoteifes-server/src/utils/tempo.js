@@ -1,5 +1,3 @@
-
-
 const FUSO = "America/Sao_Paulo";
 
 const DIAS_SEMANA_FORMATADOR = new Intl.DateTimeFormat("en-US", {

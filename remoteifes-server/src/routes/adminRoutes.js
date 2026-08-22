@@ -5,6 +5,7 @@ const salasService = require("../services/salasService");
 const tokenService = require("../services/tokenService");
 const configuracoesService = require("../services/configuracoesService");
 const presetsService = require("../services/presetsService");
+const notificacoesService = require("../services/notificacoesService");
 
 const router = express.Router();
 router.use("/admin", exigirLogin, exigirAdmin);
@@ -221,6 +222,37 @@ router.delete("/admin/salas/:sala/acesso/:usuarioId", (req, res) => {
   res.json({ ok: true, usuarios });
 });
 
+router.get("/admin/salas/:sala/donos", (req, res) => {
+  res.json(salasService.listarDonos(req.params.sala));
+});
+
+router.post("/admin/salas/:sala/donos/:usuarioId", (req, res) => {
+  const usuarioId = parseId(req, res, "usuarioId");
+  if (usuarioId === null) return;
+  try {
+    const alvo = usuariosService.buscarPorId(usuarioId);
+    if (!alvo) throw new Error("usuário não encontrado");
+    if (alvo.nivel >= usuariosService.NIVEL_ADMIN) {
+      throw new Error("administradores já possuem acesso total; não é necessário torná-los proprietários de sala");
+    }
+    const donos = salasService.concederDono(req.params.sala, usuarioId);
+    res.json({ ok: true, donos });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.delete("/admin/salas/:sala/donos/:usuarioId", (req, res) => {
+  const usuarioId = parseId(req, res, "usuarioId");
+  if (usuarioId === null) return;
+  try {
+    const donos = salasService.revogarDono(req.params.sala, usuarioId);
+    res.json({ ok: true, donos });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
 router.get("/admin/configuracoes", (req, res) => {
   res.json({ ok: true, configuracoes: configuracoesService.obter() });
 });
@@ -308,6 +340,26 @@ router.delete("/admin/presets/funcoes/:funcaoId", exigirSuperAdmin, (req, res) =
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
   }
+});
+
+router.get("/admin/notificacoes", (req, res) => {
+  res.json(notificacoesService.listar());
+});
+
+router.get("/admin/notificacoes/contagem", (req, res) => {
+  res.json({ naoLidas: notificacoesService.contarNaoLidas() });
+});
+
+router.post("/admin/notificacoes/:id/lida", (req, res) => {
+  const id = parseId(req, res);
+  if (id === null) return;
+  notificacoesService.marcarLida(id);
+  res.json({ ok: true });
+});
+
+router.post("/admin/notificacoes/marcar-todas-lidas", (req, res) => {
+  notificacoesService.marcarTodasLidas();
+  res.json({ ok: true });
 });
 
 module.exports = router;

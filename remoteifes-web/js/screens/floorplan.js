@@ -1,6 +1,6 @@
 const ScreenFloorplan = {
   _instancia: null,
-  _intervalId: null,
+  _pararSalas: null,
 
   async aoAbrir() {
     if (!this._instancia) {
@@ -46,19 +46,23 @@ const ScreenFloorplan = {
       }, true);
     }
     await this.atualizar();
-    if (this._intervalId) clearInterval(this._intervalId);
-    this._intervalId = setInterval(() => this.atualizar(), 10000);
+    if (this._pararSalas) this._pararSalas();
+    this._pararSalas = RTStatus.aoSalas((salas) => this.aplicarStatus(salas));
   },
 
   aoFechar() {
-    if (this._intervalId) {
-      clearInterval(this._intervalId);
-      this._intervalId = null;
+    if (this._pararSalas) {
+      this._pararSalas();
+      this._pararSalas = null;
     }
   },
 
   async atualizar() {
     const salas = await Api.listarSalas();
+    this.aplicarStatus(salas);
+  },
+
+  aplicarStatus(salas) {
     if (Array.isArray(salas) && this._instancia) this._instancia.aplicarStatus(salas);
   },
 };
@@ -69,4 +73,8 @@ document.getElementById("verPlantaBtn").addEventListener("click", () => {
 
 document.getElementById("floorplanListBtn").addEventListener("click", () => {
   showScreen("location");
+});
+
+document.getElementById("floorplanSimpleBtn").addEventListener("click", () => {
+  showScreen("simple");
 });

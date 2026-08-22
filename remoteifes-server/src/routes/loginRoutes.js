@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const usuariosService = require("../services/usuariosService");
+const salasService = require("../services/salasService");
 const configuracoesService = require("../services/configuracoesService");
 const { gerarToken, removerToken } = require("../services/tokenService");
 const { exigirLogin } = require("../middlewares/auth");
@@ -8,7 +9,7 @@ const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
 
-const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 10 });
+const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 100 });
 
 router.post("/login", limitarLogin, (req, res) => {
   const { usuario, senha } = req.body || {};
@@ -35,6 +36,7 @@ router.post("/login", limitarLogin, (req, res) => {
     isAdmin,
     isSuperAdmin: registro.nivel === usuariosService.NIVEL_SUPERADMIN,
     podeControlar: !!registro.podeControlar,
+    temSalaComoProprietario: salasService.usuarioEhDonoDeAlgumaSala(registro.id),
 
     timeoutInatividadeMinutos: configuracoesService.timeoutEfetivoParaUsuario(isAdmin),
     popupAvisoSegundos: config.popupAvisoSegundos,
@@ -54,6 +56,7 @@ router.get("/me", exigirLogin, (req, res) => {
     isAdmin,
     isSuperAdmin: usuario.nivel === usuariosService.NIVEL_SUPERADMIN,
     podeControlar: !!usuario.podeControlar,
+    temSalaComoProprietario: salasService.usuarioEhDonoDeAlgumaSala(usuario.id),
     timeoutInatividadeMinutos: configuracoesService.timeoutEfetivoParaUsuario(isAdmin),
     popupAvisoSegundos: config.popupAvisoSegundos,
   });

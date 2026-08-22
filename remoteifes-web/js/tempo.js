@@ -1,5 +1,3 @@
-
-
 const Tempo = {
   dataAtualBrasiliaISO() {
     const formatador = new Intl.DateTimeFormat("en-CA", {

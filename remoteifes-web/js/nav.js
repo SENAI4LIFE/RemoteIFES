@@ -1,23 +1,39 @@
 const screens = {
+  simple: document.getElementById("screen-simple"),
   location: document.getElementById("screen-location"),
   floorplan: document.getElementById("screen-floorplan"),
   rooms: document.getElementById("screen-rooms"),
   panel: document.getElementById("screen-panel"),
   agenda: document.getElementById("screen-agenda"),
   grade: document.getElementById("screen-grade"),
+  propriedade: document.getElementById("screen-propriedade"),
   admin: document.getElementById("screen-admin"),
 };
 
-let salasSubScreenAtual = "floorplan";
+let salasSubScreenAtual = "simple";
 
 function showScreen(name) {
   if (screens.floorplan && !screens.floorplan.classList.contains("hidden") && name !== "floorplan") {
-    if (window.ScreenFloorplan) ScreenFloorplan.aoFechar();
+    if (typeof ScreenFloorplan !== "undefined") ScreenFloorplan.aoFechar();
+  }
+  if (screens.panel && !screens.panel.classList.contains("hidden") && name !== "panel") {
+    if (typeof pararAutoRefreshPanel === "function") pararAutoRefreshPanel();
+  }
+  if (screens.rooms && !screens.rooms.classList.contains("hidden") && name !== "rooms") {
+    if (typeof pararAutoRefreshRooms === "function") pararAutoRefreshRooms();
+  }
+  if (screens.simple && !screens.simple.classList.contains("hidden") && name !== "simple") {
+    if (typeof SimpleWizard !== "undefined") SimpleWizard.pararAutoRefresh();
   }
   Object.values(screens).forEach((el) => el.classList.add("hidden"));
   screens[name].classList.remove("hidden");
-  if (!["agenda", "admin", "grade", "panel"].includes(name)) salasSubScreenAtual = name;
-  if (name === "floorplan" && window.ScreenFloorplan) ScreenFloorplan.aoAbrir();
+  if (!["agenda", "admin", "grade", "panel", "propriedade"].includes(name)) salasSubScreenAtual = name;
+  if (name === "floorplan" && typeof ScreenFloorplan !== "undefined") ScreenFloorplan.aoAbrir();
+  if (name === "simple" && typeof SimpleWizard !== "undefined") {
+    const stepSala = document.getElementById("simpleStepSala");
+    if (stepSala && !stepSala.classList.contains("hidden")) SimpleWizard.iniciarAutoRefresh();
+  }
+  if (name === "rooms" && typeof iniciarAutoRefreshRooms === "function") iniciarAutoRefreshRooms(true);
 }
 
 function switchTab(tab) {
@@ -34,6 +50,9 @@ function switchTab(tab) {
   } else if (tab === "grade") {
     showScreen("grade");
     Grade.aoAbrir();
+  } else if (tab === "propriedade") {
+    showScreen("propriedade");
+    ScreenPropriedade.aoAbrir();
   } else if (tab === "admin") {
     showScreen("admin");
     Admin.aoAbrir();
