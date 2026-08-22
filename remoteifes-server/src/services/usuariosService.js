@@ -149,6 +149,8 @@ function remover(id) {
 
   removerSessoesDoUsuario(id);
   db.prepare(`DELETE FROM agendamentos WHERE usuarioId = ?`).run(id);
+  db.prepare(`DELETE FROM sala_donos WHERE usuarioId = ?`).run(id);
+  db.prepare(`DELETE FROM sala_acessos WHERE usuarioId = ?`).run(id);
   db.prepare(`DELETE FROM usuarios WHERE id = ?`).run(id);
 }
 

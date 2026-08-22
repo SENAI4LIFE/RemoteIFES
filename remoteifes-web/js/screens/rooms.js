@@ -1,17 +1,32 @@
+let _roomsBlocoAtual = null;
+let _roomsAndarAtual = null;
+let _roomsPararSalas = null;
+
 async function loadRooms(bloco, andar) {
-  const list = document.getElementById("roomList");
-  const empty = document.getElementById("roomsEmpty");
+  _roomsBlocoAtual = bloco;
+  _roomsAndarAtual = andar;
   const titulo = document.getElementById("roomsTitle");
   titulo.textContent = `Bloco ${bloco} — ${andar}º andar`;
-  list.innerHTML = "";
-
   const salas = await Api.listarSalas({ bloco, andar });
+  renderRooms(salas);
+  iniciarAutoRefreshRooms();
+}
+
+function renderRooms(salasTodas) {
+  const list = document.getElementById("roomList");
+  const empty = document.getElementById("roomsEmpty");
+
+  const salas = (salasTodas || []).filter(
+    (s) => s.bloco === _roomsBlocoAtual && String(s.andar) === String(_roomsAndarAtual)
+  );
   if (salas.length === 0) {
+    list.innerHTML = "";
     empty.classList.remove("hidden");
     return;
   }
   empty.classList.add("hidden");
 
+  list.innerHTML = "";
   salas.forEach((s) => {
     const li = document.createElement("li");
     li.innerHTML = `
@@ -28,6 +43,19 @@ async function loadRooms(bloco, andar) {
     li.addEventListener("click", () => openRoom(s.sala, s.nome));
     list.appendChild(li);
   });
+}
+
+function iniciarAutoRefreshRooms(somenteSeJaCarregado) {
+  if (somenteSeJaCarregado && (!_roomsBlocoAtual || !_roomsAndarAtual)) return;
+  pararAutoRefreshRooms();
+  _roomsPararSalas = RTStatus.aoSalas((salas) => renderRooms(salas));
+}
+
+function pararAutoRefreshRooms() {
+  if (_roomsPararSalas) {
+    _roomsPararSalas();
+    _roomsPararSalas = null;
+  }
 }
 
 document.getElementById("backBtn").addEventListener("click", () => showScreen(salasSubScreenAtual));

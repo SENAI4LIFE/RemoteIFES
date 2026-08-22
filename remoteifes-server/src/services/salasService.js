@@ -1,6 +1,10 @@
+const EventEmitter = require("events");
 const db = require("../config/database");
 const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 const configuracoesService = require("./configuracoesService");
+const notificacoesService = require("./notificacoesService");
+
+const eventos = new EventEmitter();
 
 const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura"];
 const TIMEOUT_OFFLINE_MS = 90 * 1000;
@@ -99,6 +103,7 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null) {
     sala
   );
 
+  eventos.emit("mudanca");
   return buscar(sala);
 }
 
@@ -157,6 +162,51 @@ function usuarioTemAcessoSala(usuarioId, sala) {
   return !!registro;
 }
 
+function listarDonos(sala) {
+  return db.prepare(`
+    SELECT u.id, u.usuario, u.nome
+    FROM sala_donos sd
+    JOIN usuarios u ON u.id = sd.usuarioId
+    WHERE sd.sala = ?
+    ORDER BY u.nome
+  `).all(sala);
+}
+
+function concederDono(sala, usuarioId) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+  db.prepare(`INSERT OR IGNORE INTO sala_donos (sala, usuarioId) VALUES (?, ?)`).run(sala, usuarioId);
+  return listarDonos(sala);
+}
+
+function revogarDono(sala, usuarioId) {
+  db.prepare(`DELETE FROM sala_donos WHERE sala = ? AND usuarioId = ?`).run(sala, usuarioId);
+  return listarDonos(sala);
+}
+
+function usuarioEhDonoDaSala(usuarioId, sala) {
+  if (!usuarioId || !sala) return false;
+  const registro = db.prepare(`SELECT id FROM sala_donos WHERE sala = ? AND usuarioId = ?`).get(sala, usuarioId);
+  return !!registro;
+}
+
+function usuarioEhDonoDeAlgumaSala(usuarioId) {
+  if (!usuarioId) return false;
+  const registro = db.prepare(`SELECT 1 FROM sala_donos WHERE usuarioId = ? LIMIT 1`).get(usuarioId);
+  return !!registro;
+}
+
+function listarSalasDeDono(usuarioId) {
+  const linhas = db.prepare(`
+    SELECT s.sala, s.nome, s.bloco, s.andar, s.acessoRestrito
+    FROM sala_donos sd
+    JOIN salas s ON s.sala = sd.sala
+    WHERE sd.usuarioId = ?
+    ORDER BY s.nome
+  `).all(usuarioId);
+  return linhas.map((s) => ({ ...s, acessoRestrito: !!s.acessoRestrito }));
+}
+
 function usuarioPodeControlarSala(usuario, sala) {
   if (!usuario) return false;
   if (usuario.isAdmin) return true;
@@ -183,13 +233,16 @@ function definirPreset(sala, presetId) {
 function verificarTimeouts() {
   const limite = new Date(Date.now() - TIMEOUT_OFFLINE_MS).toISOString().slice(0, 19).replace("T", " ");
   const salasParaDesligar = db.prepare(`
-    SELECT sala FROM salas WHERE online = 1 AND (ultimoHeartbeat IS NULL OR ultimoHeartbeat < ?)
+    SELECT sala, nome FROM salas WHERE online = 1 AND (ultimoHeartbeat IS NULL OR ultimoHeartbeat < ?)
   `).all(limite);
 
-  for (const { sala } of salasParaDesligar) {
+  for (const { sala, nome } of salasParaDesligar) {
     db.prepare(`UPDATE salas SET online = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
     registrarEventoEsp(sala, "offline");
+    notificacoesService.criarEspOffline(sala, nome);
   }
+
+  if (salasParaDesligar.length > 0) eventos.emit("mudanca");
 }
 
 function listarEventosEsp({ sala, data } = {}) {
@@ -317,6 +370,7 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
     origem,
   });
 
+  eventos.emit("mudanca");
   const salaAtualizada = buscar(sala);
 
   return {
@@ -394,6 +448,7 @@ function apagarAcessosEsp({ data } = {}) {
 }
 
 module.exports = {
+  eventos,
   listar,
   buscar,
   statusCompleto,
@@ -417,6 +472,12 @@ module.exports = {
   revogarAcesso,
   usuarioTemAcessoSala,
   usuarioPodeControlarSala,
+  listarDonos,
+  concederDono,
+  revogarDono,
+  usuarioEhDonoDaSala,
+  usuarioEhDonoDeAlgumaSala,
+  listarSalasDeDono,
   registrarDeteccaoEsp,
   listarDetectados,
   removerDetectado,

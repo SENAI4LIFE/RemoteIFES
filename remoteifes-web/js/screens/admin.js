@@ -241,8 +241,6 @@ const Admin = {
       const estado = !s.online ? "offline" : (s.ligado ? "online-ligado" : "online-desligado");
       div.className = `mapa-cell mapa-${estado}${s.agendadaAgora ? " mapa-reservada" : ""}`;
       div.title = `${s.sala} — ${s.online ? (s.ligado ? "online, ligado" : "online, desligado") : "offline (comando enviado pode ainda não ter sido confirmado pelo dispositivo)"}${s.agendadaAgora ? " · reservada agora" : ""}`;
-      // Salas combinadas (ex.: "B-105-B-106", dois códigos unidos por um traço) são exibidas
-      // em duas linhas, sem o traço do meio, em vez do texto corrido.
       const combinada = s.sala.match(/^([A-Za-z]+-\d+[a-z]?)-([A-Za-z]+-\d+[a-z]?)$/);
       if (combinada) {
         div.classList.add("mapa-cell-dupla");
@@ -601,6 +599,96 @@ const Admin = {
       list.appendChild(li);
     });
   },
+
+  async carregarProprietarios() {
+    const select = document.getElementById("proprietariosSala");
+    const salaAnterior = select.value;
+
+    if (!this._proprietariosSalas) {
+      this._proprietariosSalas = await Api.listarSalasAdmin();
+      select.innerHTML = this._proprietariosSalas
+        .map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`)
+        .join("");
+      if (salaAnterior && this._proprietariosSalas.some((s) => s.sala === salaAnterior)) {
+        select.value = salaAnterior;
+      }
+    }
+
+    if (!select.value) return;
+    await this.carregarProprietariosDaSala(select.value);
+  },
+
+  async carregarProprietariosDaSala(sala) {
+    const salas = await Api.listarSalasAdmin();
+    const salaInfo = salas.find((s) => s.sala === sala);
+    document.getElementById("proprietariosAcessoRestritoCheck").checked = !!(salaInfo && salaInfo.acessoRestrito);
+
+    const usuarios = await Api.listarUsuarios();
+    const usuariosControlaveis = usuarios.filter((u) => !u.isAdmin);
+
+    const donos = await Api.listarDonosSala(sala);
+    const idsDonos = new Set(donos.map((d) => d.id));
+
+    const selectDono = document.getElementById("proprietariosDonoSelect");
+    selectDono.innerHTML = usuariosControlaveis
+      .filter((u) => !idsDonos.has(u.id))
+      .map((u) => `<option value="${u.id}">${u.nome} (@${u.usuario})</option>`)
+      .join("");
+
+    this.renderDonos(sala, donos);
+
+    const acesso = await Api.listarAcessoSala(sala);
+    this.renderProprietariosAcesso(sala, acesso);
+  },
+
+  renderDonos(sala, donos) {
+    const list = document.getElementById("proprietariosDonosList");
+    const empty = document.getElementById("proprietariosDonosEmpty");
+    list.innerHTML = "";
+
+    if (donos.length === 0) {
+      empty.classList.remove("hidden");
+    } else {
+      empty.classList.add("hidden");
+      donos.forEach((d) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <div class="room-name">${d.nome} <span class="room-sub">@${d.usuario}</span></div>
+          <button type="button" class="link-btn danger revogar-dono">remover proprietário</button>
+        `;
+        li.querySelector(".revogar-dono").addEventListener("click", async () => {
+          const resp = await Api.revogarDonoSala(sala, d.id);
+          if (resp.ok) await Admin.carregarProprietariosDaSala(sala);
+        });
+        list.appendChild(li);
+      });
+    }
+  },
+
+  renderProprietariosAcesso(sala, usuarios) {
+    const list = document.getElementById("proprietariosAcessoList");
+    const empty = document.getElementById("proprietariosAcessoEmpty");
+    list.innerHTML = "";
+
+    if (usuarios.length === 0) {
+      empty.classList.remove("hidden");
+      return;
+    }
+    empty.classList.add("hidden");
+
+    usuarios.forEach((u) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="room-name">${u.nome} <span class="room-sub">@${u.usuario}</span></div>
+        <button type="button" class="link-btn danger revogar-acesso-proprietarios">revogar</button>
+      `;
+      li.querySelector(".revogar-acesso-proprietarios").addEventListener("click", async () => {
+        const resp = await Api.revogarAcessoSala(sala, u.id);
+        if (resp.ok) this.renderProprietariosAcesso(sala, resp.usuarios);
+      });
+      list.appendChild(li);
+    });
+  },
 };
 
 document.getElementById("criarUsuarioBtn").addEventListener("click", async () => {
@@ -654,6 +742,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "logs") await Admin.carregarLogs();
     if (sub === "dispositivos") await Admin.carregarDispositivos();
     if (sub === "acessos") await Admin.carregarAcessos();
+    if (sub === "proprietarios") await Admin.carregarProprietarios();
     if (sub === "mapa") await Admin.carregarMapa();
     if (sub === "macs") await Admin.carregarMacs();
     if (sub === "presets") await Admin.carregarPresets();
@@ -788,4 +877,34 @@ document.getElementById("sessoesApagarTudo").addEventListener("click", async () 
 
 document.getElementById("macsSearchInput").addEventListener("input", (e) => {
   Admin.filtrarMacsList(e.target.value);
+});
+
+document.getElementById("proprietariosSala").addEventListener("change", (e) => {
+  Admin.carregarProprietariosDaSala(e.target.value);
+});
+
+document.getElementById("proprietariosAcessoRestritoCheck").addEventListener("change", async (e) => {
+  const sala = document.getElementById("proprietariosSala").value;
+  if (!sala) return;
+  const resp = await Api.definirAcessoRestrito(sala, e.target.checked);
+  if (!resp.ok) {
+    alert(resp.erro || "não foi possível alterar a restrição de acesso desta sala");
+    e.target.checked = !e.target.checked;
+  }
+});
+
+document.getElementById("proprietariosConcederDonoBtn").addEventListener("click", async () => {
+  const sala = document.getElementById("proprietariosSala").value;
+  const select = document.getElementById("proprietariosDonoSelect");
+  const errorEl = document.getElementById("proprietariosDonoError");
+  errorEl.classList.add("hidden");
+  if (!sala || !select.value) return;
+
+  const resp = await Api.concederDonoSala(sala, Number(select.value));
+  if (!resp.ok) {
+    errorEl.textContent = resp.erro || "não foi possível conceder a propriedade da sala";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  await Admin.carregarProprietariosDaSala(sala);
 });
