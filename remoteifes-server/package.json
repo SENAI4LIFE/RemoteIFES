@@ -8,6 +8,7 @@
   },
   "scripts": {
     "setup": "bash setup.sh",
+    "setup-https": "bash https-setup.sh",
     "start": "node --env-file-if-exists=.env server.js",
     "dev": "node --watch --env-file-if-exists=.env server.js",
     "reset-admin": "node reset-admin-senha.js"
@@ -15,6 +16,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.6",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "ws": "^8.21.3"
   }
 }

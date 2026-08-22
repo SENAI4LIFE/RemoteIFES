@@ -5,6 +5,7 @@ const state = {
   isSuperAdmin: false,
   nivel: 1,
   podeControlar: false,
+  temSalaComoProprietario: false,
   bloco: null,
   andar: null,
   salaAtual: null,

@@ -30,3 +30,7 @@ verSalasBtn.addEventListener("click", async () => {
 document.getElementById("backToLocationBtn").addEventListener("click", () => {
   showScreen("location");
 });
+
+document.getElementById("locationSimpleBtn").addEventListener("click", () => {
+  showScreen("simple");
+});

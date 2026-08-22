@@ -59,6 +59,14 @@ function criarSchema() {
       UNIQUE(sala, usuarioId)
     );
 
+    CREATE TABLE IF NOT EXISTS sala_donos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sala TEXT NOT NULL REFERENCES salas(sala),
+      usuarioId INTEGER NOT NULL REFERENCES usuarios(id),
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(sala, usuarioId)
+    );
+
     CREATE TABLE IF NOT EXISTS esp_detectados (
       mac TEXT PRIMARY KEY,
       ip TEXT,
@@ -126,6 +134,15 @@ function criarSchema() {
     CREATE TABLE IF NOT EXISTS configuracoes (
       chave TEXT PRIMARY KEY,
       valor TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS notificacoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo TEXT NOT NULL,
+      sala TEXT,
+      mensagem TEXT NOT NULL,
+      lida INTEGER NOT NULL DEFAULT 0,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL;

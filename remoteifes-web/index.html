@@ -11,8 +11,23 @@
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
       <img src="assets/remoteifes-logo.png" alt="RemoteIFES" />
+      <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
+      <div id="notifWrap" class="notif-wrap hidden">
+        <button type="button" id="notifBellBtn" class="notif-bell-btn" aria-label="Notificações">
+          🔔
+          <span id="notifDot" class="notif-dot hidden"></span>
+        </button>
+        <div id="notifPanel" class="notif-panel hidden">
+          <div class="notif-panel-head">
+            <h3>Notificações</h3>
+            <button type="button" id="notifMarcarTodasBtn" class="link-btn">marcar todas como lidas</button>
+          </div>
+          <ul id="notifList" class="notif-list"></ul>
+          <p id="notifEmpty" class="hint notif-empty hidden">nenhuma notificação por enquanto</p>
+        </div>
+      </div>
       <span id="userTag" class="user-tag hidden"></span>
       <button id="logoutBtn" class="link-btn hidden">Sair</button>
     </div>
@@ -25,8 +40,7 @@
         <div class="portal-col-left">
           <div class="portal-wrap">
             <div class="portal-welcome">
-              <p class="portal-eyebrow">BEM-VINDO AO</p>
-              <h1>REMOTEIFES</h1>
+              <p class="portal-eyebrow">BEM-VINDO</p>
             </div>
             <div class="portal-options">
               <div class="portal-option" data-tipo="normal">
@@ -47,7 +61,7 @@
 
         <div class="portal-col-right">
           <div class="portal-funcoes-head">
-            <h2>FUNÇÕES DO REMOTEIFES</h2>
+            <h2>FUNÇÕES DO SISTEMA</h2>
             <p class="hint">Conheça os recursos disponíveis no sistema.</p>
           </div>
           <div class="portal-funcoes-grid">
@@ -102,7 +116,7 @@
 
         <div class="login-info">
           <h2>ACESSO AO SISTEMA</h2>
-          <p class="login-info-lead">O login do RemoteIFES é próprio deste sistema, <br />independente de outras plataformas do Ifes.</p>
+          <p class="login-info-lead">O login do RemoteIFES é próprio deste sistema, <br class="lead-break" />independente de outras plataformas do Ifes.</p>
           <ul class="login-info-tips">
             <li><span class="icon-badge">🔑</span>Usuário e senha criados pelo administrador do RemoteIFES.</li>
             <li><span class="icon-badge">🔒</span>Acesso individual: não compartilhe suas credenciais.</li>
@@ -114,9 +128,66 @@
 
     <div id="mainApp" class="hidden">
 
-      <section id="screen-location" class="screen tab-content">
+      <section id="screen-simple" class="screen tab-content">
+        <div class="screen-head">
+          <h1>Selecione a sala</h1>
+          <div class="screen-head-links">
+            <button type="button" id="simpleListBtn" class="link-btn">Ver como lista</button>
+            <button type="button" id="simpleFloorplanBtn" class="link-btn">Ver planta baixa</button>
+          </div>
+        </div>
+        <p class="hint">
+          Toque para escolher o bloco, o andar e a sala.
+          <button type="button" class="help-icon-btn" data-help="cards" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+        </p>
+
+        <div class="simple-step" id="simpleStepBloco">
+          <p class="simple-step-title">Escolha o bloco</p>
+          <div class="simple-grid simple-grid-bloco" id="simpleGridBloco">
+            <button type="button" class="simple-tile simple-tile-a" data-bloco="A">
+              <span class="simple-tile-icon">A</span>
+              <span class="simple-tile-label">Bloco A</span>
+            </button>
+            <button type="button" class="simple-tile simple-tile-b" data-bloco="B">
+              <span class="simple-tile-icon">B</span>
+              <span class="simple-tile-label">Bloco B</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="simple-step hidden" id="simpleStepAndar">
+          <button type="button" id="simpleBackToBlocoBtn" class="link-btn">&larr; Trocar bloco</button>
+          <p class="simple-step-title" id="simpleAndarTitulo">Escolha o andar</p>
+          <div class="simple-grid simple-grid-andar" id="simpleGridAndar">
+            <button type="button" class="simple-tile simple-tile-1" data-andar="1">
+              <span class="simple-tile-icon">1</span>
+              <span class="simple-tile-label">1º andar</span>
+            </button>
+            <button type="button" class="simple-tile simple-tile-2" data-andar="2">
+              <span class="simple-tile-icon">2</span>
+              <span class="simple-tile-label">2º andar</span>
+            </button>
+            <button type="button" class="simple-tile simple-tile-3" data-andar="3">
+              <span class="simple-tile-icon">3</span>
+              <span class="simple-tile-label">3º andar</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="simple-step hidden" id="simpleStepSala">
+          <button type="button" id="simpleBackToAndarBtn" class="link-btn">&larr; Trocar andar</button>
+          <p class="simple-step-title" id="simpleSalaTitulo">Escolha a sala</p>
+          <div class="simple-grid simple-grid-sala" id="simpleGridSala"></div>
+          <p id="simpleEmpty" class="hint hidden">Nenhuma sala disponível no momento.</p>
+        </div>
+      </section>
+
+      <section id="screen-location" class="screen hidden tab-content">
         <div class="screen-head">
           <h1>Selecione o ambiente</h1>
+          <div class="screen-head-links">
+            <button type="button" id="locationSimpleBtn" class="link-btn">Cards</button>
+          </div>
         </div>
         <p class="hint">
           Escolha o bloco e o andar para ver as salas disponíveis.
@@ -145,7 +216,10 @@
       <section id="screen-floorplan" class="screen hidden tab-content">
         <div class="screen-head">
           <h1>Plantas baixas</h1>
-          <button type="button" id="floorplanListBtn" class="link-btn">Ver como lista</button>
+          <div class="screen-head-links">
+            <button type="button" id="floorplanSimpleBtn" class="link-btn">Cards</button>
+            <button type="button" id="floorplanListBtn" class="link-btn">Ver como lista</button>
+          </div>
         </div>
         <p class="hint">
           Toque em uma sala colorida no mapa para abrir o painel de controle. Salas sem cor não possuem ar-condicionado controlado pelo sistema.
@@ -426,32 +500,34 @@
         <div id="lockBanner" class="lock-banner hidden"></div>
         <p id="panelSomenteLeitura" class="device-warning hidden">Você tem apenas visualização desta sala: não possui permissão para controlá-la.</p>
 
-        <div class="card status-card">
-          <div class="status-row">
-            <span class="status-label">Conexão do dispositivo</span>
-            <span id="conexaoValue" class="status-badge">—</span>
-          </div>
-          <div class="status-row">
-            <span class="status-label">Ar-condicionado</span>
-            <span id="statusValue" class="status-badge">—</span>
-          </div>
-          <div class="status-row">
-            <span class="status-label">Temperatura ambiente</span>
-            <span id="tempValue" class="status-value">— °C</span>
-          </div>
-        </div>
+        <div class="ac-remote">
+          <div class="ac-remote-body">
+            <div class="ac-remote-sensor"></div>
 
-        <div class="card controls-card">
-          <div class="power-row">
-            <button id="btnOn" class="btn btn-on">Ligar</button>
-            <button id="btnOff" class="btn btn-off">Desligar</button>
-          </div>
+            <div class="ac-remote-display">
+              <div class="ac-remote-display-top">
+                <span class="ac-remote-conn" title="Conexão do dispositivo"><span class="ac-remote-conn-dot"></span><span id="conexaoValue">—</span></span>
+                <span id="statusValue" title="Estado do ar-condicionado">—</span>
+              </div>
+              <div class="ac-remote-temp-target" id="tempTarget">23°C</div>
+              <div class="ac-remote-room-temp">Ambiente: <span id="tempValue">— °C</span></div>
+            </div>
 
-          <div class="temp-set-row">
-            <span class="status-label">Ajustar para</span>
-            <button id="tempDown" class="btn-round" aria-label="Diminuir temperatura">&minus;</button>
-            <span id="tempTarget">23°C</span>
-            <button id="tempUp" class="btn-round" aria-label="Aumentar temperatura">+</button>
+            <div class="ac-remote-temp-controls">
+              <button id="tempUp" type="button" class="ac-remote-chevron" aria-label="Aumentar temperatura">&#9650;</button>
+              <button id="tempDown" type="button" class="ac-remote-chevron" aria-label="Diminuir temperatura">&#9660;</button>
+            </div>
+
+            <div class="ac-remote-power-row">
+              <button id="btnOn" type="button" class="ac-remote-power-btn ac-remote-power-on">
+                <span class="ac-remote-power-icon">&#9211;</span>
+                <span>Ligar</span>
+              </button>
+              <button id="btnOff" type="button" class="ac-remote-power-btn ac-remote-power-off">
+                <span class="ac-remote-power-icon">&#9211;</span>
+                <span>Desligar</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -539,6 +615,41 @@
         </div>
       </section>
 
+      <section id="screen-propriedade" class="screen hidden tab-content">
+        <div class="screen-head">
+          <h1>Configurações de sala</h1>
+        </div>
+        <p class="hint">
+          Aqui você gerencia quem mais pode controlar as salas das quais você é proprietário.
+          Essa permissão foi concedida por um administrador e pode ser removida por ele a qualquer momento.
+          <button type="button" class="help-icon-btn" data-help="propriedade" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+        </p>
+
+        <div class="card">
+          <label for="propriedadeSala">Sala</label>
+          <select id="propriedadeSala"></select>
+        </div>
+
+        <p id="propriedadeAvisoRestricao" class="hint hidden">
+          Esta sala ainda não está com o controle restrito a usuários específicos. Peça a um administrador
+          para ativar essa restrição; enquanto isso, qualquer usuário com permissão de controlar salas já
+          consegue operar esta sala, e conceder acesso aqui não terá efeito.
+        </p>
+
+        <div class="card">
+          <h2>Conceder acesso de controle</h2>
+          <label for="propriedadeUsuarioSelect">Usuário</label>
+          <div class="two-col">
+            <select id="propriedadeUsuarioSelect"></select>
+            <button type="button" id="propriedadeConcederBtn" class="link-btn">conceder</button>
+          </div>
+          <p id="propriedadeError" class="error hidden"></p>
+        </div>
+
+        <ul id="propriedadeUsuariosList" class="room-list"></ul>
+        <p id="propriedadeUsuariosEmpty" class="hint hidden">nenhum usuário com acesso concedido ainda</p>
+      </section>
+
       <section id="screen-admin" class="screen hidden tab-content">
         <div class="screen-head">
           <h1>Administração</h1>
@@ -552,6 +663,7 @@
           <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span>Logs</button>
           <button type="button" class="admin-subtab-btn" data-sub="dispositivos"><span class="admin-subtab-icon">📡</span>Dispositivos</button>
           <button type="button" class="admin-subtab-btn" data-sub="acessos"><span class="admin-subtab-icon">🔑</span>Acessos ESP32</button>
+          <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span>Proprietários de sala</button>
           <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span>Mapa</button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span>ESP32 / MACs</button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets"><span class="admin-subtab-icon">🎛️</span>Presets</button>
@@ -651,6 +763,44 @@
             </div>
           </div>
           <ul id="acessosList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-proprietarios" class="admin-sub hidden">
+          <p class="hint">
+            Atribua a uma sala um usuário "proprietário": ele poderá conceder ou revogar o controle
+            dessa sala para outros usuários, sem ganhar nenhuma outra função de administrador. Como
+            administrador, você continua com controle total sobre a sala, sobre o proprietário e
+            sobre qualquer acesso que ele conceder.
+            <button type="button" class="help-icon-btn" data-help="proprietarios" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+          </p>
+          <div class="card">
+            <label for="proprietariosSala">Sala</label>
+            <select id="proprietariosSala"></select>
+
+            <label class="checkbox-label">
+              <input type="checkbox" id="proprietariosAcessoRestritoCheck" /> Restringir controle desta sala a usuários específicos
+            </label>
+            <p class="hint">Necessário para que o acesso concedido pelo proprietário tenha efeito.</p>
+          </div>
+
+          <div class="card">
+            <h2>Proprietário(s) desta sala</h2>
+            <label for="proprietariosDonoSelect">Tornar proprietário</label>
+            <div class="two-col">
+              <select id="proprietariosDonoSelect"></select>
+              <button type="button" id="proprietariosConcederDonoBtn" class="link-btn">tornar proprietário</button>
+            </div>
+            <p id="proprietariosDonoError" class="error hidden"></p>
+            <ul id="proprietariosDonosList" class="room-list"></ul>
+            <p id="proprietariosDonosEmpty" class="hint hidden">nenhum proprietário atribuído a esta sala</p>
+          </div>
+
+          <div class="card">
+            <h2>Quem pode controlar esta sala</h2>
+            <p class="hint">Inclui acessos concedidos por você e pelos proprietários da sala.</p>
+            <ul id="proprietariosAcessoList" class="room-list"></ul>
+            <p id="proprietariosAcessoEmpty" class="hint hidden">nenhum usuário com acesso concedido ainda</p>
+          </div>
         </div>
 
         <div id="adminSub-mapa" class="admin-sub hidden">
@@ -807,6 +957,7 @@
         <button type="button" class="tab-btn" data-tab="salas">Salas</button>
         <button type="button" class="tab-btn hidden" data-tab="agenda" id="agendaTabBtn">Agendamentos</button>
         <button type="button" class="tab-btn hidden" data-tab="grade" id="gradeTabBtn">Grade</button>
+        <button type="button" class="tab-btn hidden" data-tab="propriedade" id="propriedadeTabBtn">Config. Salas</button>
         <button type="button" class="tab-btn hidden" data-tab="admin" id="adminTabBtn">Admin</button>
       </nav>
 
@@ -965,19 +1116,23 @@
   <script src="js/tempo.js"></script>
   <script src="js/rooms-data.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/rtstatus.js"></script>
   <script src="js/nav.js"></script>
   <script src="js/idle-timer.js"></script>
   <script src="js/a11y.js"></script>
   <script src="js/help.js"></script>
+  <script src="js/screens/notifications.js"></script>
   <script src="js/screens/login.js"></script>
   <script src="js/screens/portal-funcoes.js"></script>
   <script src="js/screens/location.js"></script>
+  <script src="js/screens/simple.js"></script>
   <script src="js/floorplan.js"></script>
   <script src="js/screens/floorplan.js"></script>
   <script src="js/screens/rooms.js"></script>
   <script src="js/screens/panel.js"></script>
   <script src="js/screens/schedule.js"></script>
   <script src="js/screens/grade.js"></script>
+  <script src="js/screens/propriedade.js"></script>
   <script src="js/screens/admin.js"></script>
   <script src="js/app.js"></script>
 </body>

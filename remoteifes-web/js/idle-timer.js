@@ -1,5 +1,3 @@
-
-
 const IdleTimer = {
   ativo: false,
   timeoutMs: 0,

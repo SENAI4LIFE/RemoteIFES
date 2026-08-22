@@ -48,6 +48,7 @@ function aplicarSessaoLogada(resp) {
   state.isSuperAdmin = resp.isSuperAdmin;
   state.nivel = resp.nivel;
   state.podeControlar = resp.podeControlar;
+  state.temSalaComoProprietario = !!resp.temSalaComoProprietario;
 
   document.getElementById("userTag").textContent = resp.isAdmin ? `${resp.nome} (admin)` : resp.nome;
   document.getElementById("userTag").classList.remove("hidden");
@@ -55,6 +56,8 @@ function aplicarSessaoLogada(resp) {
   document.getElementById("adminTabBtn").classList.toggle("hidden", !resp.isAdmin);
   document.getElementById("agendaTabBtn").classList.toggle("hidden", !resp.isAdmin);
   document.getElementById("gradeTabBtn").classList.toggle("hidden", !resp.isAdmin);
+  document.getElementById("propriedadeTabBtn").classList.toggle("hidden", resp.isAdmin || !resp.temSalaComoProprietario);
+  document.getElementById("notifWrap").classList.toggle("hidden", !resp.isAdmin);
   document.querySelectorAll(".superadmin-only").forEach((el) => {
     el.classList.toggle("hidden", !resp.isSuperAdmin);
   });
@@ -63,7 +66,10 @@ function aplicarSessaoLogada(resp) {
   document.getElementById("screen-login").classList.add("hidden");
   document.getElementById("mainApp").classList.remove("hidden");
 
+  if (resp.isAdmin) Notificacoes.iniciar();
+
   IdleTimer.iniciar(resp.timeoutInatividadeMinutos, resp.popupAvisoSegundos);
+  RTStatus.conectar();
 }
 
 async function restaurarSessaoSalva() {
@@ -105,12 +111,19 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
 function realizarLogout({ manterTela = false } = {}) {
   IdleTimer.parar();
+  if (typeof pararAutoRefreshPanel === "function") pararAutoRefreshPanel();
+  if (typeof pararAutoRefreshRooms === "function") pararAutoRefreshRooms();
+  if (typeof SimpleWizard !== "undefined") SimpleWizard.pararAutoRefresh();
+  if (typeof ScreenFloorplan !== "undefined") ScreenFloorplan.aoFechar();
+  Notificacoes.pararPolling();
+  RTStatus.desconectar();
   state.usuario = null;
   state.nome = null;
   state.isAdmin = false;
   state.isSuperAdmin = false;
   state.nivel = 1;
   state.podeControlar = false;
+  state.temSalaComoProprietario = false;
   state.bloco = null;
   state.andar = null;
   state.salaAtual = null;
@@ -120,6 +133,7 @@ function realizarLogout({ manterTela = false } = {}) {
   document.getElementById("adminTabBtn").classList.add("hidden");
   document.getElementById("agendaTabBtn").classList.add("hidden");
   document.getElementById("gradeTabBtn").classList.add("hidden");
+  document.getElementById("propriedadeTabBtn").classList.add("hidden");
   document.querySelectorAll(".superadmin-only").forEach((el) => el.classList.add("hidden"));
   document.getElementById("mainApp").classList.add("hidden");
   document.getElementById("loginForm").reset();

@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const db = require("../config/database");
 const presetsService = require("../services/presetsService");
@@ -33,7 +32,7 @@ function popularAdmin() {
   const existe = db.prepare("SELECT id FROM usuarios WHERE usuario = ?").get("admin");
   if (existe) return;
 
-  const senhaInicial = process.env.SENHA_ADMIN_INICIAL || crypto.randomBytes(9).toString("base64url");
+  const senhaInicial = process.env.SENHA_ADMIN_INICIAL || "admin";
   const senhaHash = bcrypt.hashSync(senhaInicial, 10);
   db.prepare(`
     INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
