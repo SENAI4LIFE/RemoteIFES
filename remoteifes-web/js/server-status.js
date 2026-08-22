@@ -8,7 +8,6 @@ const ServerStatus = (() => {
   const tela = document.getElementById("screen-server-status");
   const titulo = document.getElementById("serverStatusTitulo");
   const desc = document.getElementById("serverStatusDesc");
-  const retryBtn = document.getElementById("serverStatusRetryBtn");
 
   function wsUrl() {
     const base = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || "http://localhost:8080";
@@ -98,26 +97,11 @@ const ServerStatus = (() => {
     reconectarTimeoutId = setTimeout(conectar, espera);
   }
 
-  function tentarNovamente() {
-    if (retryBtn.disabled) return;
-    retryBtn.disabled = true;
-    retryBtn.textContent = "Tentando…";
-    if (reconectarTimeoutId) clearTimeout(reconectarTimeoutId);
-    tentativas = 0;
-    conectar();
-    setTimeout(() => {
-      retryBtn.disabled = false;
-      retryBtn.textContent = "Tentar novamente agora";
-    }, 1200);
-  }
-
-  retryBtn.addEventListener("click", tentarNovamente);
-
   function aoFicarPronto(cb) {
     ouvintesPronto.add(cb);
     if (confirmado) cb();
     return () => ouvintesPronto.delete(cb);
   }
 
-  return { conectar, aoFicarPronto, tentarNovamente };
+  return { conectar, aoFicarPronto };
 })();

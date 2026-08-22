@@ -13,7 +13,6 @@
       <div class="server-status-spinner" aria-hidden="true"></div>
       <h2 id="serverStatusTitulo" class="server-status-title">Sem conexão com o servidor</h2>
       <p id="serverStatusDesc" class="server-status-desc">Tentando reconectar…</p>
-      <button type="button" id="serverStatusRetryBtn" class="server-status-retry-btn">Tentar novamente agora</button>
     </div>
   </section>
 
@@ -740,6 +739,10 @@
           <div class="card">
             <label for="logsFiltroData">Filtrar por data</label>
             <input type="date" id="logsFiltroData" />
+            <label for="logsFiltroSala">Filtrar por sala</label>
+            <select id="logsFiltroSala"></select>
+            <label for="logsFiltroAndar">Filtrar por andar</label>
+            <select id="logsFiltroAndar"></select>
             <div class="two-col">
               <button type="button" id="logsApagarData" class="link-btn danger">Apagar logs da data</button>
               <button type="button" id="logsApagarTudo" class="link-btn danger">Apagar todos os logs</button>

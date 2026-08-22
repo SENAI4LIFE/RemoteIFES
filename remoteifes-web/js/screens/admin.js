@@ -189,10 +189,30 @@ const Admin = {
     });
   },
 
-  async carregarLogs(data) {
+  async carregarLogs() {
+    const salaSelect = document.getElementById("logsFiltroSala");
+    const andarSelect = document.getElementById("logsFiltroAndar");
+
+    if (salaSelect.dataset.carregado !== "1") {
+      const salas = await Api.listarSalasAdmin();
+      salaSelect.innerHTML =
+        `<option value="">todas as salas</option>` +
+        salas.map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`).join("");
+
+      const andares = [...new Set(salas.map((s) => s.andar))].sort((a, b) => a - b);
+      andarSelect.innerHTML =
+        `<option value="">todos os andares</option>` +
+        andares.map((a) => `<option value="${a}">${a}º andar</option>`).join("");
+
+      salaSelect.dataset.carregado = "1";
+    }
+
     const list = document.getElementById("logsList");
     list.innerHTML = "";
-    const logs = await Api.listarLogs(data);
+    const data = document.getElementById("logsFiltroData").value || undefined;
+    const sala = salaSelect.value || undefined;
+    const andar = andarSelect.value || undefined;
+    const logs = await Api.listarLogs({ data, sala, andar });
     logs.forEach((l) => {
       const li = document.createElement("li");
       li.innerHTML = `
@@ -971,8 +991,16 @@ document.getElementById("sessoesFiltroData").addEventListener("change", (e) => {
   Admin.carregarSessoes(e.target.value || undefined);
 });
 
-document.getElementById("logsFiltroData").addEventListener("change", (e) => {
-  Admin.carregarLogs(e.target.value || undefined);
+document.getElementById("logsFiltroData").addEventListener("change", () => {
+  Admin.carregarLogs();
+});
+
+document.getElementById("logsFiltroSala").addEventListener("change", () => {
+  Admin.carregarLogs();
+});
+
+document.getElementById("logsFiltroAndar").addEventListener("change", () => {
+  Admin.carregarLogs();
 });
 
 document.getElementById("logsApagarData").addEventListener("click", async () => {
@@ -983,13 +1011,13 @@ document.getElementById("logsApagarData").addEventListener("click", async () => 
   }
   if (!confirm(`Apagar todos os logs do dia ${data}?`)) return;
   await Api.apagarLogs(data);
-  await Admin.carregarLogs(data);
+  await Admin.carregarLogs();
 });
 
 document.getElementById("logsApagarTudo").addEventListener("click", async () => {
   if (!confirm("Apagar TODOS os logs do banco de dados? Esta ação não pode ser desfeita.")) return;
   await Api.apagarLogs();
-  await Admin.carregarLogs(document.getElementById("logsFiltroData").value || undefined);
+  await Admin.carregarLogs();
 });
 
 document.getElementById("dispositivosFiltroData").addEventListener("change", (e) => {
