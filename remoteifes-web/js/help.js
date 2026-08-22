@@ -1,4 +1,12 @@
 const HelpContent = {
+  cards: {
+    titulo: "Como usar: Modo cards",
+    itens: [
+      { titulo: "Bloco, andar e sala", texto: "Toque nos ícones grandes, em três passos, até chegar à sala desejada." },
+      { titulo: "Cores da sala", texto: "Cinza: offline. Azul: online, desligado. Verde: online, ligado. Contorno amarelo: reservada agora." },
+      { titulo: "Trocar bloco/andar", texto: "Use o link no topo de cada passo para voltar e escolher outra opção." },
+    ],
+  },
   localizacao: {
     titulo: "Como usar: Selecionar ambiente",
     itens: [
@@ -101,6 +109,15 @@ const HelpContent = {
       { titulo: "Apagar acessos", texto: "Remove os registros da data selecionada ou de todo o histórico: ação irreversível." },
     ],
   },
+  proprietarios: {
+    titulo: "Como usar: Proprietários de sala",
+    itens: [
+      { titulo: "O que é", texto: "Um usuário comum que pode conceder ou revogar o controle de uma sala específica, sem virar administrador." },
+      { titulo: "Pré-requisito", texto: "A sala precisa estar com o controle restrito a usuários específicos para que o acesso concedido tenha efeito." },
+      { titulo: "Tornar proprietário", texto: "Escolha um usuário não administrador e defina-o como proprietário da sala selecionada." },
+      { titulo: "Controle do administrador", texto: "Você pode remover um proprietário a qualquer momento; ele perde o acesso imediatamente. Você também pode revogar diretamente qualquer acesso concedido por ele." },
+    ],
+  },
   mapa: {
     titulo: "Como usar: Mapa",
     itens: [
@@ -117,6 +134,16 @@ const HelpContent = {
       { titulo: "Preset", texto: "Escolha qual conjunto de funções do ar-condicionado (temperatura, velocidade, modo etc.) a sala usa." },
       { titulo: "Acesso por sala", texto: "Defina quais usuários podem controlar cada sala." },
       { titulo: "Permissão", texto: "Apenas o administrador principal pode alterar o MAC ou o preset de uma sala." },
+    ],
+  },
+  propriedade: {
+    titulo: "Como usar: Configurações de sala",
+    itens: [
+      { titulo: "O que é", texto: "Um administrador concedeu a você a função de proprietário de uma ou mais salas." },
+      { titulo: "Conceder acesso", texto: "Escolha um usuário e conceda a ele o controle desta sala (ligar, desligar e ajustar temperatura)." },
+      { titulo: "Revogar acesso", texto: "Remove o controle concedido anteriormente a um usuário." },
+      { titulo: "Sem restrição ativa", texto: "Se a sala não estiver com o controle restrito, todos que já podem controlar salas conseguem operá-la; peça a um administrador para restringir." },
+      { titulo: "Sua permissão", texto: "É uma função de baixo nível: você não tem acesso às demais funções administrativas, e um administrador pode remover sua permissão a qualquer momento." },
     ],
   },
   presets: {
