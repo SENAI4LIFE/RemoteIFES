@@ -898,20 +898,26 @@ button.btn:disabled {
   padding: 4px 2px 10px;
 }
 
+.simple-grid-bloco {
+  align-content: stretch;
+}
 .simple-grid-bloco .simple-tile {
-  flex: 1 1 260px;
-  max-width: 46%;
-  min-height: clamp(160px, 30vh, 320px);
+  flex: 1 1 0;
+  max-width: none;
+  min-height: 0;
 }
 
+.simple-grid-andar {
+  align-content: stretch;
+}
 .simple-grid-andar .simple-tile {
-  flex: 1 1 180px;
-  max-width: 31%;
-  min-height: clamp(130px, 24vh, 260px);
+  flex: 1 1 0;
+  max-width: none;
+  min-height: 0;
 }
 
 .simple-grid-sala {
-  align-content: flex-start;
+  align-content: stretch;
 }
 
 @media (max-width: 699px) {
@@ -924,22 +930,35 @@ button.btn:disabled {
   .simple-grid-sala .simple-tile-sala {
     width: 100%;
     max-width: 100%;
-    flex: 0 0 auto;
+    flex: 1 1 0;
+    min-height: 64px;
+    height: auto;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 14px;
+    row-gap: 2px;
+    text-align: left;
   }
+  .simple-grid-sala .simple-tile-sala .simple-tile-icon { grid-row: 1 / 3; grid-column: 1; }
+  .simple-grid-sala .simple-tile-sala .simple-tile-label { grid-row: 1; grid-column: 2; }
+  .simple-grid-sala .simple-tile-sala .simple-tile-sub { grid-row: 2; grid-column: 2; }
 }
 
 @media (min-width: 700px) {
   .simple-grid-sala {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    grid-auto-rows: minmax(120px, auto);
-    align-content: start;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-auto-rows: 1fr;
+    align-content: stretch;
+    overflow: hidden;
   }
   .simple-grid-sala .simple-tile-sala {
     width: 100%;
     max-width: none;
-    min-height: 120px;
-    height: auto;
+    min-height: 0;
+    height: 100%;
   }
 }
 
@@ -999,9 +1018,6 @@ button.btn:disabled {
 .simple-tile-3 .simple-tile-icon { background: rgba(28, 107, 60, 0.12); }
 
 .simple-tile-sala {
-  flex: 1 1 170px;
-  max-width: 220px;
-  min-height: clamp(110px, 16vh, 170px);
   padding: 16px 10px;
   min-width: 0;
 }
