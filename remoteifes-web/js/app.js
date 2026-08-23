@@ -3,9 +3,10 @@ document.querySelector('.tab-btn[data-tab="salas"]').classList.add("active");
 document.getElementById("homeBtn").addEventListener("click", () => {
   if (state.usuario) {
     switchTab("salas");
-  } else {
-    mostrarPortal();
+    return;
   }
+  if (typeof ServerStatus !== "undefined" && ServerStatus.exibirManutencaoSeAtiva()) return;
+  mostrarPortal();
 });
 
 // Só tenta restaurar a sessão (e portanto exibir o app) depois que a tela de

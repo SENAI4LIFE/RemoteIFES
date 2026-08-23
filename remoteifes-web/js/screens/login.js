@@ -35,6 +35,11 @@ function mostrarLogin(tipo) {
   aplicarTextoLogin(tipo);
 }
 
+function definirTipoLoginSelecionado(tipo) {
+  tipoLoginSelecionado = tipo;
+  aplicarTextoLogin(tipo);
+}
+
 function aplicarDisponibilidadePortalNormal(manutencaoAtiva) {
   const opcaoNormal = document.querySelector('.portal-option[data-tipo="normal"]');
   const aviso = document.getElementById("portalManutencaoAviso");
@@ -97,6 +102,7 @@ function aplicarSessaoLogada(resp) {
 }
 
 async function restaurarSessaoSalva() {
+  if (state.usuario) return false;
   if (!Api.temTokenSalvo()) return false;
   const resp = await Api.me();
   if (!resp.ok) {

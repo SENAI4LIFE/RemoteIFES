@@ -122,6 +122,7 @@ const ServerStatus = (() => {
     if (msg.manutencao) {
       definirManutencao(true);
       aplicarEstadoManutencao();
+      notificarPronto();
       return;
     }
     const saindoDaManutencao = manutencaoAtiva;
@@ -229,6 +230,7 @@ const ServerStatus = (() => {
     }
 
     esconderAcessoManutencao();
+    if (typeof definirTipoLoginSelecionado === "function") definirTipoLoginSelecionado("admin");
     if (typeof aplicarSessaoLogada === "function") aplicarSessaoLogada(resp);
     if (typeof switchTab === "function") switchTab("salas");
   });
@@ -242,5 +244,15 @@ const ServerStatus = (() => {
     return manutencaoAtiva;
   }
 
-  return { conectar, aoFicarPronto, reconectarComTokenAtual, emManutencao };
+  function exibirManutencaoSeAtiva() {
+    if (!manutencaoAtiva) return false;
+    acessoManualLiberado = false;
+    esconderAcessoManutencao();
+    document.getElementById("screen-portal").classList.add("hidden");
+    document.getElementById("screen-login").classList.add("hidden");
+    aplicarEstadoManutencao();
+    return true;
+  }
+
+  return { conectar, aoFicarPronto, reconectarComTokenAtual, emManutencao, exibirManutencaoSeAtiva };
 })();
