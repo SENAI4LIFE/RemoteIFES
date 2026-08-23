@@ -16,8 +16,20 @@ function renderRooms(salasTodas) {
   const list = document.getElementById("roomList");
   const empty = document.getElementById("roomsEmpty");
 
+  const secaoPlanta = document.querySelector(`[data-fp-section="${_roomsBlocoAtual.toLowerCase()}-${String(_roomsAndarAtual) === "1" ? "terreo" : `${_roomsAndarAtual}pav`}"]`);
+  const rotulosPlanta = new Map();
+  const codigosPlanta = new Set();
+  if (secaoPlanta) {
+    secaoPlanta.querySelectorAll(".room.selectable[data-sala]").forEach((el) => {
+      codigosPlanta.add(el.dataset.sala);
+      const nome = el.querySelector(".name")?.textContent?.trim();
+      if (nome) rotulosPlanta.set(el.dataset.sala, nome);
+    });
+  }
+
   const salas = (salasTodas || []).filter(
-    (s) => s.bloco === _roomsBlocoAtual && String(s.andar) === String(_roomsAndarAtual)
+    (s) => s.bloco === _roomsBlocoAtual && String(s.andar) === String(_roomsAndarAtual) &&
+      (!codigosPlanta.size || codigosPlanta.has(s.sala))
   );
   if (salas.length === 0) {
     list.innerHTML = "";
@@ -48,7 +60,7 @@ function renderRooms(salasTodas) {
     li.dataset.nome = s.nome;
 
     li.querySelector(".room-name").innerHTML = `
-      ${s.sala}
+      ${rotulosPlanta.get(s.sala) || RoomsData.rotulo(s.sala)}
       ${s.agendadaAgora ? '<span class="schedule-badge" title="Agendamento ativo agora">agendada</span>' : ""}
       ${s.podeControlarEsta === false ? '<span class="schedule-badge readonly-badge" title="Apenas visualização">visualização</span>' : ""}
     `;

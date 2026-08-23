@@ -21,7 +21,7 @@ const Schedule = {
 
     const salas = await Api.listarSalas();
     agendaSalaSelect.innerHTML = salas
-      .map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`)
+      .map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`)
       .join("");
     agendaSalaSelect.dataset.carregado = "1";
   },
@@ -52,7 +52,7 @@ const Schedule = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${a.sala} · ${dataFormatada} · ${a.horaInicio}–${a.horaFim}</div>
+          <div class="room-name">${RoomsData.rotulo(a.sala)} · ${dataFormatada} · ${a.horaInicio}–${a.horaFim}</div>
           <div class="room-sub">${a.temperatura}°C · ${detalheModo} · por ${a.usuarioNome}${souDono ? " (você)" : ""}</div>
         </div>
         <div class="agenda-actions">

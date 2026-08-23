@@ -9,7 +9,7 @@ const ScreenPropriedade = {
     if (!Array.isArray(this._salas)) this._salas = [];
 
     select.innerHTML = this._salas
-      .map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`)
+      .map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`)
       .join("");
 
     if (this._salas.length === 0) {

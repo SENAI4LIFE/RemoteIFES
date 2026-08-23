@@ -42,6 +42,10 @@ function removerSessoesDoUsuario(usuarioId) {
   db.prepare(`UPDATE sessoes SET logout = datetime('now') WHERE usuarioId = ? AND logout IS NULL`).run(usuarioId);
 }
 
+function encerrarSessoesAtivasNoInicio() {
+  db.prepare(`UPDATE sessoes SET logout = datetime('now') WHERE logout IS NULL`).run();
+}
+
 const HORAS_SESSAO_ABANDONADA = 24;
 
 function encerrarSessoesAbandonadas() {
@@ -122,6 +126,7 @@ module.exports = {
   validarToken,
   removerToken,
   removerSessoesDoUsuario,
+  encerrarSessoesAtivasNoInicio,
   encerrarSessoesAbandonadas,
   listarUsuariosAtivos,
   listarHistoricoSessoes,

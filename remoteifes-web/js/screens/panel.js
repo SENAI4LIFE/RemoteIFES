@@ -10,7 +10,7 @@ const _panelAplicarAvisoOfflineToast = Toast.criarAvisoDeEstado(
 
 async function openRoom(sala, nome) {
   state.salaAtual = sala;
-  document.getElementById("panelRoomName").textContent = `${sala} — ${nome}`;
+  document.getElementById("panelRoomName").textContent = `${RoomsData.rotulo(sala)} — ${nome}`;
   showScreen("panel");
   await refreshStatus();
   iniciarAutoRefreshPanel();
