@@ -23,11 +23,15 @@ const SimpleWizard = {
 
   async irParaSala(andar) {
     this.andar = andar;
+    const grid = document.getElementById("simpleGridSala");
+    grid.classList.toggle("is-second-floor", String(andar) === "2");
+    grid.classList.add("is-loading");
     document.getElementById("simpleSalaTitulo").textContent = `Bloco ${this.bloco} — ${andar}º andar`;
     document.getElementById("simpleStepBloco").classList.add("hidden");
     document.getElementById("simpleStepAndar").classList.add("hidden");
     document.getElementById("simpleStepSala").classList.remove("hidden");
     await this.carregarSalas();
+    grid.classList.remove("is-loading");
     this.iniciarAutoRefresh();
   },
 
@@ -56,16 +60,19 @@ const SimpleWizard = {
       (s) => s.bloco === this.bloco && String(s.andar) === String(this.andar)
     );
     if (salas.length === 0) {
-      grid.innerHTML = "";
+      grid.replaceChildren();
       empty.classList.remove("hidden");
       return;
     }
     empty.classList.add("hidden");
 
     const existentes = new Map();
-    grid.querySelectorAll(".simple-tile-sala[data-sala]").forEach((tile) => existentes.set(tile.dataset.sala, tile));
+    grid.querySelectorAll(".simple-tile-sala[data-sala]").forEach((tile) => {
+      existentes.set(tile.dataset.sala, tile);
+    });
 
-    salas.forEach((s, index) => {
+    const fragment = document.createDocumentFragment();
+    salas.forEach((s) => {
       let tile = existentes.get(s.sala);
       if (!tile) {
         tile = document.createElement("button");
@@ -77,22 +84,19 @@ const SimpleWizard = {
           <span class="simple-tile-sub"></span>
         `;
         tile.addEventListener("click", () => openRoom(tile.dataset.sala, tile.dataset.nome));
-      } else {
-        existentes.delete(s.sala);
       }
-      tile.dataset.nome = s.nome;
 
+      tile.dataset.nome = s.nome;
       const estado = s.online ? (s.ligado ? "is-ligado" : "is-desligado") : "is-offline";
       tile.className = `simple-tile simple-tile-sala ${estado}${s.agendadaAgora ? " is-reservada" : ""}`;
       tile.querySelector(".simple-tile-label").textContent = s.sala;
       tile.querySelector(".simple-tile-sub").textContent = `${s.nome}${s.podeControlarEsta === false ? " · visualização" : ""}`;
-
-      const referencia = grid.children[index];
-      if (referencia !== tile) grid.insertBefore(tile, referencia || null);
+      fragment.appendChild(tile);
+      existentes.delete(s.sala);
     });
 
-    existentes.forEach((tile) => tile.remove());
-  },
+    grid.replaceChildren(fragment);
+  }
 };
 
 document.querySelectorAll("#simpleGridBloco .simple-tile").forEach((btn) => {

@@ -105,9 +105,11 @@ const ServerStatus = (() => {
   }
 
   function notificarPronto() {
-    if (confirmado) return;
+    if (confirmado) return Promise.resolve();
     confirmado = true;
-    ouvintesPronto.forEach((cb) => cb());
+    const resultados = [];
+    ouvintesPronto.forEach((cb) => resultados.push(cb()));
+    return Promise.all(resultados);
   }
 
   function definirManutencao(ativa) {
@@ -135,8 +137,7 @@ const ServerStatus = (() => {
       esconderAcessoManutencao();
       if (typeof mostrarPortal === "function") mostrarPortal();
     }
-    esconderTela();
-    notificarPronto();
+    notificarPronto().then(esconderTela);
   }
 
   function conectar() {

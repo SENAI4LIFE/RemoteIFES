@@ -65,7 +65,12 @@ function renderRooms(salasTodas) {
 }
 
 function iniciarAutoRefreshRooms(somenteSeJaCarregado) {
-  if (somenteSeJaCarregado && (!_roomsBlocoAtual || !_roomsAndarAtual)) return;
+  if (
+    somenteSeJaCarregado &&
+    (!_roomsBlocoAtual || !_roomsAndarAtual || _roomsBlocoAtual !== state.bloco || String(_roomsAndarAtual) !== String(state.andar))
+  ) {
+    return;
+  }
   pararAutoRefreshRooms();
   _roomsPararSalas = RTStatus.aoSalas((salas) => renderRooms(salas));
 }
