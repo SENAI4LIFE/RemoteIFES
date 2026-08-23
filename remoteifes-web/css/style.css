@@ -208,6 +208,7 @@ body {
   max-width: 480px;
   margin: 0 auto;
   padding: 24px 16px 90px;
+  transition: max-width 0.25s ease;
 }
 
 @media (min-width: 700px) {
@@ -254,6 +255,11 @@ body {
 }
 
 .screen.hidden { display: none; }
+.screen:not(.hidden) { animation: screen-fade-in 0.22s ease both; }
+@keyframes screen-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .card {
   background: var(--surface);
@@ -918,6 +924,12 @@ button.btn:disabled {
 
 .simple-grid-sala {
   align-content: stretch;
+  visibility: visible;
+}
+
+.simple-grid-sala.is-loading {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 @media (max-width: 699px) {
@@ -950,7 +962,7 @@ button.btn:disabled {
   .simple-grid-sala {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    grid-auto-rows: 1fr;
+    grid-auto-rows: minmax(108px, 1fr);
     align-content: stretch;
     overflow: hidden;
   }
@@ -959,6 +971,17 @@ button.btn:disabled {
     max-width: none;
     min-height: 0;
     height: 100%;
+  }
+}
+
+@media (min-width: 700px) {
+  .simple-grid-sala.is-second-floor {
+    grid-auto-rows: minmax(132px, 1fr);
+    overflow: visible;
+  }
+
+  .simple-grid-sala.is-second-floor .simple-tile-sala .simple-tile-sub {
+    line-height: 1.25;
   }
 }
 
@@ -2387,4 +2410,6 @@ button.btn:disabled {
   .server-status-card { animation: none; }
   .server-status-spinner { animation: none; }
   .server-status-dot-offline { animation: none; }
+  .screen:not(.hidden) { animation: none; }
+  #app { transition: none; }
 }
