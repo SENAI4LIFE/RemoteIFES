@@ -197,7 +197,7 @@ const Admin = {
       const salas = await Api.listarSalasAdmin();
       salaSelect.innerHTML =
         `<option value="">todas as salas</option>` +
-        salas.map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`).join("");
+        salas.map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`).join("");
 
       const andares = [...new Set(salas.map((s) => s.andar))].sort((a, b) => a - b);
       andarSelect.innerHTML =
@@ -217,7 +217,7 @@ const Admin = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${l.sala} · ${l.cmd}${l.valor !== null ? ` (${l.valor})` : ""}</div>
+          <div class="room-name">${RoomsData.rotulo(l.sala)} · ${l.cmd}${l.valor !== null ? ` (${l.valor})` : ""}</div>
           <div class="room-sub">${l.usuario || "sistema"} · ${l.origem} · ${Tempo.formatarDataHora(l.criadoEm)}</div>
         </div>
       `;
@@ -233,7 +233,7 @@ const Admin = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${e.sala}</div>
+          <div class="room-name">${RoomsData.rotulo(e.sala)}</div>
           <div class="room-sub">${e.status === "online" ? "ficou online" : "ficou offline"} · ${Tempo.formatarDataHora(e.criadoEm)}</div>
         </div>
         <span class="status-badge ${e.status === "online" ? "on" : "off"}">${e.status}</span>
@@ -250,7 +250,7 @@ const Admin = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${a.sala}</div>
+          <div class="room-name">${RoomsData.rotulo(a.sala)}</div>
           <div class="room-sub">${a.ip || "IP desconhecido"} · ${Tempo.formatarDataHora(a.criadoEm)}</div>
         </div>
       `;
@@ -266,17 +266,17 @@ const Admin = {
       const div = document.createElement("div");
       const estado = !s.online ? "offline" : (s.ligado ? "online-ligado" : "online-desligado");
       div.className = `mapa-cell mapa-${estado}${s.agendadaAgora ? " mapa-reservada" : ""}`;
-      div.title = `${s.sala} — ${s.online ? (s.ligado ? "online, ligado" : "online, desligado") : "offline (comando enviado pode ainda não ter sido confirmado pelo dispositivo)"}${s.agendadaAgora ? " · reservada agora" : ""}`;
+      div.title = `${RoomsData.rotulo(s.sala)} — ${s.online ? (s.ligado ? "online, ligado" : "online, desligado") : "offline (comando enviado pode ainda não ter sido confirmado pelo dispositivo)"}${s.agendadaAgora ? " · reservada agora" : ""}`;
       const combinada = s.sala.match(/^([A-Za-z]+-\d+[a-z]?)-([A-Za-z]+-\d+[a-z]?)$/);
       if (combinada) {
         div.classList.add("mapa-cell-dupla");
         const l1 = document.createElement("span");
-        l1.textContent = combinada[1];
+        l1.textContent = RoomsData.rotulo(combinada[1]);
         const l2 = document.createElement("span");
-        l2.textContent = combinada[2];
+        l2.textContent = RoomsData.rotulo(combinada[2]);
         div.append(l1, l2);
       } else {
-        div.textContent = s.sala;
+        div.textContent = RoomsData.rotulo(s.sala);
       }
       grid.appendChild(div);
     });
@@ -317,7 +317,7 @@ const Admin = {
       li.id = `macCard-${s.sala}`;
       li.innerHTML = `
         <div class="mac-row" style="width:100%">
-          <div class="room-name">${s.sala} — ${s.nome} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
+          <div class="room-name">${RoomsData.rotulo(s.sala)} — ${s.nome} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
           <label>Endereço MAC do ESP32</label>
           <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${s.mac || ""}" />
           <label>Preset em uso</label>
@@ -486,7 +486,7 @@ const Admin = {
         <div class="room-sub">Visto por último: ${Tempo.formatarDataHora(d.ultimaDeteccao)}</div>
         <select class="vincular-sala-select">
           <option value="">selecionar sala para vincular</option>
-          ${salas.map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`).join("")}
+          ${salas.map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`).join("")}
         </select>
         <div class="detectado-card-actions">
           <button type="button" class="link-btn vincular-detectado">vincular</button>
@@ -797,7 +797,7 @@ const Admin = {
     if (!this._proprietariosSalas) {
       this._proprietariosSalas = await Api.listarSalasAdmin();
       select.innerHTML = this._proprietariosSalas
-        .map((s) => `<option value="${s.sala}">${s.sala} — ${s.nome}</option>`)
+        .map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`)
         .join("");
       if (salaAnterior && this._proprietariosSalas.some((s) => s.sala === salaAnterior)) {
         select.value = salaAnterior;

@@ -983,6 +983,27 @@ button.btn:disabled {
   .simple-grid-sala.is-second-floor .simple-tile-sala .simple-tile-sub {
     line-height: 1.25;
   }
+
+  .simple-grid-sala.is-bloco-b-second-floor {
+    grid-auto-rows: minmax(0, 1fr);
+    align-content: stretch;
+    overflow: hidden;
+  }
+
+  .simple-grid-sala.is-bloco-b-second-floor .simple-tile-sala {
+    min-height: 0;
+    padding: 10px 8px;
+    gap: 4px;
+  }
+
+  .simple-grid-sala.is-bloco-b-second-floor .simple-tile-sala .simple-tile-icon {
+    flex: 0 0 auto;
+  }
+
+  .simple-grid-sala.is-bloco-b-second-floor .simple-tile-sala .simple-tile-label,
+  .simple-grid-sala.is-bloco-b-second-floor .simple-tile-sala .simple-tile-sub {
+    line-height: 1.15;
+  }
 }
 
 .simple-tile {

@@ -7,6 +7,7 @@ const SimpleWizard = {
     this.pararAutoRefresh();
     this.bloco = null;
     this.andar = null;
+    document.getElementById("simpleScreenTitle").textContent = "Selecione o bloco";
     document.getElementById("simpleStepBloco").classList.remove("hidden");
     document.getElementById("simpleStepAndar").classList.add("hidden");
     document.getElementById("simpleStepSala").classList.add("hidden");
@@ -15,6 +16,7 @@ const SimpleWizard = {
   irParaAndar(bloco) {
     this.pararAutoRefresh();
     this.bloco = bloco;
+    document.getElementById("simpleScreenTitle").textContent = "Selecione o andar";
     document.getElementById("simpleAndarTitulo").textContent = `Bloco ${bloco} — escolha o andar`;
     document.getElementById("simpleStepBloco").classList.add("hidden");
     document.getElementById("simpleStepAndar").classList.remove("hidden");
@@ -23,8 +25,10 @@ const SimpleWizard = {
 
   async irParaSala(andar) {
     this.andar = andar;
+    document.getElementById("simpleScreenTitle").textContent = "Selecione a sala";
     const grid = document.getElementById("simpleGridSala");
     grid.classList.toggle("is-second-floor", String(andar) === "2");
+    grid.classList.toggle("is-bloco-b-second-floor", this.bloco === "B" && String(andar) === "2");
     grid.classList.add("is-loading");
     document.getElementById("simpleSalaTitulo").textContent = `Bloco ${this.bloco} — ${andar}º andar`;
     document.getElementById("simpleStepBloco").classList.add("hidden");
@@ -59,6 +63,15 @@ const SimpleWizard = {
     const salas = (salasTodas || []).filter(
       (s) => s.bloco === this.bloco && String(s.andar) === String(this.andar)
     );
+
+    const secaoPlanta = document.querySelector(`[data-fp-section="${this.bloco.toLowerCase()}-${String(this.andar) === "1" ? "terreo" : `${this.andar}pav`}"]`);
+    const rotulosPlanta = new Map();
+    if (secaoPlanta) {
+      secaoPlanta.querySelectorAll(".room.selectable[data-sala]").forEach((el) => {
+        const nome = el.querySelector(".name")?.textContent?.trim();
+        if (nome) rotulosPlanta.set(el.dataset.sala, nome);
+      });
+    }
     if (salas.length === 0) {
       grid.replaceChildren();
       empty.classList.remove("hidden");
@@ -89,7 +102,8 @@ const SimpleWizard = {
       tile.dataset.nome = s.nome;
       const estado = s.online ? (s.ligado ? "is-ligado" : "is-desligado") : "is-offline";
       tile.className = `simple-tile simple-tile-sala ${estado}${s.agendadaAgora ? " is-reservada" : ""}`;
-      tile.querySelector(".simple-tile-label").textContent = s.sala;
+      const rotuloPlanta = rotulosPlanta.get(s.sala);
+      tile.querySelector(".simple-tile-label").textContent = rotuloPlanta || RoomsData.rotulo(s.sala);
       tile.querySelector(".simple-tile-sub").textContent = `${s.nome}${s.podeControlarEsta === false ? " · visualização" : ""}`;
       fragment.appendChild(tile);
       existentes.delete(s.sala);

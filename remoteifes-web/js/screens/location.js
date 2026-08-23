@@ -1,7 +1,19 @@
 const verSalasBtn = document.getElementById("verSalasBtn");
+const locationTitle = document.querySelector("#screen-location .screen-head h1");
+
+function atualizarTituloLocation() {
+  if (!state.bloco) {
+    locationTitle.textContent = "Selecione o bloco";
+  } else if (!state.andar) {
+    locationTitle.textContent = "Selecione o andar";
+  } else {
+    locationTitle.textContent = "Selecione a sala";
+  }
+}
 
 function atualizarBotaoVerSalas() {
   verSalasBtn.disabled = !(state.bloco && state.andar);
+  atualizarTituloLocation();
 }
 
 document.querySelectorAll("#blocoChoices .choice-btn").forEach((btn) => {
@@ -34,3 +46,5 @@ document.getElementById("backToLocationBtn").addEventListener("click", () => {
 document.getElementById("locationSimpleBtn").addEventListener("click", () => {
   showScreen("simple");
 });
+
+atualizarBotaoVerSalas();
