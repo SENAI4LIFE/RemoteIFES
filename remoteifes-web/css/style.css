@@ -931,16 +931,15 @@ button.btn:disabled {
 @media (min-width: 700px) {
   .simple-grid-sala {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    grid-auto-rows: 1fr;
-    align-content: stretch;
-    overflow: hidden;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    grid-auto-rows: minmax(120px, auto);
+    align-content: start;
   }
   .simple-grid-sala .simple-tile-sala {
     width: 100%;
     max-width: none;
-    min-height: 0;
-    height: 100%;
+    min-height: 120px;
+    height: auto;
   }
 }
 
@@ -1004,18 +1003,16 @@ button.btn:disabled {
   max-width: 220px;
   min-height: clamp(110px, 16vh, 170px);
   padding: 16px 10px;
-  overflow: hidden;
   min-width: 0;
 }
 .simple-tile-sala .simple-tile-icon { font-size: calc(30px * var(--a11y-font-scale)); }
-.simple-tile-sala .simple-tile-label { font-size: calc(16px * var(--a11y-font-scale)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.simple-tile-sala .simple-tile-label { font-size: calc(16px * var(--a11y-font-scale)); white-space: normal; overflow-wrap: break-word; max-width: 100%; }
 .simple-tile-sub {
   font-size: calc(12px * var(--a11y-font-scale));
   opacity: 0.9;
   line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
   max-width: 100%;
 }
 

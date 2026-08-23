@@ -1,11 +1,13 @@
 const ServerStatus = (() => {
   let ws = null;
   let reconectarTimeoutId = null;
+  let estadoConectandoTimeoutId = null;
   let tentativas = 0;
   let confirmado = false;
   let acessoManualLiberado = false;
   let manutencaoAtiva = false;
   const ouvintesPronto = new Set();
+  const ATRASO_TELA_CONECTANDO = 300;
 
   const tela = document.getElementById("screen-server-status");
   const spinner = document.getElementById("serverStatusSpinner");
@@ -45,6 +47,21 @@ const ServerStatus = (() => {
     chipLabel.textContent = texto;
   }
 
+  function limparEstadoConectandoAgendado() {
+    if (estadoConectandoTimeoutId) {
+      clearTimeout(estadoConectandoTimeoutId);
+      estadoConectandoTimeoutId = null;
+    }
+  }
+
+  function agendarEstadoConectando() {
+    limparEstadoConectandoAgendado();
+    estadoConectandoTimeoutId = setTimeout(() => {
+      estadoConectandoTimeoutId = null;
+      aplicarEstadoConectando();
+    }, ATRASO_TELA_CONECTANDO);
+  }
+
   function aplicarEstadoConectando() {
     tela.classList.remove("hidden");
     acessoAdminBtn.classList.add("hidden");
@@ -68,6 +85,7 @@ const ServerStatus = (() => {
   }
 
   function esconderTela() {
+    limparEstadoConectandoAgendado();
     tela.classList.add("hidden");
     acessoManualLiberado = false;
   }
@@ -100,6 +118,7 @@ const ServerStatus = (() => {
 
   function processarMensagem(msg) {
     if (!msg || msg.tipo !== "servidor") return;
+    limparEstadoConectandoAgendado();
     if (msg.manutencao) {
       definirManutencao(true);
       aplicarEstadoManutencao();
@@ -123,7 +142,7 @@ const ServerStatus = (() => {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
     tentativas += 1;
-    aplicarEstadoConectando();
+    agendarEstadoConectando();
 
     try {
       ws = new WebSocket(wsUrl());
