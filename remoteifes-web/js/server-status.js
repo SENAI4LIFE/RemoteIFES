@@ -1,5 +1,6 @@
 const ServerStatus = (() => {
   let ws = null;
+  let conexaoId = 0;
   let reconectarTimeoutId = null;
   let estadoConectandoTimeoutId = null;
   let tentativas = 0;
@@ -143,21 +144,26 @@ const ServerStatus = (() => {
   function conectar() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
+    const idConexao = ++conexaoId;
     tentativas += 1;
     agendarEstadoConectando();
 
+    let socket;
     try {
-      ws = new WebSocket(wsUrl());
+      socket = new WebSocket(wsUrl());
+      ws = socket;
     } catch (err) {
-      agendarReconexao();
+      if (idConexao === conexaoId) agendarReconexao();
       return;
     }
 
-    ws.addEventListener("open", () => {
+    socket.addEventListener("open", () => {
+      if (idConexao !== conexaoId || ws !== socket) return;
       tentativas = 0;
     });
 
-    ws.addEventListener("message", (event) => {
+    socket.addEventListener("message", (event) => {
+      if (idConexao !== conexaoId || ws !== socket) return;
       let msg;
       try {
         msg = JSON.parse(event.data);
@@ -167,17 +173,19 @@ const ServerStatus = (() => {
       processarMensagem(msg);
     });
 
-    ws.addEventListener("close", () => {
+    socket.addEventListener("close", () => {
+      if (idConexao !== conexaoId || ws !== socket) return;
       ws = null;
       agendarReconexao();
     });
 
-    ws.addEventListener("error", () => {
-      if (ws) ws.close();
+    socket.addEventListener("error", () => {
+      if (idConexao === conexaoId && ws === socket) socket.close();
     });
   }
 
   function reconectarComTokenAtual() {
+    conexaoId += 1;
     if (ws) {
       ws.close();
       ws = null;
