@@ -68,7 +68,7 @@ if (typeof ServerStatus !== "undefined") {
 
 document.getElementById("loginVoltarBtn").addEventListener("click", mostrarPortal);
 
-function aplicarSessaoLogada(resp) {
+function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
   state.usuario = resp.usuario;
   state.nome = resp.nome;
   state.isAdmin = resp.isAdmin;
@@ -98,7 +98,7 @@ function aplicarSessaoLogada(resp) {
 
   IdleTimer.iniciar(resp.timeoutInatividadeMinutos, resp.popupAvisoSegundos);
   RTStatus.conectar();
-  if (typeof ServerStatus !== "undefined") ServerStatus.reconectarComTokenAtual();
+  if (reconectarStatus && typeof ServerStatus !== "undefined") ServerStatus.reconectarComTokenAtual();
 }
 
 async function restaurarSessaoSalva() {
@@ -109,7 +109,7 @@ async function restaurarSessaoSalva() {
     await Api.logout();
     return false;
   }
-  aplicarSessaoLogada(resp);
+  aplicarSessaoLogada(resp, { reconectarStatus: false });
   switchTab("salas");
   return true;
 }
