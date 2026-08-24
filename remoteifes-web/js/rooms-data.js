@@ -1,3 +1,9 @@
+function escapeHtml(texto) {
+  const div = document.createElement("div");
+  div.textContent = texto == null ? "" : String(texto);
+  return div.innerHTML;
+}
+
 const RoomsData = {
   montarCodigo(bloco, andar, numero) {
     return `${bloco}${andar}0${numero}`;

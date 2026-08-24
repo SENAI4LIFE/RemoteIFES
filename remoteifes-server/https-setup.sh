@@ -60,4 +60,14 @@ certbot --nginx -d "$DOMINIO" -m "$EMAIL" --agree-tos --non-interactive --redire
 systemctl enable certbot.timer
 systemctl start certbot.timer
 
+if [ -f .env ]; then
+  if grep -q '^TRUST_PROXY=' .env; then
+    sed -i 's/^TRUST_PROXY=.*/TRUST_PROXY=1/' .env
+  else
+    echo "TRUST_PROXY=1" >> .env
+  fi
+else
+  echo "Aviso: .env não encontrado; defina TRUST_PROXY=1 manualmente antes de iniciar o servidor."
+fi
+
 echo "HTTPS configurado para https://$DOMINIO (proxy para 127.0.0.1:$PORTA)."

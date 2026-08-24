@@ -9,7 +9,7 @@ const ScreenPropriedade = {
     if (!Array.isArray(this._salas)) this._salas = [];
 
     select.innerHTML = this._salas
-      .map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`)
+      .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))} — ${escapeHtml(s.nome)}</option>`)
       .join("");
 
     if (this._salas.length === 0) {
@@ -41,7 +41,7 @@ const ScreenPropriedade = {
     const selectCandidatos = document.getElementById("propriedadeUsuarioSelect");
     if (Array.isArray(candidatos)) {
       selectCandidatos.innerHTML = candidatos
-        .map((u) => `<option value="${u.id}">${u.nome} (@${u.usuario})</option>`)
+        .map((u) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.nome)} (@${escapeHtml(u.usuario)})</option>`)
         .join("");
     } else {
       selectCandidatos.innerHTML = "";
@@ -66,7 +66,7 @@ const ScreenPropriedade = {
     usuarios.forEach((u) => {
       const li = document.createElement("li");
       li.innerHTML = `
-        <div class="room-name">${u.nome} <span class="room-sub">@${u.usuario}</span></div>
+        <div class="room-name">${escapeHtml(u.nome)} <span class="room-sub">@${escapeHtml(u.usuario)}</span></div>
         <button type="button" class="link-btn danger revogar-acesso-propriedade">revogar</button>
       `;
       li.querySelector(".revogar-acesso-propriedade").addEventListener("click", async () => {

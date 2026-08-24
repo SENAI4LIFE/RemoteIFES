@@ -60,7 +60,7 @@ function renderRooms(salasTodas) {
     li.dataset.nome = s.nome;
 
     li.querySelector(".room-name").innerHTML = `
-      ${rotulosPlanta.get(s.sala) || RoomsData.rotulo(s.sala)}
+      ${escapeHtml(rotulosPlanta.get(s.sala) || RoomsData.rotulo(s.sala))}
       ${s.agendadaAgora ? '<span class="schedule-badge" title="Agendamento ativo agora">agendada</span>' : ""}
       ${s.podeControlarEsta === false ? '<span class="schedule-badge readonly-badge" title="Apenas visualização">visualização</span>' : ""}
     `;

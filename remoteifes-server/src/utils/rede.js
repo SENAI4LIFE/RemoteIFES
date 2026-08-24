@@ -37,4 +37,16 @@ function ipAutorizado(ip, faixasAutorizadas) {
   return faixasAutorizadas.some((faixa) => ipNaFaixa(ipNormalizado, faixa));
 }
 
-module.exports = { ipAutorizado, ipNaFaixa, normalizarIp };
+function resolverIpCliente(headerXFF, enderecoSocket, hopsConfiaveis) {
+  const remetente = normalizarIp(enderecoSocket) || enderecoSocket;
+  const hops = Number(hopsConfiaveis) || 0;
+  if (hops <= 0 || !headerXFF) return remetente;
+
+  const cadeia = headerXFF.split(",").map((p) => p.trim()).filter(Boolean);
+  if (cadeia.length === 0) return remetente;
+
+  const indice = Math.max(0, cadeia.length - hops);
+  return normalizarIp(cadeia[indice]) || cadeia[indice];
+}
+
+module.exports = { ipAutorizado, ipNaFaixa, normalizarIp, resolverIpCliente };

@@ -40,7 +40,7 @@ function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
     throw new Error("apenas o administrador principal pode conceder privilégios de administrador");
   }
 
-  if (!senha || senha.length < 6) throw new Error("senha deve ter ao menos 6 caracteres");
+  if (!senha || senha.length < 8) throw new Error("senha deve ter ao menos 8 caracteres");
 
   const nivel = isAdmin ? NIVEL_ADMIN : NIVEL_USUARIO;
   const senhaHash = bcrypt.hashSync(senha, 10);
@@ -101,12 +101,22 @@ function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante
   return paraSaida(buscarPorId(id));
 }
 
+function exigirPermissaoSobreAlvo(usuario, requisitante) {
+  if (usuario.nivel === NIVEL_SUPERADMIN && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
+    throw new Error("apenas o administrador principal pode alterar este usuário");
+  }
+  if (
+    usuario.nivel === NIVEL_ADMIN &&
+    (!requisitante || (requisitante.id !== usuario.id && requisitante.nivel !== NIVEL_SUPERADMIN))
+  ) {
+    throw new Error("apenas o administrador principal pode alterar outro administrador");
+  }
+}
+
 function trocarNome(id, novoNome, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
-  if (usuario.nivel === NIVEL_SUPERADMIN && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
-    throw new Error("apenas o administrador principal pode alterar o próprio nome");
-  }
+  exigirPermissaoSobreAlvo(usuario, requisitante);
   if (!novoNome || !novoNome.trim()) throw new Error("informe o novo nome");
 
   const nomeLimpo = novoNome.trim();
@@ -117,9 +127,7 @@ function trocarNome(id, novoNome, requisitante) {
 function trocarLogin(id, novoLogin, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
-  if (usuario.nivel === NIVEL_SUPERADMIN && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
-    throw new Error("apenas o administrador principal pode alterar o próprio login");
-  }
+  exigirPermissaoSobreAlvo(usuario, requisitante);
   if (!novoLogin || !novoLogin.trim()) throw new Error("informe o novo login");
 
   const loginLimpo = novoLogin.trim();
@@ -133,19 +141,18 @@ function trocarLogin(id, novoLogin, requisitante) {
 function trocarSenha(id, novaSenha, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
-  if (usuario.nivel === NIVEL_SUPERADMIN && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
-    throw new Error("apenas o administrador principal pode alterar a própria senha");
-  }
-  if (!novaSenha || novaSenha.length < 6) throw new Error("senha deve ter ao menos 6 caracteres");
+  exigirPermissaoSobreAlvo(usuario, requisitante);
+  if (!novaSenha || novaSenha.length < 8) throw new Error("senha deve ter ao menos 8 caracteres");
   const senhaHash = bcrypt.hashSync(novaSenha, 10);
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE id = ?`).run(senhaHash, id);
   removerSessoesDoUsuario(id);
 }
 
-function remover(id) {
+function remover(id, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   if (usuario.nivel === NIVEL_SUPERADMIN) throw new Error("não é possível remover o administrador principal");
+  exigirPermissaoSobreAlvo(usuario, requisitante);
 
   removerSessoesDoUsuario(id);
   db.prepare(`DELETE FROM agendamentos WHERE usuarioId = ?`).run(id);

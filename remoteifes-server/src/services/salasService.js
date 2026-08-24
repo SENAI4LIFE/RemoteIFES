@@ -115,11 +115,16 @@ function heartbeatDispositivo(sala, estadoReportado, mac, ip) {
   return marcarOnline(sala, estadoReportado, mac, ip);
 }
 
+function macCorrespondeASala(salaRow, mac) {
+  if (!salaRow.mac || !mac) return true;
+  return salaRow.mac.toLowerCase() === String(mac).toLowerCase();
+}
+
 function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
-  if (salaRow.mac && mac && salaRow.mac.toLowerCase() !== String(mac).toLowerCase()) {
+  if (!macCorrespondeASala(salaRow, mac)) {
     throw new Error("MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala");
   }
 
@@ -519,6 +524,7 @@ module.exports = {
   listarLogs,
   apagarLogs,
   marcarOnline,
+  macCorrespondeASala,
   verificarTimeouts,
   listarEventosEsp,
   registrarComandoDispositivo,

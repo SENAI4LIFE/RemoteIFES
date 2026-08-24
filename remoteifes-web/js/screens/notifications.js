@@ -43,7 +43,7 @@ const Notificacoes = {
         const li = document.createElement("li");
         li.className = `notif-item${n.lida ? "" : " nao-lida"}`;
         li.innerHTML = `
-          <div class="notif-item-msg">${n.mensagem}</div>
+          <div class="notif-item-msg">${escapeHtml(n.mensagem)}</div>
           <div class="notif-item-hora">${this.formatarHora(n.criadoEm)}</div>
         `;
         li.addEventListener("click", async () => {

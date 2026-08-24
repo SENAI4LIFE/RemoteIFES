@@ -1,7 +1,5 @@
 function escapeHtmlAdmin(texto) {
-  const div = document.createElement("div");
-  div.textContent = texto == null ? "" : String(texto);
-  return div.innerHTML;
+  return escapeHtml(texto);
 }
 
 const Admin = {
@@ -19,16 +17,16 @@ const Admin = {
       const souSuperAdmin = state.isSuperAdmin;
       const podeRebaixar = u.isAdmin && !u.isSuperAdmin && souSuperAdmin;
       const podePromover = !u.isAdmin && souSuperAdmin;
-      const podeEditar = !u.isSuperAdmin;
-      const podeVerOuTrocarSenha = !u.isSuperAdmin || souSuperAdmin;
+      const podeEditar = !u.isSuperAdmin && (!u.isAdmin || souSuperAdmin);
+      const podeVerOuTrocarSenha = souSuperAdmin || !u.isAdmin;
       const podeGerenciarAtivoAdmin = u.isAdmin && !u.isSuperAdmin && souSuperAdmin;
 
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${u.nome} ${u.isSuperAdmin ? "· admin principal" : u.isAdmin ? "· admin" : ""}</div>
+          <div class="room-name">${escapeHtmlAdmin(u.nome)} ${u.isSuperAdmin ? "· admin principal" : u.isAdmin ? "· admin" : ""}</div>
           <div class="room-sub">
-            @${u.usuario}
+            @${escapeHtmlAdmin(u.usuario)}
             ${!u.ativo ? "· desativado" : ""}
             ${!u.isAdmin ? `· controlar: ${u.podeControlar ? "sim" : "não"}` : ""}
           </div>
@@ -146,10 +144,10 @@ const Admin = {
       li.innerHTML = `
         <div>
           <div class="room-name">
-            ${u.nome} ${u.isAdmin ? "· admin" : ""}
-            ${u.sessaoLoginEm ? `<span class="session-timer" data-login="${u.sessaoLoginEm}">00:00</span>` : ""}
+            ${escapeHtmlAdmin(u.nome)} ${u.isAdmin ? "· admin" : ""}
+            ${u.sessaoLoginEm ? `<span class="session-timer" data-login="${escapeHtmlAdmin(u.sessaoLoginEm)}">00:00</span>` : ""}
           </div>
-          <div class="room-sub">@${u.usuario} · último acesso: ${Tempo.formatarDataHora(u.ultimoAcesso)}</div>
+          <div class="room-sub">@${escapeHtmlAdmin(u.usuario)} · último acesso: ${Tempo.formatarDataHora(u.ultimoAcesso)}</div>
         </div>
         <span class="status-badge ${u.status === "online" ? "on" : u.status === "inativo" ? "inativo" : "off"}">${rotulo}</span>
       `;
@@ -176,7 +174,7 @@ const Admin = {
       li.innerHTML = `
         <div>
           <div class="room-name">
-            ${s.nome} (@${s.usuario})
+            ${escapeHtmlAdmin(s.nome)} (@${escapeHtmlAdmin(s.usuario)})
             <span class="session-timer ${s.emAndamento ? "" : "encerrada"}">${Tempo.formatarDuracao(s.duracaoSegundos)}</span>
           </div>
           <div class="room-sub">
@@ -197,7 +195,7 @@ const Admin = {
       const salas = await Api.listarSalasAdmin();
       salaSelect.innerHTML =
         `<option value="">todas as salas</option>` +
-        salas.map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`).join("");
+        salas.map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)}</option>`).join("");
 
       const andares = [...new Set(salas.map((s) => s.andar))].sort((a, b) => a - b);
       andarSelect.innerHTML =
@@ -217,8 +215,8 @@ const Admin = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${RoomsData.rotulo(l.sala)} · ${l.cmd}${l.valor !== null ? ` (${l.valor})` : ""}</div>
-          <div class="room-sub">${l.usuario || "sistema"} · ${l.origem} · ${Tempo.formatarDataHora(l.criadoEm)}</div>
+          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(l.sala))} · ${escapeHtmlAdmin(l.cmd)}${l.valor !== null ? ` (${escapeHtmlAdmin(l.valor)})` : ""}</div>
+          <div class="room-sub">${escapeHtmlAdmin(l.usuario) || "sistema"} · ${escapeHtmlAdmin(l.origem)} · ${Tempo.formatarDataHora(l.criadoEm)}</div>
         </div>
       `;
       list.appendChild(li);
@@ -233,7 +231,7 @@ const Admin = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${RoomsData.rotulo(e.sala)}</div>
+          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(e.sala))}</div>
           <div class="room-sub">${e.status === "online" ? "ficou online" : "ficou offline"} · ${Tempo.formatarDataHora(e.criadoEm)}</div>
         </div>
         <span class="status-badge ${e.status === "online" ? "on" : "off"}">${e.status}</span>
@@ -250,8 +248,8 @@ const Admin = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${RoomsData.rotulo(a.sala)}</div>
-          <div class="room-sub">${a.ip || "IP desconhecido"} · ${Tempo.formatarDataHora(a.criadoEm)}</div>
+          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(a.sala))}</div>
+          <div class="room-sub">${escapeHtmlAdmin(a.ip) || "IP desconhecido"} · ${Tempo.formatarDataHora(a.criadoEm)}</div>
         </div>
       `;
       list.appendChild(li);
@@ -296,6 +294,7 @@ const Admin = {
       document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
       document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
       document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
+      document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
       document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
       document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
     }
@@ -317,13 +316,13 @@ const Admin = {
       li.id = `macCard-${s.sala}`;
       li.innerHTML = `
         <div class="mac-row" style="width:100%">
-          <div class="room-name">${RoomsData.rotulo(s.sala)} — ${s.nome} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
+          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
           <label>Endereço MAC do ESP32</label>
-          <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${s.mac || ""}" />
+          <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${escapeHtmlAdmin(s.mac) || ""}" />
           <label>Preset em uso</label>
           <select class="preset-select">
             <option value="">(nenhum: usa o padrão)</option>
-            ${presets.map((p) => `<option value="${p.id}" ${s.presetId === p.id ? "selected" : ""}>${p.nome}${p.padrao ? " (padrão)" : ""}</option>`).join("")}
+            ${presets.map((p) => `<option value="${p.id}" ${s.presetId === p.id ? "selected" : ""}>${escapeHtmlAdmin(p.nome)}${p.padrao ? " (padrão)" : ""}</option>`).join("")}
           </select>
           <div class="two-col">
             <button type="button" class="link-btn salvar-mac">salvar MAC</button>
@@ -338,7 +337,7 @@ const Admin = {
             <label>Conceder acesso de controle a</label>
             <div class="two-col">
               <select class="acesso-usuario-select">
-                ${usuariosControlaveis.map((u) => `<option value="${u.id}">${u.nome} (@${u.usuario})</option>`).join("")}
+                ${usuariosControlaveis.map((u) => `<option value="${u.id}">${escapeHtmlAdmin(u.nome)} (@${escapeHtmlAdmin(u.usuario)})</option>`).join("")}
               </select>
               <button type="button" class="link-btn conceder-acesso-sala">conceder</button>
             </div>
@@ -395,7 +394,7 @@ const Admin = {
         usuariosComAcesso.forEach((u) => {
           const item = document.createElement("li");
           item.innerHTML = `
-            <div class="room-name">${u.nome} <span class="room-sub">@${u.usuario}</span></div>
+            <div class="room-name">${escapeHtmlAdmin(u.nome)} <span class="room-sub">@${escapeHtmlAdmin(u.usuario)}</span></div>
             <button type="button" class="link-btn danger revogar-acesso-sala">revogar</button>
           `;
           item.querySelector(".revogar-acesso-sala").addEventListener("click", async () => {
@@ -479,14 +478,14 @@ const Admin = {
       li.innerHTML = `
         <div class="detectado-card-head">
           <span class="detectado-dot"></span>
-          <span class="room-name">${d.mac}</span>
+          <span class="room-name">${escapeHtmlAdmin(d.mac)}</span>
         </div>
-        <div class="room-sub">IP: ${d.ip || "desconhecido"}</div>
-        <div class="room-sub">Sala reportada: ${d.sala || "—"}</div>
+        <div class="room-sub">IP: ${escapeHtmlAdmin(d.ip) || "desconhecido"}</div>
+        <div class="room-sub">Sala reportada: ${escapeHtmlAdmin(d.sala) || "—"}</div>
         <div class="room-sub">Visto por último: ${Tempo.formatarDataHora(d.ultimaDeteccao)}</div>
         <select class="vincular-sala-select">
           <option value="">selecionar sala para vincular</option>
-          ${salas.map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`).join("")}
+          ${salas.map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)}</option>`).join("")}
         </select>
         <div class="detectado-card-actions">
           <button type="button" class="link-btn vincular-detectado">vincular</button>
@@ -608,9 +607,9 @@ const Admin = {
       const inputId = `presetJsonInput-${p.id}`;
       li.innerHTML = `
         <div>
-          <div class="room-name">${p.nome} ${p.padrao ? "· padrão" : ""}</div>
+          <div class="room-name">${escapeHtmlAdmin(p.nome)} ${p.padrao ? "· padrão" : ""}</div>
           <div class="room-sub">
-            ${p.funcoes.map((f) => `<span class="preset-funcao-tag">${f.rotulo}</span>`).join("") || "sem funções cadastradas"}
+            ${p.funcoes.map((f) => `<span class="preset-funcao-tag">${escapeHtmlAdmin(f.rotulo)}</span>`).join("") || "sem funções cadastradas"}
           </div>
           <div class="preset-upload-row">
             <input type="file" id="${inputId}" accept="application/json,.json" />
@@ -797,7 +796,7 @@ const Admin = {
     if (!this._proprietariosSalas) {
       this._proprietariosSalas = await Api.listarSalasAdmin();
       select.innerHTML = this._proprietariosSalas
-        .map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`)
+        .map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)}</option>`)
         .join("");
       if (salaAnterior && this._proprietariosSalas.some((s) => s.sala === salaAnterior)) {
         select.value = salaAnterior;
@@ -822,7 +821,7 @@ const Admin = {
     const selectDono = document.getElementById("proprietariosDonoSelect");
     selectDono.innerHTML = usuariosControlaveis
       .filter((u) => !idsDonos.has(u.id))
-      .map((u) => `<option value="${u.id}">${u.nome} (@${u.usuario})</option>`)
+      .map((u) => `<option value="${u.id}">${escapeHtmlAdmin(u.nome)} (@${escapeHtmlAdmin(u.usuario)})</option>`)
       .join("");
 
     this.renderDonos(sala, donos);
@@ -843,7 +842,7 @@ const Admin = {
       donos.forEach((d) => {
         const li = document.createElement("li");
         li.innerHTML = `
-          <div class="room-name">${d.nome} <span class="room-sub">@${d.usuario}</span></div>
+          <div class="room-name">${escapeHtmlAdmin(d.nome)} <span class="room-sub">@${escapeHtmlAdmin(d.usuario)}</span></div>
           <button type="button" class="link-btn danger revogar-dono">remover proprietário</button>
         `;
         li.querySelector(".revogar-dono").addEventListener("click", async () => {
@@ -869,7 +868,7 @@ const Admin = {
     usuarios.forEach((u) => {
       const li = document.createElement("li");
       li.innerHTML = `
-        <div class="room-name">${u.nome} <span class="room-sub">@${u.usuario}</span></div>
+        <div class="room-name">${escapeHtmlAdmin(u.nome)} <span class="room-sub">@${escapeHtmlAdmin(u.usuario)}</span></div>
         <button type="button" class="link-btn danger revogar-acesso-proprietarios">revogar</button>
       `;
       li.querySelector(".revogar-acesso-proprietarios").addEventListener("click", async () => {
@@ -1091,4 +1090,8 @@ document.getElementById("proprietariosConcederDonoBtn").addEventListener("click"
     return;
   }
   await Admin.carregarProprietariosDaSala(sala);
+});
+
+document.getElementById("cfgModoTeste").addEventListener("change", (e) => {
+  document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !e.target.checked);
 });

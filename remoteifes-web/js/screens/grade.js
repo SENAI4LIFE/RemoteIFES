@@ -32,7 +32,7 @@ const Grade = {
     if (gradeSalaSelect.dataset.carregado !== "1") {
       const salas = await Api.listarSalas();
       gradeSalaSelect.innerHTML = salas
-        .map((s) => `<option value="${s.sala}">${RoomsData.rotulo(s.sala)} — ${s.nome}</option>`)
+        .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))} — ${escapeHtml(s.nome)}</option>`)
         .join("");
       gradeSalaSelect.dataset.carregado = "1";
     }
@@ -59,7 +59,8 @@ const Grade = {
       const ligando = ag.modo === "ligar_completo"
         || (ag.modo === "ligar_intervalo" && periodoCoberto(periodo, ag.ligarInicio, ag.ligarFim));
       const classe = ligando ? "grade-cell grade-cell-ligado" : "grade-cell grade-cell-agendado";
-      html += `<tr><td class="grade-hora">${periodo.inicio}–${periodo.fim}</td><td class="${classe}" title="${ag.usuarioNome} · ${ag.horaInicio}–${ag.horaFim}">${ag.usuarioNome}</td></tr>`;
+      const nomeEscapado = escapeHtml(ag.usuarioNome);
+      html += `<tr><td class="grade-hora">${periodo.inicio}–${periodo.fim}</td><td class="${classe}" title="${nomeEscapado} · ${ag.horaInicio}–${ag.horaFim}">${nomeEscapado}</td></tr>`;
     });
 
     html += "</tbody>";

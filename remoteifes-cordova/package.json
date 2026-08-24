@@ -1,0 +1,36 @@
+{
+  "name": "remoteifes-cordova",
+  "displayName": "RemoteIFES",
+  "version": "1.0.0",
+  "description": "Empacotamento Cordova (Android/iOS) do frontend RemoteIFES",
+  "main": "index.js",
+  "scripts": {
+    "sync": "node sync-www.js",
+    "prepare-android": "npm run sync && cordova platform add android || true && cordova prepare android",
+    "prepare-ios": "npm run sync && cordova platform add ios || true && cordova prepare ios",
+    "build-android": "npm run sync && cordova build android",
+    "build-android-release": "npm run sync && cordova build android --release",
+    "build-ios": "npm run sync && cordova build ios",
+    "run-android": "npm run sync && cordova run android",
+    "run-ios": "npm run sync && cordova run ios"
+  },
+  "cordova": {
+    "plugins": {
+      "cordova-plugin-whitelist": {},
+      "cordova-plugin-statusbar": {},
+      "cordova-plugin-splashscreen": {}
+    },
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  },
+  "devDependencies": {
+    "cordova": "^12.0.0",
+    "cordova-android": "^13.0.0",
+    "cordova-ios": "^7.1.1",
+    "cordova-plugin-whitelist": "^1.3.5",
+    "cordova-plugin-statusbar": "^4.0.0",
+    "cordova-plugin-splashscreen": "^6.0.2"
+  }
+}

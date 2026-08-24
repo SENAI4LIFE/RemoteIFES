@@ -9,8 +9,10 @@
   "scripts": {
     "setup": "bash setup.sh",
     "setup-https": "bash https-setup.sh",
+    "install-service": "bash install-service.sh",
     "start": "node --env-file-if-exists=.env server.js",
     "dev": "node --watch --env-file-if-exists=.env server.js",
+    "test": "REMOTEIFES_DB_PATH=:memory: node --test test/*.test.js",
     "reset-admin": "node reset-admin-senha.js"
   },
   "dependencies": {
