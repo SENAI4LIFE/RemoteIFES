@@ -281,6 +281,7 @@ const Admin = {
   },
 
   async carregarConfiguracoes() {
+    if (!state.isSuperAdmin) return;
     const resp = await Api.obterConfiguracoes();
     if (!resp.ok) return;
     const cfg = resp.configuracoes;
@@ -289,15 +290,12 @@ const Admin = {
     document.getElementById("cfgAdminSujeitoTimeout").checked = !!cfg.adminSujeitoTimeout;
     document.getElementById("cfgPopupAviso").value = cfg.popupAvisoSegundos;
     document.getElementById("cfgLimiarOnline").value = cfg.limiarOnlineMinutos;
-
-    if (state.isSuperAdmin) {
-      document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
-      document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
-      document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
-      document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
-      document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
-      document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
-    }
+    document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
+    document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
+    document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
+    document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
+    document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
+    document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
   },
 
   async carregarMacs() {
@@ -935,6 +933,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
 });
 
 document.getElementById("salvarConfigBtn").addEventListener("click", async () => {
+  if (!state.isSuperAdmin) return;
   const savedEl = document.getElementById("configSavedHint");
   savedEl.classList.add("hidden");
 
@@ -944,18 +943,15 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     adminSujeitoTimeout: document.getElementById("cfgAdminSujeitoTimeout").checked,
     popupAvisoSegundos: Number(document.getElementById("cfgPopupAviso").value),
     limiarOnlineMinutos: Number(document.getElementById("cfgLimiarOnline").value),
-  };
-
-  if (state.isSuperAdmin) {
-    dados.temperaturaMinima = Number(document.getElementById("cfgTemperaturaMinima").value);
-    dados.temperaturaMaxima = Number(document.getElementById("cfgTemperaturaMaxima").value);
-    dados.modoTeste = document.getElementById("cfgModoTeste").checked;
-    dados.redesAutorizadas = document.getElementById("cfgRedesAutorizadas").value
+    temperaturaMinima: Number(document.getElementById("cfgTemperaturaMinima").value),
+    temperaturaMaxima: Number(document.getElementById("cfgTemperaturaMaxima").value),
+    modoTeste: document.getElementById("cfgModoTeste").checked,
+    redesAutorizadas: document.getElementById("cfgRedesAutorizadas").value
       .split("\n")
       .map((v) => v.trim())
-      .filter(Boolean);
-    dados.modoManutencao = document.getElementById("cfgModoManutencao").checked;
-  }
+      .filter(Boolean),
+    modoManutencao: document.getElementById("cfgModoManutencao").checked,
+  };
 
   const resp = await Api.atualizarConfiguracoes(dados);
   if (!resp.ok) {
