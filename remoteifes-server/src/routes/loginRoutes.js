@@ -9,7 +9,7 @@ const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
 
-const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 100 });
+const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 20 });
 
 router.post("/login", limitarLogin, (req, res) => {
   const { usuario, senha } = req.body || {};

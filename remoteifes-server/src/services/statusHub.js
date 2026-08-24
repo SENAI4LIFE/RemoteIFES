@@ -2,7 +2,7 @@ const salasService = require("./salasService");
 const agendamentosService = require("./agendamentosService");
 const configuracoesService = require("./configuracoesService");
 const { validarToken } = require("./tokenService");
-const { ipAutorizado } = require("../utils/rede");
+const { ipAutorizado, resolverIpCliente } = require("../utils/rede");
 
 const REBROADCAST_MS = 30 * 1000;
 const PING_MS = 30 * 1000;
@@ -22,10 +22,10 @@ function origemPermitida(origin) {
   return origensPermitidas.includes(origin);
 }
 
+const TRUST_PROXY_HOPS = process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : "0";
+
 function ipDoRequest(req) {
-  const encaminhado = req.headers["x-forwarded-for"];
-  if (encaminhado) return encaminhado.split(",")[0].trim();
-  return req.socket.remoteAddress;
+  return resolverIpCliente(req.headers["x-forwarded-for"], req.socket.remoteAddress, TRUST_PROXY_HOPS);
 }
 
 function redeAutorizada(req) {

@@ -373,6 +373,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </nav>
 
   <script>
+    const WS_TOKEN = "__WS_TOKEN__";
     let ws;
     let lastCapturedRaw = [];
     let lastCapturedProtocol = "--";
@@ -418,7 +419,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     }
 
     function initWebSocket() {
-      const gateway = `ws://${window.location.hostname}:81/`;
+      const gateway = `ws://${window.location.hostname}:81/?token=${encodeURIComponent(WS_TOKEN)}`;
       ws = new WebSocket(gateway);
 
       ws.onopen = () => {

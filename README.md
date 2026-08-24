@@ -14,6 +14,10 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web,
 [![HTML5](https://img.shields.io/badge/HTML5-Frontend-E34F26?logo=html5)](#)
 [![CSS3](https://img.shields.io/badge/CSS3-Frontend-1572B6?logo=css3)](#)
 [![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript)](#)
+[![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa)](#)
+[![Cordova](https://img.shields.io/badge/Apache%20Cordova-Android%20%2F%20iOS-E8E8E8?logo=apachecordova&logoColor=black)](#)
+[![Android](https://img.shields.io/badge/Android-App-3DDC84?logo=android&logoColor=white)](#)
+[![iOS](https://img.shields.io/badge/iOS-App-000000?logo=apple)](#)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Hosting-222222?logo=github)](#)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](#)
 [![HTTP](https://img.shields.io/badge/API-HTTP-005571?logo=http)](#)
@@ -48,7 +52,9 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web,
 - [Instalação Detalhada](#instalação-detalhada)
 - [Configuração](#configuração)
 - [Deploy](#deploy)
+- [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
 - [Domínio Próprio e HTTPS](#domínio-próprio-e-https)
+- [Empacotamento como PWA e Aplicativo Nativo (Cordova)](#empacotamento-como-pwa-e-aplicativo-nativo-cordova)
 - [Scripts Auxiliares](#scripts-auxiliares)
 - [Uso da API do GitHub](#uso-da-api-do-github)
 - [Estrutura de Pastas](#estrutura-de-pastas)
@@ -59,7 +65,9 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web,
 O projeto é dividido em três partes independentes:
 
 ```
-remoteifes-web/      Frontend estático (HTML/CSS/JS puro, sem build), publicado no GitHub Pages
+remoteifes-web/      Frontend estático (HTML/CSS/JS puro, sem build), publicado no GitHub Pages,
+                     também instalável como PWA
+remoteifes-cordova/  Empacotamento do mesmo frontend como app nativo Android/iOS via Apache Cordova
 remoteifes-server/   API central (Node.js + Express + SQLite), roda em um servidor/host próprio
 remoteifes-esp32/    Firmware Arduino/ESP32 instalado em cada sala, ao lado do ar-condicionado
 ```
@@ -213,20 +221,18 @@ O frontend inclui um widget de acessibilidade (botão flutuante, disponível em 
 
 ### Software
 
-- Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental)
-- Arduino IDE ou PlatformIO, com suporte à placa ESP32, para compilar o firmware
+- Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental) — em Linux (incluindo Raspberry Pi OS), `remoteifes-server/setup.sh` instala automaticamente a versão correta caso não esteja presente, sem depender do pacote do sistema
+- Arduino IDE, PlatformIO ou `arduino-cli`, com suporte à placa ESP32, para compilar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do `arduino-cli`, do core ESP32 e das bibliotecas, além da compilação e gravação
 - Bibliotecas Arduino: [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) (inclui os módulos `IRrecv`, `IRsend`, `IRutils` e `IRac`), `WebSockets` (Links2004), `DHT sensor library` (para leitura de temperatura) e `Preferences`/`DNSServer` (inclusas no core ESP32)
 
 ### Hardware
 
-- Um servidor (VM, Raspberry Pi, etc.) para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32
+- Um servidor para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32 — de uma VM a um **Raspberry Pi** (3, 4, 5 ou Zero 2 W); como o `node:sqlite` é nativo do próprio Node.js, não há compilação de dependências nem ferramentas extras a instalar no Pi, veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
 - Um ESP32 com receptor/emissor infravermelho por sala (ou por par de salas adjacentes, quando um único equipamento cobre as duas), com um sensor DHT opcional para leitura de temperatura
 
 ## Instalação Rápida
 
-> **Antes de executar o servidor:** é necessário ter o **Node.js 22.13 ou superior** instalado no computador. Baixe a versão oficial em https://nodejs.org/en/download.
-
-**macOS/Linux:**
+**macOS/Linux (inclui Raspberry Pi):**
 
 ```bash
 cd remoteifes-server
@@ -234,7 +240,7 @@ npm run setup
 npm start
 ```
 
-`npm run setup` instala as dependências, cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista) e gera automaticamente um `DEVICE_TOKEN` aleatório. Rodar `npm run setup` novamente não sobrescreve um `.env` já existente.
+`npm run setup` verifica o Node.js instalado e, em Linux (x64, ARM64 ou ARMv7 — cobre qualquer Raspberry Pi) ou macOS (via Homebrew), instala automaticamente a versão 22.13+ quando necessário; em seguida instala as dependências, cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista) e gera automaticamente um `DEVICE_TOKEN` aleatório. Rodar `npm run setup` novamente não sobrescreve um `.env` já existente. Para manter o servidor rodando permanentemente e reiniciando sozinho no boot (essencial em um Raspberry Pi dedicado), veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi).
 
 **Windows (PowerShell/CMD):**
 
@@ -287,7 +293,20 @@ Durante o desenvolvimento, `npm run dev` inicia o servidor com reinício automá
 
 ### Firmware ESP32
 
-Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com a placa ESP32 selecionada e as bibliotecas listadas em [Requisitos](#requisitos) instaladas. No primeiro boot, o ESP32 sobe um ponto de acesso Wi-Fi próprio (`RemoteIFES-Setup`) para receber as credenciais da rede local, a sala e o endereço do servidor central; depois disso, ele se conecta normalmente à rede da sala. Se a conexão Wi-Fi salva falhar, o mesmo ponto de acesso de configuração é reaberto automaticamente.
+**Automatizado (recomendado):**
+
+```bash
+cd remoteifes-esp32
+bash flash.sh
+```
+
+`flash.sh` instala o `arduino-cli` (caso ausente), o core ESP32 e as bibliotecas necessárias, detecta a porta serial do ESP32 conectado por USB, compila o firmware e grava o dispositivo — sem precisar abrir a Arduino IDE. Se a detecção automática da porta falhar (ex.: mais de um dispositivo serial conectado), informe-a manualmente: `bash flash.sh /dev/ttyUSB0` (Linux/Raspberry Pi) ou `bash flash.sh /dev/cu.usbserial-XXXX` (macOS).
+
+**Manual (Arduino IDE ou PlatformIO):**
+
+Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com a placa ESP32 selecionada e as bibliotecas listadas em [Requisitos](#requisitos) instaladas.
+
+**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe um ponto de acesso Wi-Fi próprio (`RemoteIFES-Setup`) para receber as credenciais da rede local, a sala e o endereço do servidor central; depois disso, ele se conecta normalmente à rede da sala. Se a conexão Wi-Fi salva falhar, o mesmo ponto de acesso de configuração é reaberto automaticamente.
 
 ## Configuração
 
@@ -300,6 +319,7 @@ Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com 
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — vale tanto para a API HTTP quanto para as conexões WebSocket |
 | `DEVICE_TOKEN` | Token secreto usado pelos ESP32 para autenticar chamadas ao servidor (`x-device-token`); gerado automaticamente por `npm run setup` |
 | `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot (padrão: `admin`) |
+| `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); padrão `1`, correto para o proxy Nginx configurado por `https-setup.sh`. Use `0` se o servidor for exposto diretamente à internet sem proxy na frente — confiar em saltos que não existem permite falsificar o IP de origem e contornar o limite de tentativas de login e a restrição de rede |
 
 Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx/Caddy, ou um serviço com TLS gerenciado), já que os aparelhos móveis e o GitHub Pages exigem conteúdo servido por HTTPS.
 
@@ -345,6 +365,43 @@ sudo bash https-setup.sh <dominio> <email>
 
 O script instala Nginx e Certbot se necessário, cria um site Nginx apontando para `127.0.0.1:<PORTA>` (lida do `.env`, com 8080 como padrão), emite o certificado e ativa a renovação automática (`certbot.timer`). Rode-o como root, com o domínio já apontando para o servidor via DNS.
 
+## Hospedagem em Raspberry Pi
+
+Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é suficiente para rodar `remoteifes-server`: o `node:sqlite` usado pelo projeto é nativo do próprio Node.js, então não há dependências compiladas nem ferramentas de build a instalar no dispositivo.
+
+```bash
+git clone <url-do-repositorio>
+cd RemoteIFES/remoteifes-server
+npm run setup
+sudo bash install-service.sh
+```
+
+- `npm run setup` detecta a arquitetura do Pi (ARM64 ou ARMv7) e instala automaticamente o Node.js 22.13+ direto dos binários oficiais quando a versão do sistema é insuficiente ou inexistente, sem depender do pacote (geralmente desatualizado) do repositório da distribuição.
+- `sudo bash install-service.sh` cria e habilita um serviço `systemd` (`remoteifes.service`) que inicia o servidor no boot e o reinicia automaticamente em caso de falha — dispensa `pm2` ou uma sessão de terminal aberta.
+
+Depois de instalado, use os comandos padrão do `systemd` para gerenciar o serviço:
+
+```bash
+sudo systemctl status remoteifes.service
+sudo journalctl -u remoteifes.service -f
+sudo systemctl restart remoteifes.service
+```
+
+Reinicie o serviço (`systemctl restart`) sempre que editar `remoteifes-server/.env`. Para expor o Pi com HTTPS em um domínio próprio (necessário para o frontend em produção e para o PWA/Cordova), siga normalmente `https-setup.sh` como descrito acima — ele funciona da mesma forma em um Raspberry Pi.
+
+Cada sala continua com seu próprio ESP32 fazendo a ponte com o ar-condicionado (veja [Firmware ESP32](#firmware-esp32)); o Raspberry Pi hospeda apenas o servidor central que os agrega.
+
+### Antes de deixar o Pi exposto sem supervisão
+
+Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo permanente. Confira estes pontos antes de deixá-la assim:
+
+- **Troque a senha do `admin`** imediatamente após o primeiro login, ou defina `SENHA_ADMIN_INICIAL` no `.env` antes do primeiro `npm start` — a senha padrão é `admin` e é pública (está neste README).
+- **Desative o modo de teste** (`Admin > Configurações > Modo de teste`) e cadastre as faixas de IP em `Redes autorizadas` se a intenção é restringir o acesso a uma rede específica; por padrão o modo de teste vem ativado (para facilitar testes) e desliga essa restrição mesmo em produção.
+- **Garanta que só a porta 443 do Nginx fique exposta à internet**, nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o HTTPS, o CORS e a checagem de `TRUST_PROXY`.
+- **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
+- **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
+- **Anote o `DEVICE_TOKEN` como um segredo de verdade**: ele é compartilhado por todos os ESP32 e as rotas `/dispositivo/*` não passam pela restrição de rede (os ESP32 precisam alcançá-las de qualquer rede). Quem tiver esse token pode reportar estado falso para qualquer sala; não o commite no Git nem o deixe em anotações públicas.
+
 ### Frontend no GitHub Pages
 
 A publicação do `remoteifes-web` no GitHub Pages é manual (não há workflow de Actions no repositório). Passo a passo para publicar:
@@ -370,6 +427,112 @@ Para servir o frontend em um domínio próprio (em vez do endereço `github.io` 
 
 Com o frontend e o servidor central ambos em HTTPS e domínios próprios, o sistema funciona normalmente em navegadores de celular, incluindo ao adicionar a página como atalho na tela inicial. Como o WebSocket herda o esquema da página (`wss://` quando a página é `https://`), nenhuma configuração adicional é necessária para o tempo real funcionar sob HTTPS.
 
+## Empacotamento como PWA e Aplicativo Nativo (Cordova)
+
+Além do site publicado no GitHub Pages, o `remoteifes-web` pode ser instalado como **PWA** diretamente do navegador, e o mesmo frontend pode ser empacotado como **app nativo Android/iOS** pelo projeto `remoteifes-cordova/`. Nenhuma das duas formas exige reescrever ou duplicar a lógica da aplicação — ambas reaproveitam os arquivos de `remoteifes-web` como estão.
+
+### PWA (Progressive Web App)
+
+`remoteifes-web` já inclui os arquivos necessários:
+
+| Arquivo | Função |
+|---|---|
+| `manifest.webmanifest` | Nome, ícones (`assets/icons/`), cor de tema (`#1c6b3c`) e modo de exibição `standalone` |
+| `sw.js` | Service worker: cacheia o app shell (HTML/CSS/JS/ícones) para abrir mais rápido e funcionar parcialmente offline |
+
+O `sw.js` só intercepta arquivos estáticos do próprio domínio — chamadas à API (`serverUrl`) e a conexão WebSocket continuam exigindo rede normalmente. O registro do service worker acontece automaticamente no `index.html`, sem configuração adicional.
+
+Requisitos para o botão de instalação aparecer no navegador:
+
+- Frontend servido por HTTPS (GitHub Pages já atende isso).
+- `serverUrl` do servidor central também em HTTPS — a mesma exigência de [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
+
+No Chrome/Edge (Android ou desktop) aparece um ícone de instalação na barra de endereço; no Safari (iOS), o caminho é Compartilhar > Adicionar à Tela de Início.
+
+Sempre que algum arquivo estático de `remoteifes-web` for alterado, incremente `CACHE_VERSION` no topo de `sw.js` — isso faz os apps já instalados buscarem a versão nova na próxima abertura.
+
+### Cordova (Android/iOS)
+
+O projeto `remoteifes-cordova/` empacota `remoteifes-web` como app nativo. A pasta `remoteifes-cordova/www/` nunca deve ser editada diretamente: ela é gerada a partir de `remoteifes-web` pelo script `sync-www.js`, chamado automaticamente por todos os scripts `npm run *` do projeto.
+
+#### Instalação do Cordova
+
+```bash
+cd remoteifes-cordova
+npm install
+```
+
+Isso instala o Cordova CLI e os plugins do projeto (`cordova-plugin-whitelist`, `cordova-plugin-statusbar`, `cordova-plugin-splashscreen`) localmente, sem precisar de instalação global.
+
+Para usar o comando `cordova` diretamente no terminal:
+
+```bash
+npm install -g cordova
+```
+
+#### Requisitos por plataforma
+
+| Plataforma | Requisitos |
+|---|---|
+| Android | JDK 17, Android Studio ou Android SDK Command-line Tools, variável de ambiente `ANDROID_SDK_ROOT` apontando para o SDK |
+| iOS | macOS com Xcode e Xcode Command Line Tools, CocoaPods (`sudo gem install cocoapods`) |
+
+#### Adicionar as plataformas
+
+```bash
+cd remoteifes-cordova
+npm run prepare-android
+```
+
+```bash
+cd remoteifes-cordova
+npm run prepare-ios
+```
+
+Cada comando sincroniza `www/` a partir de `remoteifes-web`, roda `cordova platform add` e `cordova prepare` para a plataforma correspondente.
+
+#### Build e execução
+
+```bash
+npm run build-android
+```
+
+```bash
+npm run build-android-release
+```
+
+```bash
+npm run run-android
+```
+
+```bash
+npm run build-ios
+```
+
+```bash
+npm run run-ios
+```
+
+`build-android-release` gera um APK/AAB sem assinatura em `platforms/android/app/build/outputs/`; assine-o com sua própria chave antes de publicar na Play Store. Para iOS, `run-ios` abre o simulador; para dispositivo físico ou publicação na App Store, abra `platforms/ios/RemoteIFES.xcworkspace` no Xcode.
+
+#### Ícone e splash screen
+
+As imagens-fonte ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732, geradas a partir de `remoteifes-web/assets/remoteifes-logo.png`). Para gerar os tamanhos específicos de cada plataforma a partir dessas duas imagens:
+
+```bash
+cd remoteifes-cordova
+npx cordova-res android --skip-config --copy
+npx cordova-res ios --skip-config --copy
+```
+
+#### Apontando o app para o servidor de produção
+
+Edite `remoteifes-web/js/config.js` (não `remoteifes-cordova/www/js/config.js`, que é sobrescrito a cada `sync`) com o `serverUrl` de produção antes de gerar o build — o app empacotado não tem acesso a `localhost` da máquina onde foi compilado.
+
+#### Ajustando as permissões de rede
+
+`remoteifes-cordova/config.xml` vem com `<access origin="*" />` e `<allow-navigation href="*" />` para simplificar o desenvolvimento contra qualquer `serverUrl`. Para produção, restrinja ambos ao domínio real do servidor central (ex.: `https://remoteifes.ifes.edu.br/*`) antes de gerar o build final. O mesmo arquivo já libera tráfego HTTP em texto claro no Android (`usesCleartextTraffic`) para facilitar testes locais; remova essa linha se o servidor de produção só aceitar HTTPS.
+
 ## Scripts Auxiliares
 
 Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (executados a partir da raiz do repositório, com `git` instalado e disponível no `PATH`):
@@ -390,7 +553,8 @@ Este projeto não depende da API do GitHub em tempo de execução — o uso do G
 
 ```
 remoteifes-server/
-  setup.sh          instalação e configuração automatizadas (dependências, .env, DEVICE_TOKEN)
+  setup.sh          instalação e configuração automatizadas (Node.js, dependências, .env, DEVICE_TOKEN)
+  install-service.sh configura um serviço systemd para manter o servidor no ar (auto-start no boot, ex.: Raspberry Pi)
   https-setup.sh     configuração automatizada de HTTPS (Nginx + Certbot)
   reset-admin-senha.js  redefine a senha do usuário admin sem apagar dados
   server.js          ponto de entrada: sobe o HTTP server, o WebSocket e o agendador
@@ -406,6 +570,9 @@ remoteifes-server/
     utils/             funções auxiliares (data/hora em fuso de Brasília, rate limiting, faixas de rede)
 
 remoteifes-web/
+  manifest.webmanifest  manifesto da PWA (nome, ícones, cor de tema)
+  sw.js                 service worker: cache do app shell para instalação/uso offline parcial
+  assets/icons/         ícones gerados para PWA, favicon e tela inicial (iOS/Android)
   js/
     app.js             inicialização geral da página
     api.js             chamadas HTTP à API central
@@ -430,6 +597,14 @@ remoteifes-web/
 remoteifes-esp32/
   remoteifes_esp32.ino   firmware principal (Wi-Fi, IR, DHT, WebSocket local, comunicação com o servidor)
   index_html.h            interface web local do dispositivo (aprendizado de IR, termostato, presets)
+  flash.sh                compila e grava o firmware automaticamente via arduino-cli
+
+remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento como PWA e Aplicativo Nativo)
+  config.xml             configuração do app (id, nome, ícone, splash, permissões de rede)
+  package.json            scripts de sync/build/run e plugins Cordova do projeto
+  sync-www.js             copia remoteifes-web para www/ antes de cada build (não editar www/ manualmente)
+  resources/              imagens-fonte (icon.png, splash.png) usadas por cordova-res
+  www/                    cópia gerada de remoteifes-web (gitignored fora de commits manuais, se preferir)
 
 docs/                    material de apoio do projeto (imagens, documento acadêmico)
 export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxiliares)
@@ -448,4 +623,13 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
 - **Aba "Grade" ou "Agendamentos" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
 - **Aba "Config. Salas" não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Admin > Proprietários de sala`.
+- **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend e o `serverUrl` estão ambos em HTTPS (veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https)) — navegadores exigem HTTPS para registrar o service worker e oferecer a instalação.
+- **App fica com versão antiga dos arquivos depois de atualizar o PWA**: incremente `CACHE_VERSION` em `remoteifes-web/sw.js`; sem isso, os clientes que já instalaram o app continuam servindo os arquivos do cache antigo.
+- **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_SDK_ROOT` (ou `ANDROID_HOME`) aponta para a instalação do Android SDK e que o JDK 17 está no `PATH`; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
+- **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org`); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `npm run setup` novamente.
+- **`install-service.sh` falha com "systemd não encontrado"**: o script só funciona em Linux com `systemd` (padrão no Raspberry Pi OS); em outras distribuições, use um gerenciador de processo alternativo como `pm2`.
+- **Serviço `remoteifes.service` não inicia**: rode `sudo journalctl -u remoteifes.service -f` para ver o erro; confira se `remoteifes-server/.env` existe e se `DEVICE_TOKEN` está definido, e rode `sudo systemctl restart remoteifes.service` após qualquer correção.
+- **`flash.sh` não encontra a porta serial do ESP32**: confirme que o cabo USB usado transmite dados (não é só de carga) e que os drivers do conversor USB-serial (CP210x ou CH340, conforme a placa) estão instalados; informe a porta manualmente, ex.: `bash flash.sh /dev/ttyUSB0`.
+- **Restrição de rede ou limite de tentativas de login parecem não fazer efeito**: confira `TRUST_PROXY` no `.env` — o valor precisa corresponder ao número real de proxies reversos na frente do servidor (`1` para o Nginx de `https-setup.sh`, `0` se o Node estiver exposto diretamente); um valor maior que o real permite que o IP de origem seja falsificado via `X-Forwarded-For`, contornando as duas proteções.
+- **App Cordova não fala com o servidor central**: confirme que `remoteifes-web/js/config.js` (não a cópia em `remoteifes-cordova/www/`) aponta para o `serverUrl` de produção antes de gerar o build, e que `remoteifes-cordova/config.xml` libera o domínio do servidor em `access`/`allow-navigation`.
 - **Login com "admin" não funciona após clonar**: a senha padrão é `admin`, mas isso só se aplica quando o usuário `admin` é criado pela primeira vez no banco. Se `remoteifes-server/data/remoteifes.db` já veio junto no clone (por exemplo, commitado antes de existir um `.gitignore`), o `admin` já existe com outra senha e a criação é pulada silenciosamente. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou presets já cadastrados; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.

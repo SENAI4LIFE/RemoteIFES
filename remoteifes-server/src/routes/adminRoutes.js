@@ -73,7 +73,7 @@ router.delete("/admin/usuarios/:id", (req, res) => {
   const id = parseId(req, res);
   if (id === null) return;
   try {
-    usuariosService.remover(id);
+    usuariosService.remover(id, req.usuario);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
