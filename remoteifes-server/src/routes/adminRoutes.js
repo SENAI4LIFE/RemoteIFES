@@ -260,11 +260,11 @@ router.delete("/admin/salas/:sala/donos/:usuarioId", (req, res) => {
   }
 });
 
-router.get("/admin/configuracoes", (req, res) => {
+router.get("/admin/configuracoes", exigirSuperAdmin, (req, res) => {
   res.json({ ok: true, configuracoes: configuracoesService.obter() });
 });
 
-router.patch("/admin/configuracoes", (req, res) => {
+router.patch("/admin/configuracoes", exigirSuperAdmin, (req, res) => {
   try {
     const configuracoes = configuracoesService.validarEAtualizar(req.body || {}, req.usuario);
     res.json({ ok: true, configuracoes });
