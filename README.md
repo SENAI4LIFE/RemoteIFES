@@ -311,13 +311,13 @@ Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx
 
 ### Configurações globais (banco de dados, via `Admin > Configurações`)
 
-Estas configurações são armazenadas no banco (tabela `configuracoes`). As marcadas como críticas só podem ser vistas e alteradas pelo administrador principal; as demais podem ser alteradas por qualquer administrador.
+Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba **Configurações** só é visível e acessível ao administrador principal — nenhum outro administrador pode ver ou alterar esses valores.
 
 | Configuração | Padrão | Descrição |
 |---|---|---|
-| Limite de temperatura (crítica) | 23 °C a 25 °C | Intervalo permitido para qualquer comando de temperatura, manual ou agendado (aceita de 16 a 30 °C) |
-| Modo de teste (crítica) | ativado | Quando ativo, desliga a restrição de rede do IFES em produção, permitindo acessar o sistema de qualquer rede para fins de teste; deve ser desativado quando o sistema for para produção definitiva |
-| Redes autorizadas (crítica) | vazia | Lista de faixas de IP em CIDR (ex.: `10.0.0.0/8`) liberadas quando o modo de teste está desativado |
+| Limite de temperatura | 23 °C a 25 °C | Intervalo permitido para qualquer comando de temperatura, manual ou agendado (aceita de 16 a 30 °C) |
+| Modo de teste | ativado | Quando ativo, desliga a restrição de rede do IFES em produção, permitindo acessar o sistema de qualquer rede para fins de teste; deve ser desativado quando o sistema for para produção definitiva |
+| Redes autorizadas | vazia | Lista de faixas de IP em CIDR (ex.: `10.0.0.0/8`) liberadas quando o modo de teste está desativado |
 | Tempo de inatividade | indefinido (sem limite) | Minutos sem interação até deslogar automaticamente o usuário no navegador; em branco desativa o recurso |
 | Admin sujeito ao tempo de inatividade | desativado | Define se o timeout de inatividade também se aplica a administradores |
 | Aviso de logout automático | 60 segundos | Duração da contagem regressiva exibida antes do logout por inatividade |

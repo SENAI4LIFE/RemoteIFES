@@ -159,7 +159,7 @@ const HelpContent = {
     itens: [
       { titulo: "Sessão por inatividade", texto: "Tempo sem uso até deslogar automaticamente; deixe em branco para nunca deslogar por tempo." },
       { titulo: "Presença online", texto: "Por quantos minutos sem uso um usuário ainda aparece como online no painel de Ativos." },
-      { titulo: "Configurações críticas", texto: "Limites de temperatura, modo de teste e redes autorizadas: visíveis apenas ao administrador principal." },
+      { titulo: "Acesso restrito", texto: "Esta aba inteira é visível apenas ao administrador principal." },
     ],
   },
 };
