@@ -258,32 +258,18 @@ Depois abra o arquivo `.env` gerado e defina um valor para `DEVICE_TOKEN` (qualq
 **Em ambos os casos**, o banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
 
 - 95 salas reais do campus, extraídas da planta baixa (Bloco A e B, todos os pavimentos), todas offline até que os ESP32 correspondentes comecem a reportar
-- Um usuário `admin` com senha padrão `admin` (ou definida via `SENHA_ADMIN_INICIAL` em `.env`) — isso só acontece quando o `admin` ainda não existe no banco; se o banco já veio populado no clone, use `npm run reset-admin` (veja [Solução de Problemas](#solução-de-problemas))
+- Um usuário `admin`, com senha definida via `SENHA_ADMIN_INICIAL` em `.env` (mínimo 8 caracteres) ou, na ausência dela, uma senha aleatória gerada automaticamente e impressa no console na primeira execução (`npm start`) — guarde-a dali, pois não fica salva em nenhum arquivo. Isso só acontece quando o `admin` ainda não existe no banco; se o banco já veio populado no clone, use `npm run reset-admin` (veja [Solução de Problemas](#solução-de-problemas))
 - O preset padrão, com a função de temperatura configurada entre 23 °C e 25 °C
 
 ## Instalação Detalhada
 
 ### Servidor central
 
-**macOS/Linux:**
+A [Instalação Rápida](#instalação-rápida) já cobre os comandos para colocar o servidor no ar. Esta seção detalha o que acontece por trás deles e as opções relevantes para produção.
 
-```bash
-cd remoteifes-server
-npm install
-cp .env.example .env
-npm start
-```
+Em macOS/Linux, `npm run setup` (usado na instalação rápida) equivale a `npm install` + `cp .env.example .env` + geração automática de `DEVICE_TOKEN`. Rode esses passos manualmente em vez do script caso prefira não instalar o Node.js automaticamente ou queira revisar cada etapa. No Windows, onde `npm run setup` não roda, os passos manuais (`npm install`, copiar `.env.example` para `.env`, definir `DEVICE_TOKEN` à mão) já são o único caminho, como descrito na instalação rápida.
 
-**Windows (PowerShell/CMD):**
-
-```powershell
-cd remoteifes-server
-npm install
-copy .env.example .env
-npm start
-```
-
-Edite `.env` conforme a seção [Configuração](#configuração) antes de colocar o servidor em produção — em especial `DEVICE_TOKEN` (gerado automaticamente pelo `npm run setup` no macOS/Linux; no Windows, defina manualmente como descrito acima) e, quando `NODE_ENV=production`, `CORS_ORIGIN`.
+Antes de colocar o servidor em produção, edite `.env` conforme a seção [Configuração](#configuração) — em especial `CORS_ORIGIN` quando `NODE_ENV=production`, e `SENHA_ADMIN_INICIAL` se quiser escolher a senha do `admin` em vez de usar a gerada automaticamente.
 
 Durante o desenvolvimento, `npm run dev` inicia o servidor com reinício automático a cada alteração de arquivo (`node --watch`), no lugar de `npm start`.
 
@@ -318,7 +304,7 @@ Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com 
 | `PORTA` | Porta HTTP (e WebSocket, no mesmo servidor) do servidor (padrão 8080) |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — vale tanto para a API HTTP quanto para as conexões WebSocket |
 | `DEVICE_TOKEN` | Token secreto usado pelos ESP32 para autenticar chamadas ao servidor (`x-device-token`); gerado automaticamente por `npm run setup` |
-| `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot (padrão: `admin`) |
+| `SENHA_ADMIN_INICIAL` | Opcional (mínimo 8 caracteres); define a senha do usuário `admin` criado no primeiro boot. Se ausente ou muito curta, uma senha aleatória é gerada e impressa no console nesse primeiro boot |
 | `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); padrão `1`, correto para o proxy Nginx configurado por `https-setup.sh`. Use `0` se o servidor for exposto diretamente à internet sem proxy na frente — confiar em saltos que não existem permite falsificar o IP de origem e contornar o limite de tentativas de login e a restrição de rede |
 
 Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx/Caddy, ou um serviço com TLS gerenciado), já que os aparelhos móveis e o GitHub Pages exigem conteúdo servido por HTTPS.
@@ -395,7 +381,7 @@ Cada sala continua com seu próprio ESP32 fazendo a ponte com o ar-condicionado 
 
 Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo permanente. Confira estes pontos antes de deixá-la assim:
 
-- **Troque a senha do `admin`** imediatamente após o primeiro login, ou defina `SENHA_ADMIN_INICIAL` no `.env` antes do primeiro `npm start` — a senha padrão é `admin` e é pública (está neste README).
+- **Anote a senha do `admin`** exibida no console no primeiro `npm start` (ou defina `SENHA_ADMIN_INICIAL` no `.env` antes disso) e troque-a pelo painel assim que possível — ela não é salva em nenhum arquivo nem reexibida depois.
 - **Desative o modo de teste** (`Admin > Configurações > Modo de teste`) e cadastre as faixas de IP em `Redes autorizadas` se a intenção é restringir o acesso a uma rede específica; por padrão o modo de teste vem ativado (para facilitar testes) e desliga essa restrição mesmo em produção.
 - **Garanta que só a porta 443 do Nginx fique exposta à internet**, nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o HTTPS, o CORS e a checagem de `TRUST_PROXY`.
 - **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
@@ -632,4 +618,4 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **`flash.sh` não encontra a porta serial do ESP32**: confirme que o cabo USB usado transmite dados (não é só de carga) e que os drivers do conversor USB-serial (CP210x ou CH340, conforme a placa) estão instalados; informe a porta manualmente, ex.: `bash flash.sh /dev/ttyUSB0`.
 - **Restrição de rede ou limite de tentativas de login parecem não fazer efeito**: confira `TRUST_PROXY` no `.env` — o valor precisa corresponder ao número real de proxies reversos na frente do servidor (`1` para o Nginx de `https-setup.sh`, `0` se o Node estiver exposto diretamente); um valor maior que o real permite que o IP de origem seja falsificado via `X-Forwarded-For`, contornando as duas proteções.
 - **App Cordova não fala com o servidor central**: confirme que `remoteifes-web/js/config.js` (não a cópia em `remoteifes-cordova/www/`) aponta para o `serverUrl` de produção antes de gerar o build, e que `remoteifes-cordova/config.xml` libera o domínio do servidor em `access`/`allow-navigation`.
-- **Login com "admin" não funciona após clonar**: a senha padrão é `admin`, mas isso só se aplica quando o usuário `admin` é criado pela primeira vez no banco. Se `remoteifes-server/data/remoteifes.db` já veio junto no clone (por exemplo, commitado antes de existir um `.gitignore`), o `admin` já existe com outra senha e a criação é pulada silenciosamente. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou presets já cadastrados; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.
+- **Não sei a senha do `admin` (ou o login não funciona) após clonar**: a senha do `admin` não tem valor fixo — ela é definida por `SENHA_ADMIN_INICIAL` no `.env` ou, na ausência dela, gerada aleatoriamente e impressa apenas uma vez no console, no primeiro `npm start` (procure a linha `Seed: usuário admin criado...` no log). Se você perdeu essa saída, ou se `remoteifes-server/data/remoteifes.db` já veio junto no clone (por exemplo, commitado antes de existir um `.gitignore`), o `admin` já existe e a criação é pulada silenciosamente — a senha do console não se aplica. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou presets já cadastrados; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.
