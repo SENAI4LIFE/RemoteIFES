@@ -34,6 +34,8 @@ enum DeviceMode {
 
 WebServer server(80);
 WebSocketsServer webSocket(81);
+const uint8_t WS_MAX_CLIENTES = 8;
+bool wsAutenticado[WS_MAX_CLIENTES];
 DNSServer dnsServer;
 Preferences preferences;
 DHT dht(DHTPIN, DHTTYPE);
@@ -86,6 +88,8 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println("\n--- RemoteIFES IR System Initializing ---");
+
+  for (uint8_t i = 0; i < WS_MAX_CLIENTES; i++) wsAutenticado[i] = false;
 
   dht.begin();
   irsend.begin();
@@ -206,7 +210,11 @@ void gerenciarConexaoWifi() {
 void startAPMode() {
   apModeActive = true;
   WiFi.mode(WIFI_AP);
-  WiFi.softAP("RemoteIFES-Setup");
+  char apPassBuf[16];
+  snprintf(apPassBuf, sizeof(apPassBuf), "ifes-%06x", (unsigned int)(ESP.getEfuseMac() & 0xFFFFFF));
+  WiFi.softAP("RemoteIFES-Setup", apPassBuf);
+  Serial.print("Senha do Wi-Fi de configuracao (RemoteIFES-Setup): ");
+  Serial.println(apPassBuf);
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
@@ -252,11 +260,19 @@ void startAPMode() {
 }
 
 void handleRoot() {
-  server.send_P(200, "text/html", INDEX_HTML);
+  if (deviceToken.length() == 0 || !server.authenticate("remoteifes", deviceToken.c_str())) {
+    return server.requestAuthentication();
+  }
+  String html = String(INDEX_HTML);
+  html.replace("__WS_TOKEN__", deviceToken);
+  server.send(200, "text/html", html);
   reportAccess(server.client().remoteIP().toString(), server.header("User-Agent"));
 }
 
 void handleInfo() {
+  if (deviceToken.length() == 0 || !server.authenticate("remoteifes", deviceToken.c_str())) {
+    return server.requestAuthentication();
+  }
   String json = "{";
   json += "\"sala\":\"" + salaId + "\",";
   json += "\"mac\":\"" + WiFi.macAddress() + "\",";
@@ -269,14 +285,30 @@ void handleInfo() {
 void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   switch (type) {
     case WStype_DISCONNECTED:
+      if (num < WS_MAX_CLIENTES) wsAutenticado[num] = false;
       break;
 
     case WStype_CONNECTED: {
+      String url = String((char*)payload);
+      bool autenticado = false;
+      int tokenIdx = url.indexOf("token=");
+      if (deviceToken.length() > 0 && tokenIdx != -1) {
+        String supplied = url.substring(tokenIdx + 6);
+        int ampIdx = supplied.indexOf('&');
+        if (ampIdx != -1) supplied = supplied.substring(0, ampIdx);
+        autenticado = supplied.length() == deviceToken.length() && supplied == deviceToken;
+      }
+      if (num < WS_MAX_CLIENTES) wsAutenticado[num] = autenticado;
+      if (!autenticado) {
+        webSocket.disconnect(num);
+        break;
+      }
       readSensorsAndBroadcast();
       break;
     }
 
     case WStype_TEXT: {
+      if (num >= WS_MAX_CLIENTES || !wsAutenticado[num]) break;
       String msg = String((char*)payload);
 
       if (msg.indexOf("start_capture") >= 0) {
@@ -485,6 +517,7 @@ bool sendHttpPost(const String& url, const String& payload) {
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("x-device-token", deviceToken);
+  http.addHeader("x-device-mac", WiFi.macAddress());
   int statusCode = http.POST(payload);
   String response = http.getString();
   http.end();
@@ -611,6 +644,7 @@ bool sendHttpGet(const String& url, String& responseOut) {
   HTTPClient http;
   http.begin(url);
   http.addHeader("x-device-token", deviceToken);
+  http.addHeader("x-device-mac", WiFi.macAddress());
   int statusCode = http.GET();
   responseOut = http.getString();
   http.end();

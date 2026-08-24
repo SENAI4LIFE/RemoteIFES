@@ -9,7 +9,9 @@ criarSchema();
 popularBanco();
 
 const app = express();
-app.set("trust proxy", true);
+
+const TRUST_PROXY_HOPS = process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : "0";
+app.set("trust proxy", /^\d+$/.test(TRUST_PROXY_HOPS) ? Number(TRUST_PROXY_HOPS) : TRUST_PROXY_HOPS);
 
 const NODE_ENV = process.env.NODE_ENV || "development";
 const origensPermitidas = (process.env.CORS_ORIGIN || "")
@@ -28,6 +30,13 @@ const opcoesCors = NODE_ENV === "production"
 
 app.use(cors(opcoesCors));
 app.use(express.json({ limit: "100kb" }));
+
+app.use((req, res, next) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("Referrer-Policy", "same-origin");
+  next();
+});
 
 app.use(require("./routes/dispositivoRoutes"));
 

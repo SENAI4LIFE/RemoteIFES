@@ -2,8 +2,12 @@ const express = require("express");
 const crypto = require("crypto");
 const salasService = require("../services/salasService");
 const presetsService = require("../services/presetsService");
+const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
+
+const limitarDispositivo = criarLimitador({ janelaMs: 60 * 1000, maxTentativas: 120 });
+router.use(limitarDispositivo);
 
 const DEVICE_TOKEN = process.env.DEVICE_TOKEN || "";
 
@@ -21,6 +25,29 @@ function exigirDispositivo(req, res, next) {
   const token = req.headers["x-device-token"];
   if (!token || typeof token !== "string" || !tokensIguais(token, DEVICE_TOKEN)) {
     return res.status(401).json({ ok: false, erro: "token de dispositivo inválido" });
+  }
+  next();
+}
+
+// O DEVICE_TOKEN é compartilhado por todos os ESP32 do sistema (não há um
+// token por sala). Sem esta checagem, qualquer dispositivo de posse do
+// token global poderia agir em nome de qualquer outra sala informando um
+// valor arbitrário de "sala" no corpo da requisição. Quando a sala alvo já
+// tem um MAC cadastrado, exigimos que o cabeçalho x-device-mac (enviado
+// pelo firmware) corresponda a esse MAC. Dispositivos ainda não cadastrados
+// (sala sem MAC vinculado) ou firmwares antigos que não enviam o header
+// continuam funcionando normalmente — a checagem só bloqueia quando há um
+// MAC cadastrado E o header não bate com ele.
+function exigirMacDaSalaSeCadastrado(req, res, next) {
+  const sala = typeof req.body?.sala === "string" ? req.body.sala : req.query?.sala;
+  if (!sala || typeof sala !== "string") return next();
+
+  const salaRow = salasService.buscar(sala);
+  if (!salaRow) return next();
+
+  const macInformado = req.headers["x-device-mac"];
+  if (!salasService.macCorrespondeASala(salaRow, macInformado)) {
+    return res.status(403).json({ ok: false, erro: "MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala" });
   }
   next();
 }
@@ -53,7 +80,7 @@ router.post("/dispositivo/heartbeat", exigirDispositivo, (req, res) => {
   }
 });
 
-router.post("/dispositivo/acesso", exigirDispositivo, (req, res) => {
+router.post("/dispositivo/acesso", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
   const { sala, userAgent } = req.body;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -71,7 +98,7 @@ router.post("/dispositivo/acesso", exigirDispositivo, (req, res) => {
   }
 });
 
-router.post("/dispositivo/comando", exigirDispositivo, (req, res) => {
+router.post("/dispositivo/comando", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
   const { sala, cmd, valor } = req.body;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -88,7 +115,7 @@ router.post("/dispositivo/comando", exigirDispositivo, (req, res) => {
   }
 });
 
-router.get("/dispositivo/preset", exigirDispositivo, (req, res) => {
+router.get("/dispositivo/preset", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
   const { sala } = req.query;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -103,13 +130,26 @@ router.get("/dispositivo/preset", exigirDispositivo, (req, res) => {
   res.json({ ok: true, preset });
 });
 
-router.post("/dispositivo/preset", exigirDispositivo, (req, res) => {
+router.post("/dispositivo/preset", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
   const { nome, funcoes, sala } = req.body || {};
+  if (!sala || typeof sala !== "string") {
+    return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
+  }
+  const salaRow = salasService.buscar(sala);
+  if (!salaRow) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
+
   try {
-    const preset = presetsService.criarOuAtualizarViaDispositivo({ nome, funcoes });
-    if (sala && typeof sala === "string") {
-      salasService.definirPreset(sala, preset.id);
-    }
+    // O preset a ser alterado é sempre resolvido a partir do presetId já
+    // vinculado a esta sala (nunca por nome vindo do corpo da requisição),
+    // para que um dispositivo não possa sobrescrever o preset padrão
+    // compartilhado nem o preset de outra sala. Ver nota em
+    // presetsService.sincronizarPresetDaSala.
+    const preset = presetsService.sincronizarPresetDaSala({
+      presetIdAtual: salaRow.presetId || null,
+      nome,
+      funcoes,
+    });
+    salasService.definirPreset(sala, preset.id);
     res.json({ ok: true, preset });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });

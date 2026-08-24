@@ -150,29 +150,62 @@ function removerFuncao(funcaoId) {
   return buscarPorId(funcao.presetId);
 }
 
-function criarOuAtualizarViaDispositivo({ nome, funcoes }) {
+// Usado por POST /dispositivo/preset. Antes, esta função procurava/criava o
+// preset por NOME de forma global: qualquer ESP32 de posse do DEVICE_TOKEN
+// (compartilhado por todos os dispositivos) podia enviar nome: "Padrão" (ou
+// o nome de um preset já usado por outra sala) e ter seus dados
+// sobrescritos, mesmo estando vinculado a uma sala diferente — o
+// middleware exigirMacDaSalaSeCadastrado valida a "sala" da requisição, mas
+// não tem relação nenhuma com qual preset é afetado por nome. Isso incluía
+// o preset padrão (padrao = 1), usado como fallback por toda sala sem
+// preset próprio, tornando qualquer dispositivo capaz de alterar o
+// controle de TODAS as salas não vinculadas a um preset customizado.
+// Agora a identidade do preset a ser alterado vem do presetId já
+// associado à própria sala do dispositivo (presetIdAtual), nunca de uma
+// busca por nome global; se a sala ainda usa o preset padrão (ou o
+// presetId não existe mais), um preset novo e exclusivo é criado para ela.
+function sincronizarPresetDaSala({ presetIdAtual, nome, funcoes }) {
   if (!nome || !nome.trim()) throw new Error("informe o nome do preset");
   if (!Array.isArray(funcoes) || funcoes.length === 0) throw new Error("informe ao menos uma função");
 
-  let preset = buscarPorNome(nome.trim());
-  if (!preset) {
-    const info = db.prepare(`INSERT INTO presets (nome, padrao) VALUES (?, 0)`).run(nome.trim());
-    preset = { id: info.lastInsertRowid };
+  const existente = presetIdAtual ? db.prepare(`SELECT * FROM presets WHERE id = ?`).get(presetIdAtual) : null;
+  let presetId;
+  if (existente && !existente.padrao) {
+    presetId = existente.id;
+    const colisao = buscarPorNome(nome.trim());
+    // Só renomeia se o nome não pertencer a OUTRO preset já existente;
+    // colidir aqui não pode disparar um UPDATE cruzado nem uma falha de
+    // constraint — mantém o nome atual e segue apenas atualizando funções.
+    if (!colisao || colisao.id === presetId) {
+      db.prepare(`UPDATE presets SET nome = ? WHERE id = ?`).run(nome.trim(), presetId);
+    }
+  } else {
+    // Sala ainda sem preset próprio (usa o padrão) ou presetId órfão:
+    // cria um preset novo e exclusivo para esta sala em vez de reaproveitar
+    // (por nome) um preset que pode já pertencer a outra sala.
+    let nomeFinal = nome.trim();
+    let sufixo = 2;
+    while (buscarPorNome(nomeFinal)) {
+      nomeFinal = `${nome.trim()} (${sufixo})`;
+      sufixo += 1;
+    }
+    const info = db.prepare(`INSERT INTO presets (nome, padrao) VALUES (?, 0)`).run(nomeFinal);
+    presetId = info.lastInsertRowid;
   }
 
   for (const f of funcoes) {
     const { chave, rotulo, tipo, opcoes } = validarFuncao(f);
-    const existente = db.prepare(`SELECT id FROM preset_funcoes WHERE presetId = ? AND chave = ?`).get(preset.id, chave);
-    if (existente) {
+    const funcaoExistente = db.prepare(`SELECT id FROM preset_funcoes WHERE presetId = ? AND chave = ?`).get(presetId, chave);
+    if (funcaoExistente) {
       db.prepare(`UPDATE preset_funcoes SET rotulo = ?, tipo = ?, opcoes = ? WHERE id = ?`)
-        .run(rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, existente.id);
+        .run(rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, funcaoExistente.id);
     } else {
       db.prepare(`INSERT INTO preset_funcoes (presetId, chave, rotulo, tipo, opcoes, ordem) VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(preset.id, chave, rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, f.ordem || 0);
+        .run(presetId, chave, rotulo, tipo, opcoes ? JSON.stringify(opcoes) : null, f.ordem || 0);
     }
   }
 
-  return buscarPorId(preset.id);
+  return buscarPorId(presetId);
 }
 
 function seedPresetPadrao(limitesTemperatura) {
@@ -209,7 +242,7 @@ module.exports = {
   adicionarFuncao,
   atualizarFuncao,
   removerFuncao,
-  criarOuAtualizarViaDispositivo,
+  sincronizarPresetDaSala,
   seedPresetPadrao,
   presetPadrao,
   POSICOES_VALIDAS,
