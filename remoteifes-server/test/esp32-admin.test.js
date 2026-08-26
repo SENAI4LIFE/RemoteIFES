@@ -10,6 +10,7 @@ const db = require("../src/config/database");
 const app = require("../src/app");
 const statusHub = require("../src/services/statusHub");
 const deviceHub = require("../src/services/deviceHub");
+const salasService = require("../src/services/salasService");
 const usuariosService = require("../src/services/usuariosService");
 const tokenService = require("../src/services/tokenService");
 
@@ -126,19 +127,18 @@ test("dispositivo conecta via WS, envia telemetria, e recebe comandos retransmit
   const token = await tokenSuperAdmin();
   const respEntrarConfig = await authFetch("/admin/esp32/teste-esp32-online/entrar-config", token, {
     method: "POST",
-    body: JSON.stringify({ senha: "admin1234" }),
   });
   assert.equal(respEntrarConfig.status, 200);
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   const recebidoPeloDispositivo = mensagens.find((m) => m.tipo === "enter_config");
   assert.ok(recebidoPeloDispositivo, "o dispositivo deve receber o comando enter_config retransmitido");
-  assert.equal(recebidoPeloDispositivo.senha, "admin1234");
+  assert.equal(Object.prototype.hasOwnProperty.call(recebidoPeloDispositivo, "senha"), false);
 
   ws.close();
 });
 
-test("rota de entrar-config exige senha mesmo com dispositivo conectado", async () => {
+test("rota de entrar-config não exige senha do dispositivo", async () => {
   novaSalaComMac("teste-esp32-sem-senha", "AA:BB:CC:DD:EE:03");
 
   const ws = new WebSocket(baseWsDispositivoUrl, {
@@ -157,6 +157,52 @@ test("rota de entrar-config exige senha mesmo com dispositivo conectado", async 
     method: "POST",
     body: JSON.stringify({}),
   });
-  assert.equal(resp.status, 400);
+  assert.equal(resp.status, 200);
   ws.close();
+});
+
+test("início de agendamento envia um único estado IR final", async () => {
+  novaSalaComMac("teste-agendamento-ir", "AA:BB:CC:DD:EE:04");
+  db.prepare(`UPDATE salas SET irProtocolo = 5 WHERE sala = ?`).run("teste-agendamento-ir");
+  const ws = new WebSocket(baseWsDispositivoUrl, {
+    headers: {
+      "x-device-sala": "teste-agendamento-ir",
+      "x-device-mac": "AA:BB:CC:DD:EE:04",
+    },
+  });
+  const mensagens = [];
+  ws.on("message", (dados) => mensagens.push(JSON.parse(dados.toString())));
+  await new Promise((resolve, reject) => {
+    ws.once("open", resolve);
+    ws.once("error", reject);
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const quantidadeAntes = mensagens.length;
+
+  salasService.aplicarInicioAgendamento("teste-agendamento-ir", 24);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  const novosEstados = mensagens.slice(quantidadeAntes).filter((msg) => msg.tipo === "send_known_state");
+  assert.equal(novosEstados.length, 1);
+  assert.equal(novosEstados[0].power, true);
+  assert.equal(novosEstados[0].temp, 24);
+  ws.close();
+});
+
+test("alterar o vínculo MAC encerra a conexão antiga", async () => {
+  novaSalaComMac("teste-mac-revogado", "AA:BB:CC:DD:EE:05");
+  const ws = new WebSocket(baseWsDispositivoUrl, {
+    headers: {
+      "x-device-sala": "teste-mac-revogado",
+      "x-device-mac": "AA:BB:CC:DD:EE:05",
+    },
+  });
+  await new Promise((resolve, reject) => {
+    ws.once("open", resolve);
+    ws.once("error", reject);
+  });
+  const fechado = new Promise((resolve) => ws.once("close", resolve));
+  salasService.cadastrarMac("teste-mac-revogado", "AA:BB:CC:DD:EE:06");
+  await fechado;
+  assert.equal(deviceHub.dispositivoConectado("teste-mac-revogado"), false);
 });

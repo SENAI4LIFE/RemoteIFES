@@ -13,6 +13,7 @@ const Schedule = {
   async aoAbrir() {
     agendaDataInput.value = Tempo.dataAtualBrasiliaISO().split("-").reverse().join("/");
     await this.carregarSalas();
+    await this.atualizarLimitesTemperatura();
     await this.carregarAgendamentos();
   },
 
@@ -24,6 +25,20 @@ const Schedule = {
       .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))} — ${escapeHtml(s.nome)}</option>`)
       .join("");
     agendaSalaSelect.dataset.carregado = "1";
+  },
+
+  async atualizarLimitesTemperatura() {
+    if (!agendaSalaSelect.value) return;
+    const status = await Api.statusSala(agendaSalaSelect.value);
+    const minima = Number(status.temperaturaMinima);
+    const maxima = Number(status.temperaturaMaxima);
+    if (!Number.isFinite(minima) || !Number.isFinite(maxima)) return;
+    const input = document.getElementById("agendaTemperatura");
+    input.min = String(minima);
+    input.max = String(maxima);
+    const atual = Number(input.value);
+    if (!Number.isFinite(atual) || atual < minima || atual > maxima) input.value = String(minima);
+    document.getElementById("agendaTemperaturaLimites").textContent = `Limite efetivo desta sala: ${minima} °C a ${maxima} °C.`;
   },
 
   async carregarAgendamentos() {
@@ -75,7 +90,10 @@ const Schedule = {
   },
 };
 
-agendaSalaSelect.addEventListener("change", () => Schedule.carregarAgendamentos());
+agendaSalaSelect.addEventListener("change", async () => {
+  await Schedule.atualizarLimitesTemperatura();
+  await Schedule.carregarAgendamentos();
+});
 
 document.querySelectorAll('input[name="agendaModo"]').forEach((radio) => {
   radio.addEventListener("change", () => {

@@ -107,13 +107,13 @@ fi
 if [ -f data/remoteifes.db ]; then
   echo
   echo "Aviso: já existe um banco em data/remoteifes.db neste clone (provavelmente veio commitado no repositório)."
-  echo "Isso significa que o usuário admin já foi criado antes e a senha inicial NÃO será impressa novamente."
-  echo "Para definir uma nova senha para o admin sem apagar salas/MACs/presets já cadastrados, rode: npm run reset-admin"
+  echo "Isso significa que o usuário admin já foi criado antes e sua senha atual será preservada."
+  echo "Para definir uma nova senha para o admin sem apagar salas, MACs ou configurações, rode: npm run reset-admin"
 fi
 
 echo
 echo "Setup concluído."
-echo "O banco de dados SQLite é criado e populado automaticamente (usuário admin, salas e preset padrão) na primeira vez que o servidor iniciar."
+echo "O banco de dados SQLite é criado e populado automaticamente (admin/admin, salas e configurações padrão) na primeira vez que o servidor iniciar."
 echo "Para iniciar o servidor: npm start"
 echo "Para manter o servidor rodando permanentemente (Raspberry Pi ou qualquer Linux com systemd): sudo bash install-service.sh"
 echo "Esqueceu ou perdeu a senha do admin? npm run reset-admin"

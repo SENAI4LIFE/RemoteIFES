@@ -1,4 +1,4 @@
-const { aplicarComando, verificarTimeouts, agendamentoOcorreHoje } = require("../services/salasService");
+const { aplicarComando, aplicarInicioAgendamento, verificarTimeouts, agendamentoOcorreHoje } = require("../services/salasService");
 const {
   listarAtivosParaAgendador,
   registrarExecucao,
@@ -6,6 +6,7 @@ const {
 } = require("../services/agendamentosService");
 const { encerrarSessoesAbandonadas } = require("../services/tokenService");
 const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
+const logger = require("../utils/logger");
 
 const VERIFICACAO_MS = 60 * 1000;
 const VERIFICACAO_TIMEOUT_MS = 30 * 1000;
@@ -16,21 +17,23 @@ function verificarAgendamentos() {
   const dataISO = dataAtualBrasiliaISO();
 
   for (const ag of listarAtivosParaAgendador()) {
-    if (!agendamentoOcorreHoje(ag, dataISO)) continue;
+    try {
+      if (!agendamentoOcorreHoje(ag, dataISO)) continue;
+      if (ag.modo === "reserva") continue;
 
-    if (ag.modo === "reserva") continue;
+      const inicioLigar = ag.modo === "ligar_intervalo" ? ag.ligarInicio : ag.horaInicio;
+      const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
 
-    const inicioLigar = ag.modo === "ligar_intervalo" ? ag.ligarInicio : ag.horaInicio;
-    const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
-
-    if (hora >= inicioLigar && hora <= fimLigar && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
-      aplicarComando(ag.sala, "ligar", undefined, { usuario: null, origem: "agendamento" });
-      aplicarComando(ag.sala, "temperatura", ag.temperatura, { usuario: null, origem: "agendamento" });
-      registrarExecucao(ag.id, "ligar");
-    }
-    if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO)) {
-      aplicarComando(ag.sala, "desligar", undefined, { usuario: null, origem: "agendamento" });
-      registrarExecucao(ag.id, "desligar");
+      if (hora >= inicioLigar && hora <= fimLigar && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
+        aplicarInicioAgendamento(ag.sala, ag.temperatura);
+        registrarExecucao(ag.id, "ligar");
+      }
+      if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO)) {
+        aplicarComando(ag.sala, "desligar", undefined, { usuario: null, origem: "agendamento" });
+        registrarExecucao(ag.id, "desligar");
+      }
+    } catch (erro) {
+      logger.error("agendamento-falhou", { agendamentoId: ag.id, sala: ag.sala, mensagem: erro.message });
     }
   }
 }

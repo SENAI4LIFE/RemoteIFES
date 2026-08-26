@@ -22,15 +22,13 @@
     <h2>RemoteIFES Setup</h2>
     <div class="info-box">
       <strong>Modo Ponto de Acesso (AP)</strong><br>
-      Conecte o modulo a rede Wi-Fi local e defina a senha de administracao do dispositivo. Apos salvar, o ESP32 tentara se conectar e estara disponivel na sua rede.
+      Conecte o modulo a rede Wi-Fi local. Apos salvar, o ESP32 tentara se conectar e estara disponivel na sua rede. A sala e identificada pelo endereco MAC do modulo, vinculado no aplicativo web pelo administrador principal.
     </div>
     <form action="/save" method="POST">
       <label for="ssid">Nome da Rede Wi-Fi (SSID):</label>
       <input type="text" id="ssid" name="ssid" placeholder="Ex: IFES-SALA101" required>
       <label for="pass">Senha da rede Wi-Fi:</label>
       <input type="password" id="pass" name="pass" placeholder="Sua senha de Wi-Fi">
-      <label for="sala">Codigo da sala (cadastrado no servidor):</label>
-      <input type="text" id="sala" name="sala" placeholder="Ex: A101" required>
       <label for="host">Endereco do servidor RemoteIFES:</label>
       <input type="text" id="host" name="host" placeholder="Ex: 192.168.0.10" required>
       <label for="porta">Porta do servidor:</label>
@@ -41,9 +39,6 @@
         <option value="inseguro">HTTPS sem validar certificado (rede local, certificado autoassinado)</option>
         <option value="off">HTTP sem criptografia (apenas rede local confiavel)</option>
       </select>
-      <label for="adminSenha">Senha de administracao do dispositivo:</label>
-      <input type="password" id="adminSenha" name="adminSenha" placeholder="minimo de 6 caracteres" minlength="6" required>
-      <p class="hint">Esta senha e exigida sempre que um superadministrador precisar entrar no modo de configuracao deste ESP32 pelo aplicativo web (aprendizado de controles, testes de infravermelho, reset de Wi-Fi).</p>
       <button type="submit">Salvar e Conectar</button>
     </form>
   </div>

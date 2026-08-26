@@ -131,9 +131,9 @@ const HelpContent = {
       { titulo: "Buscar sala", texto: "Digite o número ou o nome da sala para filtrar a lista rapidamente." },
       { titulo: "Detectados na rede", texto: "ESP32 que já entraram em contato com o servidor mas ainda não estão vinculados a nenhuma sala." },
       { titulo: "Vincular à sala", texto: "Associe um ESP32 (pelo endereço MAC) à sala onde ele está instalado." },
-      { titulo: "Preset", texto: "Escolha qual conjunto de funções do ar-condicionado (temperatura, velocidade, modo etc.) a sala usa." },
+      { titulo: "Limites por sala", texto: "Deixe em branco para herdar cada limite global ou informe uma mínima, uma máxima, ou ambas para esta sala." },
       { titulo: "Acesso por sala", texto: "Defina quais usuários podem controlar cada sala." },
-      { titulo: "Permissão", texto: "Apenas o administrador principal pode alterar o MAC ou o preset de uma sala." },
+      { titulo: "Permissão", texto: "Apenas o administrador principal pode alterar o MAC ou os limites de uma sala." },
     ],
   },
   propriedade: {
@@ -144,15 +144,6 @@ const HelpContent = {
       { titulo: "Revogar acesso", texto: "Remove o controle concedido anteriormente a um usuário." },
       { titulo: "Sem restrição ativa", texto: "Se a sala não estiver com o controle restrito, todos que já podem controlar salas conseguem operá-la; peça a um administrador para restringir." },
       { titulo: "Sua permissão", texto: "É uma função de baixo nível: você não tem acesso às demais funções administrativas, e um administrador pode remover sua permissão a qualquer momento." },
-    ],
-  },
-  presets: {
-    titulo: "Como usar: Presets",
-    itens: [
-      { titulo: "Preset padrão", texto: "Possui apenas a função de temperatura e não pode ser removido." },
-      { titulo: "Novas funções", texto: "Velocidade, oscilação, modo turbo etc. são cadastradas aqui mesmo, escolhendo uma chave, um rótulo e o tipo de função." },
-      { titulo: "Remover função", texto: "Remove apenas aquela função do preset; as demais continuam disponíveis." },
-      { titulo: "Remover preset", texto: "As salas que o utilizavam voltam automaticamente para o preset padrão." },
     ],
   },
   config: {
@@ -168,9 +159,10 @@ const HelpContent = {
     itens: [
       { titulo: "O que é", texto: "Acesso direto às funções avançadas de cada ESP32, antes disponíveis apenas na página local do dispositivo. Visível apenas ao administrador principal." },
       { titulo: "Conexão", texto: "Mostra separadamente se o dispositivo está online na rede Wi-Fi e se está conectado ao servidor." },
-      { titulo: "Entrar em modo de configuração", texto: "Exige a senha de administração cadastrada no próprio ESP32 (definida durante a configuração do ponto de acesso)." },
+      { titulo: "Entrar em modo de configuração", texto: "Disponível ao administrador principal quando o ESP32 está conectado ao servidor." },
       { titulo: "Modo clonagem", texto: "Só disponível em modo de configuração; permite capturar sinais infravermelhos de um controle remoto original." },
       { titulo: "Capturas", texto: "Sinais capturados aparecem em tempo real; use \"testar\" para reenviar um sinal e confirmar que ele controla o aparelho." },
+      { titulo: "Protocolo IR", texto: "Ao capturar um protocolo conhecido, salve-o para que os comandos do painel sejam transmitidos ao ar-condicionado." },
       { titulo: "Sair do modo de configuração", texto: "Devolve o dispositivo ao funcionamento normal (modo operação)." },
       { titulo: "Resetar Wi-Fi", texto: "Apaga as credenciais de rede salvas no dispositivo e o reinicia em modo de ponto de acesso, para reconfiguração." },
     ],

@@ -11,11 +11,11 @@ let wss = null;
 
 function autenticar(req) {
   const sala = req.headers["x-device-sala"];
-  const mac = req.headers["x-device-mac"] || null;
-  if (!sala || typeof sala !== "string") return null;
+  const mac = req.headers["x-device-mac"];
+  if (!sala || typeof sala !== "string" || !mac || typeof mac !== "string") return null;
 
   const salaRow = salasService.buscar(sala);
-  if (salaRow && !salasService.macCorrespondeASala(salaRow, mac)) return null;
+  if (!salaRow || !salasService.macCorrespondeASala(salaRow, mac)) return null;
 
   return { sala, mac };
 }
@@ -48,13 +48,27 @@ function listarEstados() {
 function enviarComando(sala, payload) {
   const entrada = conexoes.get(sala);
   if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN) return false;
+  const salaRow = salasService.buscar(sala);
+  if (!salaRow || !salasService.macCorrespondeASala(salaRow, entrada.mac)) {
+    entrada.ws.close(4001, "vínculo MAC alterado");
+    return false;
+  }
   entrada.ws.send(JSON.stringify(payload));
   return true;
 }
 
 function dispositivoConectado(sala) {
   const entrada = conexoes.get(sala);
-  return !!(entrada && entrada.ws.readyState === entrada.ws.OPEN);
+  if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN) return false;
+  const salaRow = salasService.buscar(sala);
+  return !!(salaRow && salasService.macCorrespondeASala(salaRow, entrada.mac));
+}
+
+function desconectarSala(sala) {
+  const entrada = conexoes.get(sala);
+  if (!entrada) return false;
+  entrada.ws.close(4001, "vínculo MAC alterado");
+  return true;
 }
 
 function registrarTelemetria(sala, entrada, msg) {
@@ -152,8 +166,15 @@ function iniciar(server) {
     }
     logger.info("device-ws-conectado", { sala, mac, ip });
     eventos.emit("conexao", { sala, conectado: true });
+    const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
+    if (comandoInicial) ws.send(JSON.stringify(comandoInicial));
 
     ws.on("message", (dados) => {
+      const salaAtual = salasService.buscar(sala);
+      if (!salaAtual || !salasService.macCorrespondeASala(salaAtual, entrada.mac)) {
+        ws.close(4001, "vínculo MAC alterado");
+        return;
+      }
       entrada.ultimaAtividadeEm = new Date().toISOString();
       let msg;
       try {
@@ -167,11 +188,18 @@ function iniciar(server) {
         registrarTelemetria(sala, entrada, msg);
       } else if (msg.tipo === "captura") {
         registrarCaptura(sala, entrada, msg);
+      } else if (msg.tipo === "acesso") {
+        salasService.registrarAcessoEsp(sala, {
+          ip: typeof msg.ip === "string" ? msg.ip : entrada.ip,
+          userAgent: typeof msg.userAgent === "string" ? msg.userAgent.slice(0, 500) : null,
+        });
+      } else if (msg.tipo === "comando") {
+        if (typeof msg.cmd === "string" && msg.cmd.length <= 100) {
+          salasService.registrarComandoDispositivo(sala, msg.cmd, msg.valor);
+        }
       } else if (msg.tipo === "modo_alterado") {
         entrada.modo = typeof msg.modo === "string" ? msg.modo : entrada.modo;
         eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
-      } else if (msg.tipo === "enter_config_negado") {
-        eventos.emit("erro", { sala, mensagem: "senha de administração do dispositivo inválida" });
       }
     });
 
@@ -206,4 +234,5 @@ module.exports = {
   listarEstados,
   enviarComando,
   dispositivoConectado,
+  desconectarSala,
 };

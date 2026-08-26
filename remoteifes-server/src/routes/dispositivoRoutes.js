@@ -1,6 +1,5 @@
 const express = require("express");
 const salasService = require("../services/salasService");
-const presetsService = require("../services/presetsService");
 const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
@@ -13,16 +12,29 @@ function exigirMacDaSalaSeCadastrado(req, res, next) {
   if (!sala || typeof sala !== "string") return next();
 
   const salaRow = salasService.buscar(sala);
-  if (!salaRow) return next();
+  if (!salaRow) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
 
-  const macInformado = req.headers["x-device-mac"];
+  const macInformado = req.headers["x-device-mac"] || req.body?.mac;
   if (!salasService.macCorrespondeASala(salaRow, macInformado)) {
     return res.status(403).json({ ok: false, erro: "MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala" });
   }
   next();
 }
 
-router.post("/dispositivo/heartbeat", (req, res) => {
+router.post("/dispositivo/identificar", (req, res) => {
+  try {
+    const ip = typeof req.body?.ip === "string" && req.body.ip ? req.body.ip : req.ip;
+    const sala = salasService.identificarDispositivo(req.body?.mac, ip);
+    if (!sala) {
+      return res.status(202).json({ ok: true, pendente: true, mensagem: "dispositivo aguardando vinculação por MAC" });
+    }
+    res.json({ ok: true, sala: sala.sala, nome: sala.nome });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.post("/dispositivo/heartbeat", exigirMacDaSalaSeCadastrado, (req, res) => {
   const { sala, ligado, temperatura, mac, ip } = req.body;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -41,9 +53,6 @@ router.post("/dispositivo/heartbeat", (req, res) => {
 
     const ipReportado = typeof ip === "string" && ip ? ip : req.ip;
     const resultado = salasService.heartbeatDispositivo(sala, estadoReportado, mac, ipReportado);
-    if (resultado.pendente) {
-      return res.status(202).json({ ok: true, pendente: true, mensagem: "sala não cadastrada; dispositivo detectado e aguardando vinculação pelo administrador" });
-    }
     res.json({ ok: true, sala: resultado });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
@@ -80,42 +89,6 @@ router.post("/dispositivo/comando", exigirMacDaSalaSeCadastrado, (req, res) => {
   try {
     salasService.registrarComandoDispositivo(sala, cmd, valor);
     res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ ok: false, erro: err.message });
-  }
-});
-
-router.get("/dispositivo/preset", exigirMacDaSalaSeCadastrado, (req, res) => {
-  const { sala } = req.query;
-  if (!sala || typeof sala !== "string") {
-    return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
-  }
-  const salaRow = salasService.buscar(sala);
-  if (!salaRow) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
-
-  const preset = salaRow.presetId
-    ? presetsService.buscarPorId(salaRow.presetId)
-    : presetsService.presetPadrao();
-
-  res.json({ ok: true, preset });
-});
-
-router.post("/dispositivo/preset", exigirMacDaSalaSeCadastrado, (req, res) => {
-  const { nome, funcoes, sala } = req.body || {};
-  if (!sala || typeof sala !== "string") {
-    return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
-  }
-  const salaRow = salasService.buscar(sala);
-  if (!salaRow) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
-
-  try {
-    const preset = presetsService.sincronizarPresetDaSala({
-      presetIdAtual: salaRow.presetId || null,
-      nome,
-      funcoes,
-    });
-    salasService.definirPreset(sala, preset.id);
-    res.json({ ok: true, preset });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
   }

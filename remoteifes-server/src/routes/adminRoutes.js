@@ -4,7 +4,6 @@ const usuariosService = require("../services/usuariosService");
 const salasService = require("../services/salasService");
 const tokenService = require("../services/tokenService");
 const configuracoesService = require("../services/configuracoesService");
-const presetsService = require("../services/presetsService");
 const notificacoesService = require("../services/notificacoesService");
 
 const router = express.Router();
@@ -179,7 +178,8 @@ router.get("/admin/salas", (req, res) => {
       ligado: !!s.ligado,
       ipEsp32: s.ipEsp32,
       mac: s.mac,
-      presetId: s.presetId,
+      temperaturaMinima: s.temperaturaMinima,
+      temperaturaMaxima: s.temperaturaMaxima,
       acessoRestrito: !!s.acessoRestrito,
     }))
   );
@@ -282,9 +282,9 @@ router.patch("/admin/salas/:sala/mac", exigirSuperAdmin, (req, res) => {
   }
 });
 
-router.patch("/admin/salas/:sala/preset", exigirSuperAdmin, (req, res) => {
+router.patch("/admin/salas/:sala/limites-temperatura", exigirSuperAdmin, (req, res) => {
   try {
-    const sala = salasService.definirPreset(req.params.sala, req.body.presetId);
+    const sala = salasService.definirLimitesTemperatura(req.params.sala, req.body || {});
     res.json({ ok: true, sala });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
@@ -298,59 +298,6 @@ router.get("/admin/salas/:sala/acessar-esp32", exigirSuperAdmin, (req, res) => {
     return res.status(404).json({ ok: false, erro: "esta sala ainda não reportou um IP de ESP32" });
   }
   res.json({ ok: true, sala: sala.sala, ip: sala.ipEsp32, url: `http://${sala.ipEsp32}/` });
-});
-
-router.get("/admin/presets", (req, res) => {
-  res.json(presetsService.listar());
-});
-
-router.get("/admin/presets/posicoes", exigirSuperAdmin, (req, res) => {
-  res.json(presetsService.POSICOES_VALIDAS);
-});
-
-router.post("/admin/presets", exigirSuperAdmin, (req, res) => {
-  try {
-    const preset = presetsService.criar(req.body || {});
-    res.json({ ok: true, preset });
-  } catch (err) {
-    res.status(400).json({ ok: false, erro: err.message });
-  }
-});
-
-router.delete("/admin/presets/:id", exigirSuperAdmin, (req, res) => {
-  try {
-    presetsService.remover(Number(req.params.id));
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ ok: false, erro: err.message });
-  }
-});
-
-router.post("/admin/presets/:id/funcoes", exigirSuperAdmin, (req, res) => {
-  try {
-    const preset = presetsService.adicionarFuncao(Number(req.params.id), req.body || {});
-    res.json({ ok: true, preset });
-  } catch (err) {
-    res.status(400).json({ ok: false, erro: err.message });
-  }
-});
-
-router.patch("/admin/presets/funcoes/:funcaoId", exigirSuperAdmin, (req, res) => {
-  try {
-    const preset = presetsService.atualizarFuncao(Number(req.params.funcaoId), req.body || {});
-    res.json({ ok: true, preset });
-  } catch (err) {
-    res.status(400).json({ ok: false, erro: err.message });
-  }
-});
-
-router.delete("/admin/presets/funcoes/:funcaoId", exigirSuperAdmin, (req, res) => {
-  try {
-    const preset = presetsService.removerFuncao(Number(req.params.funcaoId));
-    res.json({ ok: true, preset });
-  } catch (err) {
-    res.status(400).json({ ok: false, erro: err.message });
-  }
 });
 
 router.get("/admin/notificacoes", (req, res) => {
