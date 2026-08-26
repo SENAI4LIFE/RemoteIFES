@@ -3,12 +3,11 @@ const db = require("../config/database");
 const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 const configuracoesService = require("./configuracoesService");
 const notificacoesService = require("./notificacoesService");
-const presetsService = require("./presetsService");
 const logger = require("../utils/logger");
 
 const eventos = new EventEmitter();
 
-const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura"];
+const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura", "turbo"];
 const TIMEOUT_OFFLINE_MS = 90 * 1000;
 
 function listar({ bloco, andar } = {}) {
@@ -30,44 +29,9 @@ function buscar(sala) {
   return db.prepare("SELECT * FROM salas WHERE sala = ?").get(sala);
 }
 
-function presetDaSala(salaRow) {
-  return salaRow.presetId ? presetsService.buscarPorId(salaRow.presetId) : presetsService.presetPadrao();
-}
-
-function funcoesEstadoDaSala(salaRow) {
-  try {
-    return salaRow.funcoesEstado ? JSON.parse(salaRow.funcoesEstado) : {};
-  } catch (err) {
-    return {};
-  }
-}
-
-function funcaoDaSalaPorChave(salaRow, chave) {
-  const preset = presetDaSala(salaRow);
-  if (!preset) return null;
-  return preset.funcoes.find((f) => f.chave === chave) || null;
-}
-
-function validarValorFuncao(funcao, valor) {
-  if (funcao.tipo === "booleano") {
-    if (typeof valor !== "boolean") throw new Error(`valor de "${funcao.rotulo}" deve ser verdadeiro ou falso`);
-    return valor;
-  }
-  if (funcao.tipo === "selecao") {
-    const opcoes = Array.isArray(funcao.opcoes) ? funcao.opcoes : null;
-    if (opcoes && opcoes.length > 0) {
-      if (!opcoes.includes(valor)) throw new Error(`valor inválido para "${funcao.rotulo}"`);
-      return valor;
-    }
-    if (typeof valor !== "boolean") throw new Error(`valor de "${funcao.rotulo}" deve ser verdadeiro ou falso`);
-    return valor;
-  }
-  const numero = Number(valor);
-  if (Number.isNaN(numero)) throw new Error(`valor de "${funcao.rotulo}" deve ser numérico`);
-  const opcoes = funcao.opcoes && typeof funcao.opcoes === "object" ? funcao.opcoes : {};
-  if (Number.isFinite(opcoes.min) && numero < opcoes.min) throw new Error(`valor de "${funcao.rotulo}" deve ser maior ou igual a ${opcoes.min}`);
-  if (Number.isFinite(opcoes.max) && numero > opcoes.max) throw new Error(`valor de "${funcao.rotulo}" deve ser menor ou igual a ${opcoes.max}`);
-  return numero;
+function normalizarMac(mac) {
+  const macLimpo = mac ? String(mac).trim().toUpperCase() : "";
+  return /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(macLimpo) ? macLimpo : null;
 }
 
 function registrarEventoEsp(sala, status) {
@@ -75,9 +39,8 @@ function registrarEventoEsp(sala, status) {
 }
 
 function registrarDeteccaoEsp(mac, ip, sala = null) {
-  if (!mac) return;
-  const macLimpo = String(mac).trim().toUpperCase();
-  if (!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(macLimpo)) return;
+  const macLimpo = normalizarMac(mac);
+  if (!macLimpo) return;
 
   const existente = db.prepare(`SELECT mac FROM esp_detectados WHERE mac = ?`).get(macLimpo);
   if (existente) {
@@ -90,6 +53,14 @@ function registrarDeteccaoEsp(mac, ip, sala = null) {
       INSERT INTO esp_detectados (mac, ip, sala) VALUES (?, ?, ?)
     `).run(macLimpo, ip || null, sala);
   }
+}
+
+function identificarDispositivo(mac, ip) {
+  const macLimpo = normalizarMac(mac);
+  if (!macLimpo) throw new Error("MAC inválido (use o formato AA:BB:CC:DD:EE:FF)");
+  const salaRow = db.prepare(`SELECT * FROM salas WHERE mac = ?`).get(macLimpo);
+  registrarDeteccaoEsp(macLimpo, ip, salaRow ? salaRow.sala : null);
+  return salaRow || null;
 }
 
 function listarDetectados() {
@@ -108,17 +79,16 @@ function removerDetectado(mac) {
 }
 
 function heartbeatDispositivo(sala, estadoReportado, mac, ip) {
-  registrarDeteccaoEsp(mac, ip, sala);
   const salaRow = buscar(sala);
-  if (!salaRow) {
-    return { pendente: true };
-  }
+  if (!salaRow) throw new Error("sala não encontrada");
+  if (!macCorrespondeASala(salaRow, mac)) throw new Error("MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala");
+  registrarDeteccaoEsp(mac, ip, sala);
   return marcarOnline(sala, estadoReportado, mac, ip);
 }
 
 function macCorrespondeASala(salaRow, mac) {
-  if (!salaRow.mac || !mac) return true;
-  return salaRow.mac.toLowerCase() === String(mac).toLowerCase();
+  const macLimpo = normalizarMac(mac);
+  return !!salaRow?.mac && !!macLimpo && salaRow.mac.toUpperCase() === macLimpo;
 }
 
 function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null) {
@@ -159,8 +129,8 @@ function cadastrarMac(sala, mac) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
-  const macLimpo = mac ? String(mac).trim().toUpperCase() : null;
-  if (macLimpo && !/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(macLimpo)) {
+  const macLimpo = mac ? normalizarMac(mac) : null;
+  if (mac && !macLimpo) {
     throw new Error("MAC inválido (use o formato AA:BB:CC:DD:EE:FF)");
   }
 
@@ -170,6 +140,8 @@ function cadastrarMac(sala, mac) {
   }
 
   db.prepare(`UPDATE salas SET mac = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(macLimpo, sala);
+  const deviceHub = require("./deviceHub");
+  deviceHub.desconectarSala(sala);
   logger.info("sala-mac-cadastrado", { sala, mac: macLimpo });
   return buscar(sala);
 }
@@ -269,15 +241,40 @@ function usuarioPodeControlarSala(usuario, sala) {
   return usuarioTemAcessoSala(usuario.id, sala);
 }
 
-function definirPreset(sala, presetId) {
+function definirLimitesTemperatura(sala, { minima, maxima }) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
-  db.prepare(`UPDATE salas SET presetId = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(
-    presetId === null || presetId === undefined ? null : Number(presetId),
-    sala
-  );
-  return buscar(sala);
+  const { minima: minimaGlobal, maxima: maximaGlobal } = configuracoesService.limitesTemperatura();
+  const minimaFinal = minima === null || minima === undefined || minima === "" ? null : Number(minima);
+  const maximaFinal = maxima === null || maxima === undefined || maxima === "" ? null : Number(maxima);
+
+  if (minimaFinal !== null && (!Number.isFinite(minimaFinal) || minimaFinal < 16 || minimaFinal > 30)) {
+    throw new Error("temperatura mínima inválida (use um valor entre 16 e 30)");
+  }
+  if (maximaFinal !== null && (!Number.isFinite(maximaFinal) || maximaFinal < 16 || maximaFinal > 30)) {
+    throw new Error("temperatura máxima inválida (use um valor entre 16 e 30)");
+  }
+
+  const efetivaMin = minimaFinal !== null ? minimaFinal : minimaGlobal;
+  const efetivaMax = maximaFinal !== null ? maximaFinal : maximaGlobal;
+  if (efetivaMin >= efetivaMax) {
+    throw new Error("a temperatura mínima efetiva desta sala deve ser menor que a máxima");
+  }
+
+  const alvoAjustado = Math.max(efetivaMin, Math.min(efetivaMax, salaRow.temperaturaAlvo));
+  db.prepare(`
+    UPDATE salas
+    SET temperaturaMinima = ?, temperaturaMaxima = ?, temperaturaAlvo = ?, atualizadoEm = datetime('now')
+    WHERE sala = ?
+  `).run(minimaFinal, maximaFinal, alvoAjustado, sala);
+  db.prepare(`
+    UPDATE agendamentos SET temperatura = MAX(?, MIN(?, temperatura)) WHERE sala = ?
+  `).run(efetivaMin, efetivaMax, sala);
+  eventos.emit("mudanca");
+  const atualizada = buscar(sala);
+  enviarEstadoIRParaDispositivo(atualizada);
+  return atualizada;
 }
 
 function verificarTimeouts() {
@@ -351,7 +348,7 @@ function statusCompleto(sala, requisitante) {
     && bloqueio.usuarioId !== requisitante.id
     && !requisitante.isAdmin;
 
-  const preset = presetDaSala(salaRow);
+  const limites = configuracoesService.limitesEfetivosDaSala(salaRow);
 
   return {
     sala: salaRow.sala,
@@ -360,13 +357,11 @@ function statusCompleto(sala, requisitante) {
     ligado: !!salaRow.ligado,
     temperatura: salaRow.temperatura,
     temperaturaAlvo: salaRow.temperaturaAlvo,
-    temperaturaMinima: configuracoesService.limitesTemperatura().minima,
-    temperaturaMaxima: configuracoesService.limitesTemperatura().maxima,
+    temperaturaMinima: limites.minima,
+    temperaturaMaxima: limites.maxima,
+    turboAtivo: !!salaRow.turboAtivo,
     acessoRestrito: !!salaRow.acessoRestrito,
     podeControlarEsta: usuarioPodeControlarSala(requisitante, sala),
-    presetId: preset ? preset.id : null,
-    funcoes: preset ? preset.funcoes.filter((f) => f.chave !== "temperatura") : [],
-    funcoesEstado: funcoesEstadoDaSala(salaRow),
     bloqueio: bloqueio
       ? {
           usuarioNome: bloqueio.usuarioNome,
@@ -386,13 +381,32 @@ function registrarLog({ usuario, sala, cmd, valor, origem }) {
   `).run(usuario || null, sala, cmd, valor === undefined ? null : String(valor), origem);
 }
 
+function comandoEstadoIR(salaAtualizada) {
+  if (!Number.isInteger(salaAtualizada?.irProtocolo)) return null;
+  const swing = configuracoesService.turboFuncaoExtra() === "swing" && !!salaAtualizada.turboAtivo;
+  return {
+    tipo: "send_known_state",
+    protocol: salaAtualizada.irProtocolo,
+    temp: salaAtualizada.temperaturaAlvo,
+    power: !!salaAtualizada.ligado,
+    turbo: !!salaAtualizada.turboAtivo,
+    fan: "",
+    swing,
+  };
+}
+
+function enviarEstadoIRParaDispositivo(salaAtualizada) {
+  const comando = comandoEstadoIR(salaAtualizada);
+  if (!comando) return;
+  const deviceHub = require("./deviceHub");
+  deviceHub.enviarComando(salaAtualizada.sala, comando);
+}
+
 function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
-  const comandoBase = COMANDOS_VALIDOS.includes(cmd);
-  const funcaoExtra = comandoBase ? null : funcaoDaSalaPorChave(salaRow, cmd);
-  if (!comandoBase && !funcaoExtra) {
+  if (!COMANDOS_VALIDOS.includes(cmd)) {
     throw new Error("comando inválido");
   }
 
@@ -410,19 +424,17 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   if (cmd === "ligar") {
     db.prepare(`UPDATE salas SET ligado = 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
   } else if (cmd === "desligar") {
-    db.prepare(`UPDATE salas SET ligado = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+    db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
   } else if (cmd === "temperatura") {
     const temp = Number(valor);
-    const { minima, maxima } = configuracoesService.limitesTemperatura();
-    if (Number.isNaN(temp) || temp < minima || temp > maxima) {
+    const { minima, maxima } = configuracoesService.limitesEfetivosDaSala(salaRow);
+    if (!Number.isFinite(temp) || temp < minima || temp > maxima) {
       throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
     }
     db.prepare(`UPDATE salas SET temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
-  } else if (funcaoExtra) {
-    const valorValidado = validarValorFuncao(funcaoExtra, valor);
-    const estadoAtual = funcoesEstadoDaSala(salaRow);
-    estadoAtual[cmd] = valorValidado;
-    db.prepare(`UPDATE salas SET funcoesEstado = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(JSON.stringify(estadoAtual), sala);
+  } else if (cmd === "turbo") {
+    if (typeof valor !== "boolean") throw new Error("turbo deve ser verdadeiro ou falso");
+    db.prepare(`UPDATE salas SET turboAtivo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(valor ? 1 : 0, sala);
   }
 
   registrarLog({
@@ -435,6 +447,7 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
 
   eventos.emit("mudanca");
   const salaAtualizada = buscar(sala);
+  enviarEstadoIRParaDispositivo(salaAtualizada);
 
   return {
     ...salaAtualizada,
@@ -484,6 +497,47 @@ function registrarComandoDispositivo(sala, cmd, valor) {
   });
 }
 
+function definirProtocoloIR(sala, protocolo) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+
+  const protocoloFinal = protocolo === null || protocolo === undefined ? null : Number(protocolo);
+  if (protocoloFinal !== null && (!Number.isInteger(protocoloFinal) || protocoloFinal < 0)) {
+    throw new Error("protocolo de infravermelho inválido");
+  }
+
+  db.prepare(`UPDATE salas SET irProtocolo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(protocoloFinal, sala);
+  const atualizada = buscar(sala);
+  enviarEstadoIRParaDispositivo(atualizada);
+  return atualizada;
+}
+
+function aplicarInicioAgendamento(sala, temperatura) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+  const temp = Number(temperatura);
+  const { minima, maxima } = configuracoesService.limitesEfetivosDaSala(salaRow);
+  if (!Number.isFinite(temp) || temp < minima || temp > maxima) {
+    throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
+  }
+
+  db.exec("BEGIN");
+  try {
+    db.prepare(`UPDATE salas SET ligado = 1, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
+    registrarLog({ usuario: null, sala, cmd: "ligar", valor: undefined, origem: "agendamento" });
+    registrarLog({ usuario: null, sala, cmd: "temperatura", valor: temp, origem: "agendamento" });
+    db.exec("COMMIT");
+  } catch (erro) {
+    db.exec("ROLLBACK");
+    throw erro;
+  }
+
+  const atualizada = buscar(sala);
+  eventos.emit("mudanca");
+  enviarEstadoIRParaDispositivo(atualizada);
+  return atualizada;
+}
+
 function registrarAcessoEsp(sala, { ip, userAgent } = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
@@ -526,6 +580,7 @@ module.exports = {
   bloqueioAtivo,
   agendamentoOcorreHoje,
   aplicarComando,
+  aplicarInicioAgendamento,
   listarLogs,
   apagarLogs,
   marcarOnline,
@@ -537,7 +592,10 @@ module.exports = {
   listarAcessosEsp,
   apagarAcessosEsp,
   cadastrarMac,
-  definirPreset,
+  identificarDispositivo,
+  comandoEstadoIR,
+  definirLimitesTemperatura,
+  definirProtocoloIR,
   definirAcessoRestrito,
   listarUsuariosComAcesso,
   concederAcesso,

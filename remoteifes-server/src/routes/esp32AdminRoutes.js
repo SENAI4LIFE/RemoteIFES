@@ -18,6 +18,7 @@ function montarLinhaDispositivo(salaRow) {
     mac: salaRow.mac,
     ipEsp32: salaRow.ipEsp32,
     online: !!salaRow.online,
+    irProtocolo: Number.isInteger(salaRow.irProtocolo) ? salaRow.irProtocolo : null,
     dispositivo: deviceHub.estadoPublico(salaRow.sala),
   };
 }
@@ -54,11 +55,7 @@ router.get("/admin/esp32/:sala/estado", exigirSalaCadastrada, (req, res) => {
 });
 
 router.post("/admin/esp32/:sala/entrar-config", exigirSalaCadastrada, exigirDispositivoConectado, (req, res) => {
-  const senha = req.body?.senha;
-  if (!senha || typeof senha !== "string") {
-    return res.status(400).json({ ok: false, erro: "senha de administração do dispositivo é obrigatória" });
-  }
-  enviarOuFalhar(res, req.params.sala, { tipo: "enter_config", senha });
+  enviarOuFalhar(res, req.params.sala, { tipo: "enter_config" });
 });
 
 router.post("/admin/esp32/:sala/sair-operacao", exigirSalaCadastrada, exigirDispositivoConectado, (req, res) => {
@@ -101,8 +98,9 @@ router.post("/admin/esp32/:sala/teste/estado", exigirSalaCadastrada, exigirDispo
   if (!Number.isInteger(protocol)) {
     return res.status(400).json({ ok: false, erro: "protocol inválido" });
   }
-  if (typeof temp !== "number" || !Number.isFinite(temp)) {
-    return res.status(400).json({ ok: false, erro: "temp inválido" });
+  const limites = require("../services/configuracoesService").limitesEfetivosDaSala(req.salaRow);
+  if (typeof temp !== "number" || !Number.isFinite(temp) || temp < limites.minima || temp > limites.maxima) {
+    return res.status(400).json({ ok: false, erro: `temp deve estar entre ${limites.minima} e ${limites.maxima}` });
   }
   if (fan !== undefined && !FAN_VALIDOS.includes(fan)) {
     return res.status(400).json({ ok: false, erro: `fan deve ser um de: ${FAN_VALIDOS.join(", ")}` });
@@ -116,6 +114,15 @@ router.post("/admin/esp32/:sala/teste/estado", exigirSalaCadastrada, exigirDispo
     fan: fan || "",
     swing: !!swing,
   });
+});
+
+router.post("/admin/esp32/:sala/protocolo-ir", exigirSalaCadastrada, (req, res) => {
+  try {
+    const sala = salasService.definirProtocoloIR(req.params.sala, req.body?.protocolo);
+    res.json({ ok: true, sala });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
 });
 
 router.post("/admin/esp32/:sala/reset-wifi", exigirSalaCadastrada, exigirDispositivoConectado, (req, res) => {

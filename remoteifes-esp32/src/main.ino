@@ -13,10 +13,7 @@
 #include <WiFiClientSecure.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
-#include <mbedtls/md.h>
-#include <mbedtls/base64.h>
 #include <string.h>
-#include "esp_random.h"
 
 #include "root_ca.h"
 
@@ -26,20 +23,23 @@
 #define IR_SEND_PIN 4
 
 #define CAPTURE_BUFFER_SIZE 1024
-#define TIMEOUT_US 50000
-#define HTTP_CLIENT_TIMEOUT_MS 5000
+#define IR_CAPTURE_TIMEOUT_MS 50
+#define HTTP_CLIENT_TIMEOUT_MS 2500
 #define MAX_RAW_IR_ENTRIES CAPTURE_BUFFER_SIZE
 
 const float AC_TEMP_MIN = 16.0;
 const float AC_TEMP_MAX = 30.0;
 
-const unsigned long SERVER_HEARTBEAT_INTERVAL = 7000;
-const unsigned long TELEMETRY_WS_INTERVAL = 5000;
+const unsigned long SERVER_HEARTBEAT_INTERVAL = 30000;
+const unsigned long TELEMETRY_WS_INTERVAL = 10000;
 const unsigned long SENSOR_READ_INTERVAL = 2500;
 const unsigned long WS_RECONNECT_INTERVAL_MS = 5000;
+const unsigned long IDENTIFICACAO_INTERVAL_MS = 60000;
+const unsigned long IDENTIFICACAO_PENDENTE_INTERVAL_MS = 15000;
+const unsigned long INTERVALO_RECONEXAO_WIFI_MS = 30000;
+const unsigned long INTERVALO_AP_RECUPERACAO_MS = 120000;
+const char SERVER_IDENTIFICACAO_PATH[] = "/dispositivo/identificar";
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
-const char SERVER_ACESSO_PATH[] = "/dispositivo/acesso";
-const char SERVER_COMANDO_PATH[] = "/dispositivo/comando";
 const char DEVICE_WS_PATH[] = "/ws/dispositivo";
 
 enum RuntimeMode {
@@ -76,13 +76,14 @@ DNSServer dnsServer;
 Preferences preferences;
 DHT dht(DHTPIN, DHTTYPE);
 
-IRrecv irrecv(IR_RECV_PIN, CAPTURE_BUFFER_SIZE, TIMEOUT_US, true);
+IRrecv irrecv(IR_RECV_PIN, CAPTURE_BUFFER_SIZE, IR_CAPTURE_TIMEOUT_MS, true);
 IRsend irsend(IR_SEND_PIN);
 IRac universalAC(IR_SEND_PIN);
 decode_results results;
 
 bool isCapturing = false;
 bool apModeActive = false;
+bool apRecuperacaoAtivo = false;
 RuntimeMode runtimeMode = RUNTIME_OPERATION;
 WifiState estadoWifi = WIFI_ESTADO_DESCONECTADO;
 ServerWsState estadoWsServidor = WS_ESTADO_DESCONECTADO;
@@ -97,28 +98,35 @@ float ultimaLeituraTemp = NAN;
 float ultimaLeituraHum = NAN;
 
 bool wifiConectadoAnteriormente = false;
-unsigned long wifiDesconectadoDesde = 0;
 unsigned long ultimaTentativaReconexao = 0;
-const unsigned long INTERVALO_RECONEXAO = 15000;
-const unsigned long TEMPO_MAXIMO_SEM_WIFI_PARA_REINICIAR = 300000;
+unsigned long wifiDesconectadoDesde = 0;
+unsigned long ultimaIdentificacao = 0;
+unsigned long reinicioAgendadoEm = 0;
+bool servicosOperacaoIniciados = false;
+bool wsConfigurado = false;
+String salaWsConfigurada;
 
 String salaId;
 String serverHost;
 int serverPort = 0;
 String tlsModo;
-String adminHash;
 unsigned long lastComandoAceito = 0;
 const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
 void startAPMode();
+void iniciarApRecuperacao();
+void encerrarApRecuperacao();
 void iniciarServicosOperacao();
 void handleRoot();
 void handleInfo();
+void handleSetup();
+void handleSaveSetup();
 void handleIRCapture();
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency);
 void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing);
 void atualizarLeituraSensores();
 String urlServidor(const char* path);
+int executarHttpPost(const String& url, const String& payload, String& resposta);
 bool sendHttpPost(const String& url, const String& payload);
 void sendHeartbeat();
 void reportAccess(const String& ip, const String& userAgent);
@@ -132,44 +140,8 @@ void processarComandoServidor(uint8_t* payload, size_t length);
 void enviarTelemetriaWs();
 void enviarModoAlterado();
 const char* modoAtualTexto();
-String sha256Hex(const String& texto);
-bool autenticadoAdmin();
-
-String sha256Hex(const String& texto) {
-  uint8_t hash[32];
-  mbedtls_md_context_t ctx;
-  mbedtls_md_init(&ctx);
-  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 0);
-  mbedtls_md_starts(&ctx);
-  mbedtls_md_update(&ctx, (const unsigned char*)texto.c_str(), texto.length());
-  mbedtls_md_finish(&ctx, hash);
-  mbedtls_md_free(&ctx);
-
-  char hex[65];
-  for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", hash[i]);
-  return String(hex);
-}
-
-bool autenticadoAdmin() {
-  if (adminHash.length() == 0) return false;
-  String authHeader = server.header("Authorization");
-  if (!authHeader.startsWith("Basic ")) return false;
-
-  String credenciaisBase64 = authHeader.substring(6);
-  unsigned char saida[128];
-  size_t tamanhoSaida = 0;
-  int resultado = mbedtls_base64_decode(saida, sizeof(saida) - 1, &tamanhoSaida,
-                                         (const unsigned char*)credenciaisBase64.c_str(), credenciaisBase64.length());
-  if (resultado != 0) return false;
-  saida[tamanhoSaida] = '\0';
-
-  String credenciais = String((char*)saida);
-  int separador = credenciais.indexOf(':');
-  if (separador < 0) return false;
-
-  String senha = credenciais.substring(separador + 1);
-  return sha256Hex(senha) == adminHash;
-}
+void identificarSalaNoServidor();
+void agendarReinicio(unsigned long esperaMs);
 
 void setup() {
   Serial.begin(115200);
@@ -186,38 +158,22 @@ void setup() {
   preferences.begin("remoteifes", false);
   String savedSSID = preferences.getString("ssid", "");
   String savedPASS = preferences.getString("pass", "");
-  salaId = preferences.getString("sala", "");
+  if (preferences.isKey("sala")) preferences.remove("sala");
+  if (preferences.isKey("adminHash")) preferences.remove("adminHash");
+  if (preferences.isKey("apPass")) preferences.remove("apPass");
+  salaId = "";
   serverHost = preferences.getString("host", "");
   serverPort = preferences.getInt("porta", 0);
   tlsModo = preferences.getString("tls", "off");
-  adminHash = preferences.getString("adminHash", "");
 
   if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
+    WiFi.persistent(false);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
-
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-      delay(500);
-      Serial.print(".");
-      attempts++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("\nWi-Fi Conectado!");
-      Serial.print("IP: ");
-      Serial.println(WiFi.localIP());
-      estadoWifi = WIFI_ESTADO_CONECTADO;
-      wifiConectadoAnteriormente = true;
-      apModeActive = false;
-      iniciarServicosOperacao();
-    } else {
-      Serial.println("\nFalha na conexao. Modo AP ativado.");
-      startAPMode();
-    }
+    apModeActive = false;
+    iniciarServicosOperacao();
   } else {
     startAPMode();
   }
@@ -227,9 +183,11 @@ void loop() {
   if (apModeActive) {
     dnsServer.processNextRequest();
     server.handleClient();
+    if (reinicioAgendadoEm != 0 && (long)(millis() - reinicioAgendadoEm) >= 0) ESP.restart();
     return;
   }
 
+  if (apRecuperacaoAtivo) dnsServer.processNextRequest();
   gerenciarConexaoWifi();
   server.handleClient();
   wsCliente.loop();
@@ -252,14 +210,26 @@ void loop() {
     enviarTelemetriaWs();
   }
 
-  if (agora - lastHeartbeat >= SERVER_HEARTBEAT_INTERVAL && estadoWifi == WIFI_ESTADO_CONECTADO) {
+  const unsigned long intervaloIdentificacao = salaId.length() > 0 ? IDENTIFICACAO_INTERVAL_MS : IDENTIFICACAO_PENDENTE_INTERVAL_MS;
+  if (estadoWifi == WIFI_ESTADO_CONECTADO && (ultimaIdentificacao == 0 || agora - ultimaIdentificacao >= intervaloIdentificacao)) {
+    ultimaIdentificacao = agora;
+    identificarSalaNoServidor();
+  }
+
+  if (agora - lastHeartbeat >= SERVER_HEARTBEAT_INTERVAL && estadoWifi == WIFI_ESTADO_CONECTADO && estadoWsServidor != WS_ESTADO_CONECTADO) {
     lastHeartbeat = agora;
     sendHeartbeat();
   }
+
+  if (reinicioAgendadoEm != 0 && (long)(agora - reinicioAgendadoEm) >= 0) ESP.restart();
 }
 
 bool configuracaoValida() {
-  return salaId.length() > 0 && serverHost.length() > 0 && serverPort > 0;
+  return serverHost.length() > 0 && serverPort > 0 && serverPort <= 65535;
+}
+
+void agendarReinicio(unsigned long esperaMs) {
+  reinicioAgendadoEm = millis() + esperaMs;
 }
 
 bool comandoPermitidoAgora() {
@@ -281,15 +251,16 @@ void gerenciarConexaoWifi() {
   unsigned long agora = millis();
 
   if (WiFi.status() == WL_CONNECTED) {
+    wifiDesconectadoDesde = 0;
+    if (apRecuperacaoAtivo) encerrarApRecuperacao();
     if (!wifiConectadoAnteriormente) {
       Serial.println("Wi-Fi reconectado.");
       Serial.print("IP: ");
       Serial.println(WiFi.localIP());
-      conectarWsServidor();
+      ultimaIdentificacao = 0;
     }
     wifiConectadoAnteriormente = true;
     estadoWifi = WIFI_ESTADO_CONECTADO;
-    wifiDesconectadoDesde = 0;
     return;
   }
 
@@ -298,100 +269,94 @@ void gerenciarConexaoWifi() {
 
   if (wifiConectadoAnteriormente) {
     Serial.println("Wi-Fi desconectado. Tentando reconectar...");
-    wifiDesconectadoDesde = agora;
   }
   wifiConectadoAnteriormente = false;
+  if (wifiDesconectadoDesde == 0) wifiDesconectadoDesde = agora;
 
-  if (wifiDesconectadoDesde != 0 && agora - wifiDesconectadoDesde >= TEMPO_MAXIMO_SEM_WIFI_PARA_REINICIAR) {
-    Serial.println("Sem Wi-Fi por tempo prolongado. Reiniciando o dispositivo.");
-    ESP.restart();
+  if (!apRecuperacaoAtivo && agora - wifiDesconectadoDesde >= INTERVALO_AP_RECUPERACAO_MS) {
+    iniciarApRecuperacao();
   }
 
-  if (agora - ultimaTentativaReconexao >= INTERVALO_RECONEXAO) {
+  if (ultimaTentativaReconexao == 0 || agora - ultimaTentativaReconexao >= INTERVALO_RECONEXAO_WIFI_MS) {
     ultimaTentativaReconexao = agora;
     Serial.println("Tentando WiFi.reconnect()...");
     WiFi.reconnect();
   }
 }
 
+void handleSetup() {
+  File f = LittleFS.open("/setup.html", "r");
+  if (!f) {
+    server.send(500, "text/plain", "setup.html ausente no sistema de arquivos");
+    return;
+  }
+  server.streamFile(f, "text/html");
+  f.close();
+}
+
+void handleSaveSetup() {
+  String newSSID = server.arg("ssid");
+  String newPASS = server.arg("pass");
+  String newHost = server.arg("host");
+  String newPorta = server.arg("porta");
+  String newTls = server.arg("tls");
+
+  int porta = newPorta.toInt();
+  if (newSSID.length() == 0 || newHost.length() == 0 || porta <= 0 || porta > 65535) {
+    server.send(400, "text/plain", "Preencha todos os campos obrigatorios.");
+    return;
+  }
+
+  if (newTls != "ca" && newTls != "inseguro" && newTls != "off") newTls = "ca";
+
+  preferences.putString("ssid", newSSID);
+  preferences.putString("pass", newPASS);
+  preferences.putString("host", newHost);
+  preferences.putInt("porta", porta);
+  preferences.putString("tls", newTls);
+
+  File f = LittleFS.open("/restart.html", "r");
+  String response = f ? f.readString() : String("Credenciais salvas. Reiniciando...");
+  if (f) f.close();
+  response.replace("{{ssid}}", newSSID);
+
+  server.send(200, "text/html", response);
+  agendarReinicio(1500);
+}
+
+void iniciarApRecuperacao() {
+  WiFi.mode(WIFI_AP_STA);
+  IPAddress apIP(192, 168, 4, 1);
+  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+  if (!WiFi.softAP("RemoteIFES-Setup")) return;
+  dnsServer.start(53, "*", apIP);
+  apRecuperacaoAtivo = true;
+  Serial.println("Wi-Fi indisponivel por 2 minutos. Portal de recuperacao aberto em 192.168.4.1; tentativas STA continuam.");
+}
+
+void encerrarApRecuperacao() {
+  dnsServer.stop();
+  WiFi.softAPdisconnect(true);
+  apRecuperacaoAtivo = false;
+  Serial.println("Wi-Fi restabelecido. Portal de recuperacao encerrado.");
+}
+
 void startAPMode() {
   apModeActive = true;
   WiFi.mode(WIFI_AP);
 
-  String apPass = preferences.getString("apPass", "");
-  if (apPass.length() < 12) {
-    uint8_t randomBytes[4];
-    for (uint8_t i = 0; i < sizeof(randomBytes); i++) randomBytes[i] = (uint8_t)(esp_random() & 0xFF);
-    char apPassBuf[16];
-    snprintf(apPassBuf, sizeof(apPassBuf), "ifes-%02x%02x%02x%02x",
-             randomBytes[0], randomBytes[1], randomBytes[2], randomBytes[3]);
-    apPass = String(apPassBuf);
-    preferences.putString("apPass", apPass);
-  }
-
-  WiFi.softAP("RemoteIFES-Setup", apPass.c_str());
-  Serial.print("Senha do Wi-Fi de configuracao (RemoteIFES-Setup): ");
-  Serial.println(apPass);
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+  WiFi.softAP("RemoteIFES-Setup");
+  Serial.println("Ponto de acesso de configuracao 'RemoteIFES-Setup' aberto (sem senha).");
 
   dnsServer.start(53, "*", apIP);
 
-  server.on("/", []() {
-    File f = LittleFS.open("/setup.html", "r");
-    if (!f) {
-      server.send(500, "text/plain", "setup.html ausente no sistema de arquivos");
-      return;
-    }
-    server.streamFile(f, "text/html");
-    f.close();
-  });
-
-  server.on("/save", HTTP_POST, []() {
-    String newSSID = server.arg("ssid");
-    String newPASS = server.arg("pass");
-    String newSala = server.arg("sala");
-    String newHost = server.arg("host");
-    String newPorta = server.arg("porta");
-    String newTls = server.arg("tls");
-    String newAdminSenha = server.arg("adminSenha");
-
-    if (newSSID.length() == 0 || newSala.length() == 0 || newHost.length() == 0 ||
-        newPorta.length() == 0 || newAdminSenha.length() < 6) {
-      server.send(400, "text/plain", "Preencha todos os campos obrigatorios (senha de administracao com pelo menos 6 caracteres).");
-      return;
-    }
-
-    if (newTls != "ca" && newTls != "inseguro" && newTls != "off") {
-      newTls = "ca";
-    }
-
-    preferences.putString("ssid", newSSID);
-    preferences.putString("pass", newPASS);
-    preferences.putString("sala", newSala);
-    preferences.putString("host", newHost);
-    preferences.putInt("porta", newPorta.toInt());
-    preferences.putString("tls", newTls);
-    preferences.putString("adminHash", sha256Hex(newAdminSenha));
-
-    File f = LittleFS.open("/restart.html", "r");
-    String response = f ? f.readString() : String("Credenciais salvas. Reiniciando...");
-    if (f) f.close();
-    response.replace("{{ssid}}", newSSID);
-
-    server.send(200, "text/html", response);
-    delay(5000);
-    ESP.restart();
-  });
+  server.on("/", handleSetup);
+  server.on("/save", HTTP_POST, handleSaveSetup);
 
   server.onNotFound([]() {
-    File f = LittleFS.open("/setup.html", "r");
-    if (!f) {
-      server.send(404, "text/plain", "não encontrado");
-      return;
-    }
-    server.streamFile(f, "text/html");
-    f.close();
+    handleSetup();
   });
 
   server.begin();
@@ -399,15 +364,21 @@ void startAPMode() {
 }
 
 void iniciarServicosOperacao() {
-  const char* headerKeys[] = { "User-Agent", "Authorization" };
-  server.collectHeaders(headerKeys, 2);
+  if (servicosOperacaoIniciados) return;
+  servicosOperacaoIniciados = true;
+  const char* headerKeys[] = { "User-Agent" };
+  server.collectHeaders(headerKeys, 1);
   server.on("/", handleRoot);
+  server.on("/setup", handleSetup);
+  server.on("/save", HTTP_POST, handleSaveSetup);
   server.on("/info", handleInfo);
   server.begin();
-  conectarWsServidor();
 }
 
 void conectarWsServidor() {
+  if (WiFi.status() != WL_CONNECTED || salaId.length() == 0) return;
+  if (wsConfigurado && salaWsConfigurada == salaId) return;
+  if (wsConfigurado) wsCliente.disconnect();
   String headers = "X-Device-Sala: " + salaId + "\r\nX-Device-Mac: " + WiFi.macAddress() + "\r\n";
   wsCliente.setExtraHeaders(headers.c_str());
   wsCliente.onEvent(handleWsServidorEvent);
@@ -420,6 +391,8 @@ void conectarWsServidor() {
   } else {
     wsCliente.beginSSL(serverHost.c_str(), serverPort, DEVICE_WS_PATH);
   }
+  wsConfigurado = true;
+  salaWsConfigurada = salaId;
 }
 
 void handleWsServidorEvent(WStype_t type, uint8_t* payload, size_t length) {
@@ -448,20 +421,10 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
   const char* tipo = doc["tipo"] | "";
 
   if (strcmp(tipo, "enter_config") == 0) {
-    String senha = doc["senha"] | "";
-    if (adminHash.length() > 0 && senha.length() > 0 && sha256Hex(senha) == adminHash) {
-      runtimeMode = RUNTIME_CONFIG_IDLE;
-      enviarModoAlterado();
-      reportComando("entrar_config", "");
-      Serial.println("Modo CONFIG ativado.");
-    } else {
-      Serial.println("Senha de administracao invalida para enter_config.");
-      JsonDocument negado;
-      negado["tipo"] = "enter_config_negado";
-      String saidaNegado;
-      serializeJson(negado, saidaNegado);
-      wsCliente.sendTXT(saidaNegado);
-    }
+    runtimeMode = RUNTIME_CONFIG_IDLE;
+    enviarModoAlterado();
+    reportComando("entrar_config", "");
+    Serial.println("Modo CONFIG ativado.");
   } else if (strcmp(tipo, "exit_operation") == 0) {
     if (isCapturing) {
       irrecv.disableIRIn();
@@ -552,8 +515,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
   } else if (strcmp(tipo, "reset_wifi") == 0) {
     reportComando("reset_wifi", "");
     preferences.clear();
-    delay(300);
-    ESP.restart();
+    agendarReinicio(500);
   }
 }
 
@@ -596,8 +558,8 @@ void enviarTelemetriaWs() {
 }
 
 void handleRoot() {
-  if (!autenticadoAdmin()) {
-    server.requestAuthentication();
+  if (apRecuperacaoAtivo) {
+    handleSetup();
     return;
   }
   File f = LittleFS.open("/status.html", "r");
@@ -607,7 +569,7 @@ void handleRoot() {
   }
   String html = f.readString();
   f.close();
-  html.replace("{{sala}}", salaId);
+  html.replace("{{sala}}", salaId.length() > 0 ? salaId : String("Aguardando vinculo por MAC"));
   html.replace("{{mac}}", WiFi.macAddress());
   html.replace("{{ip}}", WiFi.localIP().toString());
   html.replace("{{servidor}}", serverHost + ":" + String(serverPort));
@@ -616,10 +578,6 @@ void handleRoot() {
 }
 
 void handleInfo() {
-  if (!autenticadoAdmin()) {
-    server.requestAuthentication();
-    return;
-  }
   JsonDocument doc;
   doc["sala"] = salaId;
   doc["mac"] = WiFi.macAddress();
@@ -716,37 +674,77 @@ bool iniciarClienteHttp(HTTPClient& http, WiFiClientSecure& clienteSeguro, const
   return http.begin(clienteSeguro, url);
 }
 
-bool sendHttpPost(const String& url, const String& payload) {
+int executarHttpPost(const String& url, const String& payload, String& resposta) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("HTTP post falhou: WiFi nao conectado.");
-    return false;
+    return -1;
   }
 
   HTTPClient http;
   WiFiClientSecure clienteSeguro;
   if (!iniciarClienteHttp(http, clienteSeguro, url)) {
     Serial.println("HTTP post falhou: nao foi possivel iniciar a conexao.");
-    return false;
+    return -1;
   }
   http.setTimeout(HTTP_CLIENT_TIMEOUT_MS);
   http.setConnectTimeout(HTTP_CLIENT_TIMEOUT_MS);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("x-device-mac", WiFi.macAddress());
   int statusCode = http.POST(payload);
-  String response = http.getString();
+  resposta = http.getString();
   http.end();
 
   Serial.printf("HTTP POST %s -> %d\n", url.c_str(), statusCode);
-  if (statusCode >= 200 && statusCode < 300) {
-    return true;
+  if (statusCode < 200 || statusCode >= 300) Serial.printf("Falha no POST: %d, resposta: %s\n", statusCode, resposta.c_str());
+  return statusCode;
+}
+
+bool sendHttpPost(const String& url, const String& payload) {
+  String resposta;
+  int statusCode = executarHttpPost(url, payload, resposta);
+  return statusCode >= 200 && statusCode < 300;
+}
+
+void identificarSalaNoServidor() {
+  JsonDocument doc;
+  doc["mac"] = WiFi.macAddress();
+  doc["ip"] = WiFi.localIP().toString();
+
+  String payload;
+  serializeJson(doc, payload);
+  String resposta;
+  int statusCode = executarHttpPost(urlServidor(SERVER_IDENTIFICACAO_PATH), payload, resposta);
+  if (statusCode != 200 && statusCode != 202) return;
+
+  JsonDocument retorno;
+  if (deserializeJson(retorno, resposta)) return;
+  if (statusCode == 202 || retorno["pendente"] == true) {
+    if (salaId.length() > 0) {
+      salaId = "";
+      wsCliente.setReconnectInterval(0);
+      wsCliente.disconnect();
+      wsConfigurado = false;
+      salaWsConfigurada = "";
+      estadoWsServidor = WS_ESTADO_DESCONECTADO;
+      Serial.println("Vinculo por MAC removido. Aguardando nova sala.");
+    }
+    return;
   }
 
-  Serial.printf("Falha no POST: %d, resposta: %s\n", statusCode, response.c_str());
-  return false;
+  String novaSala = retorno["sala"] | "";
+  if (novaSala.length() == 0) return;
+  if (novaSala != salaId) {
+    if (wsConfigurado) wsCliente.disconnect();
+    salaId = novaSala;
+    wsConfigurado = false;
+    salaWsConfigurada = "";
+    Serial.println("Sala identificada pelo servidor: " + salaId);
+  }
+  conectarWsServidor();
 }
 
 void sendHeartbeat() {
-  if (!configuracaoValida()) return;
+  if (!configuracaoValida() || salaId.length() == 0) return;
 
   JsonDocument doc;
   doc["sala"] = salaId;
@@ -763,31 +761,29 @@ void sendHeartbeat() {
 }
 
 void reportAccess(const String& ip, const String& userAgent) {
-  if (!configuracaoValida()) return;
+  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
 
   JsonDocument doc;
-  doc["sala"] = salaId;
+  doc["tipo"] = "acesso";
   doc["ip"] = ip;
   doc["userAgent"] = userAgent;
 
   String payload;
   serializeJson(doc, payload);
 
-  String url = urlServidor(SERVER_ACESSO_PATH);
-  sendHttpPost(url, payload);
+  wsCliente.sendTXT(payload);
 }
 
 void reportComando(const String& cmd, const String& valor) {
-  if (!configuracaoValida()) return;
+  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
 
   JsonDocument doc;
-  doc["sala"] = salaId;
+  doc["tipo"] = "comando";
   doc["cmd"] = cmd;
   if (valor.length() > 0) doc["valor"] = valor;
 
   String payload;
   serializeJson(doc, payload);
 
-  String url = urlServidor(SERVER_COMANDO_PATH);
-  sendHttpPost(url, payload);
+  wsCliente.sendTXT(payload);
 }

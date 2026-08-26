@@ -105,10 +105,6 @@
               <span class="portal-funcao-icon">📈</span>
               <span class="portal-funcao-label">Grade</span>
             </button>
-            <button type="button" class="portal-funcao" data-funcao="presets">
-              <span class="portal-funcao-icon">💨</span>
-              <span class="portal-funcao-label">Presets</span>
-            </button>
             <button type="button" class="portal-funcao" data-funcao="admin">
               <span class="portal-funcao-icon">🔧</span>
               <span class="portal-funcao-label">Admin</span>
@@ -550,35 +546,30 @@
                 <span class="ac-remote-mode-label" id="modoValue">Off</span>
                 <span class="ac-remote-conn" title="Conexão do dispositivo"><span class="ac-remote-conn-dot"></span><span id="conexaoValue">—</span></span>
               </div>
-              <div class="ac-remote-set-row">
-                <span class="ac-remote-set-label">SET</span>
+              <div class="ac-remote-temp-target" id="tempTarget">23°C</div>
+              <div class="ac-remote-display-bottom">
+                <span class="ac-remote-room-temp">Ambiente: <span id="tempValue">— °C</span></span>
                 <span id="statusValue" title="Estado do ar-condicionado">—</span>
               </div>
-              <div class="ac-remote-temp-target" id="tempTarget">23°C</div>
-              <div class="ac-remote-room-temp">Ambiente: <span id="tempValue">— °C</span></div>
             </div>
 
-            <div class="ac-remote-row ac-remote-row-power">
-              <button id="btnFlankLeft" type="button" class="ac-remote-round-btn hidden" aria-label="Função extra"></button>
-              <button id="btnPower" type="button" class="ac-remote-power-btn" aria-label="Ligar ou desligar o ar-condicionado">
-                <span class="ac-remote-power-icon">&#9211;</span>
+            <div class="ac-remote-controls">
+              <button id="tempDown" type="button" class="ac-remote-temp-btn" aria-label="Diminuir temperatura">
+                <span class="ac-remote-control-symbol">−</span>
+                <span class="ac-remote-control-label">Temperatura</span>
               </button>
-              <button id="btnFlankRight" type="button" class="ac-remote-rect-btn hidden" aria-label="Função extra"></button>
-              <div class="ac-remote-stepper">
-                <button id="fanUp" type="button" class="ac-remote-chevron" aria-label="Aumentar velocidade do ventilador" disabled>&#9650;</button>
-                <span class="ac-remote-stepper-label">Fan</span>
-                <button id="fanDown" type="button" class="ac-remote-chevron" aria-label="Diminuir velocidade do ventilador" disabled>&#9660;</button>
+              <div class="ac-remote-center-controls">
+                <button id="btnPower" type="button" class="ac-remote-power-btn" aria-label="Ligar ou desligar o ar-condicionado">
+                  <span class="ac-remote-power-icon">&#9211;</span>
+                  <span class="ac-remote-control-label">Power</span>
+                </button>
+                <button id="btnTurbo" type="button" class="ac-remote-turbo-btn" aria-label="Ativar ou desativar o modo turbo" aria-pressed="false">Turbo</button>
               </div>
-              <div class="ac-remote-stepper ac-remote-stepper-temp">
-                <button id="tempUp" type="button" class="ac-remote-chevron" aria-label="Aumentar temperatura"><span class="ac-remote-chevron-sign">+</span>&#9650;</button>
-                <span class="ac-remote-stepper-label">Temp</span>
-                <button id="tempDown" type="button" class="ac-remote-chevron" aria-label="Diminuir temperatura"><span class="ac-remote-chevron-sign">&minus;</span>&#9660;</button>
-              </div>
+              <button id="tempUp" type="button" class="ac-remote-temp-btn" aria-label="Aumentar temperatura">
+                <span class="ac-remote-control-symbol">+</span>
+                <span class="ac-remote-control-label">Temperatura</span>
+              </button>
             </div>
-
-            <div class="ac-remote-grid" id="acGridTopo"></div>
-
-            <div class="ac-remote-grid" id="acGridBase"></div>
           </div>
         </div>
 
@@ -613,6 +604,7 @@
 
           <label for="agendaTemperatura">Temperatura</label>
           <input type="number" id="agendaTemperatura" min="16" max="30" value="23" />
+          <p id="agendaTemperaturaLimites" class="hint"></p>
 
           <label>O que fazer neste horário</label>
           <label class="checkbox-label"><input type="radio" name="agendaModo" value="reserva" /> Apenas reservar a sala</label>
@@ -711,7 +703,6 @@
           <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span><span class="admin-subtab-label">Proprietários de sala</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span><span class="admin-subtab-label">Mapa</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span><span class="admin-subtab-label">ESP32 / MACs</span></button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets"><span class="admin-subtab-icon">🎛️</span><span class="admin-subtab-label">Presets</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">ESP32</span></button>
         </div>
@@ -904,21 +895,6 @@
           <p id="macsListEmpty" class="hint hidden">Nenhuma sala encontrada para esta busca.</p>
         </div>
 
-        <div id="adminSub-presets" class="admin-sub hidden">
-          <p class="hint">
-            Conjuntos de funções do ar-condicionado que podem ser atribuídos às salas.
-            <button type="button" class="help-icon-btn" data-help="presets" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card">
-            <h2>Novo preset</h2>
-            <label for="novoPresetNome">Nome</label>
-            <input type="text" id="novoPresetNome" />
-            <button type="button" id="criarPresetBtn" class="btn btn-on btn-block">Criar preset</button>
-          </div>
-          <p class="hint">O preset padrão possui apenas a função de temperatura. Cadastre novas funções (velocidade, oscilação, modo turbo, etc.) diretamente abaixo, em cada preset, ou importe várias de uma vez a partir de um arquivo JSON. Depois de cadastradas, escolha em qual botão do controle cada função aparece.</p>
-          <ul id="presetsList" class="room-list"></ul>
-        </div>
-
         <div id="adminSub-config" class="admin-sub hidden">
           <p class="hint">
             Configurações gerais de sessão, presença e segurança do sistema.
@@ -980,6 +956,13 @@
                     </div>
                   </div>
 
+                  <label for="cfgTurboFuncaoExtra">Função adicional executada pelo Turbo</label>
+                  <select id="cfgTurboFuncaoExtra">
+                    <option value="nenhuma">Nenhuma</option>
+                    <option value="swing">Oscilação vertical (Swing)</option>
+                  </select>
+                  <p class="hint">Quando configurada, a função adicional é ativada e desativada junto com o Turbo.</p>
+
                   <label class="checkbox-label">
                     <input type="checkbox" id="cfgModoTeste" /> Modo de teste (permite acesso fora da rede do IFES)
                   </label>
@@ -1004,7 +987,7 @@
 
         <div id="adminSub-esp32" class="admin-sub hidden">
           <p class="hint">
-            Funções administrativas do ESP32: modo de configuração, aprendizado e testes de infravermelho, e reset de Wi-Fi. Exige a senha de administração definida no próprio dispositivo durante a configuração inicial.
+            Funções administrativas do ESP32: modo de configuração, aprendizado e testes de infravermelho, protocolo do ar-condicionado e reset de Wi-Fi.
             <button type="button" class="help-icon-btn" data-help="esp32" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
           </p>
           <ul id="esp32DeviceList" class="esp32-device-list"></ul>

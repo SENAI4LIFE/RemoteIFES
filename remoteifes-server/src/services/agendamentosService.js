@@ -83,7 +83,7 @@ function criar({ sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, 
   }
 
   const configuracoesService = require("./configuracoesService");
-  const { minima, maxima } = configuracoesService.limitesTemperatura();
+  const { minima, maxima } = configuracoesService.limitesEfetivosDaSala(salaRow);
   const temp = Number(temperatura);
   if (Number.isNaN(temp) || temp < minima || temp > maxima) {
     throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);

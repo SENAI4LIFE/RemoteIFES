@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `remoteifes-shell-${CACHE_VERSION}`;
 
 const APP_SHELL = [

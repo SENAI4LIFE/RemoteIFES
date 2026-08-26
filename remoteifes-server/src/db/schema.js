@@ -14,25 +14,6 @@ function criarSchema() {
       criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    CREATE TABLE IF NOT EXISTS presets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL UNIQUE,
-      padrao INTEGER NOT NULL DEFAULT 0,
-      criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS preset_funcoes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      presetId INTEGER NOT NULL REFERENCES presets(id) ON DELETE CASCADE,
-      chave TEXT NOT NULL,
-      rotulo TEXT NOT NULL,
-      tipo TEXT NOT NULL DEFAULT 'numero',
-      opcoes TEXT,
-      ordem INTEGER NOT NULL DEFAULT 0,
-      posicao TEXT,
-      UNIQUE(presetId, chave)
-    );
-
     CREATE TABLE IF NOT EXISTS salas (
       sala TEXT PRIMARY KEY,
       nome TEXT NOT NULL,
@@ -42,9 +23,12 @@ function criarSchema() {
       ligado INTEGER NOT NULL DEFAULT 0,
       temperatura REAL NOT NULL DEFAULT 24,
       temperaturaAlvo INTEGER NOT NULL DEFAULT 23,
+      temperaturaMinima REAL,
+      temperaturaMaxima REAL,
+      turboAtivo INTEGER NOT NULL DEFAULT 0,
+      irProtocolo INTEGER,
       ipEsp32 TEXT,
       mac TEXT,
-      presetId INTEGER REFERENCES presets(id),
       latitude REAL,
       longitude REAL,
       acessoRestrito INTEGER NOT NULL DEFAULT 0,
@@ -146,13 +130,13 @@ function criarSchema() {
       criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL;
   `);
 
   migrarColunasUsuarios();
   migrarColunasAgendamentos();
   migrarColunasSalas();
-  migrarColunasPresetFuncoes();
+  removerTabelasObsoletas();
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL`);
 }
 
 function migrarColunasUsuarios() {
@@ -194,12 +178,9 @@ function migrarColunasAgendamentos() {
 }
 
 function migrarColunasSalas() {
-  const colunas = db.prepare(`PRAGMA table_info(salas)`).all().map((c) => c.name);
+  let colunas = db.prepare(`PRAGMA table_info(salas)`).all().map((c) => c.name);
   if (!colunas.includes("mac")) {
     db.exec(`ALTER TABLE salas ADD COLUMN mac TEXT`);
-  }
-  if (!colunas.includes("presetId")) {
-    db.exec(`ALTER TABLE salas ADD COLUMN presetId INTEGER REFERENCES presets(id)`);
   }
   if (!colunas.includes("latitude")) {
     db.exec(`ALTER TABLE salas ADD COLUMN latitude REAL`);
@@ -210,16 +191,83 @@ function migrarColunasSalas() {
   if (!colunas.includes("acessoRestrito")) {
     db.exec(`ALTER TABLE salas ADD COLUMN acessoRestrito INTEGER NOT NULL DEFAULT 0`);
   }
-  if (!colunas.includes("funcoesEstado")) {
-    db.exec(`ALTER TABLE salas ADD COLUMN funcoesEstado TEXT NOT NULL DEFAULT '{}'`);
+  if (!colunas.includes("temperaturaMinima")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN temperaturaMinima REAL`);
+  }
+  if (!colunas.includes("temperaturaMaxima")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN temperaturaMaxima REAL`);
+  }
+  if (!colunas.includes("turboAtivo")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN turboAtivo INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!colunas.includes("irProtocolo")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN irProtocolo INTEGER`);
+  }
+  colunas = db.prepare(`PRAGMA table_info(salas)`).all().map((c) => c.name);
+  if (colunas.includes("presetId") || colunas.includes("funcoesEstado")) {
+    recriarTabelaSalas();
   }
 }
 
-function migrarColunasPresetFuncoes() {
-  const colunas = db.prepare(`PRAGMA table_info(preset_funcoes)`).all().map((c) => c.name);
-  if (!colunas.includes("posicao")) {
-    db.exec(`ALTER TABLE preset_funcoes ADD COLUMN posicao TEXT`);
+function recriarTabelaSalas() {
+  db.exec(`PRAGMA foreign_keys = OFF`);
+  try {
+    db.exec(`
+      BEGIN IMMEDIATE;
+      CREATE TABLE salas_nova (
+        sala TEXT PRIMARY KEY,
+        nome TEXT NOT NULL,
+        bloco TEXT NOT NULL,
+        andar INTEGER NOT NULL,
+        online INTEGER NOT NULL DEFAULT 0,
+        ligado INTEGER NOT NULL DEFAULT 0,
+        temperatura REAL NOT NULL DEFAULT 24,
+        temperaturaAlvo INTEGER NOT NULL DEFAULT 23,
+        temperaturaMinima REAL,
+        temperaturaMaxima REAL,
+        turboAtivo INTEGER NOT NULL DEFAULT 0,
+        irProtocolo INTEGER,
+        ipEsp32 TEXT,
+        mac TEXT,
+        latitude REAL,
+        longitude REAL,
+        acessoRestrito INTEGER NOT NULL DEFAULT 0,
+        ultimoHeartbeat TEXT,
+        atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO salas_nova (
+        sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
+        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, ipEsp32,
+        mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
+      )
+      SELECT
+        sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
+        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, ipEsp32,
+        mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
+      FROM salas;
+      DROP TABLE salas;
+      ALTER TABLE salas_nova RENAME TO salas;
+      COMMIT;
+    `);
+  } catch (erro) {
+    try {
+      db.exec(`ROLLBACK`);
+    } catch (rollbackErro) {}
+    throw erro;
+  } finally {
+    db.exec(`PRAGMA foreign_keys = ON`);
   }
+
+  const inconsistencias = db.prepare(`PRAGMA foreign_key_check`).all();
+  if (inconsistencias.length > 0) {
+    throw new Error("migração de salas deixou referências inválidas");
+  }
+}
+
+function removerTabelasObsoletas() {
+  db.exec(`DROP TABLE IF EXISTS preset_funcoes`);
+  db.exec(`DROP TABLE IF EXISTS presets`);
+  db.exec(`DROP TABLE IF EXISTS dispositivo_tokens`);
 }
 
 module.exports = { criarSchema };

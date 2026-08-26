@@ -292,6 +292,7 @@ const Admin = {
     document.getElementById("cfgLimiarOnline").value = cfg.limiarOnlineMinutos;
     document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
     document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
+    document.getElementById("cfgTurboFuncaoExtra").value = cfg.turboFuncaoExtra || "nenhuma";
     document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
     document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
     document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
@@ -304,9 +305,13 @@ const Admin = {
     list.innerHTML = "";
     searchInput.value = "";
     document.getElementById("macsListEmpty").classList.add("hidden");
-    const salas = await Api.listarSalasAdmin();
-    const presets = await Api.listarPresets();
-    const usuarios = await Api.listarUsuarios();
+    const [salas, usuarios, configResp] = await Promise.all([
+      Api.listarSalasAdmin(),
+      Api.listarUsuarios(),
+      Api.obterConfiguracoes(),
+    ]);
+    const limiteGlobalMin = configResp.configuracoes?.temperaturaMinima ?? 23;
+    const limiteGlobalMax = configResp.configuracoes?.temperaturaMaxima ?? 25;
     const usuariosControlaveis = usuarios.filter((u) => !u.isAdmin);
 
     for (const s of salas) {
@@ -317,13 +322,21 @@ const Admin = {
           <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
           <label>Endereço MAC do ESP32</label>
           <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${escapeHtmlAdmin(s.mac) || ""}" />
-          <label>Preset em uso</label>
-          <select class="preset-select">
-            <option value="">(nenhum: usa o padrão)</option>
-            ${presets.map((p) => `<option value="${p.id}" ${s.presetId === p.id ? "selected" : ""}>${escapeHtmlAdmin(p.nome)}${p.padrao ? " (padrão)" : ""}</option>`).join("")}
-          </select>
+          <label>Limites de temperatura desta sala</label>
+          <div class="two-col room-limit-row">
+            <div>
+              <label>Temperatura mínima (°C)</label>
+              <input type="number" class="limite-min-input" min="16" max="30" placeholder="Global: ${limiteGlobalMin}" value="${s.temperaturaMinima ?? ""}" />
+            </div>
+            <div>
+              <label>Temperatura máxima (°C)</label>
+              <input type="number" class="limite-max-input" min="16" max="30" placeholder="Global: ${limiteGlobalMax}" value="${s.temperaturaMaxima ?? ""}" />
+            </div>
+          </div>
+          <p class="hint">Deixe qualquer campo vazio para usar apenas o limite global correspondente.</p>
           <div class="two-col">
             <button type="button" class="link-btn salvar-mac">salvar MAC</button>
+            <button type="button" class="link-btn salvar-limites">salvar limites</button>
             ${s.ipEsp32 ? `<button type="button" class="link-btn acessar-esp32">acessar interface do ESP32</button>` : `<span class="hint">IP ainda não reportado</span>`}
           </div>
           <p class="error hidden mac-error"></p>
@@ -355,15 +368,22 @@ const Admin = {
         }
       });
 
-      li.querySelector(".preset-select").addEventListener("change", async (e) => {
+      li.querySelector(".salvar-limites").addEventListener("click", async () => {
         const errorEl = li.querySelector(".mac-error");
         errorEl.classList.add("hidden");
-        const presetId = e.target.value ? Number(e.target.value) : null;
-        const resp = await Api.definirPresetDaSala(s.sala, presetId);
+        const minimaTexto = li.querySelector(".limite-min-input").value.trim();
+        const maximaTexto = li.querySelector(".limite-max-input").value.trim();
+        const resp = await Api.definirLimitesTemperaturaSala(
+          s.sala,
+          minimaTexto === "" ? null : Number(minimaTexto),
+          maximaTexto === "" ? null : Number(maximaTexto)
+        );
         if (!resp.ok) {
-          errorEl.textContent = resp.erro || "não foi possível definir o preset";
+          errorEl.textContent = resp.erro || "não foi possível salvar os limites de temperatura";
           errorEl.classList.remove("hidden");
+          return;
         }
+        Toast.aviso("limites da sala salvos");
       });
 
       const acessarBtn = li.querySelector(".acessar-esp32");
@@ -595,231 +615,6 @@ const Admin = {
     }, true);
   },
 
-  async carregarPresets() {
-    const list = document.getElementById("presetsList");
-    list.innerHTML = "";
-    const presets = await Api.listarPresets();
-
-    presets.forEach((p) => {
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <div>
-          <div class="room-name">${escapeHtmlAdmin(p.nome)} ${p.padrao ? "· padrão" : ""}</div>
-          <div class="room-sub preset-funcoes-tags">
-            ${p.funcoes.map((f) => f.chave === "temperatura"
-              ? `<span class="preset-funcao-tag">${escapeHtmlAdmin(f.rotulo)}</span>`
-              : `<span class="preset-funcao-tag">${escapeHtmlAdmin(f.rotulo)}<button type="button" class="preset-funcao-remover" data-funcao-id="${f.id}" aria-label="Remover função ${escapeHtmlAdmin(f.rotulo)}" title="Remover função">×</button></span>`
-            ).join("") || "sem funções cadastradas"}
-          </div>
-          <div class="preset-nova-funcao">
-            <input type="text" class="preset-nova-funcao-chave" placeholder="chave (ex.: turbo)" />
-            <input type="text" class="preset-nova-funcao-rotulo" placeholder="rótulo (ex.: Turbo)" />
-            <select class="preset-nova-funcao-tipo">
-              <option value="booleano">liga/desliga</option>
-              <option value="numero">numérico</option>
-              <option value="selecao">seleção</option>
-            </select>
-            <input type="text" class="preset-nova-funcao-opcoes" placeholder="opções (numérico: min,max · seleção: a,b,c)" />
-            <button type="button" class="btn btn-on adicionar-funcao-preset">Adicionar função</button>
-          </div>
-          <div class="preset-grid-editor"></div>
-        </div>
-        ${!p.padrao ? `<button type="button" class="link-btn danger remover-preset">remover</button>` : ""}
-      `;
-
-      li.querySelectorAll(".preset-funcao-remover").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          if (!confirm("Remover esta função do preset?")) return;
-          btn.disabled = true;
-          const resp = await Api.removerFuncaoPreset(Number(btn.dataset.funcaoId));
-          if (!resp.ok) Toast.erro(resp.erro || "não foi possível remover a função");
-          await Admin.carregarPresets();
-        });
-      });
-
-      const adicionarFuncaoBtn = li.querySelector(".adicionar-funcao-preset");
-      adicionarFuncaoBtn.addEventListener("click", async () => {
-        const chave = li.querySelector(".preset-nova-funcao-chave").value.trim().toLowerCase();
-        const rotulo = li.querySelector(".preset-nova-funcao-rotulo").value.trim();
-        const tipo = li.querySelector(".preset-nova-funcao-tipo").value;
-        const opcoesTexto = li.querySelector(".preset-nova-funcao-opcoes").value.trim();
-
-        if (!chave || !rotulo) {
-          Toast.erro("informe a chave e o rótulo da nova função");
-          return;
-        }
-        if (!/^[a-z0-9_]+$/.test(chave)) {
-          Toast.erro("a chave deve conter apenas letras minúsculas, números e underscore (ex.: turbo, modo_eco)");
-          return;
-        }
-
-        let opcoes = null;
-        if (tipo === "numero" && opcoesTexto) {
-          const [min, max] = opcoesTexto.split(",").map((v) => Number(v.trim()));
-          if (!Number.isFinite(min) || !Number.isFinite(max)) {
-            Toast.erro("opções numéricas devem estar no formato min,max (ex.: 16,30)");
-            return;
-          }
-          opcoes = { min, max };
-        } else if (tipo === "selecao" && opcoesTexto) {
-          opcoes = opcoesTexto.split(",").map((v) => v.trim()).filter(Boolean);
-          if (opcoes.length === 0) {
-            Toast.erro("informe ao menos uma opção separada por vírgula (ex.: baixo,médio,alto)");
-            return;
-          }
-        }
-
-        adicionarFuncaoBtn.disabled = true;
-        try {
-          const resp = await Api.adicionarFuncaoPreset(p.id, { chave, rotulo, tipo, opcoes });
-          if (!resp.ok) {
-            Toast.erro(resp.erro || "não foi possível adicionar a função");
-            return;
-          }
-          await Admin.carregarPresets();
-        } finally {
-          adicionarFuncaoBtn.disabled = false;
-        }
-      });
-      const removerBtn = li.querySelector(".remover-preset");
-      if (removerBtn) {
-        removerBtn.addEventListener("click", async () => {
-          if (!confirm(`Remover o preset "${p.nome}"? As salas que o utilizam voltarão ao preset padrão.`)) return;
-          removerBtn.disabled = true;
-          const resp = await Api.removerPreset(p.id);
-          if (!resp.ok) {
-            Toast.erro(resp.erro || "não foi possível remover o preset");
-            removerBtn.disabled = false;
-            return;
-          }
-          await Admin.carregarPresets();
-        });
-      }
-
-      const funcoesPosicionaveis = p.funcoes.filter((f) => f.chave !== "temperatura");
-      if (funcoesPosicionaveis.length > 0) {
-        Admin.montarGridEditor(li.querySelector(".preset-grid-editor"), p, funcoesPosicionaveis);
-      }
-
-      list.appendChild(li);
-    });
-  },
-
-  SLOTS_CONTROLE: [
-    { posicao: "flank_esq", rotulo: "Botão esq.", area: "flank_esq" },
-    { posicao: "flank_dir", rotulo: "Botão dir.", area: "flank_dir" },
-    { posicao: "fan", rotulo: "Ventilador (+/-)", area: "fan" },
-    { posicao: "grid_topo_1", rotulo: "Topo 1", area: "grid_topo_1" },
-    { posicao: "grid_topo_2", rotulo: "Topo 2", area: "grid_topo_2" },
-    { posicao: "grid_topo_3", rotulo: "Topo 3", area: "grid_topo_3" },
-    { posicao: "grid_base_1", rotulo: "Base 1", area: "grid_base_1" },
-    { posicao: "grid_base_2", rotulo: "Base 2", area: "grid_base_2" },
-    { posicao: "grid_base_3", rotulo: "Base 3", area: "grid_base_3" },
-    { posicao: "grid_base_4", rotulo: "Base 4", area: "grid_base_4" },
-    { posicao: "grid_base_5", rotulo: "Base 5", area: "grid_base_5" },
-    { posicao: "grid_base_6", rotulo: "Base 6", area: "grid_base_6" },
-  ],
-
-  montarGridEditor(container, preset, funcoes) {
-    container.innerHTML = `
-      <div class="preset-grid-head">Posição dos botões no controle</div>
-      <p class="preset-grid-hint">Clique em um espaço do controle para escolher a função que aparece nele. "Liga/desliga" já ocupa o centro superior automaticamente. "Ventilador" fica ao lado dos botões esq./dir. e usa setas para cima/baixo, em vez de um botão único. Funções sem posição definida não aparecem no controle exibido ao usuário.</p>
-      <div class="preset-grid-visual"></div>
-      <p class="preset-grid-unassigned hidden"></p>
-    `;
-
-    const visual = container.querySelector(".preset-grid-visual");
-
-    Admin.SLOTS_CONTROLE.forEach((slot) => {
-      const funcaoNoSlot = funcoes.find((f) => f.posicao === slot.posicao) || null;
-      const botao = document.createElement("button");
-      botao.type = "button";
-      botao.className = "preset-grid-slot";
-      botao.style.gridArea = slot.area;
-      botao.dataset.posicao = slot.posicao;
-      botao.classList.toggle("preset-grid-slot-vazio", !funcaoNoSlot);
-      botao.innerHTML = `
-        <span class="preset-grid-slot-label">${slot.rotulo}</span>
-        <span class="preset-grid-slot-funcao">${funcaoNoSlot ? escapeHtmlAdmin(funcaoNoSlot.rotulo) : "vazio"}</span>
-      `;
-      botao.addEventListener("click", () => {
-        Admin.abrirEscolhaSlot(preset, funcoes, slot, funcaoNoSlot);
-      });
-      visual.appendChild(botao);
-    });
-
-    const semPosicao = funcoes.filter((f) => !f.posicao);
-    const avisoEl = container.querySelector(".preset-grid-unassigned");
-    if (semPosicao.length > 0) {
-      avisoEl.textContent = `Sem posição no controle: ${semPosicao.map((f) => f.rotulo).join(", ")}`;
-      avisoEl.classList.remove("hidden");
-    }
-  },
-
-  abrirEscolhaSlot(preset, funcoes, slot, funcaoAtual) {
-    const existente = document.querySelector(".preset-slot-popover");
-    if (existente) existente.remove();
-
-    const popover = document.createElement("div");
-    popover.className = "preset-slot-popover";
-    const opcoes = funcoes
-      .filter((f) => !f.posicao || f.posicao === slot.posicao)
-      .map(
-        (f) => `<button type="button" class="choice-btn preset-slot-opcao" data-funcao-id="${f.id}">${escapeHtmlAdmin(f.rotulo)}</button>`
-      )
-      .join("");
-
-    popover.innerHTML = `
-      <div class="preset-slot-popover-title">${slot.rotulo}</div>
-      <div class="choice-row">
-        ${opcoes || "<span class=\"hint\">nenhuma função disponível</span>"}
-        ${funcaoAtual ? `<button type="button" class="choice-btn preset-slot-limpar">deixar vazio</button>` : ""}
-      </div>
-      <button type="button" class="link-btn preset-slot-fechar">fechar</button>
-    `;
-
-    document.body.appendChild(popover);
-    let aoClicarFora;
-    const fechar = () => {
-      popover.remove();
-      if (aoClicarFora) document.removeEventListener("click", aoClicarFora);
-    };
-
-    popover.querySelectorAll(".preset-slot-opcao").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const funcaoId = Number(btn.dataset.funcaoId);
-        const resp = await Api.atualizarFuncaoPreset(funcaoId, { posicao: slot.posicao });
-        if (!resp.ok) {
-          Toast.erro(resp.erro || "não foi possível definir a posição");
-          return;
-        }
-        fechar();
-        await Admin.carregarPresets();
-      });
-    });
-
-    const limparBtn = popover.querySelector(".preset-slot-limpar");
-    if (limparBtn) {
-      limparBtn.addEventListener("click", async () => {
-        const resp = await Api.atualizarFuncaoPreset(funcaoAtual.id, { posicao: null });
-        if (!resp.ok) {
-          Toast.erro(resp.erro || "não foi possível remover a posição");
-          return;
-        }
-        fechar();
-        await Admin.carregarPresets();
-      });
-    }
-
-    popover.querySelector(".preset-slot-fechar").addEventListener("click", fechar);
-    setTimeout(() => {
-      aoClicarFora = (ev) => {
-        if (!popover.contains(ev.target)) fechar();
-      };
-      document.addEventListener("click", aoClicarFora);
-    }, 0);
-  },
-
   async carregarProprietarios() {
     const select = document.getElementById("proprietariosSala");
     const salaAnterior = select.value;
@@ -968,7 +763,6 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "proprietarios") await Admin.carregarProprietarios();
     if (sub === "mapa") await Admin.carregarMapa();
     if (sub === "macs") await Admin.carregarMacs();
-    if (sub === "presets") await Admin.carregarPresets();
     if (sub === "config") await Admin.carregarConfiguracoes();
     if (sub === "esp32") await Esp32Admin.aoAbrir();
     else Esp32Admin.aoFechar();
@@ -988,6 +782,7 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     limiarOnlineMinutos: Number(document.getElementById("cfgLimiarOnline").value),
     temperaturaMinima: Number(document.getElementById("cfgTemperaturaMinima").value),
     temperaturaMaxima: Number(document.getElementById("cfgTemperaturaMaxima").value),
+    turboFuncaoExtra: document.getElementById("cfgTurboFuncaoExtra").value,
     modoTeste: document.getElementById("cfgModoTeste").checked,
     redesAutorizadas: document.getElementById("cfgRedesAutorizadas").value
       .split("\n")
@@ -1008,30 +803,6 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     ? null
     : resp.configuracoes.timeoutInatividadeMinutos;
   IdleTimer.iniciar(timeoutEfetivo, resp.configuracoes.popupAvisoSegundos);
-});
-
-document.getElementById("criarPresetBtn").addEventListener("click", async (e) => {
-  const botao = e.currentTarget;
-  if (botao.disabled) return;
-
-  const nome = document.getElementById("novoPresetNome").value.trim();
-  if (!nome) {
-    Toast.erro("informe o nome do preset");
-    return;
-  }
-
-  botao.disabled = true;
-  try {
-    const resp = await Api.criarPreset(nome);
-    if (!resp.ok) {
-      Toast.erro(resp.erro || "não foi possível criar o preset");
-      return;
-    }
-    document.getElementById("novoPresetNome").value = "";
-    await Admin.carregarPresets();
-  } finally {
-    botao.disabled = false;
-  }
 });
 
 document.getElementById("sessoesFiltroData").addEventListener("change", (e) => {

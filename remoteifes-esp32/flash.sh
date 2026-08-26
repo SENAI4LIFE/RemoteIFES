@@ -31,6 +31,6 @@ pio run --target upload $(detect_port_flag)
 
 echo
 echo "Firmware gravado com sucesso."
-echo "No primeiro boot, o ESP32 abre a rede Wi-Fi 'RemoteIFES-Setup' (protegida por senha,"
-echo "exibida no monitor serial); conecte-se a ela para informar a rede local, a sala, o"
-echo "endereço/token do servidor central e a senha de administração do dispositivo."
+echo "No primeiro boot, o ESP32 abre a rede Wi-Fi aberta 'RemoteIFES-Setup'."
+echo "Conecte-se a ela para informar a rede local e o endereço do servidor central."
+echo "Depois, vincule o endereço MAC do dispositivo a uma sala no painel web."
