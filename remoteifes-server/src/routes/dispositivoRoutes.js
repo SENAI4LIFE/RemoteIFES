@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const salasService = require("../services/salasService");
 const presetsService = require("../services/presetsService");
+const dispositivoTokenService = require("../services/dispositivoTokenService");
 const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
@@ -18,26 +19,28 @@ function tokensIguais(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+function salaDaRequisicao(req) {
+  if (typeof req.body?.sala === "string") return req.body.sala;
+  if (typeof req.query?.sala === "string") return req.query.sala;
+  return null;
+}
+
 function exigirDispositivo(req, res, next) {
-  if (!DEVICE_TOKEN) {
-    return res.status(503).json({ ok: false, erro: "autenticação de dispositivo não configurada no servidor" });
-  }
   const token = req.headers["x-device-token"];
-  if (!token || typeof token !== "string" || !tokensIguais(token, DEVICE_TOKEN)) {
+  if (!token || typeof token !== "string") {
+    return res.status(401).json({ ok: false, erro: "token de dispositivo inválido" });
+  }
+
+  const sala = salaDaRequisicao(req);
+  const tokenDaSalaValido = sala ? dispositivoTokenService.validarTokenDaSala(sala, token) : false;
+  const tokenGlobalValido = DEVICE_TOKEN ? tokensIguais(token, DEVICE_TOKEN) : false;
+
+  if (!tokenDaSalaValido && !tokenGlobalValido) {
     return res.status(401).json({ ok: false, erro: "token de dispositivo inválido" });
   }
   next();
 }
 
-// O DEVICE_TOKEN é compartilhado por todos os ESP32 do sistema (não há um
-// token por sala). Sem esta checagem, qualquer dispositivo de posse do
-// token global poderia agir em nome de qualquer outra sala informando um
-// valor arbitrário de "sala" no corpo da requisição. Quando a sala alvo já
-// tem um MAC cadastrado, exigimos que o cabeçalho x-device-mac (enviado
-// pelo firmware) corresponda a esse MAC. Dispositivos ainda não cadastrados
-// (sala sem MAC vinculado) ou firmwares antigos que não enviam o header
-// continuam funcionando normalmente — a checagem só bloqueia quando há um
-// MAC cadastrado E o header não bate com ele.
 function exigirMacDaSalaSeCadastrado(req, res, next) {
   const sala = typeof req.body?.sala === "string" ? req.body.sala : req.query?.sala;
   if (!sala || typeof sala !== "string") return next();
@@ -139,11 +142,6 @@ router.post("/dispositivo/preset", exigirDispositivo, exigirMacDaSalaSeCadastrad
   if (!salaRow) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
 
   try {
-    // O preset a ser alterado é sempre resolvido a partir do presetId já
-    // vinculado a esta sala (nunca por nome vindo do corpo da requisição),
-    // para que um dispositivo não possa sobrescrever o preset padrão
-    // compartilhado nem o preset de outra sala. Ver nota em
-    // presetsService.sincronizarPresetDaSala.
     const preset = presetsService.sincronizarPresetDaSala({
       presetIdAtual: salaRow.presetId || null,
       nome,

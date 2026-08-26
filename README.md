@@ -44,6 +44,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web,
 - [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade)
 - [Auditoria (Logs, Dispositivos e Acessos)](#auditoria-logs-dispositivos-e-acessos)
 - [Restrição de Rede](#restrição-de-rede)
+- [Segurança](#segurança)
 - [Tempo Real (WebSocket)](#tempo-real-websocket)
 - [Interface Web dos ESP32](#interface-web-dos-esp32)
 - [Acessibilidade](#acessibilidade)
@@ -74,7 +75,7 @@ remoteifes-esp32/    Firmware Arduino/ESP32 instalado em cada sala, ao lado do a
 
 Fluxo geral:
 
-1. Cada sala possui um **ESP32** com receptor/emissor de infravermelho (e, opcionalmente, um sensor de temperatura DHT), conectado à rede Wi-Fi local. O ESP32 aprende o protocolo IR do ar-condicionado (ou usa a biblioteca de protocolos conhecidos), envia comandos e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP, autenticado por um token de dispositivo (`DEVICE_TOKEN`).
+1. Cada sala possui um **ESP32** com receptor/emissor de infravermelho (e, opcionalmente, um sensor de temperatura DHT), conectado à rede Wi-Fi local. O ESP32 aprende o protocolo IR do ar-condicionado (ou usa a biblioteca de protocolos conhecidos), envia comandos e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP ou HTTPS, autenticado por um token de dispositivo (`DEVICE_TOKEN` global ou um token próprio da sala — veja [Segurança](#segurança)).
 
 2. O **servidor central** (`remoteifes-server`) mantém o banco de dados (SQLite), a lógica de autenticação, permissões, agendamentos, presets, notificações e configurações globais. Ele expõe uma API REST usada tanto pelo frontend web quanto pelos ESP32, além de um canal WebSocket (`/ws`) para atualização de status em tempo real no painel web.
 
@@ -192,9 +193,28 @@ Em `Admin`, três sub-abas registram o histórico operacional do sistema, todas 
 
 Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas (rede do IFES), configuradas pelo administrador principal em CIDR (ex.: `10.0.0.0/8`). Existe um **modo de teste**, também configurável apenas pelo administrador principal, que permite acesso de fora da rede autorizada — útil durante testes e homologação, e ativo por padrão em uma instalação nova. Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada. A mesma restrição de rede e de modo de teste vale para as conexões WebSocket, não apenas para a API HTTP.
 
+## Segurança
+
+Resumo das principais medidas de segurança implementadas no servidor central (detalhes específicos já aparecem nas seções acima):
+
+- **Senhas**: armazenadas como hash `bcrypt` (nunca em texto puro); mínimo de 8 caracteres.
+- **Sessões**: o token de sessão retornado no login é aleatório (`crypto.randomBytes`), mas o valor gravado no banco (`sessoes.token`) é o hash SHA-256 do token, não o token em si — um vazamento do banco de dados não permite sequestrar sessões ativas diretamente. Sessões inativas por mais de 24h são encerradas automaticamente pelo servidor.
+- **Autorização**: todos os papéis (usuário, administrador, administrador principal) e as permissões pontuais (proprietário de sala, acesso restrito) são checados no backend em cada rota, nunca apenas escondidos na interface.
+- **Dispositivos (ESP32)**: autenticação por token comparado em tempo constante (`crypto.timingSafeEqual`), mais verificação de MAC por sala já cadastrada, para impedir que um dispositivo assuma a identidade de outra sala. Além do `DEVICE_TOKEN` global (compartilhado por todos os dispositivos), o administrador principal pode gerar, em `Admin > ESP32 / MACs`, um **token próprio por sala** (armazenado com hash SHA-256, nunca em texto puro) — o servidor aceita tanto o token global quanto o token específico da sala, e o token de uma sala pode ser rotacionado ou revogado a qualquer momento sem afetar as demais salas nem exigir trocar o `DEVICE_TOKEN` de todos os outros dispositivos.
+- **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
+- **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`) e comandos manuais (`/comando`) têm limites por IP para reduzir força bruta e tempestades de comando; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood). O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
+- **Cabeçalhos HTTP**: todas as respostas incluem `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy`; em produção (`NODE_ENV=production`) também `Strict-Transport-Security`.
+- **CORS**: em produção, restrito às origens listadas em `CORS_ORIGIN`.
+- **Erros**: respostas de erro nunca incluem stack trace nem detalhes internos; exceções não tratadas são registradas apenas no log do servidor.
+- **Restrição de rede** e **modo de teste**: veja a seção [Restrição de Rede](#restrição-de-rede) acima.
+
 ## Tempo Real (WebSocket)
 
-O servidor expõe um endpoint WebSocket em `/ws`, autenticado pelo mesmo token de sessão usado na API HTTP (`?token=...`). Ao conectar, o cliente recebe a lista de salas e pode "observar" uma sala específica para receber atualizações do seu status assim que qualquer mudança ocorrer (comando manual, agendamento ou heartbeat do ESP32), sem precisar recarregar a tela. A conexão é também retransmitida periodicamente (a cada 30 segundos) como reforço, e o frontend reconecta automaticamente com espera crescente caso a conexão caia. Esse canal alimenta o assistente simples, a lista de salas, o mapa da planta baixa e o painel de controle de cada sala.
+O servidor expõe um endpoint WebSocket em `/ws`. Quando o cliente já está autenticado, o token de sessão é enviado pelo campo padrão `Sec-WebSocket-Protocol` do handshake (não por query string) — isso evita que o token fique registrado em logs de acesso de proxies reversos, que costumam gravar a URL completa da requisição. Ao conectar autenticado, o cliente recebe a lista de salas e pode "observar" uma sala específica para receber atualizações do seu status assim que qualquer mudança ocorrer (comando manual, agendamento ou heartbeat do ESP32), sem precisar recarregar a tela. A conexão é também retransmitida periodicamente (a cada 30 segundos) como reforço, e o frontend reconecta automaticamente com espera crescente caso a conexão caia. Esse canal alimenta o assistente simples, a lista de salas, o mapa da planta baixa e o painel de controle de cada sala.
+
+O frontend mantém uma única conexão WebSocket por aba (compartilhada entre a tela de status do servidor e o canal de salas/status), em vez de abrir conexões redundantes. O servidor também limita a quantidade de mensagens que uma conexão autenticada pode enviar em uma janela de tempo curta, encerrando a conexão em caso de flood.
+
+Se você configurar um proxy reverso manualmente (fora do `https-setup.sh`), garanta que ele propague os cabeçalhos `Upgrade` e `Connection` do handshake WebSocket — sem isso, `/ws` não funciona atrás do proxy. O `https-setup.sh` já gera a configuração de Nginx correta para isso.
 
 ## Interface Web dos ESP32
 
@@ -413,6 +433,16 @@ Para servir o frontend em um domínio próprio (em vez do endereço `github.io` 
 
 Com o frontend e o servidor central ambos em HTTPS e domínios próprios, o sistema funciona normalmente em navegadores de celular, incluindo ao adicionar a página como atalho na tela inicial. Como o WebSocket herda o esquema da página (`wss://` quando a página é `https://`), nenhuma configuração adicional é necessária para o tempo real funcionar sob HTTPS.
 
+### HTTPS entre o ESP32 e o servidor
+
+O firmware do ESP32 também pode se conectar ao servidor central via HTTPS, além do HTTP tradicional. Essa opção é escolhida no portal de configuração de cada dispositivo (a rede Wi-Fi `RemoteIFES-Setup`, exibida quando o ESP32 ainda não está configurado ou após um reset de Wi-Fi), no campo "Conexão com o servidor":
+
+- **HTTPS com certificado válido (recomendado)**: valida o certificado do servidor contra a cadeia raiz pública da Let's Encrypt (embarcada no firmware); use quando o servidor estiver atrás do `https-setup.sh` (Nginx + Certbot) ou de qualquer outro certificado emitido por essa autoridade.
+- **HTTPS sem validar certificado**: criptografa a conexão mas não confirma a identidade do servidor; use apenas em redes locais confiáveis com um certificado autoassinado (ex.: Raspberry Pi sem domínio público).
+- **HTTP sem criptografia**: comportamento anterior, mantido para compatibilidade com implantações apenas em rede local confiável.
+
+Dispositivos já configurados antes dessa opção existir continuam em HTTP até serem reconfigurados manualmente (reset de Wi-Fi e novo cadastro pelo portal) — a atualização do firmware sozinha não muda o modo de conexão de um dispositivo já em campo.
+
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
 
 Além do site publicado no GitHub Pages, o `remoteifes-web` pode ser instalado como **PWA** diretamente do navegador, e o mesmo frontend pode ser empacotado como **app nativo Android/iOS** pelo projeto `remoteifes-cordova/`. Nenhuma das duas formas exige reescrever ou duplicar a lógica da aplicação — ambas reaproveitam os arquivos de `remoteifes-web` como estão.
@@ -529,7 +559,7 @@ Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (ex
 | `import.py` | Atualiza a cópia local a partir do remoto (`git pull origin main`) |
 | `clear.py` | Recria o histórico do repositório do zero em um único commit (`checkout --orphan`) e, mediante confirmação explícita, sobrescreve o histórico remoto (`push -f`) — apaga permanentemente todo o histórico de commits anterior; use apenas se isso for intencional |
 
-O repositório não inclui um arquivo `.gitignore`. Antes do primeiro commit, é recomendável ignorar ao menos `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (`DEVICE_TOKEN`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas).
+O repositório inclui um `.gitignore` na raiz que já ignora `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (`DEVICE_TOKEN`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas). Se você clonou uma cópia antiga do repositório em que esse arquivo não existia e chegou a commitar `.env` ou o banco, rode `git rm --cached` nesses arquivos e gere um novo `DEVICE_TOKEN` antes de publicar o repositório.
 
 ## Uso da API do GitHub
 

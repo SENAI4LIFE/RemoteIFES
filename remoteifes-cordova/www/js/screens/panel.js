@@ -236,16 +236,13 @@ function proximoValorNumeroDirecional(funcao, atual, direcao) {
   return Math.min(max, Math.max(min, proximo));
 }
 
-async function enviarComandoFuncao(chave, novoValor) {
+async function enviarComandoFuncao(chave, novoValor, botaoClicado) {
+  if (botaoClicado) botaoClicado.disabled = true;
   const resp = await Api.enviarComando(state.salaAtual, chave, novoValor);
   if (!resp.ok) {
     Toast.erro(resp.erro || "não foi possível enviar o comando");
-    return;
   }
-  _funcoesEstadoAtuais[chave] = novoValor;
-  const alvo = document.querySelector(`[data-chave="${CSS.escape(chave)}"]`);
-  const funcao = localizarFuncao(chave);
-  if (alvo && funcao) aplicarEstadoVisual(alvo, funcao);
+  await refreshStatus();
 }
 
 document.getElementById("acRemoteBody").addEventListener("click", (event) => {
@@ -258,19 +255,19 @@ document.getElementById("acRemoteBody").addEventListener("click", (event) => {
   if (funcao.tipo === "booleano") novoValor = proximoValorBooleano(!!valorAtual);
   else if (funcao.tipo === "selecao") novoValor = proximoValorSelecao(funcao, valorAtual);
   else novoValor = proximoValorNumero(funcao, valorAtual);
-  enviarComandoFuncao(funcao.chave, novoValor);
+  enviarComandoFuncao(funcao.chave, novoValor, botao);
 });
 
-document.getElementById("fanUp").addEventListener("click", () => {
-  if (!_fanFuncao) return;
+document.getElementById("fanUp").addEventListener("click", (event) => {
+  if (!_fanFuncao || event.currentTarget.disabled) return;
   const novoValor = proximoValorNumeroDirecional(_fanFuncao, _funcoesEstadoAtuais[_fanFuncao.chave], 1);
-  enviarComandoFuncao(_fanFuncao.chave, novoValor);
+  enviarComandoFuncao(_fanFuncao.chave, novoValor, event.currentTarget);
 });
 
-document.getElementById("fanDown").addEventListener("click", () => {
-  if (!_fanFuncao) return;
+document.getElementById("fanDown").addEventListener("click", (event) => {
+  if (!_fanFuncao || event.currentTarget.disabled) return;
   const novoValor = proximoValorNumeroDirecional(_fanFuncao, _funcoesEstadoAtuais[_fanFuncao.chave], -1);
-  enviarComandoFuncao(_fanFuncao.chave, novoValor);
+  enviarComandoFuncao(_fanFuncao.chave, novoValor, event.currentTarget);
 });
 
 function aplicarStatusNoPainel(status) {
@@ -314,31 +311,40 @@ async function refreshStatus() {
   }
 }
 
-document.getElementById("btnPower").addEventListener("click", async () => {
-  const ligado = document.getElementById("btnPower").classList.contains("is-on");
+document.getElementById("btnPower").addEventListener("click", async (event) => {
+  const botao = event.currentTarget;
+  if (botao.disabled) return;
+  botao.disabled = true;
+  const ligado = botao.classList.contains("is-on");
   const resp = await Api.enviarComando(state.salaAtual, ligado ? "desligar" : "ligar");
   if (!resp.ok) {
-    Toast.erro(resp.erro);
+    Toast.erro(resp.erro || "não foi possível enviar o comando");
   }
   await refreshStatus();
 });
 
-document.getElementById("tempUp").addEventListener("click", async () => {
+document.getElementById("tempUp").addEventListener("click", async (event) => {
+  const botao = event.currentTarget;
+  if (botao.disabled) return;
+  botao.disabled = true;
   const max = state.tempMaxima ?? 30;
   const novoAlvo = Math.min(max, state.tempAlvo + 1);
   const resp = await Api.enviarComando(state.salaAtual, "temperatura", novoAlvo);
-  if (resp.ok) {
-    state.tempAlvo = novoAlvo;
-    document.getElementById("tempTarget").textContent = `${state.tempAlvo}°C`;
+  if (!resp.ok) {
+    Toast.erro(resp.erro || "não foi possível enviar o comando");
   }
+  await refreshStatus();
 });
 
-document.getElementById("tempDown").addEventListener("click", async () => {
+document.getElementById("tempDown").addEventListener("click", async (event) => {
+  const botao = event.currentTarget;
+  if (botao.disabled) return;
+  botao.disabled = true;
   const min = state.tempMinima ?? 16;
   const novoAlvo = Math.max(min, state.tempAlvo - 1);
   const resp = await Api.enviarComando(state.salaAtual, "temperatura", novoAlvo);
-  if (resp.ok) {
-    state.tempAlvo = novoAlvo;
-    document.getElementById("tempTarget").textContent = `${state.tempAlvo}°C`;
+  if (!resp.ok) {
+    Toast.erro(resp.erro || "não foi possível enviar o comando");
   }
+  await refreshStatus();
 });

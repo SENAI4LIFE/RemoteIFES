@@ -8,6 +8,8 @@ const ServerStatus = (() => {
   let acessoManualLiberado = false;
   let manutencaoAtiva = false;
   const ouvintesPronto = new Set();
+  const ouvintesMensagem = new Set();
+  const ouvintesConectado = new Set();
   const ATRASO_TELA_CONECTANDO = 300;
 
   const tela = document.getElementById("screen-server-status");
@@ -28,8 +30,11 @@ const ServerStatus = (() => {
   function wsUrl() {
     const base = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || "http://localhost:8080";
     const wsBase = base.replace(/^http/, "ws");
-    const token = (typeof Api !== "undefined" && Api.obterToken()) || "";
-    return `${wsBase}/ws?token=${encodeURIComponent(token)}`;
+    return `${wsBase}/ws`;
+  }
+
+  function wsToken() {
+    return (typeof Api !== "undefined" && Api.obterToken()) || "";
   }
 
   function mostrarEmoji(caractere) {
@@ -120,7 +125,11 @@ const ServerStatus = (() => {
   }
 
   function processarMensagem(msg) {
-    if (!msg || msg.tipo !== "servidor") return;
+    if (!msg) return;
+    if (msg.tipo !== "servidor") {
+      ouvintesMensagem.forEach((cb) => cb(msg));
+      return;
+    }
     limparEstadoConectandoAgendado();
     if (msg.manutencao) {
       definirManutencao(true);
@@ -150,7 +159,8 @@ const ServerStatus = (() => {
 
     let socket;
     try {
-      socket = new WebSocket(wsUrl());
+      const token = wsToken();
+      socket = token ? new WebSocket(wsUrl(), [token]) : new WebSocket(wsUrl());
       ws = socket;
     } catch (err) {
       if (idConexao === conexaoId) agendarReconexao();
@@ -160,6 +170,7 @@ const ServerStatus = (() => {
     socket.addEventListener("open", () => {
       if (idConexao !== conexaoId || ws !== socket) return;
       tentativas = 0;
+      ouvintesConectado.forEach((cb) => cb());
     });
 
     socket.addEventListener("message", (event) => {
@@ -208,6 +219,28 @@ const ServerStatus = (() => {
     ouvintesPronto.add(cb);
     if (confirmado) cb();
     return () => ouvintesPronto.delete(cb);
+  }
+
+  function aoMensagem(cb) {
+    ouvintesMensagem.add(cb);
+    return () => ouvintesMensagem.delete(cb);
+  }
+
+  function aoConectar(cb) {
+    ouvintesConectado.add(cb);
+    return () => ouvintesConectado.delete(cb);
+  }
+
+  function enviar(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(obj));
+      return true;
+    }
+    return false;
+  }
+
+  function estaConectado() {
+    return !!ws && ws.readyState === WebSocket.OPEN;
   }
 
   acessoAdminBtn.addEventListener("click", () => {
@@ -263,5 +296,15 @@ const ServerStatus = (() => {
     return true;
   }
 
-  return { conectar, aoFicarPronto, reconectarComTokenAtual, emManutencao, exibirManutencaoSeAtiva };
+  return {
+    conectar,
+    aoFicarPronto,
+    reconectarComTokenAtual,
+    emManutencao,
+    exibirManutencaoSeAtiva,
+    aoMensagem,
+    aoConectar,
+    enviar,
+    estaConectado,
+  };
 })();

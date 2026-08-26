@@ -74,9 +74,16 @@ function remover(id) {
   if (!preset) throw new Error("preset não encontrado");
   if (preset.padrao) throw new Error("não é possível remover o preset padrão");
 
-  db.prepare(`UPDATE salas SET presetId = NULL WHERE presetId = ?`).run(id);
-  db.prepare(`DELETE FROM preset_funcoes WHERE presetId = ?`).run(id);
-  db.prepare(`DELETE FROM presets WHERE id = ?`).run(id);
+  db.exec("BEGIN");
+  try {
+    db.prepare(`UPDATE salas SET presetId = NULL WHERE presetId = ?`).run(id);
+    db.prepare(`DELETE FROM preset_funcoes WHERE presetId = ?`).run(id);
+    db.prepare(`DELETE FROM presets WHERE id = ?`).run(id);
+    db.exec("COMMIT");
+  } catch (erro) {
+    db.exec("ROLLBACK");
+    throw erro;
+  }
 }
 
 function validarPosicao(posicao) {
@@ -150,20 +157,6 @@ function removerFuncao(funcaoId) {
   return buscarPorId(funcao.presetId);
 }
 
-// Usado por POST /dispositivo/preset. Antes, esta função procurava/criava o
-// preset por NOME de forma global: qualquer ESP32 de posse do DEVICE_TOKEN
-// (compartilhado por todos os dispositivos) podia enviar nome: "Padrão" (ou
-// o nome de um preset já usado por outra sala) e ter seus dados
-// sobrescritos, mesmo estando vinculado a uma sala diferente — o
-// middleware exigirMacDaSalaSeCadastrado valida a "sala" da requisição, mas
-// não tem relação nenhuma com qual preset é afetado por nome. Isso incluía
-// o preset padrão (padrao = 1), usado como fallback por toda sala sem
-// preset próprio, tornando qualquer dispositivo capaz de alterar o
-// controle de TODAS as salas não vinculadas a um preset customizado.
-// Agora a identidade do preset a ser alterado vem do presetId já
-// associado à própria sala do dispositivo (presetIdAtual), nunca de uma
-// busca por nome global; se a sala ainda usa o preset padrão (ou o
-// presetId não existe mais), um preset novo e exclusivo é criado para ela.
 function sincronizarPresetDaSala({ presetIdAtual, nome, funcoes }) {
   if (!nome || !nome.trim()) throw new Error("informe o nome do preset");
   if (!Array.isArray(funcoes) || funcoes.length === 0) throw new Error("informe ao menos uma função");
@@ -173,16 +166,10 @@ function sincronizarPresetDaSala({ presetIdAtual, nome, funcoes }) {
   if (existente && !existente.padrao) {
     presetId = existente.id;
     const colisao = buscarPorNome(nome.trim());
-    // Só renomeia se o nome não pertencer a OUTRO preset já existente;
-    // colidir aqui não pode disparar um UPDATE cruzado nem uma falha de
-    // constraint — mantém o nome atual e segue apenas atualizando funções.
     if (!colisao || colisao.id === presetId) {
       db.prepare(`UPDATE presets SET nome = ? WHERE id = ?`).run(nome.trim(), presetId);
     }
   } else {
-    // Sala ainda sem preset próprio (usa o padrão) ou presetId órfão:
-    // cria um preset novo e exclusivo para esta sala em vez de reaproveitar
-    // (por nome) um preset que pode já pertencer a outra sala.
     let nomeFinal = nome.trim();
     let sufixo = 2;
     while (buscarPorNome(nomeFinal)) {

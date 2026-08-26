@@ -1,9 +1,3 @@
-// Testes de regressão de segurança (autorização entre salas/dispositivos).
-//
-// Rodar isoladamente do banco de desenvolvimento:
-//   REMOTEIFES_DB_PATH=:memory: node --test test/security-regression.test.js
-// (ou apenas `npm test`, que já define a variável).
-
 process.env.REMOTEIFES_DB_PATH = process.env.REMOTEIFES_DB_PATH || ":memory:";
 process.env.DEVICE_TOKEN = process.env.DEVICE_TOKEN || "test-only-device-token";
 process.env.NODE_ENV = "test";
@@ -18,6 +12,7 @@ require("../src/db/seed").popularBanco();
 const salasService = require("../src/services/salasService");
 const presetsService = require("../src/services/presetsService");
 const usuariosService = require("../src/services/usuariosService");
+const tokenService = require("../src/services/tokenService");
 
 function novaSala(sala) {
   db.prepare(
@@ -117,4 +112,37 @@ test("achado #12 — superadmin ainda consegue excluir um admin normalmente", ()
 
   usuariosService.remover(admin.id, { id: 999999, nivel: usuariosService.NIVEL_SUPERADMIN });
   assert.equal(usuariosService.buscarPorId(admin.id), undefined, "o superadmin deve conseguir remover o admin");
+});
+
+test("achado #14 — remover um usuário que já fez login não falha por FOREIGN KEY (sessoes)", () => {
+  const usuario = usuariosService.criar(
+    { usuario: "teste-usuario-14", senha: "senhaSegura123", nome: "Usuário Com Sessão", podeControlar: true },
+    { nivel: 3 }
+  );
+  tokenService.gerarToken(usuario.id);
+  tokenService.gerarToken(usuario.id);
+
+  assert.doesNotThrow(() => usuariosService.remover(usuario.id, { id: 999999, nivel: usuariosService.NIVEL_SUPERADMIN }));
+  assert.equal(usuariosService.buscarPorId(usuario.id), undefined, "o usuário deve ter sido removido");
+  const sessoesRestantes = db.prepare(`SELECT COUNT(*) AS total FROM sessoes WHERE usuarioId = ?`).get(usuario.id);
+  assert.equal(sessoesRestantes.total, 0, "as sessões do usuário removido não devem sobrar órfãs");
+});
+
+test("achado #16 — o token de sessão não é armazenado em texto puro no banco", () => {
+  const usuario = usuariosService.criar(
+    { usuario: "teste-usuario-16", senha: "senhaSegura123", nome: "Usuário Token", podeControlar: true },
+    { nivel: 3 }
+  );
+  const token = tokenService.gerarToken(usuario.id);
+
+  const linha = db.prepare(`SELECT token FROM sessoes WHERE usuarioId = ? ORDER BY id DESC LIMIT 1`).get(usuario.id);
+  assert.notEqual(linha.token, token, "o valor gravado não pode ser o token em texto puro");
+  assert.equal(linha.token.length, 64, "o valor gravado deve ser o hash sha256 (64 hex) do token");
+
+  const validado = tokenService.validarToken(token);
+  assert.ok(validado, "validarToken deve continuar aceitando o token original em texto puro");
+  assert.equal(validado.id, usuario.id);
+
+  tokenService.removerToken(token);
+  assert.equal(tokenService.validarToken(token), null, "após logout, o token não deve mais validar");
 });

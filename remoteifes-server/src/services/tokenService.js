@@ -5,19 +5,24 @@ const { paraEpochMs } = require("../utils/tempo");
 
 const NIVEL_ADMIN = 2;
 
+function hashToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
 function gerarToken(usuarioId) {
   const token = crypto.randomBytes(24).toString("hex");
-  db.prepare(`INSERT INTO sessoes (token, usuarioId) VALUES (?, ?)`).run(token, usuarioId);
+  db.prepare(`INSERT INTO sessoes (token, usuarioId) VALUES (?, ?)`).run(hashToken(token), usuarioId);
   return token;
 }
 
 function validarToken(token) {
+  const tokenHash = hashToken(token);
   const sessao = db.prepare(`
     SELECT s.token, s.ultimoUso, u.*
     FROM sessoes s
     JOIN usuarios u ON u.id = s.usuarioId
     WHERE s.token = ? AND s.logout IS NULL AND u.ativo = 1
-  `).get(token);
+  `).get(tokenHash);
 
   if (!sessao) return null;
 
@@ -30,12 +35,12 @@ function validarToken(token) {
     }
   }
 
-  db.prepare(`UPDATE sessoes SET ultimoUso = datetime('now') WHERE token = ?`).run(token);
+  db.prepare(`UPDATE sessoes SET ultimoUso = datetime('now') WHERE token = ?`).run(tokenHash);
   return sessao;
 }
 
 function removerToken(token) {
-  db.prepare(`UPDATE sessoes SET logout = datetime('now') WHERE token = ? AND logout IS NULL`).run(token);
+  db.prepare(`UPDATE sessoes SET logout = datetime('now') WHERE token = ? AND logout IS NULL`).run(hashToken(token));
 }
 
 function removerSessoesDoUsuario(usuarioId) {

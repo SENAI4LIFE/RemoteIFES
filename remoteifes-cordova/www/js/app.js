@@ -13,9 +13,6 @@ document.getElementById("homeBtn").addEventListener("click", () => {
   mostrarPortal();
 });
 
-// Só tenta restaurar a sessão (e portanto exibir o app) depois que a tela de
-// status confirmar que o servidor está no ar e fora de manutenção. Evita que
-// uma falha de rede passageira ou o servidor fora do ar pareçam um logout.
 ServerStatus.aoFicarPronto(() => {
   restaurarSessaoSalva();
 });
