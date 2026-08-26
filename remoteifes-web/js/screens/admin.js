@@ -312,7 +312,6 @@ const Admin = {
     for (const s of salas) {
       const li = document.createElement("li");
       li.id = `macCard-${s.sala}`;
-      const infoToken = await Api.infoTokenDispositivo(s.sala);
       li.innerHTML = `
         <div class="mac-row" style="width:100%">
           <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
@@ -328,15 +327,6 @@ const Admin = {
             ${s.ipEsp32 ? `<button type="button" class="link-btn acessar-esp32">acessar interface do ESP32</button>` : `<span class="hint">IP ainda não reportado</span>`}
           </div>
           <p class="error hidden mac-error"></p>
-
-          <label>Token de autenticação do dispositivo</label>
-          <p class="hint token-status">${infoToken.ok && infoToken.existe ? "token próprio configurado" : "usando o token global do servidor"}</p>
-          <div class="two-col">
-            <button type="button" class="link-btn gerar-token">${infoToken.ok && infoToken.existe ? "rotacionar token" : "gerar token próprio"}</button>
-            <button type="button" class="link-btn danger revogar-token" ${infoToken.ok && infoToken.existe ? "" : "disabled"}>revogar token próprio</button>
-          </div>
-          <p class="hint token-valor hidden"></p>
-          <p class="error hidden token-error"></p>
 
           <label class="checkbox-label">
             <input type="checkbox" class="acesso-restrito-check" ${s.acessoRestrito ? "checked" : ""} /> Restringir controle desta sala a usuários específicos
@@ -363,54 +353,6 @@ const Admin = {
           errorEl.textContent = resp.erro || "não foi possível salvar o MAC";
           errorEl.classList.remove("hidden");
         }
-      });
-
-      const gerarTokenBtn = li.querySelector(".gerar-token");
-      const revogarTokenBtn = li.querySelector(".revogar-token");
-      const tokenErrorEl = li.querySelector(".token-error");
-      const tokenValorEl = li.querySelector(".token-valor");
-      const tokenStatusEl = li.querySelector(".token-status");
-
-      gerarTokenBtn.addEventListener("click", async () => {
-        if (gerarTokenBtn.disabled) return;
-        tokenErrorEl.classList.add("hidden");
-        tokenValorEl.classList.add("hidden");
-        const confirmado = confirm("Gerar um novo token invalida imediatamente o token próprio atual desta sala (o dispositivo precisará ser reconfigurado). Continuar?");
-        if (!confirmado) return;
-        gerarTokenBtn.disabled = true;
-        try {
-          const resp = await Api.gerarTokenDispositivo(s.sala);
-          if (!resp.ok) {
-            tokenErrorEl.textContent = resp.erro || "não foi possível gerar o token";
-            tokenErrorEl.classList.remove("hidden");
-            return;
-          }
-          tokenValorEl.textContent = `novo token (copie agora, não será mostrado novamente): ${resp.token}`;
-          tokenValorEl.classList.remove("hidden");
-          tokenStatusEl.textContent = "token próprio configurado";
-          gerarTokenBtn.textContent = "rotacionar token";
-          revogarTokenBtn.disabled = false;
-        } finally {
-          gerarTokenBtn.disabled = false;
-        }
-      });
-
-      revogarTokenBtn.addEventListener("click", async () => {
-        if (revogarTokenBtn.disabled) return;
-        tokenErrorEl.classList.add("hidden");
-        const confirmado = confirm("Revogar o token próprio desta sala? O dispositivo passará a usar o token global do servidor (se configurado).");
-        if (!confirmado) return;
-        revogarTokenBtn.disabled = true;
-        const resp = await Api.revogarTokenDispositivo(s.sala);
-        if (!resp.ok) {
-          tokenErrorEl.textContent = resp.erro || "não foi possível revogar o token";
-          tokenErrorEl.classList.remove("hidden");
-          revogarTokenBtn.disabled = false;
-          return;
-        }
-        tokenStatusEl.textContent = "usando o token global do servidor";
-        tokenValorEl.classList.add("hidden");
-        gerarTokenBtn.textContent = "gerar token próprio";
       });
 
       li.querySelector(".preset-select").addEventListener("change", async (e) => {
@@ -660,7 +602,6 @@ const Admin = {
 
     presets.forEach((p) => {
       const li = document.createElement("li");
-      const inputId = `presetJsonInput-${p.id}`;
       li.innerHTML = `
         <div>
           <div class="room-name">${escapeHtmlAdmin(p.nome)} ${p.padrao ? "· padrão" : ""}</div>
@@ -681,11 +622,6 @@ const Admin = {
             <input type="text" class="preset-nova-funcao-opcoes" placeholder="opções (numérico: min,max · seleção: a,b,c)" />
             <button type="button" class="btn btn-on adicionar-funcao-preset">Adicionar função</button>
           </div>
-          <div class="preset-upload-row">
-            <input type="file" id="${inputId}" accept="application/json,.json" />
-            <button type="button" class="preset-upload-btn carregar-json-preset">Carregar JSON</button>
-            <span class="preset-upload-hint">importar várias funções de uma vez a partir de um arquivo</span>
-          </div>
           <div class="preset-grid-editor"></div>
         </div>
         ${!p.padrao ? `<button type="button" class="link-btn danger remover-preset">remover</button>` : ""}
@@ -694,82 +630,71 @@ const Admin = {
       li.querySelectorAll(".preset-funcao-remover").forEach((btn) => {
         btn.addEventListener("click", async () => {
           if (!confirm("Remover esta função do preset?")) return;
+          btn.disabled = true;
           const resp = await Api.removerFuncaoPreset(Number(btn.dataset.funcaoId));
-          if (!resp.ok) alert(resp.erro || "não foi possível remover a função");
+          if (!resp.ok) Toast.erro(resp.erro || "não foi possível remover a função");
           await Admin.carregarPresets();
         });
       });
 
-      li.querySelector(".adicionar-funcao-preset").addEventListener("click", async () => {
-        const chave = li.querySelector(".preset-nova-funcao-chave").value.trim();
+      const adicionarFuncaoBtn = li.querySelector(".adicionar-funcao-preset");
+      adicionarFuncaoBtn.addEventListener("click", async () => {
+        const chave = li.querySelector(".preset-nova-funcao-chave").value.trim().toLowerCase();
         const rotulo = li.querySelector(".preset-nova-funcao-rotulo").value.trim();
         const tipo = li.querySelector(".preset-nova-funcao-tipo").value;
         const opcoesTexto = li.querySelector(".preset-nova-funcao-opcoes").value.trim();
 
         if (!chave || !rotulo) {
-          alert("informe a chave e o rótulo da nova função");
+          Toast.erro("informe a chave e o rótulo da nova função");
+          return;
+        }
+        if (!/^[a-z0-9_]+$/.test(chave)) {
+          Toast.erro("a chave deve conter apenas letras minúsculas, números e underscore (ex.: turbo, modo_eco)");
           return;
         }
 
         let opcoes = null;
         if (tipo === "numero" && opcoesTexto) {
           const [min, max] = opcoesTexto.split(",").map((v) => Number(v.trim()));
-          if (Number.isFinite(min) && Number.isFinite(max)) opcoes = { min, max };
+          if (!Number.isFinite(min) || !Number.isFinite(max)) {
+            Toast.erro("opções numéricas devem estar no formato min,max (ex.: 16,30)");
+            return;
+          }
+          opcoes = { min, max };
         } else if (tipo === "selecao" && opcoesTexto) {
           opcoes = opcoesTexto.split(",").map((v) => v.trim()).filter(Boolean);
+          if (opcoes.length === 0) {
+            Toast.erro("informe ao menos uma opção separada por vírgula (ex.: baixo,médio,alto)");
+            return;
+          }
         }
 
-        const resp = await Api.adicionarFuncaoPreset(p.id, { chave, rotulo, tipo, opcoes });
-        if (!resp.ok) {
-          alert(resp.erro || "não foi possível adicionar a função");
-          return;
+        adicionarFuncaoBtn.disabled = true;
+        try {
+          const resp = await Api.adicionarFuncaoPreset(p.id, { chave, rotulo, tipo, opcoes });
+          if (!resp.ok) {
+            Toast.erro(resp.erro || "não foi possível adicionar a função");
+            return;
+          }
+          await Admin.carregarPresets();
+        } finally {
+          adicionarFuncaoBtn.disabled = false;
         }
-        await Admin.carregarPresets();
       });
       const removerBtn = li.querySelector(".remover-preset");
       if (removerBtn) {
         removerBtn.addEventListener("click", async () => {
           if (!confirm(`Remover o preset "${p.nome}"? As salas que o utilizam voltarão ao preset padrão.`)) return;
+          removerBtn.disabled = true;
           const resp = await Api.removerPreset(p.id);
-          if (!resp.ok) alert(resp.erro || "não foi possível remover o preset");
+          if (!resp.ok) {
+            Toast.erro(resp.erro || "não foi possível remover o preset");
+            removerBtn.disabled = false;
+            return;
+          }
           await Admin.carregarPresets();
         });
       }
-
-      const fileInput = li.querySelector(`#${inputId}`);
-      li.querySelector(".carregar-json-preset").addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", async () => {
-        const arquivo = fileInput.files && fileInput.files[0];
-        if (!arquivo) return;
-        try {
-          const texto = await arquivo.text();
-          const dados = JSON.parse(texto);
-          const funcoes = Array.isArray(dados) ? dados : dados.funcoes;
-          if (!Array.isArray(funcoes) || funcoes.length === 0) {
-            throw new Error("o arquivo não contém uma lista de funções válida");
-          }
-
-          let sucesso = 0;
-          let falhas = 0;
-          for (const f of funcoes) {
-            if (!f || !f.chave || f.chave === "temperatura") continue;
-            const payload = { chave: f.chave, rotulo: f.rotulo, tipo: f.tipo, opcoes: f.opcoes ?? null, ordem: f.ordem };
-            const existente = p.funcoes.find((pf) => pf.chave === f.chave);
-            const resp = existente
-              ? await Api.atualizarFuncaoPreset(existente.id, payload)
-              : await Api.adicionarFuncaoPreset(p.id, payload);
-            if (resp.ok) sucesso += 1;
-            else falhas += 1;
-          }
-
-          alert(`${sucesso} função(ões) carregada(s)${falhas ? `, ${falhas} com erro` : ""}.`);
-          await Admin.carregarPresets();
-        } catch (err) {
-          alert(err.message || "não foi possível ler o arquivo JSON");
-        } finally {
-          fileInput.value = "";
-        }
-      });
 
       const funcoesPosicionaveis = p.funcoes.filter((f) => f.chave !== "temperatura");
       if (funcoesPosicionaveis.length > 0) {
@@ -781,9 +706,9 @@ const Admin = {
   },
 
   SLOTS_CONTROLE: [
-    { posicao: "flank_esq", rotulo: "Flank esq.", area: "flank_esq" },
-    { posicao: "flank_dir", rotulo: "Flank dir.", area: "flank_dir" },
-    { posicao: "fan", rotulo: "Fan (steppers)", area: "fan" },
+    { posicao: "flank_esq", rotulo: "Botão esq.", area: "flank_esq" },
+    { posicao: "flank_dir", rotulo: "Botão dir.", area: "flank_dir" },
+    { posicao: "fan", rotulo: "Ventilador (+/-)", area: "fan" },
     { posicao: "grid_topo_1", rotulo: "Topo 1", area: "grid_topo_1" },
     { posicao: "grid_topo_2", rotulo: "Topo 2", area: "grid_topo_2" },
     { posicao: "grid_topo_3", rotulo: "Topo 3", area: "grid_topo_3" },
@@ -798,7 +723,7 @@ const Admin = {
   montarGridEditor(container, preset, funcoes) {
     container.innerHTML = `
       <div class="preset-grid-head">Posição dos botões no controle</div>
-      <p class="preset-grid-hint">Clique em um espaço do controle para escolher a função que aparece nele. Funções sem posição não aparecem no controle.</p>
+      <p class="preset-grid-hint">Clique em um espaço do controle para escolher a função que aparece nele. "Liga/desliga" já ocupa o centro superior automaticamente. "Ventilador" fica ao lado dos botões esq./dir. e usa setas para cima/baixo, em vez de um botão único. Funções sem posição definida não aparecem no controle exibido ao usuário.</p>
       <div class="preset-grid-visual"></div>
       <p class="preset-grid-unassigned hidden"></p>
     `;

@@ -75,7 +75,7 @@ remoteifes-esp32/    Firmware Arduino/ESP32 instalado em cada sala, ao lado do a
 
 Fluxo geral:
 
-1. Cada sala possui um **ESP32** com receptor/emissor de infravermelho (e, opcionalmente, um sensor de temperatura DHT), conectado à rede Wi-Fi local. O ESP32 aprende o protocolo IR do ar-condicionado (ou usa a biblioteca de protocolos conhecidos), envia comandos e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP ou HTTPS, autenticado por um token de dispositivo (`DEVICE_TOKEN` global ou um token próprio da sala — veja [Segurança](#segurança)).
+1. Cada sala possui um **ESP32** com receptor/emissor de infravermelho (e, opcionalmente, um sensor de temperatura DHT), conectado à rede Wi-Fi local. O ESP32 aprende o protocolo IR do ar-condicionado (ou usa a biblioteca de protocolos conhecidos), envia comandos e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP ou HTTPS, identificado pelo MAC do dispositivo (veja [Segurança](#segurança)).
 
 2. O **servidor central** (`remoteifes-server`) mantém o banco de dados (SQLite), a lógica de autenticação, permissões, agendamentos, presets, notificações e configurações globais. Ele expõe uma API REST usada tanto pelo frontend web quanto pelos ESP32, além de um canal WebSocket (`/ws`) para atualização de status em tempo real no painel web.
 
@@ -200,7 +200,7 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Senhas**: armazenadas como hash `bcrypt` (nunca em texto puro); mínimo de 8 caracteres.
 - **Sessões**: o token de sessão retornado no login é aleatório (`crypto.randomBytes`), mas o valor gravado no banco (`sessoes.token`) é o hash SHA-256 do token, não o token em si — um vazamento do banco de dados não permite sequestrar sessões ativas diretamente. Sessões inativas por mais de 24h são encerradas automaticamente pelo servidor.
 - **Autorização**: todos os papéis (usuário, administrador, administrador principal) e as permissões pontuais (proprietário de sala, acesso restrito) são checados no backend em cada rota, nunca apenas escondidos na interface.
-- **Dispositivos (ESP32)**: autenticação por token comparado em tempo constante (`crypto.timingSafeEqual`), mais verificação de MAC por sala já cadastrada, para impedir que um dispositivo assuma a identidade de outra sala. Além do `DEVICE_TOKEN` global (compartilhado por todos os dispositivos), o administrador principal pode gerar, em `Admin > ESP32 / MACs`, um **token próprio por sala** (armazenado com hash SHA-256, nunca em texto puro) — o servidor aceita tanto o token global quanto o token específico da sala, e o token de uma sala pode ser rotacionado ou revogado a qualquer momento sem afetar as demais salas nem exigir trocar o `DEVICE_TOKEN` de todos os outros dispositivos.
+- **Dispositivos (ESP32)**: autenticação por endereço MAC. Enquanto uma sala não tem um MAC cadastrado (`Admin > ESP32 / MACs`), qualquer dispositivo que se identifique com o código dessa sala é aceito (permite a detecção/vinculação inicial do ESP32). Assim que o administrador principal cadastra o MAC do ESP32 físico da sala, o servidor passa a exigir que todas as chamadas dessa sala (heartbeat, WebSocket de dispositivo, comandos, acesso) venham exatamente daquele MAC — chamadas com um MAC diferente são rejeitadas, o que impede que outro dispositivo na mesma rede assuma a identidade da sala.
 - **Senha de administração do ESP32**: obrigatória desde o provisionamento (mínimo 6 caracteres), armazenada no dispositivo apenas como hash SHA-256 — é exigida para sair do modo de operação e entrar em modo de configuração/clonagem, e nunca trafega nem fica salva em texto puro. Sem ela, ninguém consegue colocar um ESP32 em modo de aprendizado de infravermelho remotamente, mesmo tendo acesso à aba `Admin > ESP32`.
 - **Ponto de acesso de configuração**: a rede `RemoteIFES-Setup`, aberta pelo ESP32 durante o provisionamento ou após um reset de Wi-Fi, é sempre protegida por senha (gerada aleatoriamente na primeira vez, persistida no dispositivo e exibida apenas no monitor serial) — nunca fica aberta.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
@@ -273,7 +273,7 @@ npm run setup
 npm start
 ```
 
-`npm run setup` verifica o Node.js instalado e, em Linux (x64, ARM64 ou ARMv7 — cobre qualquer Raspberry Pi) ou macOS (via Homebrew), instala automaticamente a versão 22.13+ quando necessário; em seguida instala as dependências, cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista) e gera automaticamente um `DEVICE_TOKEN` aleatório. Rodar `npm run setup` novamente não sobrescreve um `.env` já existente. Para manter o servidor rodando permanentemente e reiniciando sozinho no boot (essencial em um Raspberry Pi dedicado), veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi).
+`npm run setup` verifica o Node.js instalado e, em Linux (x64, ARM64 ou ARMv7 — cobre qualquer Raspberry Pi) ou macOS (via Homebrew), instala automaticamente a versão 22.13+ quando necessário; em seguida instala as dependências e cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista). Rodar `npm run setup` novamente não sobrescreve um `.env` já existente. Para manter o servidor rodando permanentemente e reiniciando sozinho no boot (essencial em um Raspberry Pi dedicado), veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi).
 
 **Windows (PowerShell/CMD):**
 
@@ -285,8 +285,6 @@ npm install
 copy .env.example .env
 npm start
 ```
-
-Depois abra o arquivo `.env` gerado e defina um valor para `DEVICE_TOKEN` (qualquer string aleatória, ex.: `DEVICE_TOKEN=troque-por-um-valor-aleatorio`) — esse é o token usado pelos ESP32 para autenticar com o servidor, então precisa ficar igual no firmware de cada dispositivo.
 
 **Em ambos os casos**, o banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
 
@@ -300,7 +298,7 @@ Depois abra o arquivo `.env` gerado e defina um valor para `DEVICE_TOKEN` (qualq
 
 A [Instalação Rápida](#instalação-rápida) já cobre os comandos para colocar o servidor no ar. Esta seção detalha o que acontece por trás deles e as opções relevantes para produção.
 
-Em macOS/Linux, `npm run setup` (usado na instalação rápida) equivale a `npm install` + `cp .env.example .env` + geração automática de `DEVICE_TOKEN`. Rode esses passos manualmente em vez do script caso prefira não instalar o Node.js automaticamente ou queira revisar cada etapa. No Windows, onde `npm run setup` não roda, os passos manuais (`npm install`, copiar `.env.example` para `.env`, definir `DEVICE_TOKEN` à mão) já são o único caminho, como descrito na instalação rápida.
+Em macOS/Linux, `npm run setup` (usado na instalação rápida) equivale a `npm install` + `cp .env.example .env`. Rode esses passos manualmente em vez do script caso prefira não instalar o Node.js automaticamente ou queira revisar cada etapa. No Windows, onde `npm run setup` não roda, os passos manuais (`npm install`, copiar `.env.example` para `.env`) já são o único caminho, como descrito na instalação rápida.
 
 Antes de colocar o servidor em produção, edite `.env` conforme a seção [Configuração](#configuração) — em especial `CORS_ORIGIN` quando `NODE_ENV=production`, e `SENHA_ADMIN_INICIAL` se quiser escolher a senha do `admin` em vez de usar a gerada automaticamente.
 
@@ -330,9 +328,12 @@ cd remoteifes-esp32
 pio run                       # compila o firmware
 pio run --target uploadfs     # grava data/ (LittleFS) no dispositivo
 pio run --target upload       # grava o firmware
+pio device monitor -b 115200  # acompanha os logs de série do ESP32 (Ctrl+C para sair)
 ```
 
-Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instalada e use os alvos equivalentes na barra de tarefas do PlatformIO (Build, Upload Filesystem Image, Upload).
+Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instalada e use os alvos equivalentes na barra de tarefas do PlatformIO (Build, Upload Filesystem Image, Upload, Monitor).
+
+`pio device monitor -b 115200` abre o monitor serial na mesma taxa configurada pelo firmware (`Serial.begin(115200)`), útil para acompanhar o boot, o IP obtido, o estado da conexão Wi-Fi/WebSocket com o servidor e mensagens de erro em tempo real. Se houver mais de uma porta serial conectada, informe-a explicitamente: `pio device monitor -b 115200 -p /dev/ttyUSB0` (Linux/Raspberry Pi) ou `pio device monitor -b 115200 -p /dev/cu.usbserial-XXXX` (macOS). Rode `pio device list` para listar as portas disponíveis.
 
 **Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe um ponto de acesso Wi-Fi próprio (`RemoteIFES-Setup`, sempre protegido por senha) para receber as credenciais da rede local, a sala, o endereço do servidor central e a senha de administração do dispositivo (obrigatória); depois disso, ele se conecta normalmente à rede da sala. Se a conexão Wi-Fi salva falhar, o mesmo ponto de acesso de configuração é reaberto automaticamente.
 
@@ -345,7 +346,6 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 | `NODE_ENV` | `development` ou `production`. Em produção, ativa a restrição de rede e o CORS restrito |
 | `PORTA` | Porta HTTP (e WebSocket, no mesmo servidor) do servidor (padrão 8080) |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — vale tanto para a API HTTP quanto para as conexões WebSocket |
-| `DEVICE_TOKEN` | Token secreto usado pelos ESP32 para autenticar chamadas ao servidor (`x-device-token`); gerado automaticamente por `npm run setup` |
 | `SENHA_ADMIN_INICIAL` | Opcional (mínimo 8 caracteres); define a senha do usuário `admin` criado no primeiro boot. Se ausente ou muito curta, uma senha aleatória é gerada e impressa no console nesse primeiro boot |
 | `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); padrão `1`, correto para o proxy Nginx configurado por `https-setup.sh`. Use `0` se o servidor for exposto diretamente à internet sem proxy na frente — confiar em saltos que não existem permite falsificar o IP de origem e contornar o limite de tentativas de login e a restrição de rede |
 
@@ -428,7 +428,7 @@ Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo p
 - **Garanta que só a porta 443 do Nginx fique exposta à internet**, nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o HTTPS, o CORS e a checagem de `TRUST_PROXY`.
 - **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
 - **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
-- **Anote o `DEVICE_TOKEN` como um segredo de verdade**: ele é compartilhado por todos os ESP32 e as rotas `/dispositivo/*` não passam pela restrição de rede (os ESP32 precisam alcançá-las de qualquer rede). Quem tiver esse token pode reportar estado falso para qualquer sala; não o commite no Git nem o deixe em anotações públicas.
+- **Cadastre o MAC de cada ESP32 assim que possível** (`Admin > ESP32 / MACs`): as rotas `/dispositivo/*` não passam pela restrição de rede (os ESP32 precisam alcançá-las de qualquer rede), e enquanto o MAC de uma sala não está cadastrado, qualquer dispositivo que conheça o código dessa sala pode reportar estado falso para ela. Cadastrar o MAC fecha essa janela, exigindo que as chamadas venham exatamente do ESP32 físico da sala.
 
 ### Frontend no GitHub Pages
 
@@ -581,7 +581,7 @@ Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (ex
 | `import.py` | Atualiza a cópia local a partir do remoto (`git pull origin main`) |
 | `clear.py` | Recria o histórico do repositório do zero em um único commit (`checkout --orphan`) e, mediante confirmação explícita, sobrescreve o histórico remoto (`push -f`) — apaga permanentemente todo o histórico de commits anterior; use apenas se isso for intencional |
 
-O repositório inclui um `.gitignore` na raiz que já ignora `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (`DEVICE_TOKEN`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas). Se você clonou uma cópia antiga do repositório em que esse arquivo não existia e chegou a commitar `.env` ou o banco, rode `git rm --cached` nesses arquivos e gere um novo `DEVICE_TOKEN` antes de publicar o repositório.
+O repositório inclui um `.gitignore` na raiz que já ignora `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas). Se você clonou uma cópia antiga do repositório em que esse arquivo não existia e chegou a commitar `.env` ou o banco, rode `git rm --cached` nesses arquivos antes de publicar o repositório.
 
 ## Uso da API do GitHub
 
@@ -591,7 +591,7 @@ Este projeto não depende da API do GitHub em tempo de execução — o uso do G
 
 ```
 remoteifes-server/
-  setup.sh          instalação e configuração automatizadas (Node.js, dependências, .env, DEVICE_TOKEN)
+  setup.sh          instalação e configuração automatizadas (Node.js, dependências, .env)
   install-service.sh configura um serviço systemd para manter o servidor no ar (auto-start no boot, ex.: Raspberry Pi)
   https-setup.sh     configuração automatizada de HTTPS (Nginx + Certbot)
   reset-admin-senha.js  redefine a senha do usuário admin sem apagar dados
@@ -659,7 +659,7 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 
 - **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
 - **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`).
-- **ESP32 não aparece como online**: verifique se o `DEVICE_TOKEN` configurado no firmware é idêntico ao do `.env` do servidor, e se o ESP32 consegue alcançar o endereço/porta do servidor pela rede local.
+- **ESP32 não aparece como online**: verifique se o código da sala configurado no dispositivo corresponde a uma sala cadastrada no servidor, se o MAC cadastrado em `Admin > ESP32 / MACs` (quando houver um) é o mesmo do ESP32 físico, e se o dispositivo consegue alcançar o endereço/porta do servidor pela rede local. `pio device monitor -b 115200` (com o ESP32 conectado por USB) mostra o estado da conexão Wi-Fi/WebSocket e eventuais erros em tempo real.
 - **"Entrar em modo de configuração" falha com senha inválida em `Admin > ESP32`**: a senha de administração é a definida no dispositivo durante o provisionamento (portal `RemoteIFES-Setup`), não a senha de nenhum usuário do sistema; se ela foi esquecida, resete o Wi-Fi do dispositivo (fisicamente, ou pelo botão "Resetar Wi-Fi" da mesma aba, se ele ainda estiver conectado) e refaça o provisionamento com uma nova senha.
 - **Botão "Iniciar captura IR" fica desabilitado em `Admin > ESP32`**: a captura só é permitida em modo clonagem; ative "Ativar modo clonagem" primeiro (o dispositivo precisa já estar em modo de configuração).
 - **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao administrador principal, assim como `Admin > Configurações`.
@@ -677,7 +677,7 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_SDK_ROOT` (ou `ANDROID_HOME`) aponta para a instalação do Android SDK e que o JDK 17 está no `PATH`; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
 - **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org`); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `npm run setup` novamente.
 - **`install-service.sh` falha com "systemd não encontrado"**: o script só funciona em Linux com `systemd` (padrão no Raspberry Pi OS); em outras distribuições, use um gerenciador de processo alternativo como `pm2`.
-- **Serviço `remoteifes.service` não inicia**: rode `sudo journalctl -u remoteifes.service -f` para ver o erro; confira se `remoteifes-server/.env` existe e se `DEVICE_TOKEN` está definido, e rode `sudo systemctl restart remoteifes.service` após qualquer correção.
+- **Serviço `remoteifes.service` não inicia**: rode `sudo journalctl -u remoteifes.service -f` para ver o erro; confira se `remoteifes-server/.env` existe e está com as variáveis esperadas (veja [Configuração](#configuração)), e rode `sudo systemctl restart remoteifes.service` após qualquer correção.
 - **`flash.sh` não encontra a porta serial do ESP32**: confirme que o cabo USB usado transmite dados (não é só de carga) e que os drivers do conversor USB-serial (CP210x ou CH340, conforme a placa) estão instalados; informe a porta manualmente, ex.: `bash flash.sh /dev/ttyUSB0`.
 - **Restrição de rede ou limite de tentativas de login parecem não fazer efeito**: confira `TRUST_PROXY` no `.env` — o valor precisa corresponder ao número real de proxies reversos na frente do servidor (`1` para o Nginx de `https-setup.sh`, `0` se o Node estiver exposto diretamente); um valor maior que o real permite que o IP de origem seja falsificado via `X-Forwarded-For`, contornando as duas proteções.
 - **App Cordova não fala com o servidor central**: confirme que `remoteifes-web/js/config.js` (não a cópia em `remoteifes-cordova/www/`) aponta para o `serverUrl` de produção antes de gerar o build, e que `remoteifes-cordova/config.xml` libera o domínio do servidor em `access`/`allow-navigation`.

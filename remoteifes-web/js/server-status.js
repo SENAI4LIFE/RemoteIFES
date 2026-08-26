@@ -1,3 +1,14 @@
+const TELAS_ACESSO_IDS = ["screen-portal", "screen-login", "screen-manutencao-acesso", "mainApp"];
+
+function mostrarTelaAcesso(idAlvo) {
+  TELAS_ACESSO_IDS.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("hidden", id !== idAlvo);
+  });
+  const overlay = document.getElementById("screen-server-status");
+  if (overlay) overlay.classList.add("hidden");
+}
+
 const ServerStatus = (() => {
   let ws = null;
   let conexaoId = 0;
@@ -97,11 +108,8 @@ const ServerStatus = (() => {
   }
 
   function mostrarAcessoManutencao() {
-    document.getElementById("mainApp").classList.add("hidden");
-    document.getElementById("screen-portal").classList.add("hidden");
-    document.getElementById("screen-login").classList.add("hidden");
     formAcesso.reset();
-    telaAcesso.classList.remove("hidden");
+    mostrarTelaAcesso("screen-manutencao-acesso");
     inputAcessoUsuario.focus();
   }
 
@@ -245,7 +253,6 @@ const ServerStatus = (() => {
 
   acessoAdminBtn.addEventListener("click", () => {
     acessoManualLiberado = true;
-    tela.classList.add("hidden");
     mostrarAcessoManutencao();
   });
 
@@ -290,8 +297,7 @@ const ServerStatus = (() => {
     if (!manutencaoAtiva) return false;
     acessoManualLiberado = false;
     esconderAcessoManutencao();
-    document.getElementById("screen-portal").classList.add("hidden");
-    document.getElementById("screen-login").classList.add("hidden");
+    mostrarTelaAcesso(null);
     aplicarEstadoManutencao();
     return true;
   }

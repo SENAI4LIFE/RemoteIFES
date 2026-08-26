@@ -1,10 +1,7 @@
 const EventEmitter = require("events");
-const crypto = require("crypto");
 const salasService = require("./salasService");
-const dispositivoTokenService = require("./dispositivoTokenService");
 const logger = require("../utils/logger");
 
-const DEVICE_TOKEN = process.env.DEVICE_TOKEN || "";
 const PING_MS = 15 * 1000;
 const MAX_CAPTURAS_ARMAZENADAS = 20;
 
@@ -12,22 +9,10 @@ const conexoes = new Map();
 const eventos = new EventEmitter();
 let wss = null;
 
-function tokensIguais(a, b) {
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
-}
-
 function autenticar(req) {
-  const token = req.headers["x-device-token"];
   const sala = req.headers["x-device-sala"];
   const mac = req.headers["x-device-mac"] || null;
-  if (!token || typeof token !== "string" || !sala || typeof sala !== "string") return null;
-
-  const tokenDaSalaValido = dispositivoTokenService.validarTokenDaSala(sala, token);
-  const tokenGlobalValido = DEVICE_TOKEN ? tokensIguais(token, DEVICE_TOKEN) : false;
-  if (!tokenDaSalaValido && !tokenGlobalValido) return null;
+  if (!sala || typeof sala !== "string") return null;
 
   const salaRow = salasService.buscar(sala);
   if (salaRow && !salasService.macCorrespondeASala(salaRow, mac)) return null;

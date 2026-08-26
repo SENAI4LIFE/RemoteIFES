@@ -100,13 +100,6 @@ npm install
 if [ ! -f .env ]; then
   echo "Criando .env a partir de .env.example..."
   cp .env.example .env
-  DEVICE_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-  if [ "$(uname)" = "Darwin" ]; then
-    sed -i '' "s#^DEVICE_TOKEN=.*#DEVICE_TOKEN=$DEVICE_TOKEN#" .env
-  else
-    sed -i "s#^DEVICE_TOKEN=.*#DEVICE_TOKEN=$DEVICE_TOKEN#" .env
-  fi
-  echo "DEVICE_TOKEN gerado automaticamente em .env. Use o mesmo valor no firmware de cada ESP32."
 else
   echo ".env já existe, mantido sem alterações."
 fi

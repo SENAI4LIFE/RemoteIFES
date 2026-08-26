@@ -1,5 +1,4 @@
 process.env.REMOTEIFES_DB_PATH = process.env.REMOTEIFES_DB_PATH || ":memory:";
-process.env.DEVICE_TOKEN = process.env.DEVICE_TOKEN || "test-only-device-token";
 process.env.NODE_ENV = "test";
 
 const test = require("node:test");
@@ -84,6 +83,46 @@ test("achado #13 — atualização legítima do próprio preset continua funcion
   assert.equal(atualizado.id, criado.id, "deve reaproveitar o mesmo preset (in-place), não duplicar");
   const funcaoLuz = atualizado.funcoes.find((f) => f.chave === "luz");
   assert.equal(funcaoLuz.tipo, "numero");
+});
+
+test("achado #17 — atualizarFuncao não corrompe opcoes ao receber apenas a posição (editor de posição do controle)", () => {
+  const preset = presetsService.criar({ nome: "Preset achado 17" });
+
+  const comVelocidade = presetsService.adicionarFuncao(preset.id, {
+    chave: "velocidade",
+    rotulo: "Velocidade",
+    tipo: "numero",
+    opcoes: { min: 1, max: 5 },
+  });
+  const funcaoVelocidade = comVelocidade.funcoes.find((f) => f.chave === "velocidade");
+
+  const comModo = presetsService.adicionarFuncao(preset.id, {
+    chave: "modo",
+    rotulo: "Modo",
+    tipo: "selecao",
+    opcoes: ["frio", "seco", "ventilar"],
+  });
+  const funcaoModo = comModo.funcoes.find((f) => f.chave === "modo");
+
+  // Simula exatamente o que o editor "Posição dos botões no controle" faz: envia apenas { posicao },
+  // sem reenviar opcoes — atualizarFuncao precisa preservar o valor já salvo, não corrompê-lo.
+  presetsService.atualizarFuncao(funcaoVelocidade.id, { posicao: "grid_topo_1" });
+  presetsService.atualizarFuncao(funcaoVelocidade.id, { posicao: "grid_topo_2" });
+  const velocidadeDepoisDeMover = presetsService.atualizarFuncao(funcaoVelocidade.id, { posicao: null });
+  const funcaoVelocidadeFinal = velocidadeDepoisDeMover.funcoes.find((f) => f.chave === "velocidade");
+  assert.deepEqual(
+    funcaoVelocidadeFinal.opcoes,
+    { min: 1, max: 5 },
+    "opcoes numéricas devem sobreviver a múltiplas atualizações de posição sem serem reenviadas"
+  );
+
+  const modoDepoisDeMover = presetsService.atualizarFuncao(funcaoModo.id, { posicao: "flank_esq" });
+  const funcaoModoFinal = modoDepoisDeMover.funcoes.find((f) => f.chave === "modo");
+  assert.deepEqual(
+    funcaoModoFinal.opcoes,
+    ["frio", "seco", "ventilar"],
+    "opcoes de seleção devem sobreviver a atualizações de posição sem serem reenviadas"
+  );
 });
 
 test("achado #12 — admin comum não consegue excluir outro admin", () => {
