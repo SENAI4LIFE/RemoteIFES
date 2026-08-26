@@ -12,23 +12,23 @@
   const CHAVE_PARAGRAFO = "remoteifes_paragraph_width";
   const CHAVE_ALINHAMENTO = "remoteifes_text_align";
 
-  const FONTE_MIN = 0.85;
-  const FONTE_MAX = 1.3;
-  const FONTE_PASSO = 0.075;
+  const FONTE_MIN = 0.75;
+  const FONTE_MAX = 2;
+  const FONTE_PASSO = 0.05;
   const FONTE_PADRAO = 1;
 
   const ESPACAMENTO_MIN = 0;
-  const ESPACAMENTO_MAX = 0.15;
+  const ESPACAMENTO_MAX = 0.25;
   const ESPACAMENTO_PASSO = 0.01;
   const ESPACAMENTO_PADRAO = 0;
 
   const ALTURA_MIN = 1.2;
-  const ALTURA_MAX = 2.2;
+  const ALTURA_MAX = 3;
   const ALTURA_PASSO = 0.1;
   const ALTURA_PADRAO = 1.2;
 
-  const LARGURA_PARAGRAFO_PASSOS = ["none", "70ch", "60ch", "52ch", "44ch"];
-  const LARGURA_PARAGRAFO_ROTULOS = ["Padrão", "70ch", "60ch", "52ch", "44ch"];
+  const LARGURA_PARAGRAFO_PASSOS = ["none", "80ch", "70ch", "60ch", "52ch", "44ch", "36ch"];
+  const LARGURA_PARAGRAFO_ROTULOS = ["Padrão", "80ch", "70ch", "60ch", "52ch", "44ch", "36ch"];
   const LARGURA_PARAGRAFO_PADRAO = 0;
 
   const COR_PADRAO = "#1f2b23";

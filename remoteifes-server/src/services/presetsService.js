@@ -134,7 +134,8 @@ function atualizarFuncao(funcaoId, dados) {
   const funcao = db.prepare(`SELECT * FROM preset_funcoes WHERE id = ?`).get(funcaoId);
   if (!funcao) throw new Error("função não encontrada");
 
-  const { rotulo, tipo, opcoes } = validarFuncao({ ...funcao, ...dados, chave: funcao.chave });
+  const opcoesAtuais = funcao.opcoes ? JSON.parse(funcao.opcoes) : null;
+  const { rotulo, tipo, opcoes } = validarFuncao({ ...funcao, opcoes: opcoesAtuais, ...dados, chave: funcao.chave });
   const ordem = dados.ordem !== undefined && Number.isFinite(Number(dados.ordem)) ? Number(dados.ordem) : funcao.ordem;
 
   const posicaoInformada = validarPosicao(dados.posicao);

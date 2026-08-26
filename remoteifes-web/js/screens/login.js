@@ -22,14 +22,11 @@ function aplicarTextoLogin(tipo) {
 }
 
 function mostrarPortal() {
-  document.getElementById("mainApp").classList.add("hidden");
-  document.getElementById("screen-login").classList.add("hidden");
-  document.getElementById("screen-portal").classList.remove("hidden");
+  mostrarTelaAcesso("screen-portal");
 }
 
 function mostrarLogin(tipo) {
-  document.getElementById("screen-portal").classList.add("hidden");
-  document.getElementById("screen-login").classList.remove("hidden");
+  mostrarTelaAcesso("screen-login");
   document.getElementById("username").value = "";
   tipoLoginSelecionado = tipo;
   aplicarTextoLogin(tipo);
@@ -99,10 +96,7 @@ function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
     el.classList.toggle("hidden", !resp.isSuperAdmin);
   });
 
-  document.getElementById("screen-portal").classList.add("hidden");
-  document.getElementById("screen-login").classList.add("hidden");
-  document.getElementById("screen-manutencao-acesso").classList.add("hidden");
-  document.getElementById("mainApp").classList.remove("hidden");
+  mostrarTelaAcesso("mainApp");
 
   if (resp.isAdmin) Notificacoes.iniciar();
 
