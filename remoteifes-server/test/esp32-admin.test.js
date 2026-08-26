@@ -1,5 +1,4 @@
 process.env.REMOTEIFES_DB_PATH = process.env.REMOTEIFES_DB_PATH || ":memory:";
-process.env.DEVICE_TOKEN = process.env.DEVICE_TOKEN || "test-only-device-token";
 process.env.NODE_ENV = "test";
 
 const http = require("http");
@@ -87,7 +86,6 @@ test("dispositivo conecta via WS, envia telemetria, e recebe comandos retransmit
 
   const ws = new WebSocket(baseWsDispositivoUrl, {
     headers: {
-      "x-device-token": "test-only-device-token",
       "x-device-sala": "teste-esp32-online",
       "x-device-mac": "AA:BB:CC:DD:EE:02",
     },
@@ -145,7 +143,6 @@ test("rota de entrar-config exige senha mesmo com dispositivo conectado", async 
 
   const ws = new WebSocket(baseWsDispositivoUrl, {
     headers: {
-      "x-device-token": "test-only-device-token",
       "x-device-sala": "teste-esp32-sem-senha",
       "x-device-mac": "AA:BB:CC:DD:EE:03",
     },

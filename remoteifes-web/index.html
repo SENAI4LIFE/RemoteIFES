@@ -702,18 +702,18 @@
 
         <div class="admin-layout">
         <div class="admin-subtabs">
-          <button type="button" class="admin-subtab-btn active" data-sub="usuarios"><span class="admin-subtab-icon">👥</span>Usuários</button>
-          <button type="button" class="admin-subtab-btn" data-sub="ativos"><span class="admin-subtab-icon">🟢</span>Ativos</button>
-          <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span>Sessões</button>
-          <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span>Logs</button>
-          <button type="button" class="admin-subtab-btn" data-sub="dispositivos"><span class="admin-subtab-icon">📡</span>Dispositivos</button>
-          <button type="button" class="admin-subtab-btn" data-sub="acessos"><span class="admin-subtab-icon">🔑</span>Acessos ESP32</button>
-          <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span>Proprietários de sala</button>
-          <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span>Mapa</button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span>ESP32 / MACs</button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets"><span class="admin-subtab-icon">🎛️</span>Presets</button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span>Configurações</button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span>ESP32</button>
+          <button type="button" class="admin-subtab-btn active" data-sub="usuarios"><span class="admin-subtab-icon">👥</span><span class="admin-subtab-label">Usuários</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="ativos"><span class="admin-subtab-icon">🟢</span><span class="admin-subtab-label">Ativos</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span><span class="admin-subtab-label">Sessões</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span><span class="admin-subtab-label">Logs</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="dispositivos"><span class="admin-subtab-icon">📡</span><span class="admin-subtab-label">Dispositivos</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="acessos"><span class="admin-subtab-icon">🔑</span><span class="admin-subtab-label">Acessos ESP32</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span><span class="admin-subtab-label">Proprietários de sala</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span><span class="admin-subtab-label">Mapa</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span><span class="admin-subtab-label">ESP32 / MACs</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets"><span class="admin-subtab-icon">🎛️</span><span class="admin-subtab-label">Presets</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">ESP32</span></button>
         </div>
 
         <div class="admin-content">
@@ -1083,7 +1083,7 @@
           <span class="a11y-panel-label"><svg class="a11y-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M4 18h2.4l1.15-3.2h5.4L14.1 18h2.4L11.7 5h-1.9L4 18ZM8.3 12.9l2-5.5 2 5.5H8.3ZM18 9v9h-1.6v-1c-.5.7-1.3 1.1-2.2 1.1-1.4 0-2.4-1-2.4-2.4 0-1.6 1.3-2.5 3.4-2.5.4 0 .8 0 1.2.1v-.2c0-.9-.5-1.4-1.5-1.4-.7 0-1.3.2-1.9.5l-.5-1.3c.8-.4 1.6-.6 2.6-.6 1.8 0 2.9.9 2.9 2.7Z"/></svg>Tamanho da fonte</span>
           <div class="a11y-slider-row">
             <button type="button" id="a11yFontDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir tamanho da fonte">&minus;</button>
-            <input type="range" id="a11yFontSlider" class="a11y-slider" min="0.85" max="1.3" step="0.075" value="1" aria-label="Tamanho da fonte">
+            <input type="range" id="a11yFontSlider" class="a11y-slider" min="0.75" max="2" step="0.05" value="1" aria-label="Tamanho da fonte">
             <span class="a11y-slider-value" id="a11yFontValue">100%</span>
             <button type="button" id="a11yFontIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar tamanho da fonte">+</button>
           </div>
@@ -1099,7 +1099,7 @@
           <span class="a11y-panel-label"><svg class="a11y-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3 6h2v12H3V6Zm16 0h2v12h-2V6ZM7 11h2v2H7v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Z"/></svg>Espaçamento entre letras</span>
           <div class="a11y-slider-row">
             <button type="button" id="a11ySpacingDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir espaçamento entre letras">&minus;</button>
-            <input type="range" id="a11ySpacingSlider" class="a11y-slider" min="0" max="0.15" step="0.01" value="0" aria-label="Espaçamento entre letras">
+            <input type="range" id="a11ySpacingSlider" class="a11y-slider" min="0" max="0.25" step="0.01" value="0" aria-label="Espaçamento entre letras">
             <span class="a11y-slider-value" id="a11ySpacingValue">0</span>
             <button type="button" id="a11ySpacingIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar espaçamento entre letras">+</button>
           </div>
@@ -1110,7 +1110,7 @@
           <span class="a11y-panel-label"><svg class="a11y-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3 4h2v16H3V4Zm16 0h2v16h-2V4ZM7 11h10v2H7v-2Z"/></svg>Altura da linha</span>
           <div class="a11y-slider-row">
             <button type="button" id="a11yLineDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir altura da linha">&minus;</button>
-            <input type="range" id="a11yLineSlider" class="a11y-slider" min="1.2" max="2.2" step="0.1" value="1.2" aria-label="Altura da linha">
+            <input type="range" id="a11yLineSlider" class="a11y-slider" min="1.2" max="3" step="0.1" value="1.2" aria-label="Altura da linha">
             <span class="a11y-slider-value" id="a11yLineValue">1.2</span>
             <button type="button" id="a11yLineIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar altura da linha">+</button>
           </div>
@@ -1134,7 +1134,7 @@
           <span class="a11y-panel-label"><svg class="a11y-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M4 4h2v16H4V4Zm14 3h2v13h-2V7ZM7 7h9v2H7V7Zm0 4h9v2H7v-2Zm0 4h6v2H7v-2Z"/></svg>Largura do parágrafo</span>
           <div class="a11y-slider-row">
             <button type="button" id="a11yParagraphDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir largura do parágrafo">&minus;</button>
-            <input type="range" id="a11yParagraphSlider" class="a11y-slider" min="0" max="4" step="1" value="0" aria-label="Largura do parágrafo">
+            <input type="range" id="a11yParagraphSlider" class="a11y-slider" min="0" max="6" step="1" value="0" aria-label="Largura do parágrafo">
             <span class="a11y-slider-value" id="a11yParagraphValue">Padrão</span>
             <button type="button" id="a11yParagraphIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar largura do parágrafo">+</button>
           </div>

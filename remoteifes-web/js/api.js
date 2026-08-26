@@ -254,18 +254,6 @@ const Api = {
     return chamar(`/admin/salas/${encodeURIComponent(sala)}/acessar-esp32`, { headers: headersComToken() });
   },
 
-  async infoTokenDispositivo(sala) {
-    return chamar(`/admin/salas/${encodeURIComponent(sala)}/token`, { headers: headersComToken() });
-  },
-
-  async gerarTokenDispositivo(sala) {
-    return chamar(`/admin/salas/${encodeURIComponent(sala)}/token`, { method: "POST", headers: headersComToken() });
-  },
-
-  async revogarTokenDispositivo(sala) {
-    return chamar(`/admin/salas/${encodeURIComponent(sala)}/token`, { method: "DELETE", headers: headersComToken() });
-  },
-
   async listarPresets() {
     return chamar("/admin/presets", { headers: headersComToken() });
   },

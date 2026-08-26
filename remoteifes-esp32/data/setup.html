@@ -41,8 +41,6 @@
         <option value="inseguro">HTTPS sem validar certificado (rede local, certificado autoassinado)</option>
         <option value="off">HTTP sem criptografia (apenas rede local confiavel)</option>
       </select>
-      <label for="token">Token do dispositivo:</label>
-      <input type="password" id="token" name="token" placeholder="valor cadastrado no servidor para esta sala" required>
       <label for="adminSenha">Senha de administracao do dispositivo:</label>
       <input type="password" id="adminSenha" name="adminSenha" placeholder="minimo de 6 caracteres" minlength="6" required>
       <p class="hint">Esta senha e exigida sempre que um superadministrador precisar entrar no modo de configuracao deste ESP32 pelo aplicativo web (aprendizado de controles, testes de infravermelho, reset de Wi-Fi).</p>

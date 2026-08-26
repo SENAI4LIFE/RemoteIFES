@@ -1110,9 +1110,10 @@ button.btn:disabled {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .admin-content {
-  flex: 1;
+  flex: 1 1 320px;
   min-width: 0;
 }
 .admin-subtabs {
@@ -1127,6 +1128,8 @@ button.btn:disabled {
   overflow: hidden;
   position: sticky;
   top: 74px;
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
 }
 .admin-subtab-btn {
   display: flex;
@@ -1136,7 +1139,6 @@ button.btn:disabled {
   gap: 4px;
   width: 100%;
   text-align: center;
-  white-space: normal;
   border: none;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
@@ -1149,17 +1151,23 @@ button.btn:disabled {
   cursor: pointer;
 }
 .admin-subtab-btn:last-child { border-bottom: none; }
+.admin-subtab-label {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
 
 @media (min-width: 620px) {
-  .admin-subtabs { width: 210px; top: 84px; }
+  .admin-subtabs { width: min(240px, 28vw); top: 84px; }
   .admin-subtab-btn {
     flex-direction: row;
+    align-items: center;
     justify-content: flex-start;
     text-align: left;
-    white-space: nowrap;
     padding: 14px 16px;
     font-size: calc(14px * var(--a11y-font-scale));
   }
+  .admin-subtab-label { flex: 1; }
 }
 @media (min-width: 700px) {
   .admin-subtabs { top: 62px; }
@@ -1331,28 +1339,6 @@ button.btn:disabled {
   margin-top: 0;
   padding: 8px 14px;
   font-size: calc(12px * var(--a11y-font-scale));
-}
-
-.preset-upload-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-.preset-upload-row input[type="file"] { display: none; }
-.preset-upload-btn {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ifes-green-dark);
-  border-radius: var(--radius);
-  padding: 6px 12px;
-  font-size: calc(12px * var(--a11y-font-scale));
-  cursor: pointer;
-}
-.preset-upload-btn:hover { border-color: var(--ifes-green); }
-.preset-upload-hint {
-  font-size: calc(11px * var(--a11y-font-scale));
-  color: var(--text-muted);
 }
 
 .preset-grid-editor {
@@ -2032,6 +2018,13 @@ button.btn:disabled {
   #app:has(#screen-admin:not(.hidden)) {
     max-width: 940px;
     margin-left: max(12px, calc((100vw - 940px) / 2 - 40px));
+    margin-right: auto;
+  }
+}
+@media (min-width: 1300px) {
+  #app:has(#screen-admin:not(.hidden)) {
+    max-width: 1400px;
+    margin-left: max(12px, calc((100vw - 1400px) / 2 - 40px));
     margin-right: auto;
   }
 }

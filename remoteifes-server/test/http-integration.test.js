@@ -1,5 +1,4 @@
 process.env.REMOTEIFES_DB_PATH = process.env.REMOTEIFES_DB_PATH || ":memory:";
-process.env.DEVICE_TOKEN = process.env.DEVICE_TOKEN || "test-only-device-token";
 process.env.NODE_ENV = "test";
 
 const http = require("http");
@@ -103,62 +102,58 @@ test("login com senha incorreta retorna 401 e não vaza detalhes internos", asyn
   assert.doesNotMatch(resp.corpo.erro, /stack|SQLITE|constraint/i);
 });
 
-test("token de dispositivo isolado por sala: gerar, autenticar, revogar", async () => {
+test("autenticação de dispositivo por MAC: sala sem MAC aceita qualquer dispositivo, sala com MAC exige correspondência", async () => {
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'admin'`).run(bcrypt.hashSync("superSenha123", 10));
   const loginSuperAdmin = await login("admin", "superSenha123");
   const tokenSuperAdmin = loginSuperAdmin.corpo.token;
-
-  const admin = usuariosService.criar(
-    { usuario: "teste-admin-http-token", senha: "senhaSegura123", nome: "Admin HTTP Token", isAdmin: true },
-    { nivel: 3 }
-  );
-  const loginAdmin = await login("teste-admin-http-token", "senhaSegura123");
-  const tokenAdmin = loginAdmin.corpo.token;
 
   const salaResp = await authFetch("/admin/salas", tokenSuperAdmin);
   const salas = await salaResp.json();
   const sala = salas[0].sala;
 
-  const tentativaAdmin = await authFetch(`/admin/salas/${encodeURIComponent(sala)}/token`, tokenAdmin, { method: "POST" });
-  assert.equal(tentativaAdmin.status, 403, "um admin comum não pode gerar o token do dispositivo");
+  const macLegitimo = "AA:BB:CC:DD:EE:FF";
+  const macForjado = "11:22:33:44:55:66";
 
-  const geracao = await authFetch(`/admin/salas/${encodeURIComponent(sala)}/token`, tokenSuperAdmin, { method: "POST" });
-  assert.equal(geracao.status, 200);
-  const corpoGeracao = await geracao.json();
-  assert.ok(corpoGeracao.ok);
-  assert.equal(typeof corpoGeracao.token, "string");
-  const tokenDaSala = corpoGeracao.token;
-
-  const heartbeatComTokenDaSala = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
+  const heartbeatSemMacCadastrado = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-device-token": tokenDaSala },
-    body: JSON.stringify({ sala, ligado: false }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sala, ligado: false, mac: macLegitimo }),
   });
-  assert.equal(heartbeatComTokenDaSala.status, 200, "o token próprio da sala deve autenticar o dispositivo mesmo sendo diferente do DEVICE_TOKEN global");
+  assert.equal(heartbeatSemMacCadastrado.status, 200, "sem MAC cadastrado para a sala, qualquer dispositivo deve autenticar");
 
-  const heartbeatComTokenInvalido = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
+  const cadastro = await authFetch(`/admin/salas/${encodeURIComponent(sala)}/mac`, tokenSuperAdmin, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mac: macLegitimo }),
+  });
+  assert.equal(cadastro.status, 200, "o administrador principal deve conseguir cadastrar o MAC do ESP32 da sala");
+
+  const heartbeatComMacCorreto = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-device-token": "token-forjado-qualquer" },
-    body: JSON.stringify({ sala, ligado: false }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sala, ligado: false, mac: macLegitimo }),
   });
-  assert.equal(heartbeatComTokenInvalido.status, 401);
+  assert.equal(heartbeatComMacCorreto.status, 200, "o MAC cadastrado deve continuar autenticando normalmente");
 
-  const revogacao = await authFetch(`/admin/salas/${encodeURIComponent(sala)}/token`, tokenSuperAdmin, { method: "DELETE" });
-  assert.equal(revogacao.status, 200);
-
-  const heartbeatAposRevogacao = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
+  const heartbeatComMacForjado = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-device-token": tokenDaSala },
-    body: JSON.stringify({ sala, ligado: false }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sala, ligado: false, mac: macForjado }),
   });
-  assert.equal(heartbeatAposRevogacao.status, 401, "o token revogado não deve mais autenticar o dispositivo");
+  assert.equal(heartbeatComMacForjado.status, 400, "um MAC diferente do cadastrado para a sala deve ser rejeitado");
 
-  const heartbeatComTokenGlobal = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
+  const comandoComMacForjado = await fetch(`${baseUrl}/dispositivo/comando`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-device-token": "test-only-device-token" },
-    body: JSON.stringify({ sala, ligado: false }),
+    headers: { "Content-Type": "application/json", "x-device-mac": macForjado },
+    body: JSON.stringify({ sala, cmd: "ligar" }),
   });
-  assert.equal(heartbeatComTokenGlobal.status, 200, "o token global do servidor deve continuar funcionando após a revogação do token da sala");
+  assert.equal(comandoComMacForjado.status, 403, "rotas de dispositivo protegidas por exigirMacDaSalaSeCadastrado devem rejeitar MAC forjado");
+
+  await authFetch(`/admin/salas/${encodeURIComponent(sala)}/mac`, tokenSuperAdmin, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mac: null }),
+  });
 });
 
 test("corpo JSON malformado retorna 400, não 500", async () => {

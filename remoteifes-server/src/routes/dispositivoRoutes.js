@@ -1,45 +1,12 @@
 const express = require("express");
-const crypto = require("crypto");
 const salasService = require("../services/salasService");
 const presetsService = require("../services/presetsService");
-const dispositivoTokenService = require("../services/dispositivoTokenService");
 const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
 
 const limitarDispositivo = criarLimitador({ janelaMs: 60 * 1000, maxTentativas: 120 });
 router.use(limitarDispositivo);
-
-const DEVICE_TOKEN = process.env.DEVICE_TOKEN || "";
-
-function tokensIguais(a, b) {
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
-}
-
-function salaDaRequisicao(req) {
-  if (typeof req.body?.sala === "string") return req.body.sala;
-  if (typeof req.query?.sala === "string") return req.query.sala;
-  return null;
-}
-
-function exigirDispositivo(req, res, next) {
-  const token = req.headers["x-device-token"];
-  if (!token || typeof token !== "string") {
-    return res.status(401).json({ ok: false, erro: "token de dispositivo inválido" });
-  }
-
-  const sala = salaDaRequisicao(req);
-  const tokenDaSalaValido = sala ? dispositivoTokenService.validarTokenDaSala(sala, token) : false;
-  const tokenGlobalValido = DEVICE_TOKEN ? tokensIguais(token, DEVICE_TOKEN) : false;
-
-  if (!tokenDaSalaValido && !tokenGlobalValido) {
-    return res.status(401).json({ ok: false, erro: "token de dispositivo inválido" });
-  }
-  next();
-}
 
 function exigirMacDaSalaSeCadastrado(req, res, next) {
   const sala = typeof req.body?.sala === "string" ? req.body.sala : req.query?.sala;
@@ -55,7 +22,7 @@ function exigirMacDaSalaSeCadastrado(req, res, next) {
   next();
 }
 
-router.post("/dispositivo/heartbeat", exigirDispositivo, (req, res) => {
+router.post("/dispositivo/heartbeat", (req, res) => {
   const { sala, ligado, temperatura, mac, ip } = req.body;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -83,7 +50,7 @@ router.post("/dispositivo/heartbeat", exigirDispositivo, (req, res) => {
   }
 });
 
-router.post("/dispositivo/acesso", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
+router.post("/dispositivo/acesso", exigirMacDaSalaSeCadastrado, (req, res) => {
   const { sala, userAgent } = req.body;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -101,7 +68,7 @@ router.post("/dispositivo/acesso", exigirDispositivo, exigirMacDaSalaSeCadastrad
   }
 });
 
-router.post("/dispositivo/comando", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
+router.post("/dispositivo/comando", exigirMacDaSalaSeCadastrado, (req, res) => {
   const { sala, cmd, valor } = req.body;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -118,7 +85,7 @@ router.post("/dispositivo/comando", exigirDispositivo, exigirMacDaSalaSeCadastra
   }
 });
 
-router.get("/dispositivo/preset", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
+router.get("/dispositivo/preset", exigirMacDaSalaSeCadastrado, (req, res) => {
   const { sala } = req.query;
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });
@@ -133,7 +100,7 @@ router.get("/dispositivo/preset", exigirDispositivo, exigirMacDaSalaSeCadastrado
   res.json({ ok: true, preset });
 });
 
-router.post("/dispositivo/preset", exigirDispositivo, exigirMacDaSalaSeCadastrado, (req, res) => {
+router.post("/dispositivo/preset", exigirMacDaSalaSeCadastrado, (req, res) => {
   const { nome, funcoes, sala } = req.body || {};
   if (!sala || typeof sala !== "string") {
     return res.status(400).json({ ok: false, erro: "sala é obrigatória" });

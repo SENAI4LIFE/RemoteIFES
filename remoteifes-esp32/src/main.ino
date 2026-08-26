@@ -14,6 +14,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <mbedtls/md.h>
+#include <mbedtls/base64.h>
 #include <string.h>
 #include "esp_random.h"
 
@@ -104,7 +105,6 @@ const unsigned long TEMPO_MAXIMO_SEM_WIFI_PARA_REINICIAR = 300000;
 String salaId;
 String serverHost;
 int serverPort = 0;
-String deviceToken;
 String tlsModo;
 String adminHash;
 unsigned long lastComandoAceito = 0;
@@ -133,6 +133,7 @@ void enviarTelemetriaWs();
 void enviarModoAlterado();
 const char* modoAtualTexto();
 String sha256Hex(const String& texto);
+bool autenticadoAdmin();
 
 String sha256Hex(const String& texto) {
   uint8_t hash[32];
@@ -147,6 +148,27 @@ String sha256Hex(const String& texto) {
   char hex[65];
   for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", hash[i]);
   return String(hex);
+}
+
+bool autenticadoAdmin() {
+  if (adminHash.length() == 0) return false;
+  String authHeader = server.header("Authorization");
+  if (!authHeader.startsWith("Basic ")) return false;
+
+  String credenciaisBase64 = authHeader.substring(6);
+  unsigned char saida[128];
+  size_t tamanhoSaida = 0;
+  int resultado = mbedtls_base64_decode(saida, sizeof(saida) - 1, &tamanhoSaida,
+                                         (const unsigned char*)credenciaisBase64.c_str(), credenciaisBase64.length());
+  if (resultado != 0) return false;
+  saida[tamanhoSaida] = '\0';
+
+  String credenciais = String((char*)saida);
+  int separador = credenciais.indexOf(':');
+  if (separador < 0) return false;
+
+  String senha = credenciais.substring(separador + 1);
+  return sha256Hex(senha) == adminHash;
 }
 
 void setup() {
@@ -167,7 +189,6 @@ void setup() {
   salaId = preferences.getString("sala", "");
   serverHost = preferences.getString("host", "");
   serverPort = preferences.getInt("porta", 0);
-  deviceToken = preferences.getString("token", "");
   tlsModo = preferences.getString("tls", "off");
   adminHash = preferences.getString("adminHash", "");
 
@@ -238,7 +259,7 @@ void loop() {
 }
 
 bool configuracaoValida() {
-  return salaId.length() > 0 && serverHost.length() > 0 && serverPort > 0 && deviceToken.length() > 0;
+  return salaId.length() > 0 && serverHost.length() > 0 && serverPort > 0;
 }
 
 bool comandoPermitidoAgora() {
@@ -332,12 +353,11 @@ void startAPMode() {
     String newSala = server.arg("sala");
     String newHost = server.arg("host");
     String newPorta = server.arg("porta");
-    String newToken = server.arg("token");
     String newTls = server.arg("tls");
     String newAdminSenha = server.arg("adminSenha");
 
     if (newSSID.length() == 0 || newSala.length() == 0 || newHost.length() == 0 ||
-        newPorta.length() == 0 || newToken.length() == 0 || newAdminSenha.length() < 6) {
+        newPorta.length() == 0 || newAdminSenha.length() < 6) {
       server.send(400, "text/plain", "Preencha todos os campos obrigatorios (senha de administracao com pelo menos 6 caracteres).");
       return;
     }
@@ -351,7 +371,6 @@ void startAPMode() {
     preferences.putString("sala", newSala);
     preferences.putString("host", newHost);
     preferences.putInt("porta", newPorta.toInt());
-    preferences.putString("token", newToken);
     preferences.putString("tls", newTls);
     preferences.putString("adminHash", sha256Hex(newAdminSenha));
 
@@ -380,8 +399,8 @@ void startAPMode() {
 }
 
 void iniciarServicosOperacao() {
-  const char* headerKeys[] = { "User-Agent" };
-  server.collectHeaders(headerKeys, 1);
+  const char* headerKeys[] = { "User-Agent", "Authorization" };
+  server.collectHeaders(headerKeys, 2);
   server.on("/", handleRoot);
   server.on("/info", handleInfo);
   server.begin();
@@ -389,7 +408,7 @@ void iniciarServicosOperacao() {
 }
 
 void conectarWsServidor() {
-  String headers = "X-Device-Token: " + deviceToken + "\r\nX-Device-Sala: " + salaId + "\r\nX-Device-Mac: " + WiFi.macAddress() + "\r\n";
+  String headers = "X-Device-Sala: " + salaId + "\r\nX-Device-Mac: " + WiFi.macAddress() + "\r\n";
   wsCliente.setExtraHeaders(headers.c_str());
   wsCliente.onEvent(handleWsServidorEvent);
   wsCliente.setReconnectInterval(WS_RECONNECT_INTERVAL_MS);
@@ -577,8 +596,9 @@ void enviarTelemetriaWs() {
 }
 
 void handleRoot() {
-  if (deviceToken.length() == 0 || !server.authenticate("remoteifes", deviceToken.c_str())) {
-    return server.requestAuthentication();
+  if (!autenticadoAdmin()) {
+    server.requestAuthentication();
+    return;
   }
   File f = LittleFS.open("/status.html", "r");
   if (!f) {
@@ -596,8 +616,9 @@ void handleRoot() {
 }
 
 void handleInfo() {
-  if (deviceToken.length() == 0 || !server.authenticate("remoteifes", deviceToken.c_str())) {
-    return server.requestAuthentication();
+  if (!autenticadoAdmin()) {
+    server.requestAuthentication();
+    return;
   }
   JsonDocument doc;
   doc["sala"] = salaId;
@@ -710,7 +731,6 @@ bool sendHttpPost(const String& url, const String& payload) {
   http.setTimeout(HTTP_CLIENT_TIMEOUT_MS);
   http.setConnectTimeout(HTTP_CLIENT_TIMEOUT_MS);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("x-device-token", deviceToken);
   http.addHeader("x-device-mac", WiFi.macAddress());
   int statusCode = http.POST(payload);
   String response = http.getString();

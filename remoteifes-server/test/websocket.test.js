@@ -1,5 +1,4 @@
 process.env.REMOTEIFES_DB_PATH = process.env.REMOTEIFES_DB_PATH || ":memory:";
-process.env.DEVICE_TOKEN = process.env.DEVICE_TOKEN || "test-only-device-token";
 process.env.NODE_ENV = "test";
 
 const http = require("http");
