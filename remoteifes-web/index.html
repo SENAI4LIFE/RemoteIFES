@@ -713,6 +713,7 @@
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span>ESP32 / MACs</button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets"><span class="admin-subtab-icon">🎛️</span>Presets</button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span>Configurações</button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span>ESP32</button>
         </div>
 
         <div class="admin-content">
@@ -914,7 +915,7 @@
             <input type="text" id="novoPresetNome" />
             <button type="button" id="criarPresetBtn" class="btn btn-on btn-block">Criar preset</button>
           </div>
-          <p class="hint">O preset padrão possui apenas a função de temperatura. Novas funções (velocidade, oscilação, modo turbo, etc.) são cadastradas diretamente pela própria ESP32, a partir da sala em que o dispositivo está instalado. Depois de cadastradas, escolha abaixo em qual botão do controle cada função aparece.</p>
+          <p class="hint">O preset padrão possui apenas a função de temperatura. Cadastre novas funções (velocidade, oscilação, modo turbo, etc.) diretamente abaixo, em cada preset, ou importe várias de uma vez a partir de um arquivo JSON. Depois de cadastradas, escolha em qual botão do controle cada função aparece.</p>
           <ul id="presetsList" class="room-list"></ul>
         </div>
 
@@ -999,6 +1000,15 @@
 
           <button type="button" id="salvarConfigBtn" class="btn btn-on btn-block">Salvar configurações</button>
           <p id="configSavedHint" class="config-saved-hint hidden">Configurações salvas.</p>
+        </div>
+
+        <div id="adminSub-esp32" class="admin-sub hidden">
+          <p class="hint">
+            Funções administrativas do ESP32: modo de configuração, aprendizado e testes de infravermelho, e reset de Wi-Fi. Exige a senha de administração definida no próprio dispositivo durante a configuração inicial.
+            <button type="button" class="help-icon-btn" data-help="esp32" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+          </p>
+          <ul id="esp32DeviceList" class="esp32-device-list"></ul>
+          <p id="esp32DeviceListEmpty" class="esp32-empty hidden">Nenhum ESP32 com MAC cadastrado ainda. Cadastre o MAC da sala na aba "ESP32 / MACs".</p>
         </div>
         </div>
         </div>
@@ -1188,6 +1198,7 @@
   <script src="js/screens/grade.js"></script>
   <script src="js/screens/propriedade.js"></script>
   <script src="js/screens/admin.js"></script>
+  <script src="js/screens/esp32-admin.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {

@@ -2,6 +2,7 @@ const http = require("http");
 const app = require("./src/app");
 const { iniciarScheduler } = require("./src/scheduler/schedulerService");
 const statusHub = require("./src/services/statusHub");
+const deviceHub = require("./src/services/deviceHub");
 const { encerrarSessoesAtivasNoInicio } = require("./src/services/tokenService");
 const db = require("./src/config/database");
 const logger = require("./src/utils/logger");
@@ -12,6 +13,7 @@ encerrarSessoesAtivasNoInicio();
 
 const server = http.createServer(app);
 statusHub.iniciar(server);
+deviceHub.iniciar(server);
 
 server.listen(PORTA, () => {
   logger.info("startup", { porta: PORTA, ambiente: process.env.NODE_ENV || "development" });

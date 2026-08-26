@@ -399,4 +399,60 @@ const Api = {
   async marcarTodasNotificacoesLidas() {
     return chamar("/admin/notificacoes/marcar-todas-lidas", { method: "POST", headers: headersComToken() });
   },
+
+  async listarDispositivosEsp32() {
+    return chamar("/admin/esp32/dispositivos", { headers: headersComToken() });
+  },
+
+  async estadoDispositivoEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/estado`, { headers: headersComToken() });
+  },
+
+  async entrarConfigEsp32(sala, senha) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/entrar-config`, {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ senha }),
+    });
+  },
+
+  async sairOperacaoEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/sair-operacao`, { method: "POST", headers: headersComToken() });
+  },
+
+  async definirModoEsp32(sala, modo) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/modo`, {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ modo }),
+    });
+  },
+
+  async iniciarCapturaEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/captura/iniciar`, { method: "POST", headers: headersComToken() });
+  },
+
+  async pararCapturaEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/captura/parar`, { method: "POST", headers: headersComToken() });
+  },
+
+  async testarRawEsp32(sala, raw, carrierHz) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/teste/raw`, {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ raw, carrierHz }),
+    });
+  },
+
+  async testarEstadoEsp32(sala, dados) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/teste/estado`, {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify(dados),
+    });
+  },
+
+  async resetarWifiEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/reset-wifi`, { method: "POST", headers: headersComToken() });
+  },
 };

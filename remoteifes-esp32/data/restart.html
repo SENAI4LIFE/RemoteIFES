@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>RemoteIFES - Reiniciando</title>
+  <style>
+    body { font-family: sans-serif; background: #f2f4f3; padding: 20px; text-align: center; color: #1f2937; }
+    .card { background: white; padding: 30px; border-radius: 12px; max-width: 420px; margin: 40px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { color: #135d33; }
+    p { color: #4b5563; line-height: 1.5; }
+    .ip-box { background: #f8fafc; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; font-family: monospace; font-weight: bold; margin: 15px 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Credenciais Salvas</h2>
+    <p>O ESP32 tentara se conectar a rede <strong>{{ssid}}</strong> em 5 segundos.</p>
+    <p>A senha de administracao do dispositivo tambem foi salva. Guarde-a: ela sera pedida pelo aplicativo web sempre que um superadministrador precisar configurar este ESP32.</p>
+    <p>Apos reiniciar, verifique o IP atribuido pelo roteador local ou acesse pelo hostname configurado na sua rede.</p>
+    <div class="ip-box">Aguarde o reinicio do modulo...</div>
+  </div>
+</body>
+</html>

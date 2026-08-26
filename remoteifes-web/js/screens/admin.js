@@ -664,18 +664,68 @@ const Admin = {
       li.innerHTML = `
         <div>
           <div class="room-name">${escapeHtmlAdmin(p.nome)} ${p.padrao ? "· padrão" : ""}</div>
-          <div class="room-sub">
-            ${p.funcoes.map((f) => `<span class="preset-funcao-tag">${escapeHtmlAdmin(f.rotulo)}</span>`).join("") || "sem funções cadastradas"}
+          <div class="room-sub preset-funcoes-tags">
+            ${p.funcoes.map((f) => f.chave === "temperatura"
+              ? `<span class="preset-funcao-tag">${escapeHtmlAdmin(f.rotulo)}</span>`
+              : `<span class="preset-funcao-tag">${escapeHtmlAdmin(f.rotulo)}<button type="button" class="preset-funcao-remover" data-funcao-id="${f.id}" aria-label="Remover função ${escapeHtmlAdmin(f.rotulo)}" title="Remover função">×</button></span>`
+            ).join("") || "sem funções cadastradas"}
+          </div>
+          <div class="preset-nova-funcao">
+            <input type="text" class="preset-nova-funcao-chave" placeholder="chave (ex.: turbo)" />
+            <input type="text" class="preset-nova-funcao-rotulo" placeholder="rótulo (ex.: Turbo)" />
+            <select class="preset-nova-funcao-tipo">
+              <option value="booleano">liga/desliga</option>
+              <option value="numero">numérico</option>
+              <option value="selecao">seleção</option>
+            </select>
+            <input type="text" class="preset-nova-funcao-opcoes" placeholder="opções (numérico: min,max · seleção: a,b,c)" />
+            <button type="button" class="btn btn-on adicionar-funcao-preset">Adicionar função</button>
           </div>
           <div class="preset-upload-row">
             <input type="file" id="${inputId}" accept="application/json,.json" />
             <button type="button" class="preset-upload-btn carregar-json-preset">Carregar JSON</button>
-            <span class="preset-upload-hint">arquivo de preset registrado pela ESP</span>
+            <span class="preset-upload-hint">importar várias funções de uma vez a partir de um arquivo</span>
           </div>
           <div class="preset-grid-editor"></div>
         </div>
         ${!p.padrao ? `<button type="button" class="link-btn danger remover-preset">remover</button>` : ""}
       `;
+
+      li.querySelectorAll(".preset-funcao-remover").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Remover esta função do preset?")) return;
+          const resp = await Api.removerFuncaoPreset(Number(btn.dataset.funcaoId));
+          if (!resp.ok) alert(resp.erro || "não foi possível remover a função");
+          await Admin.carregarPresets();
+        });
+      });
+
+      li.querySelector(".adicionar-funcao-preset").addEventListener("click", async () => {
+        const chave = li.querySelector(".preset-nova-funcao-chave").value.trim();
+        const rotulo = li.querySelector(".preset-nova-funcao-rotulo").value.trim();
+        const tipo = li.querySelector(".preset-nova-funcao-tipo").value;
+        const opcoesTexto = li.querySelector(".preset-nova-funcao-opcoes").value.trim();
+
+        if (!chave || !rotulo) {
+          alert("informe a chave e o rótulo da nova função");
+          return;
+        }
+
+        let opcoes = null;
+        if (tipo === "numero" && opcoesTexto) {
+          const [min, max] = opcoesTexto.split(",").map((v) => Number(v.trim()));
+          if (Number.isFinite(min) && Number.isFinite(max)) opcoes = { min, max };
+        } else if (tipo === "selecao" && opcoesTexto) {
+          opcoes = opcoesTexto.split(",").map((v) => v.trim()).filter(Boolean);
+        }
+
+        const resp = await Api.adicionarFuncaoPreset(p.id, { chave, rotulo, tipo, opcoes });
+        if (!resp.ok) {
+          alert(resp.erro || "não foi possível adicionar a função");
+          return;
+        }
+        await Admin.carregarPresets();
+      });
       const removerBtn = li.querySelector(".remover-preset");
       if (removerBtn) {
         removerBtn.addEventListener("click", async () => {
@@ -995,6 +1045,8 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "macs") await Admin.carregarMacs();
     if (sub === "presets") await Admin.carregarPresets();
     if (sub === "config") await Admin.carregarConfiguracoes();
+    if (sub === "esp32") await Esp32Admin.aoAbrir();
+    else Esp32Admin.aoFechar();
   });
 });
 

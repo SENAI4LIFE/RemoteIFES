@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RemoteIFES - ESP32</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f2f4f3; padding: 20px; color: #1f2937; margin: 0; }
+    .card { background: white; padding: 24px; border-radius: 12px; max-width: 420px; margin: 40px auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { color: #135d33; margin-top: 0; }
+    dl { margin: 0; }
+    dt { font-size: 0.78rem; text-transform: uppercase; color: #6b7280; margin-top: 14px; }
+    dd { margin: 2px 0 0; font-size: 1rem; font-weight: 600; }
+    .info-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px; margin-top: 20px; font-size: 0.85rem; color: #166534; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>RemoteIFES ESP32</h2>
+    <dl>
+      <dt>Sala</dt>
+      <dd>{{sala}}</dd>
+      <dt>Endereco MAC</dt>
+      <dd>{{mac}}</dd>
+      <dt>Endereco IP</dt>
+      <dd>{{ip}}</dd>
+      <dt>Servidor RemoteIFES</dt>
+      <dd>{{servidor}}</dd>
+    </dl>
+    <div class="info-box">
+      Este dispositivo e administrado pelo aplicativo web do RemoteIFES. Superadministradores encontram as funcoes de configuracao, aprendizado de controles e testes de infravermelho na aba "ESP32" do painel administrativo.
+    </div>
+  </div>
+</body>
+</html>
