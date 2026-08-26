@@ -46,13 +46,29 @@ const Esp32Admin = (() => {
           <div>${c.isKnown ? "protocolo conhecido" : "sinal genérico"}: <strong>${escapeHtml(c.protocol || "?")}</strong></div>
           <div class="esp32-capture-hex">${escapeHtml(c.hex || "")} · ${(c.raw || []).length} pulsos</div>
         </div>
-        <button type="button" class="link-btn testar-captura-btn">testar</button>
+        <div class="esp32-capture-actions">
+          <button type="button" class="link-btn testar-captura-btn">testar</button>
+          ${c.isKnown && Number.isInteger(c.protocolId) ? `<button type="button" class="link-btn usar-protocolo-btn">usar protocolo</button>` : ""}
+        </div>
       `;
       li.querySelector(".testar-captura-btn").addEventListener("click", async () => {
         const sala = ul.closest(".esp32-device-card").dataset.sala;
         const resp = await Api.testarRawEsp32(sala, c.raw, 38000);
         if (!resp.ok) Toast.erro(resp.erro || "não foi possível testar o sinal");
         else Toast.aviso("sinal reenviado para teste");
+      });
+      const usarProtocoloBtn = li.querySelector(".usar-protocolo-btn");
+      if (usarProtocoloBtn) usarProtocoloBtn.addEventListener("click", async () => {
+        const sala = ul.closest(".esp32-device-card").dataset.sala;
+        const resp = await Api.definirProtocoloIrEsp32(sala, c.protocolId);
+        if (!resp.ok) {
+          Toast.erro(resp.erro || "não foi possível salvar o protocolo");
+          return;
+        }
+        const item = dispositivos.find((d) => d.sala === sala);
+        if (item) item.irProtocolo = c.protocolId;
+        Toast.aviso("protocolo do ar-condicionado salvo");
+        render();
       });
       ul.appendChild(li);
     });
@@ -85,12 +101,12 @@ const Esp32Admin = (() => {
         <div class="esp32-metric"><div class="esp32-metric-label">Temperatura</div><div class="esp32-metric-value">${formatarNumero(telemetria.temp, 1, "°C")}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Umidade</div><div class="esp32-metric-value">${formatarNumero(telemetria.hum, 0, "%")}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Sinal Wi-Fi</div><div class="esp32-metric-value">${dispositivo.wifiRssi != null ? `${dispositivo.wifiRssi} dBm` : "—"}</div></div>
+        <div class="esp32-metric"><div class="esp32-metric-label">Protocolo IR</div><div class="esp32-metric-value">${Number.isInteger(d.irProtocolo) ? d.irProtocolo : "não definido"}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Último comando IR</div><div class="esp32-metric-value">${escapeHtml(renderUltimoComando(dispositivo.ultimoComando))}</div></div>
       </div>
 
       ${!emConfig ? `
         <div class="esp32-config-form">
-          <input type="password" class="esp32-admin-senha" placeholder="senha de administração do dispositivo" autocomplete="off" />
           <button type="button" class="btn btn-on entrar-config-btn" ${conectado ? "" : "disabled"}>Entrar em modo de configuração</button>
         </div>
       ` : `
@@ -113,13 +129,8 @@ const Esp32Admin = (() => {
     const entrarBtn = li.querySelector(".entrar-config-btn");
     if (entrarBtn) {
       entrarBtn.addEventListener("click", async () => {
-        const senha = li.querySelector(".esp32-admin-senha").value;
-        if (!senha) {
-          Toast.erro("informe a senha de administração do dispositivo");
-          return;
-        }
         entrarBtn.disabled = true;
-        const resp = await Api.entrarConfigEsp32(d.sala, senha);
+        const resp = await Api.entrarConfigEsp32(d.sala);
         entrarBtn.disabled = false;
         if (!resp.ok) Toast.erro(resp.erro || "não foi possível entrar em modo de configuração");
       });

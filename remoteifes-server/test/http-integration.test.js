@@ -9,6 +9,10 @@ const bcrypt = require("bcryptjs");
 const db = require("../src/config/database");
 const app = require("../src/app");
 const usuariosService = require("../src/services/usuariosService");
+const senhaAdminInicialValida = bcrypt.compareSync(
+  "admin",
+  db.prepare(`SELECT senhaHash FROM usuarios WHERE usuario = 'admin'`).get().senhaHash
+);
 
 let server;
 let baseUrl;
@@ -102,7 +106,11 @@ test("login com senha incorreta retorna 401 e não vaza detalhes internos", asyn
   assert.doesNotMatch(resp.corpo.erro, /stack|SQLITE|constraint/i);
 });
 
-test("autenticação de dispositivo por MAC: sala sem MAC aceita qualquer dispositivo, sala com MAC exige correspondência", async () => {
+test("a instalação inicial mantém admin/admin", async () => {
+  assert.equal(senhaAdminInicialValida, true);
+});
+
+test("identificação de dispositivo depende do vínculo MAC e rejeita MAC divergente", async () => {
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'admin'`).run(bcrypt.hashSync("superSenha123", 10));
   const loginSuperAdmin = await login("admin", "superSenha123");
   const tokenSuperAdmin = loginSuperAdmin.corpo.token;
@@ -114,12 +122,12 @@ test("autenticação de dispositivo por MAC: sala sem MAC aceita qualquer dispos
   const macLegitimo = "AA:BB:CC:DD:EE:FF";
   const macForjado = "11:22:33:44:55:66";
 
-  const heartbeatSemMacCadastrado = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
+  const identificacaoPendente = await fetch(`${baseUrl}/dispositivo/identificar`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sala, ligado: false, mac: macLegitimo }),
+    body: JSON.stringify({ mac: macLegitimo }),
   });
-  assert.equal(heartbeatSemMacCadastrado.status, 200, "sem MAC cadastrado para a sala, qualquer dispositivo deve autenticar");
+  assert.equal(identificacaoPendente.status, 202);
 
   const cadastro = await authFetch(`/admin/salas/${encodeURIComponent(sala)}/mac`, tokenSuperAdmin, {
     method: "PATCH",
@@ -127,6 +135,14 @@ test("autenticação de dispositivo por MAC: sala sem MAC aceita qualquer dispos
     body: JSON.stringify({ mac: macLegitimo }),
   });
   assert.equal(cadastro.status, 200, "o administrador principal deve conseguir cadastrar o MAC do ESP32 da sala");
+
+  const identificacaoVinculada = await fetch(`${baseUrl}/dispositivo/identificar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mac: macLegitimo }),
+  });
+  assert.equal(identificacaoVinculada.status, 200);
+  assert.equal((await identificacaoVinculada.json()).sala, sala);
 
   const heartbeatComMacCorreto = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
     method: "POST",
@@ -140,7 +156,7 @@ test("autenticação de dispositivo por MAC: sala sem MAC aceita qualquer dispos
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sala, ligado: false, mac: macForjado }),
   });
-  assert.equal(heartbeatComMacForjado.status, 400, "um MAC diferente do cadastrado para a sala deve ser rejeitado");
+  assert.equal(heartbeatComMacForjado.status, 403, "um MAC diferente do cadastrado para a sala deve ser rejeitado");
 
   const comandoComMacForjado = await fetch(`${baseUrl}/dispositivo/comando`, {
     method: "POST",

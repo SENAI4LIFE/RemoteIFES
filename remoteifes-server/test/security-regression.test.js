@@ -9,7 +9,6 @@ require("../src/db/schema").criarSchema();
 require("../src/db/seed").popularBanco();
 
 const salasService = require("../src/services/salasService");
-const presetsService = require("../src/services/presetsService");
 const usuariosService = require("../src/services/usuariosService");
 const tokenService = require("../src/services/tokenService");
 
@@ -20,111 +19,45 @@ function novaSala(sala) {
   return salasService.buscar(sala);
 }
 
-test("achado #13 — dispositivo não consegue sobrescrever o preset padrão global por nome", () => {
-  const padraoAntes = presetsService.presetPadrao();
+test("limites efetivos usam cada substituição de sala de forma independente", () => {
+  novaSala("teste-limites-independentes");
+  salasService.definirLimitesTemperatura("teste-limites-independentes", { minima: 18, maxima: null });
+  let sala = salasService.buscar("teste-limites-independentes");
+  let limites = require("../src/services/configuracoesService").limitesEfetivosDaSala(sala);
+  assert.deepEqual(limites, { minima: 18, maxima: 25 });
 
-  const atacante = novaSala("teste-sala-atacante-13a");
-  const resultado = presetsService.sincronizarPresetDaSala({
-    presetIdAtual: atacante.presetId || null,
-    nome: "Padrão",
-    funcoes: [{ chave: "temperatura", rotulo: "temperatura", tipo: "numero", opcoes: { min: -50, max: 200 } }],
-  });
-  salasService.definirPreset("teste-sala-atacante-13a", resultado.id);
+  salasService.definirLimitesTemperatura("teste-limites-independentes", { minima: null, maxima: 28 });
+  sala = salasService.buscar("teste-limites-independentes");
+  limites = require("../src/services/configuracoesService").limitesEfetivosDaSala(sala);
+  assert.deepEqual(limites, { minima: 23, maxima: 28 });
+});
 
-  const padraoDepois = presetsService.presetPadrao();
-  assert.equal(padraoDepois.id, padraoAntes.id, "o preset padrão original deve continuar sendo o mesmo registro");
-  assert.deepEqual(
-    padraoDepois.funcoes,
-    padraoAntes.funcoes,
-    "as funções do preset padrão não podem ser alteradas por um dispositivo de outra sala"
+test("comandos de temperatura respeitam os limites efetivos da sala", () => {
+  novaSala("teste-limites-comando");
+  salasService.definirLimitesTemperatura("teste-limites-comando", { minima: 18, maxima: 28 });
+
+  assert.throws(
+    () => salasService.aplicarComando("teste-limites-comando", "temperatura", 17, { usuario: { isAdmin: true }, origem: "manual" }),
+    /entre 18 e 28/
   );
-  assert.notEqual(resultado.id, padraoAntes.id, "o dispositivo atacante deve receber um preset próprio, não o padrão");
-});
-
-test("achado #13 — dispositivo não consegue sobrescrever o preset de outra sala por colisão de nome", () => {
-  const vitima = novaSala("teste-sala-vitima-13b");
-  const infoPresetVitima = db
-    .prepare(`INSERT INTO presets (nome, padrao) VALUES ('Preset Vitima 13b', 0)`)
-    .run();
-  const presetVitimaId = Number(infoPresetVitima.lastInsertRowid);
-  db.prepare(
-    `INSERT INTO preset_funcoes (presetId, chave, rotulo, tipo, opcoes, ordem) VALUES (?, 'temperatura', 'Temperatura', 'numero', ?, 0)`
-  ).run(presetVitimaId, JSON.stringify({ min: 18, max: 28 }));
-  salasService.definirPreset("teste-sala-vitima-13b", presetVitimaId);
-
-  const atacante = novaSala("teste-sala-atacante-13b");
-  presetsService.sincronizarPresetDaSala({
-    presetIdAtual: atacante.presetId || null,
-    nome: "Preset Vitima 13b",
-    funcoes: [{ chave: "temperatura", rotulo: "hax", tipo: "numero", opcoes: { min: -99, max: 999 } }],
-  });
-
-  const presetVitimaDepois = presetsService.buscarPorId(presetVitimaId);
-  const funcaoTemperatura = presetVitimaDepois.funcoes.find((f) => f.chave === "temperatura");
-  assert.equal(funcaoTemperatura.opcoes.min, 18);
-  assert.equal(funcaoTemperatura.opcoes.max, 28);
-});
-
-test("achado #13 — atualização legítima do próprio preset continua funcionando in-place", () => {
-  const sala = novaSala("teste-sala-legitima-13c");
-  const criado = presetsService.sincronizarPresetDaSala({
-    presetIdAtual: sala.presetId || null,
-    nome: "Preset legítimo 13c",
-    funcoes: [{ chave: "luz", rotulo: "Luz", tipo: "booleano" }],
-  });
-  salasService.definirPreset("teste-sala-legitima-13c", criado.id);
-
-  const atualizado = presetsService.sincronizarPresetDaSala({
-    presetIdAtual: criado.id,
-    nome: "Preset legítimo 13c",
-    funcoes: [{ chave: "luz", rotulo: "Luz regulável", tipo: "numero", opcoes: { min: 0, max: 100 } }],
-  });
-
-  assert.equal(atualizado.id, criado.id, "deve reaproveitar o mesmo preset (in-place), não duplicar");
-  const funcaoLuz = atualizado.funcoes.find((f) => f.chave === "luz");
-  assert.equal(funcaoLuz.tipo, "numero");
-});
-
-test("achado #17 — atualizarFuncao não corrompe opcoes ao receber apenas a posição (editor de posição do controle)", () => {
-  const preset = presetsService.criar({ nome: "Preset achado 17" });
-
-  const comVelocidade = presetsService.adicionarFuncao(preset.id, {
-    chave: "velocidade",
-    rotulo: "Velocidade",
-    tipo: "numero",
-    opcoes: { min: 1, max: 5 },
-  });
-  const funcaoVelocidade = comVelocidade.funcoes.find((f) => f.chave === "velocidade");
-
-  const comModo = presetsService.adicionarFuncao(preset.id, {
-    chave: "modo",
-    rotulo: "Modo",
-    tipo: "selecao",
-    opcoes: ["frio", "seco", "ventilar"],
-  });
-  const funcaoModo = comModo.funcoes.find((f) => f.chave === "modo");
-
-  // Simula exatamente o que o editor "Posição dos botões no controle" faz: envia apenas { posicao },
-  // sem reenviar opcoes — atualizarFuncao precisa preservar o valor já salvo, não corrompê-lo.
-  presetsService.atualizarFuncao(funcaoVelocidade.id, { posicao: "grid_topo_1" });
-  presetsService.atualizarFuncao(funcaoVelocidade.id, { posicao: "grid_topo_2" });
-  const velocidadeDepoisDeMover = presetsService.atualizarFuncao(funcaoVelocidade.id, { posicao: null });
-  const funcaoVelocidadeFinal = velocidadeDepoisDeMover.funcoes.find((f) => f.chave === "velocidade");
-  assert.deepEqual(
-    funcaoVelocidadeFinal.opcoes,
-    { min: 1, max: 5 },
-    "opcoes numéricas devem sobreviver a múltiplas atualizações de posição sem serem reenviadas"
-  );
-
-  const modoDepoisDeMover = presetsService.atualizarFuncao(funcaoModo.id, { posicao: "flank_esq" });
-  const funcaoModoFinal = modoDepoisDeMover.funcoes.find((f) => f.chave === "modo");
-  assert.deepEqual(
-    funcaoModoFinal.opcoes,
-    ["frio", "seco", "ventilar"],
-    "opcoes de seleção devem sobreviver a atualizações de posição sem serem reenviadas"
+  assert.doesNotThrow(
+    () => salasService.aplicarComando("teste-limites-comando", "temperatura", 28, { usuario: { isAdmin: true }, origem: "manual" })
   );
 });
 
+test("turbo exige booleano e preserva o estado configurado", () => {
+  novaSala("teste-turbo");
+  const configuracoesService = require("../src/services/configuracoesService");
+  configuracoesService.validarEAtualizar({ turboFuncaoExtra: "swing" }, { id: 1, nivel: 3 });
+  salasService.aplicarComando("teste-turbo", "turbo", true, { usuario: { isAdmin: true }, origem: "manual" });
+  assert.equal(salasService.buscar("teste-turbo").turboAtivo, 1);
+  db.prepare(`UPDATE salas SET irProtocolo = 5 WHERE sala = ?`).run("teste-turbo");
+  assert.equal(salasService.comandoEstadoIR(salasService.buscar("teste-turbo")).swing, true);
+  assert.throws(
+    () => salasService.aplicarComando("teste-turbo", "turbo", "false", { usuario: { isAdmin: true }, origem: "manual" }),
+    /verdadeiro ou falso/
+  );
+});
 test("achado #12 — admin comum não consegue excluir outro admin", () => {
   const admin1 = usuariosService.criar(
     { usuario: "teste-admin1-12", senha: "senhaSegura123", nome: "Admin Um", isAdmin: true },

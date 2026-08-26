@@ -242,56 +242,16 @@ const Api = {
     });
   },
 
-  async definirPresetDaSala(sala, presetId) {
-    return chamar(`/admin/salas/${encodeURIComponent(sala)}/preset`, {
+  async definirLimitesTemperaturaSala(sala, minima, maxima) {
+    return chamar(`/admin/salas/${encodeURIComponent(sala)}/limites-temperatura`, {
       method: "PATCH",
       headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ presetId }),
+      body: JSON.stringify({ minima, maxima }),
     });
   },
 
   async acessarEsp32(sala) {
     return chamar(`/admin/salas/${encodeURIComponent(sala)}/acessar-esp32`, { headers: headersComToken() });
-  },
-
-  async listarPresets() {
-    return chamar("/admin/presets", { headers: headersComToken() });
-  },
-
-  async criarPreset(nome) {
-    return chamar("/admin/presets", {
-      method: "POST",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ nome }),
-    });
-  },
-
-  async removerPreset(id) {
-    return chamar(`/admin/presets/${id}`, { method: "DELETE", headers: headersComToken() });
-  },
-
-  async adicionarFuncaoPreset(presetId, dados) {
-    return chamar(`/admin/presets/${presetId}/funcoes`, {
-      method: "POST",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify(dados),
-    });
-  },
-
-  async atualizarFuncaoPreset(funcaoId, dados) {
-    return chamar(`/admin/presets/funcoes/${funcaoId}`, {
-      method: "PATCH",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify(dados),
-    });
-  },
-
-  async removerFuncaoPreset(funcaoId) {
-    return chamar(`/admin/presets/funcoes/${funcaoId}`, { method: "DELETE", headers: headersComToken() });
-  },
-
-  async listarPosicoesPreset() {
-    return chamar("/admin/presets/posicoes", { headers: headersComToken() });
   },
 
   async listarDetectados() {
@@ -396,11 +356,10 @@ const Api = {
     return chamar(`/admin/esp32/${encodeURIComponent(sala)}/estado`, { headers: headersComToken() });
   },
 
-  async entrarConfigEsp32(sala, senha) {
+  async entrarConfigEsp32(sala) {
     return chamar(`/admin/esp32/${encodeURIComponent(sala)}/entrar-config`, {
       method: "POST",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ senha }),
+      headers: headersComToken(),
     });
   },
 
@@ -437,6 +396,14 @@ const Api = {
       method: "POST",
       headers: headersComToken({ "Content-Type": "application/json" }),
       body: JSON.stringify(dados),
+    });
+  },
+
+  async definirProtocoloIrEsp32(sala, protocolo) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/protocolo-ir`, {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ protocolo }),
     });
   },
 

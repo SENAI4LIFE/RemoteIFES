@@ -19,11 +19,6 @@ const PORTAL_FUNCOES = {
     titulo: "Grade",
     texto: "Acompanhe em um painel único o status de todas as salas monitoradas ao mesmo tempo.",
   },
-  presets: {
-    icon: "💨",
-    titulo: "Presets",
-    texto: "Salve configurações de temperatura e modo prontas para aplicar rapidamente em qualquer sala.",
-  },
   admin: {
     icon: "🔧",
     titulo: "Admin",
