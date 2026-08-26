@@ -146,6 +146,14 @@ function criarSchema() {
       criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS dispositivo_tokens (
+      sala TEXT PRIMARY KEY REFERENCES salas(sala) ON DELETE CASCADE,
+      tokenHash TEXT NOT NULL,
+      criadoPor INTEGER REFERENCES usuarios(id),
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      rotacionadoEm TEXT
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL;
   `);
 

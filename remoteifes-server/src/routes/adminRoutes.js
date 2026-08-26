@@ -3,6 +3,7 @@ const { exigirLogin, exigirAdmin, exigirSuperAdmin } = require("../middlewares/a
 const usuariosService = require("../services/usuariosService");
 const salasService = require("../services/salasService");
 const tokenService = require("../services/tokenService");
+const dispositivoTokenService = require("../services/dispositivoTokenService");
 const configuracoesService = require("../services/configuracoesService");
 const presetsService = require("../services/presetsService");
 const notificacoesService = require("../services/notificacoesService");
@@ -198,7 +199,7 @@ router.delete("/admin/esp32/detectados/:mac", exigirSuperAdmin, (req, res) => {
   }
 });
 
-router.patch("/admin/salas/:sala/acesso-restrito", (req, res) => {
+router.patch("/admin/salas/:sala/acesso-restrito", exigirSuperAdmin, (req, res) => {
   try {
     const sala = salasService.definirAcessoRestrito(req.params.sala, !!req.body.restrito);
     res.json({ ok: true, sala });
@@ -271,6 +272,25 @@ router.patch("/admin/configuracoes", exigirSuperAdmin, (req, res) => {
   } catch (err) {
     res.status(err.permissao ? 403 : 400).json({ ok: false, erro: err.message });
   }
+});
+
+router.get("/admin/salas/:sala/token", exigirSuperAdmin, (req, res) => {
+  const info = dispositivoTokenService.infoDaSala(req.params.sala);
+  res.json({ ok: true, existe: !!info, criadoEm: info?.criadoEm || null, rotacionadoEm: info?.rotacionadoEm || null });
+});
+
+router.post("/admin/salas/:sala/token", exigirSuperAdmin, (req, res) => {
+  try {
+    const token = dispositivoTokenService.gerarOuRotacionar(req.params.sala, req.usuario.id);
+    res.json({ ok: true, token });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.delete("/admin/salas/:sala/token", exigirSuperAdmin, (req, res) => {
+  dispositivoTokenService.revogar(req.params.sala);
+  res.json({ ok: true });
 });
 
 router.patch("/admin/salas/:sala/mac", exigirSuperAdmin, (req, res) => {

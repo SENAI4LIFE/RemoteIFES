@@ -1,5 +1,6 @@
 const EventEmitter = require("events");
 const db = require("../config/database");
+const logger = require("../utils/logger");
 
 const eventos = new EventEmitter();
 
@@ -138,6 +139,7 @@ function validarEAtualizar(patch, requisitante) {
   if (Object.prototype.hasOwnProperty.call(patch, "modoManutencao")) {
     eventos.emit("mudanca-manutencao", !!configuracoes.modoManutencao);
   }
+  logger.info("configuracoes-alteradas", { chaves: Object.keys(patch), por: requisitante.id });
   return configuracoes;
 }
 

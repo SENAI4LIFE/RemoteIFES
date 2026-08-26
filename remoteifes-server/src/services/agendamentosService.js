@@ -134,8 +134,15 @@ function remover(id, requisitante) {
   if (ag.usuarioId !== requisitante.id && !requisitante.isAdmin) {
     throw new Error("apenas o autor ou um administrador pode remover este agendamento");
   }
-  db.prepare("DELETE FROM agendamentos_execucoes WHERE agendamentoId = ?").run(id);
-  db.prepare("DELETE FROM agendamentos WHERE id = ?").run(id);
+  db.exec("BEGIN");
+  try {
+    db.prepare("DELETE FROM agendamentos_execucoes WHERE agendamentoId = ?").run(id);
+    db.prepare("DELETE FROM agendamentos WHERE id = ?").run(id);
+    db.exec("COMMIT");
+  } catch (erro) {
+    db.exec("ROLLBACK");
+    throw erro;
+  }
 }
 
 function registrarExecucao(agendamentoId, tipo) {

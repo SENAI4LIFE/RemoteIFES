@@ -52,9 +52,19 @@ function aplicarDisponibilidadePortalNormal(manutencaoAtiva) {
 }
 
 document.querySelectorAll(".portal-option").forEach((el) => {
-  el.addEventListener("click", () => {
+  el.setAttribute("role", "button");
+  if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
+
+  const ativar = () => {
     if (el.classList.contains("portal-option-disabled")) return;
     mostrarLogin(el.dataset.tipo);
+  };
+
+  el.addEventListener("click", ativar);
+  el.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    ativar();
   });
 });
 

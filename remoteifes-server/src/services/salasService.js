@@ -4,6 +4,7 @@ const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 const configuracoesService = require("./configuracoesService");
 const notificacoesService = require("./notificacoesService");
 const presetsService = require("./presetsService");
+const logger = require("../utils/logger");
 
 const eventos = new EventEmitter();
 
@@ -125,6 +126,7 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null) {
   if (!salaRow) throw new Error("sala não encontrada");
 
   if (!macCorrespondeASala(salaRow, mac)) {
+    logger.warn("heartbeat-mac-invalido", { sala, macRecebido: mac, macEsperado: salaRow.mac, ip });
     throw new Error("MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala");
   }
 
@@ -168,6 +170,7 @@ function cadastrarMac(sala, mac) {
   }
 
   db.prepare(`UPDATE salas SET mac = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(macLimpo, sala);
+  logger.info("sala-mac-cadastrado", { sala, mac: macLimpo });
   return buscar(sala);
 }
 
@@ -178,6 +181,7 @@ function definirAcessoRestrito(sala, restrito) {
     restrito ? 1 : 0,
     sala
   );
+  logger.info("sala-acesso-restrito-alterado", { sala, restrito: !!restrito });
   return buscar(sala);
 }
 
@@ -286,6 +290,7 @@ function verificarTimeouts() {
     db.prepare(`UPDATE salas SET online = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
     registrarEventoEsp(sala, "offline");
     notificacoesService.criarEspOffline(sala, nome);
+    logger.warn("esp32-offline", { sala });
   }
 
   if (salasParaDesligar.length > 0) eventos.emit("mudanca");

@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const db = require("../config/database");
 const { removerSessoesDoUsuario } = require("./tokenService");
+const logger = require("../utils/logger");
 
 const NIVEL_USUARIO = 1;
 const NIVEL_ADMIN = 2;
@@ -49,6 +50,7 @@ function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
     VALUES (?, ?, ?, ?, ?, ?, 1)
   `).run(usuario, senhaHash, nome, nivel >= NIVEL_ADMIN ? 1 : 0, nivel, podeControlar ? 1 : 0);
 
+  logger.info("usuario-criado", { usuarioNovo: usuario, nivel, por: requisitante ? requisitante.id : null });
   return paraSaida(buscarPorId(info.lastInsertRowid));
 }
 
@@ -98,6 +100,7 @@ function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante
 
   if (ativo === false) removerSessoesDoUsuario(id);
 
+  logger.info("usuario-permissoes-alteradas", { alvo: id, podeControlar, ativo, isAdmin, por: requisitante ? requisitante.id : null });
   return paraSaida(buscarPorId(id));
 }
 
@@ -146,6 +149,7 @@ function trocarSenha(id, novaSenha, requisitante) {
   const senhaHash = bcrypt.hashSync(novaSenha, 10);
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE id = ?`).run(senhaHash, id);
   removerSessoesDoUsuario(id);
+  logger.info("usuario-senha-alterada", { alvo: id, por: requisitante ? requisitante.id : null });
 }
 
 function remover(id, requisitante) {
@@ -154,11 +158,20 @@ function remover(id, requisitante) {
   if (usuario.nivel === NIVEL_SUPERADMIN) throw new Error("não é possível remover o administrador principal");
   exigirPermissaoSobreAlvo(usuario, requisitante);
 
-  removerSessoesDoUsuario(id);
-  db.prepare(`DELETE FROM agendamentos WHERE usuarioId = ?`).run(id);
-  db.prepare(`DELETE FROM sala_donos WHERE usuarioId = ?`).run(id);
-  db.prepare(`DELETE FROM sala_acessos WHERE usuarioId = ?`).run(id);
-  db.prepare(`DELETE FROM usuarios WHERE id = ?`).run(id);
+  db.exec("BEGIN");
+  try {
+    db.prepare(`DELETE FROM agendamentos_execucoes WHERE agendamentoId IN (SELECT id FROM agendamentos WHERE usuarioId = ?)`).run(id);
+    db.prepare(`DELETE FROM agendamentos WHERE usuarioId = ?`).run(id);
+    db.prepare(`DELETE FROM sala_donos WHERE usuarioId = ?`).run(id);
+    db.prepare(`DELETE FROM sala_acessos WHERE usuarioId = ?`).run(id);
+    db.prepare(`DELETE FROM sessoes WHERE usuarioId = ?`).run(id);
+    db.prepare(`DELETE FROM usuarios WHERE id = ?`).run(id);
+    db.exec("COMMIT");
+  } catch (erro) {
+    db.exec("ROLLBACK");
+    throw erro;
+  }
+  logger.info("usuario-removido", { alvo: id, usuario: usuario.usuario, por: requisitante ? requisitante.id : null });
 }
 
 module.exports = {

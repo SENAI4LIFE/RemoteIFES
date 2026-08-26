@@ -14,7 +14,7 @@ const char SETUP_HTML[] PROGMEM = R"rawliteral(
     h2 { color: #135d33; margin-top: 0; text-align: center; }
     p { font-size: 0.9rem; color: #4b5563; line-height: 1.4; }
     label { display: block; margin-top: 12px; font-weight: bold; font-size: 0.85rem; }
-    input[type="text"], input[type="password"] { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; }
+    input[type="text"], input[type="password"], select { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; }
     button { width: 100%; background: #135d33; color: white; border: none; padding: 12px; border-radius: 6px; font-size: 1rem; margin-top: 20px; cursor: pointer; font-weight: bold; }
     button:hover { background: #0e4626; }
     .info-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.85rem; color: #166534; }
@@ -38,6 +38,12 @@ const char SETUP_HTML[] PROGMEM = R"rawliteral(
       <input type="text" id="host" name="host" placeholder="Ex: 192.168.0.10" required>
       <label for="porta">Porta do servidor:</label>
       <input type="text" id="porta" name="porta" placeholder="8080" required>
+      <label for="tls">Conexao com o servidor:</label>
+      <select id="tls" name="tls">
+        <option value="ca">HTTPS com certificado valido (recomendado)</option>
+        <option value="inseguro">HTTPS sem validar certificado (rede local, certificado autoassinado)</option>
+        <option value="off">HTTP sem criptografia (apenas rede local confiavel)</option>
+      </select>
       <label for="token">Token do dispositivo:</label>
       <input type="password" id="token" name="token" placeholder="valor de DEVICE_TOKEN no servidor" required>
       <button type="submit">Salvar e Conectar</button>

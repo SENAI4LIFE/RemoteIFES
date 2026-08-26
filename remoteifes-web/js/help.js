@@ -165,6 +165,7 @@ const HelpContent = {
 };
 
 const Help = {
+  _elementoAnterior: null,
   abrir(chave) {
     const dados = HelpContent[chave];
     if (!dados) return;
@@ -172,10 +173,15 @@ const Help = {
     document.getElementById("helpModalList").innerHTML = dados.itens
       .map((item) => `<li><strong>${item.titulo}:</strong> ${item.texto}</li>`)
       .join("");
+    this._elementoAnterior = document.activeElement;
     document.getElementById("helpModal").classList.remove("hidden");
+    document.getElementById("helpModalCloseBtn").focus();
   },
   fechar() {
     document.getElementById("helpModal").classList.add("hidden");
+    const anterior = this._elementoAnterior;
+    this._elementoAnterior = null;
+    if (anterior && typeof anterior.focus === "function") anterior.focus();
   },
 };
 
@@ -185,4 +191,24 @@ document.querySelectorAll(".help-icon-btn[data-help]").forEach((btn) => {
 document.getElementById("helpModalCloseBtn").addEventListener("click", () => Help.fechar());
 document.getElementById("helpModal").addEventListener("click", (e) => {
   if (e.target.id === "helpModal") Help.fechar();
+});
+document.getElementById("helpModal").addEventListener("keydown", (e) => {
+  const modal = document.getElementById("helpModal");
+  if (modal.classList.contains("hidden")) return;
+  if (e.key === "Escape") {
+    Help.fechar();
+    return;
+  }
+  if (e.key !== "Tab") return;
+  const focaveis = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (focaveis.length === 0) return;
+  const primeiro = focaveis[0];
+  const ultimo = focaveis[focaveis.length - 1];
+  if (e.shiftKey && document.activeElement === primeiro) {
+    e.preventDefault();
+    ultimo.focus();
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault();
+    primeiro.focus();
+  }
 });

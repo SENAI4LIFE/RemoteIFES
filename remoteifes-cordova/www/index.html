@@ -712,7 +712,7 @@
           <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span>Mapa</button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span>ESP32 / MACs</button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="presets"><span class="admin-subtab-icon">🎛️</span>Presets</button>
-          <button type="button" class="admin-subtab-btn" data-sub="config"><span class="admin-subtab-icon">⚙️</span>Configurações</button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span>Configurações</button>
         </div>
 
         <div class="admin-content">
@@ -1016,9 +1016,9 @@
 
   </main>
 
-  <div id="idleModal" class="modal-overlay hidden">
+  <div id="idleModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="idleModalTitle">
     <div class="modal-card">
-      <h2>Sessão prestes a expirar</h2>
+      <h2 id="idleModalTitle">Sessão prestes a expirar</h2>
       <p>Por inatividade, sua sessão será encerrada em:</p>
       <div class="modal-countdown" id="idleCountdown">01:00</div>
       <p>Isso evita que o app fique aberto e marcado como "online" sem ninguém acompanhando.</p>
@@ -1029,7 +1029,7 @@
     </div>
   </div>
 
-  <div id="helpModal" class="modal-overlay hidden">
+  <div id="helpModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
     <div class="modal-card help-modal-card">
       <h2 id="helpModalTitle"></h2>
       <ul class="help-list" id="helpModalList"></ul>

@@ -6,6 +6,7 @@ const configuracoesService = require("../services/configuracoesService");
 const { gerarToken, removerToken } = require("../services/tokenService");
 const { exigirLogin } = require("../middlewares/auth");
 const { criarLimitador } = require("../utils/rateLimiter");
+const logger = require("../utils/logger");
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.post("/login", limitarLogin, (req, res) => {
 
   const registro = usuariosService.buscarPorUsuario(usuario);
   if (!registro || !registro.ativo || !bcrypt.compareSync(senha, registro.senhaHash)) {
+    logger.warn("login-falhou", { usuario, ip: req.ip });
     return res.status(401).json({ ok: false, erro: "usuário ou senha inválidos" });
   }
 
