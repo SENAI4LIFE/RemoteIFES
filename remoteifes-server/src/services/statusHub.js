@@ -1,17 +1,20 @@
 const salasService = require("./salasService");
 const agendamentosService = require("./agendamentosService");
 const configuracoesService = require("./configuracoesService");
+const deviceHub = require("./deviceHub");
 const { validarToken } = require("./tokenService");
 const { ipAutorizado, resolverIpCliente } = require("../utils/rede");
 
 const REBROADCAST_MS = 30 * 1000;
 const PING_MS = 30 * 1000;
 const NIVEL_ADMIN = 2;
+const NIVEL_SUPERADMIN = 3;
 const JANELA_MENSAGENS_MS = 10 * 1000;
 const MAX_MENSAGENS_POR_JANELA = 20;
 
 let wss = null;
 const salaObservadaPorCliente = new WeakMap();
+const dispositivoObservadoPorCliente = new WeakMap();
 const janelaMensagensPorCliente = new WeakMap();
 
 function limiteDeMensagensExcedido(ws) {
@@ -113,9 +116,16 @@ function selecionarSubprotocolo(protocolos) {
 function iniciar(server) {
   const { WebSocketServer } = require("ws");
   wss = new WebSocketServer({
-    server,
-    path: "/ws",
+    noServer: true,
     handleProtocols: (protocolos) => selecionarSubprotocolo(protocolos),
+  });
+
+  server.on("upgrade", (req, socket, head) => {
+    const { pathname } = new URL(req.url, "http://localhost");
+    if (pathname !== "/ws") return;
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit("connection", ws, req);
+    });
   });
 
   wss.on("connection", (ws, req) => {
@@ -150,11 +160,20 @@ function iniciar(server) {
           salaObservadaPorCliente.delete(ws);
         }
         notificarCliente(ws);
+      } else if (msg && msg.tipo === "observar_dispositivo") {
+        const ehSuperAdmin = !!(ws.usuario && ws.usuario.nivel === NIVEL_SUPERADMIN);
+        if (ehSuperAdmin && msg.sala && typeof msg.sala === "string") {
+          dispositivoObservadoPorCliente.set(ws, msg.sala);
+          enviar(ws, { tipo: "dispositivo_status", sala: msg.sala, estado: deviceHub.estadoPublico(msg.sala) });
+        } else {
+          dispositivoObservadoPorCliente.delete(ws);
+        }
       }
     });
 
     ws.on("close", () => {
       salaObservadaPorCliente.delete(ws);
+      dispositivoObservadoPorCliente.delete(ws);
       janelaMensagensPorCliente.delete(ws);
     });
 
@@ -179,5 +198,28 @@ function iniciar(server) {
   salasService.eventos.on("mudanca", notificarTodos);
   configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
 }
+
+function notificarObservadoresDeDispositivo(sala, payload) {
+  if (!wss) return;
+  wss.clients.forEach((ws) => {
+    if (dispositivoObservadoPorCliente.get(ws) === sala) enviar(ws, payload);
+  });
+}
+
+deviceHub.eventos.on("telemetria", ({ sala, estado }) => {
+  notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_status", sala, estado });
+});
+
+deviceHub.eventos.on("captura", ({ sala, captura }) => {
+  notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_captura", sala, captura });
+});
+
+deviceHub.eventos.on("erro", ({ sala, mensagem }) => {
+  notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_erro", sala, mensagem });
+});
+
+deviceHub.eventos.on("conexao", ({ sala }) => {
+  notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_status", sala, estado: deviceHub.estadoPublico(sala) });
+});
 
 module.exports = { iniciar };

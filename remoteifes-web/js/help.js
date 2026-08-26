@@ -150,7 +150,8 @@ const HelpContent = {
     titulo: "Como usar: Presets",
     itens: [
       { titulo: "Preset padrão", texto: "Possui apenas a função de temperatura e não pode ser removido." },
-      { titulo: "Novas funções", texto: "Velocidade, oscilação, modo turbo etc. são cadastradas diretamente pela ESP32 da sala, não por aqui." },
+      { titulo: "Novas funções", texto: "Velocidade, oscilação, modo turbo etc. são cadastradas aqui mesmo, escolhendo uma chave, um rótulo e o tipo de função." },
+      { titulo: "Remover função", texto: "Remove apenas aquela função do preset; as demais continuam disponíveis." },
       { titulo: "Remover preset", texto: "As salas que o utilizavam voltam automaticamente para o preset padrão." },
     ],
   },
@@ -160,6 +161,18 @@ const HelpContent = {
       { titulo: "Sessão por inatividade", texto: "Tempo sem uso até deslogar automaticamente; deixe em branco para nunca deslogar por tempo." },
       { titulo: "Presença online", texto: "Por quantos minutos sem uso um usuário ainda aparece como online no painel de Ativos." },
       { titulo: "Acesso restrito", texto: "Esta aba inteira é visível apenas ao administrador principal." },
+    ],
+  },
+  esp32: {
+    titulo: "Como usar: ESP32",
+    itens: [
+      { titulo: "O que é", texto: "Acesso direto às funções avançadas de cada ESP32, antes disponíveis apenas na página local do dispositivo. Visível apenas ao administrador principal." },
+      { titulo: "Conexão", texto: "Mostra separadamente se o dispositivo está online na rede Wi-Fi e se está conectado ao servidor." },
+      { titulo: "Entrar em modo de configuração", texto: "Exige a senha de administração cadastrada no próprio ESP32 (definida durante a configuração do ponto de acesso)." },
+      { titulo: "Modo clonagem", texto: "Só disponível em modo de configuração; permite capturar sinais infravermelhos de um controle remoto original." },
+      { titulo: "Capturas", texto: "Sinais capturados aparecem em tempo real; use \"testar\" para reenviar um sinal e confirmar que ele controla o aparelho." },
+      { titulo: "Sair do modo de configuração", texto: "Devolve o dispositivo ao funcionamento normal (modo operação)." },
+      { titulo: "Resetar Wi-Fi", texto: "Apaga as credenciais de rede salvas no dispositivo e o reinicia em modo de ponto de acesso, para reconfiguração." },
     ],
   },
 };
