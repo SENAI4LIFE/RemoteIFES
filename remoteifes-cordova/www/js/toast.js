@@ -42,8 +42,6 @@ const Toast = (() => {
     return mostrar(texto, "aviso", DURACAO_AVISO_MS);
   }
 
-  // Para avisos de estado contínuo (ex: "dispositivo offline"), evita repetir
-  // a mensagem a cada atualização — só dispara na transição de inativo -> ativo.
   function criarAvisoDeEstado(chave, texto) {
     return function aplicar(ativo) {
       const jaAtivo = estadosAtivos.get(chave) || false;

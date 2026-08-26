@@ -46,6 +46,8 @@ function renderRooms(salasTodas) {
     if (!li) {
       li = document.createElement("li");
       li.dataset.sala = s.sala;
+      li.tabIndex = 0;
+      li.setAttribute("role", "button");
       li.innerHTML = `
         <div>
           <div class="room-name"></div>
@@ -54,6 +56,11 @@ function renderRooms(salasTodas) {
         <span class="status-badge"></span>
       `;
       li.addEventListener("click", () => openRoom(li.dataset.sala, li.dataset.nome));
+      li.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openRoom(li.dataset.sala, li.dataset.nome);
+      });
     } else {
       existentes.delete(s.sala);
     }

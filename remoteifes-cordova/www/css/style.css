@@ -86,6 +86,13 @@ body.a11y-high-contrast {
 }
 body.a11y-high-contrast .status-badge.on { background: #00d26a; color: #000; }
 body.a11y-high-contrast .status-badge.off { background: #333; color: #fff; }
+body.a11y-high-contrast .mapa-offline { background: #444444; border: 2px dashed #ffffff; }
+body.a11y-high-contrast .mapa-online-desligado { background: #0057b8; border: 2px solid #ffffff; }
+body.a11y-high-contrast .mapa-online-ligado { background: #00d26a; border: 2px solid #000000; }
+body.a11y-high-contrast .floorplan-scope .room.fp-offline { background: #444444; border: 2px dashed #ffffff; }
+body.a11y-high-contrast .floorplan-scope .room.fp-online-desligado { background: #0057b8; border: 2px solid #ffffff; }
+body.a11y-high-contrast .floorplan-scope .room.fp-online-ligado { background: #00d26a; border: 2px solid #000000; }
+body.a11y-high-contrast .floorplan-scope .room.fp-reservada { box-shadow: 0 0 0 3px #ffbe0b inset; }
 
 body {
   margin: 0;

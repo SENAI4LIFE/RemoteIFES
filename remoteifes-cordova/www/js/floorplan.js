@@ -125,10 +125,20 @@ const Floorplan = {
     };
 
     rootEl.querySelectorAll(".room.selectable").forEach((el) => {
-      el.addEventListener("click", () => {
+      el.tabIndex = 0;
+      el.setAttribute("role", "button");
+
+      const ativar = () => {
         const sala = el.dataset.sala;
         if (!sala) return;
         if (instancia.onSelect) instancia.onSelect(sala, el);
+      };
+
+      el.addEventListener("click", ativar);
+      el.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        ativar();
       });
     });
 

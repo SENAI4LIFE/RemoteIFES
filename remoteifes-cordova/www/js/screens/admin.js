@@ -281,6 +281,7 @@ const Admin = {
   },
 
   async carregarConfiguracoes() {
+    if (!state.isSuperAdmin) return;
     const resp = await Api.obterConfiguracoes();
     if (!resp.ok) return;
     const cfg = resp.configuracoes;
@@ -289,15 +290,12 @@ const Admin = {
     document.getElementById("cfgAdminSujeitoTimeout").checked = !!cfg.adminSujeitoTimeout;
     document.getElementById("cfgPopupAviso").value = cfg.popupAvisoSegundos;
     document.getElementById("cfgLimiarOnline").value = cfg.limiarOnlineMinutos;
-
-    if (state.isSuperAdmin) {
-      document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
-      document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
-      document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
-      document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
-      document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
-      document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
-    }
+    document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
+    document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
+    document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
+    document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
+    document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
+    document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
   },
 
   async carregarMacs() {
@@ -314,6 +312,7 @@ const Admin = {
     for (const s of salas) {
       const li = document.createElement("li");
       li.id = `macCard-${s.sala}`;
+      const infoToken = await Api.infoTokenDispositivo(s.sala);
       li.innerHTML = `
         <div class="mac-row" style="width:100%">
           <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
@@ -329,6 +328,15 @@ const Admin = {
             ${s.ipEsp32 ? `<button type="button" class="link-btn acessar-esp32">acessar interface do ESP32</button>` : `<span class="hint">IP ainda não reportado</span>`}
           </div>
           <p class="error hidden mac-error"></p>
+
+          <label>Token de autenticação do dispositivo</label>
+          <p class="hint token-status">${infoToken.ok && infoToken.existe ? "token próprio configurado" : "usando o token global do servidor"}</p>
+          <div class="two-col">
+            <button type="button" class="link-btn gerar-token">${infoToken.ok && infoToken.existe ? "rotacionar token" : "gerar token próprio"}</button>
+            <button type="button" class="link-btn danger revogar-token" ${infoToken.ok && infoToken.existe ? "" : "disabled"}>revogar token próprio</button>
+          </div>
+          <p class="hint token-valor hidden"></p>
+          <p class="error hidden token-error"></p>
 
           <label class="checkbox-label">
             <input type="checkbox" class="acesso-restrito-check" ${s.acessoRestrito ? "checked" : ""} /> Restringir controle desta sala a usuários específicos
@@ -355,6 +363,54 @@ const Admin = {
           errorEl.textContent = resp.erro || "não foi possível salvar o MAC";
           errorEl.classList.remove("hidden");
         }
+      });
+
+      const gerarTokenBtn = li.querySelector(".gerar-token");
+      const revogarTokenBtn = li.querySelector(".revogar-token");
+      const tokenErrorEl = li.querySelector(".token-error");
+      const tokenValorEl = li.querySelector(".token-valor");
+      const tokenStatusEl = li.querySelector(".token-status");
+
+      gerarTokenBtn.addEventListener("click", async () => {
+        if (gerarTokenBtn.disabled) return;
+        tokenErrorEl.classList.add("hidden");
+        tokenValorEl.classList.add("hidden");
+        const confirmado = confirm("Gerar um novo token invalida imediatamente o token próprio atual desta sala (o dispositivo precisará ser reconfigurado). Continuar?");
+        if (!confirmado) return;
+        gerarTokenBtn.disabled = true;
+        try {
+          const resp = await Api.gerarTokenDispositivo(s.sala);
+          if (!resp.ok) {
+            tokenErrorEl.textContent = resp.erro || "não foi possível gerar o token";
+            tokenErrorEl.classList.remove("hidden");
+            return;
+          }
+          tokenValorEl.textContent = `novo token (copie agora, não será mostrado novamente): ${resp.token}`;
+          tokenValorEl.classList.remove("hidden");
+          tokenStatusEl.textContent = "token próprio configurado";
+          gerarTokenBtn.textContent = "rotacionar token";
+          revogarTokenBtn.disabled = false;
+        } finally {
+          gerarTokenBtn.disabled = false;
+        }
+      });
+
+      revogarTokenBtn.addEventListener("click", async () => {
+        if (revogarTokenBtn.disabled) return;
+        tokenErrorEl.classList.add("hidden");
+        const confirmado = confirm("Revogar o token próprio desta sala? O dispositivo passará a usar o token global do servidor (se configurado).");
+        if (!confirmado) return;
+        revogarTokenBtn.disabled = true;
+        const resp = await Api.revogarTokenDispositivo(s.sala);
+        if (!resp.ok) {
+          tokenErrorEl.textContent = resp.erro || "não foi possível revogar o token";
+          tokenErrorEl.classList.remove("hidden");
+          revogarTokenBtn.disabled = false;
+          return;
+        }
+        tokenStatusEl.textContent = "usando o token global do servidor";
+        tokenValorEl.classList.add("hidden");
+        gerarTokenBtn.textContent = "gerar token próprio";
       });
 
       li.querySelector(".preset-select").addEventListener("change", async (e) => {
@@ -880,7 +936,10 @@ const Admin = {
   },
 };
 
-document.getElementById("criarUsuarioBtn").addEventListener("click", async () => {
+document.getElementById("criarUsuarioBtn").addEventListener("click", async (e) => {
+  const botao = e.currentTarget;
+  if (botao.disabled) return;
+
   const dados = {
     usuario: document.getElementById("novoUsuarioLogin").value.trim(),
     nome: document.getElementById("novoUsuarioNome").value.trim(),
@@ -894,17 +953,22 @@ document.getElementById("criarUsuarioBtn").addEventListener("click", async () =>
     return;
   }
 
-  const resp = await Api.criarUsuario(dados);
-  if (!resp.ok) {
-    Toast.erro(resp.erro || "não foi possível criar o usuário");
-    return;
-  }
+  botao.disabled = true;
+  try {
+    const resp = await Api.criarUsuario(dados);
+    if (!resp.ok) {
+      Toast.erro(resp.erro || "não foi possível criar o usuário");
+      return;
+    }
 
-  document.getElementById("novoUsuarioLogin").value = "";
-  document.getElementById("novoUsuarioNome").value = "";
-  document.getElementById("novoUsuarioSenha").value = "";
-  document.getElementById("novoUsuarioAdmin").checked = false;
-  await Admin.carregarUsuarios();
+    document.getElementById("novoUsuarioLogin").value = "";
+    document.getElementById("novoUsuarioNome").value = "";
+    document.getElementById("novoUsuarioSenha").value = "";
+    document.getElementById("novoUsuarioAdmin").checked = false;
+    await Admin.carregarUsuarios();
+  } finally {
+    botao.disabled = false;
+  }
 });
 
 document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
@@ -935,6 +999,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
 });
 
 document.getElementById("salvarConfigBtn").addEventListener("click", async () => {
+  if (!state.isSuperAdmin) return;
   const savedEl = document.getElementById("configSavedHint");
   savedEl.classList.add("hidden");
 
@@ -944,18 +1009,15 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     adminSujeitoTimeout: document.getElementById("cfgAdminSujeitoTimeout").checked,
     popupAvisoSegundos: Number(document.getElementById("cfgPopupAviso").value),
     limiarOnlineMinutos: Number(document.getElementById("cfgLimiarOnline").value),
-  };
-
-  if (state.isSuperAdmin) {
-    dados.temperaturaMinima = Number(document.getElementById("cfgTemperaturaMinima").value);
-    dados.temperaturaMaxima = Number(document.getElementById("cfgTemperaturaMaxima").value);
-    dados.modoTeste = document.getElementById("cfgModoTeste").checked;
-    dados.redesAutorizadas = document.getElementById("cfgRedesAutorizadas").value
+    temperaturaMinima: Number(document.getElementById("cfgTemperaturaMinima").value),
+    temperaturaMaxima: Number(document.getElementById("cfgTemperaturaMaxima").value),
+    modoTeste: document.getElementById("cfgModoTeste").checked,
+    redesAutorizadas: document.getElementById("cfgRedesAutorizadas").value
       .split("\n")
       .map((v) => v.trim())
-      .filter(Boolean);
-    dados.modoManutencao = document.getElementById("cfgModoManutencao").checked;
-  }
+      .filter(Boolean),
+    modoManutencao: document.getElementById("cfgModoManutencao").checked,
+  };
 
   const resp = await Api.atualizarConfiguracoes(dados);
   if (!resp.ok) {
@@ -971,19 +1033,28 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
   IdleTimer.iniciar(timeoutEfetivo, resp.configuracoes.popupAvisoSegundos);
 });
 
-document.getElementById("criarPresetBtn").addEventListener("click", async () => {
+document.getElementById("criarPresetBtn").addEventListener("click", async (e) => {
+  const botao = e.currentTarget;
+  if (botao.disabled) return;
+
   const nome = document.getElementById("novoPresetNome").value.trim();
   if (!nome) {
     Toast.erro("informe o nome do preset");
     return;
   }
-  const resp = await Api.criarPreset(nome);
-  if (!resp.ok) {
-    Toast.erro(resp.erro || "não foi possível criar o preset");
-    return;
+
+  botao.disabled = true;
+  try {
+    const resp = await Api.criarPreset(nome);
+    if (!resp.ok) {
+      Toast.erro(resp.erro || "não foi possível criar o preset");
+      return;
+    }
+    document.getElementById("novoPresetNome").value = "";
+    await Admin.carregarPresets();
+  } finally {
+    botao.disabled = false;
   }
-  document.getElementById("novoPresetNome").value = "";
-  await Admin.carregarPresets();
 });
 
 document.getElementById("sessoesFiltroData").addEventListener("change", (e) => {

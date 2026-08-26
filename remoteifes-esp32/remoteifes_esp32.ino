@@ -10,8 +10,11 @@
 #include <IRutils.h>
 #include <IRac.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include "esp_random.h"
 
 #include "index_html.h"
+#include "root_ca.h"
 
 #define DHTPIN 14
 #define DHTTYPE DHT11
@@ -20,6 +23,11 @@
 
 #define CAPTURE_BUFFER_SIZE 1024
 #define TIMEOUT_US 50000
+#define HTTP_CLIENT_TIMEOUT_MS 5000
+#define MAX_RAW_IR_ENTRIES CAPTURE_BUFFER_SIZE
+
+const float AC_TEMP_MIN = 16.0;
+const float AC_TEMP_MAX = 30.0;
 
 const unsigned long SERVER_HEARTBEAT_INTERVAL = 7000;
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
@@ -63,6 +71,9 @@ String salaId;
 String serverHost;
 int serverPort = 0;
 String deviceToken;
+String tlsModo;
+unsigned long lastComandoAceito = 0;
+const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
 void startAPMode();
 void handleRoot();
@@ -72,7 +83,9 @@ void handleIRCapture();
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency);
 void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing);
 void readSensorsAndBroadcast();
+String urlServidor(const char* path);
 bool sendHttpPost(const String& url, const String& payload);
+bool sendHttpGet(const String& url, String& responseOut);
 void sendHeartbeat();
 void reportAccess(const String& ip, const String& userAgent);
 void reportComando(const String& cmd, const String& valor);
@@ -83,6 +96,7 @@ String buildFuncoesJsonFromSpec(const String& funcoesSpec);
 String buildRawArrayJson(const uint16_t* rawArray, uint16_t length);
 bool configuracaoValida();
 bool jsonBoolAt(const String& msg, int keyIdx);
+bool comandoPermitidoAgora();
 
 void setup() {
   Serial.begin(115200);
@@ -101,6 +115,7 @@ void setup() {
   serverHost = preferences.getString("host", "");
   serverPort = preferences.getInt("porta", 0);
   deviceToken = preferences.getString("token", "");
+  tlsModo = preferences.getString("tls", "off");
 
   if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
@@ -172,6 +187,15 @@ bool configuracaoValida() {
   return salaId.length() > 0 && serverHost.length() > 0 && serverPort > 0 && deviceToken.length() > 0;
 }
 
+bool comandoPermitidoAgora() {
+  unsigned long agora = millis();
+  if (lastComandoAceito != 0 && agora - lastComandoAceito < INTERVALO_MINIMO_COMANDO_MS) {
+    return false;
+  }
+  lastComandoAceito = agora;
+  return true;
+}
+
 void gerenciarConexaoWifi() {
   unsigned long agora = millis();
 
@@ -210,11 +234,21 @@ void gerenciarConexaoWifi() {
 void startAPMode() {
   apModeActive = true;
   WiFi.mode(WIFI_AP);
-  char apPassBuf[16];
-  snprintf(apPassBuf, sizeof(apPassBuf), "ifes-%06x", (unsigned int)(ESP.getEfuseMac() & 0xFFFFFF));
-  WiFi.softAP("RemoteIFES-Setup", apPassBuf);
+
+  String apPass = preferences.getString("apPass", "");
+  if (apPass.length() < 12) {
+    uint8_t randomBytes[4];
+    for (uint8_t i = 0; i < sizeof(randomBytes); i++) randomBytes[i] = (uint8_t)(esp_random() & 0xFF);
+    char apPassBuf[16];
+    snprintf(apPassBuf, sizeof(apPassBuf), "ifes-%02x%02x%02x%02x",
+             randomBytes[0], randomBytes[1], randomBytes[2], randomBytes[3]);
+    apPass = String(apPassBuf);
+    preferences.putString("apPass", apPass);
+  }
+
+  WiFi.softAP("RemoteIFES-Setup", apPass.c_str());
   Serial.print("Senha do Wi-Fi de configuracao (RemoteIFES-Setup): ");
-  Serial.println(apPassBuf);
+  Serial.println(apPass);
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
 
@@ -230,11 +264,16 @@ void startAPMode() {
     String newHost = server.arg("host");
     String newPorta = server.arg("porta");
     String newToken = server.arg("token");
+    String newTls = server.arg("tls");
 
     if (newSSID.length() == 0 || newSala.length() == 0 || newHost.length() == 0 ||
         newPorta.length() == 0 || newToken.length() == 0) {
       server.send(400, "text/plain", "Preencha todos os campos obrigatorios.");
       return;
+    }
+
+    if (newTls != "ca" && newTls != "inseguro" && newTls != "off") {
+      newTls = "ca";
     }
 
     preferences.putString("ssid", newSSID);
@@ -243,6 +282,7 @@ void startAPMode() {
     preferences.putString("host", newHost);
     preferences.putInt("porta", newPorta.toInt());
     preferences.putString("token", newToken);
+    preferences.putString("tls", newTls);
 
     String response = String(RESTART_HTML);
     response.replace("{{ssid}}", newSSID);
@@ -338,23 +378,28 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
         int rawStart = msg.indexOf("[");
         int rawEnd = msg.indexOf("]");
 
-        if (rawStart != -1 && rawEnd != -1) {
+        if (rawStart != -1 && rawEnd != -1 && !comandoPermitidoAgora()) {
+          webSocket.sendTXT(num, "{\"type\":\"comando_ignorado\",\"motivo\":\"limite_de_taxa\"}");
+        } else if (rawStart != -1 && rawEnd != -1) {
           String rawArrayStr = msg.substring(rawStart + 1, rawEnd);
           int count = 1;
           for (int i = 0; i < rawArrayStr.length(); i++) {
             if (rawArrayStr.charAt(i) == ',') count++;
           }
+          if (count > MAX_RAW_IR_ENTRIES) count = MAX_RAW_IR_ENTRIES;
 
           uint16_t* rawData = new uint16_t[count];
           int idx = 0, fromIdx = 0;
           int commaIdx = rawArrayStr.indexOf(',');
 
-          while (commaIdx != -1) {
+          while (commaIdx != -1 && idx < count - 1) {
             rawData[idx++] = rawArrayStr.substring(fromIdx, commaIdx).toInt();
             fromIdx = commaIdx + 1;
             commaIdx = rawArrayStr.indexOf(',', fromIdx);
           }
-          rawData[idx] = rawArrayStr.substring(fromIdx).toInt();
+          if (idx < count) {
+            rawData[idx] = rawArrayStr.substring(fromIdx).toInt();
+          }
 
           uint16_t carrierHz = 38000;
           int hzIdx = msg.indexOf("carrier_hz");
@@ -381,7 +426,9 @@ void handleWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t 
         int fanIdx = msg.indexOf("\"fan\":\"");
         int swingIdx = msg.indexOf("\"swing\":");
 
-        if (protoIdx != -1 && tempIdx != -1) {
+        if (protoIdx != -1 && tempIdx != -1 && !comandoPermitidoAgora()) {
+          webSocket.sendTXT(num, "{\"type\":\"comando_ignorado\",\"motivo\":\"limite_de_taxa\"}");
+        } else if (protoIdx != -1 && tempIdx != -1) {
           int protocolNum = msg.substring(protoIdx + 11, msg.indexOf(",", protoIdx)).toInt();
           float temp = msg.substring(tempIdx + 7, msg.indexOf(",", tempIdx)).toFloat();
           bool power = jsonBoolAt(msg, powerIdx);
@@ -475,6 +522,8 @@ void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency) {
 
 void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing) {
   if (!universalAC.isProtocolSupported(protocol)) return;
+  if (temp < AC_TEMP_MIN) temp = AC_TEMP_MIN;
+  if (temp > AC_TEMP_MAX) temp = AC_TEMP_MAX;
   universalAC.next.protocol = protocol;
   universalAC.next.power = power;
   universalAC.next.degrees = temp;
@@ -507,6 +556,23 @@ void readSensorsAndBroadcast() {
   webSocket.broadcastTXT(telemetryJson);
 }
 
+String urlServidor(const char* path) {
+  String esquema = tlsModo == "off" ? "http://" : "https://";
+  return esquema + serverHost + ":" + String(serverPort) + path;
+}
+
+bool iniciarClienteHttp(HTTPClient& http, WiFiClientSecure& clienteSeguro, const String& url) {
+  if (tlsModo == "off") {
+    return http.begin(url);
+  }
+  if (tlsModo == "ca") {
+    clienteSeguro.setCACert(ISRG_ROOT_X1);
+  } else {
+    clienteSeguro.setInsecure();
+  }
+  return http.begin(clienteSeguro, url);
+}
+
 bool sendHttpPost(const String& url, const String& payload) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("HTTP post falhou: WiFi nao conectado.");
@@ -514,7 +580,13 @@ bool sendHttpPost(const String& url, const String& payload) {
   }
 
   HTTPClient http;
-  http.begin(url);
+  WiFiClientSecure clienteSeguro;
+  if (!iniciarClienteHttp(http, clienteSeguro, url)) {
+    Serial.println("HTTP post falhou: nao foi possivel iniciar a conexao.");
+    return false;
+  }
+  http.setTimeout(HTTP_CLIENT_TIMEOUT_MS);
+  http.setConnectTimeout(HTTP_CLIENT_TIMEOUT_MS);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("x-device-token", deviceToken);
   http.addHeader("x-device-mac", WiFi.macAddress());
@@ -566,7 +638,7 @@ void sendHeartbeat() {
   payload += ",\"ip\":\"" + WiFi.localIP().toString() + "\"";
   payload += "}";
 
-  String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_HEARTBEAT_PATH;
+  String url = urlServidor(SERVER_HEARTBEAT_PATH);
   sendHttpPost(url, payload);
 }
 
@@ -578,7 +650,7 @@ void reportAccess(const String& ip, const String& userAgent) {
   payload += ",\"userAgent\":\"" + jsonEscape(userAgent) + "\"";
   payload += "}";
 
-  String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_ACESSO_PATH;
+  String url = urlServidor(SERVER_ACESSO_PATH);
   sendHttpPost(url, payload);
 }
 
@@ -592,7 +664,7 @@ void reportComando(const String& cmd, const String& valor) {
   }
   payload += "}";
 
-  String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_COMANDO_PATH;
+  String url = urlServidor(SERVER_COMANDO_PATH);
   sendHttpPost(url, payload);
 }
 
@@ -633,7 +705,7 @@ void savePresetToServer(const String& nome, const String& funcoesSpec) {
   payload += ",\"funcoes\":" + buildFuncoesJsonFromSpec(funcoesSpec);
   payload += "}";
 
-  String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_PRESET_PATH;
+  String url = urlServidor(SERVER_PRESET_PATH);
   bool ok = sendHttpPost(url, payload);
   webSocket.broadcastTXT("{\"type\":\"preset_saved\",\"ok\":" + String(ok ? "true" : "false") + "}");
 }
@@ -642,7 +714,10 @@ bool sendHttpGet(const String& url, String& responseOut) {
   if (WiFi.status() != WL_CONNECTED) return false;
 
   HTTPClient http;
-  http.begin(url);
+  WiFiClientSecure clienteSeguro;
+  if (!iniciarClienteHttp(http, clienteSeguro, url)) return false;
+  http.setTimeout(HTTP_CLIENT_TIMEOUT_MS);
+  http.setConnectTimeout(HTTP_CLIENT_TIMEOUT_MS);
   http.addHeader("x-device-token", deviceToken);
   http.addHeader("x-device-mac", WiFi.macAddress());
   int statusCode = http.GET();
@@ -655,7 +730,7 @@ bool sendHttpGet(const String& url, String& responseOut) {
 void requestAssignedPreset() {
   if (!configuracaoValida()) return;
 
-  String url = "http://" + serverHost + ":" + String(serverPort) + SERVER_PRESET_PATH + "?sala=" + salaId;
+  String url = urlServidor(SERVER_PRESET_PATH) + "?sala=" + salaId;
   String response;
   if (sendHttpGet(url, response)) {
     webSocket.broadcastTXT("{\"type\":\"assigned_preset\",\"data\":" + response + "}");

@@ -7,9 +7,23 @@ const { ipAutorizado, resolverIpCliente } = require("../utils/rede");
 const REBROADCAST_MS = 30 * 1000;
 const PING_MS = 30 * 1000;
 const NIVEL_ADMIN = 2;
+const JANELA_MENSAGENS_MS = 10 * 1000;
+const MAX_MENSAGENS_POR_JANELA = 20;
 
 let wss = null;
 const salaObservadaPorCliente = new WeakMap();
+const janelaMensagensPorCliente = new WeakMap();
+
+function limiteDeMensagensExcedido(ws) {
+  const agora = Date.now();
+  const janela = janelaMensagensPorCliente.get(ws);
+  if (!janela || agora - janela.inicio >= JANELA_MENSAGENS_MS) {
+    janelaMensagensPorCliente.set(ws, { inicio: agora, contagem: 1 });
+    return false;
+  }
+  janela.contagem += 1;
+  return janela.contagem > MAX_MENSAGENS_POR_JANELA;
+}
 
 function origemPermitida(origin) {
   if ((process.env.NODE_ENV || "development") !== "production") return true;
@@ -91,9 +105,18 @@ function notificarStatusServidorParaTodos() {
   wss.clients.forEach((ws) => enviar(ws, statusServidorPayload(ws.usuario)));
 }
 
+function selecionarSubprotocolo(protocolos) {
+  if (!protocolos || protocolos.size === 0) return false;
+  return protocolos.values().next().value;
+}
+
 function iniciar(server) {
   const { WebSocketServer } = require("ws");
-  wss = new WebSocketServer({ server, path: "/ws" });
+  wss = new WebSocketServer({
+    server,
+    path: "/ws",
+    handleProtocols: (protocolos) => selecionarSubprotocolo(protocolos),
+  });
 
   wss.on("connection", (ws, req) => {
     if (!origemPermitida(req.headers.origin) || !redeAutorizada(req)) {
@@ -101,12 +124,8 @@ function iniciar(server) {
       return;
     }
 
-    const url = new URL(req.url, "http://localhost");
-    const token = url.searchParams.get("token");
+    const token = ws.protocol || null;
     const usuario = token ? validarToken(token) : null;
-    // Sem token: conexão pública, usada pela tela de status do servidor
-    // (pré-login) para saber se o backend está no ar / em manutenção.
-    // Não fechamos mais a conexão nesse caso.
     ws.usuario = usuario || null;
     ws.isAlive = true;
     ws.on("pong", () => {
@@ -114,6 +133,10 @@ function iniciar(server) {
     });
 
     ws.on("message", (dados) => {
+      if (limiteDeMensagensExcedido(ws)) {
+        ws.close(4008, "limite de mensagens excedido");
+        return;
+      }
       let msg;
       try {
         msg = JSON.parse(dados.toString());
@@ -132,12 +155,13 @@ function iniciar(server) {
 
     ws.on("close", () => {
       salaObservadaPorCliente.delete(ws);
+      janelaMensagensPorCliente.delete(ws);
     });
 
     notificarCliente(ws);
   });
 
-  setInterval(() => {
+  const intervaloPing = setInterval(() => {
     wss.clients.forEach((ws) => {
       if (!ws.isAlive) {
         ws.terminate();
@@ -147,8 +171,10 @@ function iniciar(server) {
       ws.ping();
     });
   }, PING_MS);
+  intervaloPing.unref();
 
-  setInterval(notificarTodos, REBROADCAST_MS);
+  const intervaloRebroadcast = setInterval(notificarTodos, REBROADCAST_MS);
+  intervaloRebroadcast.unref();
 
   salasService.eventos.on("mudanca", notificarTodos);
   configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
