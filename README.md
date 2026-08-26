@@ -46,7 +46,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web,
 - [Restrição de Rede](#restrição-de-rede)
 - [Segurança](#segurança)
 - [Tempo Real (WebSocket)](#tempo-real-websocket)
-- [Interface Web dos ESP32](#interface-web-dos-esp32)
+- [Interface Local do ESP32 e Painel Avançado (Admin > ESP32)](#interface-local-do-esp32-e-painel-avançado-admin--esp32)
 - [Acessibilidade](#acessibilidade)
 - [Requisitos](#requisitos)
 - [Instalação Rápida](#instalação-rápida)
@@ -89,7 +89,7 @@ O sistema tem três níveis de usuário:
 |---|---|---|
 | 1 | Usuário comum | Ligar/desligar e ajustar a temperatura das salas liberadas para controle |
 | 2 | Administrador | Tudo do nível 1, além de gerenciar agendamentos, grade de horários, notificações, sessões, logs, dispositivos e usuários comuns |
-| 3 | Administrador principal (superadmin) | Tudo do nível 2, além de alterar configurações globais do sistema, limites de temperatura, redes autorizadas, modo de teste, cadastro de ESP32 por MAC e presets |
+| 3 | Administrador principal (superadmin) | Tudo do nível 2, além de alterar configurações globais do sistema, limites de temperatura, redes autorizadas, modo de teste, cadastro de ESP32 por MAC, presets e o painel avançado de cada ESP32 (`Admin > ESP32`) |
 
 Além dos três níveis, existe uma permissão pontual, independente de nível: um usuário comum pode ser tornado **proprietário** de uma ou mais salas específicas, o que lhe permite conceder e revogar o acesso de controle de outros usuários apenas àquelas salas, sem se tornar administrador (veja [Controle de Acesso e Proprietários de Sala](#controle-de-acesso-e-proprietários-de-sala)).
 
@@ -158,8 +158,8 @@ A aba **Grade** (visível apenas para administradores) mostra, para uma sala e d
 Presets descrevem quais **funções** um ar-condicionado suporta (temperatura, velocidade do ventilador, oscilação, modo turbo, etc.). A estrutura é extensível: uma função é apenas uma linha na tabela `preset_funcoes` (chave, rótulo, tipo, opções), então novas funções não exigem alterar código — apenas cadastrar a função em um preset.
 
 - O preset **padrão** possui somente a função de temperatura e não pode ser removido.
-- Novas funções são criadas e associadas a um preset diretamente pela interface web do próprio ESP32 (aba "Presets" na página local do dispositivo), que sincroniza a definição com o servidor central.
-- O administrador principal decide quais presets existem, edita/remove funções e escolhe qual preset cada sala/ESP32 utiliza (`Admin > ESP32 / MACs`).
+- Presets e suas funções são criados, editados e removidos inteiramente pela interface web (`Admin > Presets`) — o administrador principal cria um preset, adiciona funções informando chave, rótulo, tipo (número, opção única, liga/desliga) e as respectivas opções, e remove funções individualmente quando não são mais necessárias. O ESP32 não participa mais desse cadastro.
+- O administrador principal decide quais presets existem e escolhe qual preset cada sala/ESP32 utiliza (`Admin > ESP32 / MACs`).
 - Remover um preset faz as salas que o utilizavam voltarem automaticamente ao preset padrão.
 
 ## Notificações
@@ -201,6 +201,8 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Sessões**: o token de sessão retornado no login é aleatório (`crypto.randomBytes`), mas o valor gravado no banco (`sessoes.token`) é o hash SHA-256 do token, não o token em si — um vazamento do banco de dados não permite sequestrar sessões ativas diretamente. Sessões inativas por mais de 24h são encerradas automaticamente pelo servidor.
 - **Autorização**: todos os papéis (usuário, administrador, administrador principal) e as permissões pontuais (proprietário de sala, acesso restrito) são checados no backend em cada rota, nunca apenas escondidos na interface.
 - **Dispositivos (ESP32)**: autenticação por token comparado em tempo constante (`crypto.timingSafeEqual`), mais verificação de MAC por sala já cadastrada, para impedir que um dispositivo assuma a identidade de outra sala. Além do `DEVICE_TOKEN` global (compartilhado por todos os dispositivos), o administrador principal pode gerar, em `Admin > ESP32 / MACs`, um **token próprio por sala** (armazenado com hash SHA-256, nunca em texto puro) — o servidor aceita tanto o token global quanto o token específico da sala, e o token de uma sala pode ser rotacionado ou revogado a qualquer momento sem afetar as demais salas nem exigir trocar o `DEVICE_TOKEN` de todos os outros dispositivos.
+- **Senha de administração do ESP32**: obrigatória desde o provisionamento (mínimo 6 caracteres), armazenada no dispositivo apenas como hash SHA-256 — é exigida para sair do modo de operação e entrar em modo de configuração/clonagem, e nunca trafega nem fica salva em texto puro. Sem ela, ninguém consegue colocar um ESP32 em modo de aprendizado de infravermelho remotamente, mesmo tendo acesso à aba `Admin > ESP32`.
+- **Ponto de acesso de configuração**: a rede `RemoteIFES-Setup`, aberta pelo ESP32 durante o provisionamento ou após um reset de Wi-Fi, é sempre protegida por senha (gerada aleatoriamente na primeira vez, persistida no dispositivo e exibida apenas no monitor serial) — nunca fica aberta.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 - **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`) e comandos manuais (`/comando`) têm limites por IP para reduzir força bruta e tempestades de comando; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood). O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
 - **Cabeçalhos HTTP**: todas as respostas incluem `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy`; em produção (`NODE_ENV=production`) também `Strict-Transport-Security`.
@@ -216,18 +218,29 @@ O frontend mantém uma única conexão WebSocket por aba (compartilhada entre a 
 
 Se você configurar um proxy reverso manualmente (fora do `https-setup.sh`), garanta que ele propague os cabeçalhos `Upgrade` e `Connection` do handshake WebSocket — sem isso, `/ws` não funciona atrás do proxy. O `https-setup.sh` já gera a configuração de Nginx correta para isso.
 
-## Interface Web dos ESP32
+## Interface Local do ESP32 e Painel Avançado (Admin > ESP32)
 
-Cada ESP32 expõe sua própria interface de configuração local (servida pelo próprio dispositivo, com WebSocket próprio na porta 81), incluindo:
+O firmware do ESP32 tem dois modos de funcionamento bem separados, com uma transição explícita entre eles:
 
-- **Aprendizado de infravermelho**: captura o sinal bruto emitido por um controle remoto físico apontado para o ESP32 ("calibração"), para acionar aparelhos sem protocolo conhecido pela biblioteca.
-- **Protocolos conhecidos**: alternativamente, o ESP32 pode controlar o ar-condicionado usando a biblioteca de protocolos universais (IRac), definindo temperatura, ligar/desligar, modo turbo, velocidade do ventilador e oscilação diretamente, sem precisar de aprendizado prévio, quando o protocolo do aparelho é suportado.
-- **Sensor de temperatura (DHT)**: leitura periódica opcional, reportada ao servidor no heartbeat.
-- **Presets**: cadastro e edição das funções suportadas pelo aparelho, sincronizadas com o servidor central.
-- **Informações do Aparelho**: mostra a sala configurada, o endereço MAC e o IP atual do dispositivo — útil para conferência visual direta no equipamento.
-- **Reset de Wi-Fi**: permite reconfigurar a rede e o servidor a partir da própria interface local, sem precisar regravar o firmware.
+- **Operação** (`operation`): modo normal do dia a dia — o dispositivo lê o sensor, reporta telemetria e aguarda comandos, sem expor nenhuma função de captura/aprendizado de infravermelho.
+- **Configuração** (`config_idle` / `config_clone`): só é alcançado a partir da operação enviando `enter_config` com a **senha de administração do dispositivo** (definida obrigatoriamente durante o provisionamento, mínimo 6 caracteres, armazenada apenas como hash SHA-256 na memória não volátil do ESP32 — nunca em texto puro). Dentro da configuração, o modo **clonagem** (`config_clone`) é o único em que a captura de sinais infravermelhos fica habilitada; `exit_operation` devolve o dispositivo à operação normal a qualquer momento, sem exigir senha.
 
-O administrador principal pode acessar essa interface a partir de uma subpágina própria em `Admin > ESP32 / MACs`, que mostra o IP mais recente reportado pelo dispositivo e abre a interface local em uma nova aba. Esse acesso é restrito ao administrador principal tanto na interface quanto no backend.
+Isso substitui a antiga interface web local completa do dispositivo (que ficava acessível na rede sem senha e expunha aprendizado de IR, termostato e cadastro de presets a qualquer um na mesma rede Wi-Fi). Hoje, o ESP32 expõe localmente apenas:
+
+- Uma página de **status somente leitura** (protegida por Basic Auth com a mesma senha de administração), mostrando sala, MAC, IP e servidor configurados — para conferência visual direta no equipamento.
+- O **portal de provisionamento** (rede `RemoteIFES-Setup`), usado apenas na configuração inicial ou após um reset de Wi-Fi, sempre protegido por senha — veja [Segurança](#segurança).
+
+Todas as funções antes exclusivas da interface local do dispositivo (entrar/sair do modo de configuração, ativar o modo clonagem, iniciar/parar captura de infravermelho, testar um sinal capturado, resetar o Wi-Fi remotamente) agora ficam em uma aba dedicada da aplicação principal, **`Admin > ESP32`**, visível apenas ao administrador principal:
+
+- Para cada sala com MAC cadastrado, mostra separadamente se o dispositivo está **online na rede Wi-Fi** e se está **conectado ao servidor** (dois estados distintos e independentes — um ESP32 pode estar na rede sem conseguir manter o WebSocket com o servidor, e vice-versa por um curto período).
+- Exibe a última leitura de temperatura e umidade, o sinal Wi-Fi (RSSI) e o **último comando infravermelho transmitido** pelo dispositivo (sinal bruto reenviado ou estado conhecido — temperatura/ligado/turbo/ventilação), tudo atualizado em tempo real.
+- Permite entrar em modo de configuração (mediante a senha do dispositivo), alternar entre modo config e modo clonagem, iniciar/parar a captura de IR e sair de volta para a operação normal.
+- Sinais capturados em modo clonagem aparecem na hora nessa aba; cada um pode ser reenviado ("testar") para confirmar que controla o aparelho corretamente antes de ser incorporado a um preset.
+- Um botão de **reset de Wi-Fi** remoto apaga as credenciais salvas do dispositivo e o reinicia em modo de ponto de acesso, sem precisar ir fisicamente até o equipamento.
+
+Essa comunicação usa um canal WebSocket dedicado (`/ws/dispositivo`, distinto do `/ws` usado pelos navegadores) pelo qual o próprio ESP32 se conecta ao servidor como cliente — a mesma conexão autenticada por token de dispositivo usada para telemetria é reaproveitada para os comandos administrativos, sem abrir portas adicionais no dispositivo nem exigir que o servidor alcance o ESP32 diretamente. O ESP32 reconecta automaticamente a esse canal a cada 5 segundos caso a conexão caia.
+
+Em `Admin > ESP32 / MACs`, o botão "acessar interface do ESP32" continua disponível e abre, em uma nova aba, a página de status somente leitura do dispositivo no IP mais recente reportado — útil para conferência visual direta no equipamento, sem substituir as funções administrativas, que agora ficam em `Admin > ESP32`.
 
 ### Detecção automática de ESP32 na rede
 
@@ -242,8 +255,8 @@ O frontend inclui um widget de acessibilidade (botão flutuante, disponível em 
 ### Software
 
 - Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental) — em Linux (incluindo Raspberry Pi OS), `remoteifes-server/setup.sh` instala automaticamente a versão correta caso não esteja presente, sem depender do pacote do sistema
-- Arduino IDE, PlatformIO ou `arduino-cli`, com suporte à placa ESP32, para compilar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do `arduino-cli`, do core ESP32 e das bibliotecas, além da compilação e gravação
-- Bibliotecas Arduino: [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) (inclui os módulos `IRrecv`, `IRsend`, `IRutils` e `IRac`), `WebSockets` (Links2004), `DHT sensor library` (para leitura de temperatura) e `Preferences`/`DNSServer` (inclusas no core ESP32)
+- [PlatformIO](https://platformio.org/) (Core CLI ou a extensão para VS Code), com a plataforma `espressif32`, para compilar e gravar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do PlatformIO Core (via `pip`) e chama `pio run` para compilar, gravar o sistema de arquivos `data/` (LittleFS) e o firmware
+- Bibliotecas (resolvidas automaticamente pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini`, sem instalação manual): [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) (inclui os módulos `IRrecv`, `IRsend`, `IRutils` e `IRac`), `WebSockets` (Links2004), `ArduinoJson`, `DHT sensor library` e `Adafruit Unified Sensor` — `Preferences`/`DNSServer`/LittleFS já vêm inclusas no core ESP32 do PlatformIO
 
 ### Hardware
 
@@ -299,6 +312,8 @@ Durante o desenvolvimento, `npm run dev` inicia o servidor com reinício automá
 
 ### Firmware ESP32
 
+O firmware é um projeto [PlatformIO](https://platformio.org/) padrão (`remoteifes-esp32/platformio.ini`), com o código-fonte em `src/main.ino` e a interface local (status e provisionamento) em `data/*.html`, gravada separadamente no sistema de arquivos LittleFS do dispositivo.
+
 **Automatizado (recomendado):**
 
 ```bash
@@ -306,13 +321,20 @@ cd remoteifes-esp32
 bash flash.sh
 ```
 
-`flash.sh` instala o `arduino-cli` (caso ausente), o core ESP32 e as bibliotecas necessárias, detecta a porta serial do ESP32 conectado por USB, compila o firmware e grava o dispositivo — sem precisar abrir a Arduino IDE. Se a detecção automática da porta falhar (ex.: mais de um dispositivo serial conectado), informe-a manualmente: `bash flash.sh /dev/ttyUSB0` (Linux/Raspberry Pi) ou `bash flash.sh /dev/cu.usbserial-XXXX` (macOS).
+`flash.sh` instala o PlatformIO Core (caso ausente, via `pip`), compila o firmware (`pio run`), grava o sistema de arquivos `data/` (`pio run --target uploadfs`) e depois o firmware (`pio run --target upload`) no ESP32 conectado por USB — sem precisar abrir a Arduino IDE ou a extensão do VS Code. A porta serial costuma ser detectada automaticamente pelo PlatformIO; se houver mais de um dispositivo serial conectado, informe a porta manualmente: `bash flash.sh /dev/ttyUSB0` (Linux/Raspberry Pi) ou `bash flash.sh /dev/cu.usbserial-XXXX` (macOS).
 
-**Manual (Arduino IDE ou PlatformIO):**
+**Manual (PlatformIO Core ou extensão do VS Code):**
 
-Abra `remoteifes-esp32/remoteifes_esp32.ino` na Arduino IDE (ou PlatformIO) com a placa ESP32 selecionada e as bibliotecas listadas em [Requisitos](#requisitos) instaladas.
+```bash
+cd remoteifes-esp32
+pio run                       # compila o firmware
+pio run --target uploadfs     # grava data/ (LittleFS) no dispositivo
+pio run --target upload       # grava o firmware
+```
 
-**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe um ponto de acesso Wi-Fi próprio (`RemoteIFES-Setup`) para receber as credenciais da rede local, a sala e o endereço do servidor central; depois disso, ele se conecta normalmente à rede da sala. Se a conexão Wi-Fi salva falhar, o mesmo ponto de acesso de configuração é reaberto automaticamente.
+Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instalada e use os alvos equivalentes na barra de tarefas do PlatformIO (Build, Upload Filesystem Image, Upload).
+
+**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe um ponto de acesso Wi-Fi próprio (`RemoteIFES-Setup`, sempre protegido por senha) para receber as credenciais da rede local, a sala, o endereço do servidor central e a senha de administração do dispositivo (obrigatória); depois disso, ele se conecta normalmente à rede da sala. Se a conexão Wi-Fi salva falhar, o mesmo ponto de acesso de configuração é reaberto automaticamente.
 
 ## Configuração
 
@@ -608,12 +630,19 @@ remoteifes-web/
                         schedule.js (agendamentos), grade.js (grade de horários),
                         propriedade.js (config. de salas para proprietários),
                         notifications.js (painel de notificações), login.js (portal e sessão),
-                        portal-funcoes.js (vitrine de funcionalidades na tela inicial), admin.js (painel administrativo)
+                        portal-funcoes.js (vitrine de funcionalidades na tela inicial), admin.js (painel administrativo),
+                        esp32-admin.js (painel avançado de cada ESP32, aba "ESP32", restrito ao administrador principal)
 
-remoteifes-esp32/
-  remoteifes_esp32.ino   firmware principal (Wi-Fi, IR, DHT, WebSocket local, comunicação com o servidor)
-  index_html.h            interface web local do dispositivo (aprendizado de IR, termostato, presets)
-  flash.sh                compila e grava o firmware automaticamente via arduino-cli
+remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev)
+  platformio.ini           configuração do projeto e dependências (bibliotecas resolvidas automaticamente)
+  src/main.ino              firmware principal (Wi-Fi, modos operação/config/clonagem, IR, DHT,
+                            WebSocket cliente com o servidor, portal de provisionamento)
+  include/root_ca.h         certificado raiz (Let's Encrypt) usado quando o firmware se conecta ao servidor via HTTPS
+  data/                     arquivos gravados no sistema de arquivos LittleFS do dispositivo
+    setup.html               formulário do portal de provisionamento (rede, sala, servidor, senha de administração)
+    restart.html             página de confirmação exibida após salvar a configuração
+    status.html               página local de status, somente leitura, protegida por Basic Auth
+  flash.sh                  instala o PlatformIO Core (se necessário) e compila/grava firmware + sistema de arquivos
 
 remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento como PWA e Aplicativo Nativo)
   config.xml             configuração do app (id, nome, ícone, splash, permissões de rede)
@@ -629,7 +658,11 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 ## Solução de Problemas
 
 - **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
+- **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`).
 - **ESP32 não aparece como online**: verifique se o `DEVICE_TOKEN` configurado no firmware é idêntico ao do `.env` do servidor, e se o ESP32 consegue alcançar o endereço/porta do servidor pela rede local.
+- **"Entrar em modo de configuração" falha com senha inválida em `Admin > ESP32`**: a senha de administração é a definida no dispositivo durante o provisionamento (portal `RemoteIFES-Setup`), não a senha de nenhum usuário do sistema; se ela foi esquecida, resete o Wi-Fi do dispositivo (fisicamente, ou pelo botão "Resetar Wi-Fi" da mesma aba, se ele ainda estiver conectado) e refaça o provisionamento com uma nova senha.
+- **Botão "Iniciar captura IR" fica desabilitado em `Admin > ESP32`**: a captura só é permitida em modo clonagem; ative "Ativar modo clonagem" primeiro (o dispositivo precisa já estar em modo de configuração).
+- **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao administrador principal, assim como `Admin > Configurações`.
 - **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / MACs`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
 - **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: a sala reportada no heartbeat não existe (ou foi digitada errado) durante a configuração inicial do dispositivo; vincule o MAC detectado a uma sala existente em `Admin > ESP32 / MACs`, ou reconfigure o ESP32 com o código de sala correto.
 - **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 15s e reinicia sozinho após 5 minutos sem rede; se isso persistir, verifique o sinal Wi-Fi no local ou se o roteador/AP mudou de canal ou senha.

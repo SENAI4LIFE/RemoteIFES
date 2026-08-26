@@ -32,6 +32,7 @@ const APP_SHELL = [
   "./js/screens/rooms.js",
   "./js/screens/schedule.js",
   "./js/screens/simple.js",
+  "./js/screens/esp32-admin.js",
   "./assets/ifes-logo.png",
   "./assets/remoteifes-logo.png",
   "./assets/icons/icon-192.png",
