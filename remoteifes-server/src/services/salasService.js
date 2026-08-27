@@ -487,12 +487,18 @@ function registrarComandoDispositivo(sala, cmd, valor) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
   if (typeof cmd !== "string" || !cmd) throw new Error("cmd é obrigatório");
+  if (cmd.length > 100) throw new Error("cmd excede o tamanho máximo");
+
+  let valorNormalizado = null;
+  if (valor !== undefined && valor !== null) {
+    valorNormalizado = String(valor).slice(0, 200);
+  }
 
   registrarLog({
     usuario: null,
     sala,
     cmd,
-    valor,
+    valor: valorNormalizado,
     origem: "esp32_local",
   });
 }

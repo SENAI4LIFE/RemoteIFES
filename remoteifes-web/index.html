@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=7" />
+  <link rel="stylesheet" href="css/style.css?v=8" />
 </head>
 <body>
 
@@ -110,7 +110,7 @@
               <span class="portal-funcao-label">Admin</span>
             </button>
           </div>
-          <div id="portalFuncaoDetalhe" class="portal-funcao-detalhe">
+          <div id="portalFuncaoDetalhe" class="portal-funcao-detalhe" aria-live="polite">
             <span id="portalFuncaoDetalheIcon" class="portal-funcao-detalhe-icon">ℹ️</span>
             <h3 id="portalFuncaoDetalheTitulo">Selecione uma função</h3>
             <p id="portalFuncaoDetalheTexto">Toque em um dos ícones acima para ver do que se trata.</p>
@@ -534,7 +534,7 @@
           <button type="button" class="help-icon-btn" data-help="painel" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
         </div>
 
-        <div id="lockBanner" class="lock-banner hidden"></div>
+        <div id="lockBanner" class="lock-banner hidden" role="status"></div>
         <p id="panelSomenteLeitura" class="aviso-inline hidden">Você tem apenas visualização desta sala: não possui permissão para controlá-la.</p>
 
         <div class="ac-remote">
@@ -982,7 +982,7 @@
           </div>
 
           <button type="button" id="salvarConfigBtn" class="btn btn-on btn-block">Salvar configurações</button>
-          <p id="configSavedHint" class="config-saved-hint hidden">Configurações salvas.</p>
+          <p id="configSavedHint" class="config-saved-hint hidden" role="status">Configurações salvas.</p>
         </div>
 
         <div id="adminSub-esp32" class="admin-sub hidden">
@@ -997,11 +997,11 @@
         </div>
       </section>
 
-      <nav class="tabbar">
+      <nav class="tabbar" aria-label="Seções">
         <button type="button" class="tab-btn" data-tab="salas">Salas</button>
-        <button type="button" class="tab-btn hidden" data-tab="agenda" id="agendaTabBtn">Agendamentos</button>
+        <button type="button" class="tab-btn hidden" data-tab="agenda" id="agendaTabBtn">Agenda</button>
         <button type="button" class="tab-btn hidden" data-tab="grade" id="gradeTabBtn">Grade</button>
-        <button type="button" class="tab-btn hidden" data-tab="propriedade" id="propriedadeTabBtn">Config. Salas</button>
+        <button type="button" class="tab-btn hidden" data-tab="propriedade" id="propriedadeTabBtn">Config.</button>
         <button type="button" class="tab-btn hidden" data-tab="admin" id="adminTabBtn">Admin</button>
       </nav>
 
@@ -1093,8 +1093,8 @@
           <span class="a11y-panel-label"><svg class="a11y-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M3 4h2v16H3V4Zm16 0h2v16h-2V4ZM7 11h10v2H7v-2Z"/></svg>Altura da linha</span>
           <div class="a11y-slider-row">
             <button type="button" id="a11yLineDecreaseBtn" class="a11y-slider-step" aria-label="Diminuir altura da linha">&minus;</button>
-            <input type="range" id="a11yLineSlider" class="a11y-slider" min="1.2" max="3" step="0.1" value="1.2" aria-label="Altura da linha">
-            <span class="a11y-slider-value" id="a11yLineValue">1.2</span>
+            <input type="range" id="a11yLineSlider" class="a11y-slider" min="1.2" max="3" step="0.1" value="1.5" aria-label="Altura da linha">
+            <span class="a11y-slider-value" id="a11yLineValue">1.5</span>
             <button type="button" id="a11yLineIncreaseBtn" class="a11y-slider-step" aria-label="Aumentar altura da linha">+</button>
           </div>
           <button type="button" id="a11yLineResetBtn" class="a11y-slider-reset-btn">Redefinir</button>
