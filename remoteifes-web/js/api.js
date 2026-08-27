@@ -332,6 +332,39 @@ const Api = {
     });
   },
 
+  async criarRelato(dados) {
+    return chamar("/relatos", {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify(dados),
+    });
+  },
+
+  async meusRelatos() {
+    return chamar("/relatos/meus", { headers: headersComToken() });
+  },
+
+  async listarRelatos(status) {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return chamar(`/superadmin/relatos${query}`, { headers: headersComToken() });
+  },
+
+  async contarRelatos() {
+    return chamar("/superadmin/relatos/contagem", { headers: headersComToken() });
+  },
+
+  async obterRelato(id) {
+    return chamar(`/superadmin/relatos/${id}`, { headers: headersComToken() });
+  },
+
+  async atualizarRelato(id, dados) {
+    return chamar(`/superadmin/relatos/${id}`, {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify(dados),
+    });
+  },
+
   async listarNotificacoes() {
     return chamar("/admin/notificacoes", { headers: headersComToken() });
   },

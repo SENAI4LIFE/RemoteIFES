@@ -47,52 +47,90 @@ const Admin = {
       `;
 
       if (podeVerOuTrocarSenha) {
-        li.querySelector(".trocar-senha").addEventListener("click", async () => {
-          const nova = prompt(`Nova senha para ${u.nome}:`);
-          if (!nova) return;
-          const resp = await Api.trocarSenhaUsuario(u.id, nova);
-          if (!resp.ok) alert(resp.erro || "não foi possível trocar a senha");
+        li.querySelector(".trocar-senha").addEventListener("click", () => {
+          Dialog.senha({
+            titulo: "Trocar senha",
+            alvoNome: u.nome,
+            aoConfirmar: async (novaSenha) => {
+              const resp = await Api.trocarSenhaUsuario(u.id, novaSenha);
+              if (!resp || !resp.ok) {
+                return { ok: false, erro: (resp && resp.erro) || "não foi possível trocar a senha" };
+              }
+              return { ok: true };
+            },
+          }).then((r) => {
+            if (r) Toast.aviso(`Senha de ${u.nome} atualizada. As sessões abertas desse usuário foram encerradas.`);
+          });
         });
       }
 
       if (podeEditar) {
-        li.querySelector(".trocar-nome").addEventListener("click", async () => {
-          const novoNome = prompt(`Novo nome para ${u.nome}:`, u.nome);
-          if (!novoNome) return;
-          const resp = await Api.trocarNomeUsuario(u.id, novoNome.trim());
-          if (!resp.ok) {
-            alert(resp.erro || "não foi possível trocar o nome");
-            return;
-          }
-          await this.carregarUsuarios();
+        li.querySelector(".trocar-nome").addEventListener("click", () => {
+          Dialog.texto({
+            titulo: "Trocar nome de exibição",
+            descricao: `Novo nome para o usuário @${u.usuario}.`,
+            label: "Nome",
+            valorInicial: u.nome,
+            minLength: 1,
+            maxLength: 120,
+            aoConfirmar: async (valor) => {
+              const resp = await Api.trocarNomeUsuario(u.id, valor.trim());
+              if (!resp || !resp.ok) {
+                return { ok: false, erro: (resp && resp.erro) || "não foi possível trocar o nome" };
+              }
+              return { ok: true };
+            },
+          }).then((valor) => {
+            if (valor !== null) this.carregarUsuarios();
+          });
         });
 
-        li.querySelector(".trocar-login").addEventListener("click", async () => {
-          const novoLogin = prompt(`Novo login para ${u.nome}:`, u.usuario);
-          if (!novoLogin) return;
-          const resp = await Api.trocarLoginUsuario(u.id, novoLogin.trim());
-          if (!resp.ok) {
-            alert(resp.erro || "não foi possível trocar o login");
-            return;
-          }
-          await this.carregarUsuarios();
+        li.querySelector(".trocar-login").addEventListener("click", () => {
+          Dialog.texto({
+            titulo: "Trocar login",
+            descricao: `Novo login de acesso para ${u.nome}.`,
+            label: "Login",
+            valorInicial: u.usuario,
+            minLength: 1,
+            maxLength: 60,
+            aoConfirmar: async (valor) => {
+              const resp = await Api.trocarLoginUsuario(u.id, valor.trim());
+              if (!resp || !resp.ok) {
+                return { ok: false, erro: (resp && resp.erro) || "não foi possível trocar o login" };
+              }
+              return { ok: true };
+            },
+          }).then((valor) => {
+            if (valor !== null) this.carregarUsuarios();
+          });
         });
       }
 
       if (podePromover) {
         li.querySelector(".conceder-admin").addEventListener("click", async () => {
-          if (!confirm(`Conceder permissão de administrador para ${u.nome}?`)) return;
+          const ok = await Dialog.confirmar({
+            titulo: "Conceder administrador",
+            mensagem: `Conceder permissão de administrador para ${u.nome}?`,
+            confirmarTexto: "Conceder",
+          });
+          if (!ok) return;
           const resp = await Api.atualizarUsuario(u.id, { isAdmin: true });
-          if (!resp.ok) alert(resp.erro || "não foi possível conceder admin");
+          if (!resp.ok) Toast.erro(resp.erro || "não foi possível conceder admin");
           await this.carregarUsuarios();
         });
       }
 
       if (podeRebaixar) {
         li.querySelector(".revogar-admin").addEventListener("click", async () => {
-          if (!confirm(`Remover permissão de administrador de ${u.nome}?`)) return;
+          const ok = await Dialog.confirmar({
+            titulo: "Revogar administrador",
+            mensagem: `Remover a permissão de administrador de ${u.nome}?`,
+            confirmarTexto: "Revogar",
+            perigo: true,
+          });
+          if (!ok) return;
           const resp = await Api.atualizarUsuario(u.id, { isAdmin: false });
-          if (!resp.ok) alert(resp.erro || "não foi possível revogar admin");
+          if (!resp.ok) Toast.erro(resp.erro || "não foi possível revogar admin");
           await this.carregarUsuarios();
         });
       }
@@ -100,7 +138,7 @@ const Admin = {
       if (podeGerenciarAtivoAdmin) {
         li.querySelector(".toggle-ativo-admin").addEventListener("click", async () => {
           const resp = await Api.atualizarUsuario(u.id, { ativo: !u.ativo });
-          if (!resp.ok) alert(resp.erro || "não foi possível alterar o status do administrador");
+          if (!resp.ok) Toast.erro(resp.erro || "não foi possível alterar o status do administrador");
           await this.carregarUsuarios();
         });
       }
@@ -115,7 +153,13 @@ const Admin = {
           await this.carregarUsuarios();
         });
         li.querySelector(".remover-usuario").addEventListener("click", async () => {
-          if (!confirm(`Remover o usuário ${u.nome}? Esta ação não pode ser desfeita.`)) return;
+          const ok = await Dialog.confirmar({
+            titulo: "Remover usuário",
+            mensagem: `Remover o usuário ${u.nome}? Esta ação não pode ser desfeita.`,
+            confirmarTexto: "Remover",
+            perigo: true,
+          });
+          if (!ok) return;
           await Api.removerUsuario(u.id);
           await this.carregarUsuarios();
         });
@@ -391,7 +435,7 @@ const Admin = {
         acessarBtn.addEventListener("click", async () => {
           const resp = await Api.acessarEsp32(s.sala);
           if (!resp.ok) {
-            alert(resp.erro || "não foi possível obter o endereço do ESP32");
+            Toast.erro(resp.erro || "não foi possível obter o endereço do ESP32");
             return;
           }
           window.open(resp.url, "_blank", "noopener");
@@ -432,7 +476,7 @@ const Admin = {
         const restrito = e.target.checked;
         const resp = await Api.definirAcessoRestrito(s.sala, restrito);
         if (!resp.ok) {
-          alert(resp.erro || "não foi possível alterar a restrição de acesso");
+          Toast.erro(resp.erro || "não foi possível alterar a restrição de acesso");
           e.target.checked = !restrito;
           return;
         }
@@ -514,12 +558,12 @@ const Admin = {
       li.querySelector(".vincular-detectado").addEventListener("click", async () => {
         const select = li.querySelector(".vincular-sala-select");
         if (!select.value) {
-          alert("selecione a sala de destino");
+          Toast.aviso("selecione a sala de destino");
           return;
         }
         const resp = await Api.cadastrarMac(select.value, d.mac);
         if (!resp.ok) {
-          alert(resp.erro || "não foi possível vincular o ESP32 à sala");
+          Toast.erro(resp.erro || "não foi possível vincular o ESP32 à sala");
           return;
         }
         await Api.removerDetectado(d.mac);
@@ -824,16 +868,28 @@ document.getElementById("logsFiltroAndar").addEventListener("change", () => {
 document.getElementById("logsApagarData").addEventListener("click", async () => {
   const data = document.getElementById("logsFiltroData").value;
   if (!data) {
-    alert("selecione uma data para apagar os logs daquele dia");
+    Toast.aviso("selecione uma data para apagar os logs daquele dia");
     return;
   }
-  if (!confirm(`Apagar todos os logs do dia ${data}?`)) return;
+  const ok = await Dialog.confirmar({
+    titulo: "Apagar logs do dia",
+    mensagem: `Apagar todos os logs do dia ${data}? Esta ação não pode ser desfeita.`,
+    confirmarTexto: "Apagar",
+    perigo: true,
+  });
+  if (!ok) return;
   await Api.apagarLogs(data);
   await Admin.carregarLogs();
 });
 
 document.getElementById("logsApagarTudo").addEventListener("click", async () => {
-  if (!confirm("Apagar TODOS os logs do banco de dados? Esta ação não pode ser desfeita.")) return;
+  const ok = await Dialog.confirmar({
+    titulo: "Apagar todos os logs",
+    mensagem: "Apagar TODOS os logs do banco de dados? Esta ação não pode ser desfeita.",
+    confirmarTexto: "Apagar tudo",
+    perigo: true,
+  });
+  if (!ok) return;
   await Api.apagarLogs();
   await Admin.carregarLogs();
 });
@@ -849,16 +905,28 @@ document.getElementById("acessosFiltroData").addEventListener("change", (e) => {
 document.getElementById("acessosApagarData").addEventListener("click", async () => {
   const data = document.getElementById("acessosFiltroData").value;
   if (!data) {
-    alert("selecione uma data para apagar os acessos daquele dia");
+    Toast.aviso("selecione uma data para apagar os acessos daquele dia");
     return;
   }
-  if (!confirm(`Apagar todos os acessos do dia ${data}?`)) return;
+  const ok = await Dialog.confirmar({
+    titulo: "Apagar acessos do dia",
+    mensagem: `Apagar todos os acessos do dia ${data}? Esta ação não pode ser desfeita.`,
+    confirmarTexto: "Apagar",
+    perigo: true,
+  });
+  if (!ok) return;
   await Api.apagarAcessosEsp(data);
   await Admin.carregarAcessos(data);
 });
 
 document.getElementById("acessosApagarTudo").addEventListener("click", async () => {
-  if (!confirm("Apagar TODOS os acessos ao webserver dos ESP32? Esta ação não pode ser desfeita.")) return;
+  const ok = await Dialog.confirmar({
+    titulo: "Apagar todos os acessos",
+    mensagem: "Apagar TODOS os acessos ao webserver dos ESP32? Esta ação não pode ser desfeita.",
+    confirmarTexto: "Apagar tudo",
+    perigo: true,
+  });
+  if (!ok) return;
   await Api.apagarAcessosEsp();
   await Admin.carregarAcessos(document.getElementById("acessosFiltroData").value || undefined);
 });
@@ -866,16 +934,28 @@ document.getElementById("acessosApagarTudo").addEventListener("click", async () 
 document.getElementById("sessoesApagarData").addEventListener("click", async () => {
   const data = document.getElementById("sessoesFiltroData").value;
   if (!data) {
-    alert("selecione uma data para apagar o histórico daquele dia");
+    Toast.aviso("selecione uma data para apagar o histórico daquele dia");
     return;
   }
-  if (!confirm(`Apagar o histórico de sessões do dia ${data}?`)) return;
+  const ok = await Dialog.confirmar({
+    titulo: "Apagar histórico do dia",
+    mensagem: `Apagar o histórico de sessões do dia ${data}? Esta ação não pode ser desfeita.`,
+    confirmarTexto: "Apagar",
+    perigo: true,
+  });
+  if (!ok) return;
   await Api.apagarHistoricoSessoes(data);
   await Admin.carregarSessoes(data);
 });
 
 document.getElementById("sessoesApagarTudo").addEventListener("click", async () => {
-  if (!confirm("Apagar TODO o histórico de sessões? Esta ação não pode ser desfeita.")) return;
+  const ok = await Dialog.confirmar({
+    titulo: "Apagar todo o histórico",
+    mensagem: "Apagar TODO o histórico de sessões? Esta ação não pode ser desfeita.",
+    confirmarTexto: "Apagar tudo",
+    perigo: true,
+  });
+  if (!ok) return;
   await Api.apagarHistoricoSessoes();
   await Admin.carregarSessoes(document.getElementById("sessoesFiltroData").value || undefined);
 });
@@ -893,7 +973,7 @@ document.getElementById("proprietariosAcessoRestritoCheck").addEventListener("ch
   if (!sala) return;
   const resp = await Api.definirAcessoRestrito(sala, e.target.checked);
   if (!resp.ok) {
-    alert(resp.erro || "não foi possível alterar a restrição de acesso desta sala");
+    Toast.erro(resp.erro || "não foi possível alterar a restrição de acesso desta sala");
     e.target.checked = !e.target.checked;
   }
 });
