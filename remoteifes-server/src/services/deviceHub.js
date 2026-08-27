@@ -203,15 +203,17 @@ function iniciar(server) {
       }
     });
 
-    ws.on("close", () => {
+    ws.on("close", (code, motivo) => {
       if (conexoes.get(sala) === entrada) {
         conexoes.delete(sala);
-        logger.info("device-ws-desconectado", { sala });
+        logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString() });
         eventos.emit("conexao", { sala, conectado: false });
       }
     });
 
-    ws.on("error", () => {});
+    ws.on("error", (err) => {
+      logger.warn("device-ws-erro", { sala, mensagem: err.message });
+    });
   });
 
   const intervaloPing = setInterval(() => {

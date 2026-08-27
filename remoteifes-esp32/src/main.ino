@@ -379,7 +379,7 @@ void conectarWsServidor() {
   if (WiFi.status() != WL_CONNECTED || salaId.length() == 0) return;
   if (wsConfigurado && salaWsConfigurada == salaId) return;
   if (wsConfigurado) wsCliente.disconnect();
-  String headers = "X-Device-Sala: " + salaId + "\r\nX-Device-Mac: " + WiFi.macAddress() + "\r\n";
+  String headers = "X-Device-Sala: " + salaId + "\r\nX-Device-Mac: " + WiFi.macAddress();
   wsCliente.setExtraHeaders(headers.c_str());
   wsCliente.onEvent(handleWsServidorEvent);
   wsCliente.setReconnectInterval(WS_RECONNECT_INTERVAL_MS);
@@ -494,7 +494,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     bool swing = doc["swing"] | false;
     String fan = doc["fan"] | "";
 
-    if (protocolo >= 0 && comandoPermitidoAgora()) {
+    if (protocolo >= 0) {
       sendKnownACState((decode_type_t)protocolo, temp, power, turbo, fan, swing);
       lastKnownPower = power;
 
