@@ -26,11 +26,11 @@ function verificarAgendamentos() {
 
       if (hora >= inicioLigar && hora <= fimLigar && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
         aplicarInicioAgendamento(ag.sala, ag.temperatura);
-        registrarExecucao(ag.id, "ligar");
+        registrarExecucao(ag.id, "ligar", dataISO);
       }
       if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO)) {
         aplicarComando(ag.sala, "desligar", undefined, { usuario: null, origem: "agendamento" });
-        registrarExecucao(ag.id, "desligar");
+        registrarExecucao(ag.id, "desligar", dataISO);
       }
     } catch (erro) {
       logger.error("agendamento-falhou", { agendamentoId: ag.id, sala: ag.sala, mensagem: erro.message });

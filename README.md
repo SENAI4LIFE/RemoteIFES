@@ -109,7 +109,7 @@ O sistema oferece três formas de chegar até uma sala, todas equivalentes em fu
 
 Qualquer usuário autenticado pode visualizar o estado de todas as salas — isso inclui salas às quais o usuário não tem permissão de controle, que aparecem marcadas como "visualização" e cujos controles ficam desabilitados no painel. Os três modos de navegação têm botões cruzados para alternar entre si a qualquer momento.
 
-As 95 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio. Um código de sala pode representar duas salas físicas controladas pelo mesmo ESP32 (ex.: `B-105-B-106`); nesse caso a interface exibe as duas etiquetas empilhadas no mesmo bloco do mapa.
+As 86 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio. Um código de sala pode representar duas salas físicas controladas pelo mesmo ESP32 (ex.: `B-105-B-106`); nesse caso a interface exibe as duas etiquetas empilhadas no mesmo bloco do mapa.
 
 ## Controle de Acesso e Proprietários de Sala
 
@@ -190,7 +190,7 @@ Em `Admin`, três sub-abas registram o histórico operacional do sistema, todas 
 
 ## Restrição de Rede
 
-Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas (rede do IFES), configuradas pelo administrador principal em CIDR (ex.: `10.0.0.0/8`). Existe um **modo de teste**, também configurável apenas pelo administrador principal, que permite acesso de fora da rede autorizada — útil durante testes e homologação, e ativo por padrão em uma instalação nova. Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada. A mesma restrição de rede e de modo de teste vale para as conexões WebSocket, não apenas para a API HTTP.
+Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas (rede do IFES), configuradas pelo administrador principal em CIDR (ex.: `10.0.0.0/8`). Existe um **modo de teste**, também configurável apenas pelo administrador principal, que permite acesso de fora da rede autorizada — útil durante testes e homologação, mas desativado por padrão em uma instalação nova de produção. Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada. A mesma restrição de rede e de modo de teste vale para as conexões WebSocket, não apenas para a API HTTP.
 
 ## Segurança
 
@@ -287,8 +287,8 @@ npm start
 
 **Em ambos os casos**, o banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
 
-- 95 salas reais do campus, extraídas da planta baixa (Bloco A e B, todos os pavimentos), todas offline até que os ESP32 correspondentes comecem a reportar
-- Um superadministrador `admin` com senha inicial `admin`. `SENHA_ADMIN_INICIAL` pode substituir esse padrão na primeira criação do banco, e a senha pode ser alterada normalmente em `Admin > Usuários`
+- 86 salas reais do campus, extraídas da planta baixa (Bloco A e B, todos os pavimentos), todas offline até que os ESP32 correspondentes comecem a reportar
+- Um superadministrador `admin`; em desenvolvimento/teste a senha inicial é `admin`, enquanto em produção uma senha aleatória é gerada se `SENHA_ADMIN_INICIAL` não for definida. A senha pode ser alterada normalmente em `Admin > Usuários`
 - Limites globais de temperatura de 23 °C a 25 °C e Turbo sem função adicional
 
 ## Instalação Detalhada
@@ -299,13 +299,13 @@ A [Instalação Rápida](#instalação-rápida) já cobre os comandos para coloc
 
 Em macOS/Linux, `npm run setup` (usado na instalação rápida) equivale a `npm install` + `cp .env.example .env`. Rode esses passos manualmente em vez do script caso prefira não instalar o Node.js automaticamente ou queira revisar cada etapa. No Windows, onde `npm run setup` não roda, os passos manuais (`npm install`, copiar `.env.example` para `.env`) já são o único caminho, como descrito na instalação rápida.
 
-Antes de colocar o servidor em produção, edite `.env` conforme a seção [Configuração](#configuração) — em especial `CORS_ORIGIN` quando `NODE_ENV=production`. Troque a senha inicial `admin` pelo painel no primeiro acesso ou defina `SENHA_ADMIN_INICIAL` antes da criação do banco.
+Antes de colocar o servidor em produção, edite `.env` conforme a seção [Configuração](#configuração) — em especial `CORS_ORIGIN` quando `NODE_ENV=production`. Defina `SENHA_ADMIN_INICIAL` antes da criação do banco ou guarde a senha aleatória exibida no primeiro boot.
 
 Durante o desenvolvimento, `npm run dev` inicia o servidor com reinício automático a cada alteração de arquivo (`node --watch`), no lugar de `npm start`.
 
 ### Frontend
 
-`remoteifes-web` não tem etapa de build: é servido como está. Para desenvolvimento local, basta abrir `index.html` em um servidor HTTP estático (ex.: `npx serve remoteifes-web`) apontando `js/config.js` para o servidor central local.
+`remoteifes-web` não tem etapa de build: é servido como está. Por padrão, o frontend usa `localhost:8080` quando aberto localmente e a própria origem quando publicado junto ao proxy reverso. Para uma origem diferente (por exemplo, GitHub Pages ou um pacote Cordova), defina `serverUrl` em `js/config.js` apontando para o servidor central.
 
 ### Firmware ESP32
 
@@ -345,7 +345,7 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 | `NODE_ENV` | `development` ou `production`. Em produção, ativa a restrição de rede e o CORS restrito |
 | `PORTA` | Porta HTTP (e WebSocket, no mesmo servidor) do servidor (padrão 8080) |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — vale tanto para a API HTTP quanto para as conexões WebSocket |
-| `SENHA_ADMIN_INICIAL` | Senha do usuário `admin` criado no primeiro boot; padrão `admin`. Use um valor diferente antes da primeira execução ou altere a senha pelo painel depois do login |
+| `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot. Em produção, uma senha aleatória é gerada quando o valor não é informado; em desenvolvimento/teste, o padrão é `admin` |
 | `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); padrão `1`, correto para o proxy Nginx configurado por `https-setup.sh`. Use `0` se o servidor for exposto diretamente à internet sem proxy na frente — confiar em saltos que não existem permite falsificar o IP de origem e contornar o limite de tentativas de login e a restrição de rede |
 
 Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx/Caddy, ou um serviço com TLS gerenciado), já que os aparelhos móveis e o GitHub Pages exigem conteúdo servido por HTTPS.
@@ -358,7 +358,7 @@ Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba 
 |---|---|---|
 | Limite de temperatura | 23 °C a 25 °C | Intervalo permitido para qualquer comando de temperatura, manual ou agendado (aceita de 16 a 30 °C) |
 | Função adicional do Turbo | nenhuma | Opcionalmente ativa também a oscilação vertical enquanto o Turbo estiver ligado |
-| Modo de teste | ativado | Quando ativo, desliga a restrição de rede do IFES em produção, permitindo acessar o sistema de qualquer rede para fins de teste; deve ser desativado quando o sistema for para produção definitiva |
+| Modo de teste | desativado em produção nova | Quando ativo, desliga a restrição de rede do IFES em produção, permitindo acessar o sistema de qualquer rede para fins de teste; deve permanecer desativado na operação definitiva |
 | Redes autorizadas | vazia | Lista de faixas de IP em CIDR (ex.: `10.0.0.0/8`) liberadas quando o modo de teste está desativado |
 | Tempo de inatividade | indefinido (sem limite) | Minutos sem interação até deslogar automaticamente o usuário no navegador; em branco desativa o recurso |
 | Admin sujeito ao tempo de inatividade | desativado | Define se o timeout de inatividade também se aplica a administradores |
@@ -424,8 +424,8 @@ Cada sala continua com seu próprio ESP32 fazendo a ponte com o ar-condicionado 
 
 Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo permanente. Confira estes pontos antes de deixá-la assim:
 
-- **Troque a senha inicial `admin`** pelo painel no primeiro acesso, ou defina `SENHA_ADMIN_INICIAL` no `.env` antes de criar o banco.
-- **Desative o modo de teste** (`Admin > Configurações > Modo de teste`) e cadastre as faixas de IP em `Redes autorizadas` se a intenção é restringir o acesso a uma rede específica; por padrão o modo de teste vem ativado (para facilitar testes) e desliga essa restrição mesmo em produção.
+- **Defina `SENHA_ADMIN_INICIAL`** no `.env` antes de criar o banco, ou guarde a senha aleatória de produção exibida no primeiro boot e troque-a pelo painel.
+- **Mantenha o modo de teste desativado** (`Admin > Configurações > Modo de teste`) e cadastre as faixas de IP em `Redes autorizadas` para restringir o acesso à rede autorizada; em uma instalação nova de produção o modo de teste começa desativado.
 - **Garanta que só a porta 443 do Nginx fique exposta à internet**, nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o HTTPS, o CORS e a checagem de `TRUST_PROXY`.
 - **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
 - **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
@@ -436,7 +436,7 @@ Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo p
 A publicação do `remoteifes-web` no GitHub Pages é manual (não há workflow de Actions no repositório). Passo a passo para publicar:
 
 1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
-2. Edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção (não use `localhost` aqui — esse endereço só funciona na sua própria máquina).
+2. Como o GitHub Pages tem origem diferente do servidor central, edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção.
 3. Faça commit e push dessa alteração na branch `main`.
 4. No repositório, vá em **Settings > Pages**.
 5. Em "Build and deployment", campo "Source", selecione **Deploy from a branch**.
@@ -479,7 +479,7 @@ Além do site publicado no GitHub Pages, o `remoteifes-web` pode ser instalado c
 | `manifest.webmanifest` | Nome, ícones (`assets/icons/`), cor de tema (`#1c6b3c`) e modo de exibição `standalone` |
 | `sw.js` | Service worker: cacheia o app shell (HTML/CSS/JS/ícones) para abrir mais rápido e funcionar parcialmente offline |
 
-O `sw.js` só intercepta arquivos estáticos do próprio domínio — chamadas à API (`serverUrl`) e a conexão WebSocket continuam exigindo rede normalmente. O registro do service worker acontece automaticamente no `index.html`, sem configuração adicional.
+O `sw.js` só intercepta carregamentos de arquivos estáticos do próprio domínio — chamadas à API (`serverUrl`), inclusive em uma implantação same-origin, e a conexão WebSocket continuam exigindo rede normalmente. O registro do service worker acontece automaticamente no `index.html`, sem configuração adicional.
 
 Requisitos para o botão de instalação aparecer no navegador:
 
@@ -642,7 +642,7 @@ remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev)
   data/                     arquivos gravados no sistema de arquivos LittleFS do dispositivo
     setup.html               formulário do portal de provisionamento (rede e servidor)
     restart.html             página de confirmação exibida após salvar a configuração
-    status.html               página local de status, somente leitura, protegida por Basic Auth
+    status.html               página local de status, somente leitura
   flash.sh                  instala o PlatformIO Core (se necessário) e compila/grava firmware + sistema de arquivos
 
 remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento como PWA e Aplicativo Nativo)
@@ -681,4 +681,4 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **`flash.sh` não encontra a porta serial do ESP32**: confirme que o cabo USB usado transmite dados (não é só de carga) e que os drivers do conversor USB-serial (CP210x ou CH340, conforme a placa) estão instalados; informe a porta manualmente, ex.: `bash flash.sh /dev/ttyUSB0`.
 - **Restrição de rede ou limite de tentativas de login parecem não fazer efeito**: confira `TRUST_PROXY` no `.env` — o valor precisa corresponder ao número real de proxies reversos na frente do servidor (`1` para o Nginx de `https-setup.sh`, `0` se o Node estiver exposto diretamente); um valor maior que o real permite que o IP de origem seja falsificado via `X-Forwarded-For`, contornando as duas proteções.
 - **App Cordova não fala com o servidor central**: confirme que `remoteifes-web/js/config.js` (não a cópia em `remoteifes-cordova/www/`) aponta para o `serverUrl` de produção antes de gerar o build, e que `remoteifes-cordova/config.xml` libera o domínio do servidor em `access`/`allow-navigation`.
-- **Não sei a senha do `admin` (ou o login não funciona) após clonar**: em um banco novo, o padrão é `admin`/`admin`, salvo se `SENHA_ADMIN_INICIAL` já tiver outro valor. Em um banco existente, a senha anterior é preservada. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou configurações; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.
+- **Não sei a senha do `admin` (ou o login não funciona) após clonar**: em um banco novo de desenvolvimento/teste, o padrão é `admin`/`admin`; em produção, a senha é aleatória quando `SENHA_ADMIN_INICIAL` não foi definida. Em um banco existente, a senha anterior é preservada. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou configurações; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.

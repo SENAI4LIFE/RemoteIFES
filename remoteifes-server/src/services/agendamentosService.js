@@ -145,18 +145,19 @@ function remover(id, requisitante) {
   }
 }
 
-function registrarExecucao(agendamentoId, tipo) {
+function registrarExecucao(agendamentoId, tipo, dataISO = dataAtualBrasiliaISO()) {
   db.prepare(`
-    INSERT INTO agendamentos_execucoes (agendamentoId, tipo) VALUES (?, ?)
-  `).run(agendamentoId, tipo);
+    INSERT INTO agendamentos_execucoes (agendamentoId, tipo, dataExecucao) VALUES (?, ?, ?)
+  `).run(agendamentoId, tipo, dataISO);
 }
 
 function jaExecutadoHoje(agendamentoId, tipo, dataISO) {
   const linha = db.prepare(`
     SELECT 1 FROM agendamentos_execucoes
-    WHERE agendamentoId = ? AND tipo = ? AND date(executadoEm) = ?
+    WHERE agendamentoId = ? AND tipo = ?
+      AND (dataExecucao = ? OR (dataExecucao IS NULL AND date(executadoEm, '-3 hours') = ?))
     LIMIT 1
-  `).get(agendamentoId, tipo, dataISO);
+  `).get(agendamentoId, tipo, dataISO, dataISO);
   return !!linha;
 }
 

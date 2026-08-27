@@ -39,7 +39,7 @@ const ServerStatus = (() => {
   const cancelarAcessoBtn = document.getElementById("manutencaoAcessoCancelarBtn");
 
   function wsUrl() {
-    const base = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || "http://localhost:8080";
+    const base = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || window.location.origin;
     const wsBase = base.replace(/^http/, "ws");
     return `${wsBase}/ws`;
   }
