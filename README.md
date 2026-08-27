@@ -129,7 +129,7 @@ A verificação é feita no backend (`aplicarComando`), então mesmo chamadas di
 
 Qualquer administrador pode tornar um usuário comum **proprietário** de uma sala específica, em `Admin > Proprietários de sala`. Um proprietário:
 
-- Ganha acesso a uma aba própria ("Config. Salas") onde vê apenas as salas das quais é dono.
+- Ganha acesso a uma aba própria ("Config.", intitulada "Configurações de sala") onde vê apenas as salas das quais é dono.
 - Pode, nessa aba, conceder e revogar o acesso de controle de outros usuários comuns à(s) sua(s) sala(s) — sem precisar de privilégios administrativos e sem enxergar o restante do painel de administração.
 - Só tem efeito prático se a sala estiver marcada como **acesso restrito**; caso contrário, todos os usuários com permissão geral já controlam a sala normalmente e a tela do proprietário mostra um aviso lembrando disso.
 
@@ -670,8 +670,8 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`; a mesma restrição vale para a conexão WebSocket.
 - **Frontend não fala com o servidor depois do deploy**: confirme `serverUrl` em `remoteifes-web/js/config.js` e se `CORS_ORIGIN` no servidor inclui o domínio do frontend publicado (isso também afeta a conexão WebSocket).
 - **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
-- **Aba "Grade" ou "Agendamentos" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
-- **Aba "Config. Salas" não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Admin > Proprietários de sala`.
+- **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
+- **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Admin > Proprietários de sala`.
 - **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend e o `serverUrl` estão ambos em HTTPS (veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https)) — navegadores exigem HTTPS para registrar o service worker e oferecer a instalação.
 - **App fica com versão antiga dos arquivos depois de atualizar o PWA**: incremente `CACHE_VERSION` em `remoteifes-web/sw.js`; sem isso, os clientes que já instalaram o app continuam servindo os arquivos do cache antigo.
 - **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_SDK_ROOT` (ou `ANDROID_HOME`) aponta para a instalação do Android SDK e que o JDK 17 está no `PATH`; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.

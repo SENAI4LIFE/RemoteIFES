@@ -9,19 +9,82 @@
   --text-muted: #62706a;
   --danger: #b3261e;
   --danger-soft: #fbeceb;
-  --warn: #8a6d1a;
+  --warn: #7a5f16;
   --warn-soft: #fbf3d9;
   --radius: 10px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+
+  /* Spacing scale — reused instead of ad-hoc pixel values */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Minimum comfortable touch target (WCAG 2.5.8 AA is 24px; 44px is the
+     mobile-friendly target used for primary controls). */
+  --tap-min: 44px;
+  --tap-min-sm: 32px;
+
+  /* Focus indicator — deliberately distinct from the brand green so it stays
+     visible on green surfaces (WCAG 2.4.7 / 2.4.13). */
+  --focus-color: #0b5cd8;
+  --focus-ring: 3px;
+
+  --shadow-1: 0 1px 3px rgba(15, 26, 18, 0.10);
+  --shadow-2: 0 10px 24px rgba(15, 26, 18, 0.16);
+
+  /* Notched-device safe areas. Kept as plain lengths so that browsers without
+     env() support still get a valid value; the real insets are layered on via
+     @supports below (viewport-fit=cover is set on the meta tag). */
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+  --safe-left: 0px;
+  --safe-right: 0px;
+
+  /* Approximate chrome heights, used to size the full-screen mobile controller
+     without JavaScript. Deliberately a touch generous so nothing is clipped. */
+  --topbar-h: 72px;
+  --tabbar-h: 54px;
+
   --a11y-zoom: 1;
   --a11y-font-scale: 1;
   --a11y-letter-spacing: 0em;
-  --a11y-line-height: 1.2;
+  /* Comfortable default leading for running text (also the WCAG 1.4.12 floor);
+     the accessibility panel can still take it lower or much higher. */
+  --a11y-line-height: 1.5;
   --a11y-paragraph-width: none;
+}
+
+@supports (top: env(safe-area-inset-top)) {
+  :root {
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+    --safe-left: env(safe-area-inset-left);
+    --safe-right: env(safe-area-inset-right);
+  }
 }
 
 * { box-sizing: border-box; }
 
-html { zoom: 1; }
+html { scroll-padding-top: 72px; scroll-padding-bottom: 88px; }
+
+/* Consistent, always-visible keyboard focus for every interactive element,
+   including JS-enhanced ones (li[role=button], .portal-option, .room.selectable). */
+:focus-visible {
+  outline: var(--focus-ring) solid var(--focus-color);
+  outline-offset: 2px;
+}
+/* High-contrast mode: a two-tone ring stays visible on both the black UI and
+   the light hard-coded floorplan room fills. */
+.a11y-high-contrast :focus-visible {
+  outline-color: #ffffff;
+  box-shadow: 0 0 0 5px #000000;
+}
+[role="button"] { cursor: pointer; }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
 
 body {
   font-size: calc(16px * var(--a11y-font-scale));
@@ -104,17 +167,18 @@ body {
 .topbar {
   background: var(--ifes-green);
   color: #fff;
-  padding: 14px 20px;
+  padding: calc(14px + var(--safe-top)) calc(20px + var(--safe-right)) 14px calc(20px + var(--safe-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
 @media (min-width: 700px) {
-  .topbar { padding: 10px 20px; }
+  .topbar { padding: calc(10px + var(--safe-top)) calc(20px + var(--safe-right)) 10px calc(20px + var(--safe-left)); }
 }
 
 .topbar-right {
@@ -142,14 +206,19 @@ body {
   line-height: 1;
   cursor: pointer;
   padding: 4px;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
   display: flex;
   align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
 }
+.notif-bell-btn:hover { background: rgba(255, 255, 255, 0.12); }
 
 .notif-dot {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: 6px;
+  right: 6px;
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -215,20 +284,21 @@ body {
   max-width: 480px;
   margin: 0 auto;
   padding: 24px 16px 90px;
+  padding-left: max(16px, var(--safe-left));
+  padding-right: max(16px, var(--safe-right));
   transition: max-width 0.25s ease;
 }
 
 @media (min-width: 700px) {
-  #app { max-width: 620px; padding: 20px 20px 76px; }
-  .tabbar { max-width: 620px; }
-  .card { padding: 16px 18px; margin-bottom: 12px; }
-  .screen-head { margin-bottom: 12px; }
-  h1 { font-size: calc(18px * var(--a11y-font-scale)); }
-  h2 { font-size: calc(15px * var(--a11y-font-scale)); }
-  .hint { font-size: calc(13px * var(--a11y-font-scale)); margin-bottom: 12px; }
-  .room-list li { padding: 12px 14px; margin-bottom: 8px; }
-  .tab-btn { padding: 10px; }
-  .btn-block { margin-top: 12px; }
+  #app { max-width: 640px; padding: 20px 24px 76px; }
+  .card { padding: 18px 20px; margin-bottom: 14px; }
+  .screen-head { margin-bottom: 14px; }
+  h1 { font-size: calc(22px * var(--a11y-font-scale)); }
+  h2 { font-size: calc(17px * var(--a11y-font-scale)); }
+  .hint { font-size: calc(13.5px * var(--a11y-font-scale)); margin-bottom: 14px; }
+  .room-list li { padding: 14px 16px; margin-bottom: 8px; }
+  .tab-btn { padding: 12px 10px; }
+  .btn-block { margin-top: 14px; }
   #loginForm button { margin-top: 14px; }
   label { margin: 8px 0 4px; }
   .status-row { padding: 4px 0; }
@@ -242,7 +312,6 @@ body {
 
 @media (min-width: 1000px) {
   #app { max-width: 760px; }
-  .tabbar { max-width: 760px; }
 }
 
 #app:has(#screen-portal:not(.hidden)) { max-width: 640px; }
@@ -276,26 +345,34 @@ body {
   margin-bottom: 16px;
 }
 
-h1 { font-size: calc(20px * var(--a11y-font-scale)); margin: 0 0 4px; font-weight: 600; }
-h2 { font-size: calc(16px * var(--a11y-font-scale)); margin: 0 0 4px; font-weight: 600; }
+h1 { font-size: calc(20px * var(--a11y-font-scale)); margin: 0 0 4px; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: calc(16px * var(--a11y-font-scale)); margin: 0 0 4px; font-weight: 600; letter-spacing: -0.005em; }
 
 .hint { color: var(--text-muted); font-size: calc(14px * var(--a11y-font-scale)); margin: 0 0 16px; }
 
-label { display: block; font-size: calc(13px * var(--a11y-font-scale)); margin: 12px 0 4px; color: var(--text-muted); }
+label { display: block; font-size: calc(13px * var(--a11y-font-scale)); margin: 12px 0 4px; color: var(--text-muted); font-weight: 500; }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: calc(14px * var(--a11y-font-scale));
   color: var(--text);
   margin: 10px 0;
+  min-height: var(--tap-min);
+  cursor: pointer;
 }
-.checkbox-label input { width: auto; }
+.checkbox-label input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--ifes-green);
+}
 
 input, select {
   width: 100%;
   padding: 10px 12px;
+  min-height: var(--tap-min);
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: calc(15px * var(--a11y-font-scale));
@@ -303,14 +380,21 @@ input, select {
   background: var(--surface);
   color: var(--text);
 }
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+/* Range sliders manage their own height (accessibility panel). */
+input[type="range"] { min-height: 0; }
 
 button.btn, #loginForm button {
   cursor: pointer;
   border: none;
   border-radius: 8px;
   font-size: calc(15px * var(--a11y-font-scale));
-  font-weight: 500;
-  padding: 12px;
+  font-weight: 600;
+  padding: 12px 16px;
+  min-height: var(--tap-min);
+  transition: background-color 0.15s ease, filter 0.15s ease;
 }
 
 button.btn:disabled {
@@ -336,7 +420,7 @@ button.btn:disabled {
 
 .toast-stack {
   position: fixed;
-  top: 12px;
+  top: calc(12px + var(--safe-top));
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
@@ -353,7 +437,7 @@ button.btn:disabled {
   margin: 0;
   padding: 12px 16px;
   border-radius: var(--radius);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-2);
   text-align: center;
   cursor: pointer;
   pointer-events: auto;
@@ -361,12 +445,13 @@ button.btn:disabled {
 }
 .toast-erro {
   color: var(--danger);
-  font-size: calc(13px * var(--a11y-font-scale));
+  font-size: calc(13.5px * var(--a11y-font-scale));
+  font-weight: 500;
   background: #fdecea;
   border: 1px solid #f3b4ae;
 }
 .toast-aviso {
-  font-size: calc(12px * var(--a11y-font-scale));
+  font-size: calc(13px * var(--a11y-font-scale));
   color: var(--warn);
   background: var(--warn-soft);
   border: 1px solid #e6d7a8;
@@ -383,6 +468,9 @@ button.btn:disabled {
   margin-bottom: 16px;
   gap: 12px;
 }
+/* Let the title take the slack and wrap its own text, so a trailing help
+   button stays beside it instead of pairing with the back link on wrap. */
+.screen-head h1 { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 
 .screen-head-links {
   display: flex;
@@ -396,9 +484,16 @@ button.btn:disabled {
   border: none;
   color: var(--ifes-green);
   font-size: calc(14px * var(--a11y-font-scale));
+  font-weight: 500;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
+  min-height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
 }
+.link-btn:hover { text-decoration: underline; }
 .link-btn.danger { color: var(--danger); }
 
 .room-list { list-style: none; padding: 0; margin: 0; }
@@ -414,10 +509,12 @@ button.btn:disabled {
   align-items: center;
   gap: 10px;
 }
-.room-list li:hover { border-color: var(--ifes-green); }
+.room-list li[role="button"] { cursor: pointer; }
+.room-list li[role="button"]:hover { border-color: var(--ifes-green); background: var(--ifes-green-soft); }
+.room-list li[role="button"]:active { transform: translateY(1px); }
 
-.room-name { font-weight: 500; display: flex; align-items: center; gap: 8px; }
-.room-sub { font-size: calc(13px * var(--a11y-font-scale)); color: var(--text-muted); margin-top: 2px; }
+.room-name { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.room-sub { font-size: calc(13px * var(--a11y-font-scale)); color: var(--text-muted); margin-top: 3px; }
 
 .detectados-grid {
   list-style: none;
@@ -481,16 +578,16 @@ button.btn:disabled {
 
 .status-badge {
   font-size: calc(13px * var(--a11y-font-scale));
-  font-weight: 500;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #eee;
+  background: #e9ece9;
   color: var(--text-muted);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 .status-badge.on { background: var(--ifes-green-soft); color: var(--ifes-green-dark); }
-.status-badge.off { background: #f1f1f1; color: var(--text-muted); }
-.status-badge.inativo { background: #fff3cd; color: #8a6d1a; }
+.status-badge.off { background: #ededed; color: var(--text-muted); }
+.status-badge.inativo { background: #fbefc7; color: #6f560f; }
 
 .power-row { display: flex; gap: 12px; margin-bottom: 20px; }
 .power-row .btn { flex: 1; }
@@ -514,7 +611,7 @@ button.btn:disabled {
 }
 
 @media (min-width: 940px) {
-  #app:has(#screen-panel:not(.hidden)) {
+  #app:has(#mainApp:not(.hidden)):has(#screen-panel:not(.hidden)) {
     max-width: 900px;
     margin-left: max(12px, calc((100vw - 900px) / 2));
     margin-right: auto;
@@ -594,10 +691,13 @@ button.btn:disabled {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: calc(13px * var(--a11y-font-scale));
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  min-height: var(--tap-min);
+  font-size: calc(13.5px * var(--a11y-font-scale));
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .choice-btn:hover { border-color: var(--ifes-green); }
 .choice-btn.active {
@@ -608,9 +708,13 @@ button.btn:disabled {
 
 .two-col {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
-.two-col > div { flex: 1; }
+.two-col > * {
+  flex: 1 1 180px;
+  min-width: 0;
+}
 
 #screen-simple.screen {
   display: flex;
@@ -823,15 +927,15 @@ button.btn:disabled {
 .simple-tile-sala .simple-tile-label { font-size: calc(16px * var(--a11y-font-scale)); white-space: normal; overflow-wrap: break-word; max-width: 100%; }
 .simple-tile-sub {
   font-size: calc(12px * var(--a11y-font-scale));
-  opacity: 0.9;
-  line-height: 1.2;
+  opacity: 0.95;
+  line-height: 1.25;
   white-space: normal;
   overflow-wrap: break-word;
   max-width: 100%;
 }
 
-.simple-tile-sala.is-offline { background: #9aa39d; }
-.simple-tile-sala.is-desligado { background: #3f7fbf; }
+.simple-tile-sala.is-offline { background: #5f6b64; }
+.simple-tile-sala.is-desligado { background: #2f6296; }
 .simple-tile-sala.is-ligado { background: var(--ifes-green); }
 .simple-tile-sala.is-reservada { box-shadow: 0 0 0 4px var(--warn), 0 10px 20px rgba(0, 0, 0, 0.12); }
 
@@ -904,6 +1008,34 @@ button.btn:disabled {
   word-break: break-word;
 }
 
+/* Phones: a full-height vertical rail buries the panel content below it.
+   Switch to a horizontal scroll strip so tabs and content are both reachable. */
+@media (max-width: 619px) {
+  .admin-layout { display: block; }
+  .admin-subtabs {
+    flex-direction: row;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    position: static;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .admin-subtab-btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 64px;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+    padding: 10px 12px;
+  }
+  .admin-subtab-btn:last-child { border-right: none; }
+  .admin-subtab-label { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+  .admin-content { width: 100%; }
+}
+
 @media (min-width: 620px) {
   .admin-subtabs { width: min(240px, 28vw); top: 84px; }
   .admin-subtab-btn {
@@ -946,23 +1078,30 @@ button.btn:disabled {
   display: flex;
   background: var(--surface);
   border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 12px rgba(15, 26, 18, 0.06);
   max-width: 480px;
   margin: 0 auto;
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
 }
 
 .tab-btn {
   flex: 1;
   background: none;
   border: none;
-  padding: 14px;
+  padding: 14px 10px;
+  min-height: var(--tap-min);
   font-size: calc(14px * var(--a11y-font-scale));
+  font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
+  border-top: 3px solid transparent;
 }
 .tab-btn.active {
   color: var(--ifes-green-dark);
-  font-weight: 600;
-  border-top: 2px solid var(--ifes-green);
+  font-weight: 700;
+  border-top-color: var(--ifes-green);
 }
 .tab-btn.hidden { display: none; }
 
@@ -978,21 +1117,33 @@ button.btn:disabled {
   border-radius: var(--radius);
 }
 
-.grade-tabela { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: calc(10px * var(--a11y-font-scale)); }
+.grade-tabela { border-collapse: collapse; width: 100%; font-size: calc(13px * var(--a11y-font-scale)); }
 .grade-tabela th, .grade-tabela td {
   border: 1px solid var(--border);
-  padding: 4px 2px;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 10px 12px;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
-.grade-tabela th { background: var(--ifes-green-soft); color: var(--ifes-green-dark); position: sticky; top: 0; z-index: 1; }
-.grade-hora { background: var(--bg); font-weight: 500; font-size: calc(9px * var(--a11y-font-scale)); white-space: normal; }
-.grade-cell { max-width: 100%; }
+.grade-tabela th {
+  background: var(--ifes-green-soft);
+  color: var(--ifes-green-dark);
+  font-size: calc(13px * var(--a11y-font-scale));
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.grade-hora {
+  background: var(--bg);
+  font-weight: 600;
+  font-size: calc(12.5px * var(--a11y-font-scale));
+  white-space: nowrap;
+  width: 1%;
+  font-variant-numeric: tabular-nums;
+}
+.grade-cell { min-height: 1.5em; }
 .grade-cell-desligado { background: var(--danger-soft); }
-.grade-cell-agendado { background: #fff6d6; color: #8a6d1a; }
-.grade-cell-ligado { background: var(--ifes-green-soft); color: var(--ifes-green-dark); font-weight: 600; }
+.grade-cell-agendado { background: #fff6d6; color: #6f560f; font-weight: 600; }
+.grade-cell-ligado { background: var(--ifes-green-soft); color: var(--ifes-green-dark); font-weight: 700; }
 
 .grade-legenda { margin-bottom: 12px; }
 .grade-cor-desligado { background: var(--danger); }
@@ -1017,11 +1168,12 @@ button.btn:disabled {
   justify-content: center;
   line-height: 1.15;
   color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
   border: 2px solid transparent;
 }
-.mapa-cell-dupla { font-size: calc(9px * var(--a11y-font-scale)); }
-.mapa-offline { background: #9aa39d; }
-.mapa-online-desligado { background: #3f7fbf; }
+.mapa-cell-dupla { font-size: calc(9.5px * var(--a11y-font-scale)); }
+.mapa-offline { background: #5f6b64; }
+.mapa-online-desligado { background: #2f6296; }
 .mapa-online-ligado { background: var(--ifes-green); }
 .mapa-reservada { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn-soft); }
 
@@ -1053,12 +1205,12 @@ button.btn:disabled {
 }
 
 .aviso-inline {
-  font-size: calc(12px * var(--a11y-font-scale));
+  font-size: calc(13px * var(--a11y-font-scale));
   color: var(--warn);
   background: var(--warn-soft);
   border: 1px solid #e6d7a8;
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: 12px 14px;
   margin: 0 0 12px;
   text-align: left;
 }
@@ -1099,23 +1251,25 @@ button.btn:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: 6px;
+  width: 24px;
+  height: 24px;
+  margin-left: 8px;
   border-radius: 50%;
   border: 1px solid var(--ifes-green);
   background: var(--ifes-green-soft);
   color: var(--ifes-green-dark);
-  font-size: calc(11px * var(--a11y-font-scale));
+  font-size: calc(13px * var(--a11y-font-scale));
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
   vertical-align: middle;
+  flex-shrink: 0;
 }
+.help-icon-btn:hover { background: var(--ifes-green); color: #fff; }
 
 .help-modal-card { max-width: 460px; text-align: left; }
 .help-list { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 10px; }
-.help-list li { font-size: calc(13.5px * var(--a11y-font-scale)); color: var(--text-muted); line-height: 1.4; }
+.help-list li { font-size: calc(13.5px * var(--a11y-font-scale)); color: var(--text-muted); line-height: 1.55; }
 .help-list strong { color: var(--text); }
 
 .config-saved-hint {
@@ -1383,7 +1537,9 @@ button.btn:disabled {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px 14px;
 }
-@media (max-width: 380px) {
+/* Two per row until there is comfortably enough width for the labels to sit
+   on one line beside the icon. */
+@media (max-width: 560px) {
   .portal-funcoes-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -1392,11 +1548,12 @@ button.btn:disabled {
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
   background: var(--surface);
   border: 1px solid #c5e2cf;
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 12px 12px;
+  min-height: var(--tap-min);
   cursor: pointer;
   font-family: inherit;
   color: var(--text);
@@ -1406,10 +1563,6 @@ button.btn:disabled {
   background: var(--ifes-green-soft);
   border-color: var(--ifes-green);
 }
-.portal-funcao:focus-visible {
-  outline: 2px solid var(--ifes-green);
-  outline-offset: 2px;
-}
 .portal-funcao.is-active {
   background: var(--ifes-green);
   border-color: var(--ifes-green-dark);
@@ -1417,16 +1570,18 @@ button.btn:disabled {
 .portal-funcao.is-active .portal-funcao-label { color: #fff; }
 
 .portal-funcao-icon {
-  font-size: calc(20px * var(--a11y-font-scale));
+  font-size: calc(19px * var(--a11y-font-scale));
   line-height: 1;
   flex-shrink: 0;
-  width: 26px;
+  width: 24px;
   text-align: center;
 }
 .portal-funcao-label {
   font-weight: 600;
-  font-size: calc(13px * var(--a11y-font-scale));
-  letter-spacing: 0.2px;
+  font-size: calc(12.5px * var(--a11y-font-scale));
+  letter-spacing: 0.1px;
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
 
 .portal-funcao-detalhe {
@@ -1494,16 +1649,15 @@ button.btn:disabled {
 }
 .login-info-tips li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   text-align: left;
-  font-size: calc(12.5px * var(--a11y-font-scale));
+  font-size: calc(13px * var(--a11y-font-scale));
   color: var(--text);
-  white-space: nowrap;
 }
 .login-info-tips .icon-badge {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
   background: #fff;
   border: 1px solid #e6d7a8;
@@ -1512,13 +1666,6 @@ button.btn:disabled {
   justify-content: center;
   font-size: calc(15px * var(--a11y-font-scale));
   flex-shrink: 0;
-}
-
-@media (max-width: 699px) {
-  .login-info-tips li {
-    white-space: normal;
-    align-items: flex-start;
-  }
 }
 
 .config-list { margin-bottom: 4px; }
@@ -1562,8 +1709,10 @@ button.btn:disabled {
   background: var(--surface);
   color: var(--text-muted);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
+  min-height: var(--tap-min);
   font-size: calc(12.5px * var(--a11y-font-scale));
+  font-weight: 500;
   cursor: pointer;
 }
 .fp-tab-btn.active {
@@ -1604,6 +1753,40 @@ button.btn:disabled {
     margin-right: auto;
   }
 }
+
+/* Wider viewports: use the horizontal room for list-style pickers instead of
+   one very long narrow column, without letting any single card stretch. */
+@media (min-width: 900px) {
+  #app:has(#screen-rooms:not(.hidden)) { max-width: 1000px; }
+  #app:has(#screen-agenda:not(.hidden)) { max-width: 940px; }
+  /* Keep the create/edit form at a comfortable reading measure even when the
+     screen grows; only the results list spreads across the extra width. */
+  #screen-agenda > .card { max-width: 620px; }
+  #roomList,
+  #agendaList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+    align-items: stretch;
+  }
+  #roomList li,
+  #agendaList li { margin-bottom: 0; }
+
+  /* Long single-line text controls read poorly when stretched the full width
+     of the admin column. */
+  #screen-admin .card > input:not([type="checkbox"]):not([type="radio"]),
+  #screen-admin .card > select,
+  #screen-admin .card > textarea { max-width: 620px; }
+}
+
+/* The step-by-step "cards" picker is meant to give large targets, not to
+   inflate two tiles to the full height of a large monitor. */
+@media (min-width: 900px) {
+  .simple-grid-bloco,
+  .simple-grid-andar { align-content: center; }
+  .simple-grid-bloco .simple-tile,
+  .simple-grid-andar .simple-tile { max-height: 460px; }
+}
 @media (min-width: 1300px) {
   #app:has(#screen-admin:not(.hidden)) {
     max-width: 1400px;
@@ -1631,12 +1814,13 @@ button.btn:disabled {
   margin-top: 8px;
 }
 .fp-zoom-btn {
-  width: 36px;
-  height: 32px;
+  width: var(--tap-min);
+  height: var(--tap-min);
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
+  font-size: calc(16px * var(--a11y-font-scale));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1648,11 +1832,12 @@ button.btn:disabled {
 
 .a11y-widget {
   position: fixed;
-  right: 16px;
-  bottom: 72px;
+  right: calc(16px + var(--safe-right));
+  bottom: calc(76px + var(--safe-bottom));
   z-index: 200;
-  zoom: 1;
 }
+/* Lift both floating buttons above the bottom tab bar when it is present. */
+body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(126px + var(--safe-bottom)); }
 .a11y-toggle-btn {
   width: 48px;
   height: 48px;
@@ -1672,6 +1857,7 @@ button.btn:disabled {
   position: fixed;
   inset: 16px;
   margin-left: auto;
+  z-index: 201;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1701,7 +1887,10 @@ button.btn:disabled {
   line-height: 1;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 4px 8px;
+  min-width: var(--tap-min-sm);
+  min-height: var(--tap-min-sm);
+  border-radius: var(--radius-sm);
 }
 .a11y-close-btn:hover { color: var(--text); }
 
@@ -1736,7 +1925,7 @@ button.btn:disabled {
   background: var(--bg);
   color: var(--text);
   border-radius: 8px;
-  padding: 6px 0;
+  padding: 9px 4px;
   font-size: calc(13px * var(--a11y-font-scale));
   font-weight: 600;
   cursor: pointer;
@@ -1750,7 +1939,7 @@ button.btn:disabled {
   background: var(--bg);
   color: var(--text);
   border-radius: 8px;
-  padding: 6px 0;
+  padding: 9px 8px;
   font-size: calc(12px * var(--a11y-font-scale));
   font-weight: 600;
   cursor: pointer;
@@ -1777,8 +1966,8 @@ button.btn:disabled {
 
 .a11y-color-row { align-items: center; }
 .a11y-color-input {
-  width: 34px;
-  height: 30px;
+  width: 40px;
+  height: 34px;
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1791,7 +1980,7 @@ button.btn:disabled {
 .a11y-align-row .a11y-toggle-option-btn,
 .a11y-font-type-row .a11y-toggle-option-btn {
   font-size: calc(11px * var(--a11y-font-scale));
-  padding: 6px 2px;
+  padding: 8px 4px;
 }
 
 .a11y-slider-row {
@@ -1801,13 +1990,13 @@ button.btn:disabled {
 }
 .a11y-slider-step {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
   border-radius: 6px;
-  font-size: calc(13px * var(--a11y-font-scale));
+  font-size: calc(14px * var(--a11y-font-scale));
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
@@ -1818,36 +2007,38 @@ button.btn:disabled {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 14px;
+  height: 24px;
   margin: 0;
   background: transparent;
   cursor: pointer;
 }
 .a11y-slider::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
+  height: 5px;
+  border-radius: 3px;
   background: linear-gradient(to right, var(--ifes-green) var(--a11y-slider-fill, 0%), var(--border) var(--a11y-slider-fill, 0%));
 }
 .a11y-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
   border-radius: 50%;
-  border: none;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--border);
   background: var(--ifes-green);
   cursor: pointer;
 }
 .a11y-slider::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
+  height: 5px;
+  border-radius: 3px;
   background: linear-gradient(to right, var(--ifes-green) var(--a11y-slider-fill, 0%), var(--border) var(--a11y-slider-fill, 0%));
 }
 .a11y-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--border);
   border-radius: 50%;
   background: var(--ifes-green);
   cursor: pointer;
@@ -1862,13 +2053,13 @@ button.btn:disabled {
 }
 .a11y-slider-reset-btn {
   width: 100%;
-  margin-top: 4px;
+  margin-top: 6px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--ifes-green-dark);
   border-radius: 8px;
-  padding: 4px 0;
-  font-size: calc(11px * var(--a11y-font-scale));
+  padding: 8px 4px;
+  font-size: calc(11.5px * var(--a11y-font-scale));
   font-weight: 600;
   cursor: pointer;
 }
@@ -1876,10 +2067,16 @@ button.btn:disabled {
 
 .help-fab-widget {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: calc(16px + var(--safe-right));
+  bottom: calc(16px + var(--safe-bottom));
   z-index: 200;
-  zoom: 1;
+}
+body:has(#mainApp:not(.hidden)) .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
+/* Browsers without :has() can't detect the tab bar; keep both floating buttons
+   clear of where it would sit rather than risk an overlap. */
+@supports not selector(:has(*)) {
+  .a11y-widget { bottom: calc(126px + var(--safe-bottom)); }
+  .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
 }
 .help-fab-btn {
   width: 48px;
@@ -1922,11 +2119,10 @@ button.btn:disabled {
 .help-fab-text strong { color: var(--text); }
 
 @media (min-width: 700px) {
-  .a11y-widget { bottom: 84px; }
-  .help-fab-widget { bottom: 20px; }
   .a11y-panel {
     width: 460px;
-    height: 500px;
+    height: auto;
+    max-height: min(580px, calc(100dvh - 32px));
     padding: 14px 16px;
   }
   .a11y-grid {
@@ -2044,11 +2240,21 @@ button.btn:disabled {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
   .server-status-card { animation: none; }
   .server-status-spinner { animation: none; }
   .server-status-dot-offline { animation: none; }
   .screen:not(.hidden) { animation: none; }
   #app { transition: none; }
+  .simple-tile:active,
+  .ac-remote-temp-btn:active:not(:disabled),
+  .ac-remote-turbo-btn:active:not(:disabled),
+  .room-list li[role="button"]:active { transform: none; }
 }
 
 .esp32-device-list {
@@ -2201,7 +2407,7 @@ textarea {
   min-width: 0;
 }
 
-.user-tag, .portal-footer span, .login-info-tips li, .grade-tabela th, .grade-tabela td {
+.user-tag, .portal-footer span, .login-info-tips li {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
@@ -2217,15 +2423,6 @@ textarea {
 .room-list li {
   align-items: flex-start;
   flex-wrap: wrap;
-}
-
-.two-col {
-  flex-wrap: wrap;
-}
-
-.two-col > * {
-  flex: 1 1 180px;
-  min-width: 0;
 }
 
 #screen-panel.screen, #screen-simple.screen {
@@ -2252,6 +2449,11 @@ textarea {
 .ac-remote {
   align-items: flex-start;
   min-height: auto;
+}
+/* On taller screens the panel column has slack space below the remote;
+   centre the remote in it instead of leaving a large void. */
+@media (min-height: 720px) {
+  .ac-remote { align-items: center; }
 }
 
 .ac-remote-body {
@@ -2306,6 +2508,146 @@ textarea {
   grid-template-columns: minmax(0, 1fr) minmax(76px, auto) minmax(0, 1fr);
   align-items: start;
   gap: clamp(8px, 3vw, 18px);
+}
+
+/* =========================================================================
+   Mobile: the room controller behaves like a dedicated physical remote —
+   it fills the viewport between the top bar and the tab bar, edge to edge,
+   with every element proportionally sized (clamp + viewport units) so it
+   fits one screen without scrolling on any phone, in either orientation.
+   ========================================================================= */
+@media (max-width: 640px) {
+  #app:has(#mainApp:not(.hidden)):has(#screen-panel:not(.hidden)) {
+    max-width: none;
+    padding: 0 max(0px, var(--safe-left)) calc(var(--tabbar-h) + var(--safe-bottom)) max(0px, var(--safe-right));
+  }
+
+  #mainApp #screen-panel.screen {
+    max-width: none;
+    margin: 0;
+    min-height: calc(100dvh - var(--topbar-h) - var(--tabbar-h) - var(--safe-top) - var(--safe-bottom));
+    padding: 4px clamp(6px, 2.5vw, 12px);
+    gap: 4px;
+  }
+
+  /* Compact single-line header; the "← Salas" return control stays pinned
+     top-left and never overlaps the remote. */
+  #screen-panel .screen-head {
+    margin-bottom: 0;
+    gap: 8px;
+    flex-wrap: nowrap;
+    align-items: center;
+    flex: 0 0 auto;
+  }
+  #screen-panel .screen-head #backBtn { flex: 0 0 auto; }
+  #screen-panel .screen-head h1 {
+    font-size: clamp(14px, 4.2vw, 19px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
+  #screen-panel .screen-head .help-icon-btn { flex: 0 0 auto; }
+  #screen-panel .lock-banner,
+  #screen-panel .aviso-inline { flex: 0 0 auto; margin-bottom: 0; }
+
+  .ac-remote { align-items: stretch; flex: 1 1 auto; min-height: 0; }
+
+  .ac-remote-body {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    justify-content: flex-start;
+    gap: clamp(10px, 2vh, 20px);
+    padding: clamp(10px, 1.8vh, 16px) clamp(12px, 4vw, 20px) clamp(12px, 1.8vh, 16px);
+    border-radius: clamp(18px, 5vw, 26px);
+  }
+  .ac-remote-sensor { flex: 0 0 auto; }
+  /* The dark panel behaves like a real device screen: it grows to fill the
+     remote face, with the mode row pinned top, set-point centred, and the
+     ambient/state row pinned bottom — no dead space. */
+  .ac-remote-display {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  .ac-remote-controls { flex: 0 0 auto; }
+
+  .ac-remote-temp-target {
+    font-size: clamp(44px, 15vw, 104px);
+    margin: 0;
+    text-align: center;
+    align-self: center;
+  }
+  .ac-remote-temp-btn { min-height: clamp(58px, 11vh, 100px); }
+  .ac-remote-turbo-btn { min-height: clamp(44px, 6.5vh, 56px); }
+  .ac-remote-power-icon { width: clamp(54px, 14vw, 88px); }
+
+  /* The floating help / accessibility buttons would sit on top of the remote
+     controls here; the header keeps its own "?" and the accessibility panel
+     stays available from every other screen. */
+  body:has(#screen-panel:not(.hidden)) .a11y-widget,
+  body:has(#screen-panel:not(.hidden)) .help-fab-widget { display: none; }
+}
+
+/* Landscape phones: wide and short — lay the display beside the controls so
+   nothing is clipped and the big number still reads. */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 520px) {
+  #app:has(#mainApp:not(.hidden)):has(#screen-panel:not(.hidden)) {
+    max-width: none;
+    padding: 0 max(0px, var(--safe-left)) calc(var(--tabbar-h) + var(--safe-bottom)) max(0px, var(--safe-right));
+  }
+  #mainApp #screen-panel.screen {
+    min-height: calc(100dvh - var(--topbar-h) - var(--tabbar-h) - var(--safe-top) - var(--safe-bottom));
+    height: auto;
+    padding: 3px clamp(6px, 2vw, 14px);
+    gap: 3px;
+  }
+  #screen-panel .screen-head { margin-bottom: 0; flex: 0 0 auto; }
+  #screen-panel .screen-head h1 { font-size: clamp(13px, 3.4vw, 17px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .ac-remote { align-items: stretch; flex: 1 1 auto; min-height: 0; }
+  .ac-remote-body {
+    flex-direction: row;
+    align-items: stretch;
+    max-width: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: clamp(8px, 2vw, 16px);
+    padding: clamp(6px, 3vh, 12px) clamp(10px, 2.5vw, 18px);
+  }
+  .ac-remote-sensor { display: none; }
+  .ac-remote-display {
+    flex: 1 1 42%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    padding: clamp(6px, 3vh, 14px) clamp(10px, 2vw, 16px);
+  }
+  .ac-remote-temp-target {
+    font-size: clamp(34px, 15vh, 92px);
+    margin: clamp(2px, 1vh, 8px) 0;
+  }
+  .ac-remote-controls {
+    flex: 1 1 58%;
+    align-content: center;
+    align-items: center;
+    gap: clamp(6px, 2vw, 16px);
+  }
+  .ac-remote-center-controls { justify-content: center; gap: clamp(6px, 1.6vh, 12px); }
+  .ac-remote-temp-btn { min-height: clamp(44px, 34vh, 104px); }
+  .ac-remote-turbo-btn { min-height: clamp(40px, 12vh, 54px); }
+  .ac-remote-power-icon { width: clamp(46px, 18vh, 82px); }
+
+  body:has(#screen-panel:not(.hidden)) .a11y-widget,
+  body:has(#screen-panel:not(.hidden)) .help-fab-widget { display: none; }
 }
 
 .ac-remote-center-controls {
@@ -2435,15 +2777,24 @@ textarea {
   overflow-x: auto;
   align-items: stretch;
 }
+/* Keep the bottom bar aligned with the content column. These live here, after
+   the base `.tabbar { max-width: 480px }`, so the responsive widths actually win. */
+@media (min-width: 700px) { .tabbar { max-width: 640px; } }
+@media (min-width: 1000px) { .tabbar { max-width: 760px; } }
 
 .tab-btn {
-  min-width: min(24vw, 120px);
+  min-width: 56px;
   line-height: var(--a11y-line-height);
   overflow-wrap: anywhere;
 }
+/* Very narrow phones with all five tabs visible: shrink the label rather than
+   wrapping or forcing a horizontal scroll. */
+@media (max-width: 400px) {
+  .tab-btn { font-size: calc(12.5px * var(--a11y-font-scale)); padding: 13px 4px; }
+}
 
 #app:has(#mainApp:not(.hidden)) {
-  padding-bottom: max(160px, calc(90px * var(--a11y-font-scale)));
+  padding-bottom: max(calc(150px + var(--safe-bottom)), calc(96px * var(--a11y-font-scale)));
 }
 
 .esp32-capture-actions {

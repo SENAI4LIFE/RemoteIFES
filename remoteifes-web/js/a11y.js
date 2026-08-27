@@ -25,7 +25,7 @@
   const ALTURA_MIN = 1.2;
   const ALTURA_MAX = 3;
   const ALTURA_PASSO = 0.1;
-  const ALTURA_PADRAO = 1.2;
+  const ALTURA_PADRAO = 1.5;
 
   const LARGURA_PARAGRAFO_PASSOS = ["none", "80ch", "70ch", "60ch", "52ch", "44ch", "36ch"];
   const LARGURA_PARAGRAFO_ROTULOS = ["Padrão", "80ch", "70ch", "60ch", "52ch", "44ch", "36ch"];

@@ -195,7 +195,10 @@ function iniciar(server) {
         });
       } else if (msg.tipo === "comando") {
         if (typeof msg.cmd === "string" && msg.cmd.length <= 100) {
-          salasService.registrarComandoDispositivo(sala, msg.cmd, msg.valor);
+          const valor = (typeof msg.valor === "string" || typeof msg.valor === "number")
+            ? msg.valor
+            : undefined;
+          salasService.registrarComandoDispositivo(sala, msg.cmd, valor);
         }
       } else if (msg.tipo === "modo_alterado") {
         entrada.modo = typeof msg.modo === "string" ? msg.modo : entrada.modo;

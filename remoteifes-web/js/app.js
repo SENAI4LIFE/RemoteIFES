@@ -1,4 +1,6 @@
-document.querySelector('.tab-btn[data-tab="salas"]').classList.add("active");
+const _tabSalasInicial = document.querySelector('.tab-btn[data-tab="salas"]');
+_tabSalasInicial.classList.add("active");
+_tabSalasInicial.setAttribute("aria-current", "page");
 
 document.getElementById("homeBtn").addEventListener("click", () => {
   if (state.usuario) {

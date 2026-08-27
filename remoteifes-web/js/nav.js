@@ -38,7 +38,10 @@ function showScreen(name) {
 
 function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.tab === tab);
+    const ativo = btn.dataset.tab === tab;
+    btn.classList.toggle("active", ativo);
+    if (ativo) btn.setAttribute("aria-current", "page");
+    else btn.removeAttribute("aria-current");
   });
 
   if (tab === "salas") {
