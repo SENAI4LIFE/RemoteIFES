@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=8" />
+  <link rel="stylesheet" href="css/style.css?v=9" />
 </head>
 <body>
 
@@ -563,7 +563,10 @@
                   <span class="ac-remote-power-icon">&#9211;</span>
                   <span class="ac-remote-control-label">Power</span>
                 </button>
-                <button id="btnTurbo" type="button" class="ac-remote-turbo-btn" aria-label="Ativar ou desativar o modo turbo" aria-pressed="false">Turbo</button>
+                <button id="btnTurbo" type="button" class="ac-remote-turbo-btn" aria-label="Ativar ou desativar o modo turbo" aria-pressed="false">
+                  <svg class="ac-remote-turbo-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm.9-8.4c1.8.36 3 1.94 2.86 3.66-.06.78-.5 2.02-1.05 3.05 1.03-.55 2.27-.99 3.05-1.05 1.72-.13 3.3 1.06 3.66 2.86.36 1.8-.62 3.5-2.28 4.02-.75.24-2.06.32-3.22.24.86.78 1.7 1.8 2.06 2.46.82 1.53.35 3.4-1.1 4.32-1.45.92-3.32.55-4.32-.9-.44-.64-1-1.84-1.3-2.96-.3 1.12-.86 2.32-1.3 2.96-1 1.45-2.87 1.82-4.32.9-1.45-.92-1.92-2.79-1.1-4.32.36-.66 1.2-1.68 2.06-2.46-1.16.08-2.47 0-3.22-.24C1.72 15.31.74 13.61 1.1 11.8c.36-1.8 1.94-2.99 3.66-2.86.78.06 2.02.5 3.05 1.05-.55-1.03-.99-2.27-1.05-3.05C6.62 5.22 7.82 3.64 9.62 3.28c.28-.06.56-.09.83-.09.5 0 .98.09 1.42.28l.13.06.87.47Z"/></svg>
+                  <span class="ac-remote-turbo-text">Turbo</span>
+                </button>
               </div>
               <button id="tempUp" type="button" class="ac-remote-temp-btn" aria-label="Aumentar temperatura">
                 <span class="ac-remote-control-symbol">+</span>
@@ -750,8 +753,8 @@
             <label for="sessoesFiltroData">Filtrar por data</label>
             <input type="date" id="sessoesFiltroData" />
             <div class="two-col">
-              <button type="button" id="sessoesApagarData" class="link-btn danger">Apagar histórico da data</button>
-              <button type="button" id="sessoesApagarTudo" class="link-btn danger">Apagar todo o histórico</button>
+              <button type="button" id="sessoesApagarData" class="admin-apagar-btn">Apagar histórico da data</button>
+              <button type="button" id="sessoesApagarTudo" class="admin-apagar-btn">Apagar todo o histórico</button>
             </div>
           </div>
           <ul id="sessoesList" class="room-list"></ul>
@@ -770,8 +773,8 @@
             <label for="logsFiltroAndar">Filtrar por andar</label>
             <select id="logsFiltroAndar"></select>
             <div class="two-col">
-              <button type="button" id="logsApagarData" class="link-btn danger">Apagar logs da data</button>
-              <button type="button" id="logsApagarTudo" class="link-btn danger">Apagar todos os logs</button>
+              <button type="button" id="logsApagarData" class="admin-apagar-btn">Apagar logs da data</button>
+              <button type="button" id="logsApagarTudo" class="admin-apagar-btn">Apagar todos os logs</button>
             </div>
           </div>
           <ul id="logsList" class="room-list"></ul>
@@ -798,8 +801,8 @@
             <label for="acessosFiltroData">Filtrar por data</label>
             <input type="date" id="acessosFiltroData" />
             <div class="two-col">
-              <button type="button" id="acessosApagarData" class="link-btn danger">Apagar acessos da data</button>
-              <button type="button" id="acessosApagarTudo" class="link-btn danger">Apagar todos os acessos</button>
+              <button type="button" id="acessosApagarData" class="admin-apagar-btn">Apagar acessos da data</button>
+              <button type="button" id="acessosApagarTudo" class="admin-apagar-btn">Apagar todos os acessos</button>
             </div>
           </div>
           <ul id="acessosList" class="room-list"></ul>
@@ -913,7 +916,7 @@
                 </p>
                 <div class="config-list-body">
                   <label for="cfgTimeoutInatividade">Tempo de inatividade (minutos)</label>
-                  <input type="number" id="cfgTimeoutInatividade" min="1" placeholder="indefinido (sugestão: 15)" />
+                  <input type="number" id="cfgTimeoutInatividade" min="1" placeholder="ex.: 15" />
 
                   <label class="checkbox-label">
                     <input type="checkbox" id="cfgAdminSujeitoTimeout" /> Aplicar este timer também para administradores
