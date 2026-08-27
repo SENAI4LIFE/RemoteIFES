@@ -15,7 +15,6 @@
   --radius-sm: 8px;
   --radius-pill: 999px;
 
-  /* Spacing scale — reused instead of ad-hoc pixel values */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -23,37 +22,27 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  /* Minimum comfortable touch target (WCAG 2.5.8 AA is 24px; 44px is the
-     mobile-friendly target used for primary controls). */
   --tap-min: 44px;
   --tap-min-sm: 32px;
 
-  /* Focus indicator — deliberately distinct from the brand green so it stays
-     visible on green surfaces (WCAG 2.4.7 / 2.4.13). */
   --focus-color: #0b5cd8;
   --focus-ring: 3px;
 
   --shadow-1: 0 1px 3px rgba(15, 26, 18, 0.10);
   --shadow-2: 0 10px 24px rgba(15, 26, 18, 0.16);
 
-  /* Notched-device safe areas. Kept as plain lengths so that browsers without
-     env() support still get a valid value; the real insets are layered on via
-     @supports below (viewport-fit=cover is set on the meta tag). */
   --safe-top: 0px;
   --safe-bottom: 0px;
   --safe-left: 0px;
   --safe-right: 0px;
 
-  /* Approximate chrome heights, used to size the full-screen mobile controller
-     without JavaScript. Deliberately a touch generous so nothing is clipped. */
   --topbar-h: 72px;
   --tabbar-h: 54px;
 
   --a11y-zoom: 1;
   --a11y-font-scale: 1;
   --a11y-letter-spacing: 0em;
-  /* Comfortable default leading for running text (also the WCAG 1.4.12 floor);
-     the accessibility panel can still take it lower or much higher. */
+
   --a11y-line-height: 1.5;
   --a11y-paragraph-width: none;
 }
@@ -71,17 +60,29 @@
 
 html { scroll-padding-top: 72px; scroll-padding-bottom: 88px; }
 
-/* Consistent, always-visible keyboard focus for every interactive element,
-   including JS-enhanced ones (li[role=button], .portal-option, .room.selectable). */
 :focus-visible {
   outline: var(--focus-ring) solid var(--focus-color);
   outline-offset: 2px;
 }
-/* High-contrast mode: a two-tone ring stays visible on both the black UI and
-   the light hard-coded floorplan room fills. */
+
 .a11y-high-contrast :focus-visible {
   outline-color: #ffffff;
   box-shadow: 0 0 0 5px #000000;
+}
+
+.ac-remote-power-btn:focus-visible {
+  outline: none;
+}
+.ac-remote-power-btn:focus-visible .ac-remote-power-icon {
+  outline: var(--focus-ring) solid var(--focus-color);
+  outline-offset: 3px;
+}
+.a11y-high-contrast .ac-remote-power-btn:focus-visible {
+  box-shadow: none;
+}
+.a11y-high-contrast .ac-remote-power-btn:focus-visible .ac-remote-power-icon {
+  outline-color: #ffffff;
+  box-shadow: 0 0 0 5px #000000, 0 4px 0 var(--ifes-green-dark), 0 8px 16px rgba(0, 0, 0, 0.18);
 }
 [role="button"] { cursor: pointer; }
 button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
@@ -345,8 +346,8 @@ body {
   margin-bottom: 16px;
 }
 
-h1 { font-size: calc(20px * var(--a11y-font-scale)); margin: 0 0 4px; font-weight: 700; letter-spacing: -0.01em; }
-h2 { font-size: calc(16px * var(--a11y-font-scale)); margin: 0 0 4px; font-weight: 600; letter-spacing: -0.005em; }
+h1 { font-size: calc(21px * var(--a11y-font-scale)); margin: 0; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; }
+h2 { font-size: calc(16px * var(--a11y-font-scale)); margin: 0 0 4px; font-weight: 600; letter-spacing: -0.005em; line-height: 1.3; }
 
 .hint { color: var(--text-muted); font-size: calc(14px * var(--a11y-font-scale)); margin: 0 0 16px; }
 
@@ -374,7 +375,7 @@ input, select {
   padding: 10px 12px;
   min-height: var(--tap-min);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: calc(15px * var(--a11y-font-scale));
   font-family: inherit;
   background: var(--surface);
@@ -383,8 +384,26 @@ input, select {
 input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
   border-color: var(--text-muted);
 }
-/* Range sliders manage their own height (accessibility panel). */
+
 input[type="range"] { min-height: 0; }
+
+input[type="text"],
+input[type="password"],
+input[type="search"],
+input[type="email"],
+input[type="url"],
+input[type="tel"],
+select {
+  max-width: 30rem;
+}
+input[type="date"],
+input[type="time"],
+input[type="month"],
+input[type="week"] {
+  max-width: 14rem;
+}
+input[type="number"] { max-width: 10rem; }
+input[type="color"] { max-width: none; }
 
 button.btn, #loginForm button {
   cursor: pointer;
@@ -465,12 +484,14 @@ button.btn:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  gap: 6px 12px;
 }
-/* Let the title take the slack and wrap its own text, so a trailing help
-   button stays beside it instead of pairing with the back link on wrap. */
+
 .screen-head h1 { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+
+.screen-head:has(+ .hint) { margin-bottom: 4px; }
 
 .screen-head-links {
   display: flex;
@@ -495,6 +516,42 @@ button.btn:disabled {
 }
 .link-btn:hover { text-decoration: underline; }
 .link-btn.danger { color: var(--danger); }
+
+.admin-apagar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  min-height: var(--tap-min);
+  font-size: calc(13px * var(--a11y-font-scale));
+  font-weight: 600;
+  cursor: pointer;
+}
+.admin-apagar-btn::before {
+  content: "";
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  background: currentColor;
+  -webkit-mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6l1 2h5v2H3V5h5l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z'/%3E%3C/svg%3E");
+  mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6l1 2h5v2H3V5h5l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z'/%3E%3C/svg%3E");
+}
+.admin-apagar-btn:hover { background: var(--danger); color: #fff; }
+.admin-apagar-btn:focus-visible { outline-offset: 2px; }
+
+.card > .two-col:has(> .admin-apagar-btn) {
+  gap: 10px;
+  max-width: none;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.two-col > .admin-apagar-btn { flex: 0 1 auto; }
 
 .room-list { list-style: none; padding: 0; margin: 0; }
 
@@ -654,10 +711,13 @@ button.btn:disabled {
 .ac-remote-display {
   flex-shrink: 0;
   background: #10241a;
+  color: #eaf5ee;
   border-radius: 16px;
   padding: clamp(8px, 1.6dvh, 14px) 16px;
   box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
 }
+.ac-remote-temp-target { color: #ffffff; }
+.ac-remote-room-temp { color: rgba(234, 245, 238, 0.82); }
 
 .ac-remote-display-top {
   display: flex;
@@ -949,7 +1009,6 @@ button.btn:disabled {
   .simple-grid-andar .simple-tile { max-width: 100%; flex-basis: 100%; }
 }
 
-
 .agenda-actions {
   display: flex;
   gap: 8px;
@@ -1008,8 +1067,6 @@ button.btn:disabled {
   word-break: break-word;
 }
 
-/* Phones: a full-height vertical rail buries the panel content below it.
-   Switch to a horizontal scroll strip so tabs and content are both reachable. */
 @media (max-width: 619px) {
   .admin-layout { display: block; }
   .admin-subtabs {
@@ -1537,8 +1594,7 @@ button.btn:disabled {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px 14px;
 }
-/* Two per row until there is comfortably enough width for the labels to sit
-   on one line beside the icon. */
+
 @media (max-width: 560px) {
   .portal-funcoes-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -1668,7 +1724,8 @@ button.btn:disabled {
   flex-shrink: 0;
 }
 
-.config-list { margin-bottom: 4px; }
+.config-list { margin-bottom: 4px; max-width: 52rem; }
+#adminSub-config #salvarConfigBtn { max-width: 22rem; }
 .config-list-item {
   display: flex;
   gap: 14px;
@@ -1679,7 +1736,7 @@ button.btn:disabled {
 .config-list-icon {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--ifes-green-soft);
   color: var(--ifes-green-dark);
   display: flex;
@@ -1691,7 +1748,24 @@ button.btn:disabled {
 .config-list-content { flex: 1; min-width: 0; }
 .config-list-title { font-weight: 600; font-size: calc(15px * var(--a11y-font-scale)); margin-bottom: 4px; }
 .config-list-desc { font-size: calc(13px * var(--a11y-font-scale)); color: var(--text-muted); margin: 0 0 12px; }
+
+.config-list-desc { max-width: 46rem; }
+.config-list-body {
+  max-width: 34rem;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
 .config-list-body label:first-child { margin-top: 0; }
+.config-list-body .hint:last-child { margin-bottom: 0; }
+.config-list-body .two-col { max-width: 18rem; }
+.config-list-body input[type="number"] { max-width: 7.5rem; }
+.config-list-body input[type="text"],
+.config-list-body input[type="password"],
+.config-list-body select { max-width: 22rem; }
+.config-list-body textarea { max-width: 24rem; }
+.config-list-body .two-col > * { flex-basis: 7rem; }
 
 .fp-tabs {
   display: flex;
@@ -1754,33 +1828,50 @@ button.btn:disabled {
   }
 }
 
-/* Wider viewports: use the horizontal room for list-style pickers instead of
-   one very long narrow column, without letting any single card stretch. */
+#app:has(#screen-propriedade:not(.hidden)) { max-width: 640px; }
+#app:has(#screen-grade:not(.hidden)) { max-width: 600px; }
+#app:has(#screen-location:not(.hidden)) { max-width: 600px; }
+#screen-grade .grade-scroll { max-width: 36rem; }
+#screen-grade > .card,
+#screen-location .card { max-width: 36rem; }
+
+#screen-admin .admin-sub > .card:not(.admin-fp-picker),
+#screen-propriedade .card { max-width: 40rem; }
+#screen-admin .admin-sub > .room-list,
+#screen-admin .admin-sub > .esp32-device-list { max-width: 52rem; }
+
 @media (min-width: 900px) {
   #app:has(#screen-rooms:not(.hidden)) { max-width: 1000px; }
   #app:has(#screen-agenda:not(.hidden)) { max-width: 940px; }
-  /* Keep the create/edit form at a comfortable reading measure even when the
-     screen grows; only the results list spreads across the extra width. */
-  #screen-agenda > .card { max-width: 620px; }
+
+  #screen-agenda > .card { max-width: 34rem; }
   #roomList,
-  #agendaList {
+  #agendaList,
+  #propriedadeUsuariosList,
+  #proprietariosDonosList,
+  #proprietariosAcessoList {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 10px;
     align-items: stretch;
   }
   #roomList li,
-  #agendaList li { margin-bottom: 0; }
+  #agendaList li,
+  #propriedadeUsuariosList li,
+  #proprietariosDonosList li,
+  #proprietariosAcessoList li { margin-bottom: 0; }
 
-  /* Long single-line text controls read poorly when stretched the full width
-     of the admin column. */
-  #screen-admin .card > input:not([type="checkbox"]):not([type="radio"]),
+  #screen-admin .card > input[type="text"],
+  #screen-admin .card > input[type="password"],
+  #screen-admin .card > input[type="search"],
+  #screen-admin .card > input[type="email"],
   #screen-admin .card > select,
-  #screen-admin .card > textarea { max-width: 620px; }
+  #screen-admin .card > textarea { max-width: 30rem; }
+  #screen-admin .card > input[type="date"],
+  #screen-admin .card > input[type="time"] { max-width: 14rem; }
+  #screen-admin .card > input[type="number"] { max-width: 10rem; }
 }
 
-/* The step-by-step "cards" picker is meant to give large targets, not to
-   inflate two tiles to the full height of a large monitor. */
 @media (min-width: 900px) {
   .simple-grid-bloco,
   .simple-grid-andar { align-content: center; }
@@ -1836,7 +1927,7 @@ button.btn:disabled {
   bottom: calc(76px + var(--safe-bottom));
   z-index: 200;
 }
-/* Lift both floating buttons above the bottom tab bar when it is present. */
+
 body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(126px + var(--safe-bottom)); }
 .a11y-toggle-btn {
   width: 48px;
@@ -2072,8 +2163,7 @@ body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(126px + var(--safe-b
   z-index: 200;
 }
 body:has(#mainApp:not(.hidden)) .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
-/* Browsers without :has() can't detect the tab bar; keep both floating buttons
-   clear of where it would sit rather than risk an overlap. */
+
 @supports not selector(:has(*)) {
   .a11y-widget { bottom: calc(126px + var(--safe-bottom)); }
   .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
@@ -2390,9 +2480,10 @@ button, .status-badge, .room-name, .admin-subtab-label {
 
 textarea {
   width: 100%;
+  max-width: 36rem;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: calc(15px * var(--a11y-font-scale));
   background: var(--surface);
   color: var(--text);
@@ -2447,25 +2538,39 @@ textarea {
 }
 
 .ac-remote {
+  --rs: 1;
+  --remote-max: 420px;
   align-items: flex-start;
   min-height: auto;
 }
-/* On taller screens the panel column has slack space below the remote;
-   centre the remote in it instead of leaving a large void. */
+
 @media (min-height: 720px) {
   .ac-remote { align-items: center; }
 }
 
 .ac-remote-body {
-  width: min(100%, 420px);
-  max-width: 420px;
+  width: min(100%, var(--remote-max));
+  max-width: var(--remote-max);
   min-height: auto;
   overflow: visible;
-  gap: clamp(14px, 3vw, 24px);
+  gap: calc(16px * var(--rs));
+  padding: calc(16px * var(--rs)) calc(18px * var(--rs)) calc(18px * var(--rs));
+  border-radius: calc(22px * var(--rs));
+}
+
+.ac-remote-sensor {
+  width: calc(44px * var(--rs));
+  height: calc(7px * var(--rs));
 }
 
 .ac-remote-display {
-  padding: clamp(12px, 3vw, 20px);
+  padding: calc(14px * var(--rs)) calc(16px * var(--rs));
+  border-radius: calc(16px * var(--rs));
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: calc(128px * var(--rs));
 }
 
 .ac-remote-display-top, .ac-remote-display-bottom {
@@ -2473,7 +2578,13 @@ textarea {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: calc(6px * var(--rs)) calc(14px * var(--rs));
+  font-size: calc(12px * var(--rs) * var(--a11y-font-scale));
+}
+
+.ac-remote-conn-dot {
+  width: calc(8px * var(--rs));
+  height: calc(8px * var(--rs));
 }
 
 .ac-remote-display #conexaoValue.status-badge, .ac-remote-display #statusValue.status-badge {
@@ -2481,6 +2592,7 @@ textarea {
   padding: 0;
   border-radius: 0;
   color: rgba(227, 243, 232, 0.72);
+  font-size: calc(12px * var(--rs) * var(--a11y-font-scale));
 }
 
 .ac-remote-display #conexaoValue.on, .ac-remote-display #statusValue.on {
@@ -2488,7 +2600,7 @@ textarea {
 }
 
 .ac-remote-display-bottom {
-  margin-top: 8px;
+  margin-top: calc(8px * var(--rs));
 }
 
 .ac-remote-room-temp {
@@ -2497,25 +2609,25 @@ textarea {
 }
 
 .ac-remote-temp-target {
-  margin: 12px 0 6px;
-  font-size: clamp(42px, calc(54px * var(--a11y-font-scale)), 108px);
-  line-height: var(--a11y-line-height);
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  text-align: center;
+  margin: calc(8px * var(--rs)) 0;
+  font-size: clamp(42px, calc(46px * var(--rs) * var(--a11y-font-scale)), 140px);
+  line-height: 1.1;
   overflow-wrap: anywhere;
 }
 
 .ac-remote-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(76px, auto) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(calc(76px * var(--rs)), auto) minmax(0, 1fr);
   align-items: start;
-  gap: clamp(8px, 3vw, 18px);
+  gap: calc(14px * var(--rs));
 }
 
-/* =========================================================================
-   Mobile: the room controller behaves like a dedicated physical remote —
-   it fills the viewport between the top bar and the tab bar, edge to edge,
-   with every element proportionally sized (clamp + viewport units) so it
-   fits one screen without scrolling on any phone, in either orientation.
-   ========================================================================= */
 @media (max-width: 640px) {
   #app:has(#mainApp:not(.hidden)):has(#screen-panel:not(.hidden)) {
     max-width: none;
@@ -2530,8 +2642,6 @@ textarea {
     gap: 4px;
   }
 
-  /* Compact single-line header; the "← Salas" return control stays pinned
-     top-left and never overlaps the remote. */
   #screen-panel .screen-head {
     margin-bottom: 0;
     gap: 8px;
@@ -2551,7 +2661,7 @@ textarea {
   #screen-panel .lock-banner,
   #screen-panel .aviso-inline { flex: 0 0 auto; margin-bottom: 0; }
 
-  .ac-remote { align-items: stretch; flex: 1 1 auto; min-height: 0; }
+  .ac-remote { --rs: 1; align-items: stretch; flex: 1 1 auto; min-height: 0; }
 
   .ac-remote-body {
     width: 100%;
@@ -2563,10 +2673,8 @@ textarea {
     padding: clamp(10px, 1.8vh, 16px) clamp(12px, 4vw, 20px) clamp(12px, 1.8vh, 16px);
     border-radius: clamp(18px, 5vw, 26px);
   }
-  .ac-remote-sensor { flex: 0 0 auto; }
-  /* The dark panel behaves like a real device screen: it grows to fill the
-     remote face, with the mode row pinned top, set-point centred, and the
-     ambient/state row pinned bottom — no dead space. */
+  .ac-remote-sensor { flex: 0 0 auto; width: 44px; height: 7px; }
+
   .ac-remote-display {
     flex: 1 1 auto;
     min-height: 0;
@@ -2587,15 +2695,10 @@ textarea {
   .ac-remote-turbo-btn { min-height: clamp(44px, 6.5vh, 56px); }
   .ac-remote-power-icon { width: clamp(54px, 14vw, 88px); }
 
-  /* The floating help / accessibility buttons would sit on top of the remote
-     controls here; the header keeps its own "?" and the accessibility panel
-     stays available from every other screen. */
   body:has(#screen-panel:not(.hidden)) .a11y-widget,
   body:has(#screen-panel:not(.hidden)) .help-fab-widget { display: none; }
 }
 
-/* Landscape phones: wide and short — lay the display beside the controls so
-   nothing is clipped and the big number still reads. */
 @media (max-width: 900px) and (orientation: landscape) and (max-height: 520px) {
   #app:has(#mainApp:not(.hidden)):has(#screen-panel:not(.hidden)) {
     max-width: none;
@@ -2610,7 +2713,7 @@ textarea {
   #screen-panel .screen-head { margin-bottom: 0; flex: 0 0 auto; }
   #screen-panel .screen-head h1 { font-size: clamp(13px, 3.4vw, 17px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .ac-remote { align-items: stretch; flex: 1 1 auto; min-height: 0; }
+  .ac-remote { --rs: 1; align-items: stretch; flex: 1 1 auto; min-height: 0; }
   .ac-remote-body {
     flex-direction: row;
     align-items: stretch;
@@ -2619,6 +2722,7 @@ textarea {
     min-height: 0;
     gap: clamp(8px, 2vw, 16px);
     padding: clamp(6px, 3vh, 12px) clamp(10px, 2.5vw, 18px);
+    border-radius: clamp(16px, 4vw, 24px);
   }
   .ac-remote-sensor { display: none; }
   .ac-remote-display {
@@ -2654,16 +2758,20 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 14px;
+  gap: calc(12px * var(--rs, 1));
 }
 
 .ac-remote-power-btn {
   width: auto;
   height: auto;
-  min-width: 76px;
+  min-width: calc(76px * var(--rs, 1));
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: calc(7px * var(--rs, 1));
+  padding: 0;
+  border: none;
+  -webkit-appearance: none;
+  appearance: none;
   background: transparent;
   color: var(--text);
   box-shadow: none;
@@ -2675,7 +2783,7 @@ textarea {
 }
 
 .ac-remote-power-icon {
-  width: clamp(58px, calc(64px * var(--a11y-font-scale)), 92px);
+  width: clamp(56px, calc(58px * var(--rs, 1) * var(--a11y-font-scale)), 132px);
   aspect-ratio: 1;
   border-radius: 50%;
   display: flex;
@@ -2684,18 +2792,18 @@ textarea {
   align-self: center;
   background: #e2734a;
   color: #fff;
-  box-shadow: 0 4px 0 #b04f2c, 0 8px 16px rgba(0, 0, 0, 0.18);
-  font-size: calc(23px * var(--a11y-font-scale));
+  box-shadow: 0 calc(4px * var(--rs, 1)) 0 #b04f2c, 0 calc(8px * var(--rs, 1)) calc(16px * var(--rs, 1)) rgba(0, 0, 0, 0.18);
+  font-size: calc(23px * var(--rs, 1) * var(--a11y-font-scale));
 }
 
 .ac-remote-power-btn.is-on .ac-remote-power-icon {
   background: var(--ifes-green);
-  box-shadow: 0 4px 0 var(--ifes-green-dark), 0 8px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 calc(4px * var(--rs, 1)) 0 var(--ifes-green-dark), 0 calc(8px * var(--rs, 1)) calc(16px * var(--rs, 1)) rgba(0, 0, 0, 0.18);
 }
 
 .ac-remote-control-label {
   display: block;
-  font-size: calc(12px * var(--a11y-font-scale));
+  font-size: calc(12px * var(--rs, 1) * var(--a11y-font-scale));
   font-weight: 700;
   color: var(--text-muted);
   text-align: center;
@@ -2705,10 +2813,10 @@ textarea {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--ifes-green-dark);
-  border-radius: 16px;
-  padding: 12px 8px;
-  min-height: calc(76px * var(--a11y-font-scale));
-  box-shadow: 0 3px 0 var(--border), 0 5px 10px rgba(0, 0, 0, 0.08);
+  border-radius: calc(16px * var(--rs, 1));
+  padding: calc(12px * var(--rs, 1)) calc(8px * var(--rs, 1));
+  min-height: calc(72px * var(--rs, 1) * var(--a11y-font-scale));
+  box-shadow: 0 calc(3px * var(--rs, 1)) 0 var(--border), 0 calc(5px * var(--rs, 1)) calc(10px * var(--rs, 1)) rgba(0, 0, 0, 0.08);
   cursor: pointer;
 }
 
@@ -2718,24 +2826,37 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: calc(5px * var(--rs, 1));
 }
 
 .ac-remote-control-symbol {
-  font-size: calc(30px * var(--a11y-font-scale));
+  font-size: calc(28px * var(--rs, 1) * var(--a11y-font-scale));
   font-weight: 700;
   line-height: 1;
 }
 
 .ac-remote-turbo-btn {
-  min-height: calc(46px * var(--a11y-font-scale));
-  font-size: calc(13px * var(--a11y-font-scale));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(8px * var(--rs, 1));
+  min-height: calc(44px * var(--rs, 1) * var(--a11y-font-scale));
+  font-size: calc(13px * var(--rs, 1) * var(--a11y-font-scale));
   font-weight: 700;
+  background: var(--warn-soft);
+  border-color: #e6d7a8;
+  color: var(--warn);
+}
+
+.ac-remote-turbo-icon {
+  width: calc(17px * var(--rs, 1) * var(--a11y-font-scale));
+  height: calc(17px * var(--rs, 1) * var(--a11y-font-scale));
+  flex-shrink: 0;
 }
 
 .ac-remote-turbo-btn.is-on {
-  background: var(--ifes-green);
-  border-color: var(--ifes-green-dark);
+  background: var(--warn);
+  border-color: var(--warn);
   color: #fff;
 }
 
@@ -2777,8 +2898,7 @@ textarea {
   overflow-x: auto;
   align-items: stretch;
 }
-/* Keep the bottom bar aligned with the content column. These live here, after
-   the base `.tabbar { max-width: 480px }`, so the responsive widths actually win. */
+
 @media (min-width: 700px) { .tabbar { max-width: 640px; } }
 @media (min-width: 1000px) { .tabbar { max-width: 760px; } }
 
@@ -2787,8 +2907,7 @@ textarea {
   line-height: var(--a11y-line-height);
   overflow-wrap: anywhere;
 }
-/* Very narrow phones with all five tabs visible: shrink the label rather than
-   wrapping or forcing a horizontal scroll. */
+
 @media (max-width: 400px) {
   .tab-btn { font-size: calc(12.5px * var(--a11y-font-scale)); padding: 13px 4px; }
 }
@@ -2815,4 +2934,88 @@ textarea {
 @media (min-width: 700px) {
   #screen-panel.screen, #screen-simple.screen { min-height: calc(100dvh - 150px); }
   .simple-grid-sala { overflow: visible; }
+}
+
+@media (min-width: 700px)  { .ac-remote { --rs: 1.16; --remote-max: 468px; } }
+@media (min-width: 760px)  { .ac-remote { --rs: 1.26; --remote-max: 500px; } }
+@media (min-width: 1024px) { .ac-remote { --rs: 1.36; --remote-max: 536px; } }
+@media (min-width: 1280px) { .ac-remote { --rs: 1.5;  --remote-max: 580px; } }
+@media (min-width: 1600px) { .ac-remote { --rs: 1.66; --remote-max: 636px; } }
+@media (min-width: 1920px) { .ac-remote { --rs: 1.8;  --remote-max: 692px; } }
+
+@media (min-width: 1024px) and (max-height: 940px) { .ac-remote { --rs: 1.34; --remote-max: 520px; } }
+@media (min-width: 1024px) and (max-height: 840px) { .ac-remote { --rs: 1.2;  --remote-max: 496px; } }
+@media (min-width: 1024px) and (max-height: 760px) { .ac-remote { --rs: 1.08; --remote-max: 468px; } }
+@media (min-width: 1024px) and (max-height: 680px) { .ac-remote { --rs: 0.98; --remote-max: 452px; } }
+@media (min-width: 700px)  and (max-height: 620px) { .ac-remote { --rs: 0.94; --remote-max: 440px; } }
+
+@media (min-width: 700px) and (min-height: 560px) {
+  .ac-remote { align-items: center; }
+
+  .ac-remote-body {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: calc(560px * var(--rs));
+    gap: min(calc(14px * var(--rs)), 1.8vh);
+    padding: min(calc(16px * var(--rs)), 2.2vh) calc(18px * var(--rs)) min(calc(18px * var(--rs)), 2.4vh);
+  }
+
+  .ac-remote-display {
+    flex: 1 1 auto;
+    min-height: min(calc(104px * var(--rs)), 16vh);
+    overflow: hidden;
+  }
+
+  .ac-remote-controls {
+    display: grid;
+    grid-template-columns: auto minmax(0, calc(300px * var(--rs)));
+    grid-template-rows: auto auto;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    gap: min(calc(11px * var(--rs)), 1.6vh) calc(18px * var(--rs));
+  }
+
+  .ac-remote-center-controls {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: min(calc(12px * var(--rs)), 1.5vh);
+  }
+
+  .ac-remote-power-btn {
+    min-width: 0;
+    gap: min(calc(6px * var(--rs)), 0.9vh);
+  }
+
+  #tempUp { grid-column: 2; grid-row: 1; }
+  #tempDown { grid-column: 2; grid-row: 2; }
+
+  .ac-remote-temp-btn {
+    flex-direction: row;
+    justify-content: center;
+    gap: calc(12px * var(--rs));
+    width: 100%;
+    min-height: min(calc(52px * var(--rs) * var(--a11y-font-scale)), 9vh);
+    padding: min(calc(10px * var(--rs)), 1.3vh) calc(10px * var(--rs));
+  }
+
+  .ac-remote-temp-btn .ac-remote-control-symbol { font-size: calc(24px * var(--rs) * var(--a11y-font-scale)); }
+  .ac-remote-temp-btn .ac-remote-control-label { font-size: calc(13px * var(--rs) * var(--a11y-font-scale)); }
+
+  .ac-remote-turbo-btn {
+    width: 100%;
+    min-height: min(calc(40px * var(--rs) * var(--a11y-font-scale)), 6.5vh);
+  }
+
+  .ac-remote-power-icon {
+    width: min(clamp(80px, calc(104px * var(--rs) * var(--a11y-font-scale)), 216px), 16vh);
+    font-size: calc(30px * var(--rs) * var(--a11y-font-scale));
+  }
+
+  .ac-remote-power-btn .ac-remote-control-label { font-size: calc(13px * var(--rs) * var(--a11y-font-scale)); }
 }
