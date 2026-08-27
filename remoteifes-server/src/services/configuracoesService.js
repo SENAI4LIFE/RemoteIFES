@@ -13,7 +13,7 @@ const PADROES = {
   temperaturaMinima: 23,
   temperaturaMaxima: 25,
   turboFuncaoExtra: "nenhuma",
-  modoTeste: true,
+  modoTeste: process.env.NODE_ENV !== "production",
   redesAutorizadas: [],
   modoManutencao: false,
 };

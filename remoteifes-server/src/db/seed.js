@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const db = require("../config/database");
 
 const SALAS_CAMPUS = require("./salasCampus");
@@ -30,7 +31,15 @@ function popularAdmin() {
   const existe = db.prepare("SELECT id FROM usuarios WHERE usuario = ?").get("admin");
   if (existe) return;
 
-  const senhaInicial = process.env.SENHA_ADMIN_INICIAL || "admin";
+  const senhaConfigurada = process.env.SENHA_ADMIN_INICIAL;
+  const senhaInicial = senhaConfigurada || (
+    process.env.NODE_ENV === "production"
+      ? crypto.randomBytes(18).toString("base64url")
+      : "admin"
+  );
+  if (process.env.NODE_ENV === "production" && senhaInicial.length < 8) {
+    throw new Error("SENHA_ADMIN_INICIAL deve ter ao menos 8 caracteres em produção");
+  }
   const senhaHash = bcrypt.hashSync(senhaInicial, 10);
   db.prepare(`
     INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)

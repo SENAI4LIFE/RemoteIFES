@@ -86,6 +86,7 @@ function criarSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       agendamentoId INTEGER NOT NULL REFERENCES agendamentos(id),
       tipo TEXT NOT NULL,
+      dataExecucao TEXT,
       executadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -134,6 +135,7 @@ function criarSchema() {
 
   migrarColunasUsuarios();
   migrarColunasAgendamentos();
+  migrarColunasAgendamentosExecucoes();
   migrarColunasSalas();
   removerTabelasObsoletas();
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL`);
@@ -174,6 +176,13 @@ function migrarColunasAgendamentos() {
         db.exec(`ALTER TABLE agendamentos DROP COLUMN ${antiga}`);
       } catch (erro) {}
     }
+  }
+}
+
+function migrarColunasAgendamentosExecucoes() {
+  const colunas = db.prepare(`PRAGMA table_info(agendamentos_execucoes)`).all().map((c) => c.name);
+  if (!colunas.includes("dataExecucao")) {
+    db.exec(`ALTER TABLE agendamentos_execucoes ADD COLUMN dataExecucao TEXT`);
   }
 }
 
