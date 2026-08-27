@@ -131,6 +131,29 @@ function criarSchema() {
       criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS relatos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuarioId INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+      usuarioNome TEXT,
+      usuarioLogin TEXT,
+      titulo TEXT NOT NULL,
+      descricao TEXT NOT NULL,
+      categoria TEXT NOT NULL DEFAULT 'outro',
+      sala TEXT,
+      pagina TEXT,
+      contexto TEXT,
+      status TEXT NOT NULL DEFAULT 'novo',
+      resposta TEXT,
+      revisadoPor INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+      revisadoEm TEXT,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_relatos_status ON relatos(status);
+    CREATE INDEX IF NOT EXISTS idx_relatos_usuario ON relatos(usuarioId);
+    CREATE INDEX IF NOT EXISTS idx_relatos_criado ON relatos(criadoEm);
+
   `);
 
   migrarColunasUsuarios();

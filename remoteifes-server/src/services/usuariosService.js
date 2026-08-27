@@ -7,6 +7,18 @@ const NIVEL_USUARIO = 1;
 const NIVEL_ADMIN = 2;
 const NIVEL_SUPERADMIN = 3;
 
+const SENHA_MIN = 8;
+const SENHA_MAX = 128;
+
+function validarSenha(senha) {
+  if (typeof senha !== "string" || senha.length < SENHA_MIN) {
+    throw new Error(`senha deve ter ao menos ${SENHA_MIN} caracteres`);
+  }
+  if (senha.length > SENHA_MAX) {
+    throw new Error(`senha deve ter no máximo ${SENHA_MAX} caracteres`);
+  }
+}
+
 function paraSaida(u) {
   return {
     id: u.id,
@@ -41,7 +53,7 @@ function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
     throw new Error("apenas o administrador principal pode conceder privilégios de administrador");
   }
 
-  if (!senha || senha.length < 8) throw new Error("senha deve ter ao menos 8 caracteres");
+  validarSenha(senha);
 
   const nivel = isAdmin ? NIVEL_ADMIN : NIVEL_USUARIO;
   const senhaHash = bcrypt.hashSync(senha, 10);
@@ -145,7 +157,7 @@ function trocarSenha(id, novaSenha, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   exigirPermissaoSobreAlvo(usuario, requisitante);
-  if (!novaSenha || novaSenha.length < 8) throw new Error("senha deve ter ao menos 8 caracteres");
+  validarSenha(novaSenha);
   const senhaHash = bcrypt.hashSync(novaSenha, 10);
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE id = ?`).run(senhaHash, id);
   removerSessoesDoUsuario(id);
@@ -178,6 +190,8 @@ module.exports = {
   NIVEL_USUARIO,
   NIVEL_ADMIN,
   NIVEL_SUPERADMIN,
+  SENHA_MIN,
+  SENHA_MAX,
   listar,
   buscarPorUsuario,
   buscarPorId,

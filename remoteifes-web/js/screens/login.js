@@ -99,6 +99,7 @@ function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
   mostrarTelaAcesso("mainApp");
 
   if (resp.isAdmin) Notificacoes.iniciar();
+  Relatos.aoLogar();
 
   IdleTimer.iniciar(resp.timeoutInatividadeMinutos, resp.popupAvisoSegundos);
   RTStatus.conectar();
@@ -146,6 +147,7 @@ function realizarLogout({ manterTela = false } = {}) {
   if (typeof SimpleWizard !== "undefined") SimpleWizard.pararAutoRefresh();
   if (typeof ScreenFloorplan !== "undefined") ScreenFloorplan.aoFechar();
   Notificacoes.pararPolling();
+  Relatos.aoDeslogar();
   RTStatus.desconectar();
   if (typeof ServerStatus !== "undefined") ServerStatus.reconectarComTokenAtual();
   state.usuario = null;
