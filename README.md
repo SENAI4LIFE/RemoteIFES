@@ -41,6 +41,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Grade de Horários](#grade-de-horários)
 - [Limites de Temperatura e Turbo](#limites-de-temperatura-e-turbo)
 - [Notificações](#notificações)
+- [Relatos de Problema](#relatos-de-problema)
 - [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade)
 - [Auditoria (Logs, Dispositivos e Acessos)](#auditoria-logs-dispositivos-e-acessos)
 - [Restrição de Rede](#restrição-de-rede)
@@ -87,9 +88,9 @@ O sistema tem três níveis de usuário:
 
 | Nível | Papel | Pode |
 |---|---|---|
-| 1 | Usuário comum | Ligar/desligar e ajustar a temperatura das salas liberadas para controle |
-| 2 | Administrador | Tudo do nível 1, além de gerenciar agendamentos, grade de horários, notificações, sessões, logs, dispositivos e usuários comuns |
-| 3 | Administrador principal (superadmin) | Tudo do nível 2, além de alterar configurações globais, limites globais e por sala, função extra do Turbo, redes autorizadas, modo de teste, cadastro de ESP32 por MAC e o painel avançado de cada ESP32 (`Admin > ESP32`) |
+| 1 | Usuário comum | Ligar/desligar e ajustar a temperatura das salas liberadas para controle; enviar relatos de problema pelo ícone de inseto no topo |
+| 2 | Administrador | Tudo do nível 1, além de gerenciar agendamentos, grade de horários, notificações de dispositivos, sessões, logs, dispositivos e usuários comuns |
+| 3 | Administrador principal (superadmin) | Tudo do nível 2, além de alterar configurações globais, limites globais e por sala, função extra do Turbo, redes autorizadas, modo de teste, cadastro de ESP32 por MAC, o painel avançado de cada ESP32 (`Admin > ESP32`) e a caixa de relatos de problema enviados pelos usuários |
 
 Além dos três níveis, existe uma permissão pontual, independente de nível: um usuário comum pode ser tornado **proprietário** de uma ou mais salas específicas, o que lhe permite conceder e revogar o acesso de controle de outros usuários apenas àquelas salas, sem se tornar administrador (veja [Controle de Acesso e Proprietários de Sala](#controle-de-acesso-e-proprietários-de-sala)).
 
@@ -163,13 +164,22 @@ O Turbo transmite o modo turbo suportado pelo protocolo IR da sala. Em `Admin > 
 
 ## Notificações
 
-Administradores recebem notificações no sino exibido no topo da interface, atualizado por consulta periódica ao servidor. Atualmente o sistema gera notificações automaticamente quando um ESP32 que estava online fica offline (timeout de heartbeat). O painel permite:
+O topo da interface tem dois indicadores com significados distintos, cada um com seu rótulo acessível:
 
-- Ver a lista de notificações mais recentes, com data/hora.
-- Marcar uma notificação individual como lida (ao clicar nela).
-- Marcar todas como lidas de uma vez.
+- **Sino** — notificações de dispositivos/ESP32, visível apenas a administradores. Atualmente o sistema gera uma notificação automática quando um ESP32 que estava online fica offline (timeout de heartbeat). O painel permite ver a lista mais recente com data/hora, marcar uma notificação como lida (ao clicar nela) e marcar todas de uma vez. O ponto vermelho no sino reflete a contagem de não lidas.
+- **Inseto (bug)** — relatos de problema enviados pelos usuários (veja a seção abaixo).
 
-O indicador (ponto vermelho) no sino reflete a contagem de notificações não lidas.
+## Relatos de Problema
+
+Qualquer usuário autenticado pode abrir o painel do ícone de inseto no topo e enviar um **relato de problema**. O formulário estilizado (não usa `prompt()`/`alert()` do navegador) pede um título curto, uma categoria, opcionalmente a sala relacionada e uma descrição do que aconteceu. Junto do relato o servidor registra automaticamente apenas contexto não sensível: usuário que enviou, data/hora, página em uso, tamanho da tela, `User-Agent` e idioma do navegador. Senhas, tokens e segredos nunca são coletados; todo o conteúdo é validado, limitado em tamanho e sanitizado no backend, e cliques repetidos no botão de envio não geram relatos duplicados.
+
+Cada relato guarda: id único, usuário (com nome/login preservados mesmo se a conta for removida depois), data de criação e de última atualização, categoria, sala/página, contexto técnico, status e a resposta/anotação da equipe.
+
+O usuário comum vê no mesmo painel apenas os **próprios** relatos e o status de cada um. O **administrador principal** (superadmin) vê a caixa global: contadores por status, filtros (novos, abertos, em análise, resolvidos), abertura de cada relato com autor, horário e detalhes, e as ações de marcar em análise, resolver ou reabrir, com uma resposta opcional que fica visível ao autor. Abrir um relato ainda `novo` o marca automaticamente como `aberto`. O ícone de inseto do superadmin exibe um contador discreto com a quantidade de relatos novos ainda não vistos.
+
+A lista global e os relatos de terceiros são bloqueados no backend (`exigirSuperAdmin`), não apenas escondidos na interface — um usuário comum recebe `403` ao tentar acessá-los diretamente.
+
+A tabela `relatos` é criada automaticamente na inicialização do servidor (`CREATE TABLE IF NOT EXISTS`), tanto em instalações novas quanto nas já existentes; não é preciso rodar nenhuma migração manual.
 
 ## Sessões e Tempo de Inatividade
 
@@ -203,7 +213,8 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do administrador principal no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
 - **Ponto de acesso de configuração**: a rede aberta `RemoteIFES-Setup` existe somente no primeiro provisionamento ou depois de um reset explícito de Wi-Fi. Ela deve ser usada localmente, e o ESP32 volta ao modo de operação depois que a rede e o servidor são salvos.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
-- **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`) e comandos manuais (`/comando`) têm limites por IP para reduzir força bruta e tempestades de comando; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood). O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
+- **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood). O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
+- **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
 - **Cabeçalhos HTTP**: todas as respostas incluem `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy`; em produção (`NODE_ENV=production`) também `Strict-Transport-Security`.
 - **CORS**: em produção, restrito às origens listadas em `CORS_ORIGIN`.
 - **Erros**: respostas de erro nunca incluem stack trace nem detalhes internos; exceções não tratadas são registradas apenas no log do servidor.
@@ -602,9 +613,9 @@ remoteifes-server/
     config/           conexão com o banco SQLite
     db/                schema, seed e a lista de salas reais do campus (salasCampus.js)
     middlewares/       autenticação, permissões, restrição de rede
-    routes/            rotas HTTP (login, salas, comandos, agendamentos, admin, dispositivo)
+    routes/            rotas HTTP (login, salas, comandos, agendamentos, admin, dispositivo, relatos)
     services/          regras de negócio (usuários, salas, agendamentos,
-                        configurações, notificações, sessões/tokens, status em tempo real)
+                        configurações, notificações, relatos de problema, sessões/tokens, status em tempo real)
     scheduler/         verificação periódica de agendamentos, timeouts de ESP32 e sessões abandonadas
     utils/             funções auxiliares (data/hora em fuso de Brasília, rate limiting, faixas de rede)
 
@@ -621,6 +632,7 @@ remoteifes-web/
     rtstatus.js        cliente WebSocket para status em tempo real
     idle-timer.js      timeout de inatividade e aviso de logout automático
     a11y.js            widget de acessibilidade (fonte, contraste, espaçamento etc.), persiste no localStorage
+    ui-dialog.js       modais/diálogos estilizados do sistema (confirmação, texto, troca de senha) — substituem prompt()/confirm()/alert()
     floorplan.js        componente reutilizável de planta baixa com zoom (usado na tela de salas e no admin)
     help.js            conteúdo dos modais de ajuda contextual espalhados pela interface
     tempo.js           formatação de datas/horas no fuso de Brasília
@@ -630,7 +642,9 @@ remoteifes-web/
                         floorplan.js (planta baixa), panel.js (painel de controle de uma sala),
                         schedule.js (agendamentos), grade.js (grade de horários),
                         propriedade.js (config. de salas para proprietários),
-                        notifications.js (painel de notificações), login.js (portal e sessão),
+                        notifications.js (painel do sino, notificações de dispositivos),
+                        relatos.js (ícone de inseto: envio de relatos e caixa global do administrador principal),
+                        login.js (portal e sessão),
                         portal-funcoes.js (vitrine de funcionalidades na tela inicial), admin.js (painel administrativo),
                         esp32-admin.js (painel avançado de cada ESP32, aba "ESP32", restrito ao administrador principal)
 

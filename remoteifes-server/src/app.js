@@ -61,6 +61,7 @@ app.use(require("./routes/comandoRoutes"));
 app.use(require("./routes/agendamentoRoutes"));
 app.use(require("./routes/adminRoutes"));
 app.use(require("./routes/esp32AdminRoutes"));
+app.use(require("./routes/relatoRoutes"));
 
 app.get("/", (req, res) => res.json({ ok: true, servico: "RemoteIFES API" }));
 

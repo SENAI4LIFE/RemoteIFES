@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=9" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
 </head>
 <body>
 
@@ -38,18 +38,25 @@
     </button>
     <div class="topbar-right">
       <div id="notifWrap" class="notif-wrap hidden">
-        <button type="button" id="notifBellBtn" class="notif-bell-btn" aria-label="Notificações">
-          🔔
-          <span id="notifDot" class="notif-dot hidden"></span>
+        <button type="button" id="notifBellBtn" class="notif-bell-btn" aria-label="Notificações de dispositivos" aria-haspopup="true" aria-expanded="false" title="Notificações de dispositivos (ESP32)">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6.36-6.4V10a6.36 6.36 0 0 0-4.9-6.19V3a1.46 1.46 0 0 0-2.92 0v.81A6.36 6.36 0 0 0 5.64 10v5.6L4 17.23V18h16v-.77l-1.64-1.63Z"/></svg>
+          <span id="notifDot" class="notif-dot hidden" aria-hidden="true"></span>
         </button>
         <div id="notifPanel" class="notif-panel hidden">
           <div class="notif-panel-head">
-            <h3>Notificações</h3>
+            <h3>Notificações de dispositivos</h3>
             <button type="button" id="notifMarcarTodasBtn" class="link-btn">marcar todas como lidas</button>
           </div>
           <ul id="notifList" class="notif-list"></ul>
           <p id="notifEmpty" class="hint notif-empty hidden">nenhuma notificação por enquanto</p>
         </div>
+      </div>
+      <div id="bugWrap" class="bug-wrap hidden">
+        <button type="button" id="bugReportBtn" class="bug-report-btn" aria-label="Relatar um problema" aria-haspopup="dialog" aria-expanded="false" title="Relatar um problema">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M20 8h-2.81a5.99 5.99 0 0 0-1.82-1.96l1.31-1.31-1.42-1.42-1.75 1.76A6.05 6.05 0 0 0 12 4.75c-.5 0-.99.07-1.46.2L8.79 3.19 7.37 4.61l1.31 1.31A5.99 5.99 0 0 0 6.86 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81a6 6 0 0 0 10.38 0H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8Zm-7 9h-2v-6h2v6Z"/></svg>
+          <span id="bugReportBadge" class="bug-report-badge hidden" aria-hidden="true"></span>
+        </button>
+        <div id="relatosPanel" class="relatos-panel hidden" role="region" aria-label="Relatos de problemas"></div>
       </div>
       <span id="userTag" class="user-tag hidden"></span>
       <button id="logoutBtn" class="link-btn hidden">Sair</button>
@@ -1170,8 +1177,10 @@
   <script src="js/nav.js"></script>
   <script src="js/idle-timer.js"></script>
   <script src="js/a11y.js"></script>
+  <script src="js/ui-dialog.js"></script>
   <script src="js/help.js"></script>
   <script src="js/screens/notifications.js"></script>
+  <script src="js/screens/relatos.js"></script>
   <script src="js/screens/login.js"></script>
   <script src="js/screens/portal-funcoes.js"></script>
   <script src="js/screens/location.js"></script>
