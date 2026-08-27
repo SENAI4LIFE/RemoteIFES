@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 const CACHE_NAME = `remoteifes-shell-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -68,11 +68,6 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // API responses must never enter the app-shell cache. In a same-origin
-  // deployment, caching `/me` or `/status?sala=...` would leak one user's
-  // authenticated response to another user and ignore query-string changes.
-  // Requests made through fetch() have an empty destination, while browser
-  // loads of shell assets have destinations such as script/style/image.
   if (request.destination === "") return;
 
   event.respondWith(
