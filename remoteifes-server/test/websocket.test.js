@@ -92,6 +92,15 @@ test("conexão autenticada recebe a lista de salas", async () => {
   cliente.ws.close();
 });
 
+test("frame acima do limite de payload derruba a conexão sem processar", async () => {
+  const cliente = criarClienteComFila();
+  await cliente.aberta();
+  await cliente.proximaMensagem();
+  cliente.ws.send("x".repeat(9 * 1024));
+  const codigo = await cliente.fechada();
+  assert.equal(codigo, 1009);
+});
+
 test("mensagens de observar acima do limite por janela derrubam a conexão", async () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-ws-flood", senha: "senhaSegura123", nome: "Usuário Flood", podeControlar: true },

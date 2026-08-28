@@ -60,15 +60,15 @@ const Schedule = {
       const souDono = a.usuarioLogin === state.usuario;
       const podeGerenciar = souDono || state.isAdmin;
       const detalheModo = a.modo === "ligar_intervalo"
-        ? `${MODO_NOME[a.modo]} (${a.ligarInicio}–${a.ligarFim})`
+        ? `${MODO_NOME[a.modo]} (${escapeHtml(a.ligarInicio)}–${escapeHtml(a.ligarFim)})`
         : MODO_NOME[a.modo] || MODO_NOME.ligar_completo;
-      const dataFormatada = a.data.split("-").reverse().join("/");
+      const dataFormatada = escapeHtml(String(a.data).split("-").reverse().join("/"));
 
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${escapeHtml(RoomsData.rotulo(a.sala))} · ${dataFormatada} · ${a.horaInicio}–${a.horaFim}</div>
-          <div class="room-sub">${a.temperatura}°C · ${detalheModo} · por ${escapeHtml(a.usuarioNome)}${souDono ? " (você)" : ""}</div>
+          <div class="room-name">${escapeHtml(RoomsData.rotulo(a.sala))} · ${dataFormatada} · ${escapeHtml(a.horaInicio)}–${escapeHtml(a.horaFim)}</div>
+          <div class="room-sub">${escapeHtml(String(a.temperatura))}°C · ${detalheModo} · por ${escapeHtml(a.usuarioNome)}${souDono ? " (você)" : ""}</div>
         </div>
         <div class="agenda-actions">
           ${podeGerenciar ? `<button type="button" class="link-btn agenda-toggle">${a.ativo ? "desativar" : "ativar"}</button>` : ""}

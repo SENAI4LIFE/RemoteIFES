@@ -32,7 +32,15 @@ function obter() {
   const linhas = db.prepare(`SELECT chave, valor FROM configuracoes`).all();
   const armazenado = {};
   for (const { chave, valor } of linhas) {
-    armazenado[chave] = valor === null ? null : JSON.parse(valor);
+    if (valor === null) {
+      armazenado[chave] = null;
+      continue;
+    }
+    try {
+      armazenado[chave] = JSON.parse(valor);
+    } catch (erro) {
+      logger.warn("configuracao-valor-invalido", { chave, mensagem: erro.message });
+    }
   }
   return { ...PADROES, ...armazenado };
 }

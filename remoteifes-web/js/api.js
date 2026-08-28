@@ -1,7 +1,25 @@
 const SERVER_URL = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || window.location.origin;
 const CHAVE_TOKEN = "remoteifes_token";
 
-let authToken = localStorage.getItem(CHAVE_TOKEN) || null;
+// localStorage pode lançar (modo privado antigo, armazenamento desativado ou
+// cheio); nesses casos a sessão simplesmente não persiste entre recarregamentos.
+function lerTokenArmazenado() {
+  try {
+    return localStorage.getItem(CHAVE_TOKEN) || null;
+  } catch (err) {
+    return null;
+  }
+}
+function gravarTokenArmazenado(valor) {
+  try {
+    if (valor) localStorage.setItem(CHAVE_TOKEN, valor);
+    else localStorage.removeItem(CHAVE_TOKEN);
+  } catch (err) {
+    /* sessão fica apenas em memória nesta aba */
+  }
+}
+
+let authToken = lerTokenArmazenado();
 
 function headersComToken(extra = {}) {
   return authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
@@ -16,7 +34,7 @@ async function chamar(path, options = {}) {
   }
   if (res.status === 401 && authToken) {
     authToken = null;
-    localStorage.removeItem(CHAVE_TOKEN);
+    gravarTokenArmazenado(null);
     window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
   }
   let data;
@@ -52,7 +70,7 @@ const Api = {
     });
     if (data.ok) {
       authToken = data.token;
-      localStorage.setItem(CHAVE_TOKEN, data.token);
+      gravarTokenArmazenado(data.token);
     }
     return data;
   },
@@ -63,7 +81,7 @@ const Api = {
       await chamar("/logout", { method: "POST", headers: headersComToken() });
     } catch (err) {}
     authToken = null;
-    localStorage.removeItem(CHAVE_TOKEN);
+    gravarTokenArmazenado(null);
   },
 
   async listarSalas({ bloco, andar } = {}) {

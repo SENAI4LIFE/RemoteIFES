@@ -5,7 +5,9 @@ const Esp32Admin = (() => {
   let dispositivos = [];
   let salaObservada = null;
   let pararOuvirMensagens = null;
+  let pararOuvirConexao = null;
   let intervaloAtualizacao = null;
+  let carregando = false;
 
   const MODO_ROTULOS = {
     operation: "operação",
@@ -200,7 +202,6 @@ const Esp32Admin = (() => {
     const item = dispositivos.find((d) => d.sala === sala);
     if (!item) return;
     item.dispositivo = estado;
-    item.online = !!estado.conectado || item.online;
     render();
   }
 
@@ -225,29 +226,44 @@ const Esp32Admin = (() => {
   }
 
   function observarTodasAsSalas() {
-    dispositivos.forEach((d) => {
-      if (d.mac) ServerStatus.enviar({ tipo: "observar_dispositivo", sala: d.sala });
-    });
+    const salas = dispositivos.filter((d) => d.mac).map((d) => d.sala);
+    ServerStatus.enviar({ tipo: "observar_dispositivos", salas });
   }
 
   async function carregar() {
-    dispositivos = await Api.listarDispositivosEsp32();
-    if (!Array.isArray(dispositivos)) dispositivos = [];
-    render();
-    observarTodasAsSalas();
+    if (carregando) return;
+    carregando = true;
+    try {
+      dispositivos = await Api.listarDispositivosEsp32();
+      if (!Array.isArray(dispositivos)) dispositivos = [];
+      render();
+      observarTodasAsSalas();
+    } finally {
+      carregando = false;
+    }
   }
 
   async function aoAbrir() {
     if (!state.isSuperAdmin) return;
-    await carregar();
     if (!pararOuvirMensagens) pararOuvirMensagens = ServerStatus.aoMensagem(aoMensagemWs);
+    if (!pararOuvirConexao) pararOuvirConexao = ServerStatus.aoConectar(observarTodasAsSalas);
+    await carregar();
     if (!intervaloAtualizacao) intervaloAtualizacao = setInterval(carregar, 20000);
   }
 
   function aoFechar() {
+    ServerStatus.enviar({ tipo: "observar_dispositivos", salas: [] });
     if (intervaloAtualizacao) {
       clearInterval(intervaloAtualizacao);
       intervaloAtualizacao = null;
+    }
+    if (pararOuvirMensagens) {
+      pararOuvirMensagens();
+      pararOuvirMensagens = null;
+    }
+    if (pararOuvirConexao) {
+      pararOuvirConexao();
+      pararOuvirConexao = null;
     }
   }
 

@@ -60,7 +60,8 @@ const Grade = {
         || (ag.modo === "ligar_intervalo" && periodoCoberto(periodo, ag.ligarInicio, ag.ligarFim));
       const classe = ligando ? "grade-cell grade-cell-ligado" : "grade-cell grade-cell-agendado";
       const nomeEscapado = escapeHtml(ag.usuarioNome);
-      html += `<tr><td class="grade-hora">${periodo.inicio}–${periodo.fim}</td><td class="${classe}" title="${nomeEscapado} · ${ag.horaInicio}–${ag.horaFim}">${nomeEscapado}</td></tr>`;
+      const janelaEscapada = `${escapeHtml(ag.horaInicio)}–${escapeHtml(ag.horaFim)}`;
+      html += `<tr><td class="grade-hora">${periodo.inicio}–${periodo.fim}</td><td class="${classe}" title="${nomeEscapado} · ${janelaEscapada}">${nomeEscapado}</td></tr>`;
     });
 
     html += "</tbody>";
