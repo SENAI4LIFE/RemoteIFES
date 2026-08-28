@@ -246,8 +246,8 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 - **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
 - **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
-- **Cabeçalhos HTTP**: todas as respostas incluem `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy`; em produção (`NODE_ENV=production`) também `Strict-Transport-Security`.
-- **CORS**: em produção, restrito às origens listadas em `CORS_ORIGIN`.
+- **Cabeçalhos HTTP**: todas as respostas incluem `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy`; em produção, `Strict-Transport-Security` também é enviado nas respostas HTTPS.
+- **CORS**: em produção, a própria origem é aceita automaticamente; origens externas precisam ser listadas em `CORS_ORIGIN`.
 - **Erros**: respostas de erro nunca incluem stack trace nem detalhes internos; exceções não tratadas são registradas apenas no log do servidor.
 - **Restrição de rede** e **modo de teste**: veja a seção [Restrição de Rede](#restrição-de-rede) acima.
 
@@ -257,7 +257,7 @@ O servidor expõe um endpoint WebSocket em `/ws`. Quando o cliente já está aut
 
 O frontend mantém uma única conexão WebSocket por aba (compartilhada entre a tela de status do servidor e o canal de salas/status), em vez de abrir conexões redundantes. O servidor também limita a quantidade de mensagens que uma conexão autenticada pode enviar em uma janela de tempo curta, encerrando a conexão em caso de flood.
 
-Se você configurar um proxy reverso manualmente (fora do `https-setup.sh`), garanta que ele propague os cabeçalhos `Upgrade` e `Connection` do handshake WebSocket — sem isso, `/ws` não funciona atrás do proxy. O `https-setup.sh` já gera a configuração de Nginx correta para isso.
+Se você configurar um proxy reverso manualmente, garanta que ele propague os cabeçalhos `Upgrade` e `Connection` do handshake WebSocket — sem isso, `/ws` não funciona atrás do proxy. `lan-setup.sh` e `https-setup.sh` já geram a configuração de Nginx correta para isso.
 
 ## Interface Local do ESP32 e Painel Avançado (Admin > ESP32)
 
@@ -341,13 +341,13 @@ A [Instalação Rápida](#instalação-rápida) já cobre os comandos para coloc
 
 Em macOS/Linux, `npm run setup` (usado na instalação rápida) equivale a `npm install` + `cp .env.example .env`. Rode esses passos manualmente em vez do script caso prefira não instalar o Node.js automaticamente ou queira revisar cada etapa. No Windows, onde `npm run setup` não roda, os passos manuais (`npm install`, copiar `.env.example` para `.env`) já são o único caminho, como descrito na instalação rápida.
 
-Antes de colocar o servidor em produção, edite `.env` conforme a seção [Configuração](#configuração) — em especial `CORS_ORIGIN` quando `NODE_ENV=production`. Defina `SENHA_ADMIN_INICIAL` antes da criação do banco ou guarde a senha aleatória exibida no primeiro boot.
+Antes de colocar o servidor em produção, edite `.env` conforme a seção [Configuração](#configuração). Defina `CORS_ORIGIN` somente se o frontend ficar em outra origem e defina `SENHA_ADMIN_INICIAL` antes da criação do banco ou guarde a senha aleatória exibida no primeiro boot.
 
 Durante o desenvolvimento, `npm run dev` inicia o servidor com reinício automático a cada alteração de arquivo (`node --watch`), no lugar de `npm start`.
 
 ### Frontend
 
-`remoteifes-web` não tem etapa de build: é servido como está. Por padrão, o frontend usa `localhost:8080` quando aberto localmente e a própria origem quando publicado junto ao proxy reverso. Para uma origem diferente (por exemplo, GitHub Pages ou um pacote Cordova), defina `serverUrl` em `js/config.js` apontando para o servidor central.
+`remoteifes-web` não tem etapa de build: é servido como está. Em produção (veja [Deploy](#deploy)), o próprio servidor Node o entrega na mesma origem da API, e o frontend fala com o servidor pela origem da página — sem configuração. Aberto localmente para desenvolvimento, ele aponta para `localhost:8080`. Para uma origem diferente (por exemplo, GitHub Pages ou um pacote Cordova apontando para um servidor remoto), defina `serverUrl` em `js/config.js`.
 
 ### Firmware ESP32
 
@@ -384,15 +384,18 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 
 | Variável | Descrição |
 |---|---|
-| `NODE_ENV` | `development` ou `production`. Em produção, ativa a restrição de rede e o CORS restrito |
+| `NODE_ENV` | `development` ou `production`. Em produção, ativa a restrição de rede, o CORS restrito e o serviço do frontend pelo próprio servidor |
 | `PORTA` | Porta HTTP (e WebSocket, no mesmo servidor) do servidor (padrão 8080) |
-| `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — vale tanto para a API HTTP quanto para as conexões WebSocket |
+| `SERVIR_FRONTEND` | Servir o `remoteifes-web` pelo próprio servidor, na mesma origem da API (operação same-origin). Padrão: ligado quando `NODE_ENV=production`, desligado nos demais casos. Com o frontend servido assim, `CORS_ORIGIN` deixa de ser necessário |
+| `FRONTEND_DIR` | Caminho da pasta do frontend a servir (padrão: `../remoteifes-web` relativo ao projeto do servidor) |
+| `REMOTEIFES_DATA_DIR` | Diretório dos dados persistentes (banco, backups, versões e log de deploy). Padrão: `data/` dentro do projeto do servidor. Aponte para fora do checkout do Git (ex.: `/var/lib/remoteifes`) para que atualizações de código nunca toquem nos dados. `REMOTEIFES_DB_PATH` e `BACKUP_DIR` continuam disponíveis para sobrescrever caminhos individuais |
+| `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — necessária **apenas** quando o frontend é servido de outra origem (ex.: GitHub Pages). Vale tanto para a API HTTP quanto para as conexões WebSocket |
 | `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot. Em produção, uma senha aleatória é gerada quando o valor não é informado; em desenvolvimento/teste, o padrão é `admin` |
-| `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); **padrão `0`** (não confia em nenhum proxy). O `https-setup.sh` altera este valor para `1` ao configurar o Nginx, que é o valor correto quando há exatamente um proxy reverso na frente. Só use um valor maior que `0` quando existir de fato um proxy confiável imediatamente à frente do servidor — confiar em saltos que não existem permite que um cliente falsifique o IP de origem via `X-Forwarded-For` e contorne o limite de tentativas de login e a restrição de rede |
+| `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); **padrão `0`** (não confia em nenhum proxy). O `https-setup.sh` e o `lan-setup.sh` alteram este valor para `1` ao configurar o Nginx, que é o valor correto quando há exatamente um proxy reverso na frente. Só use um valor maior que `0` quando existir de fato um proxy confiável imediatamente à frente do servidor — confiar em saltos que não existem permite que um cliente falsifique o IP de origem via `X-Forwarded-For` e contorne o limite de tentativas de login e a restrição de rede |
 | `RETENCAO_DIAS_LOGS` / `RETENCAO_DIAS_SESSOES` / `RETENCAO_DIAS_EXECUCOES` / `RETENCAO_DIAS_DETECCOES` | Opcionais. Dias de retenção das tabelas de histórico antes da limpeza automática (padrões: 180 / 90 / 90 / 30). Veja [Manutenção automática do banco](#manutenção-automática-do-banco) |
 | `BACKUP_AUTOMATICO` / `BACKUP_INTERVALO_HORAS` / `BACKUP_RETENCAO` / `BACKUP_DIR` | Opcionais. Backup periódico do banco SQLite (em produção, ligado por padrão). Veja [Backup e restauração do banco](#backup-e-restauração-do-banco) |
 
-Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx/Caddy, ou um serviço com TLS gerenciado), já que os aparelhos móveis e o GitHub Pages exigem conteúdo servido por HTTPS.
+Para a operação de produção local (na rede da instituição), veja [Deploy](#deploy): o servidor entrega o frontend na mesma origem e um proxy reverso HTTP (`lan-setup.sh`) basta. HTTPS com domínio próprio (`https-setup.sh`) é necessário apenas para expor o sistema fora da rede local ou para o PWA/Cordova em domínio público, já que os aparelhos móveis exigem conteúdo servido por HTTPS.
 
 ### Configurações globais (banco de dados, via `Admin > Configurações`)
 
@@ -421,22 +424,100 @@ Na mesma tela, o administrador também define se uma sala tem **acesso restrito*
 
 ## Deploy
 
+A operação de produção é **local, na rede da instituição, e não depende da Internet nem do GitHub Pages**. O caminho é:
+
+```
+Navegador/PWA → rede local → proxy reverso → remoteifes-web → API Node/Express + WebSocket → SQLite → ESP32
+```
+
+O próprio servidor Node entrega o `remoteifes-web` na **mesma origem** da API quando `NODE_ENV=production` (ou `SERVIR_FRONTEND=true`). Assim não há CORS entre frontend e backend, o WebSocket usa a mesma origem da página, e o `remoteifes-web` não precisa ser publicado em lugar nenhum.
+
 ### Servidor central
 
-O servidor central roda como um processo Node.js comum. Recomenda-se:
+Instalação de produção em um Linux com `systemd`:
 
-- Executá-lo com um gerenciador de processo (`pm2`, `systemd`) para reiniciar automaticamente em caso de falha.
-- Colocá-lo atrás de um proxy reverso com HTTPS (Nginx, Caddy) apontando para a porta definida em `PORTA`.
-- Definir `NODE_ENV=production`, `CORS_ORIGIN` com o domínio do frontend, e configurar as redes autorizadas antes de desativar o modo de teste.
-- Garantir que o servidor esteja acessível tanto pela rede onde ficam os ESP32 (para heartbeats/comandos) quanto pela rede do IFES (para os usuários), incluindo a porta usada pelo WebSocket (mesma porta HTTP do servidor).
+```bash
+cd remoteifes-server
+npm run setup                 # Node.js + dependências + .env
+sudo bash install-service.sh  # serviço systemd, watchdog de saúde, início no boot
+```
 
-Para automatizar esse último ponto em um servidor Linux com Nginx, `remoteifes-server/https-setup.sh` configura um proxy reverso e emite um certificado com Certbot (Let's Encrypt):
+`install-service.sh`:
+
+- grava `NODE_ENV=production` no `.env` e cria o serviço `remoteifes.service` (`Restart=always`, `After=network-online.target`, início automático no boot, limite de reinícios contra loop de falha);
+- instala um **watchdog** (`remoteifes-health.timer`) que checa o `/health` a cada 2 minutos e reinicia o serviço após 3 falhas seguidas;
+- pergunta a(s) faixa(s) de IP da rede local a autorizar (veja abaixo).
+
+Depois disso o sistema já responde em `http://<ip-do-servidor>:<PORTA>/` (padrão 8080) para os navegadores da rede local e em `/ws` e `/ws/dispositivo` para o tempo real e os ESP32 — tudo na mesma porta.
+
+**Liberar o acesso da rede local.** Em produção, com o modo de teste desligado, o acesso é bloqueado até que as faixas de IP da rede local sejam cadastradas. Faça isso na máquina do servidor (sem precisar da interface):
+
+```bash
+npm run redes -- 10.10.0.0/16 192.168.0.0/16   # define as faixas autorizadas
+npm run redes                                   # mostra o estado atual
+sudo systemctl restart remoteifes.service
+```
+
+As rotas `/dispositivo/*` (usadas pelos ESP32) e o acesso por `localhost` (útil para um túnel SSH) nunca dependem dessa lista. Alternativamente, para uma rede local isolada e confiável, o modo de teste pode ser deixado ligado em `Admin > Configurações`, mas o cadastro das faixas é a opção recomendada.
+
+### Proxy reverso na porta 80 (rede local, sem Internet)
+
+`lan-setup.sh` coloca o Nginx na frente do servidor na porta 80, sem Certbot nem DNS:
+
+```bash
+sudo bash lan-setup.sh
+sudo systemctl restart remoteifes.service
+```
+
+Ele cria um site Nginx que encaminha tudo (inclusive `Upgrade`/`Connection` para `/ws` e `/ws/dispositivo`) para `127.0.0.1:<PORTA>`, grava `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1` no `.env` (assim o Node passa a escutar **só em localhost**, atrás do proxy — impede que alguém alcance a `PORTA` diretamente e falsifique `X-Forwarded-For`) e passa a atender em `http://<ip-do-servidor>/`. O Nginx precisa já estar instalado (ou o script o instala via `apt`, quando disponível). O script assume um host dedicado ao RemoteIFES (assume o site padrão do Nginx na porta 80).
+
+### HTTPS com domínio próprio (opcional)
+
+Quando houver um domínio público e acesso à Internet, `remoteifes-server/https-setup.sh` configura o proxy reverso e emite um certificado Let's Encrypt com Certbot:
 
 ```bash
 sudo bash https-setup.sh <dominio> <email>
 ```
 
-O script instala Nginx e Certbot se necessário, cria um site Nginx apontando para `127.0.0.1:<PORTA>` (lida do `.env`, com 8080 como padrão), emite o certificado e ativa a renovação automática (`certbot.timer`). Rode-o como root, com o domínio já apontando para o servidor via DNS.
+O script instala Nginx e Certbot se necessário, cria um site apontando para `127.0.0.1:<PORTA>`, emite o certificado, ativa a renovação automática (`certbot.timer`) e ajusta `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1` no `.env`. É o caminho para expor o sistema fora da rede local e para PWA/HTTPS em domínio próprio; a operação local não precisa dele.
+
+### Atualização, versões e reversão
+
+Todo o fluxo é feito por Git na própria máquina de produção — o GitHub continua sendo a origem do código, mas a atualização não depende de Actions nem do GitHub Pages.
+
+```bash
+cd remoteifes-server
+bash deploy.sh               # busca e implanta a origin/main, com proteção
+bash deploy.sh v3.1.0        # implanta uma versão marcada por tag
+bash deploy.sh --offline     # sem rede: implanta um ref que já exista no clone (faça o git fetch antes, com rede)
+```
+
+O `deploy.sh` já faz o `git fetch` sozinho (exceto com `--offline`); não é preciso `git pull` antes.
+
+`deploy.sh`, em ordem: recusa se houver alterações locais não commitadas (a menos de `--force`); **cria um backup verificado do banco** (`pre-update`) antes de mexer no código; resolve o ref alvo (`origin/main` por padrão, ou uma tag/commit); aplica o código (`git reset --hard` na `main`, ou checkout da tag); roda `npm ci --omit=dev` **apenas se `package.json`/`package-lock.json` mudaram** (compatível com `--offline`); reinicia o `remoteifes.service`; espera o `/health` ficar saudável; **se o `/health` não voltar, reverte sozinho** para a versão anterior, reinstala as dependências dela e reinicia. Em caso de sucesso, grava a versão anterior e a atual em `<REMOTEIFES_DATA_DIR>/previous-version` / `current-version` e registra a operação em `deploy.log`.
+
+Reverter manualmente para a última versão boa conhecida (ou para um ref específico):
+
+```bash
+bash rollback.sh             # volta para o previous-version gravado pelo deploy
+bash rollback.sh v3.0.0      # volta para uma versão específica
+```
+
+`rollback.sh` também faz um backup `pre-rollback` do banco antes de trocar o código, reinicia e verifica o `/health`. O rollback troca **apenas o código**. Se a atualização que está sendo revertida alterou o esquema do banco (as migrações em `src/db/schema.js` podem adicionar **e remover** colunas/tabelas), a versão anterior pode não funcionar com o banco já migrado — nesse caso restaure também o backup `pre-update` daquela atualização com `npm run restore`. É por isso que `deploy.sh` sempre grava esse backup antes de mexer no código.
+
+Marcar uma versão (na máquina de desenvolvimento, a partir da `main` limpa):
+
+```bash
+cd remoteifes-server
+bash release.sh 3.1.0        # ajusta a versão no package.json, cria o commit e a tag v3.1.0, e (com confirmação) faz o push
+```
+
+### Recuperação e verificação de saúde
+
+- **`GET /health`** — estado do servidor central (banco e tempo de processo), sem autenticação. `200` com `{"ok":true,...}` quando o banco responde, `503` quando não. **Não depende de nenhum ESP32**: um dispositivo offline não afeta o resultado. Verifique pela linha de comando com `npm run health` (checa `127.0.0.1:<PORTA>/health`).
+- **Reinício após queda** — o `remoteifes.service` tem `Restart=always`; o watchdog `remoteifes-health.timer` roda `health-watchdog.sh` (como o usuário do serviço) a cada 2 minutos e, após 3 falhas seguidas do `/health` (processo vivo mas travado), aciona o `remoteifes-recover.service`, uma unidade `root` cujo único comando é `systemctl restart remoteifes.service`. Nenhum script do checkout roda como root.
+- **Reinício após reboot do host** — `install-service.sh` habilita o serviço (`systemctl enable`), que sobe sozinho no boot. Mantenha o `REMOTEIFES_DATA_DIR` em disco persistente.
+- **Restauração do banco** — `npm run restore` lista os backups de `<REMOTEIFES_DATA_DIR>/backups/` e restaura um deles, criando antes uma cópia de segurança verificada do banco atual. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
 
 ## Hospedagem em Raspberry Pi
 
@@ -446,11 +527,14 @@ Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é s
 git clone <url-do-repositorio>
 cd RemoteIFES/remoteifes-server
 npm run setup
-sudo bash install-service.sh
+sudo bash install-service.sh          # serviço + watchdog + início no boot; pergunta as faixas da rede local
+npm run redes -- 10.10.0.0/16         # se não informou as faixas no passo anterior
+sudo bash lan-setup.sh                # opcional: Nginx na porta 80 para a rede local
 ```
 
 - `npm run setup` detecta a arquitetura do Pi (ARM64 ou ARMv7) e instala automaticamente o Node.js 22.13+ direto dos binários oficiais quando a versão do sistema é insuficiente ou inexistente, sem depender do pacote (geralmente desatualizado) do repositório da distribuição.
-- `sudo bash install-service.sh` cria e habilita um serviço `systemd` (`remoteifes.service`) que inicia o servidor no boot e o reinicia automaticamente em caso de falha — dispensa `pm2` ou uma sessão de terminal aberta.
+- `sudo bash install-service.sh` grava `NODE_ENV=production` no `.env`, cria e habilita o serviço `systemd` `remoteifes.service` (início no boot, `Restart=always`) e o watchdog `remoteifes-health.timer` — dispensa `pm2` ou uma sessão de terminal aberta. O servidor passa a entregar o `remoteifes-web` na mesma origem da API.
+- Para manter os dados fora do checkout do Git (recomendado), defina `REMOTEIFES_DATA_DIR=/var/lib/remoteifes` no `.env` **antes** do primeiro boot.
 
 Depois de instalado, use os comandos padrão do `systemd` para gerenciar o serviço:
 
@@ -458,9 +542,10 @@ Depois de instalado, use os comandos padrão do `systemd` para gerenciar o servi
 sudo systemctl status remoteifes.service
 sudo journalctl -u remoteifes.service -f
 sudo systemctl restart remoteifes.service
+npm run health                        # checa o /health localmente
 ```
 
-Reinicie o serviço (`systemctl restart`) sempre que editar `remoteifes-server/.env`. Para expor o Pi com HTTPS em um domínio próprio (necessário para o frontend em produção e para o PWA/Cordova), siga normalmente `https-setup.sh` como descrito acima — ele funciona da mesma forma em um Raspberry Pi.
+Reinicie o serviço (`systemctl restart`) sempre que editar `remoteifes-server/.env`. Atualizações e reversões seguem o fluxo de [Atualização, versões e reversão](#atualização-versões-e-reversão) (`bash deploy.sh` / `bash rollback.sh`), que funciona igual no Raspberry Pi, inclusive com `--offline`. Para expor o Pi fora da rede local com HTTPS em um domínio próprio (necessário para PWA/Cordova em domínio público), use `https-setup.sh` — ele funciona da mesma forma em um Raspberry Pi.
 
 Cada sala continua com seu próprio ESP32 fazendo a ponte com o ar-condicionado (veja [Firmware ESP32](#firmware-esp32)); o Raspberry Pi hospeda apenas o servidor central que os agrega.
 
@@ -470,15 +555,15 @@ Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo p
 
 - **Defina `SENHA_ADMIN_INICIAL`** no `.env` antes de criar o banco, ou guarde a senha aleatória de produção exibida no primeiro boot e troque-a pelo painel.
 - **Mantenha o modo de teste desativado** (`Admin > Configurações > Modo de teste`) e cadastre as faixas de IP em `Redes autorizadas` para restringir o acesso à rede autorizada; em uma instalação nova de produção o modo de teste começa desativado.
-- **Garanta que só a porta 443 do Nginx fique exposta à internet**, nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o HTTPS, o CORS e a checagem de `TRUST_PROXY`.
+- **Exponha apenas a porta do proxy** (80 no `lan-setup.sh`, 443 no `https-setup.sh`), nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 80` ou `ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o TLS e a checagem de `TRUST_PROXY`.
 - **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
 - **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
 - **Cadastre o MAC de cada ESP32 assim que possível** (`Admin > ESP32 / MACs`): as rotas `/dispositivo/*` não passam pela restrição de rede (os ESP32 precisam alcançá-las de qualquer rede), e enquanto o MAC de uma sala não está cadastrado, qualquer dispositivo que conheça o código dessa sala pode reportar estado falso para ela. Cadastrar o MAC fecha essa janela, exigindo que as chamadas venham exatamente do ESP32 físico da sala.
-- **Confirme que os backups estão sendo gravados** em `remoteifes-server/data/backups/` (em produção o backup automático já vem ligado) e copie essa pasta para fora da Pi periodicamente. Teste a restauração ao menos uma vez com `npm run restore` num ambiente separado — um backup nunca verificado não é um backup. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
+- **Confirme que os backups estão sendo gravados** em `<REMOTEIFES_DATA_DIR>/backups/` (`data/backups/` por padrão; em produção o backup automático já vem ligado, e `deploy.sh`/`rollback.sh` também geram um antes de cada troca de versão) e copie essa pasta para fora da Pi periodicamente. Teste a restauração ao menos uma vez com `npm run restore` num ambiente separado — um backup nunca verificado não é um backup. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
 
-### Frontend no GitHub Pages
+### Frontend no GitHub Pages (opcional, para demonstração)
 
-A publicação do `remoteifes-web` no GitHub Pages é manual. O workflow de Actions do repositório (`.github/workflows/ci.yml`) apenas roda os testes e validações descritos em [Testes e Integração Contínua](#testes-e-integração-contínua) — não publica o frontend. Passo a passo para publicar:
+Na operação de produção descrita em [Deploy](#deploy) **o próprio servidor entrega o `remoteifes-web`** na mesma origem da API — o GitHub Pages não é necessário e a operação local não depende dele. A publicação no GitHub Pages é útil apenas como vitrine/demonstração pública, e é manual (o workflow de Actions do repositório apenas roda os testes descritos em [Testes e Integração Contínua](#testes-e-integração-contínua) — não publica o frontend). Passo a passo:
 
 1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
 2. Como o GitHub Pages tem origem diferente do servidor central, edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção.
@@ -679,15 +764,23 @@ Este projeto não depende da API do GitHub em tempo de execução — o uso do G
 ```
 remoteifes-server/
   setup.sh          instalação e configuração automatizadas (Node.js, dependências, .env)
-  install-service.sh configura um serviço systemd para manter o servidor no ar (auto-start no boot, ex.: Raspberry Pi)
-  https-setup.sh     configuração automatizada de HTTPS (Nginx + Certbot)
+  install-service.sh configura o serviço systemd + watchdog de saúde (auto-start no boot, ex.: Raspberry Pi)
+  lan-setup.sh       proxy reverso Nginx na porta 80 para a rede local (sem Internet/Certbot)
+  https-setup.sh     configuração automatizada de HTTPS (Nginx + Certbot) para domínio público
+  deploy.sh          atualização protegida (backup pré-update, health check, auto-rollback) — npm run deploy
+  rollback.sh        volta para a versão anterior ou uma tag, com backup do banco — npm run rollback
+  release.sh         marca uma versão (package.json + commit + tag vX.Y.Z) — npm run release
+  healthcheck.sh     checa o /health local — npm run health
+  health-watchdog.sh usado pelo remoteifes-health.timer para reiniciar o serviço se o /health falhar
+  redes-autorizadas.js  define/lista as faixas de IP autorizadas da rede local — npm run redes
   reset-admin-senha.js  redefine a senha do usuário admin sem apagar dados
   backup-db.js       gera um backup verificado do banco SQLite agora (npm run backup)
   restore-backup.js  lista e restaura backups, com verificação e cópia de segurança (npm run restore)
   server.js          ponto de entrada: sobe o HTTP server, o WebSocket e o agendador
-  data/
-    remoteifes.db    banco SQLite (criado na primeira execução; ignorado pelo Git)
-    backups/         backups automáticos e manuais do banco (ignorado pelo Git)
+  data/              conteúdo de REMOTEIFES_DATA_DIR (padrão); ignorado pelo Git
+    remoteifes.db    banco SQLite (criado na primeira execução)
+    backups/         backups automáticos, manuais e de pré-atualização do banco
+    previous-version / current-version / deploy.log   estado gravado por deploy.sh/rollback.sh
   src/
     app.js            monta o Express app e registra as rotas
     config/           conexão com o banco SQLite e caminhos de dados/backup (paths.js)
@@ -768,7 +861,7 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. Se o Wi-Fi continuar indisponível por mais de 2 minutos, ele também abre o ponto de acesso de recuperação `RemoteIFES-Setup` (mantendo as tentativas de reconexão em paralelo) para permitir a reconfiguração no local; assim que a rede volta, esse ponto de acesso é fechado sozinho. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
 - **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Admin > ESP32 / MACs` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala (diretamente pelo admin, ou por um proprietário da sala).
 - **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`; a mesma restrição vale para a conexão WebSocket.
-- **Frontend não fala com o servidor depois do deploy**: confirme `serverUrl` em `remoteifes-web/js/config.js` e se `CORS_ORIGIN` no servidor inclui o domínio do frontend publicado (isso também afeta a conexão WebSocket).
+- **Frontend não fala com o servidor depois do deploy**: na implantação same-origin, acesse a URL do próprio servidor/proxy e não configure `serverUrl` nem `CORS_ORIGIN`. Se o frontend estiver em outra origem (GitHub Pages ou Cordova), confirme `serverUrl` e inclua a origem dele em `CORS_ORIGIN`; isso também afeta a conexão WebSocket.
 - **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
 - **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
 - **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Admin > Proprietários de sala`.
