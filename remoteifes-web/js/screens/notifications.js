@@ -3,6 +3,7 @@ const Notificacoes = {
 
   iniciar() {
     this.pararPolling();
+    document.getElementById("notifWrap").classList.remove("hidden");
     this.atualizarContagem();
     this._intervalId = setInterval(() => this.atualizarContagem(), 20000);
   },
