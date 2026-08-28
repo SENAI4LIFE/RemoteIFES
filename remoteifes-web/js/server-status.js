@@ -57,8 +57,6 @@ const ServerStatus = (() => {
     if (!configServidorBtn) return;
     const empacotado = !!(window.RemoteIFESConfig && window.RemoteIFESConfig.empacotado);
     const apontaLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:|\/|$)/.test(baseServidor());
-    // Só aparece em app empacotado, quando não há endereço, ou quando o alvo é
-    // localhost — nunca numa PWA publicada em domínio real e alcançável.
     const precisa = empacotado || !servidorConfigurado() || apontaLocalhost;
     configServidorBtn.classList.toggle("hidden", !precisa);
   }
@@ -206,10 +204,6 @@ const ServerStatus = (() => {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
     if (!servidorConfigurado()) {
-      // App empacotado ainda sem endereço: mostra a tela de configuração em vez
-      // de abrir um WebSocket relativo condenado a falhar em laço. Ainda assim
-      // liberamos o bootstrap do app (restaurarSessaoSalva falha sem servidor,
-      // mas de forma controlada) para o estado ficar determinístico.
       tentativas = Math.max(1, tentativas);
       aplicarEstadoConectando();
       notificarPronto();
@@ -348,9 +342,6 @@ const ServerStatus = (() => {
     if (!acessoManualLiberado) aplicarEstadoManutencao();
   });
 
-  // Após o app/aba voltar ao primeiro plano (Android congela timers e pode
-  // deixar o socket "meio morto"), força uma reconexão imediata em vez de
-  // esperar o ping do servidor detectar a conexão perdida.
   function reconectarSeVisivelEDesconectado() {
     if (document.visibilityState === "visible" && !estaConectado() && servidorConfigurado()) {
       if (reconectarTimeoutId) {
@@ -362,7 +353,6 @@ const ServerStatus = (() => {
   }
   function reconectarAoRetomar() {
     if (document.visibilityState === "visible" && servidorConfigurado()) {
-      // readyState pode continuar OPEN depois de o SO suspender a rede do app.
       reconectarComTokenAtual();
     }
   }

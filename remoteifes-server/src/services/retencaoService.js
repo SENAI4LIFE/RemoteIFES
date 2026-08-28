@@ -1,10 +1,6 @@
 const db = require("../config/database");
 const logger = require("../utils/logger");
 
-// Keeps the log-like tables from growing without bound on a long-running
-// deployment (Raspberry Pi). Only history/telemetry rows are pruned — user
-// content (usuarios, salas, agendamentos, relatos, configuracoes) is never
-// touched here.
 function normalizarDiasRetencao(valor, padrao) {
   if (valor === undefined || valor === null || valor === "") return padrao;
   if (!/^\d+$/.test(String(valor).trim())) return padrao;
