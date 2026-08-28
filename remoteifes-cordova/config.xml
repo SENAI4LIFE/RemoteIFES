@@ -8,7 +8,7 @@
     <allow-intent href="http://*/*" />
     <allow-intent href="https://*/*" />
     <allow-navigation href="*" />
-    <preference name="Orientation" value="portrait" />
+    <preference name="Orientation" value="default" />
     <preference name="DisallowOverscroll" value="true" />
     <preference name="ScrollEnabled" value="false" />
     <preference name="BackgroundColor" value="0xfff4f6f4" />
@@ -24,6 +24,12 @@
         <splash src="resources/splash.png" />
     </platform>
     <platform name="ios">
+        <edit-config file="*-Info.plist" mode="merge" target="NSAppTransportSecurity">
+            <dict>
+                <key>NSAllowsLocalNetworking</key>
+                <true />
+            </dict>
+        </edit-config>
         <preference name="deployment-target" value="13.0" />
         <icon src="resources/icon.png" />
         <splash src="resources/splash.png" />

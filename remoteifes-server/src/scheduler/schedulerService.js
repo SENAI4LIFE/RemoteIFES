@@ -6,6 +6,7 @@ const {
 } = require("../services/agendamentosService");
 const { encerrarSessoesAbandonadas } = require("../services/tokenService");
 const { executarLimpezaRetencao } = require("../services/retencaoService");
+const { criarBackup, normalizarInteiro } = require("../services/backupService");
 const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 const logger = require("../utils/logger");
 
@@ -13,6 +14,11 @@ const VERIFICACAO_MS = 60 * 1000;
 const VERIFICACAO_TIMEOUT_MS = 30 * 1000;
 const VERIFICACAO_SESSOES_MS = 15 * 60 * 1000;
 const VERIFICACAO_RETENCAO_MS = 6 * 60 * 60 * 1000;
+
+const BACKUP_AUTOMATICO = String(
+  process.env.BACKUP_AUTOMATICO ?? (process.env.NODE_ENV === "production" ? "true" : "false")
+).toLowerCase() === "true";
+const BACKUP_INTERVALO_MS = normalizarInteiro(process.env.BACKUP_INTERVALO_HORAS, 24, 1, 8760) * 60 * 60 * 1000;
 
 function verificarAgendamentos() {
   const hora = horaAtualBrasilia();
@@ -60,6 +66,10 @@ function agendarPeriodico(fn, intervaloMs, rotulo) {
   timers.push(timer);
 }
 
+function executarBackupAutomatico() {
+  criarBackup();
+}
+
 function iniciarScheduler() {
   pararScheduler();
   agendarPeriodico(verificarAgendamentos, VERIFICACAO_MS, "agendamentos");
@@ -72,7 +82,18 @@ function iniciarScheduler() {
   }, 10000);
   if (typeof timerRetencaoInicial.unref === "function") timerRetencaoInicial.unref();
   timers.push(timerRetencaoInicial);
-  console.log("Agendador iniciado (agendamentos a cada minuto, checagem de ESPs offline a cada 30s, sessões abandonadas a cada 15min, retenção do banco a cada 6h).");
+  if (BACKUP_AUTOMATICO) {
+    agendarPeriodico(executarBackupAutomatico, BACKUP_INTERVALO_MS, "backup");
+    const timerBackupInicial = setTimeout(() => {
+      executarProtegido(executarBackupAutomatico, "backup-inicial");
+    }, 20000);
+    if (typeof timerBackupInicial.unref === "function") timerBackupInicial.unref();
+    timers.push(timerBackupInicial);
+  }
+  const infoBackup = BACKUP_AUTOMATICO
+    ? `, backup automático a cada ${BACKUP_INTERVALO_MS / (60 * 60 * 1000)}h`
+    : "";
+  console.log(`Agendador iniciado (agendamentos a cada minuto, checagem de ESPs offline a cada 30s, sessões abandonadas a cada 15min, retenção do banco a cada 6h${infoBackup}).`);
 }
 
 function pararScheduler() {

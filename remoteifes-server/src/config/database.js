@@ -1,11 +1,13 @@
 const path = require("path");
 const fs = require("fs");
 const { DatabaseSync } = require("node:sqlite");
+const { CAMINHO_DB } = require("./paths");
 
-const DATA_DIR = path.join(__dirname, "..", "..", "data");
-const DB_PATH = process.env.REMOTEIFES_DB_PATH || path.join(DATA_DIR, "remoteifes.db");
+const DB_PATH = CAMINHO_DB;
 
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+if (DB_PATH !== ":memory:") {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+}
 
 const db = new DatabaseSync(DB_PATH);
 db.exec("PRAGMA journal_mode = WAL");
