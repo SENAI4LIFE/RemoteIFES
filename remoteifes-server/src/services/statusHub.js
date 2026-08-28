@@ -31,18 +31,32 @@ function limiteDeMensagensExcedido(ws) {
   return janela.contagem > MAX_MENSAGENS_POR_JANELA;
 }
 
-function origemPermitida(origin) {
+const TRUST_PROXY_HOPS = process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : "0";
+
+function protocoloDaRequisicao(req) {
+  const hops = Number(TRUST_PROXY_HOPS);
+  if (Number.isInteger(hops) && hops > 0) {
+    const encaminhado = req.headers["x-forwarded-proto"];
+    if (typeof encaminhado === "string" && encaminhado) return encaminhado.split(",")[0].trim();
+  }
+  return req.socket.encrypted ? "https" : "http";
+}
+
+function origemPermitida(req) {
   if ((process.env.NODE_ENV || "development") !== "production") return true;
+  const origin = req.headers.origin;
   if (!origin) return true;
   const origensPermitidas = (process.env.CORS_ORIGIN || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (origensPermitidas.length === 0) return false;
-  return origensPermitidas.includes(origin);
+  if (origensPermitidas.includes(origin)) return true;
+  try {
+    return !!req.headers.host && new URL(origin).origin === `${protocoloDaRequisicao(req)}://${req.headers.host}`;
+  } catch (erro) {
+    return false;
+  }
 }
-
-const TRUST_PROXY_HOPS = process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : "0";
 
 function ipDoRequest(req) {
   return resolverIpCliente(req.headers["x-forwarded-for"], req.socket.remoteAddress, TRUST_PROXY_HOPS);
@@ -139,7 +153,7 @@ function iniciar(server) {
   });
 
   wss.on("connection", (ws, req) => {
-    if (!origemPermitida(req.headers.origin) || !redeAutorizada(req)) {
+    if (!origemPermitida(req) || !redeAutorizada(req)) {
       ws.close(4003, "acesso não permitido");
       return;
     }

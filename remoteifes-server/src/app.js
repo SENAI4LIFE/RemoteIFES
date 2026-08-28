@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 
@@ -24,16 +26,42 @@ const origensPermitidas = (process.env.CORS_ORIGIN || "")
   .map((s) => s.trim())
   .filter(Boolean);
 
-const opcoesCors = NODE_ENV === "production"
-  ? {
-      origin(origin, callback) {
-        if (!origin || origensPermitidas.includes(origin)) return callback(null, true);
-        return callback(new Error("origem não permitida pelo CORS"));
-      },
-    }
-  : {};
+const SERVIR_FRONTEND =
+  String(process.env.SERVIR_FRONTEND ?? (NODE_ENV === "production" ? "true" : "false")).toLowerCase() === "true";
+const FRONTEND_DIR = process.env.FRONTEND_DIR
+  ? path.resolve(process.env.FRONTEND_DIR)
+  : path.join(__dirname, "..", "..", "remoteifes-web");
+const frontendDisponivel = SERVIR_FRONTEND && fs.existsSync(path.join(FRONTEND_DIR, "index.html"));
+if (SERVIR_FRONTEND && !frontendDisponivel) {
+  logger.warn("frontend-nao-encontrado", { dir: FRONTEND_DIR });
+}
 
-app.use(cors(opcoesCors));
+const CSP_API = "default-src 'none'; frame-ancestors 'none'";
+const CSP_APP =
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; " +
+  "base-uri 'none'; object-src 'none'; frame-ancestors 'none'";
+
+function mesmaOrigem(req) {
+  const origin = req.headers.origin;
+  const host = req.headers.host;
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).origin === `${req.protocol}://${host}`;
+  } catch (erro) {
+    return false;
+  }
+}
+
+function resolverCorsProducao(req, callback) {
+  const origin = req.headers.origin;
+  const permitido =
+    !origin || origensPermitidas.includes(origin) || mesmaOrigem(req);
+  if (!permitido) return callback(new Error("origem não permitida pelo CORS"));
+  callback(null, { origin: true, credentials: false });
+}
+
+app.use(NODE_ENV === "production" ? cors(resolverCorsProducao) : cors());
 app.use(express.json({ limit: "100kb" }));
 
 app.use((req, res, next) => {
@@ -46,9 +74,9 @@ app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
   res.set("Referrer-Policy", "same-origin");
-  res.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  res.set("Content-Security-Policy", frontendDisponivel ? CSP_APP : CSP_API);
   res.set("Permissions-Policy", "geolocation=(), camera=(), microphone=(), payment=(), usb=()");
-  if (NODE_ENV === "production") {
+  if (NODE_ENV === "production" && req.secure) {
     res.set("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   }
   next();
@@ -74,6 +102,10 @@ app.get("/health", (req, res) => {
 
 app.use(require("./routes/dispositivoRoutes"));
 
+if (frontendDisponivel) {
+  app.use(express.static(FRONTEND_DIR, { index: "index.html" }));
+}
+
 app.use(restringirRedeIFES);
 
 app.use(require("./routes/loginRoutes"));
@@ -84,7 +116,9 @@ app.use(require("./routes/adminRoutes"));
 app.use(require("./routes/esp32AdminRoutes"));
 app.use(require("./routes/relatoRoutes"));
 
-app.get("/", (req, res) => res.json({ ok: true, servico: "RemoteIFES API" }));
+if (!frontendDisponivel) {
+  app.get("/", (req, res) => res.json({ ok: true, servico: "RemoteIFES API" }));
+}
 
 app.use((err, req, res, next) => {
   if (err && err.type === "entity.parse.failed") {
