@@ -457,4 +457,32 @@ const Api = {
   async resetarWifiEsp32(sala) {
     return chamar(`/admin/esp32/${encodeURIComponent(sala)}/reset-wifi`, { method: "POST", headers: headersComToken() });
   },
+
+  async firmwareEsp32() {
+    return chamar("/admin/esp32/firmware", { headers: headersComToken() });
+  },
+
+  async atualizarFirmwareEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/ota`, { method: "POST", headers: headersComToken() });
+  },
+
+  async migracaoEsp32() {
+    return chamar("/admin/esp32/migracao", { headers: headersComToken() });
+  },
+
+  async provisionarCredencialEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/credencial`, { method: "POST", headers: headersComToken() });
+  },
+
+  async rotacionarCredencialEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/credencial/rotacionar`, { method: "POST", headers: headersComToken() });
+  },
+
+  async substituirCredencialEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/credencial/substituir`, { method: "POST", headers: headersComToken() });
+  },
+
+  async revogarCredencialEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/credencial`, { method: "DELETE", headers: headersComToken() });
+  },
 };

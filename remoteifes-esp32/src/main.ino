@@ -13,9 +13,16 @@
 #include <WiFiClientSecure.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <Update.h>
+#include <esp_ota_ops.h>
+#include <mbedtls/md.h>
 #include <string.h>
 
 #include "root_ca.h"
+
+#ifndef FW_VERSAO
+#define FW_VERSAO "0.0.0-dev"
+#endif
 
 #define DHTPIN 14
 #define DHTTYPE DHT11
@@ -41,6 +48,11 @@ const unsigned long INTERVALO_AP_RECUPERACAO_MS = 120000;
 const char SERVER_IDENTIFICACAO_PATH[] = "/dispositivo/identificar";
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
 const char DEVICE_WS_PATH[] = "/ws/dispositivo";
+
+const unsigned long OTA_SELFTEST_TIMEOUT_MS = 90000;
+const unsigned long OTA_HTTP_TIMEOUT_MS = 20000;
+const size_t OTA_BUFFER_BYTES = 1024;
+const unsigned long OTA_PROGRESSO_INTERVALO_BYTES = 65536;
 
 enum RuntimeMode {
   RUNTIME_OPERATION = 0,
@@ -106,11 +118,19 @@ unsigned long reinicioAgendadoEm = 0;
 bool servicosOperacaoIniciados = false;
 bool wsConfigurado = false;
 String salaWsConfigurada;
+bool littleFsOk = false;
+
+bool otaPendenteValidacao = false;
+unsigned long otaValidacaoLimite = 0;
+bool otaEmAndamento = false;
+bool credencialAlterada = false;
 
 String salaId;
 String serverHost;
 int serverPort = 0;
 String tlsModo;
+String deviceId;
+String deviceSecret;
 unsigned long lastComandoAceito = 0;
 const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
@@ -140,17 +160,33 @@ void handleWsServidorEvent(WStype_t type, uint8_t* payload, size_t length);
 void processarComandoServidor(uint8_t* payload, size_t length);
 void enviarTelemetriaWs();
 void enviarModoAlterado();
+void enviarInfoDispositivo();
 const char* modoAtualTexto();
 void identificarSalaNoServidor();
 void agendarReinicio(unsigned long esperaMs);
+void verificarValidacaoOta();
+void aplicarCredencial(JsonDocument& doc);
+void iniciarOtaOferta(JsonDocument& doc);
+void reportarOtaResultado(bool ok, const String& erro);
+void reportarOtaProgresso(size_t recebido, size_t total);
 
 void setup() {
   Serial.begin(115200);
   delay(300);
-  Serial.println("\n--- RemoteIFES IR System Initializing ---");
+  Serial.printf("\n--- RemoteIFES IR System Initializing (fw %s) ---\n", FW_VERSAO);
 
-  if (!LittleFS.begin(true)) {
+  littleFsOk = LittleFS.begin(true);
+  if (!littleFsOk) {
     Serial.println("Falha ao montar LittleFS.");
+  }
+
+  const esp_partition_t* particaoAtual = esp_ota_get_running_partition();
+  esp_ota_img_states_t estadoOta;
+  if (particaoAtual && esp_ota_get_state_partition(particaoAtual, &estadoOta) == ESP_OK
+      && estadoOta == ESP_OTA_IMG_PENDING_VERIFY) {
+    otaPendenteValidacao = true;
+    otaValidacaoLimite = millis() + OTA_SELFTEST_TIMEOUT_MS;
+    Serial.println("Firmware recem-instalado aguardando autovalidacao (rollback automatico se falhar).");
   }
 
   dht.begin();
@@ -166,6 +202,8 @@ void setup() {
   serverHost = preferences.getString("host", "");
   serverPort = preferences.getInt("porta", 0);
   tlsModo = preferences.getString("tls", "off");
+  deviceId = preferences.getString("devId", "");
+  deviceSecret = preferences.getString("devSec", "");
 
   if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
@@ -192,6 +230,8 @@ void loop() {
   gerenciarConexaoWifi();
   server.handleClient();
   wsCliente.loop();
+
+  if (otaPendenteValidacao) verificarValidacaoOta();
 
   if (isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE) {
     handleIRCapture();
@@ -301,6 +341,8 @@ void handleSaveSetup() {
   String newHost = server.arg("host");
   String newPorta = server.arg("porta");
   String newTls = server.arg("tls");
+  String newDevId = server.arg("devId");
+  String newDevSec = server.arg("devSec");
 
   int porta = newPorta.toInt();
   if (newSSID.length() == 0 || newHost.length() == 0 || porta <= 0 || porta > 65535) {
@@ -315,6 +357,8 @@ void handleSaveSetup() {
   preferences.putString("host", newHost);
   preferences.putInt("porta", porta);
   preferences.putString("tls", newTls);
+  preferences.putString("devId", newDevId);
+  preferences.putString("devSec", newDevSec);
 
   File f = LittleFS.open("/restart.html", "r");
   String response = f ? f.readString() : String("Credenciais salvas. Reiniciando...");
@@ -378,9 +422,13 @@ void iniciarServicosOperacao() {
 
 void conectarWsServidor() {
   if (WiFi.status() != WL_CONNECTED || salaId.length() == 0) return;
-  if (wsConfigurado && salaWsConfigurada == salaId) return;
+  if (wsConfigurado && salaWsConfigurada == salaId && !credencialAlterada) return;
   if (wsConfigurado) wsCliente.disconnect();
+  credencialAlterada = false;
   String headers = "X-Device-Sala: " + salaId + "\r\nX-Device-Mac: " + WiFi.macAddress();
+  if (deviceId.length() > 0 && deviceSecret.length() > 0) {
+    headers += "\r\nX-Device-Id: " + deviceId + "\r\nX-Device-Secret: " + deviceSecret;
+  }
   wsCliente.setExtraHeaders(headers.c_str());
   wsCliente.onEvent(handleWsServidorEvent);
   wsCliente.setReconnectInterval(WS_RECONNECT_INTERVAL_MS);
@@ -405,6 +453,7 @@ void handleWsServidorEvent(WStype_t type, uint8_t* payload, size_t length) {
     case WStype_CONNECTED:
       estadoWsServidor = WS_ESTADO_CONECTADO;
       Serial.println("WS servidor: conectado.");
+      enviarInfoDispositivo();
       break;
     case WStype_TEXT:
       processarComandoServidor(payload, length);
@@ -518,7 +567,27 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     reportComando("reset_wifi", "");
     preferences.clear();
     agendarReinicio(500);
+  } else if (strcmp(tipo, "ota_oferta") == 0) {
+    iniciarOtaOferta(doc);
+  } else if (strcmp(tipo, "credencial_provisionar") == 0 || strcmp(tipo, "credencial_rotacionar") == 0) {
+    aplicarCredencial(doc);
   }
+}
+
+void aplicarCredencial(JsonDocument& doc) {
+  String novoId = doc["deviceId"] | "";
+  String novoSegredo = doc["segredo"] | "";
+  if (novoId.length() < 4 || novoSegredo.length() < 20) return;
+  if (novoId == deviceId && novoSegredo == deviceSecret) return;
+
+  preferences.putString("devId", novoId);
+  preferences.putString("devSec", novoSegredo);
+  deviceId = novoId;
+  deviceSecret = novoSegredo;
+  credencialAlterada = true;
+  reportComando("credencial", "aplicada");
+  Serial.println("Credencial de dispositivo atualizada; reconectando ao servidor.");
+  conectarWsServidor();
 }
 
 void enviarModoAlterado() {
@@ -530,11 +599,21 @@ void enviarModoAlterado() {
   wsCliente.sendTXT(saida);
 }
 
+void enviarInfoDispositivo() {
+  JsonDocument doc;
+  doc["tipo"] = "info";
+  doc["fw"] = FW_VERSAO;
+  String saida;
+  serializeJson(doc, saida);
+  wsCliente.sendTXT(saida);
+}
+
 void enviarTelemetriaWs() {
   JsonDocument doc;
   doc["tipo"] = "telemetria";
   doc["rssi"] = WiFi.RSSI();
   doc["modo"] = modoAtualTexto();
+  doc["fw"] = FW_VERSAO;
   if (powerConhecido) doc["ligado"] = lastKnownPower;
 
   if (!isnan(ultimaLeituraTemp)) doc["temp"] = ultimaLeituraTemp;
@@ -575,6 +654,7 @@ void handleRoot() {
   html.replace("{{mac}}", WiFi.macAddress());
   html.replace("{{ip}}", WiFi.localIP().toString());
   html.replace("{{servidor}}", serverHost + ":" + String(serverPort));
+  html.replace("{{fw}}", String(FW_VERSAO));
   server.send(200, "text/html", html);
   reportAccess(server.client().remoteIP().toString(), server.header("User-Agent"));
 }
@@ -586,6 +666,7 @@ void handleInfo() {
   doc["ip"] = WiFi.localIP().toString();
   doc["servidor"] = serverHost + ":" + String(serverPort);
   doc["modo"] = modoAtualTexto();
+  doc["fw"] = FW_VERSAO;
   doc["wifiRssi"] = WiFi.RSSI();
   doc["wsServidorConectado"] = estadoWsServidor == WS_ESTADO_CONECTADO;
 
@@ -692,6 +773,10 @@ int executarHttpPost(const String& url, const String& payload, String& resposta)
   http.setConnectTimeout(HTTP_CLIENT_TIMEOUT_MS);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("x-device-mac", WiFi.macAddress());
+  if (deviceId.length() > 0 && deviceSecret.length() > 0) {
+    http.addHeader("x-device-id", deviceId);
+    http.addHeader("x-device-secret", deviceSecret);
+  }
   int statusCode = http.POST(payload);
   resposta = http.getString();
   http.end();
@@ -711,6 +796,7 @@ void identificarSalaNoServidor() {
   JsonDocument doc;
   doc["mac"] = WiFi.macAddress();
   doc["ip"] = WiFi.localIP().toString();
+  doc["fw"] = FW_VERSAO;
 
   String payload;
   serializeJson(doc, payload);
@@ -756,6 +842,7 @@ void sendHeartbeat() {
   if (!isnan(ultimaLeituraTemp)) doc["temperatura"] = ultimaLeituraTemp;
   doc["mac"] = WiFi.macAddress();
   doc["ip"] = WiFi.localIP().toString();
+  doc["fw"] = FW_VERSAO;
 
   String payload;
   serializeJson(doc, payload);
@@ -790,4 +877,225 @@ void reportComando(const String& cmd, const String& valor) {
   serializeJson(doc, payload);
 
   wsCliente.sendTXT(payload);
+}
+
+void verificarValidacaoOta() {
+  bool nucleoOk = littleFsOk && WiFi.status() == WL_CONNECTED && estadoWsServidor == WS_ESTADO_CONECTADO;
+  if (nucleoOk) {
+    if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
+      Serial.println("Autovalidacao OK: novo firmware confirmado.");
+    }
+    otaPendenteValidacao = false;
+    return;
+  }
+  if ((long)(millis() - otaValidacaoLimite) >= 0) {
+    Serial.println("Autovalidacao falhou dentro do prazo: revertendo para o firmware anterior.");
+    esp_err_t r = esp_ota_mark_app_invalid_rollback_and_reboot();
+    Serial.printf("Rollback indisponivel (%d): seguindo com a imagem atual, ja verificada por hash.\n", r);
+    esp_ota_mark_app_valid_cancel_rollback();
+    otaPendenteValidacao = false;
+  }
+}
+
+void bytesParaHex(const uint8_t* dados, size_t n, char* saida) {
+  static const char* hex = "0123456789abcdef";
+  for (size_t i = 0; i < n; i++) {
+    saida[i * 2] = hex[(dados[i] >> 4) & 0x0F];
+    saida[i * 2 + 1] = hex[dados[i] & 0x0F];
+  }
+  saida[n * 2] = '\0';
+}
+
+void reportarOtaResultado(bool ok, const String& erro) {
+  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  JsonDocument doc;
+  doc["tipo"] = "ota_resultado";
+  doc["resultado"] = ok ? "ok" : "erro";
+  if (!ok) doc["erro"] = erro;
+  doc["versao"] = FW_VERSAO;
+  String payload;
+  serializeJson(doc, payload);
+  wsCliente.sendTXT(payload);
+}
+
+void reportarOtaProgresso(size_t recebido, size_t total) {
+  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  JsonDocument doc;
+  doc["tipo"] = "ota_progresso";
+  doc["recebido"] = recebido;
+  doc["total"] = total;
+  String payload;
+  serializeJson(doc, payload);
+  wsCliente.sendTXT(payload);
+}
+
+void iniciarOtaOferta(JsonDocument& doc) {
+  if (otaEmAndamento) {
+    reportarOtaResultado(false, "atualizacao ja em andamento");
+    return;
+  }
+  if (runtimeMode != RUNTIME_OPERATION) {
+    reportarOtaResultado(false, "dispositivo em modo de configuracao");
+    return;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    reportarOtaResultado(false, "sem Wi-Fi");
+    return;
+  }
+
+  String versao = doc["versao"] | "";
+  String shaEsperado = doc["sha256"] | "";
+  size_t tamanho = doc["tamanho"] | 0;
+  String caminho = doc["caminho"] | "/dispositivo/firmware";
+  shaEsperado.toLowerCase();
+
+  if (tamanho < 65536 || shaEsperado.length() != 64) {
+    reportarOtaResultado(false, "oferta de firmware invalida");
+    return;
+  }
+
+  const esp_partition_t* destino = esp_ota_get_next_update_partition(NULL);
+  if (!destino) {
+    reportarOtaResultado(false, "sem particao OTA (regrave por USB para habilitar)");
+    return;
+  }
+  if (tamanho > destino->size) {
+    reportarOtaResultado(false, "firmware maior que a particao OTA");
+    return;
+  }
+
+  otaEmAndamento = true;
+  Serial.printf("OTA: iniciando atualizacao para %s (%u bytes).\n", versao.c_str(), (unsigned)tamanho);
+
+  String url = urlServidor((caminho + "?sala=" + salaId).c_str());
+  HTTPClient http;
+  WiFiClientSecure clienteSeguro;
+  bool iniciou = iniciarClienteHttp(http, clienteSeguro, url);
+  if (!iniciou) {
+    otaEmAndamento = false;
+    reportarOtaResultado(false, "falha ao abrir conexao com o servidor");
+    return;
+  }
+  http.setTimeout(OTA_HTTP_TIMEOUT_MS);
+  http.setConnectTimeout(OTA_HTTP_TIMEOUT_MS);
+  http.addHeader("x-device-mac", WiFi.macAddress());
+  if (deviceId.length() > 0 && deviceSecret.length() > 0) {
+    http.addHeader("x-device-id", deviceId);
+    http.addHeader("x-device-secret", deviceSecret);
+  }
+
+  int codigo = http.GET();
+  if (codigo != 200) {
+    http.end();
+    otaEmAndamento = false;
+    reportarOtaResultado(false, "download retornou HTTP " + String(codigo));
+    return;
+  }
+
+  int contentLength = http.getSize();
+  if (contentLength > 0 && (size_t)contentLength != tamanho) {
+    http.end();
+    otaEmAndamento = false;
+    reportarOtaResultado(false, "tamanho do download difere da oferta");
+    return;
+  }
+
+  if (!Update.begin(tamanho)) {
+    http.end();
+    otaEmAndamento = false;
+    reportarOtaResultado(false, "Update.begin falhou: " + String(Update.errorString()));
+    return;
+  }
+
+  mbedtls_md_context_t sha;
+  mbedtls_md_init(&sha);
+  mbedtls_md_setup(&sha, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 0);
+  mbedtls_md_starts(&sha);
+
+  WiFiClient* stream = http.getStreamPtr();
+  uint8_t* buffer = (uint8_t*)malloc(OTA_BUFFER_BYTES);
+  if (!buffer) {
+    Update.abort();
+    http.end();
+    mbedtls_md_free(&sha);
+    otaEmAndamento = false;
+    reportarOtaResultado(false, "sem memoria para o buffer de OTA");
+    return;
+  }
+
+  size_t recebido = 0;
+  size_t ultimoProgresso = 0;
+  unsigned long ultimaAtividade = millis();
+  bool falhou = false;
+  String erro;
+
+  while (recebido < tamanho) {
+    int disponivel = stream->available();
+    if (disponivel > 0) {
+      size_t aLer = (size_t)disponivel < OTA_BUFFER_BYTES ? (size_t)disponivel : OTA_BUFFER_BYTES;
+      if (aLer > tamanho - recebido) aLer = tamanho - recebido;
+      int lidos = stream->readBytes(buffer, aLer);
+      if (lidos > 0) {
+        if (Update.write(buffer, lidos) != (size_t)lidos) {
+          falhou = true;
+          erro = "falha ao gravar o flash: " + String(Update.errorString());
+          break;
+        }
+        mbedtls_md_update(&sha, buffer, lidos);
+        recebido += lidos;
+        ultimaAtividade = millis();
+        if (recebido - ultimoProgresso >= OTA_PROGRESSO_INTERVALO_BYTES) {
+          ultimoProgresso = recebido;
+          reportarOtaProgresso(recebido, tamanho);
+        }
+      }
+    } else {
+      if (!http.connected() && recebido < tamanho) {
+        falhou = true;
+        erro = "conexao encerrada antes do fim do firmware";
+        break;
+      }
+      if ((long)(millis() - ultimaAtividade) > (long)OTA_HTTP_TIMEOUT_MS) {
+        falhou = true;
+        erro = "tempo esgotado durante o download";
+        break;
+      }
+      delay(1);
+    }
+    wsCliente.loop();
+  }
+
+  free(buffer);
+  http.end();
+
+  if (!falhou) {
+    uint8_t shaCalc[32];
+    mbedtls_md_finish(&sha, shaCalc);
+    char shaHex[65];
+    bytesParaHex(shaCalc, 32, shaHex);
+    if (shaEsperado != shaHex) {
+      falhou = true;
+      erro = "sha256 divergente";
+    }
+  }
+  mbedtls_md_free(&sha);
+
+  if (falhou) {
+    Update.abort();
+    otaEmAndamento = false;
+    Serial.printf("OTA: falhou (%s). Firmware atual mantido.\n", erro.c_str());
+    reportarOtaResultado(false, erro);
+    return;
+  }
+
+  if (!Update.end(true)) {
+    otaEmAndamento = false;
+    reportarOtaResultado(false, "Update.end falhou: " + String(Update.errorString()));
+    return;
+  }
+
+  Serial.println("OTA: firmware gravado e verificado. Reiniciando para validacao.");
+  reportarOtaResultado(true, "");
+  reportComando("ota", "gravado versao=" + versao);
+  agendarReinicio(1200);
 }

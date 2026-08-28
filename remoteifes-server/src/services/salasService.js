@@ -78,12 +78,14 @@ function removerDetectado(mac) {
   db.prepare(`DELETE FROM esp_detectados WHERE mac = ?`).run(macLimpo);
 }
 
-function heartbeatDispositivo(sala, estadoReportado, mac, ip) {
+function heartbeatDispositivo(sala, estadoReportado, mac, ip, opcoes = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
-  if (!macCorrespondeASala(salaRow, mac)) throw new Error("MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala");
+  if (!opcoes.viaCredencial && !macCorrespondeASala(salaRow, mac)) {
+    throw new Error("MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala");
+  }
   registrarDeteccaoEsp(mac, ip, sala);
-  return marcarOnline(sala, estadoReportado, mac, ip);
+  return marcarOnline(sala, estadoReportado, mac, ip, opcoes);
 }
 
 function macCorrespondeASala(salaRow, mac) {
@@ -91,11 +93,11 @@ function macCorrespondeASala(salaRow, mac) {
   return !!salaRow?.mac && !!macLimpo && salaRow.mac.toUpperCase() === macLimpo;
 }
 
-function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null) {
+function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null, opcoes = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
-  if (!macCorrespondeASala(salaRow, mac)) {
+  if (!opcoes.viaCredencial && !macCorrespondeASala(salaRow, mac)) {
     logger.warn("heartbeat-mac-invalido", { sala, macRecebido: mac, macEsperado: salaRow.mac, ip });
     throw new Error("MAC do dispositivo não corresponde ao ESP32 cadastrado para esta sala");
   }
@@ -483,6 +485,11 @@ function apagarLogs({ data } = {}) {
   }
 }
 
+function registrarVersaoFirmware(sala, fw) {
+  if (typeof fw !== "string" || !fw || fw.length > 32) return;
+  db.prepare(`UPDATE salas SET fwVersao = ?, atualizadoEm = datetime('now') WHERE sala = ? AND (fwVersao IS NULL OR fwVersao != ?)`).run(fw, sala, fw);
+}
+
 function registrarComandoDispositivo(sala, cmd, valor) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
@@ -594,6 +601,7 @@ module.exports = {
   verificarTimeouts,
   listarEventosEsp,
   registrarComandoDispositivo,
+  registrarVersaoFirmware,
   registrarAcessoEsp,
   listarAcessosEsp,
   apagarAcessosEsp,

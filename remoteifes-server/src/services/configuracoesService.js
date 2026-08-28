@@ -16,6 +16,7 @@ const PADROES = {
   modoTeste: process.env.NODE_ENV !== "production",
   redesAutorizadas: [],
   modoManutencao: false,
+  espCredenciaisObrigatorias: false,
 };
 
 const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
@@ -23,7 +24,7 @@ const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
 const CHAVES_NUMERICAS_ANULAVEIS = ["timeoutInatividadeMinutos"];
 const CHAVES_NUMERICAS = ["popupAvisoSegundos", "limiarOnlineMinutos"];
 const CHAVES_BOOLEANAS = ["adminSujeitoTimeout"];
-const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao"];
+const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
 const CHAVES_TEXTO_CRITICAS = ["turboFuncaoExtra"];
