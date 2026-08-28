@@ -1063,6 +1063,7 @@ void iniciarOtaOferta(JsonDocument& doc) {
       delay(1);
     }
     wsCliente.loop();
+    yield();
   }
 
   free(buffer);

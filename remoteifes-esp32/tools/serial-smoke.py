@@ -14,6 +14,7 @@ JANELA_S = 20
 
 MARCADORES_OBRIGATORIOS = ["RemoteIFES IR System Initializing"]
 MARCADORES_REDE = ["Conectando a rede salva", "Wi-Fi reconectado", "IP:", "RemoteIFES-Setup"]
+MARCADORES_OTA = ["Autovalidacao OK", "aguardando autovalidacao", "Rollback"]
 
 
 def main():
@@ -52,6 +53,14 @@ def main():
     if not any(m in texto for m in MARCADORES_REDE):
         print("FALHA: nenhum sinal de atividade de rede/portal apos o boot", file=sys.stderr)
         return 1
+
+    import re
+    versao = re.search(r"Initializing \(fw ([^)]+)\)", texto)
+    if versao:
+        print(f"firmware {versao.group(1)}", file=sys.stderr)
+    ota = next((m for m in MARCADORES_OTA if m in texto), None)
+    if ota:
+        print(f"OTA: {ota}", file=sys.stderr)
 
     print("OK: firmware inicializou e entrou na rotina de rede", file=sys.stderr)
     return 0
