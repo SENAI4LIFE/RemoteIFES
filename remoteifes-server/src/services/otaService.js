@@ -155,6 +155,11 @@ function definirEstado(sala, patch) {
   const anterior = estados.get(sala) || {};
   const proximo = { ...anterior, ...patch, atualizadoEm: new Date().toISOString() };
   estados.set(sala, proximo);
+  if (proximo.fase === "falhou" && anterior.fase !== "falhou") {
+    try {
+      require("./monitoramentoService").registrar("otaFalha", { sala, erro: proximo.erro });
+    } catch {}
+  }
   emitir(sala);
   return proximo;
 }
