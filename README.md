@@ -211,6 +211,23 @@ O servidor roda uma rotina de retenção a cada 6 horas (e uma vez na inicializa
 
 Usuários, salas, agendamentos, configurações e **relatos de problema nunca são removidos** por essa rotina. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
 
+### Backup e restauração do banco
+
+O banco inteiro fica em um único arquivo SQLite (`remoteifes-server/data/remoteifes.db`). O servidor sabe fazer cópias de segurança consistentes desse arquivo **sem parar** e sem risco de copiar um estado parcial: cada backup é gerado por `VACUUM INTO`, que produz um arquivo `.db` autônomo, compactado e transacionalmente íntegro (o conteúdo do WAL já entra na cópia; não há `-wal`/`-shm` ao lado). Logo depois de gravado, o arquivo é reaberto somente-leitura e validado com `PRAGMA integrity_check`, `PRAGMA foreign_key_check` e uma checagem das tabelas essenciais — um backup que não passa nessa verificação é descartado, nunca entra na rotação.
+
+**Backup automático** (em produção, ligado por padrão): a cada `BACKUP_INTERVALO_HORAS` (24 por padrão) e uma vez logo após a inicialização, o servidor grava um novo backup em `BACKUP_DIR` (`data/backups/` por padrão) e mantém apenas os `BACKUP_RETENCAO` mais recentes (14 por padrão), removendo os excedentes. Fora de produção o backup automático começa desligado; ligue-o com `BACKUP_AUTOMATICO=true`. Como `data/` já está no `.gitignore`, os backups não são versionados.
+
+**Backup manual:** dentro de `remoteifes-server`, `npm run backup` grava um backup imediato (verificado e já sujeito à rotação) e imprime o caminho. Aceita um rótulo opcional: `npm run backup -- pre-migracao`.
+
+**Restauração:** com o servidor **parado**, `npm run restore` lista os backups disponíveis; `npm run restore -- <arquivo>` restaura o backup indicado (nome dentro de `BACKUP_DIR` ou caminho completo). Antes de sobrescrever, o script verifica o backup candidato, faz uma cópia de segurança consistente do banco atual (`pre-restauracao-<data>.db` em `BACKUP_DIR`) e, depois da troca, revalida o arquivo restaurado. Use `--sim` para pular a confirmação interativa em scripts. Reinicie o servidor após a restauração.
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `BACKUP_AUTOMATICO` | `true` em produção, `false` nos demais | Liga/desliga o backup periódico do agendador |
+| `BACKUP_INTERVALO_HORAS` | 24 | Intervalo entre backups automáticos (1 a 8760) |
+| `BACKUP_RETENCAO` | 14 | Quantos backups manter; os mais antigos são apagados |
+| `BACKUP_DIR` | `data/backups` | Pasta onde os backups são gravados |
+
 ## Restrição de Rede
 
 Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas (rede do IFES), configuradas pelo administrador principal em CIDR (ex.: `10.0.0.0/8`). Existe um **modo de teste**, também configurável apenas pelo administrador principal, que permite acesso de fora da rede autorizada — útil durante testes e homologação, mas desativado por padrão em uma instalação nova de produção. Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada. A mesma restrição de rede e de modo de teste vale para as conexões WebSocket, não apenas para a API HTTP.
@@ -372,6 +389,7 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 | `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot. Em produção, uma senha aleatória é gerada quando o valor não é informado; em desenvolvimento/teste, o padrão é `admin` |
 | `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); **padrão `0`** (não confia em nenhum proxy). O `https-setup.sh` altera este valor para `1` ao configurar o Nginx, que é o valor correto quando há exatamente um proxy reverso na frente. Só use um valor maior que `0` quando existir de fato um proxy confiável imediatamente à frente do servidor — confiar em saltos que não existem permite que um cliente falsifique o IP de origem via `X-Forwarded-For` e contorne o limite de tentativas de login e a restrição de rede |
 | `RETENCAO_DIAS_LOGS` / `RETENCAO_DIAS_SESSOES` / `RETENCAO_DIAS_EXECUCOES` / `RETENCAO_DIAS_DETECCOES` | Opcionais. Dias de retenção das tabelas de histórico antes da limpeza automática (padrões: 180 / 90 / 90 / 30). Veja [Manutenção automática do banco](#manutenção-automática-do-banco) |
+| `BACKUP_AUTOMATICO` / `BACKUP_INTERVALO_HORAS` / `BACKUP_RETENCAO` / `BACKUP_DIR` | Opcionais. Backup periódico do banco SQLite (em produção, ligado por padrão). Veja [Backup e restauração do banco](#backup-e-restauração-do-banco) |
 
 Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx/Caddy, ou um serviço com TLS gerenciado), já que os aparelhos móveis e o GitHub Pages exigem conteúdo servido por HTTPS.
 
@@ -455,6 +473,7 @@ Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo p
 - **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
 - **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
 - **Cadastre o MAC de cada ESP32 assim que possível** (`Admin > ESP32 / MACs`): as rotas `/dispositivo/*` não passam pela restrição de rede (os ESP32 precisam alcançá-las de qualquer rede), e enquanto o MAC de uma sala não está cadastrado, qualquer dispositivo que conheça o código dessa sala pode reportar estado falso para ela. Cadastrar o MAC fecha essa janela, exigindo que as chamadas venham exatamente do ESP32 físico da sala.
+- **Confirme que os backups estão sendo gravados** em `remoteifes-server/data/backups/` (em produção o backup automático já vem ligado) e copie essa pasta para fora da Pi periodicamente. Teste a restauração ao menos uma vez com `npm run restore` num ambiente separado — um backup nunca verificado não é um backup. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
 
 ### Frontend no GitHub Pages
 
@@ -501,7 +520,7 @@ Além do site publicado no GitHub Pages, o `remoteifes-web` pode ser instalado c
 
 | Arquivo | Função |
 |---|---|
-| `manifest.webmanifest` | Nome, ícones (`assets/icons/`), cor de tema (`#1c6b3c`) e modo de exibição `standalone` |
+| `manifest.webmanifest` | Nome, ícones (`assets/icons/`), cor de tema (`#1c6b3c`), modo de exibição `standalone` e orientação `any` (retrato e paisagem) |
 | `sw.js` | Service worker: cacheia o app shell (HTML/CSS/JS/ícones) para abrir mais rápido e funcionar parcialmente offline |
 
 O `sw.js` só intercepta carregamentos de arquivos estáticos do próprio domínio — chamadas à API (`serverUrl`), inclusive em uma implantação same-origin, e a conexão WebSocket continuam exigindo rede normalmente. O registro do service worker acontece automaticamente no `index.html`, sem configuração adicional.
@@ -598,7 +617,25 @@ O app empacotado é carregado de `file://` (ou `https://localhost`), então não
 
 #### Ajustando as permissões de rede
 
-`remoteifes-cordova/config.xml` vem com `<access origin="*" />` e `<allow-navigation href="*" />` para simplificar o desenvolvimento contra qualquer `serverUrl`. Para produção, restrinja ambos ao domínio real do servidor central (ex.: `https://remoteifes.ifes.edu.br/*`) antes de gerar o build final. O mesmo arquivo já libera tráfego HTTP em texto claro no Android (`usesCleartextTraffic`) para facilitar testes locais; remova essa linha se o servidor de produção só aceitar HTTPS.
+`remoteifes-cordova/config.xml` vem, por padrão, no modo de desenvolvimento: `<access origin="*" />`, `<allow-navigation href="*" />`, `<allow-intent>` para HTTP/HTTPS e tráfego HTTP local liberado no Android e iOS, para simplificar os testes contra qualquer `serverUrl`.
+
+Para o build de produção, o script `harden-config.js` reescreve o `config.xml` restringindo rede e navegação a uma **única origem**:
+
+```bash
+cd remoteifes-cordova
+npm run harden-config -- https://remoteifes.ifes.edu.br   # origem HTTPS: remove exceções de HTTP
+npm run harden-config -- http://192.168.1.50:8080         # origem HTTP em rede local: mantém a exceção local (com aviso)
+```
+
+Depois do build de release, `npm run dev-config` (ou `git checkout config.xml`) devolve o arquivo ao modo de desenvolvimento. A operação é reversível e idempotente; rode-a após o `sync` e antes de `cordova build ... --release`.
+
+O app suporta **retrato e paisagem** (`Orientation` = `default`); a interface acompanha a rotação sem recarregar nem perder o estado atual. Para evitar gerar um APK com permissões de rede curinga, `npm run build-android-release` exige `REMOTEIFES_SERVER_URL` e endurece o `config.xml` automaticamente antes do build:
+
+```bash
+REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br npm run build-android-release
+```
+
+Para um servidor HTTP em rede local, informe a origem `http://192.168.1.50:8080`; o Android e o iOS manterão somente a exceção necessária para rede local.
 
 ## Scripts Auxiliares
 
@@ -624,16 +661,21 @@ remoteifes-server/
   install-service.sh configura um serviço systemd para manter o servidor no ar (auto-start no boot, ex.: Raspberry Pi)
   https-setup.sh     configuração automatizada de HTTPS (Nginx + Certbot)
   reset-admin-senha.js  redefine a senha do usuário admin sem apagar dados
+  backup-db.js       gera um backup verificado do banco SQLite agora (npm run backup)
+  restore-backup.js  lista e restaura backups, com verificação e cópia de segurança (npm run restore)
   server.js          ponto de entrada: sobe o HTTP server, o WebSocket e o agendador
+  data/
+    remoteifes.db    banco SQLite (criado na primeira execução; ignorado pelo Git)
+    backups/         backups automáticos e manuais do banco (ignorado pelo Git)
   src/
     app.js            monta o Express app e registra as rotas
-    config/           conexão com o banco SQLite
+    config/           conexão com o banco SQLite e caminhos de dados/backup (paths.js)
     db/                schema, seed e a lista de salas reais do campus (salasCampus.js)
     middlewares/       autenticação, permissões, restrição de rede
     routes/            rotas HTTP (login, salas, comandos, agendamentos, admin, dispositivo, relatos)
-    services/          regras de negócio (usuários, salas, agendamentos,
-                        configurações, notificações, relatos de problema, sessões/tokens, status em tempo real)
-    scheduler/         verificação periódica de agendamentos, timeouts de ESP32 e sessões abandonadas
+    services/          regras de negócio (usuários, salas, agendamentos, configurações, notificações,
+                        relatos de problema, sessões/tokens, status em tempo real, backup do banco)
+    scheduler/         verificação periódica de agendamentos, timeouts de ESP32, sessões abandonadas e backup
     utils/             funções auxiliares (data/hora em fuso de Brasília, rate limiting, faixas de rede)
 
 remoteifes-web/
@@ -677,8 +719,9 @@ remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev)
   flash.sh                  instala o PlatformIO Core (se necessário) e compila/grava firmware + sistema de arquivos
 
 remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento como PWA e Aplicativo Nativo)
-  config.xml             configuração do app (id, nome, ícone, splash, permissões de rede)
-  package.json            scripts de sync/build/run e plugins Cordova do projeto
+  config.xml             configuração do app (id, nome, ícone, splash, permissões de rede) — modo de desenvolvimento por padrão
+  harden-config.js       reescreve config.xml para produção (origem única) ou de volta para desenvolvimento (--dev)
+  package.json            scripts de sync/build/run/harden-config e plugins Cordova do projeto
   sync-www.js             copia remoteifes-web para www/ antes de cada build (não editar www/ manualmente)
   resources/              imagens-fonte (icon.png, splash.png) usadas por cordova-res
   www/                    cópia gerada de remoteifes-web (gitignored fora de commits manuais, se preferir)
