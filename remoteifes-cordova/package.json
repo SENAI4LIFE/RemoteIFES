@@ -6,10 +6,12 @@
   "main": "index.js",
   "scripts": {
     "sync": "node sync-www.js",
+    "harden-config": "node harden-config.js",
+    "dev-config": "node harden-config.js --dev",
     "prepare-android": "npm run sync && cordova platform add android || true && cordova prepare android",
     "prepare-ios": "npm run sync && cordova platform add ios || true && cordova prepare ios",
     "build-android": "npm run sync && cordova build android",
-    "build-android-release": "npm run sync && cordova build android --release",
+    "build-android-release": "node build-android-release.js",
     "build-ios": "npm run sync && cordova build ios",
     "run-android": "npm run sync && cordova run android",
     "run-ios": "npm run sync && cordova run ios"

@@ -38,7 +38,7 @@ function origemPermitida(origin) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (origensPermitidas.length === 0) return true;
+  if (origensPermitidas.length === 0) return false;
   return origensPermitidas.includes(origin);
 }
 
