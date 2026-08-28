@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 
 const db = require("../src/config/database");
 const agendamentosService = require("../src/services/agendamentosService");
+const { estaNaJanelaDeLigar } = require("../src/scheduler/schedulerService");
 
 require("../src/app");
 
@@ -14,6 +15,12 @@ const agendamento = db.prepare(`
   INSERT INTO agendamentos (sala, usuarioId, data, horaInicio, horaFim, temperatura)
   VALUES ('A-103a', ?, '2099-01-01', '08:00', '09:00', 23)
 `).run(usuario.id).lastInsertRowid;
+
+test("fim do intervalo é exclusivo para não ligar e desligar no mesmo tick", () => {
+  assert.equal(estaNaJanelaDeLigar("08:00", "08:00", "09:00"), true);
+  assert.equal(estaNaJanelaDeLigar("08:59", "08:00", "09:00"), true);
+  assert.equal(estaNaJanelaDeLigar("09:00", "08:00", "09:00"), false);
+});
 
 test("execução de agendamento usa a data de Brasília, não a data UTC do timestamp", () => {
   db.prepare(`

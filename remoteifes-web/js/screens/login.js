@@ -146,6 +146,11 @@ function realizarLogout({ manterTela = false } = {}) {
   if (typeof pararAutoRefreshRooms === "function") pararAutoRefreshRooms();
   if (typeof SimpleWizard !== "undefined") SimpleWizard.pararAutoRefresh();
   if (typeof ScreenFloorplan !== "undefined") ScreenFloorplan.aoFechar();
+  if (typeof Esp32Admin !== "undefined") Esp32Admin.aoFechar();
+  if (typeof Admin !== "undefined" && Admin._ativosIntervalId) {
+    clearInterval(Admin._ativosIntervalId);
+    Admin._ativosIntervalId = null;
+  }
   Notificacoes.pararPolling();
   Relatos.aoDeslogar();
   RTStatus.desconectar();

@@ -4,10 +4,15 @@ const logger = require("../utils/logger");
 
 const PING_MS = 15 * 1000;
 const MAX_CAPTURAS_ARMAZENADAS = 20;
+// Captura IR bruta pode trazer ~1024 inteiros; 256 KiB cobre com folga.
+// Frames maiores que isso são rejeitados pelo `ws` antes de qualquer parse.
+const MAX_PAYLOAD_BYTES = 256 * 1024;
+const MODOS_VALIDOS = new Set(["operation", "config_idle", "config_clone"]);
 
 const conexoes = new Map();
 const eventos = new EventEmitter();
 let wss = null;
+let intervaloPing = null;
 
 function autenticar(req) {
   const sala = req.headers["x-device-sala"];
@@ -71,14 +76,20 @@ function desconectarSala(sala) {
   return true;
 }
 
+function numeroNaFaixa(valor, min, max) {
+  return typeof valor === "number" && Number.isFinite(valor) && valor >= min && valor <= max;
+}
+
 function registrarTelemetria(sala, entrada, msg) {
   const agora = new Date().toISOString();
-  entrada.wifiRssi = typeof msg.rssi === "number" ? msg.rssi : entrada.wifiRssi;
-  entrada.modo = typeof msg.modo === "string" ? msg.modo : entrada.modo;
+  const tempValida = numeroNaFaixa(msg.temp, -40, 85);
+  const humValida = numeroNaFaixa(msg.hum, 0, 100);
+  entrada.wifiRssi = numeroNaFaixa(msg.rssi, -120, 0) ? msg.rssi : entrada.wifiRssi;
+  entrada.modo = MODOS_VALIDOS.has(msg.modo) ? msg.modo : entrada.modo;
   entrada.ultimaTelemetria = {
-    temp: typeof msg.temp === "number" ? msg.temp : null,
-    hum: typeof msg.hum === "number" ? msg.hum : null,
-    rssi: typeof msg.rssi === "number" ? msg.rssi : null,
+    temp: tempValida ? msg.temp : null,
+    hum: humValida ? msg.hum : null,
+    rssi: numeroNaFaixa(msg.rssi, -120, 0) ? msg.rssi : null,
     modo: entrada.modo,
     ligado: !!msg.ligado,
     recebidoEm: agora,
@@ -89,7 +100,7 @@ function registrarTelemetria(sala, entrada, msg) {
 
   try {
     const estadoReportado = {};
-    if (typeof msg.temp === "number" && Number.isFinite(msg.temp)) estadoReportado.temperatura = msg.temp;
+    if (tempValida) estadoReportado.temperatura = msg.temp;
     if (typeof msg.ligado === "boolean") estadoReportado.ligado = msg.ligado;
     salasService.marcarOnline(sala, estadoReportado, entrada.mac, entrada.ip);
   } catch (err) {
@@ -115,10 +126,16 @@ function registrarCaptura(sala, entrada, msg) {
 
 function iniciar(server) {
   const { WebSocketServer } = require("ws");
-  wss = new WebSocketServer({ noServer: true });
+  wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
 
   server.on("upgrade", (req, socket, head) => {
-    const { pathname } = new URL(req.url, "http://localhost");
+    let pathname;
+    try {
+      ({ pathname } = new URL(req.url, "http://localhost"));
+    } catch (erro) {
+      socket.destroy();
+      return;
+    }
     if (pathname !== "/ws/dispositivo") return;
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit("connection", ws, req);
@@ -126,6 +143,17 @@ function iniciar(server) {
   });
 
   wss.on("connection", (ws, req) => {
+    // Handler cedo: sem ele, um erro de socket (RST, frame acima do limite,
+    // erro de protocolo) vira 'uncaughtException' e derruba o processo.
+    ws.on("error", (err) => {
+      logger.warn("device-ws-erro", { mensagem: err && err.message });
+      try {
+        ws.terminate();
+      } catch (erro) {
+        /* já encerrado */
+      }
+    });
+
     const auth = autenticar(req);
     if (!auth) {
       ws.close(4001, "não autorizado");
@@ -201,7 +229,7 @@ function iniciar(server) {
           salasService.registrarComandoDispositivo(sala, msg.cmd, valor);
         }
       } else if (msg.tipo === "modo_alterado") {
-        entrada.modo = typeof msg.modo === "string" ? msg.modo : entrada.modo;
+        entrada.modo = MODOS_VALIDOS.has(msg.modo) ? msg.modo : entrada.modo;
         eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
       }
     });
@@ -213,13 +241,9 @@ function iniciar(server) {
         eventos.emit("conexao", { sala, conectado: false });
       }
     });
-
-    ws.on("error", (err) => {
-      logger.warn("device-ws-erro", { sala, mensagem: err.message });
-    });
   });
 
-  const intervaloPing = setInterval(() => {
+  intervaloPing = setInterval(() => {
     conexoes.forEach((entrada) => {
       if (!entrada.ws.isAlive) {
         entrada.ws.terminate();
@@ -232,8 +256,31 @@ function iniciar(server) {
   intervaloPing.unref();
 }
 
+function encerrar() {
+  if (intervaloPing) {
+    clearInterval(intervaloPing);
+    intervaloPing = null;
+  }
+  conexoes.forEach((entrada) => {
+    try {
+      entrada.ws.close(1001, "servidor encerrando");
+    } catch (erro) {
+      /* ignora sockets já fechados */
+    }
+  });
+  conexoes.clear();
+  if (wss) {
+    try {
+      wss.close();
+    } catch (erro) {
+      /* ignora */
+    }
+  }
+}
+
 module.exports = {
   iniciar,
+  encerrar,
   eventos,
   estadoPublico,
   listarEstados,

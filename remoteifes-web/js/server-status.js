@@ -29,6 +29,7 @@ const ServerStatus = (() => {
   const titulo = document.getElementById("serverStatusTitulo");
   const desc = document.getElementById("serverStatusDesc");
   const acessoAdminBtn = document.getElementById("serverStatusAcessoAdmin");
+  const configServidorBtn = document.getElementById("serverStatusConfigBtn");
   const chipDot = document.getElementById("serverStatusDot");
   const chipLabel = document.getElementById("serverStatusChipLabel");
 
@@ -38,10 +39,48 @@ const ServerStatus = (() => {
   const inputAcessoSenha = document.getElementById("manutencaoSenha");
   const cancelarAcessoBtn = document.getElementById("manutencaoAcessoCancelarBtn");
 
+  function baseServidor() {
+    return (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || "";
+  }
+
+  function servidorConfigurado() {
+    return /^https?:\/\//.test(baseServidor());
+  }
+
   function wsUrl() {
-    const base = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || window.location.origin;
+    const base = baseServidor() || window.location.origin;
     const wsBase = base.replace(/^http/, "ws");
     return `${wsBase}/ws`;
+  }
+
+  function mostrarConfigServidor() {
+    if (!configServidorBtn) return;
+    const empacotado = !!(window.RemoteIFESConfig && window.RemoteIFESConfig.empacotado);
+    const apontaLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:|\/|$)/.test(baseServidor());
+    // Só aparece em app empacotado, quando não há endereço, ou quando o alvo é
+    // localhost — nunca numa PWA publicada em domínio real e alcançável.
+    const precisa = empacotado || !servidorConfigurado() || apontaLocalhost;
+    configServidorBtn.classList.toggle("hidden", !precisa);
+  }
+
+  async function pedirEnderecoServidor() {
+    if (typeof Dialog === "undefined") return;
+    const atual = baseServidor();
+    const novo = await Dialog.texto({
+      titulo: "Endereço do servidor RemoteIFES",
+      descricao: "Informe o endereço (IP ou domínio) do servidor na rede, incluindo a porta. Ex.: http://192.168.0.10:8080",
+      label: "Endereço do servidor",
+      valorInicial: atual,
+      placeholder: "http://192.168.0.10:8080",
+      maxLength: 200,
+      confirmarTexto: "Salvar e reconectar",
+    });
+    if (!novo) return;
+    if (!window.RemoteIFESConfig || !window.RemoteIFESConfig.definirServidor(novo)) {
+      if (typeof Toast !== "undefined") Toast.erro("endereço inválido: use http://host:porta ou https://host");
+      return;
+    }
+    window.location.reload();
   }
 
   function wsToken() {
@@ -85,7 +124,10 @@ const ServerStatus = (() => {
     mostrarSpinner();
     aplicarChip("offline", "Offline");
     titulo.textContent = "Sem conexão com o servidor";
-    desc.textContent = `Tentativa de conexão nº ${Math.max(1, tentativas)}`;
+    desc.textContent = servidorConfigurado()
+      ? `Tentativa de conexão nº ${Math.max(1, tentativas)}`
+      : "Nenhum endereço de servidor configurado para este dispositivo.";
+    mostrarConfigServidor();
   }
 
   function aplicarEstadoManutencao() {
@@ -99,12 +141,14 @@ const ServerStatus = (() => {
     titulo.textContent = "Sistema em manutenção";
     desc.textContent = "O RemoteIFES está passando por uma manutenção programada. Tente novamente em alguns instantes.";
     acessoAdminBtn.classList.remove("hidden");
+    if (configServidorBtn) configServidorBtn.classList.add("hidden");
   }
 
   function esconderTela() {
     limparEstadoConectandoAgendado();
     tela.classList.add("hidden");
     acessoManualLiberado = false;
+    if (configServidorBtn) configServidorBtn.classList.add("hidden");
   }
 
   function mostrarAcessoManutencao() {
@@ -160,6 +204,17 @@ const ServerStatus = (() => {
 
   function conectar() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+    if (!servidorConfigurado()) {
+      // App empacotado ainda sem endereço: mostra a tela de configuração em vez
+      // de abrir um WebSocket relativo condenado a falhar em laço. Ainda assim
+      // liberamos o bootstrap do app (restaurarSessaoSalva falha sem servidor,
+      // mas de forma controlada) para o estado ficar determinístico.
+      tentativas = Math.max(1, tentativas);
+      aplicarEstadoConectando();
+      notificarPronto();
+      return;
+    }
 
     const idConexao = ++conexaoId;
     tentativas += 1;
@@ -256,6 +311,10 @@ const ServerStatus = (() => {
     mostrarAcessoManutencao();
   });
 
+  if (configServidorBtn) {
+    configServidorBtn.addEventListener("click", pedirEnderecoServidor);
+  }
+
   cancelarAcessoBtn.addEventListener("click", () => {
     acessoManualLiberado = false;
     esconderAcessoManutencao();
@@ -288,6 +347,28 @@ const ServerStatus = (() => {
     definirManutencao(true);
     if (!acessoManualLiberado) aplicarEstadoManutencao();
   });
+
+  // Após o app/aba voltar ao primeiro plano (Android congela timers e pode
+  // deixar o socket "meio morto"), força uma reconexão imediata em vez de
+  // esperar o ping do servidor detectar a conexão perdida.
+  function reconectarSeVisivelEDesconectado() {
+    if (document.visibilityState === "visible" && !estaConectado() && servidorConfigurado()) {
+      if (reconectarTimeoutId) {
+        clearTimeout(reconectarTimeoutId);
+        reconectarTimeoutId = null;
+      }
+      conectar();
+    }
+  }
+  function reconectarAoRetomar() {
+    if (document.visibilityState === "visible" && servidorConfigurado()) {
+      // readyState pode continuar OPEN depois de o SO suspender a rede do app.
+      reconectarComTokenAtual();
+    }
+  }
+  document.addEventListener("visibilitychange", reconectarSeVisivelEDesconectado);
+  document.addEventListener("resume", reconectarAoRetomar);
+  window.addEventListener("online", reconectarAoRetomar);
 
   function emManutencao() {
     return manutencaoAtiva;
