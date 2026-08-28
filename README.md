@@ -188,7 +188,7 @@ O servidor registra cada login como uma sessão (token, horário de início, úl
 - **Ativos**: usuários com uma sessão em aberto, com um cronômetro de tempo de sessão em tempo real e um status calculado a partir do último uso — `online` (dentro do limiar configurado), `inativo` (sessão aberta, mas sem uso recente) ou `offline`.
 - **Sessões**: histórico de logins/logouts, com duração de cada sessão, filtrável por data e removível (por data ou por completo).
 
-Sessões sem atividade por mais de 24 horas são encerradas automaticamente pelo servidor, mesmo sem logout explícito. No navegador, o **timeout de inatividade** (configurável em `Admin > Configurações`) desloga o usuário automaticamente após um período sem interação (clique, tecla ou toque), exibindo antes um aviso com contagem regressiva; o usuário pode optar por continuar conectado durante o aviso. Por padrão o timeout está desativado (sem prazo); quando ativado, pode ou não valer também para administradores, conforme configuração.
+Sessões sem atividade por mais de 24 horas são encerradas automaticamente pelo servidor, mesmo sem logout explícito. Além disso, **toda reinicialização do servidor encerra as sessões em aberto**: depois de um restart, os usuários precisam entrar novamente (o app detecta o token inválido e volta para a tela de login). No navegador, o **timeout de inatividade** (configurável em `Admin > Configurações`) desloga o usuário automaticamente após um período sem interação (clique, tecla ou toque), exibindo antes um aviso com contagem regressiva; o usuário pode optar por continuar conectado durante o aviso. Por padrão o timeout está desativado (sem prazo); quando ativado, pode ou não valer também para administradores, conforme configuração.
 
 ## Auditoria (Logs, Dispositivos e Acessos)
 
@@ -197,6 +197,19 @@ Em `Admin`, três sub-abas registram o histórico operacional do sistema, todas 
 - **Logs**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o comando parte da interface local do próprio dispositivo).
 - **Dispositivos**: eventos de conexão — sempre que um ESP32 fica online ou offline, incluindo o desligamento automático de salas cujo ESP32 parou de responder (após 90 segundos sem heartbeat).
 - **Acessos ESP32**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
+
+### Manutenção automática do banco
+
+O servidor roda uma rotina de retenção a cada 6 horas (e uma vez na inicialização) que remove linhas antigas das tabelas de histórico para o banco não crescer indefinidamente em uma operação de longo prazo (ex.: Raspberry Pi):
+
+| Tabela | Retenção padrão | Ajuste |
+|---|---|---|
+| `comandos_log`, `esp_eventos`, `esp_acessos`, `notificacoes` (apenas lidas) | 180 dias | `RETENCAO_DIAS_LOGS` |
+| `sessoes` (apenas já encerradas) | 90 dias | `RETENCAO_DIAS_SESSOES` |
+| `agendamentos_execucoes` | 90 dias | `RETENCAO_DIAS_EXECUCOES` |
+| `esp_detectados` sem vínculo com sala | 30 dias sem nova detecção | `RETENCAO_DIAS_DETECCOES` |
+
+Usuários, salas, agendamentos, configurações e **relatos de problema nunca são removidos** por essa rotina. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
 
 ## Restrição de Rede
 
@@ -213,7 +226,7 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do administrador principal no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
 - **Ponto de acesso de configuração**: a rede aberta `RemoteIFES-Setup` existe somente no primeiro provisionamento ou depois de um reset explícito de Wi-Fi. Ela deve ser usada localmente, e o ESP32 volta ao modo de operação depois que a rede e o servidor são salvos.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
-- **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood). O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
+- **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
 - **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
 - **Cabeçalhos HTTP**: todas as respostas incluem `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy`; em produção (`NODE_ENV=production`) também `Strict-Transport-Security`.
 - **CORS**: em produção, restrito às origens listadas em `CORS_ORIGIN`.
@@ -357,7 +370,8 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 | `PORTA` | Porta HTTP (e WebSocket, no mesmo servidor) do servidor (padrão 8080) |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — vale tanto para a API HTTP quanto para as conexões WebSocket |
 | `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot. Em produção, uma senha aleatória é gerada quando o valor não é informado; em desenvolvimento/teste, o padrão é `admin` |
-| `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); padrão `1`, correto para o proxy Nginx configurado por `https-setup.sh`. Use `0` se o servidor for exposto diretamente à internet sem proxy na frente — confiar em saltos que não existem permite falsificar o IP de origem e contornar o limite de tentativas de login e a restrição de rede |
+| `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); **padrão `0`** (não confia em nenhum proxy). O `https-setup.sh` altera este valor para `1` ao configurar o Nginx, que é o valor correto quando há exatamente um proxy reverso na frente. Só use um valor maior que `0` quando existir de fato um proxy confiável imediatamente à frente do servidor — confiar em saltos que não existem permite que um cliente falsifique o IP de origem via `X-Forwarded-For` e contorne o limite de tentativas de login e a restrição de rede |
+| `RETENCAO_DIAS_LOGS` / `RETENCAO_DIAS_SESSOES` / `RETENCAO_DIAS_EXECUCOES` / `RETENCAO_DIAS_DETECCOES` | Opcionais. Dias de retenção das tabelas de histórico antes da limpeza automática (padrões: 180 / 90 / 90 / 30). Veja [Manutenção automática do banco](#manutenção-automática-do-banco) |
 
 Para produção, o servidor deve ficar atrás de HTTPS (proxy reverso como Nginx/Caddy, ou um serviço com TLS gerenciado), já que os aparelhos móveis e o GitHub Pages exigem conteúdo servido por HTTPS.
 
@@ -575,9 +589,12 @@ npx cordova-res android --skip-config --copy
 npx cordova-res ios --skip-config --copy
 ```
 
-#### Apontando o app para o servidor de produção
+#### Apontando o app para o servidor
 
-Edite `remoteifes-web/js/config.js` (não `remoteifes-cordova/www/js/config.js`, que é sobrescrito a cada `sync`) com o `serverUrl` de produção antes de gerar o build — o app empacotado não tem acesso a `localhost` da máquina onde foi compilado.
+O app empacotado é carregado de `file://` (ou `https://localhost`), então não existe uma "origem" que sirva de endereço do servidor — diferente da PWA, que assume o mesmo domínio de onde foi baixada. Há duas formas de definir o endereço:
+
+- **Em tempo de execução (recomendado):** ao abrir o app sem um endereço configurado, ele mostra a tela "Sem conexão com o servidor" com o botão **Configurar endereço do servidor**. O valor informado (`http://IP:porta` ou `https://dominio`) é validado e guardado em `localStorage`; o app recarrega e passa a usá-lo. O mesmo botão aparece sempre que o app estiver empacotado e offline, permitindo trocar de servidor sem reinstalar. Esse override também funciona na PWA para apontá-la a outro servidor.
+- **Fixo no build:** edite `remoteifes-web/js/config.js` (não `remoteifes-cordova/www/js/config.js`, que é sobrescrito a cada `sync`) preenchendo um valor para `serverUrl` antes de gerar o build. Um endereço salvo em `localStorage` tem prioridade sobre esse padrão.
 
 #### Ajustando as permissões de rede
 
@@ -626,7 +643,7 @@ remoteifes-web/
   js/
     app.js             inicialização geral da página
     api.js             chamadas HTTP à API central
-    config.js          endereço do servidor central (editar para cada ambiente/domínio)
+    config.js          resolve o endereço do servidor central (origem da PWA, override em localStorage ou valor fixo para o build empacotado)
     state.js           estado da sessão atual no navegador
     nav.js             troca de abas e telas
     rtstatus.js        cliente WebSocket para status em tempo real
@@ -679,7 +696,7 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao administrador principal, assim como `Admin > Configurações`.
 - **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / MACs`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
 - **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: vincule o MAC detectado a uma sala existente em `Admin > ESP32 / MACs`; o vínculo é recebido automaticamente na próxima consulta do dispositivo.
-- **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente em intervalos de 30 segundos, sem reiniciar ou reabrir o ponto de acesso. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
+- **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. Se o Wi-Fi continuar indisponível por mais de 2 minutos, ele também abre o ponto de acesso de recuperação `RemoteIFES-Setup` (mantendo as tentativas de reconexão em paralelo) para permitir a reconfiguração no local; assim que a rede volta, esse ponto de acesso é fechado sozinho. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
 - **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Admin > ESP32 / MACs` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala (diretamente pelo admin, ou por um proprietário da sala).
 - **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`; a mesma restrição vale para a conexão WebSocket.
 - **Frontend não fala com o servidor depois do deploy**: confirme `serverUrl` em `remoteifes-web/js/config.js` e se `CORS_ORIGIN` no servidor inclui o domínio do frontend publicado (isso também afeta a conexão WebSocket).

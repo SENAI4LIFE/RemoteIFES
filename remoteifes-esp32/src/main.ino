@@ -92,6 +92,11 @@ unsigned long lastSensorRead = 0;
 unsigned long lastHeartbeat = 0;
 unsigned long lastTelemetryWs = 0;
 bool lastKnownPower = false;
+// Após um reboot o ESP32 não sabe se o ar está ligado; só passa a reportar o
+// estado depois que o servidor envia o primeiro send_known_state autoritativo.
+// Evita que um heartbeat pós-reboot marque a sala como desligada e faça o
+// servidor reenviar "power off" para um aparelho que estava ligado.
+bool powerConhecido = false;
 UltimoComandoIR ultimoComando;
 
 float ultimaLeituraTemp = NAN;
@@ -497,6 +502,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     if (protocolo >= 0) {
       sendKnownACState((decode_type_t)protocolo, temp, power, turbo, fan, swing);
       lastKnownPower = power;
+      powerConhecido = true;
 
       ultimoComando = UltimoComandoIR();
       ultimoComando.valido = true;
@@ -533,7 +539,7 @@ void enviarTelemetriaWs() {
   doc["tipo"] = "telemetria";
   doc["rssi"] = WiFi.RSSI();
   doc["modo"] = modoAtualTexto();
-  doc["ligado"] = lastKnownPower;
+  if (powerConhecido) doc["ligado"] = lastKnownPower;
 
   if (!isnan(ultimaLeituraTemp)) doc["temp"] = ultimaLeituraTemp;
   if (!isnan(ultimaLeituraHum)) doc["hum"] = ultimaLeituraHum;
@@ -721,6 +727,7 @@ void identificarSalaNoServidor() {
   if (statusCode == 202 || retorno["pendente"] == true) {
     if (salaId.length() > 0) {
       salaId = "";
+      powerConhecido = false;
       wsCliente.setReconnectInterval(0);
       wsCliente.disconnect();
       wsConfigurado = false;
@@ -736,6 +743,9 @@ void identificarSalaNoServidor() {
   if (novaSala != salaId) {
     if (wsConfigurado) wsCliente.disconnect();
     salaId = novaSala;
+    // Sala nova: o estado de power do vínculo anterior não vale aqui; só volta
+    // a ser reportado após o servidor enviar o send_known_state desta sala.
+    powerConhecido = false;
     wsConfigurado = false;
     salaWsConfigurada = "";
     Serial.println("Sala identificada pelo servidor: " + salaId);
@@ -748,7 +758,7 @@ void sendHeartbeat() {
 
   JsonDocument doc;
   doc["sala"] = salaId;
-  doc["ligado"] = lastKnownPower;
+  if (powerConhecido) doc["ligado"] = lastKnownPower;
   if (!isnan(ultimaLeituraTemp)) doc["temperatura"] = ultimaLeituraTemp;
   doc["mac"] = WiFi.macAddress();
   doc["ip"] = WiFi.localIP().toString();

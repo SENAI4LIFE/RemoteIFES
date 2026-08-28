@@ -4,6 +4,11 @@ const { dataAtualBrasiliaISO } = require("../utils/tempo");
 
 const MODOS_VALIDOS = ["reserva", "ligar_completo", "ligar_intervalo"];
 const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function horaValida(valor) {
+  return typeof valor === "string" && HORA_REGEX.test(valor);
+}
 
 function paraSaida(a) {
   return {
@@ -78,7 +83,10 @@ function criar({ sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, 
     throw new Error("o agendamento só pode ser feito para o dia atual");
   }
 
-  if (!horaInicio || !horaFim || horaInicio >= horaFim) {
+  if (!horaValida(horaInicio) || !horaValida(horaFim)) {
+    throw new Error("horário inválido: use o formato HH:MM (00:00–23:59)");
+  }
+  if (horaInicio >= horaFim) {
     throw new Error("horário inválido: início deve ser antes do fim");
   }
 
@@ -94,7 +102,7 @@ function criar({ sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, 
   let ligarFimFinal = null;
 
   if (modoFinal === "ligar_intervalo") {
-    if (!ligarInicio || !ligarFim || ligarInicio >= ligarFim) {
+    if (!horaValida(ligarInicio) || !horaValida(ligarFim) || ligarInicio >= ligarFim) {
       throw new Error("intervalo para ligar o ar-condicionado inválido");
     }
     if (ligarInicio < horaInicio || ligarFim > horaFim) {

@@ -33,27 +33,39 @@
 
   const COR_PADRAO = "#1f2b23";
 
+  function lerArmazenado(chave) {
+    try {
+      return localStorage.getItem(chave);
+    } catch (erro) {
+      return null;
+    }
+  }
+
   function lerNumero(chave, padrao) {
-    const salvo = parseFloat(localStorage.getItem(chave));
+    const salvo = parseFloat(lerArmazenado(chave));
     return Number.isFinite(salvo) ? salvo : padrao;
   }
 
   function lerInteiro(chave, padrao) {
-    const salvo = parseInt(localStorage.getItem(chave), 10);
+    const salvo = parseInt(lerArmazenado(chave), 10);
     return Number.isFinite(salvo) ? salvo : padrao;
   }
 
   function lerBooleano(chave) {
-    return localStorage.getItem(chave) === "1";
+    return lerArmazenado(chave) === "1";
   }
 
   function lerTexto(chave, padrao) {
-    const salvo = localStorage.getItem(chave);
+    const salvo = lerArmazenado(chave);
     return salvo === null ? padrao : salvo;
   }
 
   function salvar(chave, valor) {
-    localStorage.setItem(chave, String(valor));
+    try {
+      localStorage.setItem(chave, String(valor));
+    } catch (erro) {
+      /* preferências continuam aplicadas somente nesta execução */
+    }
   }
 
   function aplicarFonte(escala) {

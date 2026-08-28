@@ -10,6 +10,10 @@ const NIVEL_SUPERADMIN = 3;
 const SENHA_MIN = 8;
 const SENHA_MAX = 128;
 
+const NOME_MAX = 120;
+const LOGIN_MAX = 60;
+const CONTROLE_REGEX = /[\x00-\x1F\x7F]/g;
+
 function validarSenha(senha) {
   if (typeof senha !== "string" || senha.length < SENHA_MIN) {
     throw new Error(`senha deve ter ao menos ${SENHA_MIN} caracteres`);
@@ -17,6 +21,30 @@ function validarSenha(senha) {
   if (senha.length > SENHA_MAX) {
     throw new Error(`senha deve ter no máximo ${SENHA_MAX} caracteres`);
   }
+}
+
+function limparNome(valor) {
+  if (typeof valor !== "string") throw new Error("informe um nome válido");
+  const limpo = valor
+    .replace(CONTROLE_REGEX, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (!limpo) throw new Error("informe um nome válido");
+  if (limpo.length > NOME_MAX) throw new Error(`nome deve ter no máximo ${NOME_MAX} caracteres`);
+  return limpo;
+}
+
+function limparLogin(valor) {
+  if (typeof valor !== "string") throw new Error("informe um login válido");
+  const limpo = valor
+    .replace(CONTROLE_REGEX, "")
+    .trim();
+  if (!limpo) throw new Error("informe um login válido");
+  if (limpo.length > LOGIN_MAX) throw new Error(`login deve ter no máximo ${LOGIN_MAX} caracteres`);
+  if (!/^[A-Za-z0-9._@-]+$/.test(limpo)) {
+    throw new Error("login pode conter apenas letras, números e os símbolos . _ - @ (sem espaços)");
+  }
+  return limpo;
 }
 
 function paraSaida(u) {
@@ -46,7 +74,10 @@ function buscarPorId(id) {
 }
 
 function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
-  const existente = buscarPorUsuario(usuario);
+  const loginLimpo = limparLogin(usuario);
+  const nomeLimpo = limparNome(nome);
+
+  const existente = buscarPorUsuario(loginLimpo);
   if (existente) throw new Error("já existe um usuário com esse login");
 
   if (isAdmin && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
@@ -60,9 +91,9 @@ function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
   const info = db.prepare(`
     INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
     VALUES (?, ?, ?, ?, ?, ?, 1)
-  `).run(usuario, senhaHash, nome, nivel >= NIVEL_ADMIN ? 1 : 0, nivel, podeControlar ? 1 : 0);
+  `).run(loginLimpo, senhaHash, nomeLimpo, nivel >= NIVEL_ADMIN ? 1 : 0, nivel, podeControlar ? 1 : 0);
 
-  logger.info("usuario-criado", { usuarioNovo: usuario, nivel, por: requisitante ? requisitante.id : null });
+  logger.info("usuario-criado", { usuarioNovo: loginLimpo, nivel, por: requisitante ? requisitante.id : null });
   return paraSaida(buscarPorId(info.lastInsertRowid));
 }
 
@@ -132,9 +163,8 @@ function trocarNome(id, novoNome, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   exigirPermissaoSobreAlvo(usuario, requisitante);
-  if (!novoNome || !novoNome.trim()) throw new Error("informe o novo nome");
 
-  const nomeLimpo = novoNome.trim();
+  const nomeLimpo = limparNome(novoNome);
   db.prepare(`UPDATE usuarios SET nome = ? WHERE id = ?`).run(nomeLimpo, id);
   return paraSaida(buscarPorId(id));
 }
@@ -143,9 +173,8 @@ function trocarLogin(id, novoLogin, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   exigirPermissaoSobreAlvo(usuario, requisitante);
-  if (!novoLogin || !novoLogin.trim()) throw new Error("informe o novo login");
 
-  const loginLimpo = novoLogin.trim();
+  const loginLimpo = limparLogin(novoLogin);
   const existente = buscarPorUsuario(loginLimpo);
   if (existente && existente.id !== id) throw new Error("já existe um usuário com esse login");
 

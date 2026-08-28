@@ -11,10 +11,15 @@ const NIVEL_ADMIN = 2;
 const NIVEL_SUPERADMIN = 3;
 const JANELA_MENSAGENS_MS = 10 * 1000;
 const MAX_MENSAGENS_POR_JANELA = 20;
+// Clientes só enviam { tipo: "observar" | "observar_dispositivo", sala }.
+// 8 KiB é folga larga; frames maiores são recusados pelo `ws` sem parse.
+const MAX_PAYLOAD_BYTES = 8 * 1024;
 
 let wss = null;
+let intervaloPing = null;
+let intervaloRebroadcast = null;
 const salaObservadaPorCliente = new WeakMap();
-const dispositivoObservadoPorCliente = new WeakMap();
+const dispositivosObservadosPorCliente = new WeakMap();
 const janelaMensagensPorCliente = new WeakMap();
 
 function limiteDeMensagensExcedido(ws) {
@@ -117,11 +122,18 @@ function iniciar(server) {
   const { WebSocketServer } = require("ws");
   wss = new WebSocketServer({
     noServer: true,
+    maxPayload: MAX_PAYLOAD_BYTES,
     handleProtocols: (protocolos) => selecionarSubprotocolo(protocolos),
   });
 
   server.on("upgrade", (req, socket, head) => {
-    const { pathname } = new URL(req.url, "http://localhost");
+    let pathname;
+    try {
+      ({ pathname } = new URL(req.url, "http://localhost"));
+    } catch (erro) {
+      socket.destroy();
+      return;
+    }
     if (pathname !== "/ws") return;
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit("connection", ws, req);
@@ -140,6 +152,15 @@ function iniciar(server) {
     ws.isAlive = true;
     ws.on("pong", () => {
       ws.isAlive = true;
+    });
+    // Sem este handler, um erro de socket (reset abrupto, frame maior que o
+    // limite, erro de protocolo) vira 'uncaughtException' e derruba o processo.
+    ws.on("error", () => {
+      try {
+        ws.terminate();
+      } catch (erro) {
+        /* já encerrado */
+      }
     });
 
     ws.on("message", (dados) => {
@@ -163,24 +184,39 @@ function iniciar(server) {
       } else if (msg && msg.tipo === "observar_dispositivo") {
         const ehSuperAdmin = !!(ws.usuario && ws.usuario.nivel === NIVEL_SUPERADMIN);
         if (ehSuperAdmin && msg.sala && typeof msg.sala === "string") {
-          dispositivoObservadoPorCliente.set(ws, msg.sala);
+          let salas = dispositivosObservadosPorCliente.get(ws);
+          if (!salas) {
+            salas = new Set();
+            dispositivosObservadosPorCliente.set(ws, salas);
+          }
+          salas.add(msg.sala);
           enviar(ws, { tipo: "dispositivo_status", sala: msg.sala, estado: deviceHub.estadoPublico(msg.sala) });
         } else {
-          dispositivoObservadoPorCliente.delete(ws);
+          dispositivosObservadosPorCliente.delete(ws);
+        }
+      } else if (msg && msg.tipo === "observar_dispositivos") {
+        const ehSuperAdmin = !!(ws.usuario && ws.usuario.nivel === NIVEL_SUPERADMIN);
+        const salasValidas = Array.isArray(msg.salas)
+          ? msg.salas.filter((sala) => typeof sala === "string" && sala.length <= 100).slice(0, 200)
+          : null;
+        if (ehSuperAdmin && salasValidas) {
+          dispositivosObservadosPorCliente.set(ws, new Set(salasValidas));
+        } else {
+          dispositivosObservadosPorCliente.delete(ws);
         }
       }
     });
 
     ws.on("close", () => {
       salaObservadaPorCliente.delete(ws);
-      dispositivoObservadoPorCliente.delete(ws);
+      dispositivosObservadosPorCliente.delete(ws);
       janelaMensagensPorCliente.delete(ws);
     });
 
     notificarCliente(ws);
   });
 
-  const intervaloPing = setInterval(() => {
+  intervaloPing = setInterval(() => {
     wss.clients.forEach((ws) => {
       if (!ws.isAlive) {
         ws.terminate();
@@ -192,17 +228,44 @@ function iniciar(server) {
   }, PING_MS);
   intervaloPing.unref();
 
-  const intervaloRebroadcast = setInterval(notificarTodos, REBROADCAST_MS);
+  intervaloRebroadcast = setInterval(notificarTodos, REBROADCAST_MS);
   intervaloRebroadcast.unref();
 
   salasService.eventos.on("mudanca", notificarTodos);
   configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
 }
 
+function encerrar() {
+  if (intervaloPing) {
+    clearInterval(intervaloPing);
+    intervaloPing = null;
+  }
+  if (intervaloRebroadcast) {
+    clearInterval(intervaloRebroadcast);
+    intervaloRebroadcast = null;
+  }
+  salasService.eventos.removeListener("mudanca", notificarTodos);
+  configuracoesService.eventos.removeListener("mudanca-manutencao", notificarStatusServidorParaTodos);
+  if (wss) {
+    wss.clients.forEach((ws) => {
+      try {
+        ws.close(1001, "servidor encerrando");
+      } catch (erro) {
+        /* ignora sockets já fechados */
+      }
+    });
+    try {
+      wss.close();
+    } catch (erro) {
+      /* ignora */
+    }
+  }
+}
+
 function notificarObservadoresDeDispositivo(sala, payload) {
   if (!wss) return;
   wss.clients.forEach((ws) => {
-    if (dispositivoObservadoPorCliente.get(ws) === sala) enviar(ws, payload);
+    if (dispositivosObservadosPorCliente.get(ws)?.has(sala)) enviar(ws, payload);
   });
 }
 
@@ -222,4 +285,4 @@ deviceHub.eventos.on("conexao", ({ sala }) => {
   notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_status", sala, estado: deviceHub.estadoPublico(sala) });
 });
 
-module.exports = { iniciar };
+module.exports = { iniciar, encerrar };

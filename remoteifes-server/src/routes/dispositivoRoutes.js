@@ -42,8 +42,11 @@ router.post("/dispositivo/heartbeat", exigirMacDaSalaSeCadastrado, (req, res) =>
   if (ligado !== undefined && typeof ligado !== "boolean") {
     return res.status(400).json({ ok: false, erro: "ligado deve ser booleano" });
   }
-  if (temperatura !== undefined && (typeof temperatura !== "number" || !Number.isFinite(temperatura))) {
-    return res.status(400).json({ ok: false, erro: "temperatura deve ser numérica" });
+  if (
+    temperatura !== undefined &&
+    (typeof temperatura !== "number" || !Number.isFinite(temperatura) || temperatura < -40 || temperatura > 85)
+  ) {
+    return res.status(400).json({ ok: false, erro: "temperatura fora da faixa esperada (-40 a 85 °C)" });
   }
 
   try {

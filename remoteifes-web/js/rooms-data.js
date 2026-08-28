@@ -1,7 +1,10 @@
 function escapeHtml(texto) {
-  const div = document.createElement("div");
-  div.textContent = texto == null ? "" : String(texto);
-  return div.innerHTML;
+  return String(texto == null ? "" : texto)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 const RoomsData = {
