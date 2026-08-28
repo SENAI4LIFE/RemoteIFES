@@ -470,6 +470,10 @@ const Api = {
     return chamar("/admin/esp32/migracao", { headers: headersComToken() });
   },
 
+  async obterMonitoramento() {
+    return chamar("/admin/monitoramento", { headers: headersComToken() });
+  },
+
   async provisionarCredencialEsp32(sala) {
     return chamar(`/admin/esp32/${encodeURIComponent(sala)}/credencial`, { method: "POST", headers: headersComToken() });
   },

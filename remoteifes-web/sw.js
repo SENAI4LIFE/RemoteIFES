@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v8";
 const CACHE_NAME = `remoteifes-shell-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -35,6 +35,7 @@ const APP_SHELL = [
   "./js/screens/schedule.js",
   "./js/screens/simple.js",
   "./js/screens/esp32-admin.js",
+  "./js/screens/monitoramento.js",
   "./assets/ifes-logo.png",
   "./assets/remoteifes-logo.png",
   "./assets/icons/icon-192.png",
