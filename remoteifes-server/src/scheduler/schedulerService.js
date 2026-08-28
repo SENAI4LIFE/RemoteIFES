@@ -7,6 +7,7 @@ const {
 const { encerrarSessoesAbandonadas } = require("../services/tokenService");
 const { executarLimpezaRetencao } = require("../services/retencaoService");
 const { criarBackup, normalizarInteiro } = require("../services/backupService");
+const otaService = require("../services/otaService");
 const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 const logger = require("../utils/logger");
 
@@ -74,6 +75,7 @@ function iniciarScheduler() {
   pararScheduler();
   agendarPeriodico(verificarAgendamentos, VERIFICACAO_MS, "agendamentos");
   agendarPeriodico(verificarTimeouts, VERIFICACAO_TIMEOUT_MS, "timeouts-esp32");
+  agendarPeriodico(otaService.verificarTimeouts, VERIFICACAO_TIMEOUT_MS, "timeouts-ota");
   agendarPeriodico(encerrarSessoesAbandonadas, VERIFICACAO_SESSOES_MS, "sessoes-abandonadas");
   agendarPeriodico(executarLimpezaRetencao, VERIFICACAO_RETENCAO_MS, "retencao");
   executarProtegido(encerrarSessoesAbandonadas, "sessoes-abandonadas-inicial");

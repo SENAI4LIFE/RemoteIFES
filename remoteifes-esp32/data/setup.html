@@ -39,6 +39,11 @@
         <option value="inseguro">HTTPS sem validar certificado (rede local, certificado autoassinado)</option>
         <option value="off">HTTP sem criptografia (apenas rede local confiavel)</option>
       </select>
+      <label for="devId">Identificador do dispositivo (opcional):</label>
+      <input type="text" id="devId" name="devId" placeholder="esp_xxxxxxxxxxxxxxxx" autocomplete="off">
+      <label for="devSec">Segredo do dispositivo (opcional):</label>
+      <input type="password" id="devSec" name="devSec" placeholder="fornecido pelo painel ao provisionar" autocomplete="off">
+      <p class="hint">Preencha estes dois campos apenas se o administrador ja provisionou uma credencial para esta sala. Sem eles, o modulo se identifica apenas pelo MAC.</p>
       <button type="submit">Salvar e Conectar</button>
     </form>
   </div>

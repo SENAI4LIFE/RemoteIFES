@@ -2417,6 +2417,58 @@ body:has(#mainApp:not(.hidden)) .help-fab-widget { bottom: calc(66px + var(--saf
 }
 .esp32-actions .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.esp32-ota {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.esp32-ota-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: calc(13px * var(--a11y-font-scale));
+}
+.esp32-ota-linha .btn {
+  width: auto;
+  margin-top: 0;
+  padding: 8px 14px;
+  font-size: calc(13px * var(--a11y-font-scale));
+}
+.esp32-ota-linha .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.esp32-ota-status {
+  margin-top: 8px;
+  font-size: calc(12.5px * var(--a11y-font-scale));
+  color: var(--text-muted);
+}
+.esp32-ota-status.falhou { color: var(--danger, #b91c1c); }
+.esp32-ota-status.concluido { color: var(--success, #15803d); }
+
+.esp32-cred {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.esp32-cred-linha { font-size: calc(13px * var(--a11y-font-scale)); }
+.esp32-cred code, .esp32-cred-segredo code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  word-break: break-all;
+}
+.esp32-cred-segredo {
+  margin: 10px 0;
+  display: grid;
+  gap: 6px;
+}
+.esp32-cred-segredo > div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+.esp32-cred-segredo span { color: var(--text-muted); font-size: 0.85em; }
+
 .esp32-config-form {
   display: flex;
   flex-wrap: wrap;

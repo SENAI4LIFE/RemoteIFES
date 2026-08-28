@@ -18,6 +18,8 @@
     "redes": "node --env-file-if-exists=.env redes-autorizadas.js",
     "backup": "node --env-file-if-exists=.env backup-db.js",
     "restore": "node --env-file-if-exists=.env restore-backup.js",
+    "firmware": "node --env-file-if-exists=.env firmware-esp32.js",
+    "credencial": "node --env-file-if-exists=.env credencial-esp32.js",
     "health": "bash healthcheck.sh",
     "deploy": "bash deploy.sh",
     "rollback": "bash rollback.sh",
