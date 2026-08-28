@@ -5,7 +5,7 @@ const { criarLimitador } = require("../utils/rateLimiter");
 const router = express.Router();
 
 const limitarDispositivo = criarLimitador({ janelaMs: 60 * 1000, maxTentativas: 120 });
-router.use(limitarDispositivo);
+router.use("/dispositivo", limitarDispositivo);
 
 function exigirMacDaSalaSeCadastrado(req, res, next) {
   const sala = typeof req.body?.sala === "string" ? req.body.sala : req.query?.sala;

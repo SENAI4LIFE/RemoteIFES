@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "sync": "node sync-www.js",
+    "validate": "node validate-config.js",
     "harden-config": "node harden-config.js",
     "dev-config": "node harden-config.js --dev",
     "prepare-android": "npm run sync && cordova platform add android || true && cordova prepare android",
