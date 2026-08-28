@@ -13,19 +13,47 @@ let wss = null;
 let intervaloPing = null;
 
 function autenticar(req) {
-  const sala = req.headers["x-device-sala"];
+  const credenciaisService = require("./esp32CredenciaisService");
   const mac = req.headers["x-device-mac"];
-  if (!sala || typeof sala !== "string" || !mac || typeof mac !== "string") return null;
+  const deviceId = req.headers["x-device-id"];
+  const segredo = req.headers["x-device-secret"];
+  const salaHeader = req.headers["x-device-sala"];
+
+  let sala = null;
+  let viaCredencial = false;
+  if (typeof deviceId === "string" && typeof segredo === "string") {
+    const resultado = credenciaisService.verificar(deviceId, segredo);
+    if (!resultado) {
+      logger.warn("device-ws-credencial-invalida", { deviceId });
+      return null;
+    }
+    sala = resultado.sala;
+    viaCredencial = true;
+  } else if (typeof salaHeader === "string" && salaHeader) {
+    sala = salaHeader;
+  }
+  if (!sala) return null;
 
   const salaRow = salasService.buscar(sala);
-  if (!salaRow || !salasService.macCorrespondeASala(salaRow, mac)) return null;
+  if (!salaRow) return null;
 
-  return { sala, mac };
+  if (!viaCredencial) {
+    if (credenciaisService.exigidoPara(salaRow)) {
+      logger.warn("device-ws-credencial-exigida", { sala });
+      return null;
+    }
+    if (typeof mac !== "string" || !salasService.macCorrespondeASala(salaRow, mac)) return null;
+  } else if (salaRow.mac && !salasService.macCorrespondeASala(salaRow, mac)) {
+    logger.info("device-ws-credencial-mac-divergente", { sala, macRecebido: mac || null, macCadastrado: salaRow.mac });
+  }
+
+  return { sala, mac: (typeof mac === "string" && mac) || salaRow.mac || null, viaCredencial };
 }
 
 function estadoPublico(sala) {
   const entrada = conexoes.get(sala);
-  if (!entrada) return { conectado: false };
+  const ota = require("./otaService").estadoDaSala(sala);
+  if (!entrada) return { conectado: false, ota };
   return {
     conectado: true,
     mac: entrada.mac,
@@ -34,9 +62,11 @@ function estadoPublico(sala) {
     ultimaAtividadeEm: entrada.ultimaAtividadeEm,
     wifiRssi: entrada.wifiRssi,
     modo: entrada.modo,
+    fwVersao: entrada.fwVersao,
     ultimaTelemetria: entrada.ultimaTelemetria,
     ultimoComando: entrada.ultimoComando,
     capturasRecentes: entrada.capturas,
+    ota,
   };
 }
 
@@ -48,12 +78,18 @@ function listarEstados() {
   return estados;
 }
 
+function vinculoValido(salaRow, entrada) {
+  if (!salaRow) return false;
+  if (entrada.viaCredencial) return true;
+  return salasService.macCorrespondeASala(salaRow, entrada.mac);
+}
+
 function enviarComando(sala, payload) {
   const entrada = conexoes.get(sala);
   if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN) return false;
   const salaRow = salasService.buscar(sala);
-  if (!salaRow || !salasService.macCorrespondeASala(salaRow, entrada.mac)) {
-    entrada.ws.close(4001, "vínculo MAC alterado");
+  if (!vinculoValido(salaRow, entrada)) {
+    entrada.ws.close(4001, "vínculo do dispositivo alterado");
     return false;
   }
   entrada.ws.send(JSON.stringify(payload));
@@ -63,8 +99,7 @@ function enviarComando(sala, payload) {
 function dispositivoConectado(sala) {
   const entrada = conexoes.get(sala);
   if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN) return false;
-  const salaRow = salasService.buscar(sala);
-  return !!(salaRow && salasService.macCorrespondeASala(salaRow, entrada.mac));
+  return vinculoValido(salasService.buscar(sala), entrada);
 }
 
 function desconectarSala(sala) {
@@ -78,12 +113,28 @@ function numeroNaFaixa(valor, min, max) {
   return typeof valor === "number" && Number.isFinite(valor) && valor >= min && valor <= max;
 }
 
+function registrarVersaoFirmware(sala, entrada, fw) {
+  if (typeof fw !== "string" || !fw || fw.length > 32 || fw === entrada.fwVersao) return;
+  entrada.fwVersao = fw;
+  try {
+    salasService.registrarVersaoFirmware(sala, fw);
+  } catch (err) {
+    logger.warn("device-ws-fw-registrar-falhou", { sala, mensagem: err.message });
+  }
+  try {
+    require("./otaService").aoReconectarDispositivo(sala, fw);
+  } catch (err) {
+    logger.warn("device-ws-ota-reconectar-falhou", { sala, mensagem: err.message });
+  }
+}
+
 function registrarTelemetria(sala, entrada, msg) {
   const agora = new Date().toISOString();
   const tempValida = numeroNaFaixa(msg.temp, -40, 85);
   const humValida = numeroNaFaixa(msg.hum, 0, 100);
   entrada.wifiRssi = numeroNaFaixa(msg.rssi, -120, 0) ? msg.rssi : entrada.wifiRssi;
   entrada.modo = MODOS_VALIDOS.has(msg.modo) ? msg.modo : entrada.modo;
+  registrarVersaoFirmware(sala, entrada, msg.fw);
   entrada.ultimaTelemetria = {
     temp: tempValida ? msg.temp : null,
     hum: humValida ? msg.hum : null,
@@ -100,7 +151,7 @@ function registrarTelemetria(sala, entrada, msg) {
     const estadoReportado = {};
     if (tempValida) estadoReportado.temperatura = msg.temp;
     if (typeof msg.ligado === "boolean") estadoReportado.ligado = msg.ligado;
-    salasService.marcarOnline(sala, estadoReportado, entrada.mac, entrada.ip);
+    salasService.marcarOnline(sala, estadoReportado, entrada.mac, entrada.ip, { viaCredencial: entrada.viaCredencial });
   } catch (err) {
     logger.warn("device-ws-telemetria-marcar-online-falhou", { sala, mensagem: err.message });
   }
@@ -154,7 +205,7 @@ function iniciar(server) {
       return;
     }
 
-    const { sala, mac } = auth;
+    const { sala, mac, viaCredencial } = auth;
     const ip = req.socket.remoteAddress;
     const agora = new Date().toISOString();
 
@@ -166,11 +217,13 @@ function iniciar(server) {
     const entrada = {
       ws,
       mac,
+      viaCredencial: !!viaCredencial,
       ip,
       conectadoEm: agora,
       ultimaAtividadeEm: agora,
       wifiRssi: null,
       modo: "operation",
+      fwVersao: null,
       ultimaTelemetria: null,
       ultimoComando: null,
       capturas: [],
@@ -182,7 +235,7 @@ function iniciar(server) {
     });
 
     try {
-      salasService.marcarOnline(sala, {}, mac, ip);
+      salasService.marcarOnline(sala, {}, mac, ip, { viaCredencial });
     } catch (err) {
       logger.warn("device-ws-conectar-marcar-online-falhou", { sala, mensagem: err.message });
     }
@@ -193,8 +246,8 @@ function iniciar(server) {
 
     ws.on("message", (dados) => {
       const salaAtual = salasService.buscar(sala);
-      if (!salaAtual || !salasService.macCorrespondeASala(salaAtual, entrada.mac)) {
-        ws.close(4001, "vínculo MAC alterado");
+      if (!vinculoValido(salaAtual, entrada)) {
+        ws.close(4001, "vínculo do dispositivo alterado");
         return;
       }
       entrada.ultimaAtividadeEm = new Date().toISOString();
@@ -208,6 +261,12 @@ function iniciar(server) {
 
       if (msg.tipo === "telemetria") {
         registrarTelemetria(sala, entrada, msg);
+      } else if (msg.tipo === "info") {
+        registrarVersaoFirmware(sala, entrada, msg.fw);
+      } else if (msg.tipo === "ota_progresso") {
+        require("./otaService").registrarProgresso(sala, msg);
+      } else if (msg.tipo === "ota_resultado") {
+        require("./otaService").registrarResultado(sala, msg);
       } else if (msg.tipo === "captura") {
         registrarCaptura(sala, entrada, msg);
       } else if (msg.tipo === "acesso") {
@@ -232,6 +291,11 @@ function iniciar(server) {
       if (conexoes.get(sala) === entrada) {
         conexoes.delete(sala);
         logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString() });
+        try {
+          require("./otaService").aoDesconectarDispositivo(sala);
+        } catch (erro) {
+          logger.warn("device-ws-ota-desconectar-falhou", { sala, mensagem: erro.message });
+        }
         eventos.emit("conexao", { sala, conectado: false });
       }
     });

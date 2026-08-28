@@ -2,6 +2,8 @@ const express = require("express");
 const { exigirLogin, exigirAdmin, exigirSuperAdmin } = require("../middlewares/auth");
 const salasService = require("../services/salasService");
 const deviceHub = require("../services/deviceHub");
+const otaService = require("../services/otaService");
+const credenciaisService = require("../services/esp32CredenciaisService");
 
 const router = express.Router();
 router.use("/admin/esp32", exigirLogin, exigirAdmin, exigirSuperAdmin);
@@ -19,6 +21,8 @@ function montarLinhaDispositivo(salaRow) {
     ipEsp32: salaRow.ipEsp32,
     online: !!salaRow.online,
     irProtocolo: Number.isInteger(salaRow.irProtocolo) ? salaRow.irProtocolo : null,
+    fwVersao: salaRow.fwVersao || null,
+    credencial: credenciaisService.estado(salaRow.sala),
     dispositivo: deviceHub.estadoPublico(salaRow.sala),
   };
 }
@@ -48,6 +52,53 @@ function enviarOuFalhar(res, sala, payload) {
 router.get("/admin/esp32/dispositivos", (req, res) => {
   const salas = salasService.listar();
   res.json(salas.filter((s) => s.mac).map(montarLinhaDispositivo));
+});
+
+router.get("/admin/esp32/firmware", (req, res) => {
+  res.json({ ok: true, manifesto: otaService.lerManifesto() });
+});
+
+router.post("/admin/esp32/:sala/ota", exigirSalaCadastrada, (req, res) => {
+  try {
+    const estado = otaService.ofertar(req.params.sala);
+    res.json({ ok: true, ota: estado });
+  } catch (err) {
+    res.status(err.conflito ? 409 : 400).json({ ok: false, erro: err.message });
+  }
+});
+
+function responderCredencial(res, fn) {
+  try {
+    const resultado = fn();
+    res.json({ ok: true, ...resultado, aviso: "copie o segredo agora — ele não será exibido novamente" });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+}
+
+router.post("/admin/esp32/:sala/credencial", exigirSalaCadastrada, (req, res) => {
+  responderCredencial(res, () => credenciaisService.provisionar(req.params.sala));
+});
+
+router.post("/admin/esp32/:sala/credencial/rotacionar", exigirSalaCadastrada, (req, res) => {
+  responderCredencial(res, () => credenciaisService.rotacionar(req.params.sala));
+});
+
+router.post("/admin/esp32/:sala/credencial/substituir", exigirSalaCadastrada, (req, res) => {
+  responderCredencial(res, () => credenciaisService.substituir(req.params.sala));
+});
+
+router.delete("/admin/esp32/:sala/credencial", exigirSalaCadastrada, (req, res) => {
+  try {
+    const resultado = credenciaisService.revogar(req.params.sala);
+    res.json({ ok: true, ...resultado });
+  } catch (err) {
+    res.status(400).json({ ok: false, erro: err.message });
+  }
+});
+
+router.get("/admin/esp32/migracao", (req, res) => {
+  res.json({ ok: true, migracao: credenciaisService.resumoMigracao() });
 });
 
 router.get("/admin/esp32/:sala/estado", exigirSalaCadastrada, (req, res) => {

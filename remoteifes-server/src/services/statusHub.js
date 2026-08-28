@@ -290,6 +290,10 @@ deviceHub.eventos.on("captura", ({ sala, captura }) => {
   notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_captura", sala, captura });
 });
 
+deviceHub.eventos.on("ota", ({ sala, estado }) => {
+  notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_ota", sala, ota: estado });
+});
+
 deviceHub.eventos.on("erro", ({ sala, mensagem }) => {
   notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_erro", sala, mensagem });
 });

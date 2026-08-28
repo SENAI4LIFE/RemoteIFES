@@ -341,6 +341,7 @@ const Admin = {
     document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
     document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
     document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
+    document.getElementById("cfgEspCredenciaisObrigatorias").checked = !!cfg.espCredenciaisObrigatorias;
   },
 
   async carregarMacs() {
@@ -833,6 +834,7 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
       .map((v) => v.trim())
       .filter(Boolean),
     modoManutencao: document.getElementById("cfgModoManutencao").checked,
+    espCredenciaisObrigatorias: document.getElementById("cfgEspCredenciaisObrigatorias").checked,
   };
 
   const resp = await Api.atualizarConfiguracoes(dados);

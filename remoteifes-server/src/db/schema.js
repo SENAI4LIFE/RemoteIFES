@@ -67,6 +67,18 @@ function criarSchema() {
       criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS esp_credenciais (
+      sala TEXT PRIMARY KEY REFERENCES salas(sala) ON DELETE CASCADE,
+      deviceId TEXT NOT NULL UNIQUE,
+      segredoHash TEXT NOT NULL,
+      segredoHashAnterior TEXT,
+      anteriorExpiraEm TEXT,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      rotacionadoEm TEXT,
+      ultimoUsoEm TEXT,
+      revogadoEm TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS agendamentos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sala TEXT NOT NULL REFERENCES salas(sala),
@@ -234,6 +246,9 @@ function migrarColunasSalas() {
   }
   if (!colunas.includes("irProtocolo")) {
     db.exec(`ALTER TABLE salas ADD COLUMN irProtocolo INTEGER`);
+  }
+  if (!colunas.includes("fwVersao")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN fwVersao TEXT`);
   }
   colunas = db.prepare(`PRAGMA table_info(salas)`).all().map((c) => c.name);
   if (colunas.includes("presetId") || colunas.includes("funcoesEstado")) {
