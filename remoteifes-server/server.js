@@ -8,6 +8,7 @@ const db = require("./src/config/database");
 const logger = require("./src/utils/logger");
 
 const PORTA = process.env.PORTA || 8080;
+const ENDERECO = process.env.BIND_ADDR || "0.0.0.0";
 
 encerrarSessoesAtivasNoInicio();
 
@@ -15,8 +16,8 @@ const server = http.createServer(app);
 statusHub.iniciar(server);
 deviceHub.iniciar(server);
 
-server.listen(PORTA, () => {
-  logger.info("startup", { porta: PORTA, ambiente: process.env.NODE_ENV || "development" });
+server.listen(PORTA, ENDERECO, () => {
+  logger.info("startup", { porta: PORTA, endereco: ENDERECO, ambiente: process.env.NODE_ENV || "development" });
   console.log(`Servidor RemoteIFES rodando em http://localhost:${PORTA}`);
   iniciarScheduler();
 });

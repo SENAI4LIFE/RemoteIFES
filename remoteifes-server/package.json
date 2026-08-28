@@ -9,13 +9,19 @@
   "scripts": {
     "setup": "bash setup.sh",
     "setup-https": "bash https-setup.sh",
+    "setup-lan": "bash lan-setup.sh",
     "install-service": "bash install-service.sh",
     "start": "node --env-file-if-exists=.env server.js",
     "dev": "node --watch --env-file-if-exists=.env server.js",
     "test": "node --test test/*.test.js",
-    "reset-admin": "node reset-admin-senha.js",
-    "backup": "node backup-db.js",
-    "restore": "node restore-backup.js"
+    "reset-admin": "node --env-file-if-exists=.env reset-admin-senha.js",
+    "redes": "node --env-file-if-exists=.env redes-autorizadas.js",
+    "backup": "node --env-file-if-exists=.env backup-db.js",
+    "restore": "node --env-file-if-exists=.env restore-backup.js",
+    "health": "bash healthcheck.sh",
+    "deploy": "bash deploy.sh",
+    "rollback": "bash rollback.sh",
+    "release": "bash release.sh"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
