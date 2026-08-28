@@ -2,10 +2,13 @@ const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 
+const db = require("./config/database");
 const { criarSchema } = require("./db/schema");
 const { popularBanco } = require("./db/seed");
 const { restringirRedeIFES } = require("./middlewares/rede");
 const logger = require("./utils/logger");
+
+const INICIO_PROCESSO = Date.now();
 
 criarSchema();
 popularBanco();
@@ -49,6 +52,24 @@ app.use((req, res, next) => {
     res.set("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   }
   next();
+});
+
+app.get("/health", (req, res) => {
+  let banco = "ok";
+  try {
+    db.prepare("SELECT 1 AS ok").get();
+  } catch (erro) {
+    banco = "erro";
+    logger.error("health-banco-indisponivel", { mensagem: erro && erro.message });
+  }
+  const saudavel = banco === "ok";
+  res.status(saudavel ? 200 : 503).json({
+    ok: saudavel,
+    servico: "RemoteIFES API",
+    banco,
+    ambiente: NODE_ENV,
+    uptimeSegundos: Math.round((Date.now() - INICIO_PROCESSO) / 1000),
+  });
 });
 
 app.use(require("./routes/dispositivoRoutes"));

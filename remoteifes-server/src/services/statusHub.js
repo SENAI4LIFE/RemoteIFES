@@ -252,6 +252,15 @@ function encerrar() {
   }
 }
 
+function fecharConexoes(codigo = 1001, motivo = "conexão encerrada para teste") {
+  if (!wss) return;
+  wss.clients.forEach((ws) => {
+    try {
+      ws.close(codigo, motivo);
+    } catch (erro) {}
+  });
+}
+
 function notificarObservadoresDeDispositivo(sala, payload) {
   if (!wss) return;
   wss.clients.forEach((ws) => {
@@ -275,4 +284,4 @@ deviceHub.eventos.on("conexao", ({ sala }) => {
   notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_status", sala, estado: deviceHub.estadoPublico(sala) });
 });
 
-module.exports = { iniciar, encerrar };
+module.exports = { iniciar, encerrar, fecharConexoes };

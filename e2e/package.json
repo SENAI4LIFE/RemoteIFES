@@ -1,0 +1,15 @@
+{
+  "name": "remoteifes-web-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Testes end-to-end de navegador do frontend RemoteIFES",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "ws": "^8.21.3"
+  }
+}

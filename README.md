@@ -58,6 +58,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Domínio Próprio e HTTPS](#domínio-próprio-e-https)
 - [Empacotamento como PWA e Aplicativo Nativo (Cordova)](#empacotamento-como-pwa-e-aplicativo-nativo-cordova)
 - [Scripts Auxiliares](#scripts-auxiliares)
+- [Testes e Integração Contínua](#testes-e-integração-contínua)
 - [Uso da API do GitHub](#uso-da-api-do-github)
 - [Estrutura de Pastas](#estrutura-de-pastas)
 - [Solução de Problemas](#solução-de-problemas)
@@ -477,7 +478,7 @@ Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo p
 
 ### Frontend no GitHub Pages
 
-A publicação do `remoteifes-web` no GitHub Pages é manual (não há workflow de Actions no repositório). Passo a passo para publicar:
+A publicação do `remoteifes-web` no GitHub Pages é manual. O workflow de Actions do repositório (`.github/workflows/ci.yml`) apenas roda os testes e validações descritos em [Testes e Integração Contínua](#testes-e-integração-contínua) — não publica o frontend. Passo a passo para publicar:
 
 1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
 2. Como o GitHub Pages tem origem diferente do servidor central, edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção.
@@ -649,9 +650,29 @@ Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (ex
 
 O repositório inclui um `.gitignore` na raiz que já ignora `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas). Se você clonou uma cópia antiga do repositório em que esse arquivo não existia e chegou a commitar `.env` ou o banco, rode `git rm --cached` nesses arquivos antes de publicar o repositório.
 
+## Testes e Integração Contínua
+
+O repositório traz uma bateria de verificação de regressão. Todos os comandos rodam a partir da raiz do projeto, salvo indicação em contrário.
+
+| Alvo | Comando | Observações |
+|---|---|---|
+| Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração e o `/health`. |
+| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Requer o Google Chrome instalado (usa o navegador do sistema, não baixa binário). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador e queda/retorno de WebSocket. |
+| Configuração Cordova | `cd remoteifes-cordova && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
+| Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO. |
+| ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa e entra na rotina de rede. Independe do servidor central estar no ar. |
+
+### Health check do servidor central
+
+`GET /health` responde o estado do servidor central (conexão com o banco e tempo de processo) sem exigir autenticação. Retorna `200` com `{"ok":true,"banco":"ok",...}` quando o banco responde e `503` quando não. **Não depende de nenhum ESP32**: um dispositivo offline não afeta o resultado.
+
+### CI
+
+`.github/workflows/ci.yml` roda em cada push e pull request para `main` (e sob demanda em **Actions > CI > Run workflow**) quatro jobs independentes: servidor (`npm test` + health check), frontend end-to-end (Playwright), validação de configuração Cordova e build do firmware ESP32. Nenhum token adicional é necessário.
+
 ## Uso da API do GitHub
 
-Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita a hospedagem de código-fonte e à publicação estática do frontend via GitHub Pages, configurada manualmente em **Settings > Pages** (branch `main`, pasta `/remoteifes-web`). Não é necessário nenhum token ou workflow de Actions para isso.
+Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita a hospedagem de código-fonte, à publicação estática do frontend via GitHub Pages (configurada manualmente em **Settings > Pages**, branch `main`, pasta `/remoteifes-web`) e ao workflow de CI descrito em [Testes e Integração Contínua](#testes-e-integração-contínua). A publicação do frontend não usa Actions nem token.
 
 ## Estrutura de Pastas
 
@@ -677,6 +698,7 @@ remoteifes-server/
                         relatos de problema, sessões/tokens, status em tempo real, backup do banco)
     scheduler/         verificação periódica de agendamentos, timeouts de ESP32, sessões abandonadas e backup
     utils/             funções auxiliares (data/hora em fuso de Brasília, rate limiting, faixas de rede)
+  test/               testes de regressão do servidor (node:test) — API, permissões, WebSocket, /health, backup
 
 remoteifes-web/
   manifest.webmanifest  manifesto da PWA (nome, ícones, cor de tema)
@@ -716,16 +738,20 @@ remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev)
     setup.html               formulário do portal de provisionamento (rede e servidor)
     restart.html             página de confirmação exibida após salvar a configuração
     status.html               página local de status, somente leitura
+  tools/serial-smoke.py     smoke test de hardware: reinicia o ESP32 pela serial e confere o boot e a rotina de rede
   flash.sh                  instala o PlatformIO Core (se necessário) e compila/grava firmware + sistema de arquivos
 
 remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento como PWA e Aplicativo Nativo)
   config.xml             configuração do app (id, nome, ícone, splash, permissões de rede) — modo de desenvolvimento por padrão
   harden-config.js       reescreve config.xml para produção (origem única) ou de volta para desenvolvimento (--dev)
+  validate-config.js     valida config.xml, a reversibilidade de harden-config.js e a saída de sync-www.js (npm run validate)
   package.json            scripts de sync/build/run/harden-config e plugins Cordova do projeto
   sync-www.js             copia remoteifes-web para www/ antes de cada build (não editar www/ manualmente)
   resources/              imagens-fonte (icon.png, splash.png) usadas por cordova-res
   www/                    cópia gerada de remoteifes-web (gitignored fora de commits manuais, se preferir)
 
+e2e/                     testes end-to-end de navegador (Playwright) — specs, harness (API + estático + ESP32 simulado)
+.github/workflows/ci.yml workflow de CI: testes do servidor, end-to-end, validação Cordova e build do firmware
 docs/                    material de apoio do projeto (imagens, documento acadêmico)
 export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxiliares)
 ```

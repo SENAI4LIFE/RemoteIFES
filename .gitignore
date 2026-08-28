@@ -9,6 +9,12 @@ remoteifes-cordova/plugins/
 remoteifes-esp32/.pio/
 remoteifes-esp32/.pioenvs/
 remoteifes-esp32/.piolibdeps/
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/.last-run.json
+e2e/harness/.tokens.json
 *.log
 npm-debug.log*
 yarn-debug.log*
