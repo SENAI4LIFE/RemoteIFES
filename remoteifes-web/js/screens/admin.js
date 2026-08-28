@@ -804,6 +804,8 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "sessoes") await Admin.carregarSessoes();
     if (sub === "logs") await Admin.carregarLogs();
     if (sub === "dispositivos") await Admin.carregarDispositivos();
+    if (sub === "monitoramento") await Monitoramento.aoAbrir();
+    else Monitoramento.aoFechar();
     if (sub === "acessos") await Admin.carregarAcessos();
     if (sub === "proprietarios") await Admin.carregarProprietarios();
     if (sub === "mapa") await Admin.carregarMapa();

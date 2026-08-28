@@ -1,6 +1,7 @@
 const EventEmitter = require("events");
 const salasService = require("./salasService");
 const logger = require("../utils/logger");
+const monitoramentoService = require("./monitoramentoService");
 
 const PING_MS = 15 * 1000;
 const MAX_CAPTURAS_ARMAZENADAS = 20;
@@ -25,6 +26,7 @@ function autenticar(req) {
     const resultado = credenciaisService.verificar(deviceId, segredo);
     if (!resultado) {
       logger.warn("device-ws-credencial-invalida", { deviceId });
+      monitoramentoService.registrar("credencialFalha", { deviceId });
       return null;
     }
     sala = resultado.sala;
@@ -154,6 +156,7 @@ function registrarTelemetria(sala, entrada, msg) {
     salasService.marcarOnline(sala, estadoReportado, entrada.mac, entrada.ip, { viaCredencial: entrada.viaCredencial });
   } catch (err) {
     logger.warn("device-ws-telemetria-marcar-online-falhou", { sala, mensagem: err.message });
+    monitoramentoService.registrar("telemetriaFalha", { sala });
   }
 
   eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
@@ -240,6 +243,7 @@ function iniciar(server) {
       logger.warn("device-ws-conectar-marcar-online-falhou", { sala, mensagem: err.message });
     }
     logger.info("device-ws-conectado", { sala, mac, ip });
+    monitoramentoService.registrarConexaoDispositivo(sala);
     eventos.emit("conexao", { sala, conectado: true });
     const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
     if (comandoInicial) ws.send(JSON.stringify(comandoInicial));

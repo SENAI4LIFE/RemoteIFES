@@ -5,6 +5,7 @@ const salasService = require("../services/salasService");
 const tokenService = require("../services/tokenService");
 const configuracoesService = require("../services/configuracoesService");
 const notificacoesService = require("../services/notificacoesService");
+const monitoramentoService = require("../services/monitoramentoService");
 
 const router = express.Router();
 router.use("/admin", exigirLogin, exigirAdmin);
@@ -137,6 +138,10 @@ router.delete("/admin/sessoes/historico", (req, res) => {
   if (data === null) return;
   tokenService.apagarHistoricoSessoes({ data });
   res.json({ ok: true });
+});
+
+router.get("/admin/monitoramento", (req, res) => {
+  res.json({ ok: true, monitoramento: monitoramentoService.coletar() });
 });
 
 router.get("/admin/dispositivos", (req, res) => {

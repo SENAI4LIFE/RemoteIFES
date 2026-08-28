@@ -710,6 +710,7 @@
           <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span><span class="admin-subtab-label">Sessões</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span><span class="admin-subtab-label">Logs</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="dispositivos"><span class="admin-subtab-icon">📡</span><span class="admin-subtab-label">Dispositivos</span></button>
+          <button type="button" class="admin-subtab-btn" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Monitoramento</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="acessos"><span class="admin-subtab-icon">🔑</span><span class="admin-subtab-label">Acessos ESP32</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span><span class="admin-subtab-label">Proprietários de sala</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span><span class="admin-subtab-label">Mapa</span></button>
@@ -798,6 +799,13 @@
             <input type="date" id="dispositivosFiltroData" />
           </div>
           <ul id="dispositivosList" class="room-list"></ul>
+        </div>
+
+        <div id="adminSub-monitoramento" class="admin-sub hidden">
+          <p class="hint">Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32 — leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta.</p>
+          <div id="monAlertas" class="mon-alertas hidden"></div>
+          <div id="monGrid" class="mon-grid"></div>
+          <p id="monErro" class="hint hidden">Não foi possível carregar o monitoramento.</p>
         </div>
 
         <div id="adminSub-acessos" class="admin-sub hidden">
@@ -1198,6 +1206,7 @@
   <script src="js/screens/schedule.js"></script>
   <script src="js/screens/grade.js"></script>
   <script src="js/screens/propriedade.js"></script>
+  <script src="js/screens/monitoramento.js"></script>
   <script src="js/screens/admin.js"></script>
   <script src="js/screens/esp32-admin.js"></script>
   <script src="js/app.js"></script>
