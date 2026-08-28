@@ -9,19 +9,47 @@ const DIR_FIRMWARE = process.env.REMOTEIFES_FIRMWARE_DIR
   ? path.resolve(process.env.REMOTEIFES_FIRMWARE_DIR)
   : path.join(DIR_DADOS, "firmware");
 const ARQUIVO_MANIFESTO = path.join(DIR_FIRMWARE, "manifesto.json");
+const ARQUIVO_ESTADOS = path.join(DIR_FIRMWARE, "estados-ota.json");
 
 const RE_VERSAO = /^[0-9A-Za-z][0-9A-Za-z._-]{0,31}$/;
 const TAMANHO_MIN_BIN = 64 * 1024;
 const TAMANHO_MAX_BIN = 3 * 1024 * 1024;
 const MAGIC_IMAGEM_ESP = 0xe9;
 
-const FASES_ATIVAS = new Set(["ofertado", "baixando", "gravado"]);
+const FASES_ATIVAS = new Set(["ofertado", "baixando", "gravado", "reiniciando"]);
 const OTA_MAX_SIMULTANEOS = 2;
 const OTA_TIMEOUT_TRANSFERENCIA_MS = 4 * 60 * 1000;
 const OTA_TIMEOUT_REINICIO_MS = 3 * 60 * 1000;
 const CAMINHO_DOWNLOAD = "/dispositivo/firmware";
 
 const estados = new Map();
+
+function persistirEstados() {
+  try {
+    dirFirmware();
+    const temporario = `${ARQUIVO_ESTADOS}.tmp`;
+    fs.writeFileSync(temporario, JSON.stringify(Object.fromEntries(estados), null, 2), { mode: 0o600 });
+    fs.renameSync(temporario, ARQUIVO_ESTADOS);
+  } catch (erro) {
+    logger.warn("ota-estados-persistir-falhou", { mensagem: erro.message });
+  }
+}
+
+function carregarEstados() {
+  let bruto;
+  try {
+    bruto = JSON.parse(fs.readFileSync(ARQUIVO_ESTADOS, "utf8"));
+  } catch (erro) {
+    if (erro.code !== "ENOENT") logger.warn("ota-estados-carregar-falhou", { mensagem: erro.message });
+    return;
+  }
+  if (!bruto || typeof bruto !== "object" || Array.isArray(bruto)) return;
+  for (const [sala, estado] of Object.entries(bruto)) {
+    if (typeof sala !== "string" || !sala || sala.length > 100 || !estado || typeof estado !== "object") continue;
+    if (typeof estado.fase !== "string" || !Number.isFinite(new Date(estado.atualizadoEm).getTime())) continue;
+    estados.set(sala, { ...estado });
+  }
+}
 
 function erroConflito(mensagem) {
   const err = new Error(mensagem);
@@ -155,6 +183,7 @@ function definirEstado(sala, patch) {
   const anterior = estados.get(sala) || {};
   const proximo = { ...anterior, ...patch, atualizadoEm: new Date().toISOString() };
   estados.set(sala, proximo);
+  persistirEstados();
   if (proximo.fase === "falhou" && anterior.fase !== "falhou") {
     try {
       require("./monitoramentoService").registrar("otaFalha", { sala, erro: proximo.erro });
@@ -201,6 +230,7 @@ function ofertar(sala) {
   });
   if (!enviado) {
     estados.delete(sala);
+    persistirEstados();
     emitir(sala);
     throw erroConflito("dispositivo não está conectado no momento");
   }
@@ -210,19 +240,21 @@ function ofertar(sala) {
 
 function registrarProgresso(sala, msg) {
   const estado = estados.get(sala);
-  if (!estado || !FASES_ATIVAS.has(estado.fase)) return;
+  if (!estado || (estado.fase !== "ofertado" && estado.fase !== "baixando")) return;
   const recebido = Number(msg.recebido);
-  const total = Number(msg.total) || estado.total;
+  const recebidoValido = Number.isFinite(recebido)
+    ? Math.min(estado.total, Math.max(estado.recebido || 0, recebido))
+    : estado.recebido;
   definirEstado(sala, {
     fase: "baixando",
-    recebido: Number.isFinite(recebido) ? recebido : estado.recebido,
-    total: Number.isFinite(total) ? total : estado.total,
+    recebido: recebidoValido,
+    total: estado.total,
   });
 }
 
 function registrarResultado(sala, msg) {
   const estado = estados.get(sala);
-  if (!estado) return;
+  if (!estado || (estado.fase !== "ofertado" && estado.fase !== "baixando")) return;
   const resultado = typeof msg.resultado === "string" ? msg.resultado : "";
   if (resultado === "ok" || resultado === "gravado") {
     definirEstado(sala, { fase: "gravado", recebido: estado.total });
@@ -278,7 +310,7 @@ function verificarTimeouts() {
       definirEstado(sala, { fase: "falhou", erro: "tempo esgotado durante a transferência do firmware" });
       logger.warn("ota-timeout-transferencia", { sala, versao: estado.versao });
       notificarConcluido(sala, false, `A atualização de firmware da sala ${sala} expirou durante a transferência.`);
-    } else if (estado.fase === "gravado" && idadeMs > OTA_TIMEOUT_REINICIO_MS) {
+    } else if ((estado.fase === "gravado" || estado.fase === "reiniciando") && idadeMs > OTA_TIMEOUT_REINICIO_MS) {
       definirEstado(sala, { fase: "falhou", erro: "o dispositivo não voltou a se conectar após gravar o firmware" });
       logger.warn("ota-timeout-reinicio", { sala, versao: estado.versao });
       notificarConcluido(sala, false, `A sala ${sala} não voltou a se conectar após gravar o firmware.`);
@@ -287,11 +319,17 @@ function verificarTimeouts() {
 }
 
 function limparEstado(sala) {
-  if (estados.delete(sala)) emitir(sala);
+  if (estados.delete(sala)) {
+    persistirEstados();
+    emitir(sala);
+  }
 }
+
+carregarEstados();
 
 module.exports = {
   DIR_FIRMWARE,
+  ARQUIVO_ESTADOS,
   CAMINHO_DOWNLOAD,
   publicarFirmware,
   lerManifesto,

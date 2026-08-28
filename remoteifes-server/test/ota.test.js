@@ -1,6 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const RAIZ_TMP = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-ota-"));
 process.env.REMOTEIFES_DB_PATH = ":memory:";
@@ -164,6 +165,12 @@ test("progresso e resultado do dispositivo avançam o estado e concluem na recon
   assert.equal(estado.fase, "baixando");
   assert.equal(estado.recebido, 65536);
 
+  ws.send(JSON.stringify({ tipo: "ota_progresso", recebido: -1, total: manifesto.tamanho * 10 }));
+  await espera(50);
+  estado = otaService.estadoDaSala("ota-sala-2");
+  assert.equal(estado.recebido, 65536);
+  assert.equal(estado.total, manifesto.tamanho);
+
   ws.send(JSON.stringify({ tipo: "ota_resultado", resultado: "ok" }));
   await espera(50);
   assert.equal(otaService.estadoDaSala("ota-sala-2").fase, "gravado");
@@ -216,7 +223,42 @@ test("erro reportado pelo dispositivo marca falha e notifica", async () => {
   assert.match(estado.erro, /sha256/);
   assert.ok(notificacoesService.listar().some((n) => n.sala === "ota-sala-4" && n.tipo === "esp32_ota_falha"));
 
+  ws.send(JSON.stringify({ tipo: "ota_resultado", resultado: "ok" }));
+  await espera(50);
+  assert.equal(otaService.estadoDaSala("ota-sala-4").fase, "falhou");
+
   ws.close();
+});
+
+test("timeout de reinício encerra OTA que ficou em reiniciando", async () => {
+  novaSalaComMac("ota-sala-timeout", "AA:BB:CC:DD:0A:08");
+  const token = await tokenSuperAdmin();
+  const { ws } = await abrirDispositivo("ota-sala-timeout", "AA:BB:CC:DD:0A:08");
+
+  await authFetch("/admin/esp32/ota-sala-timeout/ota", token, { method: "POST" });
+  await espera(50);
+  ws.send(JSON.stringify({ tipo: "ota_resultado", resultado: "ok" }));
+  await espera(50);
+  ws.close();
+  await espera(50);
+  assert.equal(otaService.estadoDaSala("ota-sala-timeout").fase, "reiniciando");
+
+  const reconectado = await abrirDispositivo("ota-sala-timeout", "AA:BB:CC:DD:0A:08");
+  const concorrente = await authFetch("/admin/esp32/ota-sala-timeout/ota", token, { method: "POST" });
+  assert.equal(concorrente.status, 409);
+  reconectado.ws.close();
+  await espera(50);
+
+  const dateNow = Date.now;
+  Date.now = () => dateNow() + 4 * 60 * 1000;
+  try {
+    otaService.verificarTimeouts();
+  } finally {
+    Date.now = dateNow;
+  }
+  const estado = otaService.estadoDaSala("ota-sala-timeout");
+  assert.equal(estado.fase, "falhou");
+  assert.match(estado.erro, /não voltou/);
 });
 
 test("download de firmware exige MAC correspondente e devolve os bytes exatos", async () => {
@@ -258,4 +300,17 @@ test("um admin comum não pode ofertar OTA", async () => {
   novaSalaComMac("ota-sala-7", "AA:BB:CC:DD:0A:07");
   const resp = await authFetch("/admin/esp32/ota-sala-7/ota", token, { method: "POST" });
   assert.equal(resp.status, 403);
+});
+
+test("estado de OTA sobrevive ao reinício do processo do servidor", () => {
+  assert.equal(fs.existsSync(otaService.ARQUIVO_ESTADOS), true);
+  const script = `
+    process.env.REMOTEIFES_DB_PATH = ':memory:';
+    process.env.REMOTEIFES_FIRMWARE_DIR = ${JSON.stringify(process.env.REMOTEIFES_FIRMWARE_DIR)};
+    process.env.NODE_ENV = 'test';
+    const ota = require(${JSON.stringify(path.join(__dirname, "../src/services/otaService"))});
+    if (ota.estadoDaSala('ota-sala-timeout').fase !== 'falhou') process.exit(1);
+  `;
+  const filho = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
+  assert.equal(filho.status, 0, filho.stderr || filho.stdout);
 });

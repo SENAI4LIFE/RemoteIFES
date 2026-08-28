@@ -110,7 +110,8 @@ test("avaliar() cria uma notificação de monitoramento para um alerta e não du
   assert.ok(meio.length > antes);
   assert.ok(meio.some((n) => /MON-FLAP/.test(n.mensagem)));
 
+  db.prepare(`INSERT INTO esp_eventos (sala, status) VALUES ('MON-FLAP', 'online')`).run();
   monitoramentoService.avaliar();
   const depois = notificacoesService.listar().filter((n) => n.tipo === "monitoramento").length;
-  assert.equal(depois, meio.length, "avaliar() de novo não deve duplicar o alerta");
+  assert.equal(depois, meio.length, "mudança no contador não deve duplicar o mesmo alerta");
 });

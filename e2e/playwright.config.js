@@ -21,7 +21,7 @@ module.exports = defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL: WEB_URL,
-    channel: "chrome",
+    channel: process.env.E2E_BROWSER_CHANNEL || "chrome",
     headless: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

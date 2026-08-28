@@ -352,13 +352,20 @@ void handleSaveSetup() {
 
   if (newTls != "ca" && newTls != "inseguro" && newTls != "off") newTls = "ca";
 
+  if ((newDevId.length() == 0) != (newDevSec.length() == 0)) {
+    server.send(400, "text/plain", "Informe o identificador e o segredo do dispositivo juntos.");
+    return;
+  }
+
   preferences.putString("ssid", newSSID);
   preferences.putString("pass", newPASS);
   preferences.putString("host", newHost);
   preferences.putInt("porta", porta);
   preferences.putString("tls", newTls);
-  preferences.putString("devId", newDevId);
-  preferences.putString("devSec", newDevSec);
+  if (newDevId.length() > 0) {
+    preferences.putString("devId", newDevId);
+    preferences.putString("devSec", newDevSec);
+  }
 
   File f = LittleFS.open("/restart.html", "r");
   String response = f ? f.readString() : String("Credenciais salvas. Reiniciando...");
@@ -565,7 +572,11 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     }
   } else if (strcmp(tipo, "reset_wifi") == 0) {
     reportComando("reset_wifi", "");
-    preferences.clear();
+    preferences.remove("ssid");
+    preferences.remove("pass");
+    preferences.remove("host");
+    preferences.remove("porta");
+    preferences.remove("tls");
     agendarReinicio(500);
   } else if (strcmp(tipo, "ota_oferta") == 0) {
     iniciarOtaOferta(doc);

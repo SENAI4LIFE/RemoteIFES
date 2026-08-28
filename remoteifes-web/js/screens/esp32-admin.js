@@ -361,7 +361,7 @@ const Esp32Admin = (() => {
     resetWifiBtn.addEventListener("click", async () => {
       const ok = await Dialog.confirmar({
         titulo: "Resetar Wi-Fi do dispositivo",
-        mensagem: `Resetar o Wi-Fi do ESP32 da sala ${d.sala}? O dispositivo vai apagar suas credenciais salvas e reiniciar em modo de configuração (ponto de acesso).`,
+        mensagem: `Resetar o Wi-Fi do ESP32 da sala ${d.sala}? O dispositivo vai apagar a rede e o endereço do servidor, preservar sua credencial exclusiva e reiniciar em modo de configuração (ponto de acesso).`,
         confirmarTexto: "Resetar Wi-Fi",
         perigo: true,
       });
