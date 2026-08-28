@@ -257,7 +257,30 @@ test("provisionar empurra a credencial para um dispositivo já conectado por MAC
   assert.ok(push);
   assert.equal(push.deviceId, r.deviceId);
   assert.equal(push.segredo, r.segredo);
-  ws.close();
+  await new Promise((resolve) => ws.once("close", resolve));
+  assert.equal(deviceHub.dispositivoConectado("cred-11"), false);
+});
+
+test("substituir não entrega a nova credencial ao dispositivo antigo e encerra sua sessão", async () => {
+  novaSalaComMac("cred-13", "AA:CC:00:00:00:13");
+  const antiga = credenciaisService.provisionar("cred-13");
+  const ws = abrirWs({ "x-device-id": antiga.deviceId, "x-device-secret": antiga.segredo });
+  const mensagens = [];
+  ws.on("message", (d) => mensagens.push(JSON.parse(d.toString())));
+  await esperaAceita(ws);
+
+  const fechado = new Promise((resolve) => ws.once("close", resolve));
+  const nova = credenciaisService.substituir("cred-13");
+  await fechado;
+  assert.equal(nova.enviadoAoDispositivo, false);
+  assert.equal(mensagens.some((m) => m.deviceId === nova.deviceId || m.segredo === nova.segredo), false);
+  assert.equal(deviceHub.dispositivoConectado("cred-13"), false);
+
+  const antigaRecusada = abrirWs({ "x-device-id": antiga.deviceId, "x-device-secret": antiga.segredo });
+  await esperaRecusada(antigaRecusada);
+  const novaAceita = abrirWs({ "x-device-id": nova.deviceId, "x-device-secret": nova.segredo });
+  await esperaAceita(novaAceita);
+  novaAceita.close();
 });
 
 test("rotas de credencial exigem superadmin", async () => {

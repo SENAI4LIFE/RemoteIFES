@@ -49,7 +49,12 @@ function autenticar(req) {
     logger.info("device-ws-credencial-mac-divergente", { sala, macRecebido: mac || null, macCadastrado: salaRow.mac });
   }
 
-  return { sala, mac: (typeof mac === "string" && mac) || salaRow.mac || null, viaCredencial };
+  return {
+    sala,
+    mac: (typeof mac === "string" && mac) || salaRow.mac || null,
+    viaCredencial,
+    deviceId: viaCredencial ? deviceId : null,
+  };
 }
 
 function estadoPublico(sala) {
@@ -82,8 +87,25 @@ function listarEstados() {
 
 function vinculoValido(salaRow, entrada) {
   if (!salaRow) return false;
-  if (entrada.viaCredencial) return true;
+  const credenciaisService = require("./esp32CredenciaisService");
+  if (entrada.viaCredencial) {
+    return credenciaisService.deviceIdAtivoPara(salaRow.sala, entrada.deviceId);
+  }
+  if (credenciaisService.exigidoPara(salaRow)) return false;
   return salasService.macCorrespondeASala(salaRow, entrada.mac);
+}
+
+function enviarAtualizacaoCredencial(sala, payload) {
+  const entrada = conexoes.get(sala);
+  if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN || !salasService.buscar(sala)) return false;
+  entrada.ws.send(JSON.stringify(payload));
+  const timer = setTimeout(() => {
+    if (conexoes.get(sala) === entrada && !vinculoValido(salasService.buscar(sala), entrada)) {
+      entrada.ws.close(4001, "credencial do dispositivo alterada");
+    }
+  }, 1000);
+  timer.unref();
+  return true;
 }
 
 function enviarComando(sala, payload) {
@@ -107,7 +129,7 @@ function dispositivoConectado(sala) {
 function desconectarSala(sala) {
   const entrada = conexoes.get(sala);
   if (!entrada) return false;
-  entrada.ws.close(4001, "vínculo MAC alterado");
+  entrada.ws.close(4001, "vínculo do dispositivo alterado");
   return true;
 }
 
@@ -208,7 +230,7 @@ function iniciar(server) {
       return;
     }
 
-    const { sala, mac, viaCredencial } = auth;
+    const { sala, mac, viaCredencial, deviceId } = auth;
     const ip = req.socket.remoteAddress;
     const agora = new Date().toISOString();
 
@@ -221,6 +243,7 @@ function iniciar(server) {
       ws,
       mac,
       viaCredencial: !!viaCredencial,
+      deviceId,
       ip,
       conectadoEm: agora,
       ultimaAtividadeEm: agora,
@@ -343,6 +366,7 @@ module.exports = {
   estadoPublico,
   listarEstados,
   enviarComando,
+  enviarAtualizacaoCredencial,
   dispositivoConectado,
   desconectarSala,
 };

@@ -209,13 +209,24 @@ function coletar() {
 }
 
 function notificacaoRecenteExiste(mensagem) {
-  const linha = db.prepare(`
-    SELECT criadoEm FROM notificacoes
-    WHERE tipo = 'monitoramento' AND mensagem = ?
-    ORDER BY criadoEm DESC LIMIT 1
-  `).get(mensagem);
-  if (!linha) return false;
-  return Date.now() - new Date(linha.criadoEm.replace(" ", "T") + "Z").getTime() < DEDUP_NOTIFICACAO_MS;
+  const limite = new Date(Date.now() - DEDUP_NOTIFICACAO_MS).toISOString().slice(0, 19).replace("T", " ");
+  const recentes = db.prepare(`
+    SELECT mensagem FROM notificacoes
+    WHERE tipo = 'monitoramento' AND criadoEm >= ?
+  `).all(limite);
+  const chave = chaveAlerta(mensagem);
+  return recentes.some((linha) => chaveAlerta(linha.mensagem) === chave);
+}
+
+function chaveAlerta(mensagem) {
+  if (mensagem.startsWith("backup automático") || mensagem.startsWith("último backup")) return "backup";
+  if (mensagem.startsWith("disco com apenas ")) return `disco:${mensagem.split(" livres em ")[1] || "local"}`;
+  const sala = mensagem.match(/^sala ([^:]+): .* reconexões/);
+  if (sala) return `reconexoes:${sala[1]}`;
+  if (/atualização\(ões\) de firmware com falha/.test(mensagem)) return "ota-falha";
+  const falha = mensagem.match(/^(schedulerFalha|telemetriaFalha|comandoFalha):/);
+  if (falha) return `falha:${falha[1]}`;
+  return mensagem;
 }
 
 function avaliar() {

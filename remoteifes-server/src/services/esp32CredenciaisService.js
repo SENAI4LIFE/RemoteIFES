@@ -50,12 +50,20 @@ function exigirSala(sala) {
 function notificarDispositivo(sala, tipo, deviceId, segredo) {
   try {
     const deviceHub = require("./deviceHub");
-    if (!deviceHub.dispositivoConectado(sala)) return false;
-    return deviceHub.enviarComando(sala, { tipo, deviceId, segredo });
+    return deviceHub.enviarAtualizacaoCredencial(sala, { tipo, deviceId, segredo });
   } catch (erro) {
     logger.warn("credencial-push-falhou", { sala, mensagem: erro.message });
     return false;
   }
+}
+
+function deviceIdAtivoPara(sala, deviceId) {
+  if (typeof deviceId !== "string") return false;
+  const linha = db.prepare(`
+    SELECT 1 FROM esp_credenciais
+    WHERE sala = ? AND deviceId = ? AND revogadoEm IS NULL
+  `).get(sala, deviceId);
+  return !!linha;
 }
 
 function provisionar(sala) {
@@ -124,8 +132,12 @@ function substituir(sala) {
     WHERE sala = ?
   `).run(deviceId, hash(segredo), sala);
   logger.info("credencial-substituida", { sala, deviceId });
-  const enviadoAoDispositivo = notificarDispositivo(sala, "credencial_provisionar", deviceId, segredo);
-  return { deviceId, segredo, enviadoAoDispositivo };
+  try {
+    require("./deviceHub").desconectarSala(sala);
+  } catch (erro) {
+    logger.warn("credencial-substituir-desconectar-falhou", { sala, mensagem: erro.message });
+  }
+  return { deviceId, segredo, enviadoAoDispositivo: false };
 }
 
 function revogar(sala) {
@@ -214,5 +226,6 @@ module.exports = {
   estado,
   exigidoPara,
   resumoMigracao,
+  deviceIdAtivoPara,
   RE_DEVICE_ID,
 };
