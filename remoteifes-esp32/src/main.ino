@@ -92,10 +92,6 @@ unsigned long lastSensorRead = 0;
 unsigned long lastHeartbeat = 0;
 unsigned long lastTelemetryWs = 0;
 bool lastKnownPower = false;
-// Após um reboot o ESP32 não sabe se o ar está ligado; só passa a reportar o
-// estado depois que o servidor envia o primeiro send_known_state autoritativo.
-// Evita que um heartbeat pós-reboot marque a sala como desligada e faça o
-// servidor reenviar "power off" para um aparelho que estava ligado.
 bool powerConhecido = false;
 UltimoComandoIR ultimoComando;
 
@@ -743,8 +739,6 @@ void identificarSalaNoServidor() {
   if (novaSala != salaId) {
     if (wsConfigurado) wsCliente.disconnect();
     salaId = novaSala;
-    // Sala nova: o estado de power do vínculo anterior não vale aqui; só volta
-    // a ser reportado após o servidor enviar o send_known_state desta sala.
     powerConhecido = false;
     wsConfigurado = false;
     salaWsConfigurada = "";

@@ -63,9 +63,7 @@
   function salvar(chave, valor) {
     try {
       localStorage.setItem(chave, String(valor));
-    } catch (erro) {
-      /* preferências continuam aplicadas somente nesta execução */
-    }
+    } catch (erro) {}
   }
 
   function aplicarFonte(escala) {

@@ -11,8 +11,6 @@ const NIVEL_ADMIN = 2;
 const NIVEL_SUPERADMIN = 3;
 const JANELA_MENSAGENS_MS = 10 * 1000;
 const MAX_MENSAGENS_POR_JANELA = 20;
-// Clientes só enviam { tipo: "observar" | "observar_dispositivo", sala }.
-// 8 KiB é folga larga; frames maiores são recusados pelo `ws` sem parse.
 const MAX_PAYLOAD_BYTES = 8 * 1024;
 
 let wss = null;
@@ -153,14 +151,10 @@ function iniciar(server) {
     ws.on("pong", () => {
       ws.isAlive = true;
     });
-    // Sem este handler, um erro de socket (reset abrupto, frame maior que o
-    // limite, erro de protocolo) vira 'uncaughtException' e derruba o processo.
     ws.on("error", () => {
       try {
         ws.terminate();
-      } catch (erro) {
-        /* já encerrado */
-      }
+      } catch (erro) {}
     });
 
     ws.on("message", (dados) => {
@@ -250,15 +244,11 @@ function encerrar() {
     wss.clients.forEach((ws) => {
       try {
         ws.close(1001, "servidor encerrando");
-      } catch (erro) {
-        /* ignora sockets já fechados */
-      }
+      } catch (erro) {}
     });
     try {
       wss.close();
-    } catch (erro) {
-      /* ignora */
-    }
+    } catch (erro) {}
   }
 }
 

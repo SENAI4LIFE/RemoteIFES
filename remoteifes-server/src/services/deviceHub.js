@@ -4,8 +4,6 @@ const logger = require("../utils/logger");
 
 const PING_MS = 15 * 1000;
 const MAX_CAPTURAS_ARMAZENADAS = 20;
-// Captura IR bruta pode trazer ~1024 inteiros; 256 KiB cobre com folga.
-// Frames maiores que isso são rejeitados pelo `ws` antes de qualquer parse.
 const MAX_PAYLOAD_BYTES = 256 * 1024;
 const MODOS_VALIDOS = new Set(["operation", "config_idle", "config_clone"]);
 
@@ -143,15 +141,11 @@ function iniciar(server) {
   });
 
   wss.on("connection", (ws, req) => {
-    // Handler cedo: sem ele, um erro de socket (RST, frame acima do limite,
-    // erro de protocolo) vira 'uncaughtException' e derruba o processo.
     ws.on("error", (err) => {
       logger.warn("device-ws-erro", { mensagem: err && err.message });
       try {
         ws.terminate();
-      } catch (erro) {
-        /* já encerrado */
-      }
+      } catch (erro) {}
     });
 
     const auth = autenticar(req);
@@ -264,17 +258,13 @@ function encerrar() {
   conexoes.forEach((entrada) => {
     try {
       entrada.ws.close(1001, "servidor encerrando");
-    } catch (erro) {
-      /* ignora sockets já fechados */
-    }
+    } catch (erro) {}
   });
   conexoes.clear();
   if (wss) {
     try {
       wss.close();
-    } catch (erro) {
-      /* ignora */
-    }
+    } catch (erro) {}
   }
 }
 

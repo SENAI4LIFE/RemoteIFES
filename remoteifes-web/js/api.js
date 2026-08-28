@@ -1,8 +1,6 @@
 const SERVER_URL = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || window.location.origin;
 const CHAVE_TOKEN = "remoteifes_token";
 
-// localStorage pode lançar (modo privado antigo, armazenamento desativado ou
-// cheio); nesses casos a sessão simplesmente não persiste entre recarregamentos.
 function lerTokenArmazenado() {
   try {
     return localStorage.getItem(CHAVE_TOKEN) || null;
@@ -14,9 +12,7 @@ function gravarTokenArmazenado(valor) {
   try {
     if (valor) localStorage.setItem(CHAVE_TOKEN, valor);
     else localStorage.removeItem(CHAVE_TOKEN);
-  } catch (err) {
-    /* sessão fica apenas em memória nesta aba */
-  }
+  } catch (err) {}
 }
 
 let authToken = lerTokenArmazenado();

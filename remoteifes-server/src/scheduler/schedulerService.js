@@ -61,14 +61,12 @@ function agendarPeriodico(fn, intervaloMs, rotulo) {
 }
 
 function iniciarScheduler() {
-  // Torna a inicialização idempotente em reloads/testes e evita tarefas duplicadas.
   pararScheduler();
   agendarPeriodico(verificarAgendamentos, VERIFICACAO_MS, "agendamentos");
   agendarPeriodico(verificarTimeouts, VERIFICACAO_TIMEOUT_MS, "timeouts-esp32");
   agendarPeriodico(encerrarSessoesAbandonadas, VERIFICACAO_SESSOES_MS, "sessoes-abandonadas");
   agendarPeriodico(executarLimpezaRetencao, VERIFICACAO_RETENCAO_MS, "retencao");
   executarProtegido(encerrarSessoesAbandonadas, "sessoes-abandonadas-inicial");
-  // Primeira limpeza logo após o boot, sem competir com a subida do servidor.
   const timerRetencaoInicial = setTimeout(() => {
     executarProtegido(executarLimpezaRetencao, "retencao-inicial");
   }, 10000);

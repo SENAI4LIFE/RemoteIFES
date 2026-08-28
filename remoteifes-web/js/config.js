@@ -1,19 +1,8 @@
-// Resolução do endereço do servidor RemoteIFES.
-//
-// - No navegador (PWA hospedada junto do servidor): usa a própria origem.
-//   Em localhost de desenvolvimento, assume a porta 8080.
-// - No app empacotado (Cordova/APK): a página é carregada de file:// ou de
-//   https://localhost, então NÃO existe uma origem útil. Nesse caso o endereço
-//   precisa ser informado uma vez e fica salvo em localStorage.
-// - Em qualquer contexto, um endereço salvo em localStorage tem prioridade
-//   (permite apontar a PWA para outro servidor sem rebuild).
-
 const CHAVE_SERVIDOR = "remoteifes_server_url";
 
 function ehContextoEmpacotado() {
   const protocolo = window.location.protocol;
   if (protocolo === "file:" || protocolo === "content:") return true;
-  // cordova-android 13+ serve o app de https://localhost/ com o objeto cordova presente
   if (window.cordova && ["localhost", "127.0.0.1"].includes(window.location.hostname)) return true;
   return false;
 }
@@ -71,8 +60,6 @@ window.RemoteIFESConfig = {
   limparServidor() {
     try {
       localStorage.removeItem(CHAVE_SERVIDOR);
-    } catch (erro) {
-      /* ignora */
-    }
+    } catch (erro) {}
   },
 };
