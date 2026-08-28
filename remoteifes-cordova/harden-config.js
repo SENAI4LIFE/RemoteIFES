@@ -26,11 +26,11 @@ const EDIT_CONFIG_IOS_LOCAL_NETWORK = [
 ].join("\n");
 
 const RE_BLOCO_REDE =
-  /^([ \t]*)<access\b[^>]*\/>[ \t]*\n(?:[ \t]*<allow-intent\b[^>]*\/>[ \t]*\n)+[ \t]*<allow-navigation\b[^>]*\/>[ \t]*\n/m;
-const RE_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="app\/src\/main\/AndroidManifest\.xml"[\s\S]*?<\/edit-config>\n?/;
-const RE_IOS_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="\*-Info\.plist"[\s\S]*?<\/edit-config>\n?/;
-const RE_MIN_SDK = /([ \t]*<preference name="android-minSdkVersion" value="24" \/>\n)/;
-const RE_IOS_PLATFORM = /([ \t]*<platform name="ios">\n)/;
+  /^([ \t]*)<access\b[^>]*\/>[ \t]*\r?\n(?:[ \t]*<allow-intent\b[^>]*\/>[ \t]*\r?\n)+[ \t]*<allow-navigation\b[^>]*\/>[ \t]*\r?\n/m;
+const RE_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="app\/src\/main\/AndroidManifest\.xml"[\s\S]*?<\/edit-config>\r?\n?/;
+const RE_IOS_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="\*-Info\.plist"[\s\S]*?<\/edit-config>\r?\n?/;
+const RE_MIN_SDK = /([ \t]*<preference name="android-minSdkVersion" value="24" \/>\r?\n)/;
+const RE_IOS_PLATFORM = /([ \t]*<platform name="ios">\r?\n)/;
 const RE_CLEARTEXT_ON = /usesCleartextTraffic\s*=\s*"true"/;
 
 function uso() {
@@ -70,20 +70,24 @@ function trocarBlocoRede(xml, linhas, original) {
   if (!RE_BLOCO_REDE.test(xml)) {
     abortar("não encontrei o bloco <access>/<allow-intent>/<allow-navigation> contíguo esperado em config.xml.", original);
   }
-  return xml.replace(RE_BLOCO_REDE, (_todo, indent) => linhas.map((l) => `${indent}${l}\n`).join(""));
+  const eol = xml.includes("\r\n") ? "\r\n" : "\n";
+  return xml.replace(RE_BLOCO_REDE, (_todo, indent) => linhas.map((l) => `${indent}${l}${eol}`).join(""));
 }
 
 function definirCleartext(xml, ativo, original) {
   let saida = xml.replace(RE_EDIT_CONFIG, "").replace(RE_IOS_EDIT_CONFIG, "");
   if (ativo) {
+    const eol = xml.includes("\r\n") ? "\r\n" : "\n";
+    const android = EDIT_CONFIG_CLEARTEXT.replace(/\n/g, eol);
+    const ios = EDIT_CONFIG_IOS_LOCAL_NETWORK.replace(/\n/g, eol);
     if (!RE_MIN_SDK.test(saida)) {
       abortar('não encontrei <preference name="android-minSdkVersion" value="24" /> para reinserir o cleartext.', original);
     }
-    saida = saida.replace(RE_MIN_SDK, `$1${EDIT_CONFIG_CLEARTEXT}\n`);
+    saida = saida.replace(RE_MIN_SDK, `$1${android}${eol}`);
     if (!RE_IOS_PLATFORM.test(saida)) {
       abortar("não encontrei a plataforma iOS para habilitar a compatibilidade com rede local.", original);
     }
-    saida = saida.replace(RE_IOS_PLATFORM, (_todo, indent) => indent + EDIT_CONFIG_IOS_LOCAL_NETWORK + "\n");
+    saida = saida.replace(RE_IOS_PLATFORM, (_todo, indent) => indent + ios + eol);
   }
   return saida;
 }

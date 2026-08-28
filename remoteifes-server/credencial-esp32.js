@@ -77,6 +77,6 @@ function imprimirSegredo(r) {
   console.log("");
   console.log(r.enviadoAoDispositivo
     ? "Enviado ao dispositivo conectado; ele vai reconectar já autenticado."
-    : "Dispositivo offline: informe deviceId e segredo no portal de setup do ESP32.");
+    : "Informe deviceId e segredo no portal de setup do ESP32 que deve usar esta credencial.");
   console.log("Guarde o segredo agora — ele não é armazenado em texto e não será exibido de novo.");
 }

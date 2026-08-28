@@ -80,7 +80,7 @@ remoteifes-esp32/    Firmware Arduino/ESP32 instalado em cada sala, ao lado do a
 
 Fluxo geral:
 
-1. Cada sala possui um **ESP32** com receptor/emissor de infravermelho (e, opcionalmente, um sensor de temperatura DHT), conectado à rede Wi-Fi local. O ESP32 aprende o protocolo IR do ar-condicionado (ou usa a biblioteca de protocolos conhecidos), envia comandos e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP ou HTTPS, identificado pelo MAC do dispositivo (veja [Segurança](#segurança)).
+1. Cada sala possui um **ESP32** com receptor/emissor de infravermelho (e, opcionalmente, um sensor de temperatura DHT), conectado à rede Wi-Fi local. O ESP32 aprende o protocolo IR do ar-condicionado (ou usa a biblioteca de protocolos conhecidos), envia comandos e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP ou HTTPS, identificado pelo MAC ou por uma credencial exclusiva de dispositivo (veja [Segurança](#segurança)).
 
 2. O **servidor central** (`remoteifes-server`) mantém o banco de dados (SQLite), a lógica de autenticação, permissões, agendamentos, limites de temperatura, notificações e configurações globais. Ele expõe uma API REST usada tanto pelo frontend web quanto pelos ESP32, além de canais WebSocket para atualização de status e comandos em tempo real.
 
@@ -225,6 +225,8 @@ O banco inteiro fica em um único arquivo SQLite (`remoteifes-server/data/remote
 
 **Restauração:** com o servidor **parado**, `npm run restore` lista os backups disponíveis; `npm run restore -- <arquivo>` restaura o backup indicado (nome dentro de `BACKUP_DIR` ou caminho completo). Antes de sobrescrever, o script verifica o backup candidato, faz uma cópia de segurança consistente do banco atual (`pre-restauracao-<data>.db` em `BACKUP_DIR`) e, depois da troca, revalida o arquivo restaurado. Use `--sim` para pular a confirmação interativa em scripts. Reinicie o servidor após a restauração.
 
+As credenciais dos ESP32 fazem parte do banco e entram normalmente no backup. Se a restauração voltar para antes de uma rotação, substituição ou revogação, a NVS do dispositivo e o banco podem ficar em versões diferentes; nesse caso, emita uma credencial de substituição e informe-a no portal de setup do controlador afetado.
+
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `BACKUP_AUTOMATICO` | `true` em produção, `false` nos demais | Liga/desliga o backup periódico do agendador |
@@ -281,7 +283,7 @@ Todas as funções antes exclusivas da interface local do dispositivo (entrar/sa
 - Exibe a última leitura de temperatura e umidade, o sinal Wi-Fi (RSSI) e o **último comando infravermelho transmitido** pelo dispositivo (sinal bruto reenviado ou estado conhecido — temperatura/ligado/turbo/ventilação), tudo atualizado em tempo real.
 - Permite entrar em modo de configuração, alternar entre modo config e modo clonagem, iniciar/parar a captura de IR e sair de volta para a operação normal.
 - Sinais capturados em modo clonagem aparecem na hora nessa aba; cada um pode ser reenviado ("testar") e um protocolo de ar-condicionado compatível pode ser selecionado para a sala.
-- Um botão de **reset de Wi-Fi** remoto apaga as credenciais salvas do dispositivo e o reinicia em modo de ponto de acesso, sem precisar ir fisicamente até o equipamento.
+- Um botão de **reset de Wi-Fi** remoto apaga a rede e o endereço do servidor, preserva a credencial exclusiva do dispositivo e o reinicia em modo de ponto de acesso, sem precisar ir fisicamente até o equipamento.
 - Mostra a **versão do firmware** instalada e a publicada, com um botão de **atualização por OTA** e barra de progresso (veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)).
 - Gerencia a **credencial exclusiva do dispositivo** (provisionar, rotacionar, substituir, revogar), com o segredo exibido uma única vez (veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)).
 
@@ -382,7 +384,7 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 
 `pio device monitor -b 115200` abre o monitor serial na mesma taxa configurada pelo firmware (`Serial.begin(115200)`), útil para acompanhar o boot, o IP obtido, o estado da conexão Wi-Fi/WebSocket com o servidor e mensagens de erro em tempo real. Se houver mais de uma porta serial conectada, informe-a explicitamente: `pio device monitor -b 115200 -p /dev/ttyUSB0` (Linux/Raspberry Pi) ou `pio device monitor -b 115200 -p /dev/cu.usbserial-XXXX` (macOS). Rode `pio device list` para listar as portas disponíveis.
 
-**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe o ponto de acesso aberto `RemoteIFES-Setup` para receber apenas as credenciais da rede local e o endereço do servidor central. Depois de conectado, o servidor detecta o MAC e o administrador principal o vincula à sala em `Admin > ESP32 / MACs`. Falhas temporárias de Wi-Fi não reabrem o ponto de acesso nem reiniciam o dispositivo: o firmware tenta reconectar sem bloquear o restante da operação. O portal volta somente depois de um reset explícito de Wi-Fi.
+**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe o ponto de acesso aberto `RemoteIFES-Setup` para receber as credenciais da rede local, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o administrador principal o vincula à sala em `Admin > ESP32 / MACs`. Falhas temporárias de Wi-Fi não reabrem o ponto de acesso nem reiniciam o dispositivo: o firmware tenta reconectar sem bloquear o restante da operação. O portal volta somente depois de um reset explícito de Wi-Fi.
 
 A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.0.0`) e é reportada ao servidor na telemetria, no heartbeat e na página de status local. A partição do ESP32 usa o layout `min_spiffs.csv` (dois slots de aplicação de ~1,9 MB — o firmware atual ocupa ~63% de um slot), o que reserva um slot ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32) com reversão automática. **A gravação por USB (`flash.sh` / `pio run --target upload`) continua sendo o caminho de recuperação**: ela regrava o slot ativo e não depende do estado do OTA.
 
@@ -567,7 +569,7 @@ Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo p
 - **Exponha apenas a porta do proxy** (80 no `lan-setup.sh`, 443 no `https-setup.sh`), nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 80` ou `ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o TLS e a checagem de `TRUST_PROXY`.
 - **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
 - **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
-- **Cadastre o MAC de cada ESP32 assim que possível** (`Admin > ESP32 / MACs`): as rotas `/dispositivo/*` não passam pela restrição de rede (os ESP32 precisam alcançá-las de qualquer rede), e enquanto o MAC de uma sala não está cadastrado, qualquer dispositivo que conheça o código dessa sala pode reportar estado falso para ela. Cadastrar o MAC fecha essa janela, exigindo que as chamadas venham exatamente do ESP32 físico da sala.
+- **Cadastre o MAC de cada ESP32 assim que possível** (`Admin > ESP32 / MACs`) e migre depois para a credencial exclusiva: as rotas `/dispositivo/*` não passam pela restrição de rede porque os controladores precisam alcançá-las. Sem vínculo, o dispositivo aparece apenas como detectado e não controla uma sala; com o MAC vinculado, as chamadas precisam corresponder ao cadastro; com credencial provisionada, o MAC sozinho deixa de autenticar aquela sala.
 - **Confirme que os backups estão sendo gravados** em `<REMOTEIFES_DATA_DIR>/backups/` (`data/backups/` por padrão; em produção o backup automático já vem ligado, e `deploy.sh`/`rollback.sh` também geram um antes de cada troca de versão) e copie essa pasta para fora da Pi periodicamente. Teste a restauração ao menos uma vez com `npm run restore` num ambiente separado — um backup nunca verificado não é um backup. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
 
 ### Frontend no GitHub Pages (opcional, para demonstração)
@@ -626,6 +628,7 @@ O que o processo garante:
 - **Validação antes de instalar:** o ESP32 baixa a imagem de `/dispositivo/firmware` (autenticada por MAC ou credencial), confere o SHA-256 e o tamanho contra a oferta e só então confirma a gravação. Hash divergente, download interrompido ou imagem maior que o slot abortam sem tocar no firmware em execução.
 - **Sem OTA concorrente:** o servidor recusa uma segunda oferta para a mesma sala enquanto uma está em andamento e limita o total de atualizações simultâneas; o firmware ignora uma oferta se já estiver atualizando ou se estiver em modo de configuração.
 - **Interrupções são seguras:** se a conexão cai durante a transferência, o servidor marca a OTA como falha (com tempo-limite de transferência e de reinício) e permite reofertar; o dispositivo continua na versão atual.
+- **Reinício do servidor é recuperável:** o andamento é salvo em `<REMOTEIFES_DATA_DIR>/firmware/estados-ota.json`; depois que o backend volta, a reconexão e a versão reportada pelo ESP32 concluem ou registram a reversão, e estados sem retorno expiram pelo mesmo tempo-limite.
 - **Reversão verificada:** se o dispositivo voltar reportando a versão anterior, a OTA é registrada como revertida e gera uma notificação; se voltar com a versão nova, é registrada como concluída.
 - **Configuração preservada:** OTA grava apenas a aplicação — as credenciais de Wi-Fi/servidor/dispositivo na NVS e a associação da sala (feita no servidor) não são tocadas.
 - **Recuperação:** a gravação por USB regrava o slot ativo e ignora o estado do OTA; é o caminho para um dispositivo que, por qualquer motivo, não aceite mais OTA.
@@ -644,7 +647,9 @@ npm run credencial -- A-101 --revogar       # invalida a credencial e derruba a 
 npm run credencial -- A-101                 # mostra o estado (sem expor o segredo)
 ```
 
-O ESP32 envia a credencial no cabeçalho (`X-Device-Id` / `X-Device-Secret`) no handshake do WebSocket e nas rotas `/dispositivo/*`. Ela pode ser informada no portal de setup (`RemoteIFES-Setup`) ou, para um dispositivo já conectado por MAC, **enviada pelo próprio servidor pela conexão existente** ao provisionar/rotacionar — o dispositivo grava na NVS e reconecta já autenticado, sem visita ao local.
+O ESP32 envia a credencial no cabeçalho (`X-Device-Id` / `X-Device-Secret`) no handshake do WebSocket e nas rotas `/dispositivo/*`. Ela pode ser informada no portal de setup (`RemoteIFES-Setup`) ou, para um dispositivo já conectado por MAC, **enviada pelo próprio servidor pela conexão existente** ao provisionar/rotacionar — o dispositivo grava na NVS e reconecta já autenticado, sem visita ao local. Resetar ou reconfigurar apenas Wi-Fi/servidor preserva essa credencial; deixar os dois campos de dispositivo vazios no portal também preserva o valor existente.
+
+**Substituição de hardware é deliberadamente diferente:** a nova credencial nunca é enviada à conexão da placa antiga. O servidor invalida o `deviceId` anterior, encerra sua sessão e mostra o novo par uma vez para ser informado no portal da placa substituta.
 
 **Migração dos controladores atuais (padrão: brando):**
 
@@ -814,7 +819,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 | Alvo | Comando | Observações |
 |---|---|---|
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`) e o monitoramento operacional (`test/monitoramento.test.js`). |
-| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Requer o Google Chrome instalado (usa o navegador do sistema, não baixa binário). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador e queda/retorno de WebSocket. |
+| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Usa o Google Chrome do sistema por padrão; para Edge Chromium, defina `E2E_BROWSER_CHANNEL=msedge`. Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador e queda/retorno de WebSocket. |
 | Configuração Cordova | `cd remoteifes-cordova && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
 | ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
@@ -854,7 +859,7 @@ remoteifes-server/
   data/              conteúdo de REMOTEIFES_DATA_DIR (padrão); ignorado pelo Git
     remoteifes.db    banco SQLite (criado na primeira execução)
     backups/         backups automáticos, manuais e de pré-atualização do banco
-    firmware/        imagem de firmware do ESP32 publicada para OTA + manifesto.json
+    firmware/        imagem publicada, manifesto.json e estados-ota.json do fluxo OTA
     previous-version / current-version / deploy.log   estado gravado por deploy.sh/rollback.sh
   src/
     app.js            monta o Express app e registra as rotas
