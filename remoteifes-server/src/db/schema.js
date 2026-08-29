@@ -274,6 +274,7 @@ function recriarTabelaSalas() {
         temperaturaMaxima REAL,
         turboAtivo INTEGER NOT NULL DEFAULT 0,
         irProtocolo INTEGER,
+        fwVersao TEXT,
         ipEsp32 TEXT,
         mac TEXT,
         latitude REAL,
@@ -285,12 +286,12 @@ function recriarTabelaSalas() {
       INSERT INTO salas_nova (
         sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
         temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, ipEsp32,
-        mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
+        fwVersao, mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
       )
       SELECT
         sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
         temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, ipEsp32,
-        mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
+        fwVersao, mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
       FROM salas;
       DROP TABLE salas;
       ALTER TABLE salas_nova RENAME TO salas;

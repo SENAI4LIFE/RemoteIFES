@@ -142,6 +142,8 @@ void handleRoot();
 void handleInfo();
 void handleSetup();
 void handleSaveSetup();
+bool requisicaoPortalPermitida();
+String escaparHtml(const String& valor);
 void handleIRCapture();
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency);
 void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing);
@@ -193,17 +195,17 @@ void setup() {
   irsend.begin();
 
   preferences.begin("remoteifes", false);
-  String savedSSID = preferences.getString("ssid", "");
-  String savedPASS = preferences.getString("pass", "");
+  String savedSSID = preferences.isKey("ssid") ? preferences.getString("ssid", "") : "";
+  String savedPASS = preferences.isKey("pass") ? preferences.getString("pass", "") : "";
   if (preferences.isKey("sala")) preferences.remove("sala");
   if (preferences.isKey("adminHash")) preferences.remove("adminHash");
   if (preferences.isKey("apPass")) preferences.remove("apPass");
   salaId = "";
-  serverHost = preferences.getString("host", "");
-  serverPort = preferences.getInt("porta", 0);
-  tlsModo = preferences.getString("tls", "off");
-  deviceId = preferences.getString("devId", "");
-  deviceSecret = preferences.getString("devSec", "");
+  serverHost = preferences.isKey("host") ? preferences.getString("host", "") : "";
+  serverPort = preferences.isKey("porta") ? preferences.getInt("porta", 0) : 0;
+  tlsModo = preferences.isKey("tls") ? preferences.getString("tls", "off") : "off";
+  deviceId = preferences.isKey("devId") ? preferences.getString("devId", "") : "";
+  deviceSecret = preferences.isKey("devSec") ? preferences.getString("devSec", "") : "";
 
   if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
@@ -326,6 +328,10 @@ void gerenciarConexaoWifi() {
 }
 
 void handleSetup() {
+  if (!requisicaoPortalPermitida()) {
+    server.send(403, "text/plain", "Portal de configuracao disponivel apenas pela rede RemoteIFES-Setup.");
+    return;
+  }
   File f = LittleFS.open("/setup.html", "r");
   if (!f) {
     server.send(500, "text/plain", "setup.html ausente no sistema de arquivos");
@@ -336,6 +342,10 @@ void handleSetup() {
 }
 
 void handleSaveSetup() {
+  if (!requisicaoPortalPermitida()) {
+    server.send(403, "text/plain", "Configuracao permitida apenas pela rede RemoteIFES-Setup.");
+    return;
+  }
   String newSSID = server.arg("ssid");
   String newPASS = server.arg("pass");
   String newHost = server.arg("host");
@@ -370,10 +380,25 @@ void handleSaveSetup() {
   File f = LittleFS.open("/restart.html", "r");
   String response = f ? f.readString() : String("Credenciais salvas. Reiniciando...");
   if (f) f.close();
-  response.replace("{{ssid}}", newSSID);
+  response.replace("{{ssid}}", escaparHtml(newSSID));
 
   server.send(200, "text/html", response);
   agendarReinicio(1500);
+}
+
+bool requisicaoPortalPermitida() {
+  if (!apModeActive && !apRecuperacaoAtivo) return false;
+  return server.client().localIP() == WiFi.softAPIP();
+}
+
+String escaparHtml(const String& valor) {
+  String saida = valor;
+  saida.replace("&", "&amp;");
+  saida.replace("<", "&lt;");
+  saida.replace(">", "&gt;");
+  saida.replace("\"", "&quot;");
+  saida.replace("'", "&#39;");
+  return saida;
 }
 
 void iniciarApRecuperacao() {
@@ -661,11 +686,11 @@ void handleRoot() {
   }
   String html = f.readString();
   f.close();
-  html.replace("{{sala}}", salaId.length() > 0 ? salaId : String("Aguardando vinculo por MAC"));
-  html.replace("{{mac}}", WiFi.macAddress());
-  html.replace("{{ip}}", WiFi.localIP().toString());
-  html.replace("{{servidor}}", serverHost + ":" + String(serverPort));
-  html.replace("{{fw}}", String(FW_VERSAO));
+  html.replace("{{sala}}", escaparHtml(salaId.length() > 0 ? salaId : String("Aguardando vinculo por MAC")));
+  html.replace("{{mac}}", escaparHtml(WiFi.macAddress()));
+  html.replace("{{ip}}", escaparHtml(WiFi.localIP().toString()));
+  html.replace("{{servidor}}", escaparHtml(serverHost + ":" + String(serverPort)));
+  html.replace("{{fw}}", escaparHtml(String(FW_VERSAO)));
   server.send(200, "text/html", html);
   reportAccess(server.client().remoteIP().toString(), server.header("User-Agent"));
 }

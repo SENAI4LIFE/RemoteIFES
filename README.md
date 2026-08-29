@@ -68,7 +68,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 
 ## Visão Geral
 
-O projeto é dividido em três partes independentes:
+O projeto é dividido em quatro partes independentes:
 
 ```
 remoteifes-web/      Frontend estático (HTML/CSS/JS puro, sem build), publicado no GitHub Pages,
@@ -248,7 +248,7 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o administrador principal associa seu MAC a uma sala em `Admin > ESP32 / MACs`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits, guardado só como hash SHA-256): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação com tolerância de 24 h, revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
 - **Atualização de firmware (OTA)**: a imagem publicada no servidor é verificada por SHA-256 pelo ESP32 antes de ser instalada; a gravação usa um segundo slot de aplicação e o bootloader reverte sozinho se o novo firmware não passar no autoteste pós-boot. OTA concorrente para a mesma sala é recusada e a gravação por USB continua como caminho de recuperação. Veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32).
 - **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do administrador principal no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
-- **Ponto de acesso de configuração**: a rede aberta `RemoteIFES-Setup` existe somente no primeiro provisionamento ou depois de um reset explícito de Wi-Fi. Ela deve ser usada localmente, e o ESP32 volta ao modo de operação depois que a rede e o servidor são salvos.
+- **Ponto de acesso de configuração**: a rede aberta `RemoteIFES-Setup` existe no primeiro provisionamento, depois de um reset explícito de Wi-Fi ou como recuperação após 2 minutos contínuos sem conexão. O firmware continua tentando reconectar em paralelo e fecha o ponto de acesso quando a rede volta. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 - **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
 - **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
@@ -275,7 +275,7 @@ O firmware do ESP32 tem dois modos de funcionamento bem separados, com uma trans
 Isso substitui a antiga interface web local completa do dispositivo. Hoje, o ESP32 expõe localmente apenas:
 
 - Uma página de **status somente leitura**, mostrando sala, MAC, IP, servidor configurado e versão do firmware — para conferência visual direta no equipamento.
-- O **portal de provisionamento** na rede aberta `RemoteIFES-Setup`, usado apenas na configuração inicial ou após um reset explícito de Wi-Fi — veja [Segurança](#segurança).
+- O **portal de provisionamento** na rede aberta `RemoteIFES-Setup`, usado na configuração inicial, após um reset explícito de Wi-Fi ou na recuperação de uma indisponibilidade contínua da rede — veja [Segurança](#segurança).
 
 Todas as funções antes exclusivas da interface local do dispositivo (entrar/sair do modo de configuração, ativar o modo clonagem, iniciar/parar captura de infravermelho, testar um sinal capturado, resetar o Wi-Fi remotamente) agora ficam em uma aba dedicada da aplicação principal, **`Admin > ESP32`**, visível apenas ao administrador principal:
 
@@ -384,7 +384,7 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 
 `pio device monitor -b 115200` abre o monitor serial na mesma taxa configurada pelo firmware (`Serial.begin(115200)`), útil para acompanhar o boot, o IP obtido, o estado da conexão Wi-Fi/WebSocket com o servidor e mensagens de erro em tempo real. Se houver mais de uma porta serial conectada, informe-a explicitamente: `pio device monitor -b 115200 -p /dev/ttyUSB0` (Linux/Raspberry Pi) ou `pio device monitor -b 115200 -p /dev/cu.usbserial-XXXX` (macOS). Rode `pio device list` para listar as portas disponíveis.
 
-**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe o ponto de acesso aberto `RemoteIFES-Setup` para receber as credenciais da rede local, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o administrador principal o vincula à sala em `Admin > ESP32 / MACs`. Falhas temporárias de Wi-Fi não reabrem o ponto de acesso nem reiniciam o dispositivo: o firmware tenta reconectar sem bloquear o restante da operação. O portal volta somente depois de um reset explícito de Wi-Fi.
+**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe o ponto de acesso aberto `RemoteIFES-Setup` para receber as credenciais da rede local, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o administrador principal o vincula à sala em `Admin > ESP32 / MACs`. Em falhas de Wi-Fi, o firmware tenta reconectar sem bloquear o restante da operação; depois de 2 minutos contínuos sem conexão, também abre o ponto de acesso de recuperação e mantém as tentativas em paralelo. O ponto de acesso é fechado automaticamente quando a rede volta.
 
 A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.0.0`) e é reportada ao servidor na telemetria, no heartbeat e na página de status local. A partição do ESP32 usa o layout `min_spiffs.csv` (dois slots de aplicação de ~1,9 MB — o firmware atual ocupa ~63% de um slot), o que reserva um slot ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32) com reversão automática. **A gravação por USB (`flash.sh` / `pio run --target upload`) continua sendo o caminho de recuperação**: ela regrava o slot ativo e não depende do estado do OTA.
 
@@ -574,17 +574,17 @@ Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo p
 
 ### Frontend no GitHub Pages (opcional, para demonstração)
 
-Na operação de produção descrita em [Deploy](#deploy) **o próprio servidor entrega o `remoteifes-web`** na mesma origem da API — o GitHub Pages não é necessário e a operação local não depende dele. A publicação no GitHub Pages é útil apenas como vitrine/demonstração pública, e é manual (o workflow de Actions do repositório apenas roda os testes descritos em [Testes e Integração Contínua](#testes-e-integração-contínua) — não publica o frontend). Passo a passo:
+Na operação de produção descrita em [Deploy](#deploy) **o próprio servidor entrega o `remoteifes-web`** na mesma origem da API — o GitHub Pages não é necessário e a operação local não depende dele. A publicação no GitHub Pages é útil apenas como vitrine/demonstração pública e usa o workflow `.github/workflows/pages.yml`, porque a publicação direta a partir de uma branch aceita somente a raiz ou `/docs`, não a subpasta `/remoteifes-web`. Passo a passo:
 
 1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
 2. Como o GitHub Pages tem origem diferente do servidor central, edite `remoteifes-web/js/config.js` e defina `serverUrl` com a URL HTTPS do servidor central em produção.
 3. Faça commit e push dessa alteração na branch `main`.
 4. No repositório, vá em **Settings > Pages**.
-5. Em "Build and deployment", campo "Source", selecione **Deploy from a branch**.
-6. Em "Branch", selecione `main` e a pasta `/remoteifes-web`, depois clique em **Save**.
-7. Acompanhe o progresso na própria página de **Settings > Pages**. Quando a publicação terminar, o endereço público do site aparece no topo da página, no formato `https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`.
+5. Em "Build and deployment", campo "Source", selecione **GitHub Actions**.
+6. Abra **Actions > Pages**, execute o workflow manualmente se necessário e acompanhe a implantação. Depois disso, cada push em `main` que alterar `remoteifes-web` ou o próprio workflow republica o site.
+7. Quando a publicação terminar, o endereço público aparece em **Settings > Pages**, no formato `https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`.
 
-Esse é o link que você compartilha com os usuários para acessar o sistema pelo navegador. Sempre que `remoteifes-web` for alterado, repita o passo 3 (commit/push) — o GitHub Pages republica automaticamente a partir da branch configurada a cada push, sem necessidade de repetir os passos 4–6.
+Esse é o link que você compartilha com os usuários para acessar o sistema pelo navegador. Sempre que `remoteifes-web` for alterado, faça commit e push — o workflow republica o site automaticamente.
 
 ## Domínio Próprio e HTTPS
 
@@ -599,7 +599,7 @@ Com o frontend e o servidor central ambos em HTTPS e domínios próprios, o sist
 
 ### HTTPS entre o ESP32 e o servidor
 
-O firmware do ESP32 também pode se conectar ao servidor central via HTTPS, além do HTTP tradicional. Essa opção é escolhida no portal de configuração de cada dispositivo (a rede Wi-Fi `RemoteIFES-Setup`, exibida quando o ESP32 ainda não está configurado ou após um reset de Wi-Fi), no campo "Conexão com o servidor":
+O firmware do ESP32 também pode se conectar ao servidor central via HTTPS, além do HTTP tradicional. Essa opção é escolhida no portal de configuração de cada dispositivo (a rede Wi-Fi `RemoteIFES-Setup`, exibida quando o ESP32 ainda não está configurado, após um reset de Wi-Fi ou durante a recuperação de uma indisponibilidade contínua da rede), no campo "Conexão com o servidor":
 
 - **HTTPS com certificado válido (recomendado)**: valida o certificado do servidor contra a cadeia raiz pública da Let's Encrypt (embarcada no firmware); use quando o servidor estiver atrás do `https-setup.sh` (Nginx + Certbot) ou de qualquer outro certificado emitido por essa autoridade.
 - **HTTPS sem validar certificado**: criptografa a conexão mas não confirma a identidade do servidor; use apenas em redes locais confiáveis com um certificado autoassinado (ex.: Raspberry Pi sem domínio público).
@@ -688,10 +688,11 @@ Além do site publicado no GitHub Pages, o `remoteifes-web` pode ser instalado c
 
 O `sw.js` só intercepta carregamentos de arquivos estáticos do próprio domínio — chamadas à API (`serverUrl`), inclusive em uma implantação same-origin, e a conexão WebSocket continuam exigindo rede normalmente. O registro do service worker acontece automaticamente no `index.html`, sem configuração adicional.
 
-Requisitos para o botão de instalação aparecer no navegador:
+Requisito para o botão de instalação aparecer no navegador:
 
 - Frontend servido por HTTPS (GitHub Pages já atende isso).
-- `serverUrl` do servidor central também em HTTPS — a mesma exigência de [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
+
+O servidor central também precisa usar HTTPS para o aplicativo instalado funcionar contra ele a partir de uma página HTTPS; caso contrário, o navegador bloqueia as chamadas como conteúdo misto. Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 
 No Chrome/Edge (Android ou desktop) aparece um ícone de instalação na barra de endereço; no Safari (iOS), o caminho é Compartilhar > Adicionar à Tela de Início.
 
@@ -699,28 +700,22 @@ Sempre que algum arquivo estático de `remoteifes-web` for alterado, incremente 
 
 ### Cordova (Android/iOS)
 
-O projeto `remoteifes-cordova/` empacota `remoteifes-web` como app nativo. A pasta `remoteifes-cordova/www/` nunca deve ser editada diretamente: ela é gerada a partir de `remoteifes-web` pelo script `sync-www.js`, chamado automaticamente por todos os scripts `npm run *` do projeto.
+O projeto `remoteifes-cordova/` empacota `remoteifes-web` como app nativo. A pasta `remoteifes-cordova/www/` nunca deve ser editada diretamente: ela é gerada a partir de `remoteifes-web` pelo script `sync-www.js`, chamado automaticamente pelos scripts de preparo, build, execução e validação.
 
 #### Instalação do Cordova
 
 ```bash
 cd remoteifes-cordova
-npm install
+npm ci
 ```
 
-Isso instala o Cordova CLI e os plugins do projeto (`cordova-plugin-whitelist`, `cordova-plugin-statusbar`, `cordova-plugin-splashscreen`) localmente, sem precisar de instalação global.
-
-Para usar o comando `cordova` diretamente no terminal:
-
-```bash
-npm install -g cordova
-```
+Isso instala as versões registradas em `package-lock.json` do Cordova CLI, das plataformas Android/iOS e do `cordova-plugin-statusbar`, sem instalação global. O splash screen é fornecido pelas próprias plataformas Cordova atuais; os antigos plugins `cordova-plugin-whitelist` e `cordova-plugin-splashscreen` não são usados.
 
 #### Requisitos por plataforma
 
 | Plataforma | Requisitos |
 |---|---|
-| Android | JDK 17, Android Studio ou Android SDK Command-line Tools, variável de ambiente `ANDROID_SDK_ROOT` apontando para o SDK |
+| Android | JDK 17; Android SDK Platform 36, Build Tools 36 e Platform Tools; Android Studio ou SDK Command-line Tools; `ANDROID_HOME` apontando para o SDK; Gradle 8.14.2 no `PATH` para criar o wrapper na primeira compilação |
 | iOS | macOS com Xcode e Xcode Command Line Tools, CocoaPods (`sudo gem install cocoapods`) |
 
 #### Adicionar as plataformas
@@ -763,7 +758,7 @@ npm run run-ios
 
 #### Ícone e splash screen
 
-As imagens-fonte ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732, geradas a partir de `remoteifes-web/assets/remoteifes-logo.png`). Para gerar os tamanhos específicos de cada plataforma a partir dessas duas imagens:
+As imagens-fonte ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732, geradas a partir de `remoteifes-web/assets/remoteifes-logo.png`). O Android usa `icon.png` também no splash screen nativo da plataforma; o iOS usa `splash.png`. As plataformas atuais geram os recursos necessários durante o preparo. Para gerar variantes personalizadas com `cordova-res`, instale essa ferramenta separadamente e execute:
 
 ```bash
 cd remoteifes-cordova
@@ -776,7 +771,7 @@ npx cordova-res ios --skip-config --copy
 O app empacotado é carregado de `file://` (ou `https://localhost`), então não existe uma "origem" que sirva de endereço do servidor — diferente da PWA, que assume o mesmo domínio de onde foi baixada. Há duas formas de definir o endereço:
 
 - **Em tempo de execução (recomendado):** ao abrir o app sem um endereço configurado, ele mostra a tela "Sem conexão com o servidor" com o botão **Configurar endereço do servidor**. O valor informado (`http://IP:porta` ou `https://dominio`) é validado e guardado em `localStorage`; o app recarrega e passa a usá-lo. O mesmo botão aparece sempre que o app estiver empacotado e offline, permitindo trocar de servidor sem reinstalar. Esse override também funciona na PWA para apontá-la a outro servidor.
-- **Fixo no build:** edite `remoteifes-web/js/config.js` (não `remoteifes-cordova/www/js/config.js`, que é sobrescrito a cada `sync`) preenchendo um valor para `serverUrl` antes de gerar o build. Um endereço salvo em `localStorage` tem prioridade sobre esse padrão.
+- **Fixo no build:** em `remoteifes-web/js/config.js` (não em `remoteifes-cordova/www/js/config.js`, que é sobrescrito a cada `sync`), substitua o valor vazio do ramo empacotado em `const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());` pela origem desejada antes de gerar o build. Um endereço salvo em `localStorage` tem prioridade sobre esse padrão.
 
 #### Ajustando as permissões de rede
 
@@ -790,7 +785,7 @@ npm run harden-config -- https://remoteifes.ifes.edu.br   # origem HTTPS: remove
 npm run harden-config -- http://192.168.1.50:8080         # origem HTTP em rede local: mantém a exceção local (com aviso)
 ```
 
-Depois do build de release, `npm run dev-config` (ou `git checkout config.xml`) devolve o arquivo ao modo de desenvolvimento. A operação é reversível e idempotente; rode-a após o `sync` e antes de `cordova build ... --release`.
+Ao usar os comandos manualmente, `npm run dev-config` devolve o arquivo ao modo de desenvolvimento depois do build. A operação é reversível e idempotente. O script `build-android-release` faz essa restauração automaticamente, inclusive se a compilação falhar.
 
 O app suporta **retrato e paisagem** (`Orientation` = `default`); a interface acompanha a rotação sem recarregar nem perder o estado atual. Para evitar gerar um APK com permissões de rede curinga, `npm run build-android-release` exige `REMOTEIFES_SERVER_URL` e endurece o `config.xml` automaticamente antes do build:
 
@@ -820,7 +815,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 |---|---|---|
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`) e o monitoramento operacional (`test/monitoramento.test.js`). |
 | Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Usa o Google Chrome do sistema por padrão; para Edge Chromium, defina `E2E_BROWSER_CHANNEL=msedge`. Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador e queda/retorno de WebSocket. |
-| Configuração Cordova | `cd remoteifes-cordova && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
+| Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
 | ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
 
@@ -834,7 +829,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 
 ## Uso da API do GitHub
 
-Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita a hospedagem de código-fonte, à publicação estática do frontend via GitHub Pages (configurada manualmente em **Settings > Pages**, branch `main`, pasta `/remoteifes-web`) e ao workflow de CI descrito em [Testes e Integração Contínua](#testes-e-integração-contínua). A publicação do frontend não usa Actions nem token.
+Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita à hospedagem do código-fonte, ao workflow opcional `.github/workflows/pages.yml` que publica `remoteifes-web` no GitHub Pages e ao workflow de CI descrito em [Testes e Integração Contínua](#testes-e-integração-contínua). A publicação usa apenas o `GITHUB_TOKEN` efêmero fornecido automaticamente ao workflow, com a permissão mínima `pages: write`/`id-token: write`.
 
 ## Estrutura de Pastas
 
@@ -950,9 +945,9 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
 - **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
 - **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Admin > Proprietários de sala`.
-- **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend e o `serverUrl` estão ambos em HTTPS (veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https)) — navegadores exigem HTTPS para registrar o service worker e oferecer a instalação.
+- **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend está em HTTPS e que o navegador atende aos demais critérios de instalação. O `serverUrl` também deve usar HTTPS para a API funcionar sem bloqueio de conteúdo misto, mas não é ele que determina se o navegador oferece a instalação.
 - **App fica com versão antiga dos arquivos depois de atualizar o PWA**: incremente `CACHE_VERSION` em `remoteifes-web/sw.js`; sem isso, os clientes que já instalaram o app continuam servindo os arquivos do cache antigo.
-- **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_SDK_ROOT` (ou `ANDROID_HOME`) aponta para a instalação do Android SDK e que o JDK 17 está no `PATH`; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
+- **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_HOME` aponta para o Android SDK, que Platform 36/Build Tools 36 estão instalados, que o JDK 17 está em `JAVA_HOME`/`PATH` e que o Gradle 8.14.2 está no `PATH` para inicializar o wrapper; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
 - **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org`); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `npm run setup` novamente.
 - **`install-service.sh` falha com "systemd não encontrado"**: o script só funciona em Linux com `systemd` (padrão no Raspberry Pi OS); em outras distribuições, use um gerenciador de processo alternativo como `pm2`.
 - **Serviço `remoteifes.service` não inicia**: rode `sudo journalctl -u remoteifes.service -f` para ver o erro; confira se `remoteifes-server/.env` existe e está com as variáveis esperadas (veja [Configuração](#configuração)), e rode `sudo systemctl restart remoteifes.service` após qualquer correção.

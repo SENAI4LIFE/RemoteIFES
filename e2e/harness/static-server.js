@@ -18,6 +18,11 @@ const TIPOS = {
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || "/").split("?")[0]);
+  if (req.method === "POST" && url === "/__e2e/encerrar") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end('{"ok":true}', () => server.close(() => process.exit(0)));
+    return;
+  }
   let rel = url === "/" ? "/index.html" : url;
   const alvo = path.normalize(path.join(RAIZ_WEB, rel));
 

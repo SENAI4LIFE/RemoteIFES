@@ -125,7 +125,8 @@ if echo "$REDES" | grep -q '(nenhuma)'; then
   if [ -t 0 ]; then
     read -r -p "Faixa(s) de IP da rede local (CIDR, separadas por espaço) ou Enter para configurar depois: " FAIXAS || FAIXAS=""
     if [ -n "$FAIXAS" ]; then
-      redes_cli $FAIXAS || echo "não foi possível gravar as faixas agora; configure depois com: npm run redes -- <cidr>"
+      read -r -a FAIXAS_ARRAY <<< "$FAIXAS"
+      redes_cli "${FAIXAS_ARRAY[@]}" || echo "não foi possível gravar as faixas agora; configure depois com: npm run redes -- <cidr>"
       systemctl restart remoteifes.service
     fi
   fi
