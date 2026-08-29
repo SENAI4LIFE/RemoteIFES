@@ -4,6 +4,10 @@ set -e
 cd "$(dirname "$0")"
 
 PORT="$1"
+PORT_ARGS=()
+if [ -n "$PORT" ]; then
+  PORT_ARGS=(--upload-port "$PORT")
+fi
 
 install_platformio() {
   command -v pio >/dev/null 2>&1 && return
@@ -12,22 +16,16 @@ install_platformio() {
   export PATH="$HOME/.local/bin:$PATH"
 }
 
-detect_port_flag() {
-  if [ -n "$PORT" ]; then
-    echo "--upload-port $PORT"
-  fi
-}
-
 install_platformio
 
 echo "Compilando firmware..."
 pio run
 
 echo "Gravando o sistema de arquivos (data/) no ESP32..."
-pio run --target uploadfs $(detect_port_flag)
+pio run --target uploadfs "${PORT_ARGS[@]}"
 
 echo "Gravando firmware no ESP32..."
-pio run --target upload $(detect_port_flag)
+pio run --target upload "${PORT_ARGS[@]}"
 
 echo
 echo "Firmware gravado com sucesso."

@@ -29,6 +29,7 @@ module.exports = defineConfig({
     navigationTimeout: 20_000,
   },
   globalSetup: require.resolve("./harness/global-setup.js"),
+  globalTeardown: require.resolve("./harness/global-teardown.js"),
   projects: [{ name: "chrome-desktop", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {

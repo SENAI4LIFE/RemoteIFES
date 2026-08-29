@@ -106,9 +106,9 @@ echo "Nova versão: $DEPOIS"
 instalar_deps() {
   if git diff --name-only "$1" "$2" -- package.json package-lock.json | grep -q .; then
     echo "Dependências mudaram; rodando npm ci..."
-    local flags="--omit=dev --no-audit --no-fund"
-    [ "$OFFLINE" -eq 1 ] && flags="$flags --offline"
-    if ! npm ci $flags; then
+    local flags=(--omit=dev --no-audit --no-fund)
+    [ "$OFFLINE" -eq 1 ] && flags+=(--offline)
+    if ! npm ci "${flags[@]}"; then
       if [ -d node_modules ]; then
         echo "npm ci falhou; mantendo node_modules atual."
       else

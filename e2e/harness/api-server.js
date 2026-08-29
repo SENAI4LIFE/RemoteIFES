@@ -92,6 +92,11 @@ app.post("/__e2e/resetar-dispositivo", (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/__e2e/encerrar", (req, res) => {
+  res.json({ ok: true });
+  setImmediate(encerrar);
+});
+
 let fake = null;
 
 server.listen(PORT, "127.0.0.1", () => {
@@ -114,7 +119,10 @@ function encerrar() {
     deviceHub.encerrar();
   } catch {}
   server.close(() => {
-    fs.rmSync(TMP, { recursive: true, force: true });
+    try {
+      db.close();
+    } catch {}
+    fs.rmSync(TMP, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     process.exit(0);
   });
   setTimeout(() => process.exit(0), 3000).unref();

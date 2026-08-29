@@ -76,9 +76,9 @@ fi
 
 if git diff --name-only "$ANTES" "$ALVO" -- package.json package-lock.json | grep -q .; then
   echo "Dependências mudaram; rodando npm ci..."
-  flags="--omit=dev --no-audit --no-fund"
-  [ "$OFFLINE" -eq 1 ] && flags="$flags --offline"
-  npm ci $flags || echo "npm ci falhou; mantendo node_modules atual."
+  flags=(--omit=dev --no-audit --no-fund)
+  [ "$OFFLINE" -eq 1 ] && flags+=(--offline)
+  npm ci "${flags[@]}" || echo "npm ci falhou; mantendo node_modules atual."
 else
   echo "Dependências inalteradas; pulando npm ci."
 fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 APP_DIR="$(pwd)"
 
 LIMITE="${WATCHDOG_LIMITE:-3}"

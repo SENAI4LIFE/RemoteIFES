@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const { caminhoCordova } = require("./build-android-release");
 
 const RAIZ = __dirname;
 const CONFIG = path.join(RAIZ, "config.xml");
@@ -28,6 +29,7 @@ checar(contar(original, /<platform\b/g) === contar(original, /<\/platform>/g), "
 checar(/<content src="index\.html" \/>/.test(original), "<content src=\"index.html\" /> presente");
 checar(/<preference name="Orientation" value="default" \/>/.test(original), "Orientation = default (retrato e paisagem)");
 checar(/<platform name="android">/.test(original) && /<platform name="ios">/.test(original), "plataformas android e ios declaradas");
+checar(fs.existsSync(caminhoCordova()), "launcher do build de release usa o Cordova local");
 
 console.log("harden-config.js — reversibilidade");
 try {
@@ -35,8 +37,23 @@ try {
   const endurecido = fs.readFileSync(CONFIG, "utf8");
   checar(!/origin="\*"/.test(endurecido) && !/href="\*"/.test(endurecido), "endurecimento remove curingas de rede");
   checar(/origin="https:\/\/exemplo\.ifes\.edu\.br\/\*"/.test(endurecido), "endurecimento fixa a origem de produção");
+  checar(/usesCleartextTraffic="false"/.test(endurecido), "endurecimento HTTPS bloqueia cleartext explicitamente");
   execFileSync("node", [path.join(RAIZ, "harden-config.js"), "--dev"], { stdio: "pipe" });
   const restaurado = fs.readFileSync(CONFIG, "utf8");
+  if (restaurado !== original) {
+    const antes = original.split(/\r?\n/);
+    const depois = restaurado.split(/\r?\n/);
+    const indice = antes.findIndex((linha, i) => linha !== depois[i]);
+    if (indice >= 0) {
+      console.log(`      primeira diferença na linha ${indice + 1}:`);
+      console.log(`      original: ${JSON.stringify(antes[indice])}`);
+      console.log(`      restaurado: ${JSON.stringify(depois[indice])}`);
+    } else {
+      let caractere = 0;
+      while (caractere < original.length && original[caractere] === restaurado[caractere]) caractere += 1;
+      console.log(`      primeira diferença no byte ${caractere}: original=${JSON.stringify(original.slice(caractere, caractere + 12))}, restaurado=${JSON.stringify(restaurado.slice(caractere, caractere + 12))}`);
+    }
+  }
   checar(restaurado === original, "--dev restaura config.xml byte a byte");
 } catch (erro) {
   falhas.push(`harden-config.js falhou: ${erro.message}`);
