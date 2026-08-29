@@ -91,6 +91,7 @@ const Schedule = {
 };
 
 agendaSalaSelect.addEventListener("change", async () => {
+  if (typeof Router !== "undefined") Router.sync();
   await Schedule.atualizarLimitesTemperatura();
   await Schedule.carregarAgendamentos();
 });

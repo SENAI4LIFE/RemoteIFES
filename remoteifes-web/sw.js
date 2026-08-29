@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v8";
+const CACHE_VERSION = "v11";
 const CACHE_NAME = `remoteifes-shell-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -13,6 +13,7 @@ const APP_SHELL = [
   "./js/help.js",
   "./js/idle-timer.js",
   "./js/nav.js",
+  "./js/router.js",
   "./js/rooms-data.js",
   "./js/rtstatus.js",
   "./js/server-status.js",
@@ -21,6 +22,8 @@ const APP_SHELL = [
   "./js/toast.js",
   "./js/a11y.js",
   "./js/ui-dialog.js",
+  "./js/ui-status.js",
+  "./js/manual-content.js",
   "./js/screens/admin.js",
   "./js/screens/relatos.js",
   "./js/screens/floorplan.js",
@@ -35,6 +38,7 @@ const APP_SHELL = [
   "./js/screens/schedule.js",
   "./js/screens/simple.js",
   "./js/screens/esp32-admin.js",
+  "./js/screens/manual.js",
   "./js/screens/monitoramento.js",
   "./assets/ifes-logo.png",
   "./assets/remoteifes-logo.png",

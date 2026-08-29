@@ -34,6 +34,31 @@ test("administrador principal vê as sub-abas exclusivas (Configurações, ESP32
   await expect(page.locator('.admin-subtab-btn[data-sub="esp32"]')).toBeVisible();
 });
 
+test("o Monitoramento é exclusivo do administrador principal (interface e API)", async ({ page, sessaoComo, request, tokens }) => {
+  await sessaoComo("admin");
+  await page.locator("#adminTabBtn").click();
+  await expect(page.locator("#screen-admin")).toBeVisible();
+  await expect(page.locator('.admin-subtab-btn[data-sub="monitoramento"]')).toBeHidden();
+
+  const comAdmin = await request.get(`${API_URL}/admin/monitoramento`, {
+    headers: { Authorization: `Bearer ${tokens.admin}` },
+  });
+  expect(comAdmin.status()).toBe(403);
+  const comSuper = await request.get(`${API_URL}/admin/monitoramento`, {
+    headers: { Authorization: `Bearer ${tokens.superadmin}` },
+  });
+  expect(comSuper.status()).toBe(200);
+});
+
+test("o administrador principal abre o Monitoramento com selos de estado", async ({ page, sessaoComo }) => {
+  await sessaoComo("superadmin");
+  await page.locator("#adminTabBtn").click();
+  await page.locator('.admin-subtab-btn[data-sub="monitoramento"]').click();
+  await expect(page.locator("#adminSub-monitoramento")).toBeVisible();
+  await expect(page.locator("#monGrid .mon-card")).not.toHaveCount(0);
+  await expect(page.locator("#monGrid .status-chip").first()).toBeVisible({ timeout: 10_000 });
+});
+
 test("a API administrativa exige token e nível de admin", async ({ request, tokens }) => {
   const semToken = await request.get(`${API_URL}/admin/usuarios`);
   expect(semToken.status()).toBe(401);

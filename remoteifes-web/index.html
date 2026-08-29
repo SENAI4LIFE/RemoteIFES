@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=10" />
+  <link rel="stylesheet" href="css/style.css?v=12" />
 </head>
 <body>
 
@@ -710,13 +710,13 @@
           <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span><span class="admin-subtab-label">Sessões</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span><span class="admin-subtab-label">Logs</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="dispositivos"><span class="admin-subtab-icon">📡</span><span class="admin-subtab-label">Dispositivos</span></button>
-          <button type="button" class="admin-subtab-btn" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Monitoramento</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="acessos"><span class="admin-subtab-icon">🔑</span><span class="admin-subtab-label">Acessos ESP32</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span><span class="admin-subtab-label">Proprietários de sala</span></button>
           <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span><span class="admin-subtab-label">Mapa</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span><span class="admin-subtab-label">ESP32 / MACs</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">ESP32</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Monitoramento</span></button>
         </div>
 
         <div class="admin-content">
@@ -802,10 +802,17 @@
         </div>
 
         <div id="adminSub-monitoramento" class="admin-sub hidden">
-          <p class="hint">Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32 — leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta.</p>
-          <div id="monAlertas" class="mon-alertas hidden"></div>
-          <div id="monGrid" class="mon-grid"></div>
-          <p id="monErro" class="hint hidden">Não foi possível carregar o monitoramento.</p>
+          <p class="hint">
+            Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32 — leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta. Visível apenas ao administrador principal.
+            <button type="button" class="help-icon-btn" data-help="monitoramento" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+          </p>
+          <p class="hint"><button type="button" class="link-btn" data-manual="monitoramento">Abrir no manual &rarr;</button></p>
+          <div id="monAlertas" class="mon-alertas hidden" role="status" aria-live="polite"></div>
+          <div id="monGrid" class="mon-grid" aria-busy="false"></div>
+          <div id="monErro" class="mon-erro hidden" role="alert">
+            <span>Não foi possível carregar o monitoramento.</span>
+            <button type="button" id="monRetryBtn" class="btn btn-off">Tentar de novo</button>
+          </div>
         </div>
 
         <div id="adminSub-acessos" class="admin-sub hidden">
@@ -1033,6 +1040,27 @@
 
   </main>
 
+  <section id="screen-manual" class="manual-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="manualTitulo">
+    <div class="manual-shell">
+      <header class="manual-topbar">
+        <button type="button" id="manualVoltarBtn" class="link-btn manual-voltar-btn">&larr; Voltar ao app</button>
+        <h1 id="manualTitulo">Manual do RemoteIFES</h1>
+        <button type="button" id="manualFecharBtn" class="a11y-close-btn" aria-label="Fechar o manual">&times;</button>
+      </header>
+      <div class="manual-body">
+        <nav class="manual-nav" aria-label="Sumário do manual">
+          <label for="manualBusca" class="manual-busca-label">Buscar no manual</label>
+          <input type="search" id="manualBusca" class="manual-busca" placeholder="palavra-chave (ex.: agendamento, OTA)" autocomplete="off" />
+          <ol id="manualToc" class="manual-toc"></ol>
+          <p id="manualTocVazio" class="hint hidden">Nenhuma seção corresponde à busca.</p>
+        </nav>
+        <article id="manualConteudo" class="manual-conteudo" tabindex="-1">
+          <p class="hint">Carregando o manual…</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
   <div id="idleModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="idleModalTitle">
     <div class="modal-card">
       <h2 id="idleModalTitle">Sessão prestes a expirar</h2>
@@ -1051,6 +1079,7 @@
       <h2 id="helpModalTitle"></h2>
       <ul class="help-list" id="helpModalList"></ul>
       <div class="modal-actions">
+        <button type="button" id="helpModalManualBtn" class="btn btn-off">Abrir no manual</button>
         <button type="button" id="helpModalCloseBtn" class="btn btn-on">Entendi</button>
       </div>
     </div>
@@ -1174,8 +1203,10 @@
         <span class="a11y-panel-title">Precisa de ajuda?</span>
         <button type="button" id="helpFabCloseBtn" class="a11y-close-btn" aria-label="Fechar ajuda">&times;</button>
       </div>
-      <p class="help-fab-text">Toque no ícone <strong>?</strong> ao lado de cada título de tela para instruções específicas daquela página.</p>
-      <p class="help-fab-text">Dúvidas gerais sobre o RemoteIFES podem ser tratadas com a equipe responsável pelo sistema no seu campus.</p>
+      <p class="help-fab-text">Toque no ícone <strong>?</strong> ao lado de cada título de tela para instruções da página atual.</p>
+      <button type="button" id="helpFabManualBtn" class="btn btn-on btn-block">Abrir o manual completo</button>
+      <ul class="help-fab-links" id="helpFabLinks"></ul>
+      <p class="help-fab-text help-fab-text-muted">O manual funciona sem Internet. Dúvidas fora dele: procure a equipe responsável pelo RemoteIFES no seu campus.</p>
     </div>
   </div>
 
@@ -1192,6 +1223,7 @@
   <script src="js/idle-timer.js"></script>
   <script src="js/a11y.js"></script>
   <script src="js/ui-dialog.js"></script>
+  <script src="js/ui-status.js"></script>
   <script src="js/help.js"></script>
   <script src="js/screens/notifications.js"></script>
   <script src="js/screens/relatos.js"></script>
@@ -1209,6 +1241,8 @@
   <script src="js/screens/monitoramento.js"></script>
   <script src="js/screens/admin.js"></script>
   <script src="js/screens/esp32-admin.js"></script>
+  <script src="js/screens/manual.js"></script>
+  <script src="js/router.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {

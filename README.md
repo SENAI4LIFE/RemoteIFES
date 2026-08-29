@@ -52,6 +52,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)
 - [Monitoramento Operacional](#monitoramento-operacional)
 - [Acessibilidade](#acessibilidade)
+- [Ajuda e Manual no App](#ajuda-e-manual-no-app)
 - [Requisitos](#requisitos)
 - [Instalação Rápida](#instalação-rápida)
 - [Instalação Detalhada](#instalação-detalhada)
@@ -113,6 +114,18 @@ O sistema oferece três formas de chegar até uma sala, todas equivalentes em fu
 - **Lista tradicional** (`Bloco → Andar → Sala`): navegação simples em lista, sem elementos gráficos.
 
 Qualquer usuário autenticado pode visualizar o estado de todas as salas — isso inclui salas às quais o usuário não tem permissão de controle, que aparecem marcadas como "visualização" e cujos controles ficam desabilitados no painel. Os três modos de navegação têm botões cruzados para alternar entre si a qualquer momento.
+
+### Endereço, refresh e histórico
+
+O frontend reflete a tela atual no endereço da página como um **fragmento** (`#/salas`, `#/sala/A-108`, `#/salas/planta/a-terreo`, `#/agenda`, `#/admin`, `#/admin/esp32`, `#/admin/monitoramento`, `#/admin/relatos`, `#/relatos`, `#/ajuda`, `#/ajuda/ota`…). Isso dá o comportamento de um site tradicional:
+
+- recarregar a página mantém onde você estava (aba, subtela, sub-aba de Administração, sala aberta, seção do mapa);
+- **voltar/avançar do navegador** percorrem as seções visitadas (cada navegação entre seções gera uma entrada de histórico; trocar apenas um filtro — sala ou data na Grade/Agenda — não gera);
+- qualquer seção pode ser aberta direto pela URL, e links do sistema e da documentação podem apontar para uma seção específica (o botão **Abrir no manual** de cada ajuda e o `Ver no app` do manual usam esse mesmo endereçamento). Apelidos curtos de seção do manual são resolvidos (`#/ajuda/ota` → `#/ajuda/ota-credenciais`).
+
+A estratégia é **hash routing** (fragmento), não History API, por ser a única que funciona igual — e sem nenhuma regra de reescrita por implantação — no servidor Node local, atrás de proxy reverso, na PWA, no GitHub Pages usado para demonstração e no app Cordova (`file://`), inclusive **offline** (o app-shell e o manual vêm do cache do service worker). Um caminho real (`/admin/esp32`) exigiria um _catch-all_ no Express, regras no proxy, um truque de `404.html` no GitHub Pages e não sobreviveria a um reload em `file://`.
+
+Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do administrador principal sem esse nível cai em `Admin > Usuários`; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
 
 As 86 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio. Um código de sala pode representar duas salas físicas controladas pelo mesmo ESP32 (ex.: `B-105-B-106`); nesse caso a interface exibe as duas etiquetas empilhadas no mesmo bloco do mapa.
 
@@ -298,6 +311,10 @@ Todo ESP32 consulta o servidor com seu MAC após entrar na rede. Mesmo sem vínc
 ## Acessibilidade
 
 O frontend inclui um widget de acessibilidade (botão flutuante, disponível em todas as telas) com ajustes persistidos no navegador (`localStorage`) entre sessões: escala de fonte, tipo de fonte (incluindo uma fonte voltada para leitores com dislexia), espaçamento entre letras, altura de linha, largura máxima de parágrafo, alinhamento de texto, cor de fonte e de texto, destaque de links, alto contraste e opção de ocultar imagens.
+
+## Ajuda e Manual no App
+
+O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela página, com um atalho para a seção correspondente do manual. O botão **Precisa de ajuda?** (canto inferior) abre o **manual completo do RemoteIFES** — uma página de documentação dedicada, com sumário, busca por palavra-chave, diagramas em SVG e links "Ver no app" que levam à tela descrita. O manual funciona **sem Internet** (faz parte do cache do app), é sensível ao papel do usuário (seções de administração e do administrador principal só aparecem para quem tem acesso) e não expõe credenciais, caminhos internos nem dados operacionais protegidos. O conteúdo é mantido em um único módulo, `remoteifes-web/js/manual-content.js`; este README continua sendo a referência de operação e implantação.
 
 ## Requisitos
 
@@ -661,7 +678,7 @@ Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma 
 
 ## Monitoramento Operacional
 
-`Admin > Monitoramento` (visível a qualquer administrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes:
+`Admin > Monitoramento` (visível apenas ao administrador principal; `GET /admin/monitoramento` também exige nível de administrador principal) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
 
 - **Serviço:** ambiente, tempo no ar, memória (RSS), carga de 1 minuto, versão do Node e PID.
 - **Banco de dados:** se responde e em quanto tempo, tamanho do arquivo e do WAL.
@@ -814,7 +831,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 | Alvo | Comando | Observações |
 |---|---|---|
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`) e o monitoramento operacional (`test/monitoramento.test.js`). |
-| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Usa o Google Chrome do sistema por padrão; para Edge Chromium, defina `E2E_BROWSER_CHANNEL=msedge`. Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador e queda/retorno de WebSocket. |
+| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Usa o Google Chrome do sistema por padrão; para Edge Chromium, defina `E2E_BROWSER_CHANNEL=msedge`. Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o gate do Monitoramento por administrador principal e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
 | Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
 | ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
@@ -880,12 +897,15 @@ remoteifes-web/
     config.js          resolve o endereço do servidor central (origem da PWA, override em localStorage ou valor fixo para o build empacotado)
     state.js           estado da sessão atual no navegador
     nav.js             troca de abas e telas
+    router.js          roteador por fragmento (#/...): reflete a navegação no endereço e a restaura no reload, no link direto e no voltar/avançar, respeitando a permissão
     rtstatus.js        cliente WebSocket para status em tempo real
     idle-timer.js      timeout de inatividade e aviso de logout automático
     a11y.js            widget de acessibilidade (fonte, contraste, espaçamento etc.), persiste no localStorage
     ui-dialog.js       modais/diálogos estilizados do sistema (confirmação, texto, troca de senha) — substituem prompt()/confirm()/alert()
+    ui-status.js       selo reutilizável de estado de função (disponível, temporariamente indisponível, desativado por configuração, falha etc.)
     floorplan.js        componente reutilizável de planta baixa com zoom (usado na tela de salas e no admin)
-    help.js            conteúdo dos modais de ajuda contextual espalhados pela interface
+    help.js            conteúdo dos modais de ajuda contextual espalhados pela interface, com atalho para a seção do manual
+    manual-content.js  conteúdo do manual completo (seções por papel, diagramas SVG) — fonte única, carregado sob demanda
     tempo.js           formatação de datas/horas no fuso de Brasília
     rooms-data.js       utilitário auxiliar de composição de código de sala
     screens/           lógica de cada tela:
@@ -899,7 +919,8 @@ remoteifes-web/
                         portal-funcoes.js (vitrine de funcionalidades na tela inicial), admin.js (painel administrativo),
                         esp32-admin.js (painel avançado de cada ESP32 — status, config/clonagem IR, OTA e credenciais —
                         na aba "ESP32", restrito ao administrador principal),
-                        monitoramento.js (aba "Monitoramento" do painel administrativo)
+                        monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao administrador principal),
+                        manual.js (sobreposição do manual completo: sumário, busca, navegação e foco)
 
 remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev, partição min_spiffs.csv para OTA)
   platformio.ini           configuração do projeto, versão do firmware (-DFW_VERSAO) e dependências

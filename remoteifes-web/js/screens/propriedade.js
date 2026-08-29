@@ -80,6 +80,7 @@ const ScreenPropriedade = {
 
 document.getElementById("propriedadeSala").addEventListener("change", (e) => {
   ScreenPropriedade.carregar(e.target.value);
+  if (typeof Router !== "undefined") Router.sync();
 });
 
 document.getElementById("propriedadeConcederBtn").addEventListener("click", async () => {
