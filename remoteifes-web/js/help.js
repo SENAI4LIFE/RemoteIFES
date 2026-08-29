@@ -39,7 +39,8 @@ const HelpContent = {
     itens: [
       { titulo: "Conexão do dispositivo", texto: "Mostra se o ESP32 da sala está online. Se estiver offline, comandos ficam salvos até ele reconectar." },
       { titulo: "Ar-condicionado", texto: "Estado atual (ligado/desligado) reportado pelo dispositivo." },
-      { titulo: "Ligar/Desligar e temperatura", texto: "Enviam comandos imediatos para o ESP32 da sala." },
+      { titulo: "Ligar/Desligar e temperatura", texto: "Enviam comandos imediatos para o ESP32 da sala; a temperatura respeita os limites mínimo e máximo da sala." },
+      { titulo: "Turbo", texto: "Ativa o modo turbo do aparelho e, se configurada, uma função extra (ex.: oscilação). Disponível apenas com o ar-condicionado ligado." },
       { titulo: "Aviso de reserva", texto: "Se a sala estiver reservada por outro usuário, os controles ficam bloqueados até o fim do agendamento." },
       { titulo: "Apenas visualização", texto: "Alguns usuários podem ver o status da sala sem poder controlá-la." },
     ],
@@ -65,8 +66,8 @@ const HelpContent = {
   usuarios: {
     titulo: "Como usar: Usuários",
     itens: [
-      { titulo: "Novo usuário", texto: "Cria um login com senha inicial; a permissão de controlar salas pode ser marcada na criação." },
-      { titulo: "Trocar nome", texto: "Qualquer administrador pode alterar o nome de exibição de um usuário." },
+      { titulo: "Novo usuário", texto: "Cria um login com senha inicial; a permissão de controlar salas pode ser marcada na criação. O administrador principal também pode criar outro administrador." },
+      { titulo: "Trocar nome / login / senha", texto: "Qualquer administrador altera o nome de exibição e o login; ao trocar a senha, as sessões abertas daquele usuário são encerradas." },
       { titulo: "Conceder/revogar admin", texto: "Somente o administrador principal pode promover ou rebaixar outros administradores." },
       { titulo: "Controlar salas", texto: "Define se o usuário pode ligar/desligar e ajustar temperatura, além de apenas visualizar." },
       { titulo: "Desativar", texto: "Impede o login do usuário sem apagar seu histórico." },
@@ -128,12 +129,13 @@ const HelpContent = {
   macs: {
     titulo: "Como usar: ESP32 / Salas",
     itens: [
+      { titulo: "Planta baixa", texto: "Toque em uma sala no mapa para rolar até o cartão dela na lista. O mapa tem zoom, aproximar num ponto e restaurar; no celular ele rola quando não cabe inteiro." },
       { titulo: "Buscar sala", texto: "Digite o número ou o nome da sala para filtrar a lista rapidamente." },
-      { titulo: "Detectados na rede", texto: "ESP32 que já entraram em contato com o servidor mas ainda não estão vinculados a nenhuma sala." },
+      { titulo: "Detectados na rede", texto: "ESP32 que já entraram em contato com o servidor mas ainda não estão vinculados a nenhuma sala; escolha a sala e toque em vincular." },
       { titulo: "Vincular à sala", texto: "Associe um ESP32 (pelo endereço MAC) à sala onde ele está instalado." },
       { titulo: "Limites por sala", texto: "Deixe em branco para herdar cada limite global ou informe uma mínima, uma máxima, ou ambas para esta sala." },
-      { titulo: "Acesso por sala", texto: "Defina quais usuários podem controlar cada sala." },
-      { titulo: "Permissão", texto: "Apenas o administrador principal pode alterar o MAC ou os limites de uma sala." },
+      { titulo: "Acesso por sala", texto: "Ative o acesso restrito e defina quais usuários podem controlar cada sala." },
+      { titulo: "Permissão", texto: "Esta aba é visível apenas ao administrador principal, que também é quem altera o MAC e os limites de uma sala." },
     ],
   },
   propriedade: {
@@ -149,8 +151,12 @@ const HelpContent = {
   config: {
     titulo: "Como usar: Configurações",
     itens: [
-      { titulo: "Sessão por inatividade", texto: "Tempo sem uso até deslogar automaticamente; deixe em branco para nunca deslogar por tempo." },
+      { titulo: "Sessão por inatividade", texto: "Tempo sem uso até deslogar automaticamente; deixe em branco para nunca deslogar por tempo. Há a opção de aplicar o timer também a administradores." },
       { titulo: "Presença online", texto: "Por quantos minutos sem uso um usuário ainda aparece como online no painel de Ativos." },
+      { titulo: "Limites de temperatura e Turbo", texto: "Limite global de temperatura e a função extra opcional acionada junto com o Turbo (ex.: oscilação vertical)." },
+      { titulo: "Modo de teste e redes autorizadas", texto: "Em produção o acesso é restrito às redes autorizadas (CIDR). O modo de teste desativa essa restrição temporariamente — desligue ao terminar." },
+      { titulo: "Modo de manutenção", texto: "Bloqueia o acesso de usuários comuns e exibe um aviso; administradores continuam entrando." },
+      { titulo: "Credencial por dispositivo", texto: "Quando exigida globalmente, nenhum ESP32 conecta só pelo MAC — cada sala precisa de uma credencial provisionada em Admin > ESP32." },
       { titulo: "Acesso restrito", texto: "Esta aba inteira é visível apenas ao administrador principal." },
     ],
   },
@@ -159,14 +165,47 @@ const HelpContent = {
     itens: [
       { titulo: "O que é", texto: "Acesso direto às funções avançadas de cada ESP32, antes disponíveis apenas na página local do dispositivo. Visível apenas ao administrador principal." },
       { titulo: "Conexão", texto: "Mostra separadamente se o dispositivo está online na rede Wi-Fi e se está conectado ao servidor." },
-      { titulo: "Entrar em modo de configuração", texto: "Disponível ao administrador principal quando o ESP32 está conectado ao servidor." },
-      { titulo: "Modo clonagem", texto: "Só disponível em modo de configuração; permite capturar sinais infravermelhos de um controle remoto original." },
-      { titulo: "Capturas", texto: "Sinais capturados aparecem em tempo real; use \"testar\" para reenviar um sinal e confirmar que ele controla o aparelho." },
-      { titulo: "Protocolo IR", texto: "Ao capturar um protocolo conhecido, salve-o para que os comandos do painel sejam transmitidos ao ar-condicionado." },
+      { titulo: "Entrar em modo de configuração", texto: "Disponível quando o ESP32 está conectado ao servidor. Botões indisponíveis aparecem desabilitados com o motivo." },
+      { titulo: "Modo clonagem e capturas", texto: "Só em modo de configuração; captura sinais infravermelhos do controle original. Use \"testar\" para reenviar e \"usar protocolo\" para salvar um protocolo conhecido." },
+      { titulo: "Atualizar firmware (OTA)", texto: "Para uma sala conectada e desatualizada, envia o firmware publicado. O dispositivo baixa, confere o hash, grava e reinicia; se não validar, reverte sozinho." },
+      { titulo: "Credencial do dispositivo", texto: "Provisionar cria uma credencial exclusiva para a sala; rotacionar gera novo segredo (o anterior vale 24 h); substituir é para troca de placa; revogar derruba a conexão. O segredo é exibido uma única vez." },
       { titulo: "Sair do modo de configuração", texto: "Devolve o dispositivo ao funcionamento normal (modo operação)." },
-      { titulo: "Resetar Wi-Fi", texto: "Apaga as credenciais de rede salvas no dispositivo e o reinicia em modo de ponto de acesso, para reconfiguração." },
+      { titulo: "Resetar Wi-Fi", texto: "Apaga a rede e o endereço do servidor e reinicia em ponto de acesso, para reconfiguração. A credencial exclusiva do dispositivo é preservada." },
     ],
   },
+  monitoramento: {
+    titulo: "Como usar: Monitoramento",
+    itens: [
+      { titulo: "O que é", texto: "Retrato da saúde da instalação a partir de fontes locais e baratas, sem serviços externos. Visível apenas ao administrador principal." },
+      { titulo: "Selo de estado", texto: "Cada bloco mostra disponível, temporariamente indisponível, desativado por configuração ou falha." },
+      { titulo: "O que acompanha", texto: "Serviço, banco de dados, armazenamento, backups, ESP32 (online, offline inesperado, reconexões, OTA), credenciais e contadores de falha desde a inicialização." },
+      { titulo: "Atualização", texto: "A tela recarrega a cada 20 s enquanto aberta. A cada 5 min o servidor reavalia e gera uma notificação por alerta ativo, sem repetir o mesmo em 6 h." },
+      { titulo: "Atenção", texto: "A caixa \"Atenção\" no topo lista as condições de alerta ativas no momento." },
+    ],
+  },
+};
+
+const MANUAL_SECAO_POR_AJUDA = {
+  cards: "selecao-sala",
+  localizacao: "selecao-sala",
+  planta: "selecao-sala",
+  salas: "selecao-sala",
+  painel: "controlador",
+  agenda: "agenda-grade",
+  grade: "agenda-grade",
+  usuarios: "administracao",
+  ativos: "administracao",
+  sessoes: "administracao",
+  logs: "administracao",
+  dispositivos: "administracao",
+  acessos: "administracao",
+  proprietarios: "administracao",
+  propriedade: "administracao",
+  mapa: "administracao",
+  macs: "esp32-cadastro",
+  config: "operacao-admin",
+  esp32: "esp32-avancado",
+  monitoramento: "monitoramento",
 };
 
 const Help = {
@@ -178,6 +217,12 @@ const Help = {
     document.getElementById("helpModalList").innerHTML = dados.itens
       .map((item) => `<li><strong>${item.titulo}:</strong> ${item.texto}</li>`)
       .join("");
+    const manualBtn = document.getElementById("helpModalManualBtn");
+    if (manualBtn) {
+      const secao = MANUAL_SECAO_POR_AJUDA[chave] || null;
+      manualBtn.classList.toggle("hidden", !secao || typeof Manual === "undefined");
+      manualBtn.dataset.secao = secao || "";
+    }
     this._elementoAnterior = document.activeElement;
     document.getElementById("helpModal").classList.remove("hidden");
     document.getElementById("helpModalCloseBtn").focus();
@@ -193,6 +238,23 @@ const Help = {
 document.querySelectorAll(".help-icon-btn[data-help]").forEach((btn) => {
   btn.addEventListener("click", () => Help.abrir(btn.dataset.help));
 });
+
+const _helpModalManualBtn = document.getElementById("helpModalManualBtn");
+if (_helpModalManualBtn) {
+  _helpModalManualBtn.addEventListener("click", () => {
+    const secao = _helpModalManualBtn.dataset.secao;
+    Help.fechar();
+    if (secao && typeof Manual !== "undefined") Manual.abrir(secao);
+  });
+}
+
+document.addEventListener("click", (e) => {
+  const alvo = e.target.closest("[data-manual]");
+  if (!alvo) return;
+  e.preventDefault();
+  if (typeof Manual !== "undefined") Manual.abrir(alvo.dataset.manual || null);
+});
+
 document.getElementById("helpModalCloseBtn").addEventListener("click", () => Help.fechar());
 document.getElementById("helpModal").addEventListener("click", (e) => {
   if (e.target.id === "helpModal") Help.fechar();
@@ -205,7 +267,9 @@ document.getElementById("helpModal").addEventListener("keydown", (e) => {
     return;
   }
   if (e.key !== "Tab") return;
-  const focaveis = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  const focaveis = Array.from(
+    modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+  ).filter((el) => el.offsetParent !== null);
   if (focaveis.length === 0) return;
   const primeiro = focaveis[0];
   const ultimo = focaveis[focaveis.length - 1];

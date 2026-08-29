@@ -42,6 +42,34 @@ for (const [nome, tamanho] of Object.entries(VIEWPORTS)) {
   });
 }
 
+for (const nome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook"]) {
+  test(`planta baixa do cadastro de ESP32 não vaza da tela (${nome})`, async ({ page, context }) => {
+    await injetarSessao(context, "superadmin");
+    await page.setViewportSize(VIEWPORTS[nome]);
+    await page.goto("/#/admin/macs");
+    await expect(page.locator("#adminSub-macs")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("#macsFpInner .room.selectable").first()).toBeVisible({ timeout: 10_000 });
+
+    expect(await semRolagemHorizontal(page), "página sem rolagem horizontal").toBe(true);
+
+    const medida = await page.evaluate(() => {
+      const inner = document.getElementById("macsFpInner");
+      const secao = inner && inner.querySelector(".fp-section:not(.hidden)");
+      const plan = secao && secao.querySelector(".plan");
+      const wrap = secao && secao.querySelector(".plan-wrap");
+      if (!plan || !wrap) return null;
+      const pr = plan.getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      return {
+        vazaDireita: Math.round(pr.x + pr.width - (wr.x + wr.width)),
+        rolavel: wrap.classList.contains("fp-zoomed"),
+      };
+    });
+    expect(medida, "planta baixa renderizada").not.toBeNull();
+    expect(medida.vazaDireita <= 1 || medida.rolavel, `planta cabe ou rola (${JSON.stringify(medida)})`).toBe(true);
+  });
+}
+
 test("rotação retrato -> paisagem preserva a tela e o estado do controlador", async ({ page, context }) => {
   await abrirComoUsuario(page, context, VIEWPORTS["mobile-portrait"]);
   await irParaSala(page, "A-108");

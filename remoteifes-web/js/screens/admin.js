@@ -500,6 +500,11 @@ const Admin = {
 
     await this.carregarDetectados();
     this.carregarMacsFloorplan();
+    if (this._macsFpInstancia) {
+      this._macsFpInstancia.aplicarStatus(
+        salas.filter((s) => s.mac).map((s) => ({ sala: s.sala, online: s.online, ligado: s.ligado }))
+      );
+    }
   },
 
   filtrarMacsList(query) {
@@ -813,6 +818,8 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "config") await Admin.carregarConfiguracoes();
     if (sub === "esp32") await Esp32Admin.aoAbrir();
     else Esp32Admin.aoFechar();
+
+    if (typeof Router !== "undefined") Router.sync();
   });
 });
 

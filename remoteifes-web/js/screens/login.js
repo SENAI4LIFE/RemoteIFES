@@ -108,14 +108,22 @@ function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
 
 async function restaurarSessaoSalva() {
   if (state.usuario) return false;
-  if (!Api.temTokenSalvo()) return false;
+  const abrirAjudaSemSessao = () => {
+    if (typeof Router !== "undefined" && location.hash.startsWith("#/ajuda")) Router.restaurar();
+  };
+  if (!Api.temTokenSalvo()) {
+    abrirAjudaSemSessao();
+    return false;
+  }
   const resp = await Api.me();
   if (!resp.ok) {
     await Api.logout();
+    abrirAjudaSemSessao();
     return false;
   }
   aplicarSessaoLogada(resp, { reconectarStatus: false });
-  switchTab("salas");
+  if (typeof Router !== "undefined") await Router.restaurar();
+  else switchTab("salas");
   return true;
 }
 
@@ -137,7 +145,8 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 
   aplicarSessaoLogada(resp);
-  switchTab("salas");
+  if (typeof Router !== "undefined") await Router.restaurar();
+  else switchTab("salas");
 });
 
 function realizarLogout({ manterTela = false } = {}) {
@@ -175,6 +184,10 @@ function realizarLogout({ manterTela = false } = {}) {
   document.querySelectorAll(".superadmin-only").forEach((el) => el.classList.add("hidden"));
   document.getElementById("mainApp").classList.add("hidden");
   document.getElementById("loginForm").reset();
+
+  try {
+    history.replaceState(null, "", location.pathname + location.search);
+  } catch (erro) {}
 
   if (manterTela) {
     mostrarLogin(tipoLoginSelecionado);

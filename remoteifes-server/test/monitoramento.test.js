@@ -37,7 +37,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("/admin/monitoramento exige admin", async () => {
+test("/admin/monitoramento exige o administrador principal", async () => {
   usuariosService.criar(
     { usuario: "mon-comum", senha: "senhaSegura123", nome: "Comum", podeControlar: true },
     { nivel: 3 }
@@ -49,11 +49,12 @@ test("/admin/monitoramento exige admin", async () => {
 
   assert.equal((await authGet("/admin/monitoramento", null)).status, 401);
   assert.equal((await authGet("/admin/monitoramento", await login("mon-comum", "senhaSegura123"))).status, 403);
-  assert.equal((await authGet("/admin/monitoramento", await login("mon-admin", "senhaSegura123"))).status, 200);
+  assert.equal((await authGet("/admin/monitoramento", await login("mon-admin", "senhaSegura123"))).status, 403);
+  assert.equal((await authGet("/admin/monitoramento", await login("admin", "admin"))).status, 200);
 });
 
 test("o payload traz banco, armazenamento, backup, esp32, serviço e falhas — sem segredos", async () => {
-  const token = await login("mon-admin", "senhaSegura123");
+  const token = await login("admin", "admin");
   const corpo = await (await authGet("/admin/monitoramento", token)).json();
   const m = corpo.monitoramento;
 
@@ -75,7 +76,7 @@ test("o payload traz banco, armazenamento, backup, esp32, serviço e falhas — 
 });
 
 test("registrar() incrementa contadores e aparece no payload", async () => {
-  const token = await login("mon-admin", "senhaSegura123");
+  const token = await login("admin", "admin");
   const antes = (await (await authGet("/admin/monitoramento", token)).json()).monitoramento.falhas.contadores.telemetriaFalha;
   monitoramentoService.registrar("telemetriaFalha", { sala: "X-1" });
   monitoramentoService.registrar("telemetriaFalha", { sala: "X-1" });
@@ -93,7 +94,7 @@ test("reconexões próximas contam como reconexão anormal", () => {
 
 test("ESP32 com MAC porém offline entra em offlineInesperado", async () => {
   db.prepare(`INSERT INTO salas (sala, nome, bloco, andar, mac, online) VALUES ('MON-OFF', 'x', 'A', 1, 'AA:00:00:00:0F:01', 0)`).run();
-  const token = await login("mon-admin", "senhaSegura123");
+  const token = await login("admin", "admin");
   const m = (await (await authGet("/admin/monitoramento", token)).json()).monitoramento;
   assert.ok(m.esp32.comMac >= 1);
   assert.ok(m.esp32.offlineInesperado >= 1);

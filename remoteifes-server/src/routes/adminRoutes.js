@@ -140,7 +140,7 @@ router.delete("/admin/sessoes/historico", (req, res) => {
   res.json({ ok: true });
 });
 
-router.get("/admin/monitoramento", (req, res) => {
+router.get("/admin/monitoramento", exigirSuperAdmin, (req, res) => {
   res.json({ ok: true, monitoramento: monitoramentoService.coletar() });
 });
 
