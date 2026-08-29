@@ -23,7 +23,12 @@ const Router = (() => {
     return typeof Manual !== "undefined" && Manual.estaAberto && Manual.estaAberto();
   }
 
+  function mobileAberto() {
+    return typeof MobileApp !== "undefined" && MobileApp.estaAberto && MobileApp.estaAberto();
+  }
+
   function construirCaminho() {
+    if (mobileAberto()) return "/aplicativo";
     if (manualAberto()) {
       const secao = Manual.secaoAtual && Manual.secaoAtual();
       return secao ? `/ajuda/${secao}` : "/ajuda";
@@ -147,8 +152,16 @@ const Router = (() => {
       return;
     }
 
+    if (raiz === "aplicativo") {
+      if (logado() && typeof MobileApp !== "undefined") MobileApp.abrir();
+      return;
+    }
+
     if (typeof Manual !== "undefined" && Manual.estaAberto && Manual.estaAberto()) {
       Manual.fechar({ semRestaurar: true });
+    }
+    if (typeof MobileApp !== "undefined" && MobileApp.estaAberto && MobileApp.estaAberto()) {
+      MobileApp.fechar({ semRestaurar: true });
     }
 
     if (!logado()) return;

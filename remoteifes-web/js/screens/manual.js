@@ -112,7 +112,8 @@ const Manual = (() => {
     const assinatura = assinaturaPapel();
     if (renderRole === assinatura) return;
     renderRole = assinatura;
-    const secoes = ManualContent.secoes.filter((s) => papelPermitido(s.papel));
+    const privadas = typeof RoleDocumentation !== "undefined" ? RoleDocumentation.secoes() : [];
+    const secoes = [...ManualContent.secoes, ...privadas].filter((s) => papelPermitido(s.papel));
 
     tocEl.innerHTML = secoes
       .map((s) => `<li><button type="button" class="manual-toc-link" data-sec="${s.id}">${escapeHtml(s.titulo)}</button></li>`)
@@ -208,6 +209,8 @@ const Manual = (() => {
 
   async function abrir(secaoId) {
     await garantirConteudo();
+    if (typeof RoleDocumentation !== "undefined") await RoleDocumentation.carregar();
+    renderRole = null;
     render();
 
     if (!aberto) {
@@ -256,9 +259,36 @@ const Manual = (() => {
 
   function montarAtalhos() {
     const cont = document.getElementById("helpFabLinks");
+    const primarios = document.getElementById("helpFabPrimaryLinks");
     if (!cont || typeof ManualContent === "undefined") return;
-    cont.innerHTML = ATALHOS.map((id) => {
-      const s = ManualContent.secoes.find((x) => x.id === id && papelPermitido(x.papel));
+    const contextual = (() => {
+      const id = document.querySelector("#mainApp .screen.tab-content:not(.hidden)")?.id || "";
+      if (id === "screen-admin") {
+        const sub = document.querySelector(".admin-subtab-btn.active")?.dataset.sub;
+        return ({ monitoramento: "monitoramento", macs: "esp32-cadastro", config: "operacao-admin", esp32: "esp32-avancado" })[sub] || "administracao";
+      }
+      return ({ "screen-panel": "controlador", "screen-agenda": "agenda-grade", "screen-grade": "agenda-grade", "screen-propriedade": "papeis" })[id] || "selecao-sala";
+    })();
+    if (primarios) {
+      primarios.innerHTML = `<button type="button" class="btn btn-on btn-block" data-sec="${contextual}">Ajuda desta página</button><button type="button" id="helpFabManualBtn" class="btn btn-off btn-block" data-sec="">Manual completo</button><button type="button" class="link-btn" data-sec="solucao-problemas">Solução de problemas</button><button type="button" class="link-btn" data-help-action="report">Relatar um problema</button><button type="button" class="link-btn" data-help-action="mobile">Aplicativo móvel</button>`;
+      primarios.querySelectorAll("[data-sec]").forEach((btn) => btn.addEventListener("click", () => {
+        document.getElementById("helpFabPanel").classList.add("hidden");
+        abrir(btn.dataset.sec || null);
+      }));
+      primarios.querySelector('[data-help-action="report"]').addEventListener("click", () => {
+        document.getElementById("helpFabPanel").classList.add("hidden");
+        const relatar = document.getElementById("bugReportBtn");
+        if (relatar) relatar.click();
+      });
+      primarios.querySelector('[data-help-action="mobile"]').addEventListener("click", () => {
+        document.getElementById("helpFabPanel").classList.add("hidden");
+        if (typeof MobileApp !== "undefined") MobileApp.abrir();
+      });
+    }
+    const idsAtalho = [...ATALHOS, ...(state.isAdmin ? ["administracao"] : []), ...(state.isSuperAdmin ? ["monitoramento", "operacao-admin"] : [])];
+    const disponiveis = [...ManualContent.secoes, ...(typeof RoleDocumentation !== "undefined" ? RoleDocumentation.secoes() : [])];
+    cont.innerHTML = idsAtalho.map((id) => {
+      const s = disponiveis.find((x) => x.id === id && papelPermitido(x.papel));
       return s ? `<li><button type="button" class="link-btn" data-sec="${s.id}">${escapeHtml(s.titulo)}</button></li>` : "";
     }).join("");
     cont.querySelectorAll("button[data-sec]").forEach((btn) => {
@@ -270,14 +300,6 @@ const Manual = (() => {
     });
   }
 
-  const manualBtn = document.getElementById("helpFabManualBtn");
-  if (manualBtn) {
-    manualBtn.addEventListener("click", () => {
-      const p = document.getElementById("helpFabPanel");
-      if (p) p.classList.add("hidden");
-      abrir();
-    });
-  }
   const fecharBtn = document.getElementById("manualFecharBtn");
   if (fecharBtn) fecharBtn.addEventListener("click", () => fechar());
   const voltarBtn = document.getElementById("manualVoltarBtn");
@@ -285,9 +307,10 @@ const Manual = (() => {
   if (buscaEl) buscaEl.addEventListener("input", filtrar);
   const fabToggle = document.getElementById("helpFabToggleBtn");
   if (fabToggle) {
-    fabToggle.addEventListener("click", () => {
-      if (typeof ManualContent !== "undefined") montarAtalhos();
-      else garantirConteudo().then(montarAtalhos);
+    fabToggle.addEventListener("click", async () => {
+      await garantirConteudo();
+      if (typeof RoleDocumentation !== "undefined") await RoleDocumentation.carregar();
+      montarAtalhos();
     });
   }
 
@@ -298,3 +321,13 @@ const Manual = (() => {
     secaoAtual: () => secaoAtual,
   };
 })();
+
+const HelpQuickMenu = {
+  abrir() {
+    const painel = document.getElementById("helpFabPanel");
+    const botao = document.getElementById("helpFabToggleBtn");
+    if (painel.classList.contains("hidden")) botao.click();
+    const primeiro = painel.querySelector("button:not(.a11y-close-btn)");
+    if (primeiro) primeiro.focus();
+  },
+};

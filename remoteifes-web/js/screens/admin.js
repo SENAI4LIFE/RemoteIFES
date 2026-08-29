@@ -379,7 +379,7 @@ const Admin = {
             </div>
           </div>
           <p class="hint">Deixe qualquer campo vazio para usar apenas o limite global correspondente.</p>
-          <div class="two-col">
+          <div class="two-col mac-actions">
             <button type="button" class="link-btn salvar-mac">salvar MAC</button>
             <button type="button" class="link-btn salvar-limites">salvar limites</button>
             ${s.ipEsp32 ? `<button type="button" class="link-btn acessar-esp32">acessar interface do ESP32</button>` : `<span class="hint">IP ainda não reportado</span>`}

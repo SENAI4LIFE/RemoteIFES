@@ -85,8 +85,6 @@ function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
   state.temSalaComoProprietario = !!resp.temSalaComoProprietario;
 
   document.getElementById("userTag").textContent = resp.isAdmin ? `${resp.nome} (admin)` : resp.nome;
-  document.getElementById("userTag").classList.remove("hidden");
-  document.getElementById("logoutBtn").classList.remove("hidden");
   document.getElementById("adminTabBtn").classList.toggle("hidden", !resp.isAdmin);
   document.getElementById("agendaTabBtn").classList.toggle("hidden", !resp.isAdmin);
   document.getElementById("gradeTabBtn").classList.toggle("hidden", !resp.isAdmin);
@@ -95,6 +93,7 @@ function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
   document.querySelectorAll(".superadmin-only").forEach((el) => {
     el.classList.toggle("hidden", !resp.isSuperAdmin);
   });
+  if (typeof AccountMenu !== "undefined") AccountMenu.atualizar();
 
   mostrarTelaAcesso("mainApp");
 
@@ -163,6 +162,7 @@ function realizarLogout({ manterTela = false } = {}) {
   Notificacoes.pararPolling();
   Relatos.aoDeslogar();
   RTStatus.desconectar();
+  if (typeof RoleDocumentation !== "undefined") RoleDocumentation.limpar();
   if (typeof ServerStatus !== "undefined") ServerStatus.reconectarComTokenAtual();
   state.usuario = null;
   state.nome = null;
@@ -182,6 +182,7 @@ function realizarLogout({ manterTela = false } = {}) {
   document.getElementById("gradeTabBtn").classList.add("hidden");
   document.getElementById("propriedadeTabBtn").classList.add("hidden");
   document.querySelectorAll(".superadmin-only").forEach((el) => el.classList.add("hidden"));
+  if (typeof AccountMenu !== "undefined") AccountMenu.atualizar();
   document.getElementById("mainApp").classList.add("hidden");
   document.getElementById("loginForm").reset();
 

@@ -109,6 +109,8 @@ if (frontendDisponivel) {
 app.use(restringirRedeIFES);
 
 app.use(require("./routes/loginRoutes"));
+app.use(require("./routes/documentationRoutes"));
+app.use(require("./routes/mobileAppRoutes"));
 app.use(require("./routes/salasRoutes"));
 app.use(require("./routes/comandoRoutes"));
 app.use(require("./routes/agendamentoRoutes"));

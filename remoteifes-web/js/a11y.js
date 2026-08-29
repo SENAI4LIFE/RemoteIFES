@@ -275,6 +275,8 @@
       toggleBtn.setAttribute("aria-expanded", "true");
       const helpFabPanel = document.getElementById("helpFabPanel");
       if (helpFabPanel) helpFabPanel.classList.add("hidden");
+      const helpFabToggleBtn = document.getElementById("helpFabToggleBtn");
+      if (helpFabToggleBtn) helpFabToggleBtn.setAttribute("aria-expanded", "false");
     }
 
     function fecharPainel() {
@@ -481,19 +483,32 @@
     const helpFabPanel = document.getElementById("helpFabPanel");
     const helpFabClose = document.getElementById("helpFabCloseBtn");
     if (helpFabToggle && helpFabPanel) {
+      const fecharAjuda = (restaurarFoco = false) => {
+        helpFabPanel.classList.add("hidden");
+        helpFabToggle.setAttribute("aria-expanded", "false");
+        if (restaurarFoco) helpFabToggle.focus();
+      };
       helpFabToggle.addEventListener("click", (e) => {
         e.stopPropagation();
         const abrindo = helpFabPanel.classList.contains("hidden");
         if (abrindo) fecharPainel();
         helpFabPanel.classList.toggle("hidden");
+        helpFabToggle.setAttribute("aria-expanded", abrindo ? "true" : "false");
+        if (abrindo) setTimeout(() => helpFabPanel.querySelector("button")?.focus(), 0);
       });
       if (helpFabClose) {
-        helpFabClose.addEventListener("click", () => helpFabPanel.classList.add("hidden"));
+        helpFabClose.addEventListener("click", () => fecharAjuda(true));
       }
       document.addEventListener("click", (e) => {
         if (!helpFabPanel.contains(e.target) && e.target !== helpFabToggle && !helpFabToggle.contains(e.target)) {
-          helpFabPanel.classList.add("hidden");
+          fecharAjuda();
         }
+      });
+      document.addEventListener("focusin", (e) => {
+        if (!helpFabPanel.classList.contains("hidden") && !helpFabPanel.contains(e.target) && e.target !== helpFabToggle) fecharAjuda();
+      });
+      helpFabPanel.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { e.preventDefault(); fecharAjuda(true); }
       });
     }
   });
