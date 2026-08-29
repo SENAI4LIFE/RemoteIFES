@@ -10,11 +10,13 @@ const BLOCO_DEV = [
   '<allow-navigation href="*" />',
 ];
 
-const EDIT_CONFIG_CLEARTEXT = [
-  '        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application" xmlns:android="http://schemas.android.com/apk/res/android">',
-  '            <application android:usesCleartextTraffic="true" />',
-  "        </edit-config>",
-].join("\n");
+function blocoCleartext(ativo) {
+  return [
+    '        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application" xmlns:android="http://schemas.android.com/apk/res/android">',
+    `            <application android:usesCleartextTraffic="${ativo ? "true" : "false"}" />`,
+    "        </edit-config>",
+  ].join("\n");
+}
 
 const EDIT_CONFIG_IOS_LOCAL_NETWORK = [
   '        <edit-config file="*-Info.plist" mode="merge" target="NSAppTransportSecurity">',
@@ -29,9 +31,10 @@ const RE_BLOCO_REDE =
   /^([ \t]*)<access\b[^>]*\/>[ \t]*\r?\n(?:[ \t]*<allow-intent\b[^>]*\/>[ \t]*\r?\n)+[ \t]*<allow-navigation\b[^>]*\/>[ \t]*\r?\n/m;
 const RE_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="app\/src\/main\/AndroidManifest\.xml"[\s\S]*?<\/edit-config>\r?\n?/;
 const RE_IOS_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="\*-Info\.plist"[\s\S]*?<\/edit-config>\r?\n?/;
-const RE_MIN_SDK = /([ \t]*<preference name="android-minSdkVersion" value="24" \/>\r?\n)/;
+const RE_ANDROID_CLEARTEXT_INSERTION = /([ \t]*<preference name="android-minSdkVersion" value="24" \/>\r?\n(?:[ \t]*<preference name="AndroidWindowSplashScreenAnimatedIcon"[^>]*\/>\r?\n)?)/;
 const RE_IOS_PLATFORM = /([ \t]*<platform name="ios">\r?\n)/;
 const RE_CLEARTEXT_ON = /usesCleartextTraffic\s*=\s*"true"/;
+const RE_CLEARTEXT_OFF = /usesCleartextTraffic\s*=\s*"false"/;
 
 function uso() {
   console.log("Uso:");
@@ -76,20 +79,26 @@ function trocarBlocoRede(xml, linhas, original) {
 
 function definirCleartext(xml, ativo, original) {
   let saida = xml.replace(RE_EDIT_CONFIG, "").replace(RE_IOS_EDIT_CONFIG, "");
+  const eol = xml.includes("\r\n") ? "\r\n" : "\n";
+  const android = blocoCleartext(ativo).replace(/\n/g, eol);
+  if (!RE_ANDROID_CLEARTEXT_INSERTION.test(saida)) {
+    abortar('não encontrei <preference name="android-minSdkVersion" value="24" /> para definir a política de cleartext.', original);
+  }
+  saida = saida.replace(RE_ANDROID_CLEARTEXT_INSERTION, `$1${android}${eol}`);
   if (ativo) {
-    const eol = xml.includes("\r\n") ? "\r\n" : "\n";
-    const android = EDIT_CONFIG_CLEARTEXT.replace(/\n/g, eol);
     const ios = EDIT_CONFIG_IOS_LOCAL_NETWORK.replace(/\n/g, eol);
-    if (!RE_MIN_SDK.test(saida)) {
-      abortar('não encontrei <preference name="android-minSdkVersion" value="24" /> para reinserir o cleartext.', original);
-    }
-    saida = saida.replace(RE_MIN_SDK, `$1${android}${eol}`);
     if (!RE_IOS_PLATFORM.test(saida)) {
       abortar("não encontrei a plataforma iOS para habilitar a compatibilidade com rede local.", original);
     }
     saida = saida.replace(RE_IOS_PLATFORM, (_todo, indent) => indent + ios + eol);
   }
   return saida;
+}
+
+function preservarQuebraFinal(xml, original) {
+  const originalTerminaComQuebra = /\r?\n$/.test(original);
+  if (originalTerminaComQuebra) return xml.replace(/(?:\r?\n)*$/, original.includes("\r\n") ? "\r\n" : "\n");
+  return xml.replace(/(?:\r?\n)+$/, "");
 }
 
 const arg = process.argv[2];
@@ -101,6 +110,7 @@ let xml = original;
 if (arg === "--dev") {
   xml = trocarBlocoRede(xml, BLOCO_DEV, original);
   xml = definirCleartext(xml, true, original);
+  xml = preservarQuebraFinal(xml, original);
   if (!RE_CLEARTEXT_ON.test(xml)) abortar("falha ao reativar o cleartext HTTP no Android.", original);
   fs.writeFileSync(ARQUIVO, xml);
   console.log("config.xml restaurado para desenvolvimento (rede/navegação liberadas, HTTP local ativo no Android e iOS).");
@@ -116,12 +126,16 @@ const blocoProd = [
 
 xml = trocarBlocoRede(xml, blocoProd, original);
 xml = definirCleartext(xml, cleartext, original);
+xml = preservarQuebraFinal(xml, original);
 
 if (cleartext && !RE_CLEARTEXT_ON.test(xml)) {
   abortar("esperava manter o cleartext HTTP para uma origem http:// e não consegui.", original);
 }
 if (!cleartext && RE_CLEARTEXT_ON.test(xml)) {
   abortar("a origem é HTTPS mas o cleartext HTTP continuou habilitado no Android — abortando (fail-closed).", original);
+}
+if (!cleartext && !RE_CLEARTEXT_OFF.test(xml)) {
+  abortar("a origem é HTTPS mas o bloqueio explícito de cleartext não foi aplicado no Android.", original);
 }
 if (xml.includes('origin="*"') || xml.includes('href="*"') || xml.includes('href="http://*/*"') || xml.includes('href="https://*/*"')) {
   abortar("ainda há regras de rede curinga (*) em config.xml após o endurecimento.", original);

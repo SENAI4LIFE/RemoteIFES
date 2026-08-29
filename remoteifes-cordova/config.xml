@@ -12,16 +12,16 @@
     <preference name="DisallowOverscroll" value="true" />
     <preference name="ScrollEnabled" value="false" />
     <preference name="BackgroundColor" value="0xfff4f6f4" />
+    <preference name="SplashScreenBackgroundColor" value="#f4f6f4" />
     <icon src="resources/icon.png" />
-    <splash src="resources/splash.png" />
     <platform name="android">
         <preference name="AndroidXEnabled" value="true" />
         <preference name="android-minSdkVersion" value="24" />
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="resources/icon.png" />
         <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application" xmlns:android="http://schemas.android.com/apk/res/android">
             <application android:usesCleartextTraffic="true" />
         </edit-config>
         <icon src="resources/icon.png" />
-        <splash src="resources/splash.png" />
     </platform>
     <platform name="ios">
         <edit-config file="*-Info.plist" mode="merge" target="NSAppTransportSecurity">

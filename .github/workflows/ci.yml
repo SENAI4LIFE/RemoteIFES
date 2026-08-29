@@ -26,7 +26,7 @@ jobs:
         run: |
           NODE_ENV=development PORTA=8099 REMOTEIFES_DB_PATH="$RUNNER_TEMP/ci-health.db" node server.js &
           SV=$!
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:8099/health && break
             sleep 1
           done
@@ -70,7 +70,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node validate-config.js
+          cache: npm
+          cache-dependency-path: remoteifes-cordova/package-lock.json
+      - run: npm ci
+        working-directory: remoteifes-cordova
+      - run: npm run validate
         working-directory: remoteifes-cordova
 
   firmware:
