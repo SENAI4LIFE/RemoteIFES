@@ -44,7 +44,7 @@ const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());
 window.RemoteIFESConfig = {
   serverUrl,
   empacotado,
-  precisaConfigurar: empacotado && !salvo,
+  precisaConfigurar: empacotado && !salvo && !serverUrl,
 
   definirServidor(valor) {
     const normalizado = normalizarUrlServidor(valor);

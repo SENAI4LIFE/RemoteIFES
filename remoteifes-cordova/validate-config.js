@@ -30,6 +30,13 @@ checar(/<content src="index\.html" \/>/.test(original), "<content src=\"index.ht
 checar(/<preference name="Orientation" value="default" \/>/.test(original), "Orientation = default (retrato e paisagem)");
 checar(/<platform name="android">/.test(original) && /<platform name="ios">/.test(original), "plataformas android e ios declaradas");
 checar(fs.existsSync(caminhoCordova()), "launcher do build de release usa o Cordova local");
+const releaseScript = fs.readFileSync(path.join(RAIZ, "build-android-release.js"), "utf8");
+checar(releaseScript.includes("REMOTEIFES_ANDROID_KEYSTORE") && releaseScript.includes("REMOTEIFES_ANDROID_STORE_PASSWORD"), "build de release exige keystore e credenciais de assinatura");
+checar(releaseScript.includes("fixarServidorNoBundle") && releaseScript.includes("REMOTEIFES_SERVER_URL"), "build de release fixa a origem de produção no bundle");
+checar(releaseScript.includes("fs.mkdtempSync") && releaseScript.includes("fs.rmSync(temporario"), "configuração temporária de assinatura é removida após o build");
+const publishScript = fs.readFileSync(path.join(RAIZ, "publish-android-release.js"), "utf8");
+checar(publishScript.includes('"verify", "--verbose"') && publishScript.includes('"manifest", "debuggable"'), "publicação verifica assinatura e rejeita APK depurável");
+checar(publishScript.includes('"manifest", "version-name"') && publishScript.includes('"manifest", "version-code"'), "publicação confere versão e build no manifesto do APK");
 
 console.log("harden-config.js — reversibilidade");
 try {

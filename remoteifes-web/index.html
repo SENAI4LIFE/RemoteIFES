@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=12" />
+  <link rel="stylesheet" href="css/style.css?v=14" />
 </head>
 <body>
 
@@ -59,8 +59,21 @@
         </button>
         <div id="relatosPanel" class="relatos-panel hidden" role="region" aria-label="Relatos de problemas"></div>
       </div>
-      <span id="userTag" class="user-tag hidden"></span>
-      <button id="logoutBtn" class="link-btn hidden">Sair</button>
+      <div id="accountWrap" class="account-wrap hidden">
+        <button type="button" id="accountMenuBtn" class="account-avatar" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu" aria-label="Abrir menu da conta"></button>
+        <div id="accountMenu" class="account-menu hidden" role="menu" aria-labelledby="accountMenuBtn">
+          <div class="account-menu-identity" role="none">
+            <span id="accountMenuName" class="account-menu-name"></span>
+            <span id="accountMenuLogin" class="account-menu-login"></span>
+            <span id="accountMenuRole" class="account-menu-role"></span>
+          </div>
+          <button type="button" class="account-menu-item" role="menuitem" data-account-action="help">Ajuda e manual</button>
+          <button type="button" class="account-menu-item" role="menuitem" data-account-action="mobile">Aplicativo móvel</button>
+          <button type="button" class="account-menu-item account-menu-logout" role="menuitem" data-account-action="logout">Sair</button>
+        </div>
+      </div>
+      <span id="userTag" class="user-tag hidden" aria-hidden="true"></span>
+      <button id="logoutBtn" class="link-btn hidden" tabindex="-1" aria-hidden="true">Sair</button>
     </div>
   </header>
 
@@ -1061,6 +1074,19 @@
     </div>
   </section>
 
+  <section id="screen-mobile-app" class="mobile-app-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="mobileAppTitle">
+    <div class="mobile-app-shell">
+      <header class="mobile-app-topbar">
+        <button type="button" id="mobileAppBackBtn" class="link-btn">&larr; Voltar ao app</button>
+        <h1 id="mobileAppTitle">Aplicativo RemoteIFES</h1>
+        <button type="button" id="mobileAppCloseBtn" class="a11y-close-btn" aria-label="Fechar página do aplicativo">&times;</button>
+      </header>
+      <main id="mobileAppContent" class="mobile-app-content" tabindex="-1">
+        <p class="hint">Carregando informações da versão…</p>
+      </main>
+    </div>
+  </section>
+
   <div id="idleModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="idleModalTitle">
     <div class="modal-card">
       <h2 id="idleModalTitle">Sessão prestes a expirar</h2>
@@ -1197,16 +1223,16 @@
   </div>
 
   <div id="helpFabWidget" class="help-fab-widget">
-    <button type="button" id="helpFabToggleBtn" class="help-fab-btn" aria-label="Abrir ajuda" title="Ajuda">?</button>
+    <button type="button" id="helpFabToggleBtn" class="help-fab-btn" aria-label="Abrir ajuda" aria-haspopup="dialog" aria-expanded="false" aria-controls="helpFabPanel" title="Ajuda">?</button>
     <div id="helpFabPanel" class="help-fab-panel hidden" role="dialog" aria-label="Ajuda">
       <div class="a11y-panel-header">
         <span class="a11y-panel-title">Precisa de ajuda?</span>
         <button type="button" id="helpFabCloseBtn" class="a11y-close-btn" aria-label="Fechar ajuda">&times;</button>
       </div>
-      <p class="help-fab-text">Toque no ícone <strong>?</strong> ao lado de cada título de tela para instruções da página atual.</p>
-      <button type="button" id="helpFabManualBtn" class="btn btn-on btn-block">Abrir o manual completo</button>
+      <p class="help-fab-text">Escolha uma ajuda compatível com seu acesso.</p>
+      <div id="helpFabPrimaryLinks" class="help-fab-primary-links"></div>
       <ul class="help-fab-links" id="helpFabLinks"></ul>
-      <p class="help-fab-text help-fab-text-muted">O manual funciona sem Internet. Dúvidas fora dele: procure a equipe responsável pelo RemoteIFES no seu campus.</p>
+      <p class="help-fab-text help-fab-text-muted">A parte comum do manual funciona offline. Documentação administrativa exige uma sessão validada pelo servidor.</p>
     </div>
   </div>
 
@@ -1242,6 +1268,8 @@
   <script src="js/screens/admin.js"></script>
   <script src="js/screens/esp32-admin.js"></script>
   <script src="js/screens/manual.js"></script>
+  <script src="js/screens/mobile-app.js"></script>
+  <script src="js/account-menu.js"></script>
   <script src="js/router.js"></script>
   <script src="js/app.js"></script>
   <script>

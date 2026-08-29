@@ -58,6 +58,29 @@ const Api = {
     return chamar("/me", { headers: headersComToken() });
   },
 
+  async mobileAppInfo() {
+    return chamar("/mobile-app/info", { headers: headersComToken() });
+  },
+
+  async documentacao() {
+    return chamar("/documentation", { headers: headersComToken() });
+  },
+
+  async baixarMobileApk() {
+    let res;
+    try {
+      res = await fetch(`${SERVER_URL}/mobile-app/android`, { headers: headersComToken() });
+    } catch (err) {
+      return { ok: false, erro: `não foi possível conectar ao servidor em ${SERVER_URL} (verifique se ele está rodando e acessível)` };
+    }
+    if (!res.ok) {
+      let erro = "APK indisponível";
+      try { erro = (await res.json()).erro || erro; } catch (err) {}
+      return { ok: false, erro };
+    }
+    return { ok: true, blob: await res.blob(), nome: "RemoteIFES.apk" };
+  },
+
   async login(usuario, senha) {
     const data = await chamar("/login", {
       method: "POST",

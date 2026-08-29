@@ -13,6 +13,7 @@
     "prepare-ios": "npm run sync && cordova platform add ios || true && cordova prepare ios",
     "build-android": "npm run sync && cordova build android",
     "build-android-release": "node build-android-release.js",
+    "publish-android-release": "node publish-android-release.js",
     "build-ios": "npm run sync && cordova build ios",
     "run-android": "npm run sync && cordova run android",
     "run-ios": "npm run sync && cordova run ios"
