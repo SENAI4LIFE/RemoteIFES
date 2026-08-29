@@ -66,7 +66,8 @@ test("sair limpa o endereço de navegação", async ({ page, loginComo }) => {
   await loginComo("admin");
   await page.locator("#gradeTabBtn").click();
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#\/grade/);
-  await page.locator("#logoutBtn").click();
+  await page.locator("#accountMenuBtn").click();
+  await page.locator('[data-account-action="logout"]').click();
   await expect(page.locator("#screen-portal")).toBeVisible();
   expect(await page.evaluate(() => location.hash)).toBe("");
 });

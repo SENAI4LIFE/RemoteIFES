@@ -314,7 +314,7 @@ O frontend inclui um widget de acessibilidade (botão flutuante, disponível em 
 
 ## Ajuda e Manual no App
 
-O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela página, com um atalho para a seção correspondente do manual. O botão **Precisa de ajuda?** (canto inferior) abre o **manual completo do RemoteIFES** — uma página de documentação dedicada, com sumário, busca por palavra-chave, diagramas em SVG e links "Ver no app" que levam à tela descrita. O manual funciona **sem Internet** (faz parte do cache do app), é sensível ao papel do usuário (seções de administração e do administrador principal só aparecem para quem tem acesso) e não expõe credenciais, caminhos internos nem dados operacionais protegidos. O conteúdo é mantido em um único módulo, `remoteifes-web/js/manual-content.js`; este README continua sendo a referência de operação e implantação.
+O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela página, com um atalho para a seção correspondente do manual. O botão **Precisa de ajuda?** (canto inferior) e o item **Ajuda e manual** do menu da conta abrem um menu rápido com a ajuda da página atual, o **manual completo do RemoteIFES**, a solução de problemas, o envio de relato e a página do aplicativo móvel. O manual é uma página de documentação dedicada, com sumário, busca, diagramas em SVG e links "Ver no app". A documentação comum fica no app-shell e funciona offline. Conteúdo administrativo é entregue por `/documentation` somente após validar a sessão no servidor: administrador recebe apenas operação administrativa e administrador principal recebe também ESP32, OTA, credenciais, monitoramento, backup, implantação e manutenção. A resposta usa `private, no-store`; esses textos não ficam nos assets públicos nem no cache compartilhado da PWA/Cordova.
 
 ## Requisitos
 
@@ -692,6 +692,10 @@ A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição d
 
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
 
+Usuários autenticados podem abrir `#/aplicativo` pelo menu da conta ou pela Ajuda. A página detecta Android, explica a instalação nativa e a alternativa PWA, e consulta o servidor para obter versão, build, tamanho e SHA-256. O APK só aparece quando existe uma publicação válida em `remoteifes-server/data/releases/mobile/release.json`; o download exige a sessão RemoteIFES e é servido pelo próprio servidor com `Cache-Control: private, no-store`.
+
+O servidor valida novamente o SHA-256 do arquivo antes de anunciar ou entregar a versão. Na ausência de um APK de produção assinado e de metadados coerentes, a interface informa que o download não foi publicado. APKs `debug`, não assinados ou copiados apenas de `platforms/android/app/build/outputs/` não devem ser colocados nesse diretório.
+
 Além do site publicado no GitHub Pages, o `remoteifes-web` pode ser instalado como **PWA** diretamente do navegador, e o mesmo frontend pode ser empacotado como **app nativo Android/iOS** pelo projeto `remoteifes-cordova/`. Nenhuma das duas formas exige reescrever ou duplicar a lógica da aplicação — ambas reaproveitam os arquivos de `remoteifes-web` como estão.
 
 ### PWA (Progressive Web App)
@@ -771,7 +775,7 @@ npm run build-ios
 npm run run-ios
 ```
 
-`build-android-release` gera um APK/AAB sem assinatura em `platforms/android/app/build/outputs/`; assine-o com sua própria chave antes de publicar na Play Store. Para iOS, `run-ios` abre o simulador; para dispositivo físico ou publicação na App Store, abra `platforms/ios/RemoteIFES.xcworkspace` no Xcode.
+`build-android-release` gera um APK de produção já assinado. O comando falha se a origem do servidor, o keystore, o alias ou qualquer senha de assinatura estiver ausente; os segredos entram num `build.json` temporário fora do repositório e são removidos ao final. Para iOS, `run-ios` abre o simulador; para dispositivo físico ou publicação na App Store, abra `platforms/ios/RemoteIFES.xcworkspace` no Xcode.
 
 #### Ícone e splash screen
 
@@ -788,7 +792,7 @@ npx cordova-res ios --skip-config --copy
 O app empacotado é carregado de `file://` (ou `https://localhost`), então não existe uma "origem" que sirva de endereço do servidor — diferente da PWA, que assume o mesmo domínio de onde foi baixada. Há duas formas de definir o endereço:
 
 - **Em tempo de execução (recomendado):** ao abrir o app sem um endereço configurado, ele mostra a tela "Sem conexão com o servidor" com o botão **Configurar endereço do servidor**. O valor informado (`http://IP:porta` ou `https://dominio`) é validado e guardado em `localStorage`; o app recarrega e passa a usá-lo. O mesmo botão aparece sempre que o app estiver empacotado e offline, permitindo trocar de servidor sem reinstalar. Esse override também funciona na PWA para apontá-la a outro servidor.
-- **Fixo no build:** em `remoteifes-web/js/config.js` (não em `remoteifes-cordova/www/js/config.js`, que é sobrescrito a cada `sync`), substitua o valor vazio do ramo empacotado em `const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());` pela origem desejada antes de gerar o build. Um endereço salvo em `localStorage` tem prioridade sobre esse padrão.
+- **Fixo no build:** `build-android-release` grava `REMOTEIFES_SERVER_URL` somente na cópia gerada em `remoteifes-cordova/www/`. O fonte web continua neutro e um endereço posteriormente salvo no aparelho tem prioridade.
 
 #### Ajustando as permissões de rede
 
@@ -807,8 +811,15 @@ Ao usar os comandos manualmente, `npm run dev-config` devolve o arquivo ao modo 
 O app suporta **retrato e paisagem** (`Orientation` = `default`); a interface acompanha a rotação sem recarregar nem perder o estado atual. Para evitar gerar um APK com permissões de rede curinga, `npm run build-android-release` exige `REMOTEIFES_SERVER_URL` e endurece o `config.xml` automaticamente antes do build:
 
 ```bash
-REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br npm run build-android-release
+REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br \
+REMOTEIFES_ANDROID_KEYSTORE=/caminho/remoteifes-release.jks \
+REMOTEIFES_ANDROID_STORE_PASSWORD='...' \
+REMOTEIFES_ANDROID_KEY_ALIAS=remoteifes \
+REMOTEIFES_ANDROID_KEY_PASSWORD='...' \
+npm run build-android-release
 ```
+
+Antes de disponibilizar o APK pelo servidor, execute `npm run publish-android-release` com `REMOTEIFES_ANDROID_APK`, `REMOTEIFES_MOBILE_RELEASE_DIR`, `REMOTEIFES_ANDROID_VERSION`, `REMOTEIFES_ANDROID_BUILD`, `REMOTEIFES_SERVER_URL`, `ANDROID_APKSIGNER` e `ANDROID_APKANALYZER`. A publicação recusa nomes `debug`/`unsigned`, valida a assinatura, confirma `debuggable=false`, registra o SHA-256 do arquivo e do certificado e cria o `release.json` consumido pelo servidor. Sem todos esses dados coerentes, `/mobile-app/android` responde 404 e a interface não oferece download.
 
 Para um servidor HTTP em rede local, informe a origem `http://192.168.1.50:8080`; o Android e o iOS manterão somente a exceção necessária para rede local.
 
@@ -878,11 +889,12 @@ remoteifes-server/
     config/           conexão com o banco SQLite e caminhos de dados/backup (paths.js)
     db/                schema, seed e a lista de salas reais do campus (salasCampus.js)
     middlewares/       autenticação, permissões, restrição de rede
-    routes/            rotas HTTP (login, salas, comandos, agendamentos, admin, dispositivo, relatos)
+    routes/            rotas HTTP (login, documentação por papel, aplicativo móvel/APK, salas, comandos, agendamentos, admin, dispositivo, relatos)
     services/          regras de negócio (usuários, salas, agendamentos, configurações, notificações,
                         relatos de problema, sessões/tokens, status em tempo real, backup do banco,
                         OTA de firmware (otaService), credenciais de dispositivo (esp32CredenciaisService),
-                        monitoramento operacional (monitoramentoService))
+                        monitoramento operacional (monitoramentoService),
+                        documentação administrativa por papel (documentationService))
     scheduler/         verificação periódica de agendamentos, timeouts de ESP32 e de OTA, sessões abandonadas, monitoramento e backup
     utils/             funções auxiliares (data/hora em fuso de Brasília, rate limiting, faixas de rede)
   test/               testes de regressão do servidor (node:test) — API, permissões, WebSocket, /health, backup, OTA, credenciais de dispositivo, monitoramento
@@ -898,14 +910,15 @@ remoteifes-web/
     state.js           estado da sessão atual no navegador
     nav.js             troca de abas e telas
     router.js          roteador por fragmento (#/...): reflete a navegação no endereço e a restaura no reload, no link direto e no voltar/avançar, respeitando a permissão
+    account-menu.js    menu da conta (avatar com iniciais): identificação, atalhos de ajuda e aplicativo móvel, sair
     rtstatus.js        cliente WebSocket para status em tempo real
     idle-timer.js      timeout de inatividade e aviso de logout automático
     a11y.js            widget de acessibilidade (fonte, contraste, espaçamento etc.), persiste no localStorage
     ui-dialog.js       modais/diálogos estilizados do sistema (confirmação, texto, troca de senha) — substituem prompt()/confirm()/alert()
     ui-status.js       selo reutilizável de estado de função (disponível, temporariamente indisponível, desativado por configuração, falha etc.)
     floorplan.js        componente reutilizável de planta baixa com zoom (usado na tela de salas e no admin)
-    help.js            conteúdo dos modais de ajuda contextual espalhados pela interface, com atalho para a seção do manual
-    manual-content.js  conteúdo do manual completo (seções por papel, diagramas SVG) — fonte única, carregado sob demanda
+    help.js            ajuda contextual dos modais (parte comum embutida; textos de administração vêm de /documentation após validar a sessão), com atalho para a seção do manual
+    manual-content.js  seções comuns do manual (papel "todos") e diagramas SVG, carregadas sob demanda; as seções de administração e do administrador principal são entregues por /documentation e não ficam nos assets públicos
     tempo.js           formatação de datas/horas no fuso de Brasília
     rooms-data.js       utilitário auxiliar de composição de código de sala
     screens/           lógica de cada tela:
@@ -920,7 +933,8 @@ remoteifes-web/
                         esp32-admin.js (painel avançado de cada ESP32 — status, config/clonagem IR, OTA e credenciais —
                         na aba "ESP32", restrito ao administrador principal),
                         monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao administrador principal),
-                        manual.js (sobreposição do manual completo: sumário, busca, navegação e foco)
+                        manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
+                        mobile-app.js (página #/aplicativo: instalação PWA/Android e download do APK de produção verificado pelo servidor)
 
 remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev, partição min_spiffs.csv para OTA)
   platformio.ini           configuração do projeto, versão do firmware (-DFW_VERSAO) e dependências

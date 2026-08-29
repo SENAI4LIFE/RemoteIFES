@@ -3,13 +3,15 @@ const { test, expect } = require("../harness/fixtures");
 test("login de usuário comum entra no painel de salas", async ({ appPage, loginComo }) => {
   await loginComo("user");
   await expect(appPage.locator("#mainApp")).toBeVisible();
-  await expect(appPage.locator("#userTag")).toContainText("Usuário E2E");
+  await appPage.locator("#accountMenuBtn").click();
+  await expect(appPage.locator("#accountMenuName")).toContainText("Usuário E2E");
   await expect(appPage.locator("#screen-simple")).toBeVisible();
 });
 
 test("login de administrador mostra o rótulo (admin)", async ({ appPage, loginComo }) => {
   await loginComo("admin");
-  await expect(appPage.locator("#userTag")).toContainText("(admin)");
+  await appPage.locator("#accountMenuBtn").click();
+  await expect(appPage.locator("#accountMenuRole")).toHaveText("Administrador");
 });
 
 test("senha incorreta não autentica e mantém a tela de login", async ({ appPage }) => {
@@ -32,7 +34,8 @@ test("entrar pela porta de administrador com conta comum é recusado", async ({ 
 
 test("logout volta ao portal e esconde as abas autenticadas", async ({ appPage, loginComo }) => {
   await loginComo("admin");
-  await appPage.locator("#logoutBtn").click();
+  await appPage.locator("#accountMenuBtn").click();
+  await appPage.locator('[data-account-action="logout"]').click();
   await expect(appPage.locator("#screen-portal")).toBeVisible();
   await expect(appPage.locator("#mainApp")).toBeHidden();
   await expect(appPage.locator("#adminTabBtn")).toBeHidden();

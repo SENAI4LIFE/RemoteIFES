@@ -193,6 +193,18 @@ body {
 }
 
 .user-tag { font-size: calc(13px * var(--a11y-font-scale)); opacity: 0.9; }
+.account-wrap { position: relative; }
+.account-avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); background: #fff; color: var(--ifes-green-dark); font-weight: 800; letter-spacing: .02em; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.16); }
+.account-avatar:hover { transform: translateY(-1px); }
+.account-avatar:focus-visible { outline: 3px solid #ffd65a; outline-offset: 2px; }
+.account-menu { position: absolute; z-index: 850; right: 0; top: calc(100% + 9px); width: min(290px, calc(100vw - 24px)); padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow-2); }
+.account-menu-identity { padding: 10px 11px 12px; border-bottom: 1px solid var(--border); margin-bottom: 5px; display: grid; gap: 2px; }
+.account-menu-name { font-weight: 700; overflow-wrap: anywhere; }
+.account-menu-login { color: var(--text-muted); font-size: calc(12px * var(--a11y-font-scale)); }
+.account-menu-role { justify-self: start; margin-top: 5px; padding: 3px 7px; border-radius: 999px; background: var(--ifes-green-soft); color: var(--ifes-green-dark); font-size: calc(11px * var(--a11y-font-scale)); font-weight: 700; }
+.account-menu-item { display: block; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 10px 11px; border-radius: var(--radius-sm); cursor: pointer; font: inherit; }
+.account-menu-item:hover, .account-menu-item:focus-visible { background: var(--ifes-green-soft); outline: none; }
+.account-menu-logout { color: var(--danger); border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-sm) var(--radius-sm); margin-top: 4px; }
 
 .notif-wrap {
   position: relative;
@@ -1840,6 +1852,14 @@ button.btn:disabled {
 #screen-propriedade .card { max-width: 40rem; }
 #screen-admin .admin-sub > .room-list,
 #screen-admin .admin-sub > .esp32-device-list { max-width: 52rem; }
+
+#adminSub-macs { max-width: 56rem; }
+#screen-admin #adminSub-macs > .card:not(.admin-fp-picker),
+#screen-admin #adminSub-macs > .room-list { max-width: none; }
+#adminSub-macs .mac-input { max-width: 22rem; }
+#adminSub-macs .mac-actions { align-items: baseline; gap: 8px 16px; }
+#adminSub-macs .mac-actions > .link-btn { flex: 0 0 auto; }
+#adminSub-macs .mac-actions > .hint { flex: 0 0 auto; margin: 0; }
 
 @media (min-width: 900px) {
   #app:has(#screen-rooms:not(.hidden)) { max-width: 1000px; }
@@ -3522,17 +3542,44 @@ textarea {
 .mon-skel-line:nth-child(3) { width: 60%; }
 @keyframes mon-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 
-.admin-fp-picker .floorplan-scope .plan-wrap { height: min(500px, 62vh); }
-@media (min-width: 700px) {
-  .admin-fp-picker .floorplan-scope .plan-wrap { height: 500px; }
+.admin-fp-picker .floorplan-scope .plan-wrap {
+  height: auto;
+  aspect-ratio: 2.6 / 1;
+  min-height: 172px;
+  max-height: 68vh;
 }
 
-#helpFabManualBtn { margin: 4px 0 10px; }
+.help-fab-primary-links { display: grid; gap: 7px; margin: 4px 0 10px; }
+.help-fab-primary-links .link-btn { text-align: left; padding: 4px 0; }
 .help-fab-links { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .help-fab-links .link-btn { text-align: left; padding: 5px 0; }
 .help-fab-text-muted { font-size: calc(12px * var(--a11y-font-scale)); }
 
 body.manual-open { overflow: hidden; }
+body.mobile-app-open { overflow: hidden; }
+.mobile-app-overlay { position: fixed; inset: 0; z-index: 900; background: var(--bg); overflow: auto; }
+.mobile-app-overlay.hidden { display: none; }
+.mobile-app-shell { min-height: 100%; max-width: 1080px; margin: 0 auto; background: var(--surface); box-shadow: var(--shadow-2); }
+.mobile-app-topbar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; padding: calc(10px + var(--safe-top)) calc(16px + var(--safe-right)) 10px calc(16px + var(--safe-left)); border-bottom: 1px solid var(--border); background: var(--surface); }
+.mobile-app-topbar h1 { flex: 1; margin: 0; font-size: calc(17px * var(--a11y-font-scale)); }
+.mobile-app-content { padding: clamp(18px, 4vw, 48px) clamp(16px, 5vw, 64px) calc(64px + var(--safe-bottom)); }
+.mobile-app-content:focus { outline: none; }
+.mobile-app-hero { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: clamp(22px, 5vw, 48px); border-radius: calc(var(--radius) * 1.4); background: linear-gradient(135deg, var(--ifes-green-dark), var(--ifes-green)); color: #fff; }
+.mobile-app-hero h2 { margin: 7px 0 10px; font-size: clamp(24px, 5vw, 40px); line-height: 1.08; }
+.mobile-app-hero p { margin: 0; max-width: 62ch; }
+.mobile-app-hero img { flex: 0 0 auto; border-radius: 24px; box-shadow: 0 12px 30px rgba(0,0,0,.22); }
+.mobile-app-kicker { font-size: 12px; font-weight: 800; letter-spacing: .12em; }
+.mobile-app-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 24px 0; }
+.mobile-app-card, .mobile-app-instructions, .mobile-app-security { border: 1px solid var(--border); border-radius: var(--radius); padding: clamp(16px, 3vw, 25px); background: var(--surface); }
+.mobile-app-card.is-recommended { border-color: var(--ifes-green); box-shadow: 0 0 0 2px var(--ifes-green-soft); }
+.mobile-app-card h3, .mobile-app-instructions h2, .mobile-app-security h2 { margin-top: 0; color: var(--ifes-green-dark); }
+.mobile-app-unavailable { border-left: 3px solid #b98000; padding: 10px 12px; background: #fff8df; }
+.mobile-app-integrity { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin-bottom: 0; }
+.mobile-app-integrity dt { font-weight: 700; }
+.mobile-app-integrity dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.mobile-app-instructions { margin-bottom: 16px; }
+.mobile-app-instructions li { margin-bottom: 8px; }
+@media (max-width: 640px) { .mobile-app-grid { grid-template-columns: 1fr; } .mobile-app-hero img { width: 76px; height: 76px; } .mobile-app-topbar h1 { font-size: 14px; } .mobile-app-topbar .link-btn { font-size: 12px; } }
 .manual-overlay {
   position: fixed;
   inset: 0;
