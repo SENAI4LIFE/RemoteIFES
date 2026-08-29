@@ -9,6 +9,7 @@ async function openRoom(sala, nome) {
   state.salaAtual = sala;
   document.getElementById("panelRoomName").textContent = `${RoomsData.rotulo(sala)} — ${nome}`;
   showScreen("panel");
+  if (typeof Router !== "undefined") Router.sync();
   await refreshStatus();
   iniciarAutoRefreshPanel();
 }

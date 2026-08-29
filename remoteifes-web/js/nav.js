@@ -34,6 +34,7 @@ function showScreen(name) {
     if (stepSala && !stepSala.classList.contains("hidden")) SimpleWizard.iniciarAutoRefresh();
   }
   if (name === "rooms" && typeof iniciarAutoRefreshRooms === "function") iniciarAutoRefreshRooms(true);
+  if (typeof Router !== "undefined") Router.sync();
 }
 
 function switchTab(tab) {
@@ -60,6 +61,7 @@ function switchTab(tab) {
     showScreen("admin");
     Admin.aoAbrir();
   }
+  if (typeof Router !== "undefined") Router.sync();
 }
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {

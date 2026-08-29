@@ -6,6 +6,9 @@ const ScreenFloorplan = {
     if (!this._instancia) {
       this._instancia = Floorplan.create(document.getElementById("fpScaleInner"), document.querySelector("#screen-floorplan .fp-tabs"), {
         enableZoom: true,
+        onSectionChange: () => {
+          if (typeof Router !== "undefined") Router.sync();
+        },
         onSelect: (sala, el) => {
           const nomeEl = el.querySelector(".name");
           const nome = nomeEl ? nomeEl.textContent.trim() : sala;

@@ -1,5 +1,6 @@
 const Monitoramento = (() => {
   let intervalo = null;
+  let carregado = false;
 
   function fmtBytes(n) {
     if (n === null || n === undefined) return "—";
@@ -23,11 +24,45 @@ const Monitoramento = (() => {
     return `${m}min`;
   }
 
-  function card(titulo, linhas) {
+  function chip(estado) {
+    return typeof Status !== "undefined" ? Status.chip(estado) : "";
+  }
+
+  function card(titulo, estado, linhas) {
     const corpo = linhas
       .map(([k, v, cls]) => `<div class="mon-row${cls ? ` ${cls}` : ""}"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`)
       .join("");
-    return `<div class="card mon-card"><h4>${escapeHtml(titulo)}</h4>${corpo}</div>`;
+    return `<div class="card mon-card"><h4>${escapeHtml(titulo)}${estado ? chip(estado) : ""}</h4>${corpo}</div>`;
+  }
+
+  function estadoArmazenamento(arm) {
+    if (arm.erro) return "falha";
+    if (arm.alerta) return "temporariamente-indisponivel";
+    return "disponivel";
+  }
+
+  function estadoBackup(bk) {
+    if (!bk.automatico) return "desabilitado-config";
+    if (bk.alerta) return "falha";
+    return "disponivel";
+  }
+
+  function estadoEsp32(e) {
+    if (e.otaComFalha > 0 || (e.salasInstaveis && e.salasInstaveis.length)) return "falha";
+    if (e.offlineInesperado > 0) return "temporariamente-indisponivel";
+    return "disponivel";
+  }
+
+  function estadoCredenciais(c) {
+    if (!c || !c.obrigatorio) return "desabilitado-config";
+    if ((c.somenteMac || 0) > 0) return "temporariamente-indisponivel";
+    return "disponivel";
+  }
+
+  function estadoFalhas(fc) {
+    if ((fc.schedulerFalha || 0) > 0) return "falha";
+    const algum = Object.values(fc).some((n) => (n || 0) > 0);
+    return algum ? "temporariamente-indisponivel" : "disponivel";
   }
 
   function render(m) {
@@ -49,33 +84,33 @@ const Monitoramento = (() => {
     const fc = m.falhas.contadores || {};
 
     const grid = [
-      card("Serviço", [
+      card("Serviço", "disponivel", [
         ["Ambiente", s.ambiente],
         ["Tempo no ar", fmtDuracao(s.uptimeSegundos)],
         ["Memória (RSS)", `${s.memoriaRssMB} MB`],
         ["Carga 1 min", s.cargaMedia1min],
         ["Node / PID", `${s.nodeVersao} / ${s.pid}`],
       ]),
-      card("Banco de dados", [
+      card("Banco de dados", b.ok ? "disponivel" : "falha", [
         ["Responde", b.ok ? "sim" : "não", b.ok ? "ok" : "alerta"],
         ["Latência", `${b.respostaMs} ms`],
         ["Arquivo", fmtBytes(b.arquivoBytes)],
         ["WAL", fmtBytes(b.walBytes)],
       ]),
-      card("Armazenamento", arm.erro
+      card("Armazenamento", estadoArmazenamento(arm), arm.erro
         ? [["Erro", arm.erro, "alerta"]]
         : [
             ["Livre", `${fmtBytes(arm.livreBytes)} (${arm.livrePercent}%)`, arm.alerta ? "alerta" : ""],
             ["Total", fmtBytes(arm.totalBytes)],
-            ["Local", arm.caminho],
+            ["Local", arm.caminho, "caminho"],
           ]),
-      card("Backups", [
+      card("Backups", estadoBackup(bk), [
         ["Automático", bk.automatico ? "ligado" : "desligado"],
         ["Quantidade", bk.quantidade],
         ["Último", bk.ultimo || "nenhum", bk.alerta ? "alerta" : ""],
         ["Idade do último", bk.idadeHoras === null ? "—" : `${bk.idadeHoras} h`, bk.alerta ? "alerta" : ""],
       ]),
-      card("ESP32", [
+      card("ESP32", estadoEsp32(e), [
         ["Com MAC cadastrado", e.comMac],
         ["Online", e.online],
         ["Offline inesperado", e.offlineInesperado, e.offlineInesperado > 0 ? "aviso" : ""],
@@ -85,13 +120,13 @@ const Monitoramento = (() => {
         ["OTA com falha", e.otaComFalha, e.otaComFalha > 0 ? "alerta" : ""],
         ["Quedas (24 h)", e.offlineUlt24h],
       ]),
-      card("Credenciais de dispositivo", [
+      card("Credenciais de dispositivo", estadoCredenciais(c), [
         ["Provisionadas", c.comCredencial ?? "—"],
         ["Só MAC", c.somenteMac ?? "—", (c.somenteMac || 0) > 0 && c.obrigatorio ? "alerta" : ""],
         ["Revogadas", c.revogadas ?? "—"],
         ["Exigência global", c.obrigatorio ? "ligada" : "desligada"],
       ]),
-      card("Falhas desde a inicialização", [
+      card("Falhas desde a inicialização", estadoFalhas(fc), [
         ["Comandos", fc.comandoFalha || 0, (fc.comandoFalha || 0) > 0 ? "aviso" : ""],
         ["Telemetria", fc.telemetriaFalha || 0, (fc.telemetriaFalha || 0) > 0 ? "aviso" : ""],
         ["OTA", fc.otaFalha || 0, (fc.otaFalha || 0) > 0 ? "aviso" : ""],
@@ -101,7 +136,17 @@ const Monitoramento = (() => {
       ]),
     ];
 
-    document.getElementById("monGrid").innerHTML = grid.join("");
+    const gridEl = document.getElementById("monGrid");
+    gridEl.innerHTML = grid.join("");
+    gridEl.setAttribute("aria-busy", "false");
+  }
+
+  function skeleton() {
+    const gridEl = document.getElementById("monGrid");
+    gridEl.setAttribute("aria-busy", "true");
+    gridEl.innerHTML = Array.from({ length: 7 })
+      .map(() => `<div class="card mon-card mon-card-skeleton" aria-hidden="true"><span class="mon-skel-line"></span><span class="mon-skel-line"></span><span class="mon-skel-line"></span></div>`)
+      .join("");
   }
 
   async function carregar() {
@@ -110,12 +155,17 @@ const Monitoramento = (() => {
       if (!resp || !resp.ok) throw new Error("resposta inválida");
       document.getElementById("monErro").classList.add("hidden");
       render(resp.monitoramento);
+      carregado = true;
     } catch (e) {
       document.getElementById("monErro").classList.remove("hidden");
+      document.getElementById("monGrid").setAttribute("aria-busy", "false");
+      if (!carregado) document.getElementById("monGrid").innerHTML = "";
     }
   }
 
   async function aoAbrir() {
+    if (typeof state !== "undefined" && !state.isSuperAdmin) return;
+    if (!carregado) skeleton();
     await carregar();
     if (!intervalo) intervalo = setInterval(carregar, 20000);
   }
@@ -125,6 +175,14 @@ const Monitoramento = (() => {
       clearInterval(intervalo);
       intervalo = null;
     }
+  }
+
+  const retryBtn = document.getElementById("monRetryBtn");
+  if (retryBtn) {
+    retryBtn.addEventListener("click", () => {
+      if (!carregado) skeleton();
+      carregar();
+    });
   }
 
   return { aoAbrir, aoFechar };

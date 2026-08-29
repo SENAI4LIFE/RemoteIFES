@@ -1,8 +1,10 @@
 const Floorplan = {
-  create(rootEl, tabsEl, { onSelect, fitToWidth = true, minScale = null, enableZoom = false } = {}) {
+  create(rootEl, tabsEl, { onSelect, onSectionChange, fitToWidth = true, minScale = null, enableZoom = false } = {}) {
+    const LEGIVEL_MIN = 0.28;
     const instancia = {
       root: rootEl,
       onSelect: onSelect || null,
+      onSectionChange: onSectionChange || null,
       fitEnabled: fitToWidth,
       minScale,
       enableZoom,
@@ -16,6 +18,7 @@ const Floorplan = {
           el.classList.toggle("hidden", el.dataset.fpSection !== sectionId);
         });
         this.fitToWidth();
+        if (this.onSectionChange) this.onSectionChange(sectionId);
       },
 
       fitToWidth() {
@@ -41,16 +44,26 @@ const Floorplan = {
         const availableHeight = wrap.clientHeight;
         if (!availableWidth || !availableHeight) return;
 
-        let baseScale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
-        if (baseScale > 1) baseScale = 1;
-        if (this.minScale && baseScale < this.minScale) baseScale = this.minScale;
-        if (!baseScale || Number.isNaN(baseScale)) baseScale = 1;
+        let fitScale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
+        if (fitScale > 1) fitScale = 1;
+        if (this.minScale && fitScale < this.minScale) fitScale = this.minScale;
+        if (!fitScale || Number.isNaN(fitScale)) fitScale = 1;
 
-        const scale = Math.max(0.5, Math.min(3, baseScale * this.zoomMultiplier));
+        const semZoom = this.zoomMultiplier <= 1.0001;
+        let scale;
+        if (semZoom) {
+          scale = fitScale >= LEGIVEL_MIN ? fitScale : LEGIVEL_MIN;
+        } else {
+          scale = Math.min(3, Math.max(LEGIVEL_MIN, fitScale * this.zoomMultiplier));
+        }
+
         plan.style.transform = `scale(${scale})`;
         plan.style.transformOrigin = this.zoomOrigin ? `${this.zoomOrigin.x}px ${this.zoomOrigin.y}px` : "top left";
 
-        if (this.zoomMultiplier <= 1.0001) {
+        const cabeNaLargura = naturalWidth * scale <= availableWidth + 1;
+        const cabeNaAltura = naturalHeight * scale <= availableHeight + 1;
+
+        if (semZoom && cabeNaLargura && cabeNaAltura) {
           plan.style.marginLeft = `${Math.max(0, (availableWidth - naturalWidth * scale) / 2)}px`;
           plan.style.marginTop = `${Math.max(0, (availableHeight - naturalHeight * scale) / 2)}px`;
           wrap.classList.remove("fp-zoomed");
@@ -60,6 +73,10 @@ const Floorplan = {
           plan.style.marginLeft = "0px";
           plan.style.marginTop = "0px";
           wrap.classList.add("fp-zoomed");
+          if (semZoom) {
+            wrap.scrollLeft = 0;
+            wrap.scrollTop = 0;
+          }
         }
       },
 

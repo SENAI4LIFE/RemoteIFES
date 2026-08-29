@@ -69,5 +69,14 @@ const Grade = {
   },
 };
 
-gradeSalaSelect.addEventListener("change", () => Grade.renderizar());
-gradeDataInput.addEventListener("change", () => Grade.renderizar());
+function _gradeSync() {
+  if (typeof Router !== "undefined") Router.sync();
+}
+gradeSalaSelect.addEventListener("change", () => {
+  Grade.renderizar();
+  _gradeSync();
+});
+gradeDataInput.addEventListener("change", () => {
+  Grade.renderizar();
+  _gradeSync();
+});
