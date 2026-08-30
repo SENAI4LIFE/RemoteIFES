@@ -1,19 +1,13 @@
 const crypto = require("crypto");
 const fs = require("fs");
-const { test, expect, API_URL, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
-
-async function publicar(request) {
-  const resp = await request.post(`${API_URL}/__e2e/publicar-apk`);
-  expect(resp.ok(), "harness publicou o APK de release").toBe(true);
-  return resp.json();
-}
+const { test, expect, API_URL, injetarSessao, semRolagemHorizontal, publicarApkFixture, despublicarApkFixture } = require("../harness/fixtures");
 
 test.afterEach(async ({ request }) => {
-  await request.post(`${API_URL}/__e2e/despublicar-apk`);
+  await despublicarApkFixture(request);
 });
 
 test("o APK publicado é anunciado com versão, tamanho, SHA-256 e botão de download", async ({ page, context, request }) => {
-  const meta = await publicar(request);
+  const meta = await publicarApkFixture(request);
   await injetarSessao(context, "user");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/#/aplicativo");
@@ -37,7 +31,7 @@ test("o APK publicado é anunciado com versão, tamanho, SHA-256 e botão de dow
 });
 
 test("baixar o APK publicado confirma a integridade pelo SHA-256 exibido", async ({ page, context, request }) => {
-  const meta = await publicar(request);
+  const meta = await publicarApkFixture(request);
   await injetarSessao(context, "user");
   await page.goto("/#/aplicativo");
   const baixar = page.locator(".mobile-app-download-btn");
@@ -57,7 +51,7 @@ test("baixar o APK publicado confirma a integridade pelo SHA-256 exibido", async
 });
 
 test("um APK adulterado em trânsito é recusado pela verificação de integridade no cliente", async ({ page, context, request }) => {
-  await publicar(request);
+  await publicarApkFixture(request);
   await injetarSessao(context, "user");
   await page.goto("/#/aplicativo");
   const baixar = page.locator(".mobile-app-download-btn");
@@ -83,7 +77,7 @@ test("um APK adulterado em trânsito é recusado pela verificação de integrida
 });
 
 test("o endpoint de download entrega exatamente os bytes cujo hash é anunciado", async ({ request, tokens }) => {
-  const meta = await publicar(request);
+  const meta = await publicarApkFixture(request);
   const info = await request.get(`${API_URL}/mobile-app/info`, {
     headers: { Authorization: `Bearer ${tokens.user}` },
   });

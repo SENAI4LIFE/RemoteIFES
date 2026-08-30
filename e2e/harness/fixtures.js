@@ -107,6 +107,25 @@ async function semRolagemHorizontal(page) {
   });
 }
 
+async function publicarApkFixture(request) {
+  const resp = await request.post(`${API_URL}/__e2e/publicar-apk`);
+  if (!resp.ok()) {
+    throw new Error(`/__e2e/publicar-apk falhou (HTTP ${resp.status()}): ${await resp.text()}`);
+  }
+  const corpo = await resp.json();
+  if (!corpo || corpo.ok !== true) {
+    throw new Error(`/__e2e/publicar-apk não confirmou a publicação: ${JSON.stringify(corpo)}`);
+  }
+  return corpo;
+}
+
+async function despublicarApkFixture(request) {
+  const resp = await request.post(`${API_URL}/__e2e/despublicar-apk`);
+  if (!resp.ok()) {
+    throw new Error(`/__e2e/despublicar-apk falhou (HTTP ${resp.status()})`);
+  }
+}
+
 async function irParaSala(page, sala, andar = "1") {
   await page.locator('.tab-btn[data-tab="salas"]').click();
   await expect(page.locator("#screen-simple")).toBeVisible();
@@ -134,4 +153,6 @@ module.exports = {
   injetarSessao,
   semRolagemHorizontal,
   irParaSala,
+  publicarApkFixture,
+  despublicarApkFixture,
 };
