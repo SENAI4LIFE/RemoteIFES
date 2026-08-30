@@ -92,7 +92,8 @@ function listarUsuariosAtivos() {
   });
 }
 
-function listarHistoricoSessoes({ data } = {}) {
+function listarHistoricoSessoes({ data, limite = 500 } = {}) {
+  const max = Number.isInteger(limite) && limite > 0 && limite <= 2000 ? limite : 500;
   let query = `
     SELECT u.usuario, u.nome, s.login, s.logout
     FROM sessoes s
@@ -104,7 +105,8 @@ function listarHistoricoSessoes({ data } = {}) {
     query += " AND date(s.login) = ?";
     params.push(data);
   }
-  query += " ORDER BY s.login DESC";
+  query += " ORDER BY s.login DESC LIMIT ?";
+  params.push(max);
   const linhas = db.prepare(query).all(...params);
 
   return linhas.map((l) => {

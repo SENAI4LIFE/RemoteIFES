@@ -165,6 +165,19 @@ function criarSchema() {
     CREATE INDEX IF NOT EXISTS idx_relatos_status ON relatos(status);
     CREATE INDEX IF NOT EXISTS idx_relatos_usuario ON relatos(usuarioId);
     CREATE INDEX IF NOT EXISTS idx_relatos_criado ON relatos(criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_relatos_status_atualizado ON relatos(status, atualizadoEm);
+
+    CREATE INDEX IF NOT EXISTS idx_comandos_log_criado ON comandos_log(criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_esp_eventos_criado ON esp_eventos(criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_esp_eventos_status_criado ON esp_eventos(status, criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_esp_acessos_criado ON esp_acessos(criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_notificacoes_lida_criado ON notificacoes(lida, criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_notificacoes_tipo_sala_criado ON notificacoes(tipo, sala, criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_sessoes_login ON sessoes(login);
+    CREATE INDEX IF NOT EXISTS idx_sessoes_logout ON sessoes(logout);
+    CREATE INDEX IF NOT EXISTS idx_ag_execucoes_executado ON agendamentos_execucoes(executadoEm);
+    CREATE INDEX IF NOT EXISTS idx_ag_execucoes_ag_tipo_data ON agendamentos_execucoes(agendamentoId, tipo, dataExecucao);
+    CREATE INDEX IF NOT EXISTS idx_agendamentos_usuario_ativo ON agendamentos(usuarioId, ativo);
 
   `);
 
@@ -182,6 +195,7 @@ function migrarColunasUsuarios() {
     db.exec(`ALTER TABLE usuarios ADD COLUMN nivel INTEGER NOT NULL DEFAULT 1`);
     db.exec(`UPDATE usuarios SET nivel = 2 WHERE isAdmin = 1`);
   }
+  renomearContaPadraoSuperadmin();
   if (colunas.includes("senha")) {
     try {
       db.exec(`ALTER TABLE usuarios DROP COLUMN senha`);
@@ -193,6 +207,17 @@ function migrarColunasUsuarios() {
     try {
       db.exec(`ALTER TABLE usuarios DROP COLUMN podeAgendar`);
     } catch (erro) {}
+  }
+}
+
+function renomearContaPadraoSuperadmin() {
+  const antiga = db.prepare("SELECT id, nome FROM usuarios WHERE usuario = 'admin'").get();
+  if (!antiga) return;
+  const conflito = db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get();
+  if (conflito) return;
+  db.prepare("UPDATE usuarios SET usuario = 'superadmin' WHERE id = ?").run(antiga.id);
+  if (antiga.nome === "Administrador") {
+    db.prepare("UPDATE usuarios SET nome = 'Superadministrador' WHERE id = ?").run(antiga.id);
   }
 }
 

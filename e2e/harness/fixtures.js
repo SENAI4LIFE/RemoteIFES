@@ -6,7 +6,7 @@ const API_URL = process.env.E2E_API_URL || "http://127.0.0.1:8791";
 const ARQUIVO_TOKENS = path.join(__dirname, ".tokens.json");
 
 const USERS = {
-  superadmin: { usuario: "admin", senha: "admin", tipo: "admin" },
+  superadmin: { usuario: "superadmin", senha: "admin", tipo: "admin" },
   admin: { usuario: "e2e_admin", senha: "e2e-admin-pass-123", tipo: "admin" },
   user: { usuario: "e2e_user", senha: "e2e-user-pass-123", tipo: "normal" },
   readonly: { usuario: "e2e_readonly", senha: "e2e-readonly-123", tipo: "normal" },
@@ -103,8 +103,11 @@ async function semRolagemHorizontal(page) {
 }
 
 async function irParaSala(page, sala, andar = "1") {
-  await page.locator("#homeBtn").click();
+  await page.locator('.tab-btn[data-tab="salas"]').click();
   await expect(page.locator("#screen-simple")).toBeVisible();
+  await page.evaluate(() => {
+    if (typeof SimpleWizard !== "undefined" && SimpleWizard.irParaBloco) SimpleWizard.irParaBloco();
+  });
   await expect(page.locator("#simpleStepBloco")).toBeVisible();
   await page.locator(`#simpleGridBloco .simple-tile[data-bloco="${sala.charAt(0)}"]`).click();
   await page.locator(`#simpleGridAndar .simple-tile[data-andar="${andar}"]`).click();

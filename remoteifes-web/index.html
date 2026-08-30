@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=14" />
+  <link rel="stylesheet" href="css/style.css?v=17" />
 </head>
 <body>
 
@@ -67,7 +67,6 @@
             <span id="accountMenuLogin" class="account-menu-login"></span>
             <span id="accountMenuRole" class="account-menu-role"></span>
           </div>
-          <button type="button" class="account-menu-item" role="menuitem" data-account-action="help">Ajuda e manual</button>
           <button type="button" class="account-menu-item" role="menuitem" data-account-action="mobile">Aplicativo móvel</button>
           <button type="button" class="account-menu-item account-menu-logout" role="menuitem" data-account-action="logout">Sair</button>
         </div>
@@ -186,7 +185,49 @@
 
     <div id="mainApp" class="hidden">
 
-      <section id="screen-simple" class="screen tab-content">
+      <section id="screen-inicio" class="screen tab-content">
+        <div class="hub-hero">
+          <div class="hub-hero-texto">
+            <p class="hub-hero-eyebrow">RemoteIFES</p>
+            <h1 id="hubHeroTitulo">Início</h1>
+            <p id="hubHeroSub" class="hub-hero-sub">Controle do ar-condicionado das salas do campus.</p>
+          </div>
+          <div class="hub-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 120 96" width="120" height="96" role="img" focusable="false">
+              <rect x="10" y="34" width="38" height="54" rx="5" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+              <rect x="58" y="20" width="44" height="68" rx="5" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+              <g fill="rgba(255,255,255,0.75)">
+                <rect x="17" y="42" width="8" height="8" rx="1.5"/><rect x="33" y="42" width="8" height="8" rx="1.5"/>
+                <rect x="17" y="58" width="8" height="8" rx="1.5"/><rect x="33" y="58" width="8" height="8" rx="1.5"/>
+                <rect x="17" y="74" width="8" height="8" rx="1.5"/><rect x="33" y="74" width="8" height="8" rx="1.5"/>
+                <rect x="65" y="30" width="9" height="9" rx="1.5"/><rect x="86" y="30" width="9" height="9" rx="1.5"/>
+                <rect x="65" y="48" width="9" height="9" rx="1.5"/><rect x="86" y="48" width="9" height="9" rx="1.5"/>
+                <rect x="65" y="66" width="9" height="9" rx="1.5"/><rect x="86" y="66" width="9" height="9" rx="1.5"/>
+              </g>
+              <path d="M84 8a18 18 0 0 1 24 0" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="3" stroke-linecap="round"/>
+              <path d="M90 14a10 10 0 0 1 12 0" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="3" stroke-linecap="round"/>
+              <circle cx="96" cy="20" r="2.6" fill="#fff"/>
+              <g stroke="#fff" stroke-width="2.4" stroke-linecap="round">
+                <path d="M20 20v14M13 24l14 6M27 24l-14 6"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <div id="hubResumo" class="hub-resumo" hidden></div>
+
+        <section class="hub-secao" aria-labelledby="hubTituloPrincipal">
+          <h2 id="hubTituloPrincipal" class="hub-secao-titulo">Ações principais</h2>
+          <div id="hubGridPrincipal" class="hub-grid" role="list"></div>
+        </section>
+
+        <section id="hubAdminBloco" class="hub-secao" aria-labelledby="hubTituloAdmin" hidden>
+          <h2 id="hubTituloAdmin" class="hub-secao-titulo">Administração</h2>
+          <div id="hubGridAdmin" class="hub-grid hub-grid-compacto" role="list"></div>
+        </section>
+      </section>
+
+      <section id="screen-simple" class="screen hidden tab-content">
         <div class="screen-head">
           <h1 id="simpleScreenTitle">Selecione o bloco</h1>
           <div class="screen-head-links">
@@ -730,6 +771,7 @@
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">ESP32</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Monitoramento</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="relatos"><span class="admin-subtab-icon">🐞</span><span class="admin-subtab-label">Relatos de problemas</span><span id="adminRelatosSubBadge" class="admin-subtab-badge hidden"></span></button>
         </div>
 
         <div class="admin-content">
@@ -816,7 +858,7 @@
 
         <div id="adminSub-monitoramento" class="admin-sub hidden">
           <p class="hint">
-            Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32 — leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta. Visível apenas ao administrador principal.
+            Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32 — leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta. Visível apenas ao superadministrador.
             <button type="button" class="help-icon-btn" data-help="monitoramento" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
           </p>
           <p class="hint"><button type="button" class="link-btn" data-manual="monitoramento">Abrir no manual &rarr;</button></p>
@@ -826,6 +868,17 @@
             <span>Não foi possível carregar o monitoramento.</span>
             <button type="button" id="monRetryBtn" class="btn btn-off">Tentar de novo</button>
           </div>
+        </div>
+
+        <div id="adminSub-relatos" class="admin-sub hidden">
+          <p class="hint">
+            Gerencie os relatos enviados pelos usuários: filtre por situação, abra cada um para revisar, responder, marcar em análise, resolver ou reabrir. Os usuários enviam novos relatos pelo botão de inseto em qualquer tela. Visível apenas ao superadministrador.
+            <button type="button" class="help-icon-btn" data-help="relatos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+          </p>
+          <p class="hint"><button type="button" class="link-btn" data-manual="administracao">Abrir no manual &rarr;</button></p>
+          <div id="adminRelatosFiltros" class="relato-filtros" role="group" aria-label="Filtrar relatos por situação"></div>
+          <ul id="adminRelatosLista" class="relato-lista" aria-live="polite"></ul>
+          <p id="adminRelatosVazio" class="hint relato-vazio hidden">Nenhum relato para este filtro.</p>
         </div>
 
         <div id="adminSub-acessos" class="admin-sub hidden">
@@ -980,8 +1033,8 @@
             <div class="config-list-item superadmin-only hidden" id="cfgCriticoCard">
               <div class="config-list-icon">🔒</div>
               <div class="config-list-content">
-                <div class="config-list-title">Configurações críticas (administrador principal)</div>
-                <p class="config-list-desc">Estas opções alteram o comportamento global do sistema e só podem ser alteradas pelo administrador principal.</p>
+                <div class="config-list-title">Configurações críticas (superadministrador)</div>
+                <p class="config-list-desc">Estas opções alteram o comportamento global do sistema e só podem ser alteradas pelo superadministrador.</p>
                 <div class="config-list-body">
                   <label>Limite de temperatura permitido</label>
                   <div class="two-col">
@@ -1042,6 +1095,7 @@
       </section>
 
       <nav class="tabbar" aria-label="Seções">
+        <button type="button" class="tab-btn" data-tab="inicio" id="inicioTabBtn">Início</button>
         <button type="button" class="tab-btn" data-tab="salas">Salas</button>
         <button type="button" class="tab-btn hidden" data-tab="agenda" id="agendaTabBtn">Agenda</button>
         <button type="button" class="tab-btn hidden" data-tab="grade" id="gradeTabBtn">Grade</button>
@@ -1265,6 +1319,7 @@
   <script src="js/screens/grade.js"></script>
   <script src="js/screens/propriedade.js"></script>
   <script src="js/screens/monitoramento.js"></script>
+  <script src="js/screens/inicio.js"></script>
   <script src="js/screens/admin.js"></script>
   <script src="js/screens/esp32-admin.js"></script>
   <script src="js/screens/manual.js"></script>

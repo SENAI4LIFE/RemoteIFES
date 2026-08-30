@@ -30,7 +30,7 @@ test("o manual esconde as seções de administração de um usuário comum", asy
   await expect(page.locator("#manual-sec-administracao")).toHaveCount(0);
 });
 
-test("o manual mostra as seções de administração ao administrador principal", async ({ page, context }) => {
+test("o manual mostra as seções de administração ao superadministrador", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/ajuda/monitoramento");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -60,6 +60,8 @@ test("\"Ver no app\" leva à tela correspondente e fecha o manual", async ({ pag
 
 test("o ícone de ajuda de uma tela leva à seção do manual", async ({ page, context }) => {
   await abrirApp(page, context, "user");
+  await page.locator('.tab-btn[data-tab="salas"]').click();
+  await expect(page.locator("#screen-simple")).toBeVisible();
   await page.locator('#screen-simple .help-icon-btn').click();
   await expect(page.locator("#helpModal")).toBeVisible();
   await page.locator("#helpModalManualBtn").click();

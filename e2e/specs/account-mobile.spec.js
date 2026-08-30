@@ -15,14 +15,32 @@ test("avatar usa duas iniciais e o menu funciona por teclado", async ({ page, co
   await expect(page.locator("#accountMenuBtn")).toBeFocused();
 });
 
-test("página móvel é autenticada, responsiva e não oferece APK não publicado", async ({ page, context }) => {
+test("página móvel é autenticada, responsiva e não oferece APK não publicado", async ({ page, context, request }) => {
+  await request.post(`${API_URL}/__e2e/despublicar-apk`);
   await injetarSessao(context, "user");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/#/aplicativo");
   await expect(page.locator("#screen-mobile-app")).toBeVisible();
-  await expect(page.locator(".mobile-app-unavailable")).toContainText("não foi publicado");
+  await expect(page.locator(".mobile-app-unavailable")).toContainText("Nenhum APK de produção assinado está publicado");
   await expect(page.locator(".mobile-app-download-btn")).toHaveCount(0);
+  await expect(page.locator(".mobile-app-card.is-recommended h3")).toHaveText("Instalar como PWA");
   expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);
+});
+
+test("o menu da conta não oferece ajuda nem manual, só aplicativo e sair", async ({ page, context }) => {
+  await injetarSessao(context, "user");
+  await page.goto("/");
+  await page.locator("#accountMenuBtn").click();
+  await expect(page.locator("#accountMenu")).toBeVisible();
+  const itens = page.locator("#accountMenu [role=menuitem]");
+  await expect(itens).toHaveCount(2);
+  await expect(itens.nth(0)).toHaveAttribute("data-account-action", "mobile");
+  await expect(itens.nth(1)).toHaveAttribute("data-account-action", "logout");
+  await expect(page.locator("#accountMenu")).not.toContainText("Ajuda");
+  await expect(page.locator("#accountMenu")).not.toContainText("Manual");
+  await page.keyboard.press("Escape");
+  await page.locator("#helpFabToggleBtn").click();
+  await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Manual completo");
 });
 
 test("rota direta do aplicativo não abre sem autenticação", async ({ page }) => {

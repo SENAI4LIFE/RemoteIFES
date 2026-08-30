@@ -6,6 +6,14 @@ remoteifes-cordova/node_modules/
 remoteifes-cordova/www/
 remoteifes-cordova/platforms/
 remoteifes-cordova/plugins/
+remoteifes-cordova/.signing/
+remoteifes-cordova/.env
+remoteifes-cordova/.env.*
+*.keystore
+*.jks
+*.apk
+*.aab
+build.json
 remoteifes-esp32/.pio/
 remoteifes-esp32/.pioenvs/
 remoteifes-esp32/.piolibdeps/

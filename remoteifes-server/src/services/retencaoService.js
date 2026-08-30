@@ -12,13 +12,24 @@ const DIAS_LOGS = normalizarDiasRetencao(process.env.RETENCAO_DIAS_LOGS, 180);
 const DIAS_SESSOES = normalizarDiasRetencao(process.env.RETENCAO_DIAS_SESSOES, 90);
 const DIAS_EXECUCOES = normalizarDiasRetencao(process.env.RETENCAO_DIAS_EXECUCOES, 90);
 const DIAS_DETECCOES = normalizarDiasRetencao(process.env.RETENCAO_DIAS_DETECCOES, 30);
+const DIAS_NOTIFICACOES = normalizarDiasRetencao(process.env.RETENCAO_DIAS_NOTIFICACOES, 365);
+const DIAS_RELATOS_RESOLVIDOS = normalizarDiasRetencao(process.env.RETENCAO_DIAS_RELATOS_RESOLVIDOS, 0);
+const DIAS_AGENDAMENTOS = normalizarDiasRetencao(process.env.RETENCAO_DIAS_AGENDAMENTOS, 90);
 
 const ALVOS = [
   { nome: "comandos_log", sql: `DELETE FROM comandos_log WHERE criadoEm < datetime('now', ?)`, dias: DIAS_LOGS },
   { nome: "esp_eventos", sql: `DELETE FROM esp_eventos WHERE criadoEm < datetime('now', ?)`, dias: DIAS_LOGS },
   { nome: "esp_acessos", sql: `DELETE FROM esp_acessos WHERE criadoEm < datetime('now', ?)`, dias: DIAS_LOGS },
   { nome: "notificacoes", sql: `DELETE FROM notificacoes WHERE lida = 1 AND criadoEm < datetime('now', ?)`, dias: DIAS_LOGS },
+  { nome: "notificacoes_antigas", sql: `DELETE FROM notificacoes WHERE criadoEm < datetime('now', ?)`, dias: DIAS_NOTIFICACOES },
   { nome: "agendamentos_execucoes", sql: `DELETE FROM agendamentos_execucoes WHERE executadoEm < datetime('now', ?)`, dias: DIAS_EXECUCOES },
+  {
+    nome: "agendamentos_execucoes_orfas",
+    sql: `DELETE FROM agendamentos_execucoes
+          WHERE agendamentoId IN (SELECT id FROM agendamentos WHERE data < date('now', ?))`,
+    dias: DIAS_AGENDAMENTOS,
+  },
+  { nome: "agendamentos_passados", sql: `DELETE FROM agendamentos WHERE data < date('now', ?)`, dias: DIAS_AGENDAMENTOS },
   { nome: "sessoes", sql: `DELETE FROM sessoes WHERE logout IS NOT NULL AND logout < datetime('now', ?)`, dias: DIAS_SESSOES },
   {
     nome: "esp_detectados",
@@ -27,6 +38,14 @@ const ALVOS = [
     dias: DIAS_DETECCOES,
   },
 ];
+
+if (DIAS_RELATOS_RESOLVIDOS > 0) {
+  ALVOS.push({
+    nome: "relatos_resolvidos",
+    sql: `DELETE FROM relatos WHERE status = 'resolvido' AND atualizadoEm < datetime('now', ?)`,
+    dias: DIAS_RELATOS_RESOLVIDOS,
+  });
+}
 
 function executarLimpezaRetencao() {
   const resumo = {};

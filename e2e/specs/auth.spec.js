@@ -1,11 +1,13 @@
 const { test, expect } = require("../harness/fixtures");
 
-test("login de usuário comum entra no painel de salas", async ({ appPage, loginComo }) => {
+test("login de usuário comum abre o início (hub)", async ({ appPage, loginComo }) => {
   await loginComo("user");
   await expect(appPage.locator("#mainApp")).toBeVisible();
+  await expect(appPage.locator("#screen-inicio")).toBeVisible();
+  await expect(appPage.locator('.tab-btn[data-tab="inicio"].active')).toBeVisible();
+  await expect(appPage.locator('#hubGridPrincipal .hub-card[data-hub-card="salas"]')).toBeVisible();
   await appPage.locator("#accountMenuBtn").click();
   await expect(appPage.locator("#accountMenuName")).toContainText("Usuário E2E");
-  await expect(appPage.locator("#screen-simple")).toBeVisible();
 });
 
 test("login de administrador mostra o rótulo (admin)", async ({ appPage, loginComo }) => {

@@ -9,6 +9,14 @@ const RELEASE_DIR = path.resolve(process.env.MOBILE_APP_RELEASE_DIR || path.join
 const METADATA = path.join(RELEASE_DIR, "release.json");
 let releaseCache = null;
 
+function origemLoopback(valor) {
+  try {
+    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(valor).hostname.toLowerCase());
+  } catch (erro) {
+    return true;
+  }
+}
+
 function dadosPublicados(req) {
   try {
     const metaStat = fs.statSync(METADATA);
@@ -18,7 +26,9 @@ function dadosPublicados(req) {
     if (!/^[a-f0-9]{64}$/.test(String(meta.sha256 || ""))) return null;
     if (!/^[a-f0-9]{64}$/.test(String(meta.certificateSha256 || ""))) return null;
     if (meta.artifactType !== "release" || meta.signed !== true || meta.debuggable !== false) return null;
+    if (meta.minSdk !== 24 || !Number.isInteger(meta.targetSdk) || meta.targetSdk < 35) return null;
     if (typeof meta.serverOrigin !== "string" || !/^https?:\/\/[^/]+$/.test(meta.serverOrigin)) return null;
+    if (process.env.NODE_ENV !== "test" && origemLoopback(meta.serverOrigin)) return null;
     if (meta.serverOrigin !== `${req.protocol}://${req.get("host")}`) return null;
     const nome = path.basename(String(meta.file || ""));
     if (!nome.toLowerCase().endsWith(".apk")) return null;
@@ -54,6 +64,8 @@ router.get("/mobile-app/info", exigirLogin, (req, res) => {
       sha256: release.sha256,
       certificateSha256: release.certificateSha256,
       tamanho: tamanho(release.tamanhoBytes),
+      minSdk: release.minSdk,
+      targetSdk: release.targetSdk,
       url: "/mobile-app/android",
     } : { disponivel: false },
   });

@@ -28,7 +28,7 @@ function popularSalas() {
 }
 
 function popularAdmin() {
-  const existe = db.prepare("SELECT id FROM usuarios WHERE usuario = ?").get("admin");
+  const existe = db.prepare("SELECT id FROM usuarios WHERE usuario = ?").get("superadmin");
   if (existe) return;
 
   const senhaConfigurada = process.env.SENHA_ADMIN_INICIAL;
@@ -43,10 +43,10 @@ function popularAdmin() {
   const senhaHash = bcrypt.hashSync(senhaInicial, 10);
   db.prepare(`
     INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
-    VALUES ('admin', ?, 'Administrador', 1, 3, 1, 1)
+    VALUES ('superadmin', ?, 'Superadministrador', 1, 3, 1, 1)
   `).run(senhaHash);
 
-  console.log(`Seed: usuário admin criado (usuario: admin / senha: ${senhaInicial}) — troque a senha após o primeiro acesso.`);
+  console.log(`Seed: usuário superadmin criado (usuario: superadmin / senha: ${senhaInicial}) — troque a senha após o primeiro acesso.`);
 }
 
 function popularBanco() {

@@ -10,7 +10,7 @@ const { estaNaJanelaDeLigar } = require("../src/scheduler/schedulerService");
 
 require("../src/app");
 
-const usuario = db.prepare("SELECT id FROM usuarios WHERE usuario = 'admin'").get();
+const usuario = db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get();
 const agendamento = db.prepare(`
   INSERT INTO agendamentos (sala, usuarioId, data, horaInicio, horaFim, temperatura)
   VALUES ('A-103a', ?, '2099-01-01', '08:00', '09:00', 23)

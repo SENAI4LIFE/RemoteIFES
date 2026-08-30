@@ -64,8 +64,8 @@ function authFetch(caminho, token, opcoes = {}) {
 
 async function tokenSuperAdmin() {
   const bcrypt = require("bcryptjs");
-  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'admin'`).run(bcrypt.hashSync("superSenha123", 10));
-  return login("admin", "superSenha123");
+  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'`).run(bcrypt.hashSync("superSenha123", 10));
+  return login("superadmin", "superSenha123");
 }
 
 const socketsAbertos = new Set();

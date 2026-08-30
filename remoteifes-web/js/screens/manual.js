@@ -249,7 +249,7 @@ const Manual = (() => {
     }
     if (semRestaurar) return;
     if (typeof state !== "undefined" && state.usuario && typeof Router !== "undefined") {
-      Router.ir(hashAnterior || "/salas");
+      Router.ir(hashAnterior || "/inicio");
     } else {
       try {
         history.replaceState(null, "", location.pathname + location.search);
@@ -265,7 +265,7 @@ const Manual = (() => {
       const id = document.querySelector("#mainApp .screen.tab-content:not(.hidden)")?.id || "";
       if (id === "screen-admin") {
         const sub = document.querySelector(".admin-subtab-btn.active")?.dataset.sub;
-        return ({ monitoramento: "monitoramento", macs: "esp32-cadastro", config: "operacao-admin", esp32: "esp32-avancado" })[sub] || "administracao";
+        return ({ monitoramento: "monitoramento", macs: "esp32-cadastro", config: "operacao-admin", esp32: "esp32-avancado", relatos: "relatos-gestao" })[sub] || "administracao";
       }
       return ({ "screen-panel": "controlador", "screen-agenda": "agenda-grade", "screen-grade": "agenda-grade", "screen-propriedade": "papeis" })[id] || "selecao-sala";
     })();
