@@ -8,7 +8,6 @@ const RAIZ_SERVIDOR = path.join(__dirname, "..", "..", "remoteifes-server");
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-e2e-"));
 
 const RELEASE_DIR_E2E = path.join(TMP, "mobile-release");
-const FONTE_RELEASE_REAL = path.join(RAIZ_SERVIDOR, "data", "releases", "mobile");
 
 process.env.REMOTEIFES_DB_PATH = path.join(TMP, "e2e.db");
 process.env.NODE_ENV = process.env.NODE_ENV || "test";
@@ -104,50 +103,42 @@ function limparReleaseE2E() {
   }
 }
 
+function gerarReleaseFixture(req) {
+  fs.mkdirSync(RELEASE_DIR_E2E, { recursive: true });
+  limparReleaseE2E();
+  const bytes = Buffer.from(`RemoteIFES-e2e-fixture-1.0.0-10000-${"0".repeat(8192)}`, "utf8");
+  const meta = {
+    file: "RemoteIFES-1.0.0-10000.apk",
+    version: "1.0.0",
+    build: "10000",
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+    certificateSha256: crypto.createHash("sha256").update("remoteifes-e2e-fixture-certificate").digest("hex"),
+    serverOrigin: `${req.protocol}://${req.get("host")}`,
+    artifactType: "release",
+    signed: true,
+    debuggable: false,
+    minSdk: 24,
+    targetSdk: 36,
+    fonte: "harness-fixture",
+  };
+  fs.writeFileSync(path.join(RELEASE_DIR_E2E, meta.file), bytes);
+  fs.writeFileSync(path.join(RELEASE_DIR_E2E, "release.json"), JSON.stringify(meta, null, 2));
+  return { meta, tamanhoBytes: bytes.length };
+}
+
 app.post("/__e2e/publicar-apk", (req, res) => {
   try {
-    fs.mkdirSync(RELEASE_DIR_E2E, { recursive: true });
-    limparReleaseE2E();
-    const serverOrigin = `${req.protocol}://${req.get("host")}`;
-    const metaReal = path.join(FONTE_RELEASE_REAL, "release.json");
-    let meta;
-    let bytes;
-    let fonte;
-    if (fs.existsSync(metaReal)) {
-      const real = JSON.parse(fs.readFileSync(metaReal, "utf8"));
-      bytes = fs.readFileSync(path.join(FONTE_RELEASE_REAL, path.basename(String(real.file || ""))));
-      meta = { ...real, serverOrigin };
-      meta.minSdk = 24;
-      meta.targetSdk = 36;
-      fonte = "artefato-real";
-    } else {
-      bytes = Buffer.from(`RemoteIFES APK de teste do harness E2E ${"-".repeat(4096)}`, "utf8");
-      meta = {
-        file: "RemoteIFES-1.0.0-10000.apk",
-        version: "1.0.0",
-        build: "10000",
-        sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
-        certificateSha256: "e2e00000000000000000000000000000000000000000000000000000000e2e000",
-        serverOrigin,
-        artifactType: "release",
-        signed: true,
-        debuggable: false,
-        minSdk: 24,
-        targetSdk: 36,
-        fonte: "harness-fixture",
-      };
-      fonte = "harness-fixture";
-    }
-    fs.writeFileSync(path.join(RELEASE_DIR_E2E, path.basename(meta.file)), bytes);
-    fs.writeFileSync(path.join(RELEASE_DIR_E2E, "release.json"), JSON.stringify(meta, null, 2));
+    const { meta, tamanhoBytes } = gerarReleaseFixture(req);
     res.json({
       ok: true,
-      fonte,
+      fonte: meta.fonte,
       version: meta.version,
       build: meta.build,
       sha256: meta.sha256,
       certificateSha256: meta.certificateSha256,
-      tamanhoBytes: bytes.length,
+      minSdk: meta.minSdk,
+      targetSdk: meta.targetSdk,
+      tamanhoBytes,
     });
   } catch (erro) {
     res.status(500).json({ ok: false, erro: erro.message });

@@ -1,4 +1,4 @@
-const { test, expect, VIEWPORTS, API_URL, injetarSessao, semRolagemHorizontal, irParaSala } = require("../harness/fixtures");
+const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal, irParaSala, publicarApkFixture, despublicarApkFixture } = require("../harness/fixtures");
 
 async function dentroDaViewport(locator) {
   const box = await locator.boundingBox();
@@ -72,7 +72,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
 
 for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile-landscape", "tablet-compact", "tablet-portrait", "tablet-large"]) {
   test(`a página do aplicativo com APK publicado não vaza da tela (${nome})`, async ({ page, context, request }) => {
-    await request.post(`${API_URL}/__e2e/publicar-apk`);
+    await publicarApkFixture(request);
     try {
       await injetarSessao(context, "user");
       await page.setViewportSize(VIEWPORTS[nome]);
@@ -93,7 +93,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
       expect(medidas.botaoVaza, "botão de download cabe na largura").toBeLessThanOrEqual(1);
       expect(medidas.hashVaza, "o SHA-256 quebra dentro do cartão").toBeLessThanOrEqual(1);
     } finally {
-      await request.post(`${API_URL}/__e2e/despublicar-apk`);
+      await despublicarApkFixture(request);
     }
   });
 }

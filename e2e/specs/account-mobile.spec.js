@@ -111,6 +111,7 @@ test("menu rápido de ajuda expõe todas as ações comuns e fecha com Escape", 
 test("atalhos do menu de ajuda de admin não incluem infraestrutura", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/");
+  await expect(page.locator("#adminTabBtn")).toBeVisible();
   await page.locator("#helpFabToggleBtn").click();
   await expect(page.locator("#helpFabLinks")).toContainText("Administração");
   await expect(page.locator("#helpFabLinks")).not.toContainText("Monitoramento");
@@ -119,6 +120,7 @@ test("atalhos do menu de ajuda de admin não incluem infraestrutura", async ({ p
 test("atalhos do menu de ajuda de superadmin incluem infraestrutura", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/");
+  await expect(page.locator("#adminTabBtn")).toBeVisible();
   await page.locator("#helpFabToggleBtn").click();
   await expect(page.locator("#helpFabLinks")).toContainText("Monitoramento");
   await expect(page.locator("#helpFabLinks")).toContainText("Operação, implantação e manutenção");
