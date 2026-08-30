@@ -6,6 +6,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const WebSocket = require("ws");
 
+const db = require("../src/config/database");
 const app = require("../src/app");
 const statusHub = require("../src/services/statusHub");
 const usuariosService = require("../src/services/usuariosService");
@@ -118,4 +119,41 @@ test("mensagens de observar acima do limite por janela derrubam a conexão", asy
   }
   const codigo = await cliente.fechada();
   assert.equal(codigo, 4008);
+});
+
+test("token invalido no upgrade nao e rebaixado para conexao anonima", async () => {
+  const cliente = criarClienteComFila(["0".repeat(48)]);
+  const codigo = await cliente.fechada();
+  assert.equal(codigo, 4001);
+});
+
+test("logout revoga imediatamente uma conexao WebSocket ja aberta", async () => {
+  const usuario = usuariosService.criar(
+    { usuario: "teste-ws-revogado", senha: "senhaSegura123", nome: "Usuario WS Revogado", podeControlar: true },
+    { nivel: 3 }
+  );
+  const token = tokenService.gerarToken(usuario.id);
+  const cliente = criarClienteComFila([token]);
+  await cliente.aberta();
+  await cliente.proximaMensagem();
+  await cliente.proximaMensagem();
+  tokenService.removerToken(token);
+  cliente.ws.send(JSON.stringify({ tipo: "observar", sala: "A-103a" }));
+  const codigo = await cliente.fechada();
+  assert.equal(codigo, 4001);
+});
+
+test("inatividade expirada revoga a conexão WebSocket autenticada", async () => {
+  const usuario = usuariosService.criar(
+    { usuario: "teste-ws-expirado", senha: "senhaSegura123", nome: "Usuario WS Expirado", podeControlar: true },
+    { nivel: 3 }
+  );
+  const token = tokenService.gerarToken(usuario.id);
+  const cliente = criarClienteComFila([token]);
+  await cliente.aberta();
+  await cliente.proximaMensagem();
+  await cliente.proximaMensagem();
+  db.prepare("UPDATE sessoes SET ultimoUso = datetime('now', '-61 minutes') WHERE usuarioId = ?").run(usuario.id);
+  cliente.ws.send(JSON.stringify({ tipo: "observar", sala: "A-103a" }));
+  assert.equal(await cliente.fechada(), 4001);
 });

@@ -4,6 +4,12 @@ const configuracoesService = require("./configuracoesService");
 const { paraEpochMs } = require("../utils/tempo");
 
 const NIVEL_ADMIN = 2;
+const SESSAO_MAX_HORAS_PADRAO = 12;
+
+function sessaoMaxHoras() {
+  const valor = Number(process.env.SESSAO_MAX_HORAS || SESSAO_MAX_HORAS_PADRAO);
+  return Number.isFinite(valor) && valor > 0 && valor <= 168 ? valor : SESSAO_MAX_HORAS_PADRAO;
+}
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(String(token)).digest("hex");
@@ -15,16 +21,33 @@ function gerarToken(usuarioId) {
   return token;
 }
 
-function validarToken(token) {
+function detalhesSessao(sessao, baseInatividadeMs = Date.now()) {
+  const timeoutInatividadeMinutos = configuracoesService.timeoutEfetivoParaUsuario(sessao.nivel >= NIVEL_ADMIN);
+  const expiraAbsoluta = paraEpochMs(sessao.login) + sessaoMaxHoras() * 3600000;
+  const expiraInatividade = baseInatividadeMs + timeoutInatividadeMinutos * 60000;
+  return {
+    timeoutInatividadeMinutos,
+    sessaoExpiraEm: new Date(Math.min(expiraAbsoluta, expiraInatividade)).toISOString(),
+    servidorAgora: new Date().toISOString(),
+  };
+}
+
+function validarToken(token, { atualizarUso = true } = {}) {
   const tokenHash = hashToken(token);
   const sessao = db.prepare(`
-    SELECT s.token, s.ultimoUso, u.*
+    SELECT s.token, s.login, s.ultimoUso, u.*
     FROM sessoes s
     JOIN usuarios u ON u.id = s.usuarioId
     WHERE s.token = ? AND s.logout IS NULL AND u.ativo = 1
   `).get(tokenHash);
 
   if (!sessao) return null;
+
+  const idadeHoras = (Date.now() - paraEpochMs(sessao.login)) / 3600000;
+  if (idadeHoras > sessaoMaxHoras()) {
+    removerToken(token);
+    return null;
+  }
 
   const timeoutMinutos = configuracoesService.timeoutEfetivoParaUsuario(sessao.nivel >= NIVEL_ADMIN);
   if (timeoutMinutos) {
@@ -35,7 +58,11 @@ function validarToken(token) {
     }
   }
 
-  db.prepare(`UPDATE sessoes SET ultimoUso = datetime('now') WHERE token = ?`).run(tokenHash);
+  const agora = Date.now();
+  if (atualizarUso) {
+    db.prepare(`UPDATE sessoes SET ultimoUso = datetime('now') WHERE token = ?`).run(tokenHash);
+  }
+  Object.assign(sessao, detalhesSessao(sessao, atualizarUso ? agora : paraEpochMs(sessao.ultimoUso)));
   return sessao;
 }
 
@@ -138,4 +165,5 @@ module.exports = {
   listarUsuariosAtivos,
   listarHistoricoSessoes,
   apagarHistoricoSessoes,
+  detalhesSessao,
 };

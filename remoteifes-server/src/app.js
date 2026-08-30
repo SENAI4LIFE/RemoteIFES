@@ -16,6 +16,7 @@ criarSchema();
 popularBanco();
 
 const app = express();
+app.disable("x-powered-by");
 
 const TRUST_PROXY_HOPS = process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : "0";
 app.set("trust proxy", /^\d+$/.test(TRUST_PROXY_HOPS) ? Number(TRUST_PROXY_HOPS) : TRUST_PROXY_HOPS);
@@ -38,7 +39,7 @@ if (SERVIR_FRONTEND && !frontendDisponivel) {
 
 const CSP_API = "default-src 'none'; frame-ancestors 'none'";
 const CSP_APP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; " +
   "base-uri 'none'; object-src 'none'; frame-ancestors 'none'";
 

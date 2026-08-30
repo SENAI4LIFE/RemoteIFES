@@ -131,6 +131,7 @@ int serverPort = 0;
 String tlsModo;
 String deviceId;
 String deviceSecret;
+String apPassword;
 unsigned long lastComandoAceito = 0;
 const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
@@ -171,6 +172,7 @@ void aplicarCredencial(JsonDocument& doc);
 void iniciarOtaOferta(JsonDocument& doc);
 void reportarOtaResultado(bool ok, const String& erro);
 void reportarOtaProgresso(size_t recebido, size_t total);
+bool versaoSemanticaMenor(const String& candidata, const String& atual);
 
 void setup() {
   Serial.begin(115200);
@@ -195,15 +197,22 @@ void setup() {
   irsend.begin();
 
   preferences.begin("remoteifes", false);
+  apPassword = preferences.getString("apPass", "");
+  if (apPassword.length() < 12) {
+    char senhaGerada[17];
+    snprintf(senhaGerada, sizeof(senhaGerada), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
+    apPassword = senhaGerada;
+    preferences.putString("apPass", apPassword);
+  }
   String savedSSID = preferences.isKey("ssid") ? preferences.getString("ssid", "") : "";
   String savedPASS = preferences.isKey("pass") ? preferences.getString("pass", "") : "";
   if (preferences.isKey("sala")) preferences.remove("sala");
   if (preferences.isKey("adminHash")) preferences.remove("adminHash");
-  if (preferences.isKey("apPass")) preferences.remove("apPass");
   salaId = "";
   serverHost = preferences.isKey("host") ? preferences.getString("host", "") : "";
   serverPort = preferences.isKey("porta") ? preferences.getInt("porta", 0) : 0;
-  tlsModo = preferences.isKey("tls") ? preferences.getString("tls", "off") : "off";
+  tlsModo = preferences.isKey("tls") ? preferences.getString("tls", "ca") : "ca";
+  if (tlsModo != "ca") Serial.println("AVISO DE SEGURANCA: transporte sem validacao de certificado foi selecionado explicitamente.");
   deviceId = preferences.isKey("devId") ? preferences.getString("devId", "") : "";
   deviceSecret = preferences.isKey("devSec") ? preferences.getString("devSec", "") : "";
 
@@ -361,6 +370,7 @@ void handleSaveSetup() {
   }
 
   if (newTls != "ca" && newTls != "inseguro" && newTls != "off") newTls = "ca";
+  if (newTls != "ca") Serial.println("AVISO DE SEGURANCA: salvando modo de transporte apenas para desenvolvimento ou LAN confiavel.");
 
   if ((newDevId.length() == 0) != (newDevSec.length() == 0)) {
     server.send(400, "text/plain", "Informe o identificador e o segredo do dispositivo juntos.");
@@ -405,9 +415,10 @@ void iniciarApRecuperacao() {
   WiFi.mode(WIFI_AP_STA);
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-  if (!WiFi.softAP("RemoteIFES-Setup")) return;
+  if (!WiFi.softAP("RemoteIFES-Setup", apPassword.c_str())) return;
   dnsServer.start(53, "*", apIP);
   apRecuperacaoAtivo = true;
+  Serial.println("Senha do portal de recuperacao: " + apPassword);
   Serial.println("Wi-Fi indisponivel por 2 minutos. Portal de recuperacao aberto em 192.168.4.1; tentativas STA continuam.");
 }
 
@@ -424,8 +435,9 @@ void startAPMode() {
 
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-  WiFi.softAP("RemoteIFES-Setup");
-  Serial.println("Ponto de acesso de configuracao 'RemoteIFES-Setup' aberto (sem senha).");
+  WiFi.softAP("RemoteIFES-Setup", apPassword.c_str());
+  Serial.println("Ponto de acesso de configuracao 'RemoteIFES-Setup' aberto.");
+  Serial.println("Senha do ponto de acesso: " + apPassword);
 
   dnsServer.start(53, "*", apIP);
 
@@ -989,6 +1001,10 @@ void iniciarOtaOferta(JsonDocument& doc) {
     reportarOtaResultado(false, "oferta de firmware invalida");
     return;
   }
+  if (versaoSemanticaMenor(versao, FW_VERSAO)) {
+    reportarOtaResultado(false, "downgrade de firmware bloqueado");
+    return;
+  }
 
   const esp_partition_t* destino = esp_ota_get_next_update_partition(NULL);
   if (!destino) {
@@ -1135,4 +1151,14 @@ void iniciarOtaOferta(JsonDocument& doc) {
   reportarOtaResultado(true, "");
   reportComando("ota", "gravado versao=" + versao);
   agendarReinicio(1200);
+}
+
+bool versaoSemanticaMenor(const String& candidata, const String& atual) {
+  unsigned int c1, c2, c3, a1, a2, a3;
+  char extraC, extraA;
+  if (sscanf(candidata.c_str(), "%u.%u.%u%c", &c1, &c2, &c3, &extraC) != 3) return false;
+  if (sscanf(atual.c_str(), "%u.%u.%u%c", &a1, &a2, &a3, &extraA) != 3) return false;
+  if (c1 != a1) return c1 < a1;
+  if (c2 != a2) return c2 < a2;
+  return c3 < a3;
 }

@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   server:
     name: Servidor (API + banco)
@@ -24,7 +27,7 @@ jobs:
       - name: Health check do servidor central
         working-directory: remoteifes-server
         run: |
-          NODE_ENV=development PORTA=8099 REMOTEIFES_DB_PATH="$RUNNER_TEMP/ci-health.db" node server.js &
+          NODE_ENV=development PORTA=8099 REMOTEIFES_DB_PATH="$RUNNER_TEMP/ci-health.db" SENHA_ADMIN_INICIAL="ci-only-strong-password" node server.js &
           SV=$!
           for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:8099/health && break
@@ -94,6 +97,6 @@ jobs:
             ~/.platformio
             remoteifes-esp32/.pio
           key: pio-${{ runner.os }}-${{ hashFiles('remoteifes-esp32/platformio.ini') }}
-      - run: pip install --upgrade platformio
+      - run: pip install platformio==6.1.19
       - run: pio run
         working-directory: remoteifes-esp32

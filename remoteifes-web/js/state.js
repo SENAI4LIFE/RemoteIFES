@@ -3,6 +3,7 @@ const state = {
   nome: null,
   isAdmin: false,
   isSuperAdmin: false,
+  senhaPadraoAtiva: false,
   nivel: 1,
   podeControlar: false,
   temSalaComoProprietario: false,

@@ -113,7 +113,7 @@ fi
 
 echo
 echo "Setup concluído."
-echo "O banco de dados SQLite é criado e populado automaticamente na primeira vez que o servidor iniciar. Em produção, uma senha aleatória do superadministrador é gerada se SENHA_ADMIN_INICIAL não for definida."
+echo "O banco de dados SQLite é criado e populado automaticamente na primeira vez que o servidor iniciar. Sem SENHA_ADMIN_INICIAL, use superadmin/admin e altere a senha pelo aviso exibido no sistema."
 echo "Para iniciar o servidor: npm start"
 echo "Para manter o servidor rodando permanentemente (Raspberry Pi ou qualquer Linux com systemd): sudo bash install-service.sh"
 echo "Esqueceu ou perdeu a senha do superadministrador? npm run reset-admin"
