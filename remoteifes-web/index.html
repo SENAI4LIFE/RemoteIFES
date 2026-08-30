@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="css/style.css?v=17" />
+  <link rel="stylesheet" href="css/style.css?v=18" />
 </head>
 <body>
 
@@ -61,6 +61,8 @@
       </div>
       <div id="accountWrap" class="account-wrap hidden">
         <button type="button" id="accountMenuBtn" class="account-avatar" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu" aria-label="Abrir menu da conta"></button>
+        <span class="account-timer-separator" aria-hidden="true">·</span>
+        <span id="accountSessionTimer" class="account-session-timer" aria-label="Tempo restante da sessão"></span>
         <div id="accountMenu" class="account-menu hidden" role="menu" aria-labelledby="accountMenuBtn">
           <div class="account-menu-identity" role="none">
             <span id="accountMenuName" class="account-menu-name"></span>
@@ -184,6 +186,11 @@
     </section>
 
     <div id="mainApp" class="hidden">
+
+      <aside id="defaultPasswordWarning" class="security-warning hidden" role="status">
+        <span>A conta superadmin ainda usa a senha padrão. Altere-a para proteger a instalação.</span>
+        <button type="button" id="defaultPasswordChangeBtn" class="link-btn">Alterar senha agora</button>
+      </aside>
 
       <section id="screen-inicio" class="screen tab-content">
         <div class="hub-hero">
@@ -998,19 +1005,15 @@
               <div class="config-list-content">
                 <div class="config-list-title">Sessão por inatividade</div>
                 <p class="config-list-desc">
-                  Tempo de inatividade até deslogar automaticamente um usuário
-                  (evita que o app fique aberto e "online" indefinidamente). Deixe em
-                  branco para indefinido: não desloga por tempo. Vale para todos os
-                  usuários.
+                  Tempo sem atividade até encerrar a sessão. Usuários e administradores
+                  podem ter limites distintos; o servidor sempre aplica o prazo.
                 </p>
                 <div class="config-list-body">
-                  <label for="cfgTimeoutInatividade">Tempo de inatividade (minutos)</label>
-                  <input type="number" id="cfgTimeoutInatividade" min="1" placeholder="ex.: 15" />
+                  <label for="cfgTimeoutInatividade">Usuários (minutos)</label>
+                  <input type="number" id="cfgTimeoutInatividade" min="1" value="60" />
 
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="cfgAdminSujeitoTimeout" /> Aplicar este timer também para administradores
-                  </label>
-                  <p class="hint">Desligado por padrão: administradores ficam isentos do timer de inatividade.</p>
+                  <label for="cfgTimeoutInatividadeAdmin">Administradores e superadministrador (minutos)</label>
+                  <input type="number" id="cfgTimeoutInatividadeAdmin" min="1" value="720" />
 
                   <label for="cfgPopupAviso">Aviso antes de deslogar (segundos)</label>
                   <input type="number" id="cfgPopupAviso" min="10" value="60" />
@@ -1326,12 +1329,5 @@
   <script src="js/account-menu.js"></script>
   <script src="js/router.js"></script>
   <script src="js/app.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
-      });
-    }
-  </script>
 </body>
 </html>

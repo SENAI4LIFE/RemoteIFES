@@ -10,7 +10,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-e2e-"));
 const RELEASE_DIR_E2E = path.join(TMP, "mobile-release");
 
 process.env.REMOTEIFES_DB_PATH = path.join(TMP, "e2e.db");
-process.env.NODE_ENV = process.env.NODE_ENV || "test";
+process.env.NODE_ENV = "test";
 process.env.BACKUP_AUTOMATICO = "false";
 process.env.SENHA_ADMIN_INICIAL = "";
 process.env.MOBILE_APP_RELEASE_DIR = RELEASE_DIR_E2E;

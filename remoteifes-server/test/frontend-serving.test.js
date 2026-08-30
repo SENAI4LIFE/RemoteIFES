@@ -1,5 +1,6 @@
 process.env.REMOTEIFES_DB_PATH = ":memory:";
 process.env.NODE_ENV = "production";
+process.env.SENHA_ADMIN_INICIAL = "frontend-test-pass-123";
 process.env.SERVIR_FRONTEND = "true";
 process.env.FRONTEND_DIR = require("path").join(__dirname, "..", "..", "remoteifes-web");
 
@@ -23,9 +24,17 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
+test("a CSP nao permite JavaScript inline", async () => {
+  const resposta = await fetch(baseUrl);
+  const csp = resposta.headers.get("content-security-policy");
+  assert.ok(csp.includes("script-src 'self'"));
+  assert.equal(csp.includes("script-src 'self' 'unsafe-inline'"), false);
+});
+
 test("GET / entrega o index.html do frontend na mesma origem", async () => {
   const resp = await fetch(`${baseUrl}/`);
   assert.equal(resp.status, 200);
+  assert.equal(resp.headers.get("x-powered-by"), null);
   assert.match(resp.headers.get("content-type"), /text\/html/);
   const html = await resp.text();
   assert.match(html, /<title>RemoteIFES<\/title>/);

@@ -2,6 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { DatabaseSync } = require("node:sqlite");
+process.env.NODE_ENV = "test";
 
 const RAIZ_TMP = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-backup-"));
 process.env.REMOTEIFES_DB_PATH = path.join(RAIZ_TMP, "remoteifes.db");

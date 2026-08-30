@@ -1,5 +1,6 @@
 process.env.REMOTEIFES_DB_PATH = ":memory:";
 process.env.NODE_ENV = "production";
+process.env.SENHA_ADMIN_INICIAL = "ws-origin-test-pass-123";
 delete process.env.CORS_ORIGIN;
 
 const http = require("http");

@@ -1,5 +1,4 @@
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
 const db = require("../config/database");
 
 const SALAS_CAMPUS = require("./salasCampus");
@@ -31,22 +30,14 @@ function popularAdmin() {
   const existe = db.prepare("SELECT id FROM usuarios WHERE usuario = ?").get("superadmin");
   if (existe) return;
 
-  const senhaConfigurada = process.env.SENHA_ADMIN_INICIAL;
-  const senhaInicial = senhaConfigurada || (
-    process.env.NODE_ENV === "production"
-      ? crypto.randomBytes(18).toString("base64url")
-      : "admin"
-  );
-  if (process.env.NODE_ENV === "production" && senhaInicial.length < 8) {
-    throw new Error("SENHA_ADMIN_INICIAL deve ter ao menos 8 caracteres em produção");
-  }
+  const senhaConfigurada = String(process.env.SENHA_ADMIN_INICIAL || "").trim();
+  const senhaInicial = senhaConfigurada || "admin";
   const senhaHash = bcrypt.hashSync(senhaInicial, 10);
   db.prepare(`
     INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
     VALUES ('superadmin', ?, 'Superadministrador', 1, 3, 1, 1)
   `).run(senhaHash);
-
-  console.log(`Seed: usuário superadmin criado (usuario: superadmin / senha: ${senhaInicial}) — troque a senha após o primeiro acesso.`);
+  console.log("Seed: usuario superadmin criado.");
 }
 
 function popularBanco() {

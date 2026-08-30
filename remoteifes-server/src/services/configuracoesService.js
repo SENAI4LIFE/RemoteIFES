@@ -5,9 +5,8 @@ const logger = require("../utils/logger");
 const eventos = new EventEmitter();
 
 const PADROES = {
-  timeoutInatividadeMinutos: null,
-  timeoutInatividadeMinutosSugestao: 15,
-  adminSujeitoTimeout: false,
+  timeoutInatividadeMinutos: 60,
+  timeoutInatividadeAdminMinutos: 720,
   popupAvisoSegundos: 60,
   limiarOnlineMinutos: 5,
   temperaturaMinima: 23,
@@ -16,14 +15,12 @@ const PADROES = {
   modoTeste: process.env.NODE_ENV !== "production",
   redesAutorizadas: [],
   modoManutencao: false,
-  espCredenciaisObrigatorias: false,
+  espCredenciaisObrigatorias: process.env.NODE_ENV !== "test",
 };
 
 const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
 
-const CHAVES_NUMERICAS_ANULAVEIS = ["timeoutInatividadeMinutos"];
-const CHAVES_NUMERICAS = ["popupAvisoSegundos", "limiarOnlineMinutos"];
-const CHAVES_BOOLEANAS = ["adminSujeitoTimeout"];
+const CHAVES_NUMERICAS = ["timeoutInatividadeMinutos", "timeoutInatividadeAdminMinutos", "popupAvisoSegundos", "limiarOnlineMinutos"];
 const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
@@ -43,14 +40,24 @@ function obter() {
       logger.warn("configuracao-valor-invalido", { chave, mensagem: erro.message });
     }
   }
-  return { ...PADROES, ...armazenado };
+  const configuracoes = { ...PADROES, ...armazenado };
+  if (!(Number(configuracoes.timeoutInatividadeMinutos) > 0)) {
+    configuracoes.timeoutInatividadeMinutos = PADROES.timeoutInatividadeMinutos;
+  }
+  if (!Object.prototype.hasOwnProperty.call(armazenado, "timeoutInatividadeAdminMinutos")
+    && armazenado.adminSujeitoTimeout === true
+    && Number(armazenado.timeoutInatividadeMinutos) > 0) {
+    configuracoes.timeoutInatividadeAdminMinutos = Number(armazenado.timeoutInatividadeMinutos);
+  }
+  if (!(Number(configuracoes.timeoutInatividadeAdminMinutos) > 0)) {
+    configuracoes.timeoutInatividadeAdminMinutos = PADROES.timeoutInatividadeAdminMinutos;
+  }
+  return configuracoes;
 }
 
 function timeoutEfetivoParaUsuario(isAdmin) {
   const cfg = obter();
-  if (!cfg.timeoutInatividadeMinutos) return null;
-  if (isAdmin && !cfg.adminSujeitoTimeout) return null;
-  return cfg.timeoutInatividadeMinutos;
+  return isAdmin ? cfg.timeoutInatividadeAdminMinutos : cfg.timeoutInatividadeMinutos;
 }
 
 function limitesTemperatura() {
@@ -90,19 +97,6 @@ function validarEAtualizar(patch, requisitante) {
   const atual = obter();
   const proximo = { ...atual };
 
-  if (Object.prototype.hasOwnProperty.call(patch, "timeoutInatividadeMinutos")) {
-    const v = patch.timeoutInatividadeMinutos;
-    if (v === null || v === "" || v === undefined) {
-      proximo.timeoutInatividadeMinutos = null;
-    } else {
-      const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0) {
-        throw new Error("tempo de inatividade deve ser um número de minutos maior que zero (ou vazio para indefinido)");
-      }
-      proximo.timeoutInatividadeMinutos = n;
-    }
-  }
-
   for (const chave of CHAVES_NUMERICAS) {
     if (Object.prototype.hasOwnProperty.call(patch, chave)) {
       const n = Number(patch[chave]);
@@ -110,12 +104,6 @@ function validarEAtualizar(patch, requisitante) {
         throw new Error(`${chave} deve ser um número maior que zero`);
       }
       proximo[chave] = n;
-    }
-  }
-
-  for (const chave of CHAVES_BOOLEANAS) {
-    if (Object.prototype.hasOwnProperty.call(patch, chave)) {
-      proximo[chave] = !!patch[chave];
     }
   }
 
@@ -164,9 +152,7 @@ function validarEAtualizar(patch, requisitante) {
   );
 
   const chavesArmazenaveis = [
-    ...CHAVES_NUMERICAS_ANULAVEIS,
     ...CHAVES_NUMERICAS,
-    ...CHAVES_BOOLEANAS,
     ...CHAVES_BOOLEANAS_CRITICAS,
     ...CHAVES_NUMERICAS_CRITICAS,
     ...CHAVES_LISTA_CRITICAS,

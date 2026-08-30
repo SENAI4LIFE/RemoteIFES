@@ -2,6 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
+process.env.NODE_ENV = "test";
 
 const RAIZ_TMP = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-ota-"));
 process.env.REMOTEIFES_DB_PATH = ":memory:";
@@ -118,6 +119,17 @@ test("publicarFirmware valida o byte mágico ESP e grava um manifesto verificáv
   fs.writeFileSync(semMagic, Buffer.alloc(128 * 1024, 1));
   assert.throws(() => otaService.publicarFirmware({ origem: semMagic, versao: "9.9.9" }), /0xE9/);
   assert.throws(() => otaService.publicarFirmware({ origem: binPath, versao: "espaço inválido" }), /versão inválida/);
+});
+
+test("manifesto OTA adulterado nao atravessa o diretorio de firmware", () => {
+  const caminhoManifesto = path.join(otaService.DIR_FIRMWARE, "manifesto.json");
+  const original = fs.readFileSync(caminhoManifesto);
+  try {
+    fs.writeFileSync(caminhoManifesto, JSON.stringify({ ...manifesto, arquivo: "../firmware-fake.bin" }));
+    assert.equal(otaService.lerManifesto(), null);
+  } finally {
+    fs.writeFileSync(caminhoManifesto, original);
+  }
 });
 
 test("GET /admin/esp32/firmware expõe o manifesto ao superadmin", async () => {

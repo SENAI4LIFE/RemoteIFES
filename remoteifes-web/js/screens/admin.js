@@ -414,9 +414,8 @@ const Admin = {
     const resp = await Api.obterConfiguracoes();
     if (!resp.ok) return;
     const cfg = resp.configuracoes;
-    document.getElementById("cfgTimeoutInatividade").value = cfg.timeoutInatividadeMinutos ?? "";
-    document.getElementById("cfgTimeoutInatividade").placeholder = `indefinido (sugestão: ${cfg.timeoutInatividadeMinutosSugestao} min)`;
-    document.getElementById("cfgAdminSujeitoTimeout").checked = !!cfg.adminSujeitoTimeout;
+    document.getElementById("cfgTimeoutInatividade").value = cfg.timeoutInatividadeMinutos;
+    document.getElementById("cfgTimeoutInatividadeAdmin").value = cfg.timeoutInatividadeAdminMinutos;
     document.getElementById("cfgPopupAviso").value = cfg.popupAvisoSegundos;
     document.getElementById("cfgLimiarOnline").value = cfg.limiarOnlineMinutos;
     document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
@@ -914,10 +913,9 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
   const savedEl = document.getElementById("configSavedHint");
   savedEl.classList.add("hidden");
 
-  const timeoutVal = document.getElementById("cfgTimeoutInatividade").value.trim();
   const dados = {
-    timeoutInatividadeMinutos: timeoutVal === "" ? null : Number(timeoutVal),
-    adminSujeitoTimeout: document.getElementById("cfgAdminSujeitoTimeout").checked,
+    timeoutInatividadeMinutos: Number(document.getElementById("cfgTimeoutInatividade").value),
+    timeoutInatividadeAdminMinutos: Number(document.getElementById("cfgTimeoutInatividadeAdmin").value),
     popupAvisoSegundos: Number(document.getElementById("cfgPopupAviso").value),
     limiarOnlineMinutos: Number(document.getElementById("cfgLimiarOnline").value),
     temperaturaMinima: Number(document.getElementById("cfgTemperaturaMinima").value),
@@ -940,10 +938,8 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
 
   savedEl.classList.remove("hidden");
 
-  const timeoutEfetivo = state.isAdmin && !resp.configuracoes.adminSujeitoTimeout
-    ? null
-    : resp.configuracoes.timeoutInatividadeMinutos;
-  IdleTimer.iniciar(timeoutEfetivo, resp.configuracoes.popupAvisoSegundos);
+  const ping = await Api.ping();
+  if (ping.ok) IdleTimer.sincronizar(ping);
 });
 
 document.getElementById("sessoesFiltroData").addEventListener("change", (e) => {

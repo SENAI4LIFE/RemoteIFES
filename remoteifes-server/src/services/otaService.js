@@ -26,6 +26,21 @@ const CAMINHO_DOWNLOAD = "/dispositivo/firmware";
 
 const estados = new Map();
 
+function versaoSemantica(valor) {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(valor || ""));
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function compararVersoes(a, b) {
+  const va = versaoSemantica(a);
+  const vb = versaoSemantica(b);
+  if (!va || !vb) return null;
+  for (let i = 0; i < 3; i += 1) {
+    if (va[i] !== vb[i]) return va[i] < vb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
 function persistirEstados() {
   try {
     dirFirmware();
@@ -79,11 +94,33 @@ function lerManifesto() {
     logger.warn("ota-manifesto-invalido", { mensagem: erro.message });
     return null;
   }
-  const arquivoBin = path.join(DIR_FIRMWARE, manifesto.arquivo || "");
-  if (!manifesto.arquivo || !fs.existsSync(arquivoBin)) return null;
-  const bytes = fs.statSync(arquivoBin).size;
+  if (!manifesto || typeof manifesto !== "object" || Array.isArray(manifesto)) return null;
+  if (typeof manifesto.versao !== "string" || !RE_VERSAO.test(manifesto.versao)) return null;
+  if (typeof manifesto.arquivo !== "string" || path.basename(manifesto.arquivo) !== manifesto.arquivo) return null;
+  if (manifesto.arquivo !== `firmware-${manifesto.versao}.bin`) return null;
+  if (!Number.isInteger(manifesto.tamanho) || manifesto.tamanho < TAMANHO_MIN_BIN || manifesto.tamanho > TAMANHO_MAX_BIN) return null;
+  if (typeof manifesto.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(manifesto.sha256)) return null;
+  const raiz = path.resolve(DIR_FIRMWARE);
+  const arquivoBin = path.resolve(raiz, manifesto.arquivo);
+  if (!arquivoBin.startsWith(`${raiz}${path.sep}`) || !fs.existsSync(arquivoBin)) return null;
+  const stat = fs.statSync(arquivoBin);
+  if (!stat.isFile()) return null;
+  const bytes = stat.size;
   if (bytes !== manifesto.tamanho) {
     logger.warn("ota-manifesto-tamanho-divergente", { esperado: manifesto.tamanho, real: bytes });
+    return null;
+  }
+  const fd = fs.openSync(arquivoBin, "r");
+  try {
+    const cabecalho = Buffer.alloc(1);
+    fs.readSync(fd, cabecalho, 0, 1, 0);
+    if (cabecalho[0] !== MAGIC_IMAGEM_ESP) return null;
+  } finally {
+    fs.closeSync(fd);
+  }
+  const hashReal = sha256Arquivo(arquivoBin);
+  if (!crypto.timingSafeEqual(Buffer.from(hashReal, "hex"), Buffer.from(manifesto.sha256, "hex"))) {
+    logger.warn("ota-manifesto-hash-divergente", { arquivo: manifesto.arquivo });
     return null;
   }
   return manifesto;
@@ -213,6 +250,9 @@ function ofertar(sala) {
   }
 
   const versaoDispositivo = deviceHub.estadoPublico(sala).fwVersao || null;
+  if (compararVersoes(manifesto.versao, versaoDispositivo) === -1) {
+    throw erroConflito(`downgrade bloqueado: dispositivo em ${versaoDispositivo}, firmware publicado ${manifesto.versao}`);
+  }
   definirEstado(sala, {
     fase: "ofertado",
     versao: manifesto.versao,

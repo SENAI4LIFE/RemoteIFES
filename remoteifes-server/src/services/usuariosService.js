@@ -73,6 +73,13 @@ function buscarPorId(id) {
   return db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(id);
 }
 
+function senhaPadraoAtiva(usuario) {
+  return !!usuario
+    && usuario.usuario === "superadmin"
+    && usuario.nivel === NIVEL_SUPERADMIN
+    && bcrypt.compareSync("admin", usuario.senhaHash);
+}
+
 function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
   const loginLimpo = limparLogin(usuario);
   const nomeLimpo = limparNome(nome);
@@ -187,6 +194,9 @@ function trocarSenha(id, novaSenha, requisitante) {
   if (!usuario) throw new Error("usuário não encontrado");
   exigirPermissaoSobreAlvo(usuario, requisitante);
   validarSenha(novaSenha);
+  if (usuario.nivel === NIVEL_SUPERADMIN && novaSenha === "admin") {
+    throw new Error("escolha uma senha diferente da credencial padrao");
+  }
   const senhaHash = bcrypt.hashSync(novaSenha, 10);
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE id = ?`).run(senhaHash, id);
   removerSessoesDoUsuario(id);
@@ -221,9 +231,11 @@ module.exports = {
   NIVEL_SUPERADMIN,
   SENHA_MIN,
   SENHA_MAX,
+  LOGIN_MAX,
   listar,
   buscarPorUsuario,
   buscarPorId,
+  senhaPadraoAtiva,
   criar,
   atualizarPermissoes,
   trocarNome,
