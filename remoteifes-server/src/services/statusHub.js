@@ -102,7 +102,22 @@ function enviarStatusServidor(ws) {
   enviar(ws, statusServidorPayload(ws.usuario));
 }
 
+function revalidarCliente(ws, atualizarUso = false) {
+  if (!ws.token) return true;
+  const usuario = validarToken(ws.token, { atualizarUso });
+  if (!usuario) {
+    ws.usuario = null;
+    salaObservadaPorCliente.delete(ws);
+    dispositivosObservadosPorCliente.delete(ws);
+    ws.close(4001, "sessao invalida ou expirada");
+    return false;
+  }
+  ws.usuario = usuario;
+  return true;
+}
+
 function notificarCliente(ws) {
+  if (!revalidarCliente(ws)) return;
   enviarStatusServidor(ws);
   if (!ws.usuario) return;
   enviar(ws, { tipo: "salas", salas: montarSalas(ws.usuario) });
@@ -122,7 +137,9 @@ function notificarTodos() {
 
 function notificarStatusServidorParaTodos() {
   if (!wss) return;
-  wss.clients.forEach((ws) => enviar(ws, statusServidorPayload(ws.usuario)));
+  wss.clients.forEach((ws) => {
+    if (revalidarCliente(ws)) enviar(ws, statusServidorPayload(ws.usuario));
+  });
 }
 
 function selecionarSubprotocolo(protocolos) {
@@ -160,6 +177,11 @@ function iniciar(server) {
 
     const token = ws.protocol || null;
     const usuario = token ? validarToken(token) : null;
+    if (token && !usuario) {
+      ws.close(4001, "sessao invalida ou expirada");
+      return;
+    }
+    ws.token = token;
     ws.usuario = usuario || null;
     ws.isAlive = true;
     ws.on("pong", () => {
@@ -172,6 +194,7 @@ function iniciar(server) {
     });
 
     ws.on("message", (dados) => {
+      if (!revalidarCliente(ws, true)) return;
       if (limiteDeMensagensExcedido(ws)) {
         ws.close(4008, "limite de mensagens excedido");
         return;
@@ -278,7 +301,8 @@ function fecharConexoes(codigo = 1001, motivo = "conexão encerrada para teste")
 function notificarObservadoresDeDispositivo(sala, payload) {
   if (!wss) return;
   wss.clients.forEach((ws) => {
-    if (dispositivosObservadosPorCliente.get(ws)?.has(sala)) enviar(ws, payload);
+    if (!revalidarCliente(ws)) return;
+    if (ws.usuario?.nivel === NIVEL_SUPERADMIN && dispositivosObservadosPorCliente.get(ws)?.has(sala)) enviar(ws, payload);
   });
 }
 

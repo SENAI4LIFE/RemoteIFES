@@ -23,6 +23,7 @@ function exigirLogin(req, res, next) {
 
   req.usuario = usuario;
   req.token = token;
+  res.set("Cache-Control", "private, no-store");
   next();
 }
 

@@ -193,7 +193,9 @@ body {
 }
 
 .user-tag { font-size: calc(13px * var(--a11y-font-scale)); opacity: 0.9; }
-.account-wrap { position: relative; }
+.account-wrap { position: relative; display: flex; align-items: center; gap: 5px; color: #fff; white-space: nowrap; }
+.account-timer-separator { opacity: .7; }
+.account-session-timer { min-width: 4.4em; font-size: calc(12px * var(--a11y-font-scale)); font-variant-numeric: tabular-nums; font-weight: 700; }
 .account-avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); background: #fff; color: var(--ifes-green-dark); font-weight: 800; letter-spacing: .02em; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.16); }
 .account-avatar:hover { transform: translateY(-1px); }
 .account-avatar:focus-visible { outline: 3px solid #ffd65a; outline-offset: 2px; }
@@ -205,6 +207,15 @@ body {
 .account-menu-item { display: block; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 10px 11px; border-radius: var(--radius-sm); cursor: pointer; font: inherit; }
 .account-menu-item:hover, .account-menu-item:focus-visible { background: var(--ifes-green-soft); outline: none; }
 .account-menu-logout { color: var(--danger); border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-sm) var(--radius-sm); margin-top: 4px; }
+.security-warning { position: sticky; top: 68px; z-index: 500; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 16px; background: #fff3cd; color: #5c4300; border-bottom: 1px solid #d9b94e; font-size: calc(13px * var(--a11y-font-scale)); }
+.security-warning .link-btn { color: #684b00; font-weight: 800; text-decoration: underline; }
+
+@media (max-width: 520px) {
+  .account-wrap { gap: 3px; }
+  .account-avatar { width: 34px; height: 34px; font-size: 12px; }
+  .account-session-timer { min-width: 3.8em; font-size: 11px; }
+  .security-warning { position: static; align-items: flex-start; flex-direction: column; gap: 4px; padding: 9px 12px; }
+}
 
 .notif-wrap {
   position: relative;

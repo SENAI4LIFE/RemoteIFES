@@ -30,7 +30,7 @@ async function login(usuario, senha) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ usuario, senha }),
   });
-  return { status: resp.status, corpo: await resp.json() };
+  return { status: resp.status, cacheControl: resp.headers.get("cache-control"), corpo: await resp.json() };
 }
 
 function authFetch(path, token, opcoes = {}) {
@@ -56,11 +56,13 @@ test("ciclo de sessão: login emite token, /me confirma, logout invalida", async
 
   const entrada = await login("sessao-user", "senhaSegura123");
   assert.equal(entrada.status, 200);
+  assert.equal(entrada.cacheControl, "no-store");
   const token = entrada.corpo.token;
   assert.ok(token && typeof token === "string");
 
   const me = await authFetch("/me", token);
   assert.equal(me.status, 200);
+  assert.equal(me.headers.get("cache-control"), "private, no-store");
   assert.equal((await me.json()).usuario, "sessao-user");
 
   const saiu = await authFetch("/logout", token, { method: "POST" });
@@ -170,4 +172,37 @@ test("notificações de dispositivo: usuário comum recebe 403; qualquer admin l
 
   const contagemDepois = await (await authFetch("/admin/notificacoes/contagem", tokenAdmin)).json();
   assert.equal(contagemDepois.naoLidas, contagemAntes.naoLidas - 1);
+});
+
+test("superadmin com senha padrão recebe aviso, mantém acesso e remove o aviso após a troca", async () => {
+  db.prepare(`
+    UPDATE usuarios
+    SET senhaHash = ?
+    WHERE usuario = 'superadmin'
+  `).run(bcrypt.hashSync("admin", 10));
+
+  const entrada = await login("superadmin", "admin");
+  assert.equal(entrada.status, 200);
+  assert.equal(entrada.corpo.senhaPadraoAtiva, true);
+  assert.equal(entrada.corpo.timeoutInatividadeMinutos, 720);
+  assert.ok(Date.parse(entrada.corpo.sessaoExpiraEm) > Date.now());
+
+  const permitido = await authFetch("/admin/usuarios", entrada.corpo.token);
+  assert.equal(permitido.status, 200);
+
+  const me = await authFetch("/me", entrada.corpo.token);
+  assert.equal(me.status, 200);
+  assert.equal((await me.json()).senhaPadraoAtiva, true);
+
+  const alterada = await authFetch("/me/senha", entrada.corpo.token, {
+    method: "PATCH",
+    body: JSON.stringify({ novaSenha: "novaSenhaSegura123" }),
+  });
+  assert.equal(alterada.status, 200);
+  assert.equal((await authFetch("/me", entrada.corpo.token)).status, 401);
+
+  const novaEntrada = await login("superadmin", "novaSenhaSegura123");
+  assert.equal(novaEntrada.status, 200);
+  assert.equal(novaEntrada.corpo.senhaPadraoAtiva, false);
+  assert.equal((await authFetch("/admin/usuarios", novaEntrada.corpo.token)).status, 200);
 });

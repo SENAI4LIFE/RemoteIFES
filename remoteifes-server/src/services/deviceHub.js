@@ -6,6 +6,8 @@ const monitoramentoService = require("./monitoramentoService");
 const PING_MS = 15 * 1000;
 const MAX_CAPTURAS_ARMAZENADAS = 20;
 const MAX_PAYLOAD_BYTES = 256 * 1024;
+const MAX_MENSAGENS_JANELA = 120;
+const JANELA_MENSAGENS_MS = 10 * 1000;
 const MODOS_VALIDOS = new Set(["operation", "config_idle", "config_clone"]);
 
 const conexoes = new Map();
@@ -256,6 +258,8 @@ function iniciar(server) {
     };
     conexoes.set(sala, entrada);
     ws.isAlive = true;
+    ws.janelaMensagensInicio = Date.now();
+    ws.mensagensNaJanela = 0;
     ws.on("pong", () => {
       ws.isAlive = true;
     });
@@ -272,6 +276,16 @@ function iniciar(server) {
     if (comandoInicial) ws.send(JSON.stringify(comandoInicial));
 
     ws.on("message", (dados) => {
+      const agoraMs = Date.now();
+      if (agoraMs - ws.janelaMensagensInicio >= JANELA_MENSAGENS_MS) {
+        ws.janelaMensagensInicio = agoraMs;
+        ws.mensagensNaJanela = 0;
+      }
+      ws.mensagensNaJanela += 1;
+      if (ws.mensagensNaJanela > MAX_MENSAGENS_JANELA) {
+        ws.close(4008, "limite de mensagens excedido");
+        return;
+      }
       const salaAtual = salasService.buscar(sala);
       if (!vinculoValido(salaAtual, entrada)) {
         ws.close(4001, "vínculo do dispositivo alterado");

@@ -17,6 +17,12 @@ function gravarTokenArmazenado(valor) {
 
 let authToken = lerTokenArmazenado();
 
+window.addEventListener("storage", (evento) => {
+  if (evento.key !== CHAVE_TOKEN || evento.newValue || !authToken) return;
+  authToken = null;
+  window.dispatchEvent(new CustomEvent("app:sessao-expirada", { detail: { outraAba: true } }));
+});
+
 function headersComToken(extra = {}) {
   return authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
 }
@@ -52,6 +58,11 @@ const Api = {
 
   obterToken() {
     return authToken;
+  },
+
+  limparSessaoLocal() {
+    authToken = null;
+    gravarTokenArmazenado(null);
   },
 
   async me() {
@@ -101,6 +112,14 @@ const Api = {
     } catch (err) {}
     authToken = null;
     gravarTokenArmazenado(null);
+  },
+
+  async trocarMinhaSenha(novaSenha) {
+    return chamar("/me/senha", {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ novaSenha }),
+    });
   },
 
   async listarSalas({ bloco, andar } = {}) {

@@ -11,6 +11,7 @@ require("../src/db/seed").popularBanco();
 const salasService = require("../src/services/salasService");
 const usuariosService = require("../src/services/usuariosService");
 const tokenService = require("../src/services/tokenService");
+const configuracoesService = require("../src/services/configuracoesService");
 
 function novaSala(sala) {
   db.prepare(
@@ -117,4 +118,55 @@ test("achado #16 — o token de sessão não é armazenado em texto puro no banc
 
   tokenService.removerToken(token);
   assert.equal(tokenService.validarToken(token), null, "após logout, o token não deve mais validar");
+});
+
+test("sessao expira pelo limite absoluto mesmo que tenha uso recente", () => {
+  const usuario = usuariosService.criar(
+    { usuario: "teste-sessao-absoluta", senha: "senhaSegura123", nome: "Sessao Absoluta", podeControlar: true },
+    { nivel: 3 }
+  );
+  const token = tokenService.gerarToken(usuario.id);
+  db.prepare(`UPDATE sessoes SET login = datetime('now', '-13 hours'), ultimoUso = datetime('now') WHERE usuarioId = ?`).run(usuario.id);
+  assert.equal(tokenService.validarToken(token), null);
+});
+
+test("prazos padrão são 60 minutos para usuário e 720 para admin e superadmin", () => {
+  assert.equal(configuracoesService.timeoutEfetivoParaUsuario(false), 60);
+  assert.equal(configuracoesService.timeoutEfetivoParaUsuario(true), 720);
+  const usuario = usuariosService.criar(
+    { usuario: "teste-timeout-user", senha: "senhaSegura123", nome: "Timeout User", podeControlar: true },
+    { nivel: 3 }
+  );
+  const admin = usuariosService.criar(
+    { usuario: "teste-timeout-admin", senha: "senhaSegura123", nome: "Timeout Admin", isAdmin: true },
+    { nivel: 3 }
+  );
+  const tokenUsuario = tokenService.gerarToken(usuario.id);
+  const tokenAdmin = tokenService.gerarToken(admin.id);
+  db.prepare("UPDATE sessoes SET ultimoUso = datetime('now', '-61 minutes') WHERE usuarioId = ?").run(usuario.id);
+  db.prepare("UPDATE sessoes SET ultimoUso = datetime('now', '-61 minutes') WHERE usuarioId = ?").run(admin.id);
+  assert.equal(tokenService.validarToken(tokenUsuario, { atualizarUso: false }), null);
+  assert.ok(tokenService.validarToken(tokenAdmin, { atualizarUso: false }));
+});
+
+test("uso autenticado renova o prazo retornado pelo servidor", () => {
+  const usuario = usuariosService.criar(
+    { usuario: "teste-timeout-renova", senha: "senhaSegura123", nome: "Timeout Renova", podeControlar: true },
+    { nivel: 3 }
+  );
+  const token = tokenService.gerarToken(usuario.id);
+  db.prepare("UPDATE sessoes SET ultimoUso = datetime('now', '-30 minutes') WHERE usuarioId = ?").run(usuario.id);
+  const antes = tokenService.validarToken(token, { atualizarUso: false });
+  const depois = tokenService.validarToken(token);
+  assert.ok(Date.parse(depois.sessaoExpiraEm) - Date.parse(antes.sessaoExpiraEm) > 25 * 60000);
+});
+
+test("configuração legada de timeout migra sem perder a escolha administrativa", () => {
+  const gravar = db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor) VALUES (?, ?)");
+  gravar.run("timeoutInatividadeMinutos", JSON.stringify(90));
+  gravar.run("adminSujeitoTimeout", JSON.stringify(true));
+  db.prepare("DELETE FROM configuracoes WHERE chave = 'timeoutInatividadeAdminMinutos'").run();
+  assert.equal(configuracoesService.timeoutEfetivoParaUsuario(false), 90);
+  assert.equal(configuracoesService.timeoutEfetivoParaUsuario(true), 90);
+  db.prepare("DELETE FROM configuracoes WHERE chave IN ('timeoutInatividadeMinutos', 'adminSujeitoTimeout')").run();
 });

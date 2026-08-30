@@ -83,6 +83,7 @@ function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
   state.nivel = resp.nivel;
   state.podeControlar = resp.podeControlar;
   state.temSalaComoProprietario = !!resp.temSalaComoProprietario;
+  state.senhaPadraoAtiva = !!resp.senhaPadraoAtiva && !!resp.isSuperAdmin;
 
   document.getElementById("userTag").textContent = resp.isAdmin ? `${resp.nome} (admin)` : resp.nome;
   document.getElementById("adminTabBtn").classList.toggle("hidden", !resp.isAdmin);
@@ -94,13 +95,14 @@ function aplicarSessaoLogada(resp, { reconectarStatus = true } = {}) {
     el.classList.toggle("hidden", !resp.isSuperAdmin);
   });
   if (typeof AccountMenu !== "undefined") AccountMenu.atualizar();
+  document.getElementById("defaultPasswordWarning").classList.toggle("hidden", !state.senhaPadraoAtiva);
 
   mostrarTelaAcesso("mainApp");
 
   if (resp.isAdmin) Notificacoes.iniciar();
   Relatos.aoLogar();
 
-  IdleTimer.iniciar(resp.timeoutInatividadeMinutos, resp.popupAvisoSegundos);
+  IdleTimer.iniciar(resp.sessaoExpiraEm, resp.popupAvisoSegundos, resp.servidorAgora);
   RTStatus.conectar();
   if (reconectarStatus && typeof ServerStatus !== "undefined") ServerStatus.reconectarComTokenAtual();
 }
@@ -171,6 +173,7 @@ function realizarLogout({ manterTela = false } = {}) {
   state.nivel = 1;
   state.podeControlar = false;
   state.temSalaComoProprietario = false;
+  state.senhaPadraoAtiva = false;
   state.bloco = null;
   state.andar = null;
   state.salaAtual = null;
@@ -182,6 +185,7 @@ function realizarLogout({ manterTela = false } = {}) {
   document.getElementById("gradeTabBtn").classList.add("hidden");
   document.getElementById("propriedadeTabBtn").classList.add("hidden");
   document.querySelectorAll(".superadmin-only").forEach((el) => el.classList.add("hidden"));
+  document.getElementById("defaultPasswordWarning").classList.add("hidden");
   if (typeof AccountMenu !== "undefined") AccountMenu.atualizar();
   document.getElementById("mainApp").classList.add("hidden");
   document.getElementById("loginForm").reset();
@@ -209,4 +213,20 @@ window.addEventListener("app:sessao-expirada", () => {
   Api.logout();
   realizarLogout({ manterTela: true });
   Toast.erro("sua sessão expirou por inatividade: entre novamente");
+});
+
+document.getElementById("defaultPasswordChangeBtn").addEventListener("click", async () => {
+  if (!state.isSuperAdmin || !state.senhaPadraoAtiva) return;
+  const alterada = await Dialog.senha({
+    titulo: "Alterar senha do superadministrador",
+    descricao: "Defina uma senha com pelo menos 8 caracteres. As sessões atuais serão encerradas.",
+    aoConfirmar: async (novaSenha) => {
+      const resposta = await Api.trocarMinhaSenha(novaSenha);
+      return resposta && resposta.ok ? { ok: true } : { ok: false, erro: resposta?.erro || "não foi possível trocar a senha" };
+    },
+  });
+  if (!alterada) return;
+  Api.limparSessaoLocal();
+  realizarLogout({ manterTela: true });
+  Toast.aviso("Senha atualizada. Entre novamente com a nova senha.");
 });

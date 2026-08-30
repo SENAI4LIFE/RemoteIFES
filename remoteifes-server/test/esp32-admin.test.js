@@ -265,3 +265,20 @@ test("alterar o vínculo MAC encerra a conexão antiga", async () => {
   await fechado;
   assert.equal(deviceHub.dispositivoConectado("teste-mac-revogado"), false);
 });
+
+test("flood de mensagens do dispositivo encerra a conexao", async () => {
+  novaSalaComMac("teste-esp32-flood", "AA:BB:CC:DD:EE:08");
+  const ws = new WebSocket(baseWsDispositivoUrl, {
+    headers: {
+      "x-device-sala": "teste-esp32-flood",
+      "x-device-mac": "AA:BB:CC:DD:EE:08",
+    },
+  });
+  await new Promise((resolve, reject) => {
+    ws.once("open", resolve);
+    ws.once("error", reject);
+  });
+  const fechado = new Promise((resolve) => ws.once("close", (codigo) => resolve(codigo)));
+  for (let i = 0; i < 121; i += 1) ws.send(JSON.stringify({ tipo: "info", fw: "1.0.0" }));
+  assert.equal(await fechado, 4008);
+});
