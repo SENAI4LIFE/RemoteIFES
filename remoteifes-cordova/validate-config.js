@@ -75,6 +75,7 @@ console.log("sync-www.js — geração de www/");
 try {
   execFileSync("node", [path.join(RAIZ, "sync-www.js")], { stdio: "pipe" });
   checar(fs.existsSync(path.join(WWW, "index.html")), "www/index.html gerado");
+  checar(fs.readFileSync(path.join(WWW, "index.html"), "utf8").includes('<script src="cordova.js"></script>'), "www/index.html carrega cordova.js");
   checar(fs.existsSync(path.join(WWW, "js", "config.js")), "www/js/config.js gerado");
   checar(!fs.existsSync(path.join(WWW, "sw.js")), "www/ não inclui sw.js (service worker é só da PWA)");
   checar(!fs.existsSync(path.join(WWW, "manifest.webmanifest")), "www/ não inclui manifest.webmanifest");

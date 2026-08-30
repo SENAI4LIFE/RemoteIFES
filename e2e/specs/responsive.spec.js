@@ -42,7 +42,7 @@ for (const [nome, tamanho] of Object.entries(VIEWPORTS)) {
   });
 }
 
-for (const nome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook"]) {
+for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile-landscape", "tablet-compact", "tablet-portrait", "tablet-large", "notebook"]) {
   test(`planta baixa do cadastro de ESP32 não vaza da tela (${nome})`, async ({ page, context }) => {
     await injetarSessao(context, "superadmin");
     await page.setViewportSize(VIEWPORTS[nome]);
@@ -70,7 +70,7 @@ for (const nome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "n
   });
 }
 
-for (const nome of ["mobile-portrait", "mobile-landscape", "tablet-portrait"]) {
+for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile-landscape", "tablet-compact", "tablet-portrait", "tablet-large"]) {
   test(`a página do aplicativo com APK publicado não vaza da tela (${nome})`, async ({ page, context, request }) => {
     await request.post(`${API_URL}/__e2e/publicar-apk`);
     try {

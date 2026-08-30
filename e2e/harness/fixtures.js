@@ -16,11 +16,16 @@ const USERS = {
 const SALA_ONLINE = "A-108";
 
 const VIEWPORTS = {
+  "mobile-compact": { width: 360, height: 800 },
   "mobile-portrait": { width: 390, height: 844 },
+  "mobile-large": { width: 414, height: 896 },
   "mobile-landscape": { width: 844, height: 390 },
+  "tablet-compact": { width: 768, height: 1024 },
   "tablet-portrait": { width: 820, height: 1180 },
+  "tablet-large": { width: 834, height: 1194 },
   "tablet-landscape": { width: 1180, height: 820 },
   notebook: { width: 1366, height: 768 },
+  "desktop-compact": { width: 1440, height: 900 },
   desktop: { width: 1920, height: 1080 },
   "wide-desktop": { width: 2560, height: 1440 },
 };

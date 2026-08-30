@@ -21,4 +21,9 @@ function copyDir(src, dest) {
 
 fs.rmSync(DEST, { recursive: true, force: true });
 copyDir(SRC, DEST);
+const indexPath = path.join(DEST, "index.html");
+const index = fs.readFileSync(indexPath, "utf8");
+const marcador = '  <script src="js/state.js"></script>';
+if (!index.includes(marcador)) throw new Error("marcador de scripts não encontrado no index.html");
+fs.writeFileSync(indexPath, index.replace(marcador, `  <script src="cordova.js"></script>\n${marcador}`));
 console.log(`remoteifes-web sincronizado em ${DEST}`);
