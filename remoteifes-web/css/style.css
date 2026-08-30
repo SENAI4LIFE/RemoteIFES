@@ -1421,6 +1421,7 @@ button.btn:disabled {
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  min-height: 24px;
 }
 .home-btn img {
   height: clamp(22px, 6vw, 32px);
