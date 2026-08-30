@@ -139,7 +139,7 @@ test("comando sem autenticação é rejeitado com 401", async () => {
 });
 
 test("notificações de dispositivo: usuário comum recebe 403; qualquer admin lê e marca como lida", async () => {
-  db.prepare("UPDATE usuarios SET senhaHash = ? WHERE usuario = 'admin'").run(bcrypt.hashSync("superSenha123", 10));
+  db.prepare("UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'").run(bcrypt.hashSync("superSenha123", 10));
 
   usuariosService.criar(
     { usuario: "admin-nivel-2", senha: "senhaSegura123", nome: "Admin Nível 2", isAdmin: true },

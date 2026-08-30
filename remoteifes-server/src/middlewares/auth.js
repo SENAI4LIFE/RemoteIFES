@@ -37,7 +37,7 @@ const NIVEL_SUPERADMIN = 3;
 
 function exigirSuperAdmin(req, res, next) {
   if (!req.usuario || req.usuario.nivel !== NIVEL_SUPERADMIN) {
-    return res.status(403).json({ ok: false, erro: "apenas o administrador principal" });
+    return res.status(403).json({ ok: false, erro: "apenas o superadministrador" });
   }
   next();
 }

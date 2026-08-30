@@ -13,7 +13,7 @@ const ManualContent = (() => {
 
   const diagramas = {
     navegacao: svg("520 218", box(10, 12, 130, "Portal de acesso") + box(200, 12, 140, "Login") + box(390, 12, 120, "Aplicação") + arrow(140, 29, 200, 29) + arrow(340, 29, 390, 29) + box(200, 92, 140, "Salas e recursos") + arrow(450, 46, 300, 92) + `<text class="md-cap" x="10" y="198">O endereço guarda a tela atual sem guardar credenciais.</text>`),
-    papeis: svg("520 250", box(10, 10, 200, "Usuário") + box(310, 10, 200, "Usuário com controle") + box(10, 90, 200, "Proprietário de sala") + box(310, 90, 200, "Administrador") + box(160, 170, 200, "Administrador principal") + arrow(210, 27, 310, 27) + arrow(110, 44, 110, 90) + arrow(410, 124, 300, 170)),
+    papeis: svg("520 250", box(10, 10, 200, "Usuário") + box(310, 10, 200, "Usuário com controle") + box(10, 90, 200, "Proprietário de sala") + box(310, 90, 200, "Administrador") + box(160, 170, 200, "Superadministrador") + arrow(210, 27, 310, 27) + arrow(110, 44, 110, 90) + arrow(410, 124, 300, 170)),
     selecaoSala: svg("520 145", box(10, 20, 130, "Cards") + box(195, 20, 130, "Lista") + box(380, 20, 130, "Planta baixa") + `<text class="md-cap" x="20" y="100">As três opções levam ao mesmo painel da sala.</text>`),
     controlador: svg("520 172", box(20, 20, 120, "Desligado") + box(210, 20, 120, "Ligado") + box(400, 20, 100, "Turbo") + arrowBi(140, 37, 210, 37) + arrowBi(330, 37, 400, 37) + `<text class="md-cap" x="20" y="98">Conexão, reserva e permissão determinam quais comandos estão disponíveis.</text>`),
   };
@@ -29,7 +29,7 @@ const ManualContent = (() => {
       { t: "lista", itens: ["A barra inferior mostra apenas as seções permitidas.", "Os ícones de ajuda abrem a orientação da página e a seção correspondente do manual.", "Atualizar ou usar voltar/avançar preserva a rota permitida; uma URL nunca concede nova permissão."] },
     ] },
     { id: "papeis", titulo: "Papéis e permissões", papel: "todos", corpo: [
-      { t: "tabela", cabecalho: ["Papel", "Acesso"], linhas: [["Usuário", "salas, controle autorizado, relatos e uso móvel"], ["Proprietário de sala", "gestão de acesso somente das salas atribuídas"], ["Administrador", "operação administrativa permitida pelo servidor"], ["Administrador principal", "administração avançada e infraestrutura"]] },
+      { t: "tabela", cabecalho: ["Papel", "Acesso"], linhas: [["Usuário", "salas, controle autorizado, relatos e uso móvel"], ["Proprietário de sala", "gestão de acesso somente das salas atribuídas"], ["Administrador", "operação administrativa permitida pelo servidor"], ["Superadministrador", "administração avançada e infraestrutura"]] },
       { t: "diagrama", chave: "papeis" },
       { t: "nota", texto: "O servidor verifica a autorização em cada operação; ocultar controles é apenas uma proteção adicional da interface." },
     ] },
@@ -47,7 +47,7 @@ const ManualContent = (() => {
       { t: "nota", texto: "Nunca inclua senhas, tokens, segredos ou credenciais de dispositivo." },
     ] },
     { id: "pwa-mobile", titulo: "PWA, celular e aplicativo", papel: "todos", verNoApp: "/aplicativo", corpo: [
-      { t: "lista", itens: ["Abra Aplicativo móvel no menu da conta para consultar a versão e as opções compatíveis.", "Em navegadores compatíveis, instale a PWA ou adicione-a à tela inicial.", "O aplicativo Cordova usa o mesmo frontend e exige acesso ao servidor para autenticação, estado e comandos."] },
+      { t: "lista", itens: ["Abra Aplicativo móvel no menu da conta ou na ajuda para ver a versão, o tamanho e o SHA-256 do APK.", "Quando há um APK publicado, use Baixar APK: o navegador confere o SHA-256 do arquivo antes de salvar e cancela o download se não bater.", "Em navegadores compatíveis, instale a PWA ou adicione-a à tela inicial — é a opção indicada quando não há APK publicado.", "Na primeira execução do aplicativo, informe o endereço do servidor da sua instalação quando ele for solicitado.", "O aplicativo Cordova usa o mesmo frontend e exige acesso ao servidor para autenticação, estado e comandos."] },
     ] },
     { id: "solucao-problemas", titulo: "Solução de problemas", papel: "todos", corpo: [
       { t: "tabela", cabecalho: ["Sintoma", "Verificação"], linhas: [["Sem conexão", "rede do aparelho e endereço do servidor"], ["Sessão encerrada", "entre novamente; a sessão pode ter expirado"], ["Controle bloqueado", "permissão, reserva ativa e conexão"], ["Aplicativo não conecta", "origem do servidor e disponibilidade na rede local"]] },

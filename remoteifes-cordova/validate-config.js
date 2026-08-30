@@ -37,6 +37,8 @@ checar(releaseScript.includes("fs.mkdtempSync") && releaseScript.includes("fs.rm
 const publishScript = fs.readFileSync(path.join(RAIZ, "publish-android-release.js"), "utf8");
 checar(publishScript.includes('"verify", "--verbose"') && publishScript.includes('"manifest", "debuggable"'), "publicação verifica assinatura e rejeita APK depurável");
 checar(publishScript.includes('"manifest", "version-name"') && publishScript.includes('"manifest", "version-code"'), "publicação confere versão e build no manifesto do APK");
+checar(publishScript.includes('"manifest", "min-sdk"') && publishScript.includes('"manifest", "target-sdk"'), "publicação confere minSdk e targetSdk no manifesto do APK");
+checar(publishScript.includes('localhost') && releaseScript.includes('localhost'), "build e publicação recusam origem loopback para APK de produção");
 
 console.log("harden-config.js — reversibilidade");
 try {

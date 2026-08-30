@@ -1,4 +1,4 @@
-const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal, irParaSala } = require("../harness/fixtures");
+const { test, expect, VIEWPORTS, API_URL, injetarSessao, semRolagemHorizontal, irParaSala } = require("../harness/fixtures");
 
 async function dentroDaViewport(locator) {
   const box = await locator.boundingBox();
@@ -67,6 +67,34 @@ for (const nome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "n
     });
     expect(medida, "planta baixa renderizada").not.toBeNull();
     expect(medida.vazaDireita <= 1 || medida.rolavel, `planta cabe ou rola (${JSON.stringify(medida)})`).toBe(true);
+  });
+}
+
+for (const nome of ["mobile-portrait", "mobile-landscape", "tablet-portrait"]) {
+  test(`a página do aplicativo com APK publicado não vaza da tela (${nome})`, async ({ page, context, request }) => {
+    await request.post(`${API_URL}/__e2e/publicar-apk`);
+    try {
+      await injetarSessao(context, "user");
+      await page.setViewportSize(VIEWPORTS[nome]);
+      await page.goto("/#/aplicativo");
+      const baixar = page.locator(".mobile-app-download-btn");
+      await expect(baixar).toBeVisible({ timeout: 20_000 });
+      expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);
+
+      const medidas = await page.evaluate(() => {
+        const vw = document.documentElement.clientWidth;
+        const btn = document.querySelector(".mobile-app-download-btn").getBoundingClientRect();
+        const hash = document.querySelector(".mobile-app-hash");
+        return {
+          botaoVaza: Math.round(btn.x + btn.width - vw),
+          hashVaza: hash.scrollWidth - hash.clientWidth,
+        };
+      });
+      expect(medidas.botaoVaza, "botão de download cabe na largura").toBeLessThanOrEqual(1);
+      expect(medidas.hashVaza, "o SHA-256 quebra dentro do cartão").toBeLessThanOrEqual(1);
+    } finally {
+      await request.post(`${API_URL}/__e2e/despublicar-apk`);
+    }
   });
 }
 

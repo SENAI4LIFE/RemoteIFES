@@ -4,7 +4,10 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 function executar(comando, argumentos) {
-  const resultado = spawnSync(comando, argumentos, { encoding: "utf8" });
+  const ehBat = process.platform === "win32" && /\.(bat|cmd)$/i.test(comando);
+  const resultado = ehBat
+    ? spawnSync("cmd.exe", ["/c", comando, ...argumentos], { encoding: "utf8" })
+    : spawnSync(comando, argumentos, { encoding: "utf8" });
   if (resultado.error || resultado.status !== 0) {
     const detalhe = resultado.stderr || resultado.stdout || (resultado.error && resultado.error.message) || `${comando} terminou com código ${resultado.status}`;
     throw new Error(String(detalhe).trim());
@@ -24,6 +27,8 @@ const version = exigir("REMOTEIFES_ANDROID_VERSION");
 const build = exigir("REMOTEIFES_ANDROID_BUILD");
 const serverUrl = new URL(exigir("REMOTEIFES_SERVER_URL"));
 if (!["http:", "https:"].includes(serverUrl.protocol)) throw new Error("REMOTEIFES_SERVER_URL deve usar HTTP ou HTTPS.");
+if (serverUrl.username || serverUrl.password || serverUrl.pathname !== "/" || serverUrl.search || serverUrl.hash) throw new Error("REMOTEIFES_SERVER_URL deve conter somente a origem do servidor.");
+if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(serverUrl.hostname.toLowerCase())) throw new Error("Um APK de produção não pode ser publicado para localhost: no aparelho, localhost é o próprio Android.");
 const serverOrigin = serverUrl.origin;
 if (!/^\d+\.\d+\.\d+$/.test(version) || !/^\d+$/.test(build)) throw new Error("Versão ou build inválido.");
 if (!fs.existsSync(apk) || !fs.statSync(apk).isFile() || !apk.toLowerCase().endsWith(".apk")) throw new Error("APK ausente ou inválido.");
@@ -38,6 +43,10 @@ if (!cert || cert[1].length !== 64) throw new Error("Não foi possível confirma
 if (executar(apkanalyzer, ["manifest", "debuggable", apk]).toLowerCase() !== "false") throw new Error("O APK está marcado como depurável.");
 if (executar(apkanalyzer, ["manifest", "version-name", apk]) !== version) throw new Error("A versão informada não corresponde ao AndroidManifest do APK.");
 if (executar(apkanalyzer, ["manifest", "version-code", apk]) !== build) throw new Error("O build informado não corresponde ao AndroidManifest do APK.");
+const minSdk = executar(apkanalyzer, ["manifest", "min-sdk", apk]);
+const targetSdk = executar(apkanalyzer, ["manifest", "target-sdk", apk]);
+if (minSdk !== "24") throw new Error("O APK deve declarar minSdk 24.");
+if (!/^\d+$/.test(targetSdk) || Number(targetSdk) < 35) throw new Error("O APK deve declarar targetSdk 35 ou posterior.");
 
 const bytes = fs.readFileSync(apk);
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
@@ -57,6 +66,8 @@ fs.writeFileSync(metaTemporario, JSON.stringify({
   artifactType: "release",
   signed: true,
   debuggable: false,
+  minSdk: Number(minSdk),
+  targetSdk: Number(targetSdk),
 }, null, 2));
 fs.renameSync(metaTemporario, path.join(destino, "release.json"));
 console.log(`${nome} verificado e publicado em ${destino}`);

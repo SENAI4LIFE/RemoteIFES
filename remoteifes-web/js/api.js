@@ -402,6 +402,13 @@ const Api = {
     });
   },
 
+  async excluirRelato(id) {
+    return chamar(`/superadmin/relatos/${id}`, {
+      method: "DELETE",
+      headers: headersComToken(),
+    });
+  },
+
   async listarNotificacoes() {
     return chamar("/admin/notificacoes", { headers: headersComToken() });
   },

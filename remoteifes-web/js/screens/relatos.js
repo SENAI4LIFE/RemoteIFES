@@ -1,7 +1,6 @@
 const Relatos = {
   _badgeIntervalId: null,
   _painelAberto: false,
-  _filtroStatus: "",
 
   CATEGORIAS: [
     { valor: "ar_condicionado", rotulo: "Ar-condicionado" },
@@ -89,6 +88,9 @@ const Relatos = {
       badge.classList.add("hidden");
       if (botao) botao.setAttribute("aria-label", "Relatar um problema");
     }
+    if (typeof Admin !== "undefined" && typeof Admin.atualizarBadgeRelatos === "function") {
+      Admin.atualizarBadgeRelatos(novos);
+    }
   },
 
   alternarPainel() {
@@ -120,27 +122,30 @@ const Relatos = {
 
     const cabecalho = `
       <div class="relatos-panel-head">
-        <h3>Relatos de problemas</h3>
+        <h3>Relatar um problema</h3>
         <button type="button" class="link-btn relatos-fechar-btn" aria-label="Fechar painel de relatos">&times;</button>
       </div>
       <button type="button" class="btn btn-on btn-block relatos-novo-btn">Relatar um problema</button>`;
 
-    if (state.isSuperAdmin) {
-      painel.innerHTML = cabecalho + `
-        <div class="relato-filtros" role="group" aria-label="Filtrar relatos por status"></div>
-        <ul class="relato-lista" aria-live="polite"></ul>
-        <p class="hint relato-vazio hidden">Nenhum relato para este filtro.</p>`;
-      await this.renderSuperadmin(painel);
-    } else {
-      painel.innerHTML = cabecalho + `
-        <p class="hint relatos-subtitulo">Seus relatos enviados</p>
-        <ul class="relato-lista" aria-live="polite"></ul>
-        <p class="hint relato-vazio hidden">Você ainda não enviou nenhum relato.</p>`;
-      await this.renderMeus(painel);
-    }
+    const gestao = state.isSuperAdmin
+      ? `<p class="hint relatos-gestao"><button type="button" class="link-btn relatos-gestao-btn">Gerenciar relatos em Administração &rsaquo; Relatos de problemas &rarr;</button></p>`
+      : "";
+
+    painel.innerHTML = cabecalho + gestao + `
+      <p class="hint relatos-subtitulo">Seus relatos enviados</p>
+      <ul class="relato-lista" aria-live="polite"></ul>
+      <p class="hint relato-vazio hidden">Você ainda não enviou nenhum relato.</p>`;
+    await this.renderMeus(painel);
 
     painel.querySelector(".relatos-fechar-btn").addEventListener("click", () => this.fecharPainel());
     painel.querySelector(".relatos-novo-btn").addEventListener("click", () => this.abrirFormulario());
+    const gestaoBtn = painel.querySelector(".relatos-gestao-btn");
+    if (gestaoBtn) {
+      gestaoBtn.addEventListener("click", () => {
+        this.fecharPainel();
+        if (typeof Router !== "undefined") Router.ir("/admin/relatos", { push: true });
+      });
+    }
   },
 
   async renderMeus(painel) {
@@ -183,70 +188,6 @@ const Relatos = {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           alternar();
-        }
-      });
-      lista.appendChild(li);
-    });
-  },
-
-  async renderSuperadmin(painel) {
-    const filtros = painel.querySelector(".relato-filtros");
-    const lista = painel.querySelector(".relato-lista");
-    const vazio = painel.querySelector(".relato-vazio");
-
-    const [contagem, relatos] = await Promise.all([
-      Api.contarRelatos(),
-      Api.listarRelatos(this._filtroStatus || undefined),
-    ]);
-
-    const c = contagem && typeof contagem.novos === "number" ? contagem : { novos: 0, abertos: 0, emAnalise: 0, resolvidos: 0 };
-    const chips = [
-      { status: "", rotulo: "Todos", n: null },
-      { status: "novo", rotulo: "Novos", n: c.novos },
-      { status: "aberto", rotulo: "Abertos", n: c.abertos },
-      { status: "em_analise", rotulo: "Em análise", n: c.emAnalise },
-      { status: "resolvido", rotulo: "Resolvidos", n: c.resolvidos },
-    ];
-    filtros.innerHTML = chips
-      .map(
-        (chip) =>
-          `<button type="button" class="relato-chip${chip.status === this._filtroStatus ? " is-active" : ""}" data-status="${chip.status}" aria-pressed="${chip.status === this._filtroStatus}">${escapeHtml(chip.rotulo)}${chip.n !== null ? ` <span class="relato-chip-n">${chip.n}</span>` : ""}</button>`
-      )
-      .join("");
-    filtros.querySelectorAll(".relato-chip").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        this._filtroStatus = btn.dataset.status;
-        this.renderSuperadmin(painel);
-      });
-    });
-
-    lista.innerHTML = "";
-    if (!Array.isArray(relatos) || relatos.length === 0) {
-      vazio.classList.remove("hidden");
-      return;
-    }
-    vazio.classList.add("hidden");
-    relatos.forEach((r) => {
-      const li = document.createElement("li");
-      li.className = `relato-item${r.status === "novo" ? " relato-item-novo" : ""}`;
-      li.setAttribute("role", "button");
-      li.tabIndex = 0;
-      li.innerHTML = `
-        <div class="relato-item-title">
-          <span></span>
-          <span class="relato-status relato-status-${r.status}">${escapeHtml(this.STATUS_ROTULO[r.status] || r.status)}</span>
-        </div>
-        <div class="relato-item-meta"></div>`;
-      li.querySelector(".relato-item-title span").textContent = r.titulo;
-      const autor = r.autor && r.autor.nome ? r.autor.nome : "usuário";
-      li.querySelector(".relato-item-meta").textContent =
-        `${autor} · ${this.rotuloCategoria(r.categoria)} · ${this.formatarHora(r.criadoEm)}`;
-      const abrir = () => this.abrirDetalhe(r.id);
-      li.addEventListener("click", abrir);
-      li.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          abrir();
         }
       });
       lista.appendChild(li);
@@ -350,7 +291,7 @@ const Relatos = {
     const r = resp.relato;
     this.atualizarBadge();
 
-    Dialog.abrir({
+    return Dialog.abrir({
       titulo: `Relato #${r.id}`,
       confirmarTexto: "Fechar",
       semCancelar: true,
@@ -379,6 +320,7 @@ const Relatos = {
               <textarea id="relatoResposta" rows="3" maxlength="2000"></textarea>
             </div>
             <div class="relato-detalhe-acoes"></div>
+            <div class="relato-detalhe-perigo"></div>
           </div>`;
 
         body.querySelector(".d-autor").textContent =
@@ -421,6 +363,44 @@ const Relatos = {
         if (r.status === "em_analise") acao("Voltar para aberto", "aberto", "btn-off");
         if (r.status !== "resolvido") acao("Marcar como resolvido", "resolvido", "btn-on");
         if (r.status === "resolvido") acao("Reabrir relato", "aberto", "btn-off");
+
+        const perigo = body.querySelector(".relato-detalhe-perigo");
+        if (perigo && typeof state !== "undefined" && state.isSuperAdmin) {
+          const bloquearTudo = (v) => {
+            acoes.querySelectorAll("button").forEach((b) => (b.disabled = v));
+            perigo.querySelectorAll("button").forEach((b) => (b.disabled = v));
+            respostaEl.disabled = v;
+          };
+          const mostrarBotaoExcluir = () => {
+            perigo.innerHTML = `<button type="button" class="btn btn-danger relato-excluir-btn">Excluir relato</button>`;
+            perigo.querySelector(".relato-excluir-btn").addEventListener("click", mostrarConfirmacao);
+          };
+          const mostrarConfirmacao = () => {
+            helpers.limparErro();
+            perigo.innerHTML = `
+              <p class="relato-detalhe-perigo-aviso">Excluir permanentemente o relato #${r.id}? Esta ação não pode ser desfeita e remove a descrição, a resposta e o histórico de revisão.</p>
+              <div class="relato-detalhe-perigo-linha">
+                <button type="button" class="btn btn-danger relato-excluir-confirmar">Excluir definitivamente</button>
+                <button type="button" class="btn btn-off relato-excluir-cancelar">Cancelar</button>
+              </div>`;
+            perigo.querySelector(".relato-excluir-cancelar").addEventListener("click", mostrarBotaoExcluir);
+            perigo.querySelector(".relato-excluir-confirmar").addEventListener("click", async () => {
+              helpers.limparErro();
+              bloquearTudo(true);
+              const resp = await Api.excluirRelato(r.id);
+              if (!resp || !resp.ok) {
+                helpers.mostrarErro((resp && resp.erro) || "não foi possível excluir o relato");
+                bloquearTudo(false);
+                return;
+              }
+              helpers.fechar(true);
+              Toast.aviso(`Relato #${r.id} excluído.`);
+              this.atualizarBadge();
+              if (this._painelAberto) this.renderPainel();
+            });
+          };
+          mostrarBotaoExcluir();
+        }
       },
     });
   },

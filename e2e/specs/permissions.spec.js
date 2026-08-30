@@ -25,7 +25,7 @@ test("administrador vê Admin, Agenda, Grade e o sino, mas não as sub-abas de s
   await expect(page.locator('.admin-subtab-btn[data-sub="esp32"]')).toBeHidden();
 });
 
-test("administrador principal vê as sub-abas exclusivas (Configurações, ESP32/MACs, ESP32)", async ({ page, sessaoComo }) => {
+test("superadministrador vê as sub-abas exclusivas (Configurações, ESP32/MACs, ESP32)", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
   await expect(page.locator("#screen-admin")).toBeVisible();
@@ -34,7 +34,7 @@ test("administrador principal vê as sub-abas exclusivas (Configurações, ESP32
   await expect(page.locator('.admin-subtab-btn[data-sub="esp32"]')).toBeVisible();
 });
 
-test("o Monitoramento é exclusivo do administrador principal (interface e API)", async ({ page, sessaoComo, request, tokens }) => {
+test("o Monitoramento é exclusivo do superadministrador (interface e API)", async ({ page, sessaoComo, request, tokens }) => {
   await sessaoComo("admin");
   await page.locator("#adminTabBtn").click();
   await expect(page.locator("#screen-admin")).toBeVisible();
@@ -50,7 +50,7 @@ test("o Monitoramento é exclusivo do administrador principal (interface e API)"
   expect(comSuper.status()).toBe(200);
 });
 
-test("o administrador principal abre o Monitoramento com selos de estado", async ({ page, sessaoComo }) => {
+test("o superadministrador abre o Monitoramento com selos de estado", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
   await page.locator('.admin-subtab-btn[data-sub="monitoramento"]').click();

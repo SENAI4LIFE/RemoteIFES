@@ -122,7 +122,7 @@ async function restaurarSessaoSalva() {
   }
   aplicarSessaoLogada(resp, { reconectarStatus: false });
   if (typeof Router !== "undefined") await Router.restaurar();
-  else switchTab("salas");
+  else switchTab("inicio");
   return true;
 }
 
@@ -145,7 +145,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
   aplicarSessaoLogada(resp);
   if (typeof Router !== "undefined") await Router.restaurar();
-  else switchTab("salas");
+  else switchTab("inicio");
 });
 
 function realizarLogout({ manterTela = false } = {}) {

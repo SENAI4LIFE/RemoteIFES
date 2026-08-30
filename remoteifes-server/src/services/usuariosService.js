@@ -81,7 +81,7 @@ function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
   if (existente) throw new Error("já existe um usuário com esse login");
 
   if (isAdmin && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
-    throw new Error("apenas o administrador principal pode conceder privilégios de administrador");
+    throw new Error("apenas o superadministrador pode conceder privilégios de administrador");
   }
 
   validarSenha(senha);
@@ -101,12 +101,12 @@ function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   if (usuario.nivel === NIVEL_SUPERADMIN) {
-    throw new Error("não é possível alterar o nível do administrador principal");
+    throw new Error("não é possível alterar o nível do superadministrador");
   }
 
   if (usuario.nivel === NIVEL_ADMIN && (ativo !== undefined || podeControlar !== undefined)) {
     if (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN) {
-      throw new Error("apenas o administrador principal pode alterar outro administrador");
+      throw new Error("apenas o superadministrador pode alterar outro administrador");
     }
   }
 
@@ -115,12 +115,12 @@ function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante
     const querAdmin = !!isAdmin;
     if (querAdmin && usuario.nivel === NIVEL_USUARIO) {
       if (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN) {
-        throw new Error("apenas o administrador principal pode conceder privilégios de administrador");
+        throw new Error("apenas o superadministrador pode conceder privilégios de administrador");
       }
       novoNivel = NIVEL_ADMIN;
     } else if (!querAdmin && usuario.nivel === NIVEL_ADMIN) {
       if (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN) {
-        throw new Error("apenas o administrador principal pode remover privilégios de administrador");
+        throw new Error("apenas o superadministrador pode remover privilégios de administrador");
       }
       novoNivel = NIVEL_USUARIO;
     }
@@ -149,13 +149,13 @@ function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante
 
 function exigirPermissaoSobreAlvo(usuario, requisitante) {
   if (usuario.nivel === NIVEL_SUPERADMIN && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
-    throw new Error("apenas o administrador principal pode alterar este usuário");
+    throw new Error("apenas o superadministrador pode alterar este usuário");
   }
   if (
     usuario.nivel === NIVEL_ADMIN &&
     (!requisitante || (requisitante.id !== usuario.id && requisitante.nivel !== NIVEL_SUPERADMIN))
   ) {
-    throw new Error("apenas o administrador principal pode alterar outro administrador");
+    throw new Error("apenas o superadministrador pode alterar outro administrador");
   }
 }
 
@@ -196,7 +196,7 @@ function trocarSenha(id, novaSenha, requisitante) {
 function remover(id, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
-  if (usuario.nivel === NIVEL_SUPERADMIN) throw new Error("não é possível remover o administrador principal");
+  if (usuario.nivel === NIVEL_SUPERADMIN) throw new Error("não é possível remover o superadministrador");
   exigirPermissaoSobreAlvo(usuario, requisitante);
 
   db.exec("BEGIN");

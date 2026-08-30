@@ -17,9 +17,11 @@ const TAMANHO_MAX_BIN = 3 * 1024 * 1024;
 const MAGIC_IMAGEM_ESP = 0xe9;
 
 const FASES_ATIVAS = new Set(["ofertado", "baixando", "gravado", "reiniciando"]);
+const FASES_TERMINAIS = new Set(["concluido", "falhou", "ocioso"]);
 const OTA_MAX_SIMULTANEOS = 2;
 const OTA_TIMEOUT_TRANSFERENCIA_MS = 4 * 60 * 1000;
 const OTA_TIMEOUT_REINICIO_MS = 3 * 60 * 1000;
+const OTA_ESTADO_TERMINAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CAMINHO_DOWNLOAD = "/dispositivo/firmware";
 
 const estados = new Map();
@@ -304,8 +306,14 @@ function notificarConcluido(sala, sucesso, mensagem) {
 
 function verificarTimeouts() {
   const agora = Date.now();
+  let removeuTerminal = false;
   estados.forEach((estado, sala) => {
     const idadeMs = agora - new Date(estado.atualizadoEm).getTime();
+    if (FASES_TERMINAIS.has(estado.fase) && idadeMs > OTA_ESTADO_TERMINAL_TTL_MS) {
+      estados.delete(sala);
+      removeuTerminal = true;
+      return;
+    }
     if ((estado.fase === "ofertado" || estado.fase === "baixando") && idadeMs > OTA_TIMEOUT_TRANSFERENCIA_MS) {
       definirEstado(sala, { fase: "falhou", erro: "tempo esgotado durante a transferência do firmware" });
       logger.warn("ota-timeout-transferencia", { sala, versao: estado.versao });
@@ -316,6 +324,7 @@ function verificarTimeouts() {
       notificarConcluido(sala, false, `A sala ${sala} não voltou a se conectar após gravar o firmware.`);
     }
   });
+  if (removeuTerminal) persistirEstados();
 }
 
 function limparEstado(sala) {

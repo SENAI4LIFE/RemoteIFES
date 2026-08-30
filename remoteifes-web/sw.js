@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v14";
+const CACHE_VERSION = "v17";
 const CACHE_NAME = `remoteifes-shell-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -33,6 +33,7 @@ const APP_SHELL = [
   "./js/screens/notifications.js",
   "./js/screens/panel.js",
   "./js/screens/portal-funcoes.js",
+  "./js/screens/inicio.js",
   "./js/screens/propriedade.js",
   "./js/screens/rooms.js",
   "./js/screens/schedule.js",

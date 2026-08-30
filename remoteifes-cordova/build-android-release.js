@@ -21,6 +21,20 @@ function exigirAmbiente(nome) {
   return valor;
 }
 
+function exigirOrigemPublicavel(valor) {
+  let url;
+  try { url = new URL(valor); }
+  catch (erro) { throw new Error("REMOTEIFES_SERVER_URL deve ser uma origem HTTP ou HTTPS válida."); }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("REMOTEIFES_SERVER_URL deve conter somente uma origem HTTP ou HTTPS.");
+  }
+  const host = url.hostname.toLowerCase();
+  if (["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) {
+    throw new Error("REMOTEIFES_SERVER_URL não pode usar localhost em um APK de produção: no aparelho, localhost é o próprio Android.");
+  }
+  return url.origin;
+}
+
 function fixarServidorNoBundle(origem) {
   const arquivo = path.join(__dirname, "www", "js", "config.js");
   const atual = fs.readFileSync(arquivo, "utf8");
@@ -33,7 +47,7 @@ function main() {
   let temporario = null;
   let endurecido = false;
   try {
-    const origem = exigirAmbiente("REMOTEIFES_SERVER_URL");
+    const origem = exigirOrigemPublicavel(exigirAmbiente("REMOTEIFES_SERVER_URL"));
     const keystore = path.resolve(exigirAmbiente("REMOTEIFES_ANDROID_KEYSTORE"));
     if (!fs.existsSync(keystore) || !fs.statSync(keystore).isFile()) throw new Error("O keystore de produção informado não existe.");
     const release = {

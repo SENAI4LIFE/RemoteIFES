@@ -4,9 +4,9 @@ const Router = (() => {
 
   const ADMIN_SUBS = [
     "usuarios", "ativos", "sessoes", "logs", "dispositivos", "monitoramento",
-    "acessos", "proprietarios", "mapa", "macs", "config", "esp32",
+    "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "relatos",
   ];
-  const ADMIN_SUBS_SUPERADMIN = ["monitoramento", "macs", "config", "esp32"];
+  const ADMIN_SUBS_SUPERADMIN = ["monitoramento", "macs", "config", "esp32", "relatos"];
   const FP_SECOES = ["a-terreo", "a-2pav", "a-3pav", "b-terreo", "b-2pav", "b-3pav"];
   const RAIZES_COM_PARAMETRO = ["agenda", "agendamentos", "grade", "config", "ajuda"];
 
@@ -42,6 +42,8 @@ const Router = (() => {
     };
 
     switch (id) {
+      case "screen-inicio":
+        return "/inicio";
       case "screen-simple":
         return "/salas";
       case "screen-location":
@@ -166,6 +168,11 @@ const Router = (() => {
 
     if (!logado()) return;
 
+    if (raiz === "inicio") {
+      irParaAba("inicio");
+      return;
+    }
+
     if (raiz === "sala") {
       irParaAba("salas");
       const ok = await abrirSalaPorCodigo(a || "");
@@ -180,10 +187,6 @@ const Router = (() => {
 
     if (raiz === "admin") {
       if (!state.isAdmin) return irParaAba("salas");
-      if (a === "relatos") {
-        abrirRelatos();
-        return;
-      }
       irParaAba("admin");
       clicarSubAdmin(a || "usuarios");
       return;
@@ -230,7 +233,7 @@ const Router = (() => {
       return;
     }
 
-    irParaAba("salas");
+    irParaAba("inicio");
   }
 
   function definirValor(id, valor) {
@@ -267,7 +270,7 @@ const Router = (() => {
     if (restaurando) return;
     const segs = segmentos();
     if (segs.length === 0) {
-      if (logado()) irParaAba("salas");
+      if (logado()) irParaAba("inicio");
       return;
     }
     restaurando = true;

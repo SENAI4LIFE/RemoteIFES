@@ -61,6 +61,21 @@ test("administrador comum com link direto para o monitoramento cai em Usuários"
   await expect(page.locator("#adminSub-monitoramento")).toBeHidden();
 });
 
+test("uma rota desconhecida recai no Início e normaliza o endereço", async ({ page, context }) => {
+  await abrirComo(page, context, "user", "/rota-que-nao-existe");
+  await expect(page.locator("#screen-inicio")).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/inicio");
+});
+
+test("fechar a página do aplicativo volta para o Início", async ({ page, context }) => {
+  await abrirComo(page, context, "user", "/aplicativo");
+  await expect(page.locator("#screen-mobile-app")).toBeVisible({ timeout: 20_000 });
+  await page.locator("#mobileAppBackBtn").click();
+  await expect(page.locator("#screen-mobile-app")).toBeHidden();
+  await expect(page.locator("#screen-inicio")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/inicio");
+});
+
 test("sair limpa o endereço de navegação", async ({ page, loginComo }) => {
   await page.goto("/");
   await loginComo("admin");
@@ -74,7 +89,7 @@ test("sair limpa o endereço de navegação", async ({ page, loginComo }) => {
 
 test("voltar e avançar do navegador percorrem as seções visitadas", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin");
-  await expect(page.locator("#screen-simple")).toBeVisible();
+  await expect(page.locator("#screen-inicio")).toBeVisible();
 
   await page.locator("#gradeTabBtn").click();
   await expect(page.locator("#screen-grade")).toBeVisible();
@@ -90,7 +105,7 @@ test("voltar e avançar do navegador percorrem as seções visitadas", async ({ 
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#\/grade/);
 
   await page.goBack();
-  await expect(page.locator("#screen-simple")).toBeVisible();
+  await expect(page.locator("#screen-inicio")).toBeVisible();
 
   await page.goForward();
   await expect(page.locator("#screen-grade")).toBeVisible();
@@ -139,9 +154,21 @@ test("link direto /relatos abre o painel de relatos", async ({ page, context }) 
   await expect(page.locator("#relatosPanel")).toBeVisible({ timeout: 20_000 });
 });
 
-test("link direto /admin/relatos abre o painel de relatos para o superadmin", async ({ page, context }) => {
+test("link direto /admin/relatos abre a sub-aba de gestão de relatos e sobrevive ao refresh (superadmin)", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin", "/admin/relatos");
-  await expect(page.locator("#relatosPanel")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#screen-admin")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#adminSub-relatos")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#adminRelatosFiltros .relato-chip").first()).toBeVisible();
+  await page.reload();
+  await expect(page.locator("#adminSub-relatos")).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/relatos");
+});
+
+test("link direto /admin/relatos não concede a gestão de relatos a um admin comum", async ({ page, context }) => {
+  await abrirComo(page, context, "admin", "/admin/relatos");
+  await expect(page.locator("#screen-admin")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#adminSub-relatos")).toBeHidden();
+  await expect(page.locator('.admin-subtab-btn[data-sub="relatos"]')).toBeHidden();
 });
 
 test("o alias /agendamentos abre a aba Agenda", async ({ page, context }) => {

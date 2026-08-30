@@ -24,7 +24,7 @@ const Admin = {
       const li = document.createElement("li");
       li.innerHTML = `
         <div>
-          <div class="room-name">${escapeHtmlAdmin(u.nome)} ${u.isSuperAdmin ? "· admin principal" : u.isAdmin ? "· admin" : ""}</div>
+          <div class="room-name">${escapeHtmlAdmin(u.nome)} ${u.isSuperAdmin ? "· superadmin" : u.isAdmin ? "· admin" : ""}</div>
           <div class="room-sub">
             @${escapeHtmlAdmin(u.usuario)}
             ${!u.ativo ? "· desativado" : ""}
@@ -297,6 +297,91 @@ const Admin = {
         </div>
       `;
       list.appendChild(li);
+    });
+  },
+
+  _relatosFiltro: "",
+
+  atualizarBadgeRelatos(novos) {
+    const badge = document.getElementById("adminRelatosSubBadge");
+    if (!badge) return;
+    if (novos > 0) {
+      badge.textContent = novos > 99 ? "99+" : String(novos);
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  },
+
+  async carregarRelatos() {
+    if (!state.isSuperAdmin) return;
+    const filtros = document.getElementById("adminRelatosFiltros");
+    const lista = document.getElementById("adminRelatosLista");
+    const vazio = document.getElementById("adminRelatosVazio");
+    if (!filtros || !lista || !vazio) return;
+
+    const [contagem, relatos] = await Promise.all([
+      Api.contarRelatos(),
+      Api.listarRelatos(this._relatosFiltro || undefined),
+    ]);
+
+    const c = contagem && typeof contagem.novos === "number"
+      ? contagem
+      : { novos: 0, abertos: 0, emAnalise: 0, resolvidos: 0 };
+    const chips = [
+      { status: "", rotulo: "Todos", n: null },
+      { status: "novo", rotulo: "Novos", n: c.novos },
+      { status: "aberto", rotulo: "Abertos", n: c.abertos },
+      { status: "em_analise", rotulo: "Em análise", n: c.emAnalise },
+      { status: "resolvido", rotulo: "Resolvidos", n: c.resolvidos },
+    ];
+    filtros.innerHTML = chips
+      .map((chip) =>
+        `<button type="button" class="relato-chip${chip.status === this._relatosFiltro ? " is-active" : ""}" data-status="${chip.status}" aria-pressed="${chip.status === this._relatosFiltro}">${escapeHtmlAdmin(chip.rotulo)}${chip.n !== null ? ` <span class="relato-chip-n">${chip.n}</span>` : ""}</button>`
+      )
+      .join("");
+    filtros.querySelectorAll(".relato-chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._relatosFiltro = btn.dataset.status;
+        this.carregarRelatos();
+      });
+    });
+
+    this.atualizarBadgeRelatos(c.novos);
+
+    lista.innerHTML = "";
+    if (!Array.isArray(relatos) || relatos.length === 0) {
+      vazio.classList.remove("hidden");
+      return;
+    }
+    vazio.classList.add("hidden");
+    relatos.forEach((r) => {
+      const li = document.createElement("li");
+      li.className = `relato-item${r.status === "novo" ? " relato-item-novo" : ""}`;
+      li.setAttribute("role", "button");
+      li.tabIndex = 0;
+      li.innerHTML = `
+        <div class="relato-item-title">
+          <span></span>
+          <span class="relato-status relato-status-${r.status}">${escapeHtmlAdmin(Relatos.STATUS_ROTULO[r.status] || r.status)}</span>
+        </div>
+        <div class="relato-item-meta"></div>`;
+      li.querySelector(".relato-item-title span").textContent = r.titulo;
+      const autor = r.autor && r.autor.nome ? r.autor.nome : "usuário";
+      li.querySelector(".relato-item-meta").textContent =
+        `${autor} · ${Relatos.rotuloCategoria(r.categoria)} · ${Relatos.formatarHora(r.criadoEm)}`;
+      const abrir = async () => {
+        await Relatos.abrirDetalhe(r.id);
+        this.carregarRelatos();
+      };
+      li.addEventListener("click", abrir);
+      li.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          abrir();
+        }
+      });
+      lista.appendChild(li);
     });
   },
 
@@ -811,6 +896,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "dispositivos") await Admin.carregarDispositivos();
     if (sub === "monitoramento") await Monitoramento.aoAbrir();
     else Monitoramento.aoFechar();
+    if (sub === "relatos") await Admin.carregarRelatos();
     if (sub === "acessos") await Admin.carregarAcessos();
     if (sub === "proprietarios") await Admin.carregarProprietarios();
     if (sub === "mapa") await Admin.carregarMapa();

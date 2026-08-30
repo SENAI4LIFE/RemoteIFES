@@ -257,6 +257,13 @@ function atualizar(id, dadosBrutos, revisor) {
   return buscarPorId(id);
 }
 
+function remover(id, revisor) {
+  const linha = db.prepare(`SELECT id, status FROM relatos WHERE id = ?`).get(id);
+  if (!linha) throw new Error("relato não encontrado");
+  db.prepare(`DELETE FROM relatos WHERE id = ?`).run(id);
+  logger.info("relato-removido", { id, status: linha.status, por: revisor ? revisor.id : null });
+}
+
 module.exports = {
   CATEGORIAS,
   STATUS,
@@ -268,4 +275,5 @@ module.exports = {
   contarPorStatus,
   marcarAbertoSeNovo,
   atualizar,
+  remover,
 };

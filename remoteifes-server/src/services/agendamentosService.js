@@ -6,6 +6,15 @@ const MODOS_VALIDOS = ["reserva", "ligar_completo", "ligar_intervalo"];
 const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+function normalizarInteiro(valor, padrao, min, max) {
+  if (valor === undefined || valor === null || valor === "") return padrao;
+  if (!/^\d+$/.test(String(valor).trim())) return padrao;
+  const n = Number(valor);
+  return Number.isSafeInteger(n) && n >= min && n <= max ? n : padrao;
+}
+
+const MAX_ATIVOS_POR_USUARIO = normalizarInteiro(process.env.AGENDAMENTOS_MAX_ATIVOS_POR_USUARIO, 300, 1, 100000);
+
 function horaValida(valor) {
   return typeof valor === "string" && HORA_REGEX.test(valor);
 }
@@ -97,6 +106,15 @@ function criar({ sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, 
     throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
   }
 
+  const ativosDoUsuario = db
+    .prepare("SELECT COUNT(*) AS n FROM agendamentos WHERE usuarioId = ? AND ativo = 1")
+    .get(usuarioId).n;
+  if (ativosDoUsuario >= MAX_ATIVOS_POR_USUARIO) {
+    throw new Error(
+      `limite de ${MAX_ATIVOS_POR_USUARIO} agendamentos ativos por usuário atingido; remova ou desative agendamentos antigos`
+    );
+  }
+
   const modoFinal = modo && MODOS_VALIDOS.includes(modo) ? modo : "ligar_completo";
   let ligarInicioFinal = null;
   let ligarFimFinal = null;
@@ -169,13 +187,13 @@ function jaExecutadoHoje(agendamentoId, tipo, dataISO) {
   return !!linha;
 }
 
-function listarAtivosParaAgendador() {
+function listarAtivosParaAgendador(dataISO = dataAtualBrasiliaISO()) {
   return db.prepare(`
     SELECT a.*, u.usuario AS usuarioLogin
     FROM agendamentos a
     JOIN usuarios u ON u.id = a.usuarioId
-    WHERE a.ativo = 1
-  `).all();
+    WHERE a.ativo = 1 AND a.data = ?
+  `).all(dataISO);
 }
 
 module.exports = {

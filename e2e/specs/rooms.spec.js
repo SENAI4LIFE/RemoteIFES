@@ -1,8 +1,13 @@
 const { test, expect } = require("../harness/fixtures");
 
+async function abrirSalas(page) {
+  await page.locator('.tab-btn[data-tab="salas"]').click();
+  await expect(page.locator("#screen-simple")).toBeVisible();
+}
+
 test("assistente simples: bloco -> andar -> sala abre o painel de controle", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
-  await expect(page.locator("#screen-simple")).toBeVisible();
+  await abrirSalas(page);
 
   await page.locator('#simpleGridBloco .simple-tile[data-bloco="A"]').click();
   await expect(page.locator("#simpleStepAndar")).toBeVisible();
@@ -18,6 +23,7 @@ test("assistente simples: bloco -> andar -> sala abre o painel de controle", asy
 
 test("navegação em lista tradicional (bloco/andar) chega à mesma sala", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
+  await abrirSalas(page);
   await page.locator("#simpleListBtn").click();
   await expect(page.locator("#screen-location")).toBeVisible();
 
@@ -33,6 +39,7 @@ test("navegação em lista tradicional (bloco/andar) chega à mesma sala", async
 
 test("planta baixa mostra as seis seções e permite voltar para o assistente", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
+  await abrirSalas(page);
   await page.locator("#simpleFloorplanBtn").click();
   await expect(page.locator("#screen-floorplan")).toBeVisible();
   await expect(page.locator(".fp-tab-btn")).toHaveCount(6);
@@ -42,6 +49,7 @@ test("planta baixa mostra as seis seções e permite voltar para o assistente", 
 
 test("sala com ESP32 conectado aparece como online na lista", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
+  await abrirSalas(page);
   await page.locator("#simpleListBtn").click();
   await page.locator('#blocoChoices .choice-btn[data-bloco="A"]').click();
   await page.locator('#andarChoices .choice-btn[data-andar="1"]').click();
