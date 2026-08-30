@@ -1,4 +1,5 @@
 const screens = {
+  inicio: document.getElementById("screen-inicio"),
   simple: document.getElementById("screen-simple"),
   location: document.getElementById("screen-location"),
   floorplan: document.getElementById("screen-floorplan"),
@@ -27,7 +28,7 @@ function showScreen(name) {
   }
   Object.values(screens).forEach((el) => el.classList.add("hidden"));
   screens[name].classList.remove("hidden");
-  if (!["agenda", "admin", "grade", "panel", "propriedade"].includes(name)) salasSubScreenAtual = name;
+  if (!["inicio", "agenda", "admin", "grade", "panel", "propriedade"].includes(name)) salasSubScreenAtual = name;
   if (name === "floorplan" && typeof ScreenFloorplan !== "undefined") ScreenFloorplan.aoAbrir();
   if (name === "simple" && typeof SimpleWizard !== "undefined") {
     const stepSala = document.getElementById("simpleStepSala");
@@ -45,7 +46,10 @@ function switchTab(tab) {
     else btn.removeAttribute("aria-current");
   });
 
-  if (tab === "salas") {
+  if (tab === "inicio") {
+    showScreen("inicio");
+    if (typeof Inicio !== "undefined") Inicio.aoAbrir();
+  } else if (tab === "salas") {
     showScreen(salasSubScreenAtual);
     if (salasSubScreenAtual === "floorplan") ScreenFloorplan.aoAbrir();
   } else if (tab === "agenda") {

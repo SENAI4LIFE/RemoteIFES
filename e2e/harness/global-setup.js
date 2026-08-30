@@ -5,7 +5,7 @@ const API_URL = process.env.E2E_API_URL || "http://127.0.0.1:8791";
 const ARQUIVO_TOKENS = path.join(__dirname, ".tokens.json");
 
 const CREDENCIAIS = {
-  superadmin: { usuario: "admin", senha: "admin" },
+  superadmin: { usuario: "superadmin", senha: "admin" },
   admin: { usuario: "e2e_admin", senha: "e2e-admin-pass-123" },
   user: { usuario: "e2e_user", senha: "e2e-user-pass-123" },
   readonly: { usuario: "e2e_readonly", senha: "e2e-readonly-123" },

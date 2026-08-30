@@ -8,6 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const app = require("../src/app");
+const db = require("../src/config/database");
 
 let server;
 let baseUrl;
@@ -68,6 +69,18 @@ test("as rotas de API e /health continuam respondendo com o frontend ativo", asy
   assert.notEqual(dispositivo.status, 404);
 });
 
+test("endpoints exclusivos do harness E2E não existem no servidor de produção", async () => {
+  db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('modoTeste', 'true') ON CONFLICT(chave) DO UPDATE SET valor = 'true'").run();
+  try {
+    for (const rota of ["/__e2e/publicar-apk", "/__e2e/despublicar-apk", "/__e2e/encerrar"]) {
+      const resp = await fetch(`${baseUrl}${rota}`, { method: "POST" });
+      assert.equal(resp.status, 404, rota);
+    }
+  } finally {
+    db.prepare("UPDATE configuracoes SET valor = 'false' WHERE chave = 'modoTeste'").run();
+  }
+});
+
 test("CORS de produção aceita requisição da mesma origem sem CORS_ORIGIN configurado", async () => {
   const resp = await fetch(`${baseUrl}/health`, { headers: { Origin: baseUrl } });
   assert.equal(resp.status, 200);
@@ -91,7 +104,7 @@ test("o frontend carrega mesmo quando a API está bloqueada pela restrição de 
   const login = await fetch(`${baseUrl}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ usuario: "admin", senha: "x" }),
+    body: JSON.stringify({ usuario: "superadmin", senha: "x" }),
   });
   assert.equal(login.status, 403);
 });

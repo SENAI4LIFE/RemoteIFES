@@ -74,4 +74,16 @@ router.patch("/superadmin/relatos/:id", exigirLogin, exigirSuperAdmin, (req, res
   }
 });
 
+router.delete("/superadmin/relatos/:id", exigirLogin, exigirSuperAdmin, (req, res) => {
+  const id = parseId(req, res);
+  if (id === null) return;
+  try {
+    relatosService.remover(id, req.usuario);
+    res.json({ ok: true });
+  } catch (err) {
+    const status = err.message === "relato não encontrado" ? 404 : 400;
+    res.status(status).json({ ok: false, erro: err.message });
+  }
+});
+
 module.exports = router;

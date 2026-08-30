@@ -14,7 +14,7 @@ const adminSections = [
       "<strong>Logs, Dispositivos e Acessos ESP32</strong>: consultar a auditoria disponível ao administrador.",
       "<strong>Proprietários de sala</strong>: delegar a gestão de acesso de salas específicas.",
     ] },
-    { t: "nota", texto: "Configuração global, credenciais, OTA, monitoramento e infraestrutura não fazem parte do acesso de administrador comum." },
+    { t: "nota", texto: "Configuração global, credenciais, OTA, monitoramento, relatos de problemas e infraestrutura não fazem parte do acesso de administrador comum." },
   ] },
 ];
 
@@ -28,6 +28,11 @@ const superSections = [
   { id: "monitoramento", titulo: "Monitoramento e saúde do sistema", papel: "superadmin", verNoApp: "/admin/monitoramento", corpo: [
     { t: "p", texto: "Acompanhe serviço, banco, armazenamento, backups, controladores, credenciais e contadores de falha. A tela atualiza enquanto permanece aberta." },
   ] },
+  { id: "relatos-gestao", titulo: "Relatos de problemas (gestão)", papel: "superadmin", verNoApp: "/admin/relatos", corpo: [
+    { t: "p", texto: "Em <strong>Administração &rsaquo; Relatos de problemas</strong>, o superadministrador filtra os relatos por situação (novo, aberto, em análise, resolvido), abre cada um para revisar o contexto, escreve uma resposta visível ao autor e move a situação: marcar em análise, resolver ou reabrir. Abrir um relato novo já o marca como aberto." },
+    { t: "p", texto: "A janela de detalhe também permite <strong>excluir permanentemente</strong> um relato já enviado, após uma confirmação em duas etapas dentro da própria janela. A exclusão remove a descrição, a resposta e o histórico de revisão, não pode ser desfeita e não depende da situação do relato." },
+    { t: "nota", texto: "Os usuários enviam relatos pelo botão de inseto presente em qualquer tela; o formulário de envio não faz parte desta seção de gestão. Nenhum relato é removido automaticamente — a exclusão é sempre manual e deliberada." },
+  ] },
   { id: "backup", titulo: "Backup e recuperação", papel: "superadmin", corpo: [
     { t: "p", texto: "Confira a execução e a idade dos backups no monitoramento. No host, use <code>cd remoteifes-server && npm run backup</code> para uma cópia manual verificada." },
     { t: "passos", itens: ["Pare o serviço antes da restauração.", "Execute <code>npm run restore</code> para listar as cópias ou <code>npm run restore -- &lt;arquivo&gt;</code> para escolher uma.", "Reinicie o serviço, execute a verificação de saúde e confirme autenticação, banco e controladores."] },
@@ -38,7 +43,7 @@ const superSections = [
     { t: "p", texto: "Credenciais exclusivas podem ser provisionadas, rotacionadas, substituídas ou revogadas. O segredo é mostrado uma única vez e nunca integra esta documentação." },
   ] },
   { id: "operacao-admin", titulo: "Operação, implantação e manutenção", papel: "superadmin", corpo: [
-    { t: "p", texto: "Procedimentos de terminal, configuração do servidor, implantação, reversão, serviços, diagnóstico e manutenção são exclusivos do administrador principal." },
+    { t: "p", texto: "Procedimentos de terminal, configuração do servidor, implantação, reversão, serviços, diagnóstico e manutenção são exclusivos do superadministrador." },
     { t: "lista", itens: [
       "<strong>Preparação</strong>: <code>cd remoteifes-server &amp;&amp; npm ci &amp;&amp; npm run setup</code>.",
       "<strong>Serviço</strong>: use <code>npm run install-service</code> na instalação e o gerenciador de serviços do host para iniciar, parar, reiniciar e consultar o estado.",
@@ -54,7 +59,8 @@ const superSections = [
       "Defina o ambiente de produção, a origem CORS exata, a política de proxy confiável, o diretório persistente de dados e as redes autorizadas no arquivo de ambiente protegido do host.",
       "Use HTTPS sempre que o tráfego sair de uma rede local controlada. Não publique arquivos de ambiente, bancos, backups, keystores ou diretórios de release em hospedagem estática.",
       "Após alterar assets web, incremente a versão do cache do service worker, valide instalação/atualização da PWA e sincronize novamente o projeto Cordova.",
-      "Para Android, gere com origem fixa e keystore de produção; publique somente após apksigner, verificação de debuggable, versão/build, SHA-256 e certificado.",
+      "Para Android, gere com origem fixa e keystore de produção; publique somente após apksigner, verificação de debuggable, versão/build, SHA-256 e certificado. O APK servido fica preso à origem do build — outra implantação exige um APK novo.",
+      "Mantenha o keystore e as senhas de assinatura fora do controle de versão e com backup próprio em cofre ou mídia offline: perder a chave impede atualizações em aparelhos já instalados.",
     ] },
   ] },
 ];
@@ -77,6 +83,11 @@ const superHelp = {
   config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Escopo", texto: "Mudanças globais afetam segurança, sessões, rede e todos os controladores." }] },
   esp32: { titulo: "Como usar: ESP32", itens: [{ titulo: "Operação avançada", texto: "Use configuração, IR, OTA, credenciais e reset somente no dispositivo selecionado." }] },
   monitoramento: { titulo: "Como usar: Monitoramento", itens: [{ titulo: "Saúde", texto: "Revise alertas de serviço, banco, disco, backup, controladores e credenciais." }] },
+  relatos: { titulo: "Como usar: Relatos de problemas", itens: [
+    { titulo: "Fluxo", texto: "Filtre por situação, abra um relato para revisar o contexto, responda ao autor e mova entre em análise, resolvido e reaberto." },
+    { titulo: "Envio", texto: "Novos relatos chegam pelo botão de inseto usado pelos usuários; esta seção é só de gestão." },
+    { titulo: "Exclusão", texto: "A janela de detalhe permite excluir um relato de forma permanente, após confirmação em duas etapas; a ação não pode ser desfeita." },
+  ] },
 };
 
 function para(usuario) {

@@ -8,6 +8,13 @@ function criar({ tipo, sala = null, mensagem }) {
 }
 
 function criarEspOffline(sala, nomeSala) {
+  const recente = db.prepare(`
+    SELECT 1 FROM notificacoes
+    WHERE tipo = 'esp32_offline' AND sala = ? AND lida = 0
+      AND criadoEm >= datetime('now', '-1 hour')
+    LIMIT 1
+  `).get(sala);
+  if (recente) return;
   criar({
     tipo: "esp32_offline",
     sala,

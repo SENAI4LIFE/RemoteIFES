@@ -82,7 +82,7 @@ function modoManutencaoAtivo() {
 function validarEAtualizar(patch, requisitante) {
   const souSuperAdmin = !!requisitante && requisitante.nivel === 3;
   if (!souSuperAdmin) {
-    const erro = new Error("apenas o administrador principal pode alterar configurações do sistema");
+    const erro = new Error("apenas o superadministrador pode alterar configurações do sistema");
     erro.permissao = true;
     throw erro;
   }

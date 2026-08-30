@@ -10,6 +10,14 @@ const MobileApp = (() => {
     return "desktop";
   }
 
+  const ICONE_BAIXAR =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1Zm-7 13a1 1 0 0 1 1 1v2h12v-2a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/></svg>';
+
+  async function sha256Hex(buffer) {
+    const digest = await crypto.subtle.digest("SHA-256", buffer);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
   function render(info) {
     const android = plataforma() === "android";
     const disponivel = !!(info && info.android && info.android.disponivel);
@@ -21,26 +29,64 @@ const MobileApp = (() => {
         <img src="assets/icons/icon-192.png" alt="" width="128" height="128" />
       </section>
       <div class="mobile-app-grid">
-        <section class="mobile-app-card mobile-app-download ${android ? "is-recommended" : ""}"><h3>Android</h3><p>Android 7.0 ou posterior · versão ${escapeHtml(versao)}${apk.build ? ` · build ${escapeHtml(apk.build)}` : ""}</p>
-          ${disponivel ? `<button type="button" class="btn btn-on mobile-app-download-btn">Baixar APK de produção para Android</button><dl class="mobile-app-integrity"><dt>SHA-256</dt><dd><code>${escapeHtml(apk.sha256)}</code></dd><dt>Certificado</dt><dd><code>${escapeHtml(apk.certificateSha256)}</code></dd><dt>Tamanho</dt><dd>${escapeHtml(apk.tamanho)}</dd></dl>` : `<p class="mobile-app-unavailable" role="status">O APK de produção ainda não foi publicado. Nenhum APK de teste ou sem assinatura será oferecido.</p>`}
-          ${!android ? `<p class="hint">Este download é destinado a dispositivos Android. Você ainda pode consultar os dados manualmente.</p>` : ""}
+        <section class="mobile-app-card mobile-app-download ${android ? "is-recommended" : ""}"><h3>Android</h3>
+          <dl class="mobile-app-integrity">
+            <dt>Versão</dt><dd>${escapeHtml(versao)}${apk.build ? ` (build ${escapeHtml(apk.build)})` : ""}</dd>
+            <dt>Compatibilidade</dt><dd>Android 7.0 (API 24) ou posterior</dd>
+            ${disponivel ? `<dt>Tamanho</dt><dd>${escapeHtml(apk.tamanho || "—")}</dd><dt>SHA-256</dt><dd><code class="mobile-app-hash">${escapeHtml(apk.sha256)}</code></dd><dt>Certificado</dt><dd><code class="mobile-app-hash">${escapeHtml(apk.certificateSha256)}</code></dd>` : ""}
+          </dl>
+          ${disponivel
+            ? `<button type="button" class="btn btn-on btn-block mobile-app-download-btn">${ICONE_BAIXAR}<span>Baixar APK</span></button><p class="mobile-app-verify hint" role="status" aria-live="polite">O arquivo é verificado pelo SHA-256 acima antes de ser salvo.</p>`
+            : `<p class="mobile-app-unavailable" role="status">Nenhum APK de produção assinado está publicado neste servidor no momento. Nenhum APK de teste ou sem assinatura é oferecido — use a instalação como PWA abaixo.</p>`}
+          ${!android && disponivel ? `<p class="hint">O download é destinado a aparelhos Android; em outros sistemas ele serve apenas para transferir o arquivo verificado.</p>` : ""}
         </section>
-        <section class="mobile-app-card ${!android ? "is-recommended" : ""}"><h3>Instalar como PWA</h3><p>No navegador compatível, use <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>. É a opção indicada para iPhone, iPad e computadores.</p></section>
+        <section class="mobile-app-card ${!android || !disponivel ? "is-recommended" : ""}"><h3>Instalar como PWA</h3><p>No navegador compatível, use <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>. É a opção indicada para iPhone, iPad e computadores, e a alternativa quando não há APK publicado.</p></section>
       </div>
-      <section class="mobile-app-instructions"><h2>Instalação e configuração</h2><ol><li>Baixe somente desta página controlada pelo servidor RemoteIFES e confira o SHA-256.</li><li>No Android, confirme a instalação do arquivo. Autorize apenas esta instalação quando o sistema solicitar; não desative a proteção do aparelho globalmente.</li><li>Abra o aplicativo e informe o endereço HTTPS fornecido pela equipe local, se a versão não vier pré-configurada.</li><li>Entre com sua conta RemoteIFES. Atualizações usam o mesmo fluxo: baixe a versão publicada e valide a integridade antes de instalar.</li></ol></section>
+      <section class="mobile-app-instructions"><h2>Instalação</h2><ol>
+        <li>Baixe apenas por esta página, servida pelo servidor RemoteIFES da sua instalação.</li>
+        <li>Confira que o SHA-256 mostrado aqui é igual ao do arquivo baixado (a página valida isso automaticamente antes de salvar).</li>
+        <li>No Android, abra o arquivo e confirme a instalação. Autorize somente esta instalação quando o sistema pedir; não desligue a proteção do aparelho de forma permanente.</li>
+        <li>Abra o aplicativo. Se ele não vier pré-configurado, informe o endereço do servidor fornecido pela equipe local e entre com sua conta RemoteIFES.</li>
+      </ol></section>
+      <section class="mobile-app-instructions"><h2>Atualizações</h2><ol>
+        <li>Volte a esta página quando uma nova versão for publicada — a versão e o SHA-256 acima mudam.</li>
+        <li>Baixe o novo APK e instale por cima do anterior; os dados de sessão e o endereço do servidor são preservados.</li>
+        <li>A PWA se atualiza sozinha ao reabrir com conexão ao servidor.</li>
+      </ol></section>
       <section class="mobile-app-security"><h2>Segurança e funcionamento</h2><p>O aplicativo não instala nada silenciosamente, não inclui credenciais de desenvolvimento e não substitui as permissões do servidor. A interface e o manual comum podem abrir sem Internet; comandos, estado em tempo real e autenticação exigem acesso ao servidor local.</p></section>`;
+
     const baixar = conteudo.querySelector(".mobile-app-download-btn");
+    const verificacao = conteudo.querySelector(".mobile-app-verify");
     if (baixar) baixar.addEventListener("click", async () => {
       baixar.disabled = true;
+      if (verificacao) { verificacao.classList.remove("mobile-app-verify-erro"); verificacao.textContent = "Baixando e verificando o arquivo…"; }
       const resultado = await Api.baixarMobileApk();
-      baixar.disabled = false;
-      if (!resultado.ok) return Toast.erro(resultado.erro);
-      const url = URL.createObjectURL(resultado.blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = resultado.nome;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (!resultado.ok) {
+        baixar.disabled = false;
+        if (verificacao) verificacao.textContent = "O arquivo é verificado pelo SHA-256 acima antes de ser salvo.";
+        return Toast.erro(resultado.erro);
+      }
+      try {
+        const bytes = await resultado.blob.arrayBuffer();
+        const hash = await sha256Hex(bytes);
+        if (apk.sha256 && hash !== String(apk.sha256).toLowerCase()) {
+          baixar.disabled = false;
+          if (verificacao) { verificacao.classList.add("mobile-app-verify-erro"); verificacao.textContent = "Falha na verificação de integridade: o arquivo baixado não corresponde ao SHA-256 publicado. O download foi cancelado."; }
+          return Toast.erro("APK descartado: SHA-256 diferente do publicado.");
+        }
+        const url = URL.createObjectURL(resultado.blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = resultado.nome;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        if (verificacao) verificacao.textContent = `Integridade confirmada (SHA-256 ${hash.slice(0, 12)}…). Instale o arquivo baixado.`;
+      } catch (err) {
+        if (verificacao) { verificacao.classList.add("mobile-app-verify-erro"); verificacao.textContent = "Não foi possível verificar a integridade do arquivo; o download foi cancelado."; }
+        Toast.erro("não foi possível verificar o APK");
+      } finally {
+        baixar.disabled = false;
+      }
     });
   }
 
@@ -64,7 +110,7 @@ const MobileApp = (() => {
     document.body.classList.remove("mobile-app-open");
     if (anterior && typeof anterior.focus === "function") anterior.focus();
     anterior = null;
-    if (!semRestaurar && typeof Router !== "undefined") Router.ir("/salas");
+    if (!semRestaurar && typeof Router !== "undefined") Router.ir("/inicio");
   }
 
   document.getElementById("mobileAppBackBtn").addEventListener("click", () => fechar());

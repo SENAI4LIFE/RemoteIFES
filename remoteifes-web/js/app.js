@@ -1,14 +1,10 @@
-const _tabSalasInicial = document.querySelector('.tab-btn[data-tab="salas"]');
-_tabSalasInicial.classList.add("active");
-_tabSalasInicial.setAttribute("aria-current", "page");
+const _tabInicial = document.querySelector('.tab-btn[data-tab="inicio"]');
+_tabInicial.classList.add("active");
+_tabInicial.setAttribute("aria-current", "page");
 
 document.getElementById("homeBtn").addEventListener("click", () => {
   if (state.usuario) {
-    if (salasSubScreenAtual === "simple" && typeof SimpleWizard !== "undefined") {
-      if (SimpleWizard.bloco) SimpleWizard.irParaAndar(SimpleWizard.bloco);
-      else SimpleWizard.irParaBloco();
-    }
-    switchTab("salas");
+    switchTab("inicio");
     return;
   }
   if (typeof ServerStatus !== "undefined" && ServerStatus.exibirManutencaoSeAtiva()) return;

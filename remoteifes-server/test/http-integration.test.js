@@ -11,7 +11,7 @@ const app = require("../src/app");
 const usuariosService = require("../src/services/usuariosService");
 const senhaAdminInicialValida = bcrypt.compareSync(
   "admin",
-  db.prepare(`SELECT senhaHash FROM usuarios WHERE usuario = 'admin'`).get().senhaHash
+  db.prepare(`SELECT senhaHash FROM usuarios WHERE usuario = 'superadmin'`).get().senhaHash
 );
 
 let server;
@@ -47,9 +47,9 @@ function authFetch(path, token, opcoes = {}) {
   });
 }
 
-test("achado #15 — apenas o administrador principal pode alterar o acesso restrito de uma sala (via HTTP)", async () => {
-  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'admin'`).run(bcrypt.hashSync("superSenha123", 10));
-  const loginSuperAdmin = await login("admin", "superSenha123");
+test("achado #15 — apenas o superadministrador pode alterar o acesso restrito de uma sala (via HTTP)", async () => {
+  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'`).run(bcrypt.hashSync("superSenha123", 10));
+  const loginSuperAdmin = await login("superadmin", "superSenha123");
   assert.equal(loginSuperAdmin.status, 200);
   const tokenSuperAdmin = loginSuperAdmin.corpo.token;
 
@@ -78,7 +78,7 @@ test("achado #15 — apenas o administrador principal pode alterar o acesso rest
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ restrito: true }),
   });
-  assert.equal(tentativaSuperAdmin.status, 200, "o administrador principal pode alterar o acesso restrito de uma sala");
+  assert.equal(tentativaSuperAdmin.status, 200, "o superadministrador pode alterar o acesso restrito de uma sala");
 
   await authFetch(`/admin/salas/${encodeURIComponent(sala)}/acesso-restrito`, tokenSuperAdmin, {
     method: "PATCH",
@@ -100,19 +100,19 @@ test("um usuário sem privilégio de admin não consegue acessar rotas /admin", 
 });
 
 test("login com senha incorreta retorna 401 e não vaza detalhes internos", async () => {
-  const resp = await login("admin", "senha-errada-com-certeza");
+  const resp = await login("superadmin", "senha-errada-com-certeza");
   assert.equal(resp.status, 401);
   assert.equal(resp.corpo.ok, false);
   assert.doesNotMatch(resp.corpo.erro, /stack|SQLITE|constraint/i);
 });
 
-test("a instalação inicial mantém admin/admin", async () => {
+test("a instalação inicial mantém superadmin/admin", async () => {
   assert.equal(senhaAdminInicialValida, true);
 });
 
 test("identificação de dispositivo depende do vínculo MAC e rejeita MAC divergente", async () => {
-  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'admin'`).run(bcrypt.hashSync("superSenha123", 10));
-  const loginSuperAdmin = await login("admin", "superSenha123");
+  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'`).run(bcrypt.hashSync("superSenha123", 10));
+  const loginSuperAdmin = await login("superadmin", "superSenha123");
   const tokenSuperAdmin = loginSuperAdmin.corpo.token;
 
   const salaResp = await authFetch("/admin/salas", tokenSuperAdmin);
@@ -134,7 +134,7 @@ test("identificação de dispositivo depende do vínculo MAC e rejeita MAC diver
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mac: macLegitimo }),
   });
-  assert.equal(cadastro.status, 200, "o administrador principal deve conseguir cadastrar o MAC do ESP32 da sala");
+  assert.equal(cadastro.status, 200, "o superadministrador deve conseguir cadastrar o MAC do ESP32 da sala");
 
   const identificacaoVinculada = await fetch(`${baseUrl}/dispositivo/identificar`, {
     method: "POST",

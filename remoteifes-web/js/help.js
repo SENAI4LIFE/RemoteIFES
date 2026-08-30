@@ -12,6 +12,7 @@ const MANUAL_SECAO_POR_AJUDA = {
   agenda: "agenda-grade", grade: "agenda-grade", usuarios: "administracao", ativos: "administracao", sessoes: "administracao",
   logs: "administracao", dispositivos: "administracao", acessos: "administracao", proprietarios: "administracao", propriedade: "papeis",
   mapa: "administracao", macs: "esp32-cadastro", config: "operacao-admin", esp32: "esp32-avancado", monitoramento: "monitoramento",
+  relatos: "relatos-gestao",
 };
 
 const RoleDocumentation = (() => {

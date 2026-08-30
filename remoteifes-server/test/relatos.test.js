@@ -53,9 +53,9 @@ test.before(async () => {
   server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
-  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'admin'`).run(bcrypt.hashSync("superSenha123", 10));
+  db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'`).run(bcrypt.hashSync("superSenha123", 10));
 
-  const superLogin = await login("admin", "superSenha123");
+  const superLogin = await login("superadmin", "superSenha123");
   tokenSuper = superLogin.corpo.token;
 
   usuariosService.criar(
@@ -210,6 +210,49 @@ test("o superadmin lista, abre, revisa e resolve relatos; abrir marca como abert
   const corpoResolvido = (await resolvido.json()).relato;
   assert.equal(corpoResolvido.status, "resolvido");
   assert.match(corpoResolvido.resposta, /Reiniciamos o ESP32/);
+});
+
+test("a exclusão de relato é exclusiva do superadministrador", async () => {
+  const criado = await jsonPost("/relatos", tokenUsuario, {
+    titulo: "Relato que ninguém sem permissão pode excluir",
+    descricao: "Verifica que apenas o superadministrador remove relatos já enviados.",
+  });
+  const id = criado.corpo.relato.id;
+
+  const semToken = await fetch(`${baseUrl}/superadmin/relatos/${id}`, { method: "DELETE" });
+  assert.equal(semToken.status, 401);
+
+  const comoUsuario = await authFetch(`/superadmin/relatos/${id}`, tokenUsuario, { method: "DELETE" });
+  assert.equal(comoUsuario.status, 403);
+
+  const comoAdmin = await authFetch(`/superadmin/relatos/${id}`, tokenAdmin, { method: "DELETE" });
+  assert.equal(comoAdmin.status, 403);
+
+  const aindaExiste = await authFetch(`/superadmin/relatos/${id}`, tokenSuper);
+  assert.equal(aindaExiste.status, 200);
+});
+
+test("o superadministrador exclui um relato já enviado, inclusive não resolvido", async () => {
+  const criado = await jsonPost("/relatos", tokenUsuario, {
+    titulo: "Relato pendente a ser removido",
+    descricao: "Relato ainda não resolvido que o superadministrador decide remover manualmente.",
+  });
+  const id = criado.corpo.relato.id;
+
+  const antes = await (await authFetch("/superadmin/relatos/contagem", tokenSuper)).json();
+
+  const excluir = await authFetch(`/superadmin/relatos/${id}`, tokenSuper, { method: "DELETE" });
+  assert.equal(excluir.status, 200);
+  assert.equal((await excluir.json()).ok, true);
+
+  const depoisGet = await authFetch(`/superadmin/relatos/${id}`, tokenSuper);
+  assert.equal(depoisGet.status, 404);
+
+  const depois = await (await authFetch("/superadmin/relatos/contagem", tokenSuper)).json();
+  assert.equal(depois.total, antes.total - 1);
+
+  const inexistente = await authFetch(`/superadmin/relatos/${id}`, tokenSuper, { method: "DELETE" });
+  assert.equal(inexistente.status, 404);
 });
 
 test("status inválido no PATCH é rejeitado", async () => {

@@ -70,7 +70,7 @@ test("achado #12 — admin comum não consegue excluir outro admin", () => {
 
   assert.throws(
     () => usuariosService.remover(admin2.id, { id: admin1.id, nivel: usuariosService.NIVEL_ADMIN }),
-    /apenas o administrador principal/,
+    /apenas o superadministrador/,
     "um admin comum não pode remover outro admin"
   );
   assert.ok(usuariosService.buscarPorId(admin2.id), "a conta alvo deve continuar existindo após a tentativa bloqueada");

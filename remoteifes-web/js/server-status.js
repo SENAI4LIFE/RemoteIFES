@@ -334,7 +334,7 @@ const ServerStatus = (() => {
     esconderAcessoManutencao();
     if (typeof definirTipoLoginSelecionado === "function") definirTipoLoginSelecionado("admin");
     if (typeof aplicarSessaoLogada === "function") aplicarSessaoLogada(resp);
-    if (typeof switchTab === "function") switchTab("salas");
+    if (typeof switchTab === "function") switchTab("inicio");
   });
 
   window.addEventListener("app:manutencao-ativa", () => {

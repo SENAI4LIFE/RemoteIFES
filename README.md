@@ -95,7 +95,9 @@ O sistema tem três níveis de usuário:
 |---|---|---|
 | 1 | Usuário comum | Ligar/desligar e ajustar a temperatura das salas liberadas para controle; enviar relatos de problema pelo ícone de inseto no topo |
 | 2 | Administrador | Tudo do nível 1, além de gerenciar agendamentos, grade de horários, notificações de dispositivos, sessões, logs, dispositivos e usuários comuns |
-| 3 | Administrador principal (superadmin) | Tudo do nível 2, além de alterar configurações globais, limites globais e por sala, função extra do Turbo, redes autorizadas, modo de teste, cadastro de ESP32 por MAC, o painel avançado de cada ESP32 (`Admin > ESP32`) e a caixa de relatos de problema enviados pelos usuários |
+| 3 | Superadministrador (`superadmin`) | Tudo do nível 2, além de alterar configurações globais, limites globais e por sala, função extra do Turbo, redes autorizadas, modo de teste, cadastro de ESP32 por MAC, o painel avançado de cada ESP32 (`Admin > ESP32`) e a gestão dos relatos de problema enviados pelos usuários — inclusive a exclusão permanente de um relato — em `Admin > Relatos de problemas` |
+
+A conta padrão do nível 3 usa o login `superadmin` (nome exibido "Superadministrador"). Instalações anteriores que usavam o login `admin` são migradas automaticamente para `superadmin` no primeiro boot após a atualização, preservando id, hash de senha, nível e permissões; o identificador interno do papel continua sendo `superadmin`.
 
 Além dos três níveis, existe uma permissão pontual, independente de nível: um usuário comum pode ser tornado **proprietário** de uma ou mais salas específicas, o que lhe permite conceder e revogar o acesso de controle de outros usuários apenas àquelas salas, sem se tornar administrador (veja [Controle de Acesso e Proprietários de Sala](#controle-de-acesso-e-proprietários-de-sala)).
 
@@ -103,9 +105,15 @@ Todas as permissões são impostas no backend (não apenas escondidas na interfa
 
 ## Navegação e Seleção de Salas
 
+### Início (hub)
+
+Após o login o aplicativo abre no **Início** (`#/inicio`, também a aba "Início" e o logotipo no topo): um painel visual que reúne as ações principais em cartões, na ordem de uso mais comum — selecionar sala, planta baixa, agenda e grade (administrador), notificações (administrador), relatar um problema, ajuda/manual e aplicativo móvel. Os cartões respeitam o papel do usuário e apenas abrem telas já existentes (nenhuma função é duplicada). Abaixo das ações operacionais, administradores veem atalhos para as sub-abas de **Administração**; o superadministrador vê ainda uma faixa curta com o estado do banco, do armazenamento, dos ESP32 e dos backups, com link para o Monitoramento. No celular o hub vira uma lista de cartões de toque em coluna única. O hub não altera o roteamento: todos os endereços e o comportamento de refresh/histórico continuam iguais.
+
+### Formas de chegar a uma sala
+
 O sistema oferece três formas de chegar até uma sala, todas equivalentes em funcionalidade:
 
-- **Assistente simples** (tela inicial após o login): três passos guiados por ícones grandes — bloco, andar e sala — pensados para toque em celular. É a navegação padrão.
+- **Assistente simples**: três passos guiados por ícones grandes — bloco, andar e sala — pensados para toque em celular. É a navegação padrão de salas.
 - **Planta baixa**: exibe a planta baixa real do campus (Bloco A e Bloco B, térreo/2º/3º pavimentos), com abas para alternar entre os seis setores e suporte a zoom. Cada sala com ar-condicionado controlado pelo sistema aparece destacada e colorida conforme seu estado:
   - cinza: offline (sem ESP32 reportando)
   - azul: online, desligado
@@ -117,7 +125,7 @@ Qualquer usuário autenticado pode visualizar o estado de todas as salas — iss
 
 ### Endereço, refresh e histórico
 
-O frontend reflete a tela atual no endereço da página como um **fragmento** (`#/salas`, `#/sala/A-108`, `#/salas/planta/a-terreo`, `#/agenda`, `#/admin`, `#/admin/esp32`, `#/admin/monitoramento`, `#/admin/relatos`, `#/relatos`, `#/ajuda`, `#/ajuda/ota`…). Isso dá o comportamento de um site tradicional:
+O frontend reflete a tela atual no endereço da página como um **fragmento** (`#/inicio`, `#/salas`, `#/sala/A-108`, `#/salas/planta/a-terreo`, `#/agenda`, `#/admin`, `#/admin/esp32`, `#/admin/monitoramento`, `#/admin/relatos`, `#/relatos`, `#/ajuda`, `#/ajuda/ota`…). Um endereço vazio equivale a `#/inicio`. Isso dá o comportamento de um site tradicional:
 
 - recarregar a página mantém onde você estava (aba, subtela, sub-aba de Administração, sala aberta, seção do mapa);
 - **voltar/avançar do navegador** percorrem as seções visitadas (cada navegação entre seções gera uma entrada de histórico; trocar apenas um filtro — sala ou data na Grade/Agenda — não gera);
@@ -125,7 +133,7 @@ O frontend reflete a tela atual no endereço da página como um **fragmento** (`
 
 A estratégia é **hash routing** (fragmento), não History API, por ser a única que funciona igual — e sem nenhuma regra de reescrita por implantação — no servidor Node local, atrás de proxy reverso, na PWA, no GitHub Pages usado para demonstração e no app Cordova (`file://`), inclusive **offline** (o app-shell e o manual vêm do cache do service worker). Um caminho real (`/admin/esp32`) exigiria um _catch-all_ no Express, regras no proxy, um truque de `404.html` no GitHub Pages e não sobreviveria a um reload em `file://`.
 
-Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do administrador principal sem esse nível cai em `Admin > Usuários`; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
+Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do superadministrador sem esse nível cai em `Admin > Usuários`; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
 
 As 86 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio. Um código de sala pode representar duas salas físicas controladas pelo mesmo ESP32 (ex.: `B-105-B-106`); nesse caso a interface exibe as duas etiquetas empilhadas no mesmo bloco do mapa.
 
@@ -135,7 +143,7 @@ Além da permissão geral "pode controlar" (nível de usuário), existem dois me
 
 ### Acesso restrito por sala
 
-Em `Admin > ESP32 / MACs` (ou em `Admin > Proprietários de sala`), o administrador principal pode marcar uma sala como **acesso restrito**:
+Em `Admin > ESP32 / MACs` (ou em `Admin > Proprietários de sala`), o superadministrador pode marcar uma sala como **acesso restrito**:
 
 1. Isso impede que qualquer usuário comum a controle, mesmo com a permissão geral ativa — exceto os usuários explicitamente autorizados para aquela sala.
 2. Usuários autorizados são concedidos/revogados individualmente, por sala.
@@ -175,9 +183,9 @@ A aba **Grade** (visível apenas para administradores) mostra, para uma sala e d
 
 O controlador possui somente as ações fixas necessárias: diminuir temperatura à esquerda, ligar/desligar ao centro, aumentar temperatura à direita e Turbo abaixo do botão de energia. A disposição não pode ser arrastada nem editada.
 
-O administrador principal configura os limites globais de temperatura, inicialmente 23 °C e 25 °C. Cada sala pode substituir apenas o mínimo, apenas o máximo ou os dois em `Admin > ESP32 / MACs`; um campo deixado vazio herda seu valor global correspondente. Os limites efetivos são aplicados aos comandos manuais, agendamentos e testes de infravermelho. Ao estreitar um intervalo, temperaturas alvo e agendadas existentes são ajustadas para o novo intervalo.
+O superadministrador configura os limites globais de temperatura, inicialmente 23 °C e 25 °C. Cada sala pode substituir apenas o mínimo, apenas o máximo ou os dois em `Admin > ESP32 / MACs`; um campo deixado vazio herda seu valor global correspondente. Os limites efetivos são aplicados aos comandos manuais, agendamentos e testes de infravermelho. Ao estreitar um intervalo, temperaturas alvo e agendadas existentes são ajustadas para o novo intervalo.
 
-O Turbo transmite o modo turbo suportado pelo protocolo IR da sala. Em `Admin > Configurações`, o administrador principal também pode configurar o Turbo para acionar simultaneamente a oscilação vertical, ou deixá-lo sem função adicional.
+O Turbo transmite o modo turbo suportado pelo protocolo IR da sala. Em `Admin > Configurações`, o superadministrador também pode configurar o Turbo para acionar simultaneamente a oscilação vertical, ou deixá-lo sem função adicional.
 
 ## Notificações
 
@@ -192,9 +200,11 @@ Qualquer usuário autenticado pode abrir o painel do ícone de inseto no topo e 
 
 Cada relato guarda: id único, usuário (com nome/login preservados mesmo se a conta for removida depois), data de criação e de última atualização, categoria, sala/página, contexto técnico, status e a resposta/anotação da equipe.
 
-O usuário comum vê no mesmo painel apenas os **próprios** relatos e o status de cada um. O **administrador principal** (superadmin) vê a caixa global: contadores por status, filtros (novos, abertos, em análise, resolvidos), abertura de cada relato com autor, horário e detalhes, e as ações de marcar em análise, resolver ou reabrir, com uma resposta opcional que fica visível ao autor. Abrir um relato ainda `novo` o marca automaticamente como `aberto`. O ícone de inseto do superadmin exibe um contador discreto com a quantidade de relatos novos ainda não vistos.
+**Envio e gestão são separados.** Qualquer usuário — inclusive o superadministrador — envia relatos pelo painel do ícone de inseto, que mostra também os **próprios** relatos e o status de cada um; esse painel nunca contém a fila de gestão. A gestão fica em **`Administração > Relatos de problemas`**, uma sub-aba exclusiva do superadministrador com contadores por situação, filtros (novos, abertos, em análise, resolvidos), abertura de cada relato com autor, horário e detalhes, e as ações de marcar em análise, resolver ou reabrir, com uma resposta opcional que fica visível ao autor. Abrir um relato ainda `novo` o marca automaticamente como `aberto`. Essa sub-aba trata apenas relatos **já enviados** pelos usuários; não há formulário de envio nela. Tanto o ícone de inseto quanto a própria sub-aba exibem um contador discreto com a quantidade de relatos novos ainda não vistos; o painel de envio do superadmin traz um atalho para essa sub-aba.
 
-A lista global e os relatos de terceiros são bloqueados no backend (`exigirSuperAdmin`), não apenas escondidos na interface — um usuário comum recebe `403` ao tentar acessá-los diretamente.
+Dentro da janela de detalhe, o superadministrador pode ainda **excluir permanentemente** um relato. A exclusão fica atrás de uma confirmação em duas etapas dentro da própria janela (não usa `confirm()` do navegador), avisa que a ação não pode ser desfeita e remove a descrição, a resposta e o histórico de revisão. O backend expõe `DELETE /superadmin/relatos/:id` sob `exigirSuperAdmin` e registra apenas metadados no log (`relato-removido`: id, status anterior, quem removeu) — nunca o texto.
+
+A lista global, os relatos de terceiros e a exclusão são bloqueados no backend (`exigirSuperAdmin`), não apenas escondidos na interface — um usuário comum recebe `403` ao tentar acessá-los diretamente.
 
 A tabela `relatos` é criada automaticamente na inicialização do servidor (`CREATE TABLE IF NOT EXISTS`), tanto em instalações novas quanto nas já existentes; não é preciso rodar nenhuma migração manual.
 
@@ -222,11 +232,29 @@ O servidor roda uma rotina de retenção a cada 6 horas (e uma vez na inicializa
 | Tabela | Retenção padrão | Ajuste |
 |---|---|---|
 | `comandos_log`, `esp_eventos`, `esp_acessos`, `notificacoes` (apenas lidas) | 180 dias | `RETENCAO_DIAS_LOGS` |
+| `notificacoes` (qualquer, lida ou não) | 365 dias | `RETENCAO_DIAS_NOTIFICACOES` |
 | `sessoes` (apenas já encerradas) | 90 dias | `RETENCAO_DIAS_SESSOES` |
 | `agendamentos_execucoes` | 90 dias | `RETENCAO_DIAS_EXECUCOES` |
+| `agendamentos` com data já passada (o agendamento é sempre do dia; após esse prazo já cumpriu seu efeito) e as execuções ligadas a eles | 90 dias | `RETENCAO_DIAS_AGENDAMENTOS` |
 | `esp_detectados` sem vínculo com sala | 30 dias sem nova detecção | `RETENCAO_DIAS_DETECCOES` |
+| `relatos` **apenas com status `resolvido`** | desligado (`0`); defina para ativar | `RETENCAO_DIAS_RELATOS_RESOLVIDOS` |
 
-Usuários, salas, agendamentos, configurações e **relatos de problema nunca são removidos** por essa rotina. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
+Usuários, salas, agendamentos do dia atual, configurações e **relatos de problema não resolvidos nunca são removidos** por essa rotina — a retenção de relatos resolvidos vem **desligada** e só apaga relatos já marcados como `resolvido` quando `RETENCAO_DIAS_RELATOS_RESOLVIDOS` recebe um número de dias. Notificações não lidas sobrevivem a `RETENCAO_DIAS_NOTIFICACOES` (365 dias por padrão) antes de serem descartadas, para uma caixa esquecida não crescer sem limite. As tabelas de histórico têm índices por data/hora para que a limpeza e as consultas de faixa de tempo (monitoramento, listas administrativas) continuem baratas mesmo com o banco cheio. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
+
+### Limites de crescimento e hardware mínimo
+
+O servidor foi pensado para rodar por anos em hardware modesto (classe **Raspberry Pi 3**: 1 GB de RAM, quatro núcleos ARM, cartão SD). Os pontos que poderiam crescer sem limite estão contidos:
+
+- **Banco**: todas as tabelas de histórico têm retenção por tempo (acima) e índices por data; a rotina de limpeza trunca o WAL ao final.
+- **Agendamentos**: o agendador só carrega, a cada minuto, os agendamentos **do dia**, independentemente do tamanho da tabela; agendamentos passados são apagados pela retenção e há um teto por usuário (`AGENDAMENTOS_MAX_ATIVOS_POR_USUARIO`).
+- **Notificações de ESP32 offline**: uma nova notificação para a mesma sala é suprimida se já existe uma não lida na última hora, evitando enxurrada por um dispositivo instável.
+- **Estado de OTA em memória e em `estados-ota.json`**: entradas em fase terminal (`concluído`, `falhou`) são descartadas após 7 dias; só uma imagem de firmware `.bin` é mantida por vez.
+- **Backups e pré-restaurações**: rotacionados por contagem (`BACKUP_RETENCAO`, 14; pré-restaurações, 5); temporários órfãos são varridos após 10 minutos.
+- **APK de produção**: apenas o release publicado em `data/releases/mobile/` é servido; nada é acumulado.
+- **Estado em memória**: mapas por sala (conexões de dispositivo, última reconexão, capturas de IR — no máximo 20 por sala) e por conexão WebSocket (`WeakMap`, limpos no `close`); o limitador de taxa expira entradas por janela. As listas administrativas usam `LIMIT` no servidor (300–500 linhas) e nunca devolvem a tabela inteira.
+- **Logs**: o servidor escreve em `stdout`/`stderr`; a rotação é do coletor (o `journald` do systemd, com seus próprios limites de tamanho, quando instalado via `install-service.sh`).
+
+**Rodar o servidor em um ESP32-S3 não é viável e não faz parte da arquitetura.** O ESP32-S3 é o alvo do *firmware* (`remoteifes-esp32/`), não do servidor central. O servidor depende de Node.js + V8 (que não têm porte para o Xtensa LX7), do módulo nativo `node:sqlite`, de dois `WebSocketServer` simultâneos e de TLS por software para dezenas de conexões — cada uma dessas peças sozinha excede a RAM interna (~512 KB) e o armazenamento (8–16 MB de flash) do chip, sem contar que backups e a imagem de OTA já não caberiam. A fronteira correta já é a atual: dispositivo fino no ESP32, servidor em um host Linux pequeno. O piso prático abaixo do Pi 3 é algo como um Raspberry Pi Zero 2 W (mesma RAM, ainda roda Node); abaixo disso o servidor não cabe.
 
 ### Backup e restauração do banco
 
@@ -249,7 +277,7 @@ As credenciais dos ESP32 fazem parte do banco e entram normalmente no backup. Se
 
 ## Restrição de Rede
 
-Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas (rede do IFES), configuradas pelo administrador principal em CIDR (ex.: `10.0.0.0/8`). Existe um **modo de teste**, também configurável apenas pelo administrador principal, que permite acesso de fora da rede autorizada — útil durante testes e homologação, mas desativado por padrão em uma instalação nova de produção. Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada. A mesma restrição de rede e de modo de teste vale para as conexões WebSocket, não apenas para a API HTTP.
+Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas (rede do IFES), configuradas pelo superadministrador em CIDR (ex.: `10.0.0.0/8`). Existe um **modo de teste**, também configurável apenas pelo superadministrador, que permite acesso de fora da rede autorizada — útil durante testes e homologação, mas desativado por padrão em uma instalação nova de produção. Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada. A mesma restrição de rede e de modo de teste vale para as conexões WebSocket, não apenas para a API HTTP.
 
 ## Segurança
 
@@ -257,10 +285,10 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 
 - **Senhas**: armazenadas como hash `bcrypt` (nunca em texto puro); mínimo de 8 caracteres.
 - **Sessões**: o token de sessão retornado no login é aleatório (`crypto.randomBytes`), mas o valor gravado no banco (`sessoes.token`) é o hash SHA-256 do token, não o token em si — um vazamento do banco de dados não permite sequestrar sessões ativas diretamente. Sessões inativas por mais de 24h são encerradas automaticamente pelo servidor.
-- **Autorização**: todos os papéis (usuário, administrador, administrador principal) e as permissões pontuais (proprietário de sala, acesso restrito) são checados no backend em cada rota, nunca apenas escondidos na interface.
-- **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o administrador principal associa seu MAC a uma sala em `Admin > ESP32 / MACs`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits, guardado só como hash SHA-256): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação com tolerância de 24 h, revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
+- **Autorização**: todos os papéis (usuário, administrador, superadministrador) e as permissões pontuais (proprietário de sala, acesso restrito) são checados no backend em cada rota, nunca apenas escondidos na interface.
+- **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o superadministrador associa seu MAC a uma sala em `Admin > ESP32 / MACs`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits, guardado só como hash SHA-256): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação com tolerância de 24 h, revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
 - **Atualização de firmware (OTA)**: a imagem publicada no servidor é verificada por SHA-256 pelo ESP32 antes de ser instalada; a gravação usa um segundo slot de aplicação e o bootloader reverte sozinho se o novo firmware não passar no autoteste pós-boot. OTA concorrente para a mesma sala é recusada e a gravação por USB continua como caminho de recuperação. Veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32).
-- **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do administrador principal no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
+- **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do superadministrador no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
 - **Ponto de acesso de configuração**: a rede aberta `RemoteIFES-Setup` existe no primeiro provisionamento, depois de um reset explícito de Wi-Fi ou como recuperação após 2 minutos contínuos sem conexão. O firmware continua tentando reconectar em paralelo e fecha o ponto de acesso quando a rede volta. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 - **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
@@ -283,14 +311,14 @@ Se você configurar um proxy reverso manualmente, garanta que ele propague os ca
 O firmware do ESP32 tem dois modos de funcionamento bem separados, com uma transição explícita entre eles:
 
 - **Operação** (`operation`): modo normal do dia a dia — o dispositivo lê o sensor, reporta telemetria e aguarda comandos, sem expor nenhuma função de captura/aprendizado de infravermelho.
-- **Configuração** (`config_idle` / `config_clone`): é alcançada a partir da operação por um comando do administrador principal. Dentro da configuração, o modo **clonagem** (`config_clone`) é o único em que a captura de sinais infravermelhos fica habilitada; `exit_operation` devolve o dispositivo à operação normal.
+- **Configuração** (`config_idle` / `config_clone`): é alcançada a partir da operação por um comando do superadministrador. Dentro da configuração, o modo **clonagem** (`config_clone`) é o único em que a captura de sinais infravermelhos fica habilitada; `exit_operation` devolve o dispositivo à operação normal.
 
 Isso substitui a antiga interface web local completa do dispositivo. Hoje, o ESP32 expõe localmente apenas:
 
 - Uma página de **status somente leitura**, mostrando sala, MAC, IP, servidor configurado e versão do firmware — para conferência visual direta no equipamento.
 - O **portal de provisionamento** na rede aberta `RemoteIFES-Setup`, usado na configuração inicial, após um reset explícito de Wi-Fi ou na recuperação de uma indisponibilidade contínua da rede — veja [Segurança](#segurança).
 
-Todas as funções antes exclusivas da interface local do dispositivo (entrar/sair do modo de configuração, ativar o modo clonagem, iniciar/parar captura de infravermelho, testar um sinal capturado, resetar o Wi-Fi remotamente) agora ficam em uma aba dedicada da aplicação principal, **`Admin > ESP32`**, visível apenas ao administrador principal:
+Todas as funções antes exclusivas da interface local do dispositivo (entrar/sair do modo de configuração, ativar o modo clonagem, iniciar/parar captura de infravermelho, testar um sinal capturado, resetar o Wi-Fi remotamente) agora ficam em uma aba dedicada da aplicação principal, **`Admin > ESP32`**, visível apenas ao superadministrador:
 
 - Para cada sala com MAC cadastrado, mostra separadamente se o dispositivo está **online na rede Wi-Fi** e se está **conectado ao servidor** (dois estados distintos e independentes — um ESP32 pode estar na rede sem conseguir manter o WebSocket com o servidor, e vice-versa por um curto período).
 - Exibe a última leitura de temperatura e umidade, o sinal Wi-Fi (RSSI) e o **último comando infravermelho transmitido** pelo dispositivo (sinal bruto reenviado ou estado conhecido — temperatura/ligado/turbo/ventilação), tudo atualizado em tempo real.
@@ -314,7 +342,7 @@ O frontend inclui um widget de acessibilidade (botão flutuante, disponível em 
 
 ## Ajuda e Manual no App
 
-O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela página, com um atalho para a seção correspondente do manual. O botão **Precisa de ajuda?** (canto inferior) e o item **Ajuda e manual** do menu da conta abrem um menu rápido com a ajuda da página atual, o **manual completo do RemoteIFES**, a solução de problemas, o envio de relato e a página do aplicativo móvel. O manual é uma página de documentação dedicada, com sumário, busca, diagramas em SVG e links "Ver no app". A documentação comum fica no app-shell e funciona offline. Conteúdo administrativo é entregue por `/documentation` somente após validar a sessão no servidor: administrador recebe apenas operação administrativa e administrador principal recebe também ESP32, OTA, credenciais, monitoramento, backup, implantação e manutenção. A resposta usa `private, no-store`; esses textos não ficam nos assets públicos nem no cache compartilhado da PWA/Cordova.
+O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela página, com um atalho para a seção correspondente do manual. O botão **Precisa de ajuda?** (canto inferior) abre um menu rápido com a ajuda da página atual, o **manual completo do RemoteIFES**, a solução de problemas, o envio de relato e a página do aplicativo móvel. O menu da conta (avatar com iniciais) traz apenas ações de conta — **Aplicativo móvel** e **Sair**; ajuda e manual ficam exclusivamente na interface de ajuda dedicada. O manual é uma página de documentação dedicada, com sumário, busca, diagramas em SVG e links "Ver no app". A documentação comum fica no app-shell e funciona offline. Conteúdo administrativo é entregue por `/documentation` somente após validar a sessão no servidor: administrador recebe apenas operação administrativa e superadministrador recebe também ESP32, OTA, credenciais, monitoramento, backup, implantação e manutenção. A resposta usa `private, no-store`; esses textos não ficam nos assets públicos nem no cache compartilhado da PWA/Cordova.
 
 ## Requisitos
 
@@ -355,7 +383,7 @@ npm start
 **Em ambos os casos**, o banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
 
 - 86 salas reais do campus, extraídas da planta baixa (Bloco A e B, todos os pavimentos), todas offline até que os ESP32 correspondentes comecem a reportar
-- Um superadministrador `admin`; em desenvolvimento/teste a senha inicial é `admin`, enquanto em produção uma senha aleatória é gerada se `SENHA_ADMIN_INICIAL` não for definida. A senha pode ser alterada normalmente em `Admin > Usuários`
+- Um superadministrador `superadmin`; em desenvolvimento/teste a senha inicial é `admin`, enquanto em produção uma senha aleatória é gerada se `SENHA_ADMIN_INICIAL` não for definida. A senha pode ser alterada normalmente em `Admin > Usuários`
 - Limites globais de temperatura de 23 °C a 25 °C e Turbo sem função adicional
 
 ## Instalação Detalhada
@@ -372,7 +400,7 @@ Durante o desenvolvimento, `npm run dev` inicia o servidor com reinício automá
 
 ### Frontend
 
-`remoteifes-web` não tem etapa de build: é servido como está. Em produção (veja [Deploy](#deploy)), o próprio servidor Node o entrega na mesma origem da API, e o frontend fala com o servidor pela origem da página — sem configuração. Aberto localmente para desenvolvimento, ele aponta para `localhost:8080`. Para uma origem diferente (por exemplo, GitHub Pages ou um pacote Cordova apontando para um servidor remoto), defina `serverUrl` em `js/config.js`.
+`remoteifes-web` não tem etapa de build: é servido como está. Em produção (veja [Deploy](#deploy)), o próprio servidor Node o entrega na mesma origem da API, e o frontend fala com o servidor pela origem da página — sem configuração. Aberto localmente para desenvolvimento, ele aponta para `localhost:8080`. O pacote Cordova de produção recebe a origem da implantação por `REMOTEIFES_SERVER_URL` durante o build; não edite `js/config.js` manualmente.
 
 ### Firmware ESP32
 
@@ -401,7 +429,7 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 
 `pio device monitor -b 115200` abre o monitor serial na mesma taxa configurada pelo firmware (`Serial.begin(115200)`), útil para acompanhar o boot, o IP obtido, o estado da conexão Wi-Fi/WebSocket com o servidor e mensagens de erro em tempo real. Se houver mais de uma porta serial conectada, informe-a explicitamente: `pio device monitor -b 115200 -p /dev/ttyUSB0` (Linux/Raspberry Pi) ou `pio device monitor -b 115200 -p /dev/cu.usbserial-XXXX` (macOS). Rode `pio device list` para listar as portas disponíveis.
 
-**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe o ponto de acesso aberto `RemoteIFES-Setup` para receber as credenciais da rede local, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o administrador principal o vincula à sala em `Admin > ESP32 / MACs`. Em falhas de Wi-Fi, o firmware tenta reconectar sem bloquear o restante da operação; depois de 2 minutos contínuos sem conexão, também abre o ponto de acesso de recuperação e mantém as tentativas em paralelo. O ponto de acesso é fechado automaticamente quando a rede volta.
+**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe o ponto de acesso aberto `RemoteIFES-Setup` para receber as credenciais da rede local, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o superadministrador o vincula à sala em `Admin > ESP32 / MACs`. Em falhas de Wi-Fi, o firmware tenta reconectar sem bloquear o restante da operação; depois de 2 minutos contínuos sem conexão, também abre o ponto de acesso de recuperação e mantém as tentativas em paralelo. O ponto de acesso é fechado automaticamente quando a rede volta.
 
 A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.0.0`) e é reportada ao servidor na telemetria, no heartbeat e na página de status local. A partição do ESP32 usa o layout `min_spiffs.csv` (dois slots de aplicação de ~1,9 MB — o firmware atual ocupa ~63% de um slot), o que reserva um slot ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32) com reversão automática. **A gravação por USB (`flash.sh` / `pio run --target upload`) continua sendo o caminho de recuperação**: ela regrava o slot ativo e não depende do estado do OTA.
 
@@ -417,16 +445,19 @@ A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualme
 | `FRONTEND_DIR` | Caminho da pasta do frontend a servir (padrão: `../remoteifes-web` relativo ao projeto do servidor) |
 | `REMOTEIFES_DATA_DIR` | Diretório dos dados persistentes (banco, backups, imagem de firmware para OTA, versões e log de deploy). Padrão: `data/` dentro do projeto do servidor. Aponte para fora do checkout do Git (ex.: `/var/lib/remoteifes`) para que atualizações de código nunca toquem nos dados. `REMOTEIFES_DB_PATH`, `BACKUP_DIR` e `REMOTEIFES_FIRMWARE_DIR` continuam disponíveis para sobrescrever caminhos individuais |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — necessária **apenas** quando o frontend é servido de outra origem (ex.: GitHub Pages). Vale tanto para a API HTTP quanto para as conexões WebSocket |
-| `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `admin` criado no primeiro boot. Em produção, uma senha aleatória é gerada quando o valor não é informado; em desenvolvimento/teste, o padrão é `admin` |
+| `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `superadmin` criado no primeiro boot. Em produção, uma senha aleatória é gerada quando o valor não é informado; em desenvolvimento/teste, o padrão é `admin` |
 | `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); **padrão `0`** (não confia em nenhum proxy). O `https-setup.sh` e o `lan-setup.sh` alteram este valor para `1` ao configurar o Nginx, que é o valor correto quando há exatamente um proxy reverso na frente. Só use um valor maior que `0` quando existir de fato um proxy confiável imediatamente à frente do servidor — confiar em saltos que não existem permite que um cliente falsifique o IP de origem via `X-Forwarded-For` e contorne o limite de tentativas de login e a restrição de rede |
 | `RETENCAO_DIAS_LOGS` / `RETENCAO_DIAS_SESSOES` / `RETENCAO_DIAS_EXECUCOES` / `RETENCAO_DIAS_DETECCOES` | Opcionais. Dias de retenção das tabelas de histórico antes da limpeza automática (padrões: 180 / 90 / 90 / 30). Veja [Manutenção automática do banco](#manutenção-automática-do-banco) |
+| `RETENCAO_DIAS_NOTIFICACOES` / `RETENCAO_DIAS_AGENDAMENTOS` | Opcionais. Dias até descartar qualquer notificação (mesmo não lida) e até apagar agendamentos com data já passada e suas execuções (padrões: 365 / 90) |
+| `RETENCAO_DIAS_RELATOS_RESOLVIDOS` | Opcional. **Desligado por padrão (`0`).** Quando recebe um número de dias, a rotina apaga relatos **já resolvidos** mais antigos que esse prazo; relatos não resolvidos nunca são tocados |
+| `AGENDAMENTOS_MAX_ATIVOS_POR_USUARIO` | Opcional. Teto de agendamentos ativos por usuário (padrão `300`); evita que um único autor infle a varredura do agendador |
 | `BACKUP_AUTOMATICO` / `BACKUP_INTERVALO_HORAS` / `BACKUP_RETENCAO` / `BACKUP_DIR` | Opcionais. Backup periódico do banco SQLite (em produção, ligado por padrão). Veja [Backup e restauração do banco](#backup-e-restauração-do-banco) |
 
 Para a operação de produção local (na rede da instituição), veja [Deploy](#deploy): o servidor entrega o frontend na mesma origem e um proxy reverso HTTP (`lan-setup.sh`) basta. HTTPS com domínio próprio (`https-setup.sh`) é necessário apenas para expor o sistema fora da rede local ou para o PWA/Cordova em domínio público, já que os aparelhos móveis exigem conteúdo servido por HTTPS.
 
 ### Configurações globais (banco de dados, via `Admin > Configurações`)
 
-Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba **Configurações** só é visível e acessível ao administrador principal — nenhum outro administrador pode ver ou alterar esses valores.
+Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba **Configurações** só é visível e acessível ao superadministrador — nenhum outro administrador pode ver ou alterar esses valores.
 
 | Configuração | Padrão | Descrição |
 |---|---|---|
@@ -442,7 +473,7 @@ Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba 
 
 ### ESP32 por MAC e limites por sala (via `Admin > ESP32 / MACs`)
 
-O administrador principal cadastra o endereço MAC de cada ESP32 autorizado para uma sala — manualmente ou vinculando um dispositivo já detectado na rede (veja [Detecção automática de ESP32 na rede](#detecção-automática-de-esp32-na-rede)). Isso:
+O superadministrador cadastra o endereço MAC de cada ESP32 autorizado para uma sala — manualmente ou vinculando um dispositivo já detectado na rede (veja [Detecção automática de ESP32 na rede](#detecção-automática-de-esp32-na-rede)). Isso:
 
 1. Associa a sala ao dispositivo sem salvar o código da sala no firmware.
 2. Faz o servidor rejeitar comunicações que declarem a sala com outro MAC.
@@ -638,7 +669,7 @@ npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.0.1 "
 
 A imagem é validada (byte mágico `0xE9`, tamanho plausível), tem o SHA-256 calculado e é gravada em `<REMOTEIFES_DATA_DIR>/firmware/` junto de um `manifesto.json`. Só uma imagem fica publicada por vez; o número de versão deve casar com o `-DFW_VERSAO` compilado nela.
 
-**Enviar a atualização a uma sala:** em `Admin > ESP32`, cada dispositivo online mostra a versão instalada, a versão publicada e um botão **Atualizar firmware (OTA)** com barra de progresso. Também é possível pela API: `POST /admin/esp32/:sala/ota` (apenas administrador principal).
+**Enviar a atualização a uma sala:** em `Admin > ESP32`, cada dispositivo online mostra a versão instalada, a versão publicada e um botão **Atualizar firmware (OTA)** com barra de progresso. Também é possível pela API: `POST /admin/esp32/:sala/ota` (apenas superadministrador).
 
 O que o processo garante:
 
@@ -654,7 +685,7 @@ O que o processo garante:
 
 Além da identificação por MAC, cada sala pode ter uma **credencial exclusiva** de dispositivo: um `deviceId` (`esp_…`) e um segredo aleatório de 256 bits. O servidor guarda apenas o hash SHA-256 do segredo; o valor em texto é exibido uma única vez, no momento em que é gerado, e nunca aparece em logs nem em respostas de estado.
 
-Gestão em `Admin > ESP32` (apenas administrador principal), ou pela linha de comando na máquina do servidor:
+Gestão em `Admin > ESP32` (apenas superadministrador), ou pela linha de comando na máquina do servidor:
 
 ```bash
 npm run credencial -- A-101 --provisionar   # cria a credencial e imprime deviceId + segredo uma vez
@@ -678,7 +709,7 @@ Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma 
 
 ## Monitoramento Operacional
 
-`Admin > Monitoramento` (visível apenas ao administrador principal; `GET /admin/monitoramento` também exige nível de administrador principal) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
+`Admin > Monitoramento` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
 
 - **Serviço:** ambiente, tempo no ar, memória (RSS), carga de 1 minuto, versão do Node e PID.
 - **Banco de dados:** se responde e em quanto tempo, tamanho do arquivo e do WAL.
@@ -692,9 +723,11 @@ A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição d
 
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
 
-Usuários autenticados podem abrir `#/aplicativo` pelo menu da conta ou pela Ajuda. A página detecta Android, explica a instalação nativa e a alternativa PWA, e consulta o servidor para obter versão, build, tamanho e SHA-256. O APK só aparece quando existe uma publicação válida em `remoteifes-server/data/releases/mobile/release.json`; o download exige a sessão RemoteIFES e é servido pelo próprio servidor com `Cache-Control: private, no-store`.
+Usuários autenticados podem abrir `#/aplicativo` pelo menu da conta ou pela Ajuda. A página detecta Android, explica a instalação nativa e a alternativa PWA, e consulta o servidor para obter versão, build, tamanho, SHA-256 e SHA-256 do certificado de assinatura. O APK só aparece quando existe uma publicação válida em `remoteifes-server/data/releases/mobile/release.json` **e** o `serverOrigin` gravado nesse arquivo coincide com a origem pela qual o servidor está sendo acessado; o download exige a sessão RemoteIFES e é servido pelo próprio servidor com `Cache-Control: private, no-store`.
 
-O servidor valida novamente o SHA-256 do arquivo antes de anunciar ou entregar a versão. Na ausência de um APK de produção assinado e de metadados coerentes, a interface informa que o download não foi publicado. APKs `debug`, não assinados ou copiados apenas de `platforms/android/app/build/outputs/` não devem ser colocados nesse diretório.
+Quando há um APK publicado, a página mostra um botão **Baixar APK** (com ícone de download), a versão e o build, a compatibilidade (Android 7.0 / API 24 ou posterior), o tamanho, o SHA-256 do arquivo e do certificado, e instruções de instalação, de atualização e da alternativa PWA. Ao baixar, o próprio navegador recalcula o SHA-256 dos bytes recebidos e **cancela o salvamento** se ele não bater com o hash anunciado — o arquivo só é entregue ao usuário depois de confirmada a integridade. Enquanto não há APK, a mensagem de "não publicado" aparece e o cartão da PWA é marcado como recomendado; o item continua visível no menu rápido de ajuda.
+
+O servidor valida novamente o SHA-256 do arquivo antes de anunciar ou entregar a versão. Na ausência de um APK de produção assinado e de metadados coerentes, a interface informa que o download não foi publicado. APKs `debug`, não assinados ou copiados apenas de `platforms/android/app/build/outputs/` não devem ser colocados nesse diretório. Atrás de proxy reverso HTTPS, defina `TRUST_PROXY=1` para que a origem calculada (`https://…`) confira com o `serverOrigin` publicado.
 
 Além do site publicado no GitHub Pages, o `remoteifes-web` pode ser instalado como **PWA** diretamente do navegador, e o mesmo frontend pode ser empacotado como **app nativo Android/iOS** pelo projeto `remoteifes-cordova/`. Nenhuma das duas formas exige reescrever ou duplicar a lógica da aplicação — ambas reaproveitam os arquivos de `remoteifes-web` como estão.
 
@@ -775,7 +808,9 @@ npm run build-ios
 npm run run-ios
 ```
 
-`build-android-release` gera um APK de produção já assinado. O comando falha se a origem do servidor, o keystore, o alias ou qualquer senha de assinatura estiver ausente; os segredos entram num `build.json` temporário fora do repositório e são removidos ao final. Para iOS, `run-ios` abre o simulador; para dispositivo físico ou publicação na App Store, abra `platforms/ios/RemoteIFES.xcworkspace` no Xcode.
+`build-android-release` gera um APK de produção já assinado. O comando falha se a origem do servidor, o keystore, o alias ou qualquer senha de assinatura estiver ausente; os segredos entram num `build.json` temporário fora do repositório (modo `0600`) e são removidos ao final. Para iOS, `run-ios` abre o simulador; para dispositivo físico ou publicação na App Store, abra `platforms/ios/RemoteIFES.xcworkspace` no Xcode.
+
+**Material de assinatura — nunca versionado.** O `.gitignore` bloqueia `remoteifes-cordova/.signing/`, `*.keystore`, `*.jks` e `build.json`. A convenção local é manter o keystore e um arquivo `signing.env` (com as variáveis abaixo, `chmod 600`) em `remoteifes-cordova/.signing/`, carregado com `set -a && . ./.signing/signing.env && set +a` antes do build. Como esse diretório fica fora do Git, **ele não é coberto por nenhum backup do repositório**: guarde uma cópia do keystore e das senhas num cofre de segredos da instituição ou em mídia offline cifrada. Se o keystore original for perdido, o Android recusa qualquer atualização assinada por outra chave — os aparelhos já instalados só conseguem migrar desinstalando e reinstalando (perdendo o endereço do servidor salvo e a sessão), e a rotação de chave do esquema de assinatura v3 ainda exige a chave antiga para autorizar a nova. Trate o backup do keystore como requisito de operação, não como opcional.
 
 #### Ícone e splash screen
 
@@ -791,8 +826,10 @@ npx cordova-res ios --skip-config --copy
 
 O app empacotado é carregado de `file://` (ou `https://localhost`), então não existe uma "origem" que sirva de endereço do servidor — diferente da PWA, que assume o mesmo domínio de onde foi baixada. Há duas formas de definir o endereço:
 
-- **Em tempo de execução (recomendado):** ao abrir o app sem um endereço configurado, ele mostra a tela "Sem conexão com o servidor" com o botão **Configurar endereço do servidor**. O valor informado (`http://IP:porta` ou `https://dominio`) é validado e guardado em `localStorage`; o app recarrega e passa a usá-lo. O mesmo botão aparece sempre que o app estiver empacotado e offline, permitindo trocar de servidor sem reinstalar. Esse override também funciona na PWA para apontá-la a outro servidor.
-- **Fixo no build:** `build-android-release` grava `REMOTEIFES_SERVER_URL` somente na cópia gerada em `remoteifes-cordova/www/`. O fonte web continua neutro e um endereço posteriormente salvo no aparelho tem prioridade.
+- **Em tempo de execução:** a tela de indisponibilidade permite guardar outro endereço em `localStorage`. Na PWA isso é útil para desenvolvimento. Em um APK de produção, porém, a política de rede do Cordova é fixada à origem informada no build; por isso a troca só é funcional para origens previamente autorizadas no pacote e não substitui a geração de um APK para cada implantação.
+- **Fixo no build:** `build-android-release` grava `REMOTEIFES_SERVER_URL` somente na cópia gerada em `remoteifes-cordova/www/` (o fonte web em `remoteifes-web/` continua neutro, com `serverUrl` vazio no contexto empacotado). Um endereço salvo depois no aparelho tem prioridade sobre esse valor.
+
+O APK servido é **específico daquela instalação**: `harden-config.js` trava rede e navegação na origem do build e o servidor só anuncia o APK quando `release.json.serverOrigin` bate com a origem da requisição. Para outra implantação (outro IP de rede local, um domínio HTTPS), gere e publique um APK novo com o `REMOTEIFES_SERVER_URL` daquela implantação. Builds e publicações de produção recusam `localhost`, `127.0.0.1` e `::1`, pois esses endereços apontam para o próprio aparelho Android. O artefato local não versionado em `data/releases/mobile/` usa `http://localhost:8080` apenas como amostra validável pelo harness e não é anunciado pelo servidor fora de `NODE_ENV=test`.
 
 #### Ajustando as permissões de rede
 
@@ -812,14 +849,17 @@ O app suporta **retrato e paisagem** (`Orientation` = `default`); a interface ac
 
 ```bash
 REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br \
-REMOTEIFES_ANDROID_KEYSTORE=/caminho/remoteifes-release.jks \
+REMOTEIFES_ANDROID_KEYSTORE=/caminho/.signing/remoteifes-release.keystore \
+REMOTEIFES_ANDROID_KEYSTORE_TYPE=pkcs12 \
 REMOTEIFES_ANDROID_STORE_PASSWORD='...' \
 REMOTEIFES_ANDROID_KEY_ALIAS=remoteifes \
 REMOTEIFES_ANDROID_KEY_PASSWORD='...' \
 npm run build-android-release
 ```
 
-Antes de disponibilizar o APK pelo servidor, execute `npm run publish-android-release` com `REMOTEIFES_ANDROID_APK`, `REMOTEIFES_MOBILE_RELEASE_DIR`, `REMOTEIFES_ANDROID_VERSION`, `REMOTEIFES_ANDROID_BUILD`, `REMOTEIFES_SERVER_URL`, `ANDROID_APKSIGNER` e `ANDROID_APKANALYZER`. A publicação recusa nomes `debug`/`unsigned`, valida a assinatura, confirma `debuggable=false`, registra o SHA-256 do arquivo e do certificado e cria o `release.json` consumido pelo servidor. Sem todos esses dados coerentes, `/mobile-app/android` responde 404 e a interface não oferece download.
+Variáveis de assinatura exigidas: `REMOTEIFES_ANDROID_KEYSTORE` (caminho do keystore), `REMOTEIFES_ANDROID_KEYSTORE_TYPE` (`pkcs12` ou `jks`; padrão `jks`), `REMOTEIFES_ANDROID_KEY_ALIAS`, `REMOTEIFES_ANDROID_STORE_PASSWORD` e `REMOTEIFES_ANDROID_KEY_PASSWORD`, além de `REMOTEIFES_SERVER_URL`. Mantenha-as em `remoteifes-cordova/.signing/signing.env` (fora do Git) e carregue-as no ambiente antes do build. O build precisa de JDK 17, do Android SDK (build-tools e plataforma da API 36) e de um `gradle` do sistema (a cordova-android 15 não usa o wrapper).
+
+Antes de disponibilizar o APK pelo servidor, execute `npm run publish-android-release` com `REMOTEIFES_ANDROID_APK`, `REMOTEIFES_MOBILE_RELEASE_DIR` (aponta para o `MOBILE_APP_RELEASE_DIR` lido pelo servidor — por padrão `remoteifes-server/data/releases/mobile/`), `REMOTEIFES_ANDROID_VERSION`, `REMOTEIFES_ANDROID_BUILD`, `REMOTEIFES_SERVER_URL`, `ANDROID_APKSIGNER` e `ANDROID_APKANALYZER`. A publicação recusa nomes `debug`/`unsigned` e origens loopback, valida a assinatura, confirma `debuggable=false`, versão, build, `minSdk=24` e `targetSdk` atual (35 ou posterior), registra o SHA-256 do arquivo e do certificado, grava o `serverOrigin` e escreve `release.json` de forma atômica. Sem todos esses dados coerentes — ou se a origem da requisição não for igual ao `serverOrigin` —, `/mobile-app/android` responde 404 e a interface não oferece download. No Windows, o script chama `apksigner.bat`/`apkanalyzer.bat` via `cmd.exe /c`.
 
 Para um servidor HTTP em rede local, informe a origem `http://192.168.1.50:8080`; o Android e o iOS manterão somente a exceção necessária para rede local.
 
@@ -842,7 +882,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 | Alvo | Comando | Observações |
 |---|---|---|
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`) e o monitoramento operacional (`test/monitoramento.test.js`). |
-| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Usa o Google Chrome do sistema por padrão; para Edge Chromium, defina `E2E_BROWSER_CHANNEL=msedge`. Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o gate do Monitoramento por administrador principal e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
+| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Usa o Google Chrome do sistema por padrão; para Edge Chromium, defina `E2E_BROWSER_CHANNEL=msedge`. Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`inicio.spec.js`), o gate do Monitoramento por superadministrador e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
 | Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
 | ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
@@ -873,7 +913,7 @@ remoteifes-server/
   healthcheck.sh     checa o /health local — npm run health
   health-watchdog.sh usado pelo remoteifes-health.timer para reiniciar o serviço se o /health falhar
   redes-autorizadas.js  define/lista as faixas de IP autorizadas da rede local — npm run redes
-  reset-admin-senha.js  redefine a senha do usuário admin sem apagar dados
+  reset-admin-senha.js  redefine a senha do superadministrador sem apagar dados
   backup-db.js       gera um backup verificado do banco SQLite agora (npm run backup)
   restore-backup.js  lista e restaura backups, com verificação e cópia de segurança (npm run restore)
   firmware-esp32.js  publica/mostra a imagem de firmware do ESP32 para OTA (npm run firmware)
@@ -910,7 +950,7 @@ remoteifes-web/
     state.js           estado da sessão atual no navegador
     nav.js             troca de abas e telas
     router.js          roteador por fragmento (#/...): reflete a navegação no endereço e a restaura no reload, no link direto e no voltar/avançar, respeitando a permissão
-    account-menu.js    menu da conta (avatar com iniciais): identificação, atalhos de ajuda e aplicativo móvel, sair
+    account-menu.js    menu da conta (avatar com iniciais): identificação, atalho para o aplicativo móvel, sair
     rtstatus.js        cliente WebSocket para status em tempo real
     idle-timer.js      timeout de inatividade e aviso de logout automático
     a11y.js            widget de acessibilidade (fonte, contraste, espaçamento etc.), persiste no localStorage
@@ -918,21 +958,22 @@ remoteifes-web/
     ui-status.js       selo reutilizável de estado de função (disponível, temporariamente indisponível, desativado por configuração, falha etc.)
     floorplan.js        componente reutilizável de planta baixa com zoom (usado na tela de salas e no admin)
     help.js            ajuda contextual dos modais (parte comum embutida; textos de administração vêm de /documentation após validar a sessão), com atalho para a seção do manual
-    manual-content.js  seções comuns do manual (papel "todos") e diagramas SVG, carregadas sob demanda; as seções de administração e do administrador principal são entregues por /documentation e não ficam nos assets públicos
+    manual-content.js  seções comuns do manual (papel "todos") e diagramas SVG, carregadas sob demanda; as seções de administração e do superadministrador são entregues por /documentation e não ficam nos assets públicos
     tempo.js           formatação de datas/horas no fuso de Brasília
     rooms-data.js       utilitário auxiliar de composição de código de sala
     screens/           lógica de cada tela:
+                        inicio.js (hub de início: cartões das ações principais adaptados ao papel, faixa de saúde do sistema para o superadministrador),
                         simple.js (assistente simples), location.js e rooms.js (navegação tradicional),
                         floorplan.js (planta baixa), panel.js (painel de controle de uma sala),
                         schedule.js (agendamentos), grade.js (grade de horários),
                         propriedade.js (config. de salas para proprietários),
                         notifications.js (painel do sino, notificações de dispositivos),
-                        relatos.js (ícone de inseto: envio de relatos e caixa global do administrador principal),
+                        relatos.js (ícone de inseto: envio de relatos e lista dos próprios; a gestão fica em admin.js, sub-aba Relatos de problemas),
                         login.js (portal e sessão),
                         portal-funcoes.js (vitrine de funcionalidades na tela inicial), admin.js (painel administrativo),
                         esp32-admin.js (painel avançado de cada ESP32 — status, config/clonagem IR, OTA e credenciais —
-                        na aba "ESP32", restrito ao administrador principal),
-                        monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao administrador principal),
+                        na aba "ESP32", restrito ao superadministrador),
+                        monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao superadministrador),
                         manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
                         mobile-app.js (página #/aplicativo: instalação PWA/Android e download do APK de produção verificado pelo servidor)
 
@@ -970,7 +1011,7 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`).
 - **ESP32 não aparece como online**: confirme que o dispositivo aparece em `Admin > ESP32 / MACs`, vincule seu MAC a uma sala e verifique se ele alcança o endereço/porta do servidor pela rede local. `pio device monitor -b 115200 -p /dev/ttyUSB0` mostra o estado de Wi-Fi, identificação e WebSocket em tempo real.
 - **Botão "Iniciar captura IR" fica desabilitado em `Admin > ESP32`**: a captura só é permitida em modo clonagem; ative "Ativar modo clonagem" primeiro (o dispositivo precisa já estar em modo de configuração).
-- **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao administrador principal, assim como `Admin > Configurações`.
+- **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao superadministrador, assim como `Admin > Configurações`.
 - **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / MACs`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
 - **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: vincule o MAC detectado a uma sala existente em `Admin > ESP32 / MACs`; o vínculo é recebido automaticamente na próxima consulta do dispositivo.
 - **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. Se o Wi-Fi continuar indisponível por mais de 2 minutos, ele também abre o ponto de acesso de recuperação `RemoteIFES-Setup` (mantendo as tentativas de reconexão em paralelo) para permitir a reconfiguração no local; assim que a rede volta, esse ponto de acesso é fechado sozinho. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
@@ -989,4 +1030,4 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **`flash.sh` não encontra a porta serial do ESP32**: confirme que o cabo USB usado transmite dados (não é só de carga) e que os drivers do conversor USB-serial (CP210x ou CH340, conforme a placa) estão instalados; informe a porta manualmente, ex.: `bash flash.sh /dev/ttyUSB0`.
 - **Restrição de rede ou limite de tentativas de login parecem não fazer efeito**: confira `TRUST_PROXY` no `.env` — o valor precisa corresponder ao número real de proxies reversos na frente do servidor (`1` para o Nginx de `https-setup.sh`, `0` se o Node estiver exposto diretamente); um valor maior que o real permite que o IP de origem seja falsificado via `X-Forwarded-For`, contornando as duas proteções.
 - **App Cordova não fala com o servidor central**: confirme que `remoteifes-web/js/config.js` (não a cópia em `remoteifes-cordova/www/`) aponta para o `serverUrl` de produção antes de gerar o build, e que `remoteifes-cordova/config.xml` libera o domínio do servidor em `access`/`allow-navigation`.
-- **Não sei a senha do `admin` (ou o login não funciona) após clonar**: em um banco novo de desenvolvimento/teste, o padrão é `admin`/`admin`; em produção, a senha é aleatória quando `SENHA_ADMIN_INICIAL` não foi definida. Em um banco existente, a senha anterior é preservada. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou configurações; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.
+- **Não sei a senha do `superadmin` (ou o login não funciona) após clonar**: em um banco novo de desenvolvimento/teste, o padrão é `superadmin`/`admin`; em produção, a senha é aleatória quando `SENHA_ADMIN_INICIAL` não foi definida. Em um banco existente, a senha anterior é preservada, e um login `admin` de uma versão anterior é migrado para `superadmin` no primeiro boot. Rode `npm run reset-admin` dentro de `remoteifes-server` para definir uma nova senha sem apagar salas, MACs ou configurações; passe a senha desejada como argumento (`npm run reset-admin -- minhaSenhaForte`) ou deixe em branco para gerar uma aleatória.

@@ -74,3 +74,39 @@ test("migração da tabela legada de salas preserva dados e cria fwVersao", () =
   assert.equal(db.prepare("SELECT fwVersao FROM salas WHERE sala = ?").get("LEGACY-1").fwVersao, "4.0.0");
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 });
+
+test("a conta padrão 'admin' é migrada para 'superadmin' preservando id, nível e hash", () => {
+  db.prepare("DELETE FROM usuarios").run();
+  const info = db
+    .prepare(
+      "INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo) VALUES ('admin', 'hash-legado', 'Administrador', 1, 3, 1, 1)"
+    )
+    .run();
+
+  criarSchema();
+
+  assert.equal(db.prepare("SELECT id FROM usuarios WHERE usuario = 'admin'").get(), undefined);
+  const conta = db.prepare("SELECT * FROM usuarios WHERE usuario = 'superadmin'").get();
+  assert.equal(conta.id, info.lastInsertRowid);
+  assert.equal(conta.nivel, 3);
+  assert.equal(conta.senhaHash, "hash-legado");
+  assert.equal(conta.nome, "Superadministrador");
+
+  criarSchema();
+  assert.equal(db.prepare("SELECT COUNT(*) AS c FROM usuarios WHERE usuario = 'superadmin'").get().c, 1);
+});
+
+test("a migração não sobrescreve uma conta 'superadmin' já existente nem o nome personalizado", () => {
+  db.prepare("DELETE FROM usuarios").run();
+  db.prepare(
+    "INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo) VALUES ('superadmin', 'hash-novo', 'Superadministrador', 1, 3, 1, 1)"
+  ).run();
+  db.prepare(
+    "INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo) VALUES ('admin', 'hash-antigo', 'Personalizado', 1, 3, 1, 1)"
+  ).run();
+
+  criarSchema();
+
+  assert.equal(db.prepare("SELECT senhaHash FROM usuarios WHERE usuario = 'superadmin'").get().senhaHash, "hash-novo");
+  assert.equal(db.prepare("SELECT nome FROM usuarios WHERE usuario = 'admin'").get().nome, "Personalizado");
+});

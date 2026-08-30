@@ -8,13 +8,15 @@ criarSchema();
 const novaSenha = process.argv[2] || crypto.randomBytes(9).toString("base64url");
 const senhaHash = bcrypt.hashSync(novaSenha, 10);
 
-const admin = db.prepare("SELECT id FROM usuarios WHERE usuario = ?").get("admin");
+const conta =
+  db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'superadmin'").get() ||
+  db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'admin'").get();
 
-if (!admin) {
-  console.log("Nenhum usuário 'admin' encontrado no banco — inicie o servidor uma vez (npm start) para criá-lo automaticamente.");
+if (!conta) {
+  console.log("Nenhuma conta de superadministrador encontrada — inicie o servidor uma vez (npm start) para criá-la automaticamente.");
   process.exit(1);
 }
 
-db.prepare("UPDATE usuarios SET senhaHash = ? WHERE id = ?").run(senhaHash, admin.id);
-console.log(`Senha do usuário admin redefinida para: ${novaSenha}`);
+db.prepare("UPDATE usuarios SET senhaHash = ? WHERE id = ?").run(senhaHash, conta.id);
+console.log(`Senha do usuário ${conta.usuario} redefinida para: ${novaSenha}`);
 console.log("Troque essa senha após o login em Admin > Usuários.");
