@@ -1954,6 +1954,9 @@ button.btn:disabled {
 .audit-list .room-sub { overflow-wrap: anywhere; }
 .audit-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; min-height: 2.75rem; }
 .audit-pagination .link-btn:disabled { opacity: .45; cursor: default; }
+@media (max-width: 1100px) {
+  .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 720px) {
   .audit-filters, .audit-filters-connectivity { grid-template-columns: 1fr; }
   .audit-pagination { justify-content: space-between; gap: .5rem; }
@@ -2090,9 +2093,8 @@ button.btn:disabled {
 
 @media (min-width: 940px) {
   #app:has(#screen-admin:not(.hidden)) {
-    max-width: 940px;
-    margin-left: max(12px, calc((100vw - 940px) / 2 - 40px));
-    margin-right: auto;
+    max-width: 1280px;
+    margin-inline: auto;
   }
 }
 
@@ -2117,10 +2119,13 @@ button.btn:disabled {
   align-items: stretch;
   gap: 16px;
   max-width: var(--admin-col-wide);
+  width: 100%;
+  margin-inline: auto;
 }
-.admin-sub > * { max-width: var(--admin-col); min-width: 0; margin-top: 0; margin-bottom: 0; }
+.admin-sub > * { width: 100%; max-width: var(--admin-col); min-width: 0; margin: 0 auto; }
 .admin-sub > .admin-fp-picker,
-.admin-sub > .mapa-grid { max-width: var(--admin-col-wide); }
+.admin-sub > .mapa-grid,
+#adminSub-energia > * { max-width: var(--admin-col-wide); }
 .admin-sub > .room-list > li:last-child { margin-bottom: 0; }
 
 #adminSub-macs .mac-input { max-width: 22rem; }
@@ -2132,7 +2137,7 @@ button.btn:disabled {
   #app:has(#screen-rooms:not(.hidden)) { max-width: 1000px; }
   #app:has(#screen-agenda:not(.hidden)) { max-width: 940px; }
 
-  #screen-agenda > .card { max-width: 34rem; }
+  #screen-agenda > .card { max-width: 34rem; margin-inline: auto; }
   #roomList,
   #agendaList,
   #propriedadeUsuariosList,
@@ -2170,8 +2175,7 @@ button.btn:disabled {
 @media (min-width: 1300px) {
   #app:has(#screen-admin:not(.hidden)) {
     max-width: 1400px;
-    margin-left: max(12px, calc((100vw - 1400px) / 2 - 40px));
-    margin-right: auto;
+    margin-inline: auto;
   }
 }
 
@@ -2212,12 +2216,12 @@ button.btn:disabled {
 
 .a11y-widget {
   position: fixed;
-  right: calc(16px + var(--safe-right));
-  bottom: calc(76px + var(--safe-bottom));
+  right: calc(76px + var(--safe-right));
+  bottom: calc(16px + var(--safe-bottom));
   z-index: 200;
 }
 
-body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(126px + var(--safe-bottom)); }
+body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(66px + var(--safe-bottom)); }
 .a11y-toggle-btn {
   width: 48px;
   height: 48px;
@@ -2454,7 +2458,7 @@ body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(126px + var(--safe-b
 body:has(#mainApp:not(.hidden)) .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
 
 @supports not selector(:has(*)) {
-  .a11y-widget { bottom: calc(126px + var(--safe-bottom)); }
+  .a11y-widget { bottom: calc(66px + var(--safe-bottom)); }
   .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
 }
 .help-fab-btn {

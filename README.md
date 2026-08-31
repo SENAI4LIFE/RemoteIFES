@@ -56,7 +56,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Ajuda e Manual no App](#ajuda-e-manual-no-app)
 - [Requisitos](#requisitos)
 - [Instalação Rápida](#instalação-rápida)
-- [Instalação Detalhada](#instalação-detalhada)
+- [Inicialização e implantação (referência canônica)](#inicialização-e-implantação-referência-canônica)
 - [Configuração](#configuração)
 - [Deploy](#deploy)
 - [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
@@ -362,7 +362,7 @@ O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela pág
 ### Software
 
 - Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental) — em Linux (incluindo Raspberry Pi OS), `remoteifes-server/setup.sh` instala automaticamente a versão correta caso não esteja presente, sem depender do pacote do sistema
-- [PlatformIO](https://platformio.org/) (Core CLI ou a extensão para VS Code), com a plataforma `espressif32`, para compilar e gravar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do PlatformIO Core (via `pip`) e chama `pio run` para compilar, gravar o sistema de arquivos `data/` (LittleFS) e o firmware
+- [PlatformIO](https://platformio.org/) (Core CLI ou a extensão para VS Code), com a plataforma `espressif32`, para compilar e gravar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do PlatformIO Core (prefere `pipx`, com fallback para `pip --user`) e chama `pio run` para compilar, gravar o sistema de arquivos `data/` (LittleFS) e o firmware
 - Bibliotecas (resolvidas automaticamente pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini`, sem instalação manual): [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) (inclui os módulos `IRrecv`, `IRsend`, `IRutils` e `IRac`), `WebSockets` (Links2004), `ArduinoJson`, `DHT sensor library` e `Adafruit Unified Sensor` — `Preferences`/`DNSServer`/LittleFS já vêm inclusas no core ESP32 do PlatformIO
 
 ### Hardware
@@ -380,7 +380,11 @@ npm run setup
 npm start
 ```
 
-`npm run setup` verifica o Node.js instalado e, em Linux (x64, ARM64 ou ARMv7 — cobre qualquer Raspberry Pi) ou macOS (via Homebrew), instala automaticamente a versão 22.13+ quando necessário; em seguida instala as dependências e cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista). Rodar `npm run setup` novamente não sobrescreve um `.env` já existente. Para manter o servidor rodando permanentemente e reiniciando sozinho no boot (essencial em um Raspberry Pi dedicado), veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi).
+Abra **`http://localhost:8080`** no próprio servidor. De outro dispositivo na mesma rede, abra **`http://IP_DO_SERVIDOR:8080`**. Este é o fluxo normal integrado de desenvolvimento e teste: o Node/Express entrega o frontend do RemoteIFES, a API e o WebSocket juntos na porta 8080 e na mesma origem.
+
+O VS Code Live Server **não é necessário** nesse fluxo. Ele cria outra origem e só deve ser usado intencionalmente no desenvolvimento isolado do frontend, conforme [Frontend em origem separada](#frontend-em-origem-separada-desenvolvimento-opcional). Produção não depende de `localhost` fixado no código: use a origem do servidor/proxy ou configure explicitamente a origem separada.
+
+`npm run setup` verifica o Node.js instalado e, em Linux (x64, ARM64 ou ARMv7 — cobre qualquer Raspberry Pi) ou macOS (via Homebrew), instala automaticamente a versão 22.13+ quando necessário; em seguida instala as dependências e cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista). Rodar `npm run setup` novamente não sobrescreve um `.env` já existente. Os fluxos definitivos de desenvolvimento, produção, `systemd`, proxy reverso e frontend separado ficam somente na [referência canônica de inicialização e implantação](#inicialização-e-implantação-referência-canônica).
 
 **Windows (PowerShell/CMD):**
 
@@ -399,21 +403,54 @@ npm start
 - Um superadministrador inicial `superadmin` com senha `admin` quando `SENHA_ADMIN_INICIAL` não for definida. O acesso permanece funcional e um aviso persistente, visível somente ao superadministrador autenticado, leva à troca da senha
 - Limites globais de temperatura de 23 °C a 25 °C e Turbo sem função adicional
 
-## Instalação Detalhada
+## Inicialização e implantação (referência canônica)
 
-### Servidor central
+Esta é a referência canônica de startup. Se a arquitetura de inicialização mudar, atualize esta seção; a [Instalação Rápida](#instalação-rápida), [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) e [Deploy](#deploy) apenas resumem ou detalham operações posteriores.
 
-A [Instalação Rápida](#instalação-rápida) já cobre os comandos para colocar o servidor no ar. Esta seção detalha o que acontece por trás deles e as opções relevantes para produção.
+### Desenvolvimento integrado
 
-Em macOS/Linux, `npm run setup` (usado na instalação rápida) equivale a `npm install` + `cp .env.example .env`. Rode esses passos manualmente em vez do script caso prefira não instalar o Node.js automaticamente ou queira revisar cada etapa. No Windows, onde `npm run setup` não roda, os passos manuais (`npm install`, copiar `.env.example` para `.env`) já são o único caminho, como descrito na instalação rápida.
+Primeira instalação (uma vez):
 
-Antes de colocar o servidor em produção, edite `.env` conforme a seção [Configuração](#configuração). Defina `CORS_ORIGIN` somente se o frontend ficar em outra origem. Você pode definir `SENHA_ADMIN_INICIAL` antes da criação do banco ou deixar o servidor gerar a credencial de uso único no diretório local de dados; a senha nunca é impressa no log.
+```bash
+cd remoteifes-server
+npm run setup
+npm start
+```
 
-Durante o desenvolvimento, `npm run dev` inicia o servidor com reinício automático a cada alteração de arquivo (`node --watch`), no lugar de `npm start`.
+Startup normal (todas as vezes seguintes):
 
-### Frontend
+```bash
+cd remoteifes-server
+npm start
+```
 
-`remoteifes-web` não tem etapa de build: é servido como está. Em produção (veja [Deploy](#deploy)), o próprio servidor Node o entrega na mesma origem da API, e o frontend fala com o servidor pela origem da página — sem configuração. Aberto localmente para desenvolvimento, ele aponta para `localhost:8080`. O pacote Cordova de produção recebe a origem da implantação por `REMOTEIFES_SERVER_URL` durante o build; não edite `js/config.js` manualmente.
+`npm run setup` só é necessário na primeira instalação ou quando as dependências mudam; não o rode antes de cada reinício. Com `SERVIR_FRONTEND=true` (padrão), abra `http://localhost:8080` ou `http://IP_DO_SERVIDOR:8080`. Express serve `remoteifes-web`, API e `/ws` na mesma origem. `npm run dev` oferece o mesmo conjunto integrado com reinício automático do processo ao alterar arquivos do servidor. O frontend não tem etapa de build.
+
+Em macOS/Linux, `npm run setup` instala as dependências e copia `.env.example` para `.env` somente se o arquivo ainda não existir. No Windows, use os passos manuais da [Instalação Rápida](#instalação-rápida). Banco e migrações são aplicados automaticamente no primeiro startup; não há comando separado de migração.
+
+### Produção
+
+Antes do primeiro startup, revise `.env`, defina `NODE_ENV=production`, mantenha `SERVIR_FRONTEND=true`, defina `SENHA_ADMIN_INICIAL` e cadastre as redes autorizadas. Inicie manualmente com `npm start` apenas para validação ou operação supervisionada. A aplicação usa a URL pela qual foi aberta; portanto, uma implantação normal same-origin nunca depende de `localhost` hardcoded. Veja [Configuração](#configuração) e as rotinas operacionais em [Deploy](#deploy).
+
+### Linux com systemd
+
+```bash
+cd remoteifes-server
+npm run setup
+sudo bash install-service.sh
+```
+
+Esse é o startup persistente canônico para Linux/Raspberry Pi: instala e habilita `remoteifes.service` e o watchdog. Gerencie-o com `sudo systemctl status|start|stop|restart remoteifes.service`; consulte logs com `sudo journalctl -u remoteifes.service -f` e saúde com `npm run health`. O instalador configura produção e pergunta as redes autorizadas. Os detalhes de atualização, backup e recuperação ficam em [Deploy](#deploy).
+
+### Proxy reverso
+
+Para LAN na porta 80, depois do serviço `systemd`, rode `sudo bash lan-setup.sh`. Para HTTPS com domínio, rode `sudo bash https-setup.sh <dominio> <email>`. Ambos mantêm frontend, API e WebSocket na mesma origem, encaminham o upgrade WebSocket e ajustam `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1`. Não exponha simultaneamente a porta interna 8080. Veja [Proxy reverso na porta 80](#proxy-reverso-na-porta-80-rede-local-sem-internet) e [HTTPS com domínio próprio](#https-com-domínio-próprio-opcional) para os efeitos operacionais dos scripts.
+
+### Frontend em origem separada (desenvolvimento opcional)
+
+O Live Server é suportado somente como modo intencional de desenvolvimento isolado. Primeiro mantenha a API/WebSocket em `http://localhost:8080`; depois sirva `remoteifes-web` pelo Live Server em `localhost`. Nesse caso `js/config.js` resolve explicitamente o backend local na porta 8080 e o CORS aberto de `NODE_ENV=development` aceita a origem do Live Server. Se o frontend separado não estiver em `localhost`, sua URL de servidor precisa ser configurada deliberadamente para o ambiente e, em produção, a origem exata precisa constar em `CORS_ORIGIN`. Não use Live Server para validar a implantação integrada, PWA de produção, proxy ou ESP32.
+
+Para voltar ao modo normal, pare o Live Server e acesse `http://localhost:8080`. Não grave um `localhost` fixo para produção. O Cordova recebe a origem de produção por `REMOTEIFES_SERVER_URL` durante o build; não edite `js/config.js` manualmente para o fluxo integrado ou Cordova.
 
 ### Firmware ESP32
 
@@ -426,7 +463,7 @@ cd remoteifes-esp32
 bash flash.sh
 ```
 
-`flash.sh` instala o PlatformIO Core (caso ausente, via `pip`), compila o firmware (`pio run`), grava o sistema de arquivos `data/` (`pio run --target uploadfs`) e depois o firmware (`pio run --target upload`) no ESP32 conectado por USB — sem precisar abrir a Arduino IDE ou a extensão do VS Code. A porta serial costuma ser detectada automaticamente pelo PlatformIO; se houver mais de um dispositivo serial conectado, informe a porta manualmente: `bash flash.sh /dev/ttyUSB0` (Linux/Raspberry Pi) ou `bash flash.sh /dev/cu.usbserial-XXXX` (macOS).
+`flash.sh` instala o PlatformIO Core caso esteja ausente (com `pipx`, recomendado no Ubuntu 24.04 e demais sistemas com Python gerenciado; se `pipx` não existir, usa `pip --user`), compila o firmware (`pio run`), grava o sistema de arquivos `data/` (`pio run --target uploadfs`) e depois o firmware (`pio run --target upload`) no ESP32 conectado por USB — sem precisar abrir a Arduino IDE ou a extensão do VS Code. A porta serial costuma ser detectada automaticamente pelo PlatformIO; se houver mais de um dispositivo serial conectado, informe a porta manualmente: `bash flash.sh /dev/ttyUSB0` (Linux/Raspberry Pi) ou `bash flash.sh /dev/cu.usbserial-XXXX` (macOS).
 
 **Manual (PlatformIO Core ou extensão do VS Code):**
 
@@ -454,7 +491,7 @@ A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualme
 |---|---|
 | `NODE_ENV` | `development` ou `production`. Em produção, ativa a restrição de rede, o CORS restrito e o serviço do frontend pelo próprio servidor |
 | `PORTA` | Porta HTTP (e WebSocket, no mesmo servidor) do servidor (padrão 8080) |
-| `SERVIR_FRONTEND` | Servir o `remoteifes-web` pelo próprio servidor, na mesma origem da API (operação same-origin). Padrão: ligado quando `NODE_ENV=production`, desligado nos demais casos. Com o frontend servido assim, `CORS_ORIGIN` deixa de ser necessário |
+| `SERVIR_FRONTEND` | Servir o `remoteifes-web` pelo próprio servidor, na mesma origem da API (operação same-origin). Padrão: ligado em desenvolvimento e produção. Desative apenas no desenvolvimento intencional do frontend em outra origem. Com o frontend servido assim, `CORS_ORIGIN` deixa de ser necessário |
 | `FRONTEND_DIR` | Caminho da pasta do frontend a servir (padrão: `../remoteifes-web` relativo ao projeto do servidor) |
 | `REMOTEIFES_DATA_DIR` | Diretório dos dados persistentes (banco, backups, imagem de firmware para OTA, versões e log de deploy). Padrão: `data/` dentro do projeto do servidor. Aponte para fora do checkout do Git (ex.: `/var/lib/remoteifes`) para que atualizações de código nunca toquem nos dados. `REMOTEIFES_DB_PATH`, `BACKUP_DIR` e `REMOTEIFES_FIRMWARE_DIR` continuam disponíveis para sobrescrever caminhos individuais |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — necessária **apenas** quando o frontend é servido de outra origem (ex.: GitHub Pages). Vale tanto para a API HTTP quanto para as conexões WebSocket |
@@ -482,7 +519,7 @@ Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba 
 | Tempo de inatividade administrativo | 720 minutos | Limite de inatividade aplicado a administradores e superadministrador |
 | Aviso de logout automático | 60 segundos | Duração da contagem regressiva exibida antes do logout por inatividade |
 | Limiar de presença online | 5 minutos | Minutos sem uso após os quais um usuário com sessão aberta passa de "online" para "inativo" na aba Ativos |
-| Exigir credencial por dispositivo em todos os ESP32 | desativado | Quando ativo, nenhum ESP32 se conecta apenas pelo MAC — toda sala precisa de uma credencial provisionada. Ative só depois de provisionar todos os controladores. Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração) |
+| Exigir credencial por dispositivo em todos os ESP32 | ativado em instalações normais novas | Nenhum ESP32 se conecta apenas pelo MAC enquanto esta opção estiver ativa — toda sala precisa de uma credencial provisionada. Para um controlador novo, provisione a credencial da sala no painel e informe `deviceId` e segredo junto com o Wi-Fi no portal `RemoteIFES-Setup`; em uma migração de controladores antigos, siga o fluxo gradual da seção [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). O ambiente automatizado de testes começa com a opção desativada para exercitar também o modo legado. |
 
 ### ESP32 por MAC e limites por sala (via `Admin > ESP32 / MACs`)
 
@@ -506,13 +543,7 @@ O próprio servidor Node entrega o `remoteifes-web` na **mesma origem** da API q
 
 ### Servidor central
 
-Instalação de produção em um Linux com `systemd`:
-
-```bash
-cd remoteifes-server
-npm run setup                 # Node.js + dependências + .env
-sudo bash install-service.sh  # serviço systemd, watchdog de saúde, início no boot
-```
+Faça a instalação pelo fluxo único de [Linux com systemd](#linux-com-systemd). Esta seção descreve os efeitos e a operação posterior, sem redefinir os comandos de startup.
 
 `install-service.sh`:
 
@@ -534,22 +565,13 @@ As rotas `/dispositivo/*` (usadas pelos ESP32) e o acesso por `localhost` (útil
 
 ### Proxy reverso na porta 80 (rede local, sem Internet)
 
-`lan-setup.sh` coloca o Nginx na frente do servidor na porta 80, sem Certbot nem DNS:
-
-```bash
-sudo bash lan-setup.sh
-sudo systemctl restart remoteifes.service
-```
+Use o comando da referência canônica em [Proxy reverso](#proxy-reverso). `lan-setup.sh` coloca o Nginx na frente do servidor na porta 80, sem Certbot nem DNS.
 
 Ele cria um site Nginx que encaminha tudo (inclusive `Upgrade`/`Connection` para `/ws` e `/ws/dispositivo`) para `127.0.0.1:<PORTA>`, grava `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1` no `.env` (assim o Node passa a escutar **só em localhost**, atrás do proxy — impede que alguém alcance a `PORTA` diretamente e falsifique `X-Forwarded-For`) e passa a atender em `http://<ip-do-servidor>/`. O Nginx precisa já estar instalado (ou o script o instala via `apt`, quando disponível). O script assume um host dedicado ao RemoteIFES (assume o site padrão do Nginx na porta 80).
 
 ### HTTPS com domínio próprio (opcional)
 
-Quando houver um domínio público e acesso à Internet, `remoteifes-server/https-setup.sh` configura o proxy reverso e emite um certificado Let's Encrypt com Certbot:
-
-```bash
-sudo bash https-setup.sh <dominio> <email>
-```
+Quando houver um domínio público e acesso à Internet, use o comando canônico de [Proxy reverso](#proxy-reverso). `remoteifes-server/https-setup.sh` configura o proxy e emite um certificado Let's Encrypt com Certbot.
 
 O script instala Nginx e Certbot se necessário, cria um site apontando para `127.0.0.1:<PORTA>`, emite o certificado, ativa a renovação automática (`certbot.timer`) e ajusta `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1` no `.env`. É o caminho para expor o sistema fora da rede local e para PWA/HTTPS em domínio próprio; a operação local não precisa dele.
 
@@ -595,14 +617,7 @@ bash release.sh 3.1.0        # ajusta a versão no package.json, cria o commit e
 
 Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é suficiente para rodar `remoteifes-server`: o `node:sqlite` usado pelo projeto é nativo do próprio Node.js, então não há dependências compiladas nem ferramentas de build a instalar no dispositivo.
 
-```bash
-git clone <url-do-repositorio>
-cd RemoteIFES/remoteifes-server
-npm run setup
-sudo bash install-service.sh          # serviço + watchdog + início no boot; pergunta as faixas da rede local
-npm run redes -- 10.10.0.0/16         # se não informou as faixas no passo anterior
-sudo bash lan-setup.sh                # opcional: Nginx na porta 80 para a rede local
-```
+Clone o repositório e siga somente [Linux com systemd](#linux-com-systemd); se quiser Nginx, continue em [Proxy reverso](#proxy-reverso). Cadastre redes adicionais depois com `npm run redes -- 10.10.0.0/16`.
 
 - `npm run setup` detecta a arquitetura do Pi (ARM64 ou ARMv7) e instala automaticamente o Node.js 22.13+ direto dos binários oficiais quando a versão do sistema é insuficiente ou inexistente, sem depender do pacote (geralmente desatualizado) do repositório da distribuição.
 - `sudo bash install-service.sh` grava `NODE_ENV=production` no `.env`, cria e habilita o serviço `systemd` `remoteifes.service` (início no boot, `Restart=always`) e o watchdog `remoteifes-health.timer` — dispensa `pm2` ou uma sessão de terminal aberta. O servidor passa a entregar o `remoteifes-web` na mesma origem da API.
@@ -899,7 +914,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 | Alvo | Comando | Observações |
 |---|---|---|
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`) e o monitoramento operacional (`test/monitoramento.test.js`). |
-| Frontend end-to-end | `cd e2e && npm install && npx playwright test` | Usa o Chromium instalado pelo Playwright por padrão; para usar um canal do sistema, defina `E2E_BROWSER_CHANNEL` (por exemplo, `chrome` ou `msedge`). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`inicio.spec.js`), o gate do Monitoramento por superadministrador e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
+| Frontend end-to-end | `cd e2e && npm install && npx playwright install chromium && npx playwright test` | A instalação do pacote npm não baixa o navegador automaticamente; `npx playwright install chromium` instala a versão compatível. Em uma imagem Ubuntu mínima que ainda não tenha as bibliotecas do Chromium, use uma vez `sudo npx playwright install-deps chromium`. Para usar um canal do sistema, defina `E2E_BROWSER_CHANNEL` (por exemplo, `chrome` ou `msedge`). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`inicio.spec.js`), o gate do Monitoramento por superadministrador e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
 | Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
 | ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
@@ -1025,8 +1040,13 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 
 ## Solução de Problemas
 
+- **`EADDRINUSE` / porta 8080 ocupada**: descubra o processo com `ss -ltnp 'sport = :8080'` (use `sudo ss -ltnp 'sport = :8080'` se o nome/PID não aparecer). Se já for uma instância do RemoteIFES, use-a ou pare-a pelo mesmo método com que foi iniciada; não abra uma segunda instância sobre o mesmo banco. Confirme depois com `curl -fsS http://localhost:8080/health` ou `npm run health`.
+- **Servidor parece iniciado, mas a tela não abre**: `curl -fsS http://localhost:8080/health` deve retornar JSON com `"ok":true`, e `curl -I http://localhost:8080/` deve indicar conteúdo HTML. Confira também `ss -ltnp 'sport = :8080'`. Se `/health` funciona mas `/` não é HTML, confirme `SERVIR_FRONTEND=true` e reinicie o processo.
+- **PWA mostra frontend antigo após uma alteração**: recarregue uma vez com a rede disponível e aguarde o novo service worker assumir o controle. Para diagnóstico local, em DevTools > Application > Service Workers use **Update** e depois recarregue; se ainda houver estado obsoleto, use **Unregister** e limpe somente os dados/cache do site RemoteIFES. Em uma release, incremente `CACHE_VERSION` em `remoteifes-web/sw.js` sempre que o app-shell mudar.
+- **Perda temporária ou endereço incorreto**: uma queda momentânea mostra “Reconectando automaticamente…” e a interface recupera sozinha quando HTTP/WebSocket voltam. Falha persistente desde a abertura, `/health` inacessível pelo mesmo dispositivo ou acesso por um IP antigo indica endereço, porta, firewall, proxy ou rede autorizada incorretos. No fluxo integrado, abra novamente `http://IP_DO_SERVIDOR:8080`; não troque a configuração por causa de uma interrupção breve.
+- **Live Server abre a interface, mas não representa a implantação**: ele é apenas o modo opcional de [frontend em origem separada](#frontend-em-origem-separada-desenvolvimento-opcional). Para teste integrado, pare-o e use `http://localhost:8080` ou `http://IP_DO_SERVIDOR:8080`.
 - **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
-- **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`).
+- **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`). No Ubuntu 24.04, não contorne a proteção de Python gerenciado com `pip --break-system-packages`: instale `pipx` pelo gerenciador de pacotes e rode `flash.sh` novamente.
 - **ESP32 não aparece como online**: confirme que o dispositivo aparece em `Admin > ESP32 / MACs`, vincule seu MAC a uma sala e verifique se ele alcança o endereço/porta do servidor pela rede local. `pio device monitor -b 115200 -p /dev/ttyUSB0` mostra o estado de Wi-Fi, identificação e WebSocket em tempo real.
 - **Botão "Iniciar captura IR" fica desabilitado em `Admin > ESP32`**: a captura só é permitida em modo clonagem; ative "Ativar modo clonagem" primeiro (o dispositivo precisa já estar em modo de configuração).
 - **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao superadministrador, assim como `Admin > Configurações`.
@@ -1040,7 +1060,6 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
 - **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Admin > Proprietários de sala`.
 - **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend está em HTTPS e que o navegador atende aos demais critérios de instalação. O `serverUrl` também deve usar HTTPS para a API funcionar sem bloqueio de conteúdo misto, mas não é ele que determina se o navegador oferece a instalação.
-- **App fica com versão antiga dos arquivos depois de atualizar o PWA**: incremente `CACHE_VERSION` em `remoteifes-web/sw.js`; sem isso, os clientes que já instalaram o app continuam servindo os arquivos do cache antigo.
 - **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_HOME` aponta para o Android SDK, que Platform 36/Build Tools 36 estão instalados, que o JDK 17 está em `JAVA_HOME`/`PATH` e que o Gradle 8.14.2 está no `PATH` para inicializar o wrapper; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
 - **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org`); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `npm run setup` novamente.
 - **`install-service.sh` falha com "systemd não encontrado"**: o script só funciona em Linux com `systemd` (padrão no Raspberry Pi OS); em outras distribuições, use um gerenciador de processo alternativo como `pm2`.

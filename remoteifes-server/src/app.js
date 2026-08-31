@@ -28,7 +28,7 @@ const origensPermitidas = (process.env.CORS_ORIGIN || "")
   .filter(Boolean);
 
 const SERVIR_FRONTEND =
-  String(process.env.SERVIR_FRONTEND ?? (NODE_ENV === "production" ? "true" : "false")).toLowerCase() === "true";
+  String(process.env.SERVIR_FRONTEND ?? "true").toLowerCase() === "true";
 const FRONTEND_DIR = process.env.FRONTEND_DIR
   ? path.resolve(process.env.FRONTEND_DIR)
   : path.join(__dirname, "..", "..", "remoteifes-web");
