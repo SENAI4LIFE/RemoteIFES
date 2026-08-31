@@ -30,10 +30,10 @@ function ipNaFaixa(ip, faixaCidr) {
 }
 
 function ipAutorizado(ip, faixasAutorizadas) {
-  if (!Array.isArray(faixasAutorizadas) || faixasAutorizadas.length === 0) return false;
   const ipNormalizado = normalizarIp(ip);
   if (!ipNormalizado) return false;
   if (ipNormalizado === "127.0.0.1") return true;
+  if (!Array.isArray(faixasAutorizadas) || faixasAutorizadas.length === 0) return false;
   return faixasAutorizadas.some((faixa) => ipNaFaixa(ipNormalizado, faixa));
 }
 

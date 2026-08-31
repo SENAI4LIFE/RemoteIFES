@@ -191,8 +191,8 @@ const ServerStatus = (() => {
     agendarEstadoConectando();
 
     let socket;
+    const token = wsToken();
     try {
-      const token = wsToken();
       socket = token ? new WebSocket(wsUrl(), [token]) : new WebSocket(wsUrl());
       ws = socket;
     } catch (err) {
@@ -217,9 +217,18 @@ const ServerStatus = (() => {
       processarMensagem(msg);
     });
 
-    socket.addEventListener("close", () => {
+    socket.addEventListener("close", (event) => {
       if (idConexao !== conexaoId || ws !== socket) return;
       ws = null;
+      if (event.code === 4001 && token) {
+        if (typeof Api !== "undefined") Api.limparSessaoLocal();
+        if (typeof state !== "undefined" && state.usuario) {
+          window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
+        } else if (typeof mostrarPortal === "function") {
+          mostrarPortal();
+        }
+        return;
+      }
       agendarReconexao();
     });
 

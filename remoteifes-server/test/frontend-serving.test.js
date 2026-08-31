@@ -2,6 +2,7 @@ process.env.REMOTEIFES_DB_PATH = ":memory:";
 process.env.NODE_ENV = "production";
 process.env.SENHA_ADMIN_INICIAL = "frontend-test-pass-123";
 process.env.SERVIR_FRONTEND = "true";
+process.env.TRUST_PROXY = "1";
 process.env.FRONTEND_DIR = require("path").join(__dirname, "..", "..", "remoteifes-web");
 
 const http = require("http");
@@ -112,7 +113,7 @@ test("o frontend carrega mesmo quando a API está bloqueada pela restrição de 
 
   const login = await fetch(`${baseUrl}/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Forwarded-For": "203.0.113.10" },
     body: JSON.stringify({ usuario: "superadmin", senha: "x" }),
   });
   assert.equal(login.status, 403);
