@@ -1,4 +1,4 @@
-const TELAS_ACESSO_IDS = ["screen-portal", "screen-login", "screen-manutencao-acesso", "mainApp"];
+const TELAS_ACESSO_IDS = ["screen-portal", "screen-login", "screen-manutencao-acesso", "screen-server-config", "mainApp"];
 
 function mostrarTelaAcesso(idAlvo) {
   TELAS_ACESSO_IDS.forEach((id) => {
@@ -29,9 +29,13 @@ const ServerStatus = (() => {
   const titulo = document.getElementById("serverStatusTitulo");
   const desc = document.getElementById("serverStatusDesc");
   const acessoAdminBtn = document.getElementById("serverStatusAcessoAdmin");
-  const configServidorBtn = document.getElementById("serverStatusConfigBtn");
   const chipDot = document.getElementById("serverStatusDot");
   const chipLabel = document.getElementById("serverStatusChipLabel");
+
+  const telaConfig = document.getElementById("screen-server-config");
+  const formConfig = document.getElementById("serverConfigForm");
+  const inputConfig = document.getElementById("serverConfigUrl");
+  const erroConfig = document.getElementById("serverConfigError");
 
   const telaAcesso = document.getElementById("screen-manutencao-acesso");
   const formAcesso = document.getElementById("manutencaoAcessoForm");
@@ -51,34 +55,6 @@ const ServerStatus = (() => {
     const base = baseServidor() || window.location.origin;
     const wsBase = base.replace(/^http/, "ws");
     return `${wsBase}/ws`;
-  }
-
-  function mostrarConfigServidor() {
-    if (!configServidorBtn) return;
-    const empacotado = !!(window.RemoteIFESConfig && window.RemoteIFESConfig.empacotado);
-    const apontaLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:|\/|$)/.test(baseServidor());
-    const precisa = empacotado || !servidorConfigurado() || apontaLocalhost;
-    configServidorBtn.classList.toggle("hidden", !precisa);
-  }
-
-  async function pedirEnderecoServidor() {
-    if (typeof Dialog === "undefined") return;
-    const atual = baseServidor();
-    const novo = await Dialog.texto({
-      titulo: "Endereço do servidor RemoteIFES",
-      descricao: "Informe o endereço (IP ou domínio) do servidor na rede, incluindo a porta. Ex.: http://192.168.0.10:8080",
-      label: "Endereço do servidor",
-      valorInicial: atual,
-      placeholder: "http://192.168.0.10:8080",
-      maxLength: 200,
-      confirmarTexto: "Salvar e reconectar",
-    });
-    if (!novo) return;
-    if (!window.RemoteIFESConfig || !window.RemoteIFESConfig.definirServidor(novo)) {
-      if (typeof Toast !== "undefined") Toast.erro("endereço inválido: use http://host:porta ou https://host");
-      return;
-    }
-    window.location.reload();
   }
 
   function wsToken() {
@@ -122,10 +98,14 @@ const ServerStatus = (() => {
     mostrarSpinner();
     aplicarChip("offline", "Offline");
     titulo.textContent = "Sem conexão com o servidor";
-    desc.textContent = servidorConfigurado()
-      ? `Tentativa de conexão nº ${Math.max(1, tentativas)}`
-      : "Nenhum endereço de servidor configurado para este dispositivo.";
-    mostrarConfigServidor();
+    desc.textContent = "Reconectando automaticamente…";
+  }
+
+  function aplicarEstadoConfiguracao() {
+    tela.classList.add("hidden");
+    telaConfig.classList.remove("hidden");
+    erroConfig.classList.add("hidden");
+    setTimeout(() => inputConfig.focus(), 0);
   }
 
   function aplicarEstadoManutencao() {
@@ -139,14 +119,12 @@ const ServerStatus = (() => {
     titulo.textContent = "Sistema em manutenção";
     desc.textContent = "O RemoteIFES está passando por uma manutenção programada. Tente novamente em alguns instantes.";
     acessoAdminBtn.classList.remove("hidden");
-    if (configServidorBtn) configServidorBtn.classList.add("hidden");
   }
 
   function esconderTela() {
     limparEstadoConectandoAgendado();
     tela.classList.add("hidden");
     acessoManualLiberado = false;
-    if (configServidorBtn) configServidorBtn.classList.add("hidden");
   }
 
   function mostrarAcessoManutencao() {
@@ -204,9 +182,7 @@ const ServerStatus = (() => {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
     if (!servidorConfigurado()) {
-      tentativas = Math.max(1, tentativas);
-      aplicarEstadoConectando();
-      notificarPronto();
+      aplicarEstadoConfiguracao();
       return;
     }
 
@@ -305,9 +281,17 @@ const ServerStatus = (() => {
     mostrarAcessoManutencao();
   });
 
-  if (configServidorBtn) {
-    configServidorBtn.addEventListener("click", pedirEnderecoServidor);
-  }
+  formConfig.addEventListener("submit", (event) => {
+    event.preventDefault();
+    erroConfig.classList.add("hidden");
+    if (!window.RemoteIFESConfig || !window.RemoteIFESConfig.definirServidor(inputConfig.value)) {
+      erroConfig.textContent = "Use um endereço HTTP ou HTTPS válido, sem caminho adicional.";
+      erroConfig.classList.remove("hidden");
+      inputConfig.focus();
+      return;
+    }
+    window.location.reload();
+  });
 
   cancelarAcessoBtn.addEventListener("click", () => {
     acessoManualLiberado = false;

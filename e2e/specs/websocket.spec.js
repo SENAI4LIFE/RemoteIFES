@@ -25,11 +25,58 @@ test("queda de rede mostra o aviso de conexão e o app se recupera ao voltar", a
   expect(fechado.ok()).toBe(true);
   await expect(page.locator("#screen-server-status")).toBeVisible({ timeout: 25_000 });
   await expect(page.locator("#serverStatusTitulo")).toContainText("Sem conexão");
+  await expect(page.locator("#serverStatusDesc")).toHaveText("Reconectando automaticamente…");
+  await expect(page.getByText("Configurar endereço do servidor", { exact: true })).toHaveCount(0);
 
   await context.setOffline(false);
   await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 25_000 });
   await expect(page.locator("#mainApp")).toBeVisible();
   await expect(page.locator('.tab-btn[data-tab="salas"]')).toBeVisible();
+});
+
+for (const papel of ["admin", "superadmin"]) {
+  test(`queda temporária para ${papel} mantém somente a reconexão automática`, async ({ page, sessaoComo, context, request }) => {
+    await sessaoComo(papel);
+    await context.setOffline(true);
+    const fechado = await request.post(`${API_URL}/__e2e/fechar-status`);
+    expect(fechado.ok()).toBe(true);
+    await expect(page.locator("#screen-server-status")).toBeVisible({ timeout: 25_000 });
+    await expect(page.locator("#serverStatusDesc")).toHaveText("Reconectando automaticamente…");
+    await expect(page.locator("#screen-server-config")).toBeHidden();
+    await expect(page.getByText("Configurar endereço do servidor", { exact: true })).toHaveCount(0);
+    await context.setOffline(false);
+    await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 25_000 });
+  });
+}
+
+test("falha HTTP isolada não oferece reconfiguração de infraestrutura", async ({ page, sessaoComo }) => {
+  await sessaoComo("user");
+  await page.route(`${API_URL}/salas`, (route) => route.abort("failed"));
+  const resultado = await page.evaluate(async () => Api.listarSalas());
+  expect(resultado.ok).toBe(false);
+  await expect(page.locator("#screen-server-status")).toBeHidden();
+  await expect(page.locator("#screen-server-config")).toBeHidden();
+  await expect(page.getByText("Configurar endereço do servidor", { exact: true })).toHaveCount(0);
+});
+
+test("Cordova sem origem usa configuração inicial dedicada e funcional", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    window.cordova = {};
+    if (!window.sessionStorage.getItem("e2e_cordova_config_iniciado")) {
+      window.localStorage.removeItem("remoteifes_server_url");
+      window.sessionStorage.setItem("e2e_cordova_config_iniciado", "1");
+    }
+  });
+  await page.goto("/");
+  await expect(page.locator("#screen-server-config")).toBeVisible();
+  await expect(page.locator("#screen-server-status")).toBeHidden();
+  await page.locator("#serverConfigUrl").fill("ftp://servidor-invalido");
+  await page.locator("#serverConfigForm button[type=submit]").click();
+  await expect(page.locator("#serverConfigError")).toBeVisible();
+  await page.locator("#serverConfigUrl").fill(API_URL);
+  await page.locator("#serverConfigForm button[type=submit]").click();
+  await expect(page.locator("#screen-server-config")).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
 });
 
 test("recarregar a página restaura a sessão sem novo login", async ({ page, sessaoComo }) => {
