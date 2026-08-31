@@ -100,7 +100,7 @@ test("menu rápido de ajuda expõe todas as ações comuns e fecha com Escape", 
   await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Ajuda desta página");
   await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Manual completo");
   await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Solução de problemas");
-  await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Relatar um problema");
+  await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Relatar problema");
   await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Aplicativo móvel");
   await page.keyboard.press("Escape");
   await expect(page.locator("#helpFabPanel")).toBeHidden();

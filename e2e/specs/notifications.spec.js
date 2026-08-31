@@ -1,4 +1,18 @@
-const { test, expect } = require("../harness/fixtures");
+const { test, expect, API_URL, tokenDe, injetarSessao } = require("../harness/fixtures");
+
+test("API de notificações exige autorização administrativa", async ({ request }) => {
+  expect((await request.get(`${API_URL}/admin/notificacoes`)).status()).toBe(401);
+  expect((await request.get(`${API_URL}/admin/notificacoes`, { headers: { Authorization: `Bearer ${tokenDe("user")}` } })).status()).toBe(403);
+  expect((await request.get(`${API_URL}/admin/notificacoes`, { headers: { Authorization: `Bearer ${tokenDe("admin")}` } })).status()).toBe(200);
+});
+
+test("Administração oferece a seção Notificações de dispositivos sem duplicar dados", async ({ page, context }) => {
+  await injetarSessao(context, "admin");
+  await page.goto("/#/admin/notificacoes");
+  await expect(page.locator('.admin-subtab-btn[data-sub="notificacoes"]')).toContainText("Notificações de dispositivos");
+  await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#adminNotifList .notif-item").first()).toContainText("offline");
+});
 
 test("administrador abre o sino e vê a notificação de ESP32 offline", async ({ page, sessaoComo }) => {
   await sessaoComo("admin");

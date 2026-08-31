@@ -104,6 +104,19 @@ app.get("/health", (req, res) => {
 app.use(require("./routes/dispositivoRoutes"));
 
 if (frontendDisponivel) {
+  app.use((req, res, next) => {
+    const caminho = req.path;
+    const semCache = caminho === "/" || caminho === "/index.html" || caminho === "/sw.js" ||
+      caminho === "/manifest.webmanifest" || caminho === "/version.json";
+    if (semCache) {
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    } else if (req.query.v && /\.(?:css|js|png|svg|ico)$/.test(caminho)) {
+      res.set("Cache-Control", "public, max-age=31536000, immutable");
+    } else if (/\.(?:html|css|js|webmanifest|json)$/.test(caminho)) {
+      res.set("Cache-Control", "no-cache");
+    }
+    next();
+  });
   app.use(express.static(FRONTEND_DIR, { index: "index.html" }));
 }
 

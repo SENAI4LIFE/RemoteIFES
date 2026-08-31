@@ -26,7 +26,7 @@ const MobileApp = (() => {
     conteudo.innerHTML = `
       <section class="mobile-app-hero">
         <div><span class="mobile-app-kicker">REMOTEIFES NO CELULAR</span><h2>Controle as salas com a mesma segurança do site</h2><p>O aplicativo empacota a interface mantida do RemoteIFES e conecta somente ao servidor configurado para a sua instalação.</p></div>
-        <img src="assets/icons/icon-192.png" alt="" width="128" height="128" />
+        <img src="assets/icons/icon-192.png?v=${encodeURIComponent(window.REMOTEIFES_FRONTEND_VERSION || "unknown")}" alt="" width="128" height="128" />
       </section>
       <div class="mobile-app-grid">
         <section class="mobile-app-card mobile-app-download ${android ? "is-recommended" : ""}"><h3>Android</h3>

@@ -23,6 +23,14 @@ const Manual = (() => {
     cordova: "pwa-mobile",
     problemas: "solucao-problemas",
     ajuda: "inicio",
+    hub: "inicio-acoes",
+    atalhos: "inicio-acoes",
+    conta: "conta-sessao",
+    sessao: "conta-sessao",
+    offline: "pwa-mobile",
+    historico: "auditoria",
+    notificacao: "notificacoes",
+    acessibilidade: "acessibilidade",
   };
 
   function resolverSecao(id) {
@@ -174,7 +182,8 @@ const Manual = (() => {
     if (!carregando) {
       carregando = new Promise((resolve) => {
         const s = document.createElement("script");
-        s.src = "js/manual-content.js";
+        const versao = window.REMOTEIFES_FRONTEND_VERSION || "unknown";
+        s.src = `js/manual-content.js?v=${encodeURIComponent(versao)}`;
         s.onload = resolve;
         s.onerror = resolve;
         document.head.appendChild(s);
@@ -270,12 +279,14 @@ const Manual = (() => {
       return ({ "screen-panel": "controlador", "screen-agenda": "agenda-grade", "screen-grade": "agenda-grade", "screen-propriedade": "papeis" })[id] || "selecao-sala";
     })();
     if (primarios) {
-      primarios.innerHTML = `<button type="button" class="btn btn-on btn-block" data-sec="${contextual}">Ajuda desta página</button><button type="button" id="helpFabManualBtn" class="btn btn-off btn-block" data-sec="">Manual completo</button><button type="button" class="link-btn" data-sec="solucao-problemas">Solução de problemas</button><button type="button" class="link-btn" data-help-action="report">Relatar um problema</button><button type="button" class="link-btn" data-help-action="mobile">Aplicativo móvel</button>`;
+      primarios.innerHTML = `<button type="button" class="btn btn-on btn-block" data-sec="${contextual}">Ajuda desta página</button><button type="button" id="helpFabManualBtn" class="btn btn-off btn-block" data-sec="">Manual completo</button><button type="button" class="link-btn" data-sec="solucao-problemas">Solução de problemas</button><button type="button" class="link-btn" data-help-action="report">Relatar problema</button><button type="button" class="link-btn" data-help-action="mobile">Aplicativo móvel</button>`;
       primarios.querySelectorAll("[data-sec]").forEach((btn) => btn.addEventListener("click", () => {
         document.getElementById("helpFabPanel").classList.add("hidden");
         abrir(btn.dataset.sec || null);
       }));
-      primarios.querySelector('[data-help-action="report"]').addEventListener("click", () => {
+      primarios.querySelector('[data-help-action="report"]').addEventListener("click", (evento) => {
+        // Sem isto, o fechamento global por clique no documento fecharia o painel de relatos recém-aberto.
+        evento.stopPropagation();
         document.getElementById("helpFabPanel").classList.add("hidden");
         const relatar = document.getElementById("bugReportBtn");
         if (relatar) relatar.click();
