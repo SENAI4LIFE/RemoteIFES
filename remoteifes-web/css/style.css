@@ -2529,6 +2529,28 @@ body:has(#mainApp:not(.hidden)) .help-fab-widget { bottom: calc(66px + var(--saf
   box-sizing: border-box;
 }
 #screen-server-status.hidden { display: none; }
+.server-config-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+.server-config-screen.hidden { display: none; }
+.server-config-label {
+  width: 100%;
+  margin-top: 12px;
+  text-align: left;
+}
+.server-config-screen input,
+.server-config-screen .btn,
+.server-config-screen .error { width: 100%; }
+.server-config-screen .btn { margin-top: 8px; }
+.server-status-dot-config { background: var(--ifes-green); }
 .server-status-card {
   width: min(92vw, 380px);
   min-height: calc(260px * var(--a11y-font-scale));

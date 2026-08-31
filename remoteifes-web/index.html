@@ -26,10 +26,22 @@
         <span id="serverStatusChipLabel">Offline</span>
       </div>
       <h2 id="serverStatusTitulo" class="server-status-title">Sem conexão com o servidor</h2>
-      <p id="serverStatusDesc" class="server-status-desc">Tentativa de conexão nº 1</p>
+      <p id="serverStatusDesc" class="server-status-desc">Reconectando automaticamente…</p>
       <button type="button" id="serverStatusAcessoAdmin" class="link-btn hidden">Sou administrador</button>
-      <button type="button" id="serverStatusConfigBtn" class="link-btn hidden">Configurar endereço do servidor</button>
     </div>
+  </section>
+
+  <section id="screen-server-config" class="server-config-screen hidden">
+    <form id="serverConfigForm" class="server-status-card">
+      <div class="server-status-emoji" aria-hidden="true">📱</div>
+      <div class="server-status-chip"><span class="server-status-dot server-status-dot-config" aria-hidden="true"></span><span>Configuração inicial</span></div>
+      <h2 class="server-status-title">Conectar este aplicativo</h2>
+      <p class="server-status-desc">Este aplicativo ainda não possui o endereço da instalação RemoteIFES. Solicite-o à equipe responsável.</p>
+      <label class="server-config-label" for="serverConfigUrl">Endereço do servidor</label>
+      <input id="serverConfigUrl" type="url" inputmode="url" autocomplete="url" maxlength="200" placeholder="https://remoteifes.exemplo.br" required />
+      <p id="serverConfigError" class="error hidden" role="alert"></p>
+      <button type="submit" class="btn btn-on">Salvar e conectar</button>
+    </form>
   </section>
 
   <header class="topbar">
