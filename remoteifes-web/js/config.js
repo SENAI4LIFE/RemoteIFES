@@ -44,9 +44,9 @@ const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());
 window.RemoteIFESConfig = {
   serverUrl,
   empacotado,
-  precisaConfigurar: empacotado && !salvo && !serverUrl,
 
   definirServidor(valor) {
+    if (!empacotado) return false;
     const normalizado = normalizarUrlServidor(valor);
     if (!normalizado) return false;
     try {
@@ -55,11 +55,5 @@ window.RemoteIFESConfig = {
       return false;
     }
     return true;
-  },
-
-  limparServidor() {
-    try {
-      localStorage.removeItem(CHAVE_SERVIDOR);
-    } catch (erro) {}
   },
 };
