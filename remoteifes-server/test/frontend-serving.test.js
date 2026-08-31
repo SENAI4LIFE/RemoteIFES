@@ -11,6 +11,7 @@ const assert = require("node:assert/strict");
 
 const app = require("../src/app");
 const db = require("../src/config/database");
+const FRONTEND_VERSION = require("../../remoteifes-web/version.json").version;
 
 let server;
 let baseUrl;
@@ -39,7 +40,8 @@ test("GET / entrega o index.html do frontend na mesma origem", async () => {
   assert.match(resp.headers.get("content-type"), /text\/html/);
   const html = await resp.text();
   assert.match(html, /<title>RemoteIFES<\/title>/);
-  assert.match(html, /src="js\/app\.js"/);
+  assert.ok(html.includes(`src="js/app.js?v=${FRONTEND_VERSION}"`));
+  assert.ok(html.includes(`name="remoteifes-version" content="${FRONTEND_VERSION}"`));
 });
 
 test("ativos estáticos do frontend são servidos com o tipo correto", async () => {
@@ -50,6 +52,15 @@ test("ativos estáticos do frontend são servidos com o tipo correto", async () 
   const manifest = await fetch(`${baseUrl}/manifest.webmanifest`);
   assert.equal(manifest.status, 200);
   assert.match(manifest.headers.get("content-type"), /manifest\+json/);
+});
+
+test("HTML, service worker e ativos versionados usam cache coerente", async () => {
+  for (const rota of ["/", "/index.html", "/sw.js", "/manifest.webmanifest", "/version.json"]) {
+    const resp = await fetch(`${baseUrl}${rota}`);
+    assert.match(resp.headers.get("cache-control"), /no-cache|no-store/, rota);
+  }
+  const ativo = await fetch(`${baseUrl}/js/app.js?v=${FRONTEND_VERSION}`);
+  assert.match(ativo.headers.get("cache-control"), /immutable/);
 });
 
 test("a CSP no modo frontend permite a própria origem para script, estilo e conexão", async () => {

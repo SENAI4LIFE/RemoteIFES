@@ -289,8 +289,7 @@ body {
 .notif-item {
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
+  overflow: hidden;
 }
 .notif-item.nao-lida {
   background: #fdecea;
@@ -302,6 +301,21 @@ body {
   color: var(--text-muted);
   margin-top: 4px;
 }
+.notif-item-action {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-notificacoes-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-notificacoes-head h2 { margin-bottom: 0; }
+.admin-notif-list { margin-top: 14px; }
 
 .notif-empty { margin: 0; text-align: center; }
 
@@ -1048,6 +1062,7 @@ button.btn:disabled {
 }
 .admin-content {
   flex: 1 1 320px;
+  width: 100%;
   min-width: 0;
 }
 .admin-subtabs {
@@ -2111,6 +2126,9 @@ button.btn:disabled {
 
 #screen-propriedade .card { max-width: 40rem; }
 
+#screen-agenda { width: 100%; max-width: 46rem; margin-inline: auto; }
+#screen-admin { width: 100%; }
+
 .admin-sub {
   --admin-col: 52rem;
   --admin-col-wide: 64rem;
@@ -2183,12 +2201,12 @@ button.btn:disabled {
 .admin-fp-picker .fp-scale-outer {
   width: 100%;
   margin-right: 0;
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 6px;
 }
-.admin-fp-picker .floorplan-scope .plan-wrap { overflow: hidden; border: none; padding: 0; }
+.admin-fp-picker .floorplan-scope .plan-wrap { overflow-x: auto; border: none; padding: 0; }
 .admin-fp-picker .floorplan-scope .plan-wrap.fp-zoomed { overflow: auto; }
 .admin-fp-picker .floorplan-scope .room.selectable { cursor: pointer; }
 .fp-zoom-controls {
@@ -2216,12 +2234,13 @@ button.btn:disabled {
 
 .a11y-widget {
   position: fixed;
-  right: calc(76px + var(--safe-right));
-  bottom: calc(16px + var(--safe-bottom));
-  z-index: 200;
+  right: calc(16px + var(--safe-right));
+  top: calc(64dvh - 24px);
+  bottom: auto;
+  z-index: 1000;
 }
 
-body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(66px + var(--safe-bottom)); }
+body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: auto; }
 .a11y-toggle-btn {
   width: 48px;
   height: 48px;
@@ -2239,9 +2258,11 @@ body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(66px + var(--safe-bo
 
 .a11y-panel {
   position: fixed;
-  inset: 16px;
+  inset: auto 16px auto auto;
+  top: 50dvh;
+  transform: translateY(-50%);
   margin-left: auto;
-  z-index: 201;
+  z-index: 1001;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2249,7 +2270,7 @@ body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(66px + var(--safe-bo
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   width: min(460px, calc(100vw - 32px));
   height: auto;
-  max-height: calc(100dvh - 32px);
+  max-height: min(76dvh, calc(100dvh - 32px));
   overflow-y: auto;
   box-sizing: border-box;
 }
@@ -2458,7 +2479,7 @@ body:has(#mainApp:not(.hidden)) .a11y-widget { bottom: calc(66px + var(--safe-bo
 body:has(#mainApp:not(.hidden)) .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
 
 @supports not selector(:has(*)) {
-  .a11y-widget { bottom: calc(66px + var(--safe-bottom)); }
+  .a11y-widget { bottom: auto; }
   .help-fab-widget { bottom: calc(66px + var(--safe-bottom)); }
 }
 .help-fab-btn {
@@ -2505,7 +2526,7 @@ body:has(#mainApp:not(.hidden)) .help-fab-widget { bottom: calc(66px + var(--saf
   .a11y-panel {
     width: 460px;
     height: auto;
-    max-height: min(580px, calc(100dvh - 32px));
+    max-height: min(580px, 88dvh);
     padding: 14px 16px;
   }
   .a11y-grid {
@@ -3964,6 +3985,8 @@ body.mobile-app-open { overflow: hidden; }
 .manual-secao p { line-height: 1.65; margin: 0 0 12px; }
 .manual-secao ul, .manual-secao ol { margin: 0 0 14px; padding-left: 22px; line-height: 1.6; }
 .manual-secao li { margin-bottom: 6px; }
+.manual-secao p, .manual-secao li { text-align: left; }
+.manual-secao ul { list-style-position: outside; }
 .manual-secao code { background: #eef0ee; border-radius: 4px; padding: 1px 5px; font-size: 0.9em; }
 .manual-nota {
   border-left: 3px solid var(--ifes-green);

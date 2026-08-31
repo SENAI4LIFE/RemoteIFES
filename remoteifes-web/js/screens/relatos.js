@@ -83,10 +83,10 @@ const Relatos = {
     if (novos > 0) {
       badge.textContent = novos > 99 ? "99+" : String(novos);
       badge.classList.remove("hidden");
-      if (botao) botao.setAttribute("aria-label", `Relatar um problema — ${novos} ${novos === 1 ? "relato novo" : "relatos novos"}`);
+      if (botao) botao.setAttribute("aria-label", `Relatar problema — ${novos} ${novos === 1 ? "relato novo" : "relatos novos"}`);
     } else {
       badge.classList.add("hidden");
-      if (botao) botao.setAttribute("aria-label", "Relatar um problema");
+      if (botao) botao.setAttribute("aria-label", "Relatar problema");
     }
     if (typeof Admin !== "undefined" && typeof Admin.atualizarBadgeRelatos === "function") {
       Admin.atualizarBadgeRelatos(novos);
@@ -122,10 +122,10 @@ const Relatos = {
 
     const cabecalho = `
       <div class="relatos-panel-head">
-        <h3>Relatar um problema</h3>
+        <h3>Relatar problema</h3>
         <button type="button" class="link-btn relatos-fechar-btn" aria-label="Fechar painel de relatos">&times;</button>
       </div>
-      <button type="button" class="btn btn-on btn-block relatos-novo-btn">Relatar um problema</button>`;
+      <button type="button" class="btn btn-on btn-block relatos-novo-btn">Relatar problema</button>`;
 
     const gestao = state.isSuperAdmin
       ? `<p class="hint relatos-gestao"><button type="button" class="link-btn relatos-gestao-btn">Gerenciar relatos em Administração &rsaquo; Relatos de problemas &rarr;</button></p>`
@@ -201,7 +201,7 @@ const Relatos = {
     ).join("");
 
     Dialog.abrir({
-      titulo: "Relatar um problema",
+      titulo: "Relatar problema",
       descricao:
         "Descreva o que aconteceu. Sua identificação e a página atual são registradas automaticamente. Não inclua senhas nem códigos de acesso.",
       confirmarTexto: "Enviar relato",
