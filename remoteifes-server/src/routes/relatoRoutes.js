@@ -2,10 +2,16 @@ const express = require("express");
 const { exigirLogin, exigirSuperAdmin } = require("../middlewares/auth");
 const { criarLimitador } = require("../utils/rateLimiter");
 const relatosService = require("../services/relatosService");
+const auditoriaService = require("../services/auditoriaService");
+const logger = require("../utils/logger");
 
 const router = express.Router();
 
 const limitarCriacao = criarLimitador({ janelaMs: 10 * 60 * 1000, maxTentativas: 15 });
+
+function auditar(dados) {
+  try { auditoriaService.registrar(dados); } catch (erro) { logger.warn("auditoria-registro-falhou", { tipo: dados.tipo, mensagem: erro.message }); }
+}
 
 function parseId(req, res) {
   const id = Number(req.params.id);
@@ -66,7 +72,10 @@ router.patch("/superadmin/relatos/:id", exigirLogin, exigirSuperAdmin, (req, res
   const id = parseId(req, res);
   if (id === null) return;
   try {
+    const anterior = relatosService.buscarPorId(id);
     const relato = relatosService.atualizar(id, req.body, req.usuario);
+    const campos = ["status", "resposta"].filter((campo) => JSON.stringify(anterior?.[campo]) !== JSON.stringify(relato[campo]));
+    if (campos.length) auditar({ tipo: "relato_administrado", ator: req.usuario, alvoTipo: "relato", alvoId: id, alvoRotulo: relato.titulo, descricao: `Relato ${id} atualizado`, camposAlterados: campos });
     res.json({ ok: true, relato });
   } catch (err) {
     const status = err.message === "relato não encontrado" ? 404 : 400;
@@ -78,7 +87,9 @@ router.delete("/superadmin/relatos/:id", exigirLogin, exigirSuperAdmin, (req, re
   const id = parseId(req, res);
   if (id === null) return;
   try {
+    const relato = relatosService.buscarPorId(id);
     relatosService.remover(id, req.usuario);
+    auditar({ tipo: "relato_excluido", ator: req.usuario, alvoTipo: "relato", alvoId: id, alvoRotulo: relato?.titulo || String(id), descricao: `Relato ${id} excluido` });
     res.json({ ok: true });
   } catch (err) {
     const status = err.message === "relato não encontrado" ? 404 : 400;

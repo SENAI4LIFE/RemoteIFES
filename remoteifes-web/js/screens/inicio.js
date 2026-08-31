@@ -78,6 +78,8 @@ const Inicio = (() => {
     { sub: "config", icon: "⚙️", titulo: "Configurações", exigeSuper: true },
     { sub: "esp32", icon: "📶", titulo: "ESP32", exigeSuper: true },
     { sub: "monitoramento", icon: "🩺", titulo: "Monitoramento", exigeSuper: true },
+    { sub: "auditoria", icon: "🛡️", titulo: "Auditoria", exigeSuper: true },
+    { sub: "energia", icon: "⚡", titulo: "Energia estimada", exigeSuper: true },
     { sub: "relatos", icon: "🐞", titulo: "Relatos", exigeSuper: true },
   ];
 

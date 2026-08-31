@@ -88,6 +88,19 @@ router.patch("/me/senha", exigirLogin, (req, res) => {
   }
   try {
     usuariosService.trocarSenha(req.usuario.id, req.body && req.body.novaSenha, req.usuario);
+    try {
+      require("../services/auditoriaService").registrar({
+        tipo: "conta_senha_alterada",
+        ator: req.usuario,
+        alvoTipo: "usuario",
+        alvoId: req.usuario.id,
+        alvoRotulo: req.usuario.usuario,
+        descricao: `Senha da conta ${req.usuario.usuario} alterada`,
+        camposAlterados: ["senha"],
+      });
+    } catch (erroAuditoria) {
+      logger.warn("auditoria-registro-falhou", { tipo: "conta_senha_alterada", mensagem: erroAuditoria.message });
+    }
     res.set("Cache-Control", "no-store");
     return res.json({ ok: true });
   } catch (erro) {

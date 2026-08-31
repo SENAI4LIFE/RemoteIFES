@@ -10,6 +10,16 @@ const eventos = new EventEmitter();
 const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura", "turbo"];
 const TIMEOUT_OFFLINE_MS = 90 * 1000;
 
+function energiaAntes(sala) {
+  try { require("./energiaService").consolidarSala(sala); }
+  catch (erro) { logger.warn("energia-isolada-falhou", { sala, etapa: "consolidar", mensagem: erro.message }); }
+}
+
+function energiaDepois(sala) {
+  try { require("./energiaService").sincronizarSala(sala); }
+  catch (erro) { logger.warn("energia-isolada-falhou", { sala, etapa: "sincronizar", mensagem: erro.message }); }
+}
+
 function listar({ bloco, andar } = {}) {
   let query = "SELECT * FROM salas WHERE 1=1";
   const params = [];
@@ -103,6 +113,11 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null, opcoes 
   }
 
   if (!salaRow.online) registrarEventoEsp(sala, "online");
+  try {
+    require("./auditoriaService").registrarOnline(sala, new Date().toISOString());
+  } catch (erro) {
+    logger.warn("esp32-indisponibilidade-fechamento-falhou", { sala, mensagem: erro.message });
+  }
 
   const temLigado = Object.prototype.hasOwnProperty.call(estadoReportado, "ligado");
   const temTemperatura = Object.prototype.hasOwnProperty.call(estadoReportado, "temperatura");
@@ -287,6 +302,11 @@ function verificarTimeouts() {
 
   for (const { sala, nome } of salasParaDesligar) {
     db.prepare(`UPDATE salas SET online = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+    try {
+      require("./auditoriaService").registrarOffline(sala, new Date().toISOString());
+    } catch (erro) {
+      logger.warn("esp32-indisponibilidade-registro-falhou", { sala, mensagem: erro.message });
+    }
     registrarEventoEsp(sala, "offline");
     notificacoesService.criarEspOffline(sala, nome);
     logger.warn("esp32-offline", { sala });
@@ -423,6 +443,8 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
     }
   }
 
+  energiaAntes(sala);
+
   if (cmd === "ligar") {
     db.prepare(`UPDATE salas SET ligado = 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
   } else if (cmd === "desligar") {
@@ -449,6 +471,7 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
 
   eventos.emit("mudanca");
   const salaAtualizada = buscar(sala);
+  energiaDepois(sala);
   enviarEstadoIRParaDispositivo(salaAtualizada);
 
   return {
@@ -534,6 +557,7 @@ function aplicarInicioAgendamento(sala, temperatura) {
     throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
   }
 
+  energiaAntes(sala);
   db.exec("BEGIN");
   try {
     db.prepare(`UPDATE salas SET ligado = 1, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
@@ -546,6 +570,7 @@ function aplicarInicioAgendamento(sala, temperatura) {
   }
 
   const atualizada = buscar(sala);
+  energiaDepois(sala);
   eventos.emit("mudanca");
   enviarEstadoIRParaDispositivo(atualizada);
   return atualizada;

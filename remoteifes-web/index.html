@@ -778,6 +778,8 @@
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">ESP32</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Monitoramento</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="auditoria"><span class="admin-subtab-icon">🛡️</span><span class="admin-subtab-label">Auditoria</span></button>
+          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="energia"><span class="admin-subtab-icon">⚡</span><span class="admin-subtab-label">Energia</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="relatos"><span class="admin-subtab-icon">🐞</span><span class="admin-subtab-label">Relatos de problemas</span><span id="adminRelatosSubBadge" class="admin-subtab-badge hidden"></span></button>
         </div>
 
@@ -875,6 +877,79 @@
             <span>Não foi possível carregar o monitoramento.</span>
             <button type="button" id="monRetryBtn" class="btn btn-off">Tentar de novo</button>
           </div>
+        </div>
+
+        <div id="adminSub-auditoria" class="admin-sub hidden">
+          <p class="hint">Histórico administrativo e períodos de indisponibilidade dos ESP32. Visível apenas ao superadministrador. Os registros expiram automaticamente.</p>
+          <div class="card audit-filter-card">
+            <div class="audit-heading-row">
+              <h2>Eventos administrativos</h2>
+              <span class="hint">Retenção atual: <strong id="auditRetentionCurrent">7 dias</strong></span>
+            </div>
+            <div class="audit-filters">
+              <div><label for="auditFiltroData">Data</label><input type="date" id="auditFiltroData" /></div>
+              <div><label for="auditFiltroTipo">Tipo</label><select id="auditFiltroTipo"><option value="">Todos</option></select></div>
+              <div><label for="auditFiltroAtor">Ator</label><input type="search" id="auditFiltroAtor" maxlength="60" placeholder="login" /></div>
+              <div><label for="auditFiltroAlvo">Usuário, ESP32 ou recurso</label><input type="search" id="auditFiltroAlvo" maxlength="120" placeholder="nome, login ou sala" /></div>
+            </div>
+            <button type="button" id="auditFiltrarBtn" class="btn btn-off">Aplicar filtros</button>
+          </div>
+          <ul id="auditList" class="room-list audit-list" aria-live="polite"></ul>
+          <p id="auditEmpty" class="hint hidden">Nenhum evento encontrado.</p>
+          <div class="audit-pagination">
+            <button type="button" id="auditPrevBtn" class="link-btn">← Anterior</button>
+            <span id="auditPageInfo" class="hint"></span>
+            <button type="button" id="auditNextBtn" class="link-btn">Próxima →</button>
+          </div>
+
+          <div class="card audit-filter-card audit-connectivity-heading">
+            <h2>Indisponibilidade dos ESP32</h2>
+            <div class="audit-filters audit-filters-connectivity">
+              <div><label for="connectFiltroData">Data</label><input type="date" id="connectFiltroData" /></div>
+              <div><label for="connectFiltroSala">ESP32 / sala</label><input type="search" id="connectFiltroSala" maxlength="100" placeholder="ex.: A-108" /></div>
+            </div>
+            <button type="button" id="connectFiltrarBtn" class="btn btn-off">Aplicar filtros</button>
+          </div>
+          <ul id="connectList" class="room-list audit-list" aria-live="polite"></ul>
+          <p id="connectEmpty" class="hint hidden">Nenhuma indisponibilidade encontrada.</p>
+          <div class="audit-pagination">
+            <button type="button" id="connectPrevBtn" class="link-btn">← Anterior</button>
+            <span id="connectPageInfo" class="hint"></span>
+            <button type="button" id="connectNextBtn" class="link-btn">Próxima →</button>
+          </div>
+        </div>
+
+        <div id="adminSub-energia" class="admin-sub hidden">
+          <div class="energy-estimate-banner" role="note">
+            <strong>Estimativas, não medições para faturamento.</strong>
+            Potência significa entrada elétrica nominal em watts, não capacidade térmica em BTU/h. A configuração é opcional e nunca interfere no controle dos aparelhos.
+            <span>Modelo: kWh estimado = potência nominal em kW × horas ligadas × fator de carga estimado.</span>
+          </div>
+          <div id="energySummary" class="energy-summary"></div>
+          <div class="card energy-toolbar">
+            <div>
+              <label for="energyMetric">Mapa energético</label>
+              <select id="energyMetric">
+                <option value="kwh30">Consumo estimado · 30 dias</option>
+                <option value="kwhHoje">Consumo estimado · hoje</option>
+                <option value="carga">Carga atual estimada</option>
+                <option value="horas">Tempo ligado · 30 dias</option>
+                <option value="potenciaMedia">Potência média estimada · 30 dias</option>
+              </select>
+            </div>
+            <div class="energy-legend"><span>menor</span><i></i><span>maior</span><span class="energy-unset-key">cinza: potência não configurada</span></div>
+          </div>
+          <div class="card energy-map-card">
+            <div class="fp-tabs" id="energyFpTabs"></div>
+            <div class="fp-scale-outer"><div class="fp-scale-inner floorplan-scope energy-floorplan" id="energyFpInner"></div></div>
+          </div>
+          <div class="energy-table-wrap">
+            <table class="energy-table">
+              <thead><tr><th>Sala / configuração</th><th>Agora</th><th>Hoje</th><th>7 dias</th><th>30 dias</th><th>Cobertura</th></tr></thead>
+              <tbody id="energyTableBody"></tbody>
+            </table>
+          </div>
+          <p id="energyError" class="error hidden" role="alert"></p>
         </div>
 
         <div id="adminSub-relatos" class="admin-sub hidden">
@@ -1076,6 +1151,10 @@
                     <input type="checkbox" id="cfgEspCredenciaisObrigatorias" /> Exigir credencial por dispositivo em todos os ESP32
                   </label>
                   <p class="hint">Quando ativo, nenhum ESP32 se conecta apenas pelo MAC — cada sala precisa de uma credencial provisionada em Admin &gt; ESP32. Ative só depois de provisionar todos os controladores.</p>
+
+                  <label for="cfgRetencaoAuditoria">Retenção de auditoria e indisponibilidade (dias)</label>
+                  <input type="number" id="cfgRetencaoAuditoria" min="1" max="365" value="7" />
+                  <p class="hint">Registros operacionais expirados são removidos automaticamente. Dados permanentes e relatos não resolvidos não são afetados.</p>
                 </div>
               </div>
             </div>
@@ -1321,6 +1400,7 @@
   <script src="js/screens/grade.js"></script>
   <script src="js/screens/propriedade.js"></script>
   <script src="js/screens/monitoramento.js"></script>
+  <script src="js/screens/energia.js"></script>
   <script src="js/screens/inicio.js"></script>
   <script src="js/screens/admin.js"></script>
   <script src="js/screens/esp32-admin.js"></script>

@@ -10,6 +10,8 @@ const INICIO_PROCESSO = Date.now();
 const RECONEXAO_FLAP_MS = 60 * 1000;
 const DEDUP_NOTIFICACAO_MS = 6 * 60 * 60 * 1000;
 const DISCO_LIVRE_ALERTA_PCT = 10;
+const DISCO_LIVRE_CRITICO_PCT = 5;
+const DISCO_LIVRE_CRITICO_BYTES = 512 * 1024 * 1024;
 
 const contadores = {
   comandoFalha: 0,
@@ -58,12 +60,27 @@ function coletarBanco() {
   }
   const respostaMs = Number(process.hrtime.bigint() - inicio) / 1e6;
   const emMemoria = CAMINHO_DB === ":memory:";
+  let paginas = {};
+  let tabelas = {};
+  if (ok) {
+    try {
+      const pageSize = Number(db.prepare("PRAGMA page_size").get().page_size);
+      const pageCount = Number(db.prepare("PRAGMA page_count").get().page_count);
+      const freePages = Number(db.prepare("PRAGMA freelist_count").get().freelist_count);
+      paginas = { pageSize, pageCount, freePages, reutilizavelBytes: freePages * pageSize };
+      tabelas = require("./retencaoService").estatisticasTabelas();
+    } catch (erro) {
+      logger.warn("monitoramento-banco-estatisticas-falhou", { mensagem: erro.message });
+    }
+  }
   return {
     ok,
     respostaMs: Math.round(respostaMs * 100) / 100,
     caminho: emMemoria ? ":memory:" : CAMINHO_DB,
     arquivoBytes: emMemoria ? 0 : tamanhoArquivo(CAMINHO_DB),
     walBytes: emMemoria ? 0 : tamanhoArquivo(`${CAMINHO_DB}-wal`),
+    ...paginas,
+    tabelas,
   };
 }
 
@@ -73,17 +90,25 @@ function coletarArmazenamento() {
     const st = fs.statfsSync(alvo);
     const totalBytes = st.blocks * st.bsize;
     const livreBytes = st.bavail * st.bsize;
-    const livrePercent = totalBytes > 0 ? Math.round((livreBytes / totalBytes) * 1000) / 10 : null;
+    const avaliacao = avaliarEspaco(totalBytes, livreBytes);
     return {
       caminho: alvo,
       totalBytes,
       livreBytes,
-      livrePercent,
-      alerta: livrePercent !== null && livrePercent < DISCO_LIVRE_ALERTA_PCT,
+      ...avaliacao,
     };
   } catch (erro) {
     return { caminho: alvo, erro: erro.message };
   }
+}
+
+function avaliarEspaco(totalBytes, livreBytes) {
+  const livrePercent = totalBytes > 0 ? Math.round((livreBytes / totalBytes) * 1000) / 10 : null;
+  return {
+    livrePercent,
+    alerta: livrePercent !== null && livrePercent < DISCO_LIVRE_ALERTA_PCT,
+    critico: (livrePercent !== null && livrePercent < DISCO_LIVRE_CRITICO_PCT) || livreBytes < DISCO_LIVRE_CRITICO_BYTES,
+  };
 }
 
 function coletarBackup() {
@@ -231,7 +256,9 @@ function chaveAlerta(mensagem) {
 
 function avaliar() {
   try {
-    const { alertas } = coletar();
+    const estado = coletar();
+    if (estado.armazenamento.critico) require("./retencaoService").executarLimpezaRetencao();
+    const { alertas } = estado;
     for (const mensagem of alertas) {
       if (!notificacaoRecenteExiste(mensagem)) {
         notificacoesService.criar({ tipo: "monitoramento", mensagem });
@@ -242,4 +269,4 @@ function avaliar() {
   }
 }
 
-module.exports = { registrar, registrarConexaoDispositivo, coletar, avaliar };
+module.exports = { registrar, registrarConexaoDispositivo, coletar, avaliar, avaliarEspaco };

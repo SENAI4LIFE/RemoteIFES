@@ -7,6 +7,7 @@ const eventos = new EventEmitter();
 const PADROES = {
   timeoutInatividadeMinutos: 60,
   timeoutInatividadeAdminMinutos: 720,
+  retencaoAuditoriaDias: 7,
   popupAvisoSegundos: 60,
   limiarOnlineMinutos: 5,
   temperaturaMinima: 23,
@@ -20,7 +21,7 @@ const PADROES = {
 
 const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
 
-const CHAVES_NUMERICAS = ["timeoutInatividadeMinutos", "timeoutInatividadeAdminMinutos", "popupAvisoSegundos", "limiarOnlineMinutos"];
+const CHAVES_NUMERICAS = ["timeoutInatividadeMinutos", "timeoutInatividadeAdminMinutos", "retencaoAuditoriaDias", "popupAvisoSegundos", "limiarOnlineMinutos"];
 const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
@@ -100,6 +101,9 @@ function validarEAtualizar(patch, requisitante) {
   for (const chave of CHAVES_NUMERICAS) {
     if (Object.prototype.hasOwnProperty.call(patch, chave)) {
       const n = Number(patch[chave]);
+      if (chave === "retencaoAuditoriaDias" && (!Number.isInteger(n) || n < 1 || n > 365)) {
+        throw new Error("retencaoAuditoriaDias deve ser um inteiro entre 1 e 365");
+      }
       if (!Number.isFinite(n) || n <= 0) {
         throw new Error(`${chave} deve ser um número maior que zero`);
       }
