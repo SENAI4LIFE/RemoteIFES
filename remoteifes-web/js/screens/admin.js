@@ -3,6 +3,11 @@ function escapeHtmlAdmin(texto) {
 }
 
 const Admin = {
+  _auditPage: 1,
+  _auditPages: 1,
+  _connectPage: 1,
+  _connectPages: 1,
+
   async aoAbrir() {
     document.getElementById("novoUsuarioAdminLabel").classList.toggle("hidden", !state.isSuperAdmin);
     await this.carregarUsuarios();
@@ -426,6 +431,97 @@ const Admin = {
     document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
     document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
     document.getElementById("cfgEspCredenciaisObrigatorias").checked = !!cfg.espCredenciaisObrigatorias;
+    document.getElementById("cfgRetencaoAuditoria").value = cfg.retencaoAuditoriaDias ?? 7;
+  },
+
+  async carregarAuditoria() {
+    if (!state.isSuperAdmin) return;
+    const filtros = {
+      pagina: this._auditPage,
+      limite: 25,
+      data: document.getElementById("auditFiltroData").value,
+      tipo: document.getElementById("auditFiltroTipo").value,
+      ator: document.getElementById("auditFiltroAtor").value.trim(),
+      alvo: document.getElementById("auditFiltroAlvo").value.trim(),
+    };
+    const [resp, tiposResp, configResp] = await Promise.all([
+      Api.listarAuditoria(filtros),
+      Api.tiposAuditoria(),
+      Api.obterConfiguracoes(),
+    ]);
+    if (!resp.ok) {
+      Toast.erro(resp.erro || "não foi possível carregar a auditoria");
+      return;
+    }
+    const lista = document.getElementById("auditList");
+    lista.innerHTML = "";
+    resp.itens.forEach((evento) => {
+      const li = document.createElement("li");
+      const bloco = document.createElement("div");
+      const titulo = document.createElement("div");
+      titulo.className = "room-name";
+      titulo.textContent = `🛡️ ${evento.descricao}`;
+      const meta = document.createElement("div");
+      meta.className = "room-sub";
+      const ator = evento.atorLogin ? `@${evento.atorLogin}` : "sistema";
+      const alvo = evento.alvoRotulo || evento.alvoId;
+      meta.textContent = `${Tempo.formatarDataHora(evento.criadoEm)} · ${evento.tipo} · ${ator}${alvo ? ` · ${alvo}` : ""}${evento.camposAlterados ? ` · campos: ${evento.camposAlterados}` : ""}`;
+      bloco.append(titulo, meta);
+      li.appendChild(bloco);
+      lista.appendChild(li);
+    });
+    document.getElementById("auditEmpty").classList.toggle("hidden", resp.itens.length > 0);
+    this._auditPages = resp.paginas;
+    document.getElementById("auditPageInfo").textContent = `Página ${resp.pagina} de ${resp.paginas} · ${resp.total} evento(s)`;
+    document.getElementById("auditPrevBtn").disabled = resp.pagina <= 1;
+    document.getElementById("auditNextBtn").disabled = resp.pagina >= resp.paginas;
+
+    const seletor = document.getElementById("auditFiltroTipo");
+    const selecionado = seletor.value;
+    if (tiposResp.ok) {
+      seletor.replaceChildren(new Option("Todos", ""));
+      tiposResp.tipos.forEach((item) => seletor.add(new Option(`${item.tipo} (${item.total})`, item.tipo)));
+      seletor.value = selecionado;
+    }
+    if (configResp.ok) {
+      document.getElementById("auditRetentionCurrent").textContent = `${configResp.configuracoes.retencaoAuditoriaDias ?? 7} dias`;
+    }
+    await this.carregarConectividade();
+  },
+
+  async carregarConectividade() {
+    if (!state.isSuperAdmin) return;
+    const resp = await Api.listarConectividadeEsp32({
+      pagina: this._connectPage,
+      limite: 25,
+      data: document.getElementById("connectFiltroData").value,
+      sala: document.getElementById("connectFiltroSala").value.trim(),
+    });
+    if (!resp.ok) return;
+    const lista = document.getElementById("connectList");
+    lista.innerHTML = "";
+    resp.itens.forEach((periodo) => {
+      const li = document.createElement("li");
+      const bloco = document.createElement("div");
+      const titulo = document.createElement("div");
+      titulo.className = "room-name";
+      titulo.textContent = `📡 ${RoomsData.rotulo(periodo.sala)}`;
+      const meta = document.createElement("div");
+      meta.className = "room-sub";
+      if (periodo.onlineEm) {
+        meta.textContent = `offline ${Tempo.formatarDataHora(periodo.offlineEm)} → online ${Tempo.formatarDataHora(periodo.onlineEm)} · indisponível por ${Tempo.formatarDuracao(periodo.duracaoSegundos)}`;
+      } else {
+        meta.textContent = `offline desde ${Tempo.formatarDataHora(periodo.offlineEm)} · ainda indisponível`;
+      }
+      bloco.append(titulo, meta);
+      li.appendChild(bloco);
+      lista.appendChild(li);
+    });
+    document.getElementById("connectEmpty").classList.toggle("hidden", resp.itens.length > 0);
+    this._connectPages = resp.paginas;
+    document.getElementById("connectPageInfo").textContent = `Página ${resp.pagina} de ${resp.paginas} · ${resp.total} período(s)`;
+    document.getElementById("connectPrevBtn").disabled = resp.pagina <= 1;
+    document.getElementById("connectNextBtn").disabled = resp.pagina >= resp.paginas;
   },
 
   async carregarMacs() {
@@ -901,6 +997,8 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "mapa") await Admin.carregarMapa();
     if (sub === "macs") await Admin.carregarMacs();
     if (sub === "config") await Admin.carregarConfiguracoes();
+    if (sub === "auditoria") await Admin.carregarAuditoria();
+    if (sub === "energia") await Energia.aoAbrir();
     if (sub === "esp32") await Esp32Admin.aoAbrir();
     else Esp32Admin.aoFechar();
 
@@ -928,6 +1026,7 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
       .filter(Boolean),
     modoManutencao: document.getElementById("cfgModoManutencao").checked,
     espCredenciaisObrigatorias: document.getElementById("cfgEspCredenciaisObrigatorias").checked,
+    retencaoAuditoriaDias: Number(document.getElementById("cfgRetencaoAuditoria").value),
   };
 
   const resp = await Api.atualizarConfiguracoes(dados);
@@ -940,6 +1039,31 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
 
   const ping = await Api.ping();
   if (ping.ok) IdleTimer.sincronizar(ping);
+});
+
+document.getElementById("auditFiltrarBtn").addEventListener("click", () => {
+  Admin._auditPage = 1;
+  Admin.carregarAuditoria();
+});
+document.getElementById("auditPrevBtn").addEventListener("click", () => {
+  if (Admin._auditPage > 1) Admin._auditPage -= 1;
+  Admin.carregarAuditoria();
+});
+document.getElementById("auditNextBtn").addEventListener("click", () => {
+  if (Admin._auditPage < Admin._auditPages) Admin._auditPage += 1;
+  Admin.carregarAuditoria();
+});
+document.getElementById("connectFiltrarBtn").addEventListener("click", () => {
+  Admin._connectPage = 1;
+  Admin.carregarConectividade();
+});
+document.getElementById("connectPrevBtn").addEventListener("click", () => {
+  if (Admin._connectPage > 1) Admin._connectPage -= 1;
+  Admin.carregarConectividade();
+});
+document.getElementById("connectNextBtn").addEventListener("click", () => {
+  if (Admin._connectPage < Admin._connectPages) Admin._connectPage += 1;
+  Admin.carregarConectividade();
 });
 
 document.getElementById("sessoesFiltroData").addEventListener("change", (e) => {

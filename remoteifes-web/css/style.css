@@ -1944,6 +1944,53 @@ button.btn:disabled {
 
 .config-list { margin: 0; }
 #adminSub-config #salvarConfigBtn { max-width: 22rem; }
+.audit-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.audit-heading-row h2 { margin-bottom: 0; }
+.audit-filters { display: grid; grid-template-columns: repeat(4, minmax(8rem, 1fr)); gap: .75rem; margin: .75rem 0; }
+.audit-filters-connectivity { grid-template-columns: repeat(2, minmax(8rem, 1fr)); }
+.audit-filters label { display: block; margin-bottom: .25rem; }
+.audit-filter-card .btn { width: auto; min-width: 9rem; }
+.audit-connectivity-heading { margin-top: 1.5rem; }
+.audit-list .room-sub { overflow-wrap: anywhere; }
+.audit-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; min-height: 2.75rem; }
+.audit-pagination .link-btn:disabled { opacity: .45; cursor: default; }
+@media (max-width: 720px) {
+  .audit-filters, .audit-filters-connectivity { grid-template-columns: 1fr; }
+  .audit-pagination { justify-content: space-between; gap: .5rem; }
+  .audit-pagination .hint { text-align: center; }
+}
+.energy-estimate-banner { padding: .85rem 1rem; margin-bottom: 1rem; border: 1px solid #d4a017; border-radius: var(--radius); background: #fff8d9; color: #5c4700; }
+.energy-estimate-banner strong { display: block; margin-bottom: .2rem; }
+.energy-estimate-banner span { display: block; margin-top: .35rem; font-size: .85rem; }
+.energy-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+.energy-summary-card { display: grid; gap: .3rem; margin: 0; }
+.energy-summary-card span { color: var(--muted); font-size: .84rem; }
+.energy-summary-card strong { font-size: 1.05rem; }
+.energy-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.energy-toolbar label { display: block; margin-bottom: .25rem; }
+.energy-legend { display: flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .8rem; flex-wrap: wrap; }
+.energy-legend i { width: 8rem; height: .75rem; border-radius: 1rem; background: linear-gradient(90deg, rgba(255,176,0,.1), rgba(255,112,0,1)); }
+.energy-unset-key { margin-left: .5rem; }
+.energy-map-card { overflow: hidden; }
+.energy-floorplan .room.energy-room-value { background: rgba(255, 137, 0, var(--energy-intensity)) !important; border-color: #8f4e00 !important; color: #251400; }
+.energy-floorplan .room.energy-room-unset { background: #e3e6e8 !important; border-color: #8b9297 !important; color: #555; }
+.energy-table-wrap { width: 100%; overflow-x: auto; margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); }
+.energy-table { width: 100%; min-width: 72rem; border-collapse: collapse; background: var(--surface); }
+.energy-table th, .energy-table td { padding: .7rem; border-bottom: 1px solid var(--border); vertical-align: top; text-align: left; }
+.energy-table th { position: sticky; top: 0; background: var(--surface-strong); font-size: .8rem; z-index: 1; }
+.energy-table td > span, .energy-table td > strong { display: block; margin-bottom: .2rem; }
+.energy-room-name, .energy-btu-note { color: var(--muted); font-size: .78rem; }
+.energy-config-row { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(8rem, 1fr) auto; gap: .45rem; align-items: end; margin: .45rem 0; }
+.energy-config-row label span { display: block; color: var(--muted); font-size: .72rem; margin-bottom: .15rem; }
+.energy-config-row input, .energy-config-row select { min-width: 0; }
+.energy-partial { color: #8a5b00; font-weight: 700; }
+@media (max-width: 900px) {
+  .energy-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .energy-summary { grid-template-columns: 1fr; }
+  .energy-toolbar > div:first-child, .energy-toolbar select { width: 100%; }
+}
 @media (max-width: 560px) {
   #adminSub-config #salvarConfigBtn { max-width: none; }
 }

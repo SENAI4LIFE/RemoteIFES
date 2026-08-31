@@ -44,6 +44,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Relatos de Problema](#relatos-de-problema)
 - [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade)
 - [Auditoria (Logs, Dispositivos e Acessos)](#auditoria-logs-dispositivos-e-acessos)
+- [Energia Estimada](#energia-estimada)
 - [Restrição de Rede](#restrição-de-rede)
 - [Segurança](#segurança)
 - [Tempo Real (WebSocket)](#tempo-real-websocket)
@@ -225,6 +226,16 @@ Em `Admin`, três sub-abas registram o histórico operacional do sistema, todas 
 - **Dispositivos**: eventos de conexão — sempre que um ESP32 fica online ou offline, incluindo o desligamento automático de salas cujo ESP32 parou de responder (após 90 segundos sem heartbeat).
 - **Acessos ESP32**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
 
+O superadministrador dispõe ainda de **`Administração > Auditoria`**, uma visão paginada e filtrável de ações administrativas importantes, como criação, alteração e exclusão de contas, mudanças de papel e configuração e operações relevantes sobre ESP32. Os registros contêm apenas metadados concisos — nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e duração calculada quando há reconexão. Interface e APIs exigem `superadmin`; a retenção padrão é 7 dias, configurável entre 1 e 365 dias em Administração.
+
+## Energia Estimada
+
+**`Administração > Energia`** é uma área analítica exclusiva do superadministrador e separada do mapa operacional. A potência elétrica nominal de entrada, em watts, e o tipo do aparelho (`inverter` ou velocidade fixa) podem ser configurados opcionalmente por sala. Watts elétricos não representam capacidade térmica em BTU/h; sem essa configuração o RemoteIFES continua operando normalmente e não calcula consumo para a sala.
+
+A tela compara carga e potência atuais estimadas, consumo estimado hoje/em 7/em 30 dias, tempo ligado, temperaturas disponíveis e cobertura/confiança. O mapa da própria aba oferece somente modos energéticos e não adiciona essas métricas ao mapa operacional. O modelo é deliberadamente simples e limitado: `kWh estimado = kW nominal × horas ligadas × fator de carga estimado`; aparelhos fixos usam fator 1 enquanto ligados, e inverter usa um fator entre 0,35 e 1 baseado apenas na diferença entre temperatura ambiente e alvo. Sem temperatura recente, o fator conservador é 0,65 e a confiança é reduzida. Os valores são estimativas operacionais, nunca medições para faturamento.
+
+Não há persistência por segundo nem nova coleta de temperatura: o servidor agrega o estado e a telemetria já existentes em resumos diários compactos por sala, mantidos por 45 dias além do dia corrente. A consulta ocorre ao abrir a aba e a consolidação periódica roda a cada 15 minutos, sem polling contínuo no navegador. Falhas do estimador são isoladas e não podem ligar/desligar aparelhos, alterar temperatura ou agendas nem interromper a comunicação com o ESP32.
+
 ### Manutenção automática do banco
 
 O servidor roda uma rotina de retenção a cada 6 horas (e uma vez na inicialização) que remove linhas antigas das tabelas de histórico para o banco não crescer indefinidamente em uma operação de longo prazo (ex.: Raspberry Pi):
@@ -237,6 +248,8 @@ O servidor roda uma rotina de retenção a cada 6 horas (e uma vez na inicializa
 | `agendamentos_execucoes` | 90 dias | `RETENCAO_DIAS_EXECUCOES` |
 | `agendamentos` com data já passada (o agendamento é sempre do dia; após esse prazo já cumpriu seu efeito) e as execuções ligadas a eles | 90 dias | `RETENCAO_DIAS_AGENDAMENTOS` |
 | `esp_detectados` sem vínculo com sala | 30 dias sem nova detecção | `RETENCAO_DIAS_DETECCOES` |
+| `auditoria_eventos`, `esp_indisponibilidades` | 7 dias | Administração, de 1 a 365 dias |
+| `energia_resumos_diarios` | 45 dias além do dia corrente | fixo; cobre as comparações de 30 dias com margem operacional |
 | `relatos` **apenas com status `resolvido`** | desligado (`0`); defina para ativar | `RETENCAO_DIAS_RELATOS_RESOLVIDOS` |
 
 Usuários, salas, agendamentos do dia atual, configurações e **relatos de problema não resolvidos nunca são removidos** por essa rotina — a retenção de relatos resolvidos vem **desligada** e só apaga relatos já marcados como `resolvido` quando `RETENCAO_DIAS_RELATOS_RESOLVIDOS` recebe um número de dias. Notificações não lidas sobrevivem a `RETENCAO_DIAS_NOTIFICACOES` (365 dias por padrão) antes de serem descartadas, para uma caixa esquecida não crescer sem limite. As tabelas de histórico têm índices por data/hora para que a limpeza e as consultas de faixa de tempo (monitoramento, listas administrativas) continuem baratas mesmo com o banco cheio. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
@@ -976,6 +989,7 @@ remoteifes-web/
                         esp32-admin.js (painel avançado de cada ESP32 — status, config/clonagem IR, OTA e credenciais —
                         na aba "ESP32", restrito ao superadministrador),
                         monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao superadministrador),
+                        energia.js (estimativas energéticas agregadas, mapa e tabela exclusivos do superadministrador),
                         manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
                         mobile-app.js (página #/aplicativo: instalação PWA/Android e download do APK de produção verificado pelo servidor)
 

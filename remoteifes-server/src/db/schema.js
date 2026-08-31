@@ -162,6 +162,59 @@ function criarSchema() {
       atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS auditoria_eventos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo TEXT NOT NULL,
+      atorId INTEGER,
+      atorLogin TEXT,
+      alvoTipo TEXT,
+      alvoId TEXT,
+      alvoRotulo TEXT,
+      descricao TEXT NOT NULL,
+      camposAlterados TEXT,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS esp_indisponibilidades (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sala TEXT NOT NULL,
+      offlineEm TEXT NOT NULL DEFAULT (datetime('now')),
+      onlineEm TEXT,
+      duracaoSegundos INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS energia_configuracoes (
+      sala TEXT PRIMARY KEY REFERENCES salas(sala) ON DELETE CASCADE,
+      potenciaWatts INTEGER NOT NULL,
+      tipo TEXT NOT NULL CHECK(tipo IN ('inverter', 'fixo')),
+      atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS energia_estados (
+      sala TEXT PRIMARY KEY REFERENCES salas(sala) ON DELETE CASCADE,
+      ligado INTEGER NOT NULL,
+      temperaturaAlvo REAL NOT NULL,
+      temperaturaAmbiente REAL,
+      telemetriaEm TEXT,
+      processadoAte TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS energia_resumos_diarios (
+      sala TEXT NOT NULL REFERENCES salas(sala) ON DELETE CASCADE,
+      data TEXT NOT NULL,
+      segundosObservados REAL NOT NULL DEFAULT 0,
+      segundosLigado REAL NOT NULL DEFAULT 0,
+      segundosCargaInverter REAL NOT NULL DEFAULT 0,
+      segundosTelemetriaLigado REAL NOT NULL DEFAULT 0,
+      temperaturaAlvoPonderada REAL NOT NULL DEFAULT 0,
+      temperaturaAmbientePonderada REAL NOT NULL DEFAULT 0,
+      segundosTemperaturaAmbiente REAL NOT NULL DEFAULT 0,
+      temperaturaAmbienteMin REAL,
+      temperaturaAmbienteMax REAL,
+      atualizadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (sala, data)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_relatos_status ON relatos(status);
     CREATE INDEX IF NOT EXISTS idx_relatos_usuario ON relatos(usuarioId);
     CREATE INDEX IF NOT EXISTS idx_relatos_criado ON relatos(criadoEm);
@@ -172,12 +225,23 @@ function criarSchema() {
     CREATE INDEX IF NOT EXISTS idx_esp_eventos_status_criado ON esp_eventos(status, criadoEm);
     CREATE INDEX IF NOT EXISTS idx_esp_acessos_criado ON esp_acessos(criadoEm);
     CREATE INDEX IF NOT EXISTS idx_notificacoes_lida_criado ON notificacoes(lida, criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_notificacoes_criado ON notificacoes(criadoEm);
     CREATE INDEX IF NOT EXISTS idx_notificacoes_tipo_sala_criado ON notificacoes(tipo, sala, criadoEm);
     CREATE INDEX IF NOT EXISTS idx_sessoes_login ON sessoes(login);
     CREATE INDEX IF NOT EXISTS idx_sessoes_logout ON sessoes(logout);
     CREATE INDEX IF NOT EXISTS idx_ag_execucoes_executado ON agendamentos_execucoes(executadoEm);
     CREATE INDEX IF NOT EXISTS idx_ag_execucoes_ag_tipo_data ON agendamentos_execucoes(agendamentoId, tipo, dataExecucao);
     CREATE INDEX IF NOT EXISTS idx_agendamentos_usuario_ativo ON agendamentos(usuarioId, ativo);
+    CREATE INDEX IF NOT EXISTS idx_agendamentos_data ON agendamentos(data);
+    CREATE INDEX IF NOT EXISTS idx_esp_detectados_ultima ON esp_detectados(ultimaDeteccao);
+    CREATE INDEX IF NOT EXISTS idx_auditoria_criado ON auditoria_eventos(criadoEm DESC);
+    CREATE INDEX IF NOT EXISTS idx_auditoria_tipo_criado ON auditoria_eventos(tipo, criadoEm DESC);
+    CREATE INDEX IF NOT EXISTS idx_auditoria_ator_criado ON auditoria_eventos(atorLogin, criadoEm DESC);
+    CREATE INDEX IF NOT EXISTS idx_auditoria_alvo_criado ON auditoria_eventos(alvoRotulo, criadoEm DESC);
+    CREATE INDEX IF NOT EXISTS idx_esp_indisp_sala_offline ON esp_indisponibilidades(sala, offlineEm DESC);
+    CREATE INDEX IF NOT EXISTS idx_esp_indisp_offline ON esp_indisponibilidades(offlineEm DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_esp_indisp_aberta ON esp_indisponibilidades(sala) WHERE onlineEm IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_energia_resumos_data ON energia_resumos_diarios(data);
 
   `);
 

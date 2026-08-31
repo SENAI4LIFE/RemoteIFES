@@ -4,12 +4,18 @@ const salasService = require("../services/salasService");
 const deviceHub = require("../services/deviceHub");
 const otaService = require("../services/otaService");
 const credenciaisService = require("../services/esp32CredenciaisService");
+const auditoriaService = require("../services/auditoriaService");
+const logger = require("../utils/logger");
 
 const router = express.Router();
 router.use("/admin/esp32", exigirLogin, exigirAdmin, exigirSuperAdmin);
 
 const MODOS_VALIDOS = ["idle", "clone"];
 const FAN_VALIDOS = ["low", "medio", "alto", "max"];
+
+function auditar(dados) {
+  try { auditoriaService.registrar(dados); } catch (erro) { logger.warn("auditoria-registro-falhou", { tipo: dados.tipo, mensagem: erro.message }); }
+}
 
 function montarLinhaDispositivo(salaRow) {
   return {
@@ -61,15 +67,17 @@ router.get("/admin/esp32/firmware", (req, res) => {
 router.post("/admin/esp32/:sala/ota", exigirSalaCadastrada, (req, res) => {
   try {
     const estado = otaService.ofertar(req.params.sala);
+    auditar({ tipo: "esp32_ota_iniciada", ator: req.usuario, alvoTipo: "esp32", alvoId: req.params.sala, alvoRotulo: req.params.sala, descricao: `Atualizacao OTA iniciada para ${req.params.sala}` });
     res.json({ ok: true, ota: estado });
   } catch (err) {
     res.status(err.conflito ? 409 : 400).json({ ok: false, erro: err.message });
   }
 });
 
-function responderCredencial(res, fn) {
+function responderCredencial(req, res, fn, tipo, descricao) {
   try {
     const resultado = fn();
+    auditar({ tipo, ator: req.usuario, alvoTipo: "esp32", alvoId: req.params.sala, alvoRotulo: req.params.sala, descricao });
     res.json({ ok: true, ...resultado, aviso: "copie o segredo agora — ele não será exibido novamente" });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
@@ -77,20 +85,21 @@ function responderCredencial(res, fn) {
 }
 
 router.post("/admin/esp32/:sala/credencial", exigirSalaCadastrada, (req, res) => {
-  responderCredencial(res, () => credenciaisService.provisionar(req.params.sala));
+  responderCredencial(req, res, () => credenciaisService.provisionar(req.params.sala), "esp32_credencial_provisionada", `Credencial provisionada para ${req.params.sala}`);
 });
 
 router.post("/admin/esp32/:sala/credencial/rotacionar", exigirSalaCadastrada, (req, res) => {
-  responderCredencial(res, () => credenciaisService.rotacionar(req.params.sala));
+  responderCredencial(req, res, () => credenciaisService.rotacionar(req.params.sala), "esp32_credencial_rotacionada", `Credencial rotacionada para ${req.params.sala}`);
 });
 
 router.post("/admin/esp32/:sala/credencial/substituir", exigirSalaCadastrada, (req, res) => {
-  responderCredencial(res, () => credenciaisService.substituir(req.params.sala));
+  responderCredencial(req, res, () => credenciaisService.substituir(req.params.sala), "esp32_credencial_substituida", `Credencial substituida para ${req.params.sala}`);
 });
 
 router.delete("/admin/esp32/:sala/credencial", exigirSalaCadastrada, (req, res) => {
   try {
     const resultado = credenciaisService.revogar(req.params.sala);
+    auditar({ tipo: "esp32_credencial_revogada", ator: req.usuario, alvoTipo: "esp32", alvoId: req.params.sala, alvoRotulo: req.params.sala, descricao: `Credencial revogada para ${req.params.sala}` });
     res.json({ ok: true, ...resultado });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
@@ -170,6 +179,7 @@ router.post("/admin/esp32/:sala/teste/estado", exigirSalaCadastrada, exigirDispo
 router.post("/admin/esp32/:sala/protocolo-ir", exigirSalaCadastrada, (req, res) => {
   try {
     const sala = salasService.definirProtocoloIR(req.params.sala, req.body?.protocolo);
+    auditar({ tipo: "esp32_protocolo_alterado", ator: req.usuario, alvoTipo: "esp32", alvoId: sala.sala, alvoRotulo: sala.sala, descricao: `Protocolo infravermelho de ${sala.sala} alterado`, camposAlterados: ["irProtocolo"] });
     res.json({ ok: true, sala });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
