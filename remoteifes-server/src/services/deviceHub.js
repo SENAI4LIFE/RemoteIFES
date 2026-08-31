@@ -331,6 +331,11 @@ function iniciar(server) {
     ws.on("close", (code, motivo) => {
       if (conexoes.get(sala) === entrada) {
         conexoes.delete(sala);
+        try {
+          require("./auditoriaService").registrarOffline(sala, new Date().toISOString());
+        } catch (erro) {
+          logger.warn("esp32-indisponibilidade-registro-falhou", { sala, mensagem: erro.message });
+        }
         logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString() });
         try {
           require("./otaService").aoDesconectarDispositivo(sala);

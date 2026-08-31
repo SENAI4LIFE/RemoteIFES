@@ -73,6 +73,13 @@ test("migração da tabela legada de salas preserva dados e cria fwVersao", () =
   db.prepare("UPDATE salas SET fwVersao = ? WHERE sala = ?").run("4.0.0", "LEGACY-1");
   assert.equal(db.prepare("SELECT fwVersao FROM salas WHERE sala = ?").get("LEGACY-1").fwVersao, "4.0.0");
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'auditoria_eventos'").get());
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'esp_indisponibilidades'").get());
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_auditoria_criado'").get());
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_esp_indisp_aberta'").get());
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'energia_configuracoes'").get());
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'energia_estados'").get());
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'energia_resumos_diarios'").get());
 });
 
 test("a conta padrão 'admin' é migrada para 'superadmin' preservando id, nível e hash", () => {

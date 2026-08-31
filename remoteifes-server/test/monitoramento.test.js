@@ -60,6 +60,9 @@ test("o payload traz banco, armazenamento, backup, esp32, serviço e falhas — 
 
   assert.equal(m.banco.ok, true);
   assert.equal(typeof m.banco.respostaMs, "number");
+  assert.equal(typeof m.banco.reutilizavelBytes, "number");
+  assert.ok(m.banco.tabelas.auditoria_eventos);
+  assert.ok(m.banco.tabelas.esp_indisponibilidades);
   assert.ok(m.armazenamento.caminho);
   assert.ok("livreBytes" in m.armazenamento || "erro" in m.armazenamento);
   assert.ok("automatico" in m.backup);

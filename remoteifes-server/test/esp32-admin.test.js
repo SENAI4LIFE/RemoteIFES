@@ -137,7 +137,29 @@ test("dispositivo conecta via WS, envia telemetria, e recebe comandos retransmit
   assert.ok(recebidoPeloDispositivo, "o dispositivo deve receber o comando enter_config retransmitido");
   assert.equal(Object.prototype.hasOwnProperty.call(recebidoPeloDispositivo, "senha"), false);
 
+  const fechou = new Promise((resolve) => ws.once("close", resolve));
   ws.close();
+  await fechou;
+  let indisponibilidade = [];
+  for (let tentativa = 0; tentativa < 50 && indisponibilidade.length === 0; tentativa += 1) {
+    indisponibilidade = db.prepare("SELECT * FROM esp_indisponibilidades WHERE sala = ? AND onlineEm IS NULL").all("teste-esp32-online");
+    if (indisponibilidade.length === 0) await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(indisponibilidade.length, 1, "a queda do WebSocket deve abrir um único período de indisponibilidade");
+  const wsReconectado = new WebSocket(baseWsDispositivoUrl, {
+    headers: { "x-device-sala": "teste-esp32-online", "x-device-mac": "AA:BB:CC:DD:EE:02" },
+  });
+  await new Promise((resolve, reject) => {
+    wsReconectado.once("open", resolve);
+    wsReconectado.once("error", reject);
+  });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const fechado = db.prepare("SELECT * FROM esp_indisponibilidades WHERE sala = ? AND onlineEm IS NOT NULL ORDER BY id DESC LIMIT 1").get("teste-esp32-online");
+  assert.ok(fechado);
+  assert.ok(fechado.duracaoSegundos >= 0);
+  const fechouNovamente = new Promise((resolve) => wsReconectado.once("close", resolve));
+  wsReconectado.close();
+  await fechouNovamente;
 });
 
 test("telemetria com valores fora de faixa não corrompe estado nem broadcast", async () => {

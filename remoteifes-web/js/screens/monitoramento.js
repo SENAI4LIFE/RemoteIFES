@@ -37,6 +37,7 @@ const Monitoramento = (() => {
 
   function estadoArmazenamento(arm) {
     if (arm.erro) return "falha";
+    if (arm.critico) return "falha";
     if (arm.alerta) return "temporariamente-indisponivel";
     return "disponivel";
   }
@@ -82,6 +83,18 @@ const Monitoramento = (() => {
     const s = m.servico;
     const c = m.credenciais || {};
     const fc = m.falhas.contadores || {};
+    const tabelas = b.tabelas || {};
+    const rotuloTabela = {
+      auditoria_eventos: "Auditoria",
+      esp_indisponibilidades: "Indisponibilidades",
+      comandos_log: "Comandos",
+      esp_eventos: "Eventos ESP32",
+      esp_acessos: "Acessos ESP32",
+      notificacoes: "Notificações",
+      sessoes: "Sessões",
+      agendamentos_execucoes: "Execuções de agenda",
+      energia_resumos_diarios: "Resumos de energia",
+    };
 
     const grid = [
       card("Serviço", "disponivel", [
@@ -96,6 +109,7 @@ const Monitoramento = (() => {
         ["Latência", `${b.respostaMs} ms`],
         ["Arquivo", fmtBytes(b.arquivoBytes)],
         ["WAL", fmtBytes(b.walBytes)],
+        ["Espaço reutilizável", fmtBytes(b.reutilizavelBytes)],
       ]),
       card("Armazenamento", estadoArmazenamento(arm), arm.erro
         ? [["Erro", arm.erro, "alerta"]]
@@ -126,6 +140,12 @@ const Monitoramento = (() => {
         ["Revogadas", c.revogadas ?? "—"],
         ["Exigência global", c.obrigatorio ? "ligada" : "desligada"],
       ]),
+      card("Históricos com limite", Object.values(tabelas).some((t) => t.usoPercentual >= 90) ? "temporariamente-indisponivel" : "disponivel",
+        Object.entries(tabelas).map(([nome, info]) => [
+          rotuloTabela[nome] || nome,
+          `${info.total} / ${info.limite} (${info.usoPercentual}%)`,
+          info.usoPercentual >= 90 ? "alerta" : info.usoPercentual >= 75 ? "aviso" : "",
+        ])),
       card("Falhas desde a inicialização", estadoFalhas(fc), [
         ["Comandos", fc.comandoFalha || 0, (fc.comandoFalha || 0) > 0 ? "aviso" : ""],
         ["Telemetria", fc.telemetriaFalha || 0, (fc.telemetriaFalha || 0) > 0 ? "aviso" : ""],
@@ -144,7 +164,7 @@ const Monitoramento = (() => {
   function skeleton() {
     const gridEl = document.getElementById("monGrid");
     gridEl.setAttribute("aria-busy", "true");
-    gridEl.innerHTML = Array.from({ length: 7 })
+    gridEl.innerHTML = Array.from({ length: 8 })
       .map(() => `<div class="card mon-card mon-card-skeleton" aria-hidden="true"><span class="mon-skel-line"></span><span class="mon-skel-line"></span><span class="mon-skel-line"></span></div>`)
       .join("");
   }
