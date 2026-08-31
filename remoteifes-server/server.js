@@ -16,6 +16,26 @@ const server = http.createServer(app);
 statusHub.iniciar(server);
 deviceHub.iniciar(server);
 
+server.on("error", (erro) => {
+  if (erro.code === "EADDRINUSE") {
+    console.error(
+      `Porta ${PORTA} já está em uso. Se o RemoteIFES já estiver rodando, use essa instância; ` +
+        `caso contrário, identifique o processo com "ss -ltnp 'sport = :${PORTA}'" e encerre-o antes de iniciar de novo.`
+    );
+    logger.error("startup-porta-em-uso", { porta: PORTA, endereco: ENDERECO });
+    process.exit(1);
+  }
+  if (erro.code === "EACCES") {
+    console.error(
+      `Sem permissão para escutar na porta ${PORTA}. Use uma porta acima de 1024 (variável PORTA) ou o privilégio adequado.`
+    );
+    logger.error("startup-porta-sem-permissao", { porta: PORTA });
+    process.exit(1);
+  }
+  logger.error("startup-erro-servidor", { mensagem: erro.message });
+  process.exit(1);
+});
+
 server.listen(PORTA, ENDERECO, () => {
   logger.info("startup", { porta: PORTA, endereco: ENDERECO, ambiente: process.env.NODE_ENV || "development" });
   console.log(`Servidor RemoteIFES rodando em http://localhost:${PORTA}`);
@@ -53,6 +73,9 @@ function encerrarComGraciosidade(sinal) {
     }
     process.exit(0);
   });
+  // Descarta conexões keep-alive/WebSocket remanescentes para que a porta seja
+  // liberada de imediato, sem depender do timeout de segurança abaixo.
+  if (typeof server.closeAllConnections === "function") server.closeAllConnections();
   setTimeout(() => process.exit(0), 5000).unref();
 }
 

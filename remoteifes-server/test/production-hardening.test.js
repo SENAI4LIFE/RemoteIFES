@@ -15,6 +15,7 @@ const bcrypt = require("bcryptjs");
 const db = require("../src/config/database");
 const { popularBanco } = require("../src/db/seed");
 const configuracoesService = require("../src/services/configuracoesService");
+const { ipAutorizado } = require("../src/utils/rede");
 
 require("../src/app");
 popularBanco();
@@ -24,6 +25,13 @@ test("bootstrap de produção cria a credencial padrão sem enfraquecer os contr
   assert.equal(bcrypt.compareSync("admin", admin.senhaHash), true);
   assert.equal(configuracoesService.acessoRestritoAtivo().modoTeste, false);
   assert.equal(configuracoesService.obter().espCredenciaisObrigatorias, true);
+});
+
+test("loopback permanece autorizado sem faixas cadastradas para manutenção local", () => {
+  assert.equal(ipAutorizado("127.0.0.1", []), true);
+  assert.equal(ipAutorizado("::1", []), true);
+  assert.equal(ipAutorizado("::ffff:127.0.0.1", []), true);
+  assert.equal(ipAutorizado("10.10.1.50", []), false);
 });
 
 test("bootstrap aceita uma senha inicial configurada sem alterar contas existentes", () => {

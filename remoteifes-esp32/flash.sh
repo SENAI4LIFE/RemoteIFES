@@ -12,7 +12,14 @@ fi
 install_platformio() {
   command -v pio >/dev/null 2>&1 && return
   echo "Instalando PlatformIO Core..."
-  python3 -m pip install --user -U platformio
+  if command -v pipx >/dev/null 2>&1; then
+    pipx install platformio
+  elif python3 -m pip --version >/dev/null 2>&1; then
+    python3 -m pip install --user -U platformio
+  else
+    echo "Instale o pipx (recomendado) ou o pip para Python 3 e rode este script novamente."
+    exit 1
+  fi
   export PATH="$HOME/.local/bin:$PATH"
 }
 
