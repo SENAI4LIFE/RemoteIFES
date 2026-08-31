@@ -23,7 +23,9 @@ fs.rmSync(DEST, { recursive: true, force: true });
 copyDir(SRC, DEST);
 const indexPath = path.join(DEST, "index.html");
 const index = fs.readFileSync(indexPath, "utf8");
-const marcador = '  <script src="js/state.js"></script>';
-if (!index.includes(marcador)) throw new Error("marcador de scripts não encontrado no index.html");
-fs.writeFileSync(indexPath, index.replace(marcador, `  <script src="cordova.js"></script>\n${marcador}`));
+// O primeiro script da aplicação declara a versão do frontend e traz o sufixo "?v=" dessa versão.
+const marcador = /^([ \t]*)<script src="js\/version\.js(?:\?[^"]*)?"><\/script>$/m;
+const encontrado = index.match(marcador);
+if (!encontrado) throw new Error("marcador de scripts não encontrado no index.html");
+fs.writeFileSync(indexPath, index.replace(marcador, `${encontrado[1]}<script src="cordova.js"></script>\n${encontrado[0]}`));
 console.log(`remoteifes-web sincronizado em ${DEST}`);
