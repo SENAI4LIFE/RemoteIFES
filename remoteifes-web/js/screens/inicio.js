@@ -43,13 +43,18 @@ const Inicio = (() => {
     {
       id: "notificacoes", icon: "🔔", titulo: "Notificações",
       desc: "Avisos de conexão e falha dos dispositivos ESP32.",
-      quando: () => !!state.isAdmin, acao: () => clicar("notifBellBtn"),
+      quando: () => !!state.isAdmin,
+      acao: (evento) => { if (evento) evento.stopPropagation(); clicar("notifBellBtn"); },
     },
     {
-      id: "relatos", icon: "🐞", titulo: "Relatar um problema",
+      id: "relatos", icon: "🐞", titulo: "Relatar problema",
       desc: "Envie um problema para a equipe e acompanhe seus relatos.",
       quando: () => true,
-      acao: () => { if (typeof Relatos !== "undefined") Relatos.abrirPainel(); },
+      acao: (evento) => {
+        // O fechamento global por clique no documento fecharia o painel logo depois de abri-lo.
+        if (evento) evento.stopPropagation();
+        if (typeof Relatos !== "undefined") Relatos.abrirPainel();
+      },
     },
     {
       id: "ajuda", icon: "📖", titulo: "Ajuda e manual",
@@ -87,7 +92,6 @@ const Inicio = (() => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = compacto ? "hub-card hub-card-compacto" : "hub-card";
-    btn.setAttribute("role", "listitem");
     btn.dataset.hubCard = def.chave;
 
     const ic = document.createElement("span");
@@ -117,7 +121,7 @@ const Inicio = (() => {
       btn.appendChild(badge);
     }
 
-    btn.addEventListener("click", def.acao);
+    btn.addEventListener("click", (evento) => def.acao(evento));
     return btn;
   }
 

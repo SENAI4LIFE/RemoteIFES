@@ -15,6 +15,7 @@ const Notificacoes = {
     }
     document.getElementById("notifPanel").classList.add("hidden");
     document.getElementById("notifWrap").classList.add("hidden");
+    this.sincronizarSino();
   },
 
   async atualizarContagem() {
@@ -30,35 +31,53 @@ const Notificacoes = {
     return criadoEm.replace("T", " ").slice(0, 16);
   },
 
-  async abrirPainel() {
-    const lista = document.getElementById("notifList");
-    const empty = document.getElementById("notifEmpty");
+  async renderizar(lista, empty) {
     const notificacoes = await Api.listarNotificacoes();
-
     lista.innerHTML = "";
     if (!Array.isArray(notificacoes) || notificacoes.length === 0) {
       empty.classList.remove("hidden");
-    } else {
-      empty.classList.add("hidden");
-      notificacoes.forEach((n) => {
-        const li = document.createElement("li");
-        li.className = `notif-item${n.lida ? "" : " nao-lida"}`;
-        li.innerHTML = `
-          <div class="notif-item-msg">${escapeHtml(n.mensagem)}</div>
-          <div class="notif-item-hora">${escapeHtml(this.formatarHora(n.criadoEm))}</div>
-        `;
-        li.addEventListener("click", async () => {
-          if (!n.lida) {
-            await Api.marcarNotificacaoLida(n.id);
-            li.classList.remove("nao-lida");
-            this.atualizarContagem();
-          }
-        });
-        lista.appendChild(li);
-      });
+      return;
     }
 
+    empty.classList.add("hidden");
+    notificacoes.forEach((n) => {
+      const li = document.createElement("li");
+      li.className = `notif-item${n.lida ? "" : " nao-lida"}`;
+      li.innerHTML = `
+        <button type="button" class="notif-item-action">
+          <span class="notif-item-msg">${escapeHtml(n.mensagem)}</span>
+          <span class="notif-item-hora">${escapeHtml(this.formatarHora(n.criadoEm))}</span>
+        </button>
+      `;
+      li.dataset.notificacaoId = String(n.id);
+      li.querySelector("button").addEventListener("click", async () => {
+        if (!n.lida) {
+          await Api.marcarNotificacaoLida(n.id);
+          document.querySelectorAll(`.notif-item[data-notificacao-id="${n.id}"]`).forEach((el) => el.classList.remove("nao-lida"));
+          this.atualizarContagem();
+        }
+      });
+      lista.appendChild(li);
+    });
+  },
+
+  async carregarAdmin() {
+    await this.renderizar(document.getElementById("adminNotifList"), document.getElementById("adminNotifEmpty"));
+  },
+
+  async abrirPainel() {
+    const lista = document.getElementById("notifList");
+    const empty = document.getElementById("notifEmpty");
+    await this.renderizar(lista, empty);
+
     document.getElementById("notifPanel").classList.toggle("hidden");
+    this.sincronizarSino();
+  },
+
+  sincronizarSino() {
+    const painel = document.getElementById("notifPanel");
+    const sino = document.getElementById("notifBellBtn");
+    if (painel && sino) sino.setAttribute("aria-expanded", String(!painel.classList.contains("hidden")));
   },
 };
 
@@ -74,8 +93,15 @@ document.getElementById("notifMarcarTodasBtn").addEventListener("click", async (
   Notificacoes.atualizarContagem();
 });
 
+document.getElementById("adminNotifMarcarTodasBtn").addEventListener("click", async () => {
+  await Api.marcarTodasNotificacoesLidas();
+  document.querySelectorAll(".notif-item.nao-lida").forEach((el) => el.classList.remove("nao-lida"));
+  Notificacoes.atualizarContagem();
+});
+
 document.getElementById("notifPanel").addEventListener("click", (e) => e.stopPropagation());
 
 document.addEventListener("click", () => {
   document.getElementById("notifPanel").classList.add("hidden");
+  Notificacoes.sincronizarSino();
 });

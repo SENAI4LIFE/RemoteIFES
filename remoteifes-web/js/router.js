@@ -3,7 +3,7 @@ const Router = (() => {
   let salasCache = null;
 
   const ADMIN_SUBS = [
-    "usuarios", "ativos", "sessoes", "logs", "dispositivos", "monitoramento",
+    "usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "monitoramento",
     "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "relatos", "auditoria", "energia",
   ];
   const ADMIN_SUBS_SUPERADMIN = ["monitoramento", "macs", "config", "esp32", "relatos", "auditoria", "energia"];

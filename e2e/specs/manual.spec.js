@@ -95,3 +95,73 @@ test("o manual não faz requisições externas e cabe no celular", async ({ page
   expect(externas.filter((u) => !u.includes("cordova.js"))).toEqual([]);
   expect(await semRolagemHorizontal(page)).toBe(true);
 });
+
+test("a Ajuda pública cobre Início, conta, conexão, acessibilidade e PWA", async ({ page, context }) => {
+  await abrirApp(page, context, "user");
+  await abrirManualPeloFab(page);
+  for (const id of ["inicio", "inicio-acoes", "papeis", "conta-sessao", "conexao", "selecao-sala", "controlador", "relatos", "pwa-mobile", "acessibilidade", "solucao-problemas"]) {
+    await expect(page.locator(`#manual-sec-${id}`), `seção ${id} da Ajuda`).toHaveCount(1);
+  }
+  await expect(page.locator("#manual-sec-inicio-acoes")).toContainText("Relatar problema");
+  await expect(page.locator("#manual-sec-pwa-mobile")).toContainText("atualiza sozinha");
+});
+
+test("todo item do sumário da Ajuda aponta para uma seção existente", async ({ page, context }) => {
+  await injetarSessao(context, "superadmin");
+  await page.goto("/#/ajuda");
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
+  const orfas = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("#manualToc .manual-toc-link"))
+      .map((b) => b.dataset.sec)
+      .filter((id) => !document.getElementById(`manual-sec-${id}`))
+  );
+  expect(orfas).toEqual([]);
+  const rotas = await page.$$eval("#manualConteudo .manual-ver-app", (bs) => bs.map((b) => b.dataset.rota));
+  expect(rotas.length).toBeGreaterThan(0);
+  expect(rotas.filter((r) => !/^\/(inicio|salas|agenda|grade|config|aplicativo|admin\/[a-z0-9-]+)$/.test(r))).toEqual([]);
+});
+
+test("Notificações de dispositivos está na Ajuda do administrador e leva à aba correta", async ({ page, context }) => {
+  await injetarSessao(context, "admin");
+  await page.goto("/#/ajuda/notificacoes");
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#manual-sec-notificacoes")).toContainText("Administração");
+  await expect(page.locator("#manual-sec-auditoria")).toHaveCount(0);
+  await page.locator("#manual-sec-notificacoes .manual-ver-app").click();
+  await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 15_000 });
+});
+
+test("Auditoria e Energia só aparecem na Ajuda do superadministrador", async ({ page, context }) => {
+  await injetarSessao(context, "user");
+  await page.goto("/#/ajuda");
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#manual-sec-auditoria")).toHaveCount(0);
+  await expect(page.locator("#manual-sec-energia")).toHaveCount(0);
+  await expect(page.locator("#manual-sec-notificacoes")).toHaveCount(0);
+
+  await context.clearCookies();
+  await injetarSessao(context, "superadmin");
+  await page.goto("/#/ajuda/auditoria");
+  await page.reload();
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#manual-sec-auditoria")).toContainText("retenção");
+  await expect(page.locator("#manual-sec-energia")).toContainText("estimativa");
+});
+
+test("os ícones de ajuda das abas novas de Administração abrem a orientação correta", async ({ page, context }) => {
+  await injetarSessao(context, "superadmin");
+  await page.goto("/#/admin/notificacoes");
+  await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 20_000 });
+  await page.locator('#adminSub-notificacoes .help-icon-btn').click();
+  await expect(page.locator("#helpModal")).toBeVisible();
+  await expect(page.locator("#helpModalTitle")).toContainText("Notificações de dispositivos");
+  await page.locator("#helpModalManualBtn").click();
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/ajuda/notificacoes");
+
+  await page.goto("/#/admin/auditoria");
+  await expect(page.locator("#adminSub-auditoria")).toBeVisible({ timeout: 20_000 });
+  await page.locator('#adminSub-auditoria .help-icon-btn').click();
+  await expect(page.locator("#helpModal")).toBeVisible();
+  await expect(page.locator("#helpModalTitle")).toContainText("Auditoria");
+});
