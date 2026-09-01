@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>RemoteIFES</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2026.08.31.2" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.09.01.1" />
   <meta name="theme-color" content="#1c6b3c" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemoteIFES" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.08.31.2" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.08.31.2" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.08.31.2" />
-  <meta name="remoteifes-version" content="2026.08.31.2" />
-  <link rel="stylesheet" href="css/style.css?v=2026.08.31.2" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.01.1" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.01.1" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.01.1" />
+  <meta name="remoteifes-version" content="2026.09.01.1" />
+  <link rel="stylesheet" href="css/style.css?v=2026.09.01.1" />
 </head>
 <body>
 
@@ -47,7 +47,7 @@
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
-      <img src="assets/remoteifes-logo.png?v=2026.08.31.2" alt="RemoteIFES" />
+      <img src="assets/remoteifes-logo.png?v=2026.09.01.1" alt="RemoteIFES" />
       <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
@@ -113,7 +113,7 @@
             </div>
           </div>
           <div class="portal-footer">
-            <img src="assets/ifes-logo.png?v=2026.08.31.2" alt="Instituto Federal do Espírito Santo" />
+            <img src="assets/ifes-logo.png?v=2026.09.01.1" alt="Instituto Federal do Espírito Santo" />
             <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
@@ -333,7 +333,7 @@
       </section>
 
       <section id="screen-floorplan" class="screen hidden tab-content">
-        <div class="screen-head">
+        <div class="screen-head screen-head-centralizado">
           <h1>Plantas baixas</h1>
           <div class="screen-head-links">
             <button type="button" id="floorplanSimpleBtn" class="link-btn">Cards</button>
@@ -505,7 +505,7 @@
 <div class="fp-section hidden" id="fp-b-2pav" data-fp-section="b-2pav">
 <h2>BLOCO B - 2º PAV.</h2>
 <div class="plan-wrap"><div class="plan" style="width:1350px;height:520px">
-<div class="room selectable" data-sala="B-207" style="left:160px;top:50px;width:100px;height:230px;z-index:5"><span class="num">B-207</span><span class="name">LABORATÓRIO INSTALAÇÕES ELÉTRICAS</span></div>
+<div class="room selectable" data-sala="B-207" style="left:160px;top:90px;width:100px;height:190px;z-index:5"><span class="num">B-207</span><span class="name">LABORATÓRIO INSTALAÇÕES ELÉTRICAS</span></div>
 <div class="corridor" style="left:260px;top:50px;width:120px;height:210px"></div>
 <div class="room" style="left:260px;top:20px;width:120px;height:70px"><span class="name">ESCADAS</span><span class="red name" style="margin-top:auto">SAÍDA</span></div>
 <div class="room selectable" data-sala="B-206" style="left:350px;top:50px;width:170px;height:180px"><span class="num">B-206</span><span class="name">SALA TÉCNICA</span></div>
@@ -661,7 +661,7 @@
       </section>
 
       <section id="screen-agenda" class="screen hidden tab-content">
-        <div class="screen-head">
+        <div class="screen-head screen-head-centralizado">
           <h1>Agendamentos</h1>
         </div>
         <p class="hint">
@@ -715,7 +715,7 @@
       </section>
 
       <section id="screen-grade" class="screen hidden tab-content">
-        <div class="screen-head">
+        <div class="screen-head screen-head-centralizado">
           <h1>Grade do dia</h1>
         </div>
         <p class="hint">
@@ -773,7 +773,7 @@
       </section>
 
       <section id="screen-admin" class="screen hidden tab-content">
-        <div class="screen-head">
+        <div class="screen-head screen-head-centralizado">
           <h1>Administração</h1>
         </div>
 
@@ -896,7 +896,7 @@
 
         <div id="adminSub-monitoramento" class="admin-sub hidden">
           <p class="hint">
-            Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32 — leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta. Visível apenas ao superadministrador.
+            Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32: leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta. Visível apenas ao superadministrador.
             <button type="button" class="help-icon-btn" data-help="monitoramento" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
           </p>
           <p class="hint"><button type="button" class="link-btn" data-manual="monitoramento">Abrir no manual &rarr;</button></p>
@@ -906,6 +906,49 @@
             <span>Não foi possível carregar o monitoramento.</span>
             <button type="button" id="monRetryBtn" class="btn btn-off">Tentar de novo</button>
           </div>
+
+          <details id="heatmapBloco" class="card heatmap-bloco">
+            <summary class="heatmap-summary">
+              <span class="heatmap-summary-titulo">Mapa de calor operacional</span>
+              <span class="heatmap-summary-nota">Calculado somente ao abrir esta seção</span>
+            </summary>
+            <p class="hint">
+              Compara as salas em uma métrica operacional no período escolhido, sobre a planta baixa. Não inclui consumo de energia, que continua na aba Energia.
+              <button type="button" class="help-icon-btn" data-help="heatmap" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="heatmap-toolbar">
+              <div>
+                <label for="heatmapMetrica">Métrica</label>
+                <select id="heatmapMetrica"></select>
+              </div>
+              <div>
+                <label for="heatmapPeriodo">Período</label>
+                <select id="heatmapPeriodo"></select>
+              </div>
+              <button type="button" id="heatmapAtualizarBtn" class="btn btn-off">Atualizar</button>
+            </div>
+            <p id="heatmapDescricao" class="hint heatmap-descricao"></p>
+            <p id="heatmapAviso" class="hint heatmap-aviso hidden" role="note"></p>
+            <div class="heatmap-legenda" id="heatmapLegenda">
+              <span id="heatmapLegendaMin">frio</span>
+              <i class="heatmap-escala" aria-hidden="true"></i>
+              <span id="heatmapLegendaMax">quente</span>
+              <span class="heatmap-legenda-chave"><i class="heatmap-chave-sem-dados" aria-hidden="true"></i> sem dados</span>
+            </div>
+            <div class="heatmap-map-card">
+              <div class="fp-tabs" id="heatmapFpTabs"></div>
+              <div class="fp-scale-outer"><div class="fp-scale-inner floorplan-scope heatmap-floorplan" id="heatmapFpInner"></div></div>
+            </div>
+            <div id="heatmapDetalhe" class="heatmap-detalhe" role="status" aria-live="polite">Selecione uma sala no mapa para ver os números dela.</div>
+            <div class="heatmap-tabela-wrap">
+              <table class="heatmap-tabela">
+                <caption id="heatmapTabelaCaption">Valores por sala</caption>
+                <thead><tr><th scope="col">Sala</th><th scope="col">Valor</th><th scope="col">Faixa</th></tr></thead>
+                <tbody id="heatmapTabelaCorpo"></tbody>
+              </table>
+            </div>
+            <p id="heatmapErro" class="error hidden" role="alert"></p>
+          </details>
         </div>
 
         <div id="adminSub-auditoria" class="admin-sub hidden">
@@ -1183,7 +1226,7 @@
                   <label class="checkbox-label">
                     <input type="checkbox" id="cfgEspCredenciaisObrigatorias" /> Exigir credencial por dispositivo em todos os ESP32
                   </label>
-                  <p class="hint">Quando ativo, nenhum ESP32 se conecta apenas pelo MAC — cada sala precisa de uma credencial provisionada em Admin &gt; ESP32. Ative só depois de provisionar todos os controladores.</p>
+                  <p class="hint">Quando ativo, nenhum ESP32 se conecta apenas pelo MAC: cada sala precisa de uma credencial provisionada em Admin &gt; ESP32. Ative só depois de provisionar todos os controladores.</p>
 
                   <label for="cfgRetencaoAuditoria">Retenção de auditoria e indisponibilidade (dias)</label>
                   <input type="number" id="cfgRetencaoAuditoria" min="1" max="365" value="7" />
@@ -1405,43 +1448,44 @@
     </div>
   </div>
 
-  <script src="js/version.js?v=2026.08.31.2"></script>
-  <script src="js/state.js?v=2026.08.31.2"></script>
-  <script src="js/config.js?v=2026.08.31.2"></script>
-  <script src="js/toast.js?v=2026.08.31.2"></script>
-  <script src="js/server-status.js?v=2026.08.31.2"></script>
-  <script src="js/tempo.js?v=2026.08.31.2"></script>
-  <script src="js/rooms-data.js?v=2026.08.31.2"></script>
-  <script src="js/api.js?v=2026.08.31.2"></script>
-  <script src="js/rtstatus.js?v=2026.08.31.2"></script>
-  <script src="js/nav.js?v=2026.08.31.2"></script>
-  <script src="js/idle-timer.js?v=2026.08.31.2"></script>
-  <script src="js/a11y.js?v=2026.08.31.2"></script>
-  <script src="js/ui-dialog.js?v=2026.08.31.2"></script>
-  <script src="js/ui-status.js?v=2026.08.31.2"></script>
-  <script src="js/help.js?v=2026.08.31.2"></script>
-  <script src="js/screens/notifications.js?v=2026.08.31.2"></script>
-  <script src="js/screens/relatos.js?v=2026.08.31.2"></script>
-  <script src="js/screens/login.js?v=2026.08.31.2"></script>
-  <script src="js/screens/portal-funcoes.js?v=2026.08.31.2"></script>
-  <script src="js/screens/location.js?v=2026.08.31.2"></script>
-  <script src="js/screens/simple.js?v=2026.08.31.2"></script>
-  <script src="js/floorplan.js?v=2026.08.31.2"></script>
-  <script src="js/screens/floorplan.js?v=2026.08.31.2"></script>
-  <script src="js/screens/rooms.js?v=2026.08.31.2"></script>
-  <script src="js/screens/panel.js?v=2026.08.31.2"></script>
-  <script src="js/screens/schedule.js?v=2026.08.31.2"></script>
-  <script src="js/screens/grade.js?v=2026.08.31.2"></script>
-  <script src="js/screens/propriedade.js?v=2026.08.31.2"></script>
-  <script src="js/screens/monitoramento.js?v=2026.08.31.2"></script>
-  <script src="js/screens/energia.js?v=2026.08.31.2"></script>
-  <script src="js/screens/inicio.js?v=2026.08.31.2"></script>
-  <script src="js/screens/admin.js?v=2026.08.31.2"></script>
-  <script src="js/screens/esp32-admin.js?v=2026.08.31.2"></script>
-  <script src="js/screens/manual.js?v=2026.08.31.2"></script>
-  <script src="js/screens/mobile-app.js?v=2026.08.31.2"></script>
-  <script src="js/account-menu.js?v=2026.08.31.2"></script>
-  <script src="js/router.js?v=2026.08.31.2"></script>
-  <script src="js/app.js?v=2026.08.31.2"></script>
+  <script src="js/version.js?v=2026.09.01.1"></script>
+  <script src="js/state.js?v=2026.09.01.1"></script>
+  <script src="js/config.js?v=2026.09.01.1"></script>
+  <script src="js/toast.js?v=2026.09.01.1"></script>
+  <script src="js/server-status.js?v=2026.09.01.1"></script>
+  <script src="js/tempo.js?v=2026.09.01.1"></script>
+  <script src="js/rooms-data.js?v=2026.09.01.1"></script>
+  <script src="js/api.js?v=2026.09.01.1"></script>
+  <script src="js/rtstatus.js?v=2026.09.01.1"></script>
+  <script src="js/nav.js?v=2026.09.01.1"></script>
+  <script src="js/idle-timer.js?v=2026.09.01.1"></script>
+  <script src="js/a11y.js?v=2026.09.01.1"></script>
+  <script src="js/ui-dialog.js?v=2026.09.01.1"></script>
+  <script src="js/ui-status.js?v=2026.09.01.1"></script>
+  <script src="js/help.js?v=2026.09.01.1"></script>
+  <script src="js/screens/notifications.js?v=2026.09.01.1"></script>
+  <script src="js/screens/relatos.js?v=2026.09.01.1"></script>
+  <script src="js/screens/login.js?v=2026.09.01.1"></script>
+  <script src="js/screens/portal-funcoes.js?v=2026.09.01.1"></script>
+  <script src="js/screens/location.js?v=2026.09.01.1"></script>
+  <script src="js/screens/simple.js?v=2026.09.01.1"></script>
+  <script src="js/floorplan.js?v=2026.09.01.1"></script>
+  <script src="js/screens/floorplan.js?v=2026.09.01.1"></script>
+  <script src="js/screens/rooms.js?v=2026.09.01.1"></script>
+  <script src="js/screens/panel.js?v=2026.09.01.1"></script>
+  <script src="js/screens/schedule.js?v=2026.09.01.1"></script>
+  <script src="js/screens/grade.js?v=2026.09.01.1"></script>
+  <script src="js/screens/propriedade.js?v=2026.09.01.1"></script>
+  <script src="js/screens/monitoramento.js?v=2026.09.01.1"></script>
+  <script src="js/screens/heatmap.js?v=2026.09.01.1"></script>
+  <script src="js/screens/energia.js?v=2026.09.01.1"></script>
+  <script src="js/screens/inicio.js?v=2026.09.01.1"></script>
+  <script src="js/screens/admin.js?v=2026.09.01.1"></script>
+  <script src="js/screens/esp32-admin.js?v=2026.09.01.1"></script>
+  <script src="js/screens/manual.js?v=2026.09.01.1"></script>
+  <script src="js/screens/mobile-app.js?v=2026.09.01.1"></script>
+  <script src="js/account-menu.js?v=2026.09.01.1"></script>
+  <script src="js/router.js?v=2026.09.01.1"></script>
+  <script src="js/app.js?v=2026.09.01.1"></script>
 </body>
 </html>

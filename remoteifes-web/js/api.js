@@ -523,6 +523,11 @@ const Api = {
     return chamar("/admin/monitoramento", { headers: headersComToken() });
   },
 
+  async obterHeatmap(metrica, periodo) {
+    const q = new URLSearchParams({ metrica, periodo }).toString();
+    return chamar(`/admin/heatmap?${q}`, { headers: headersComToken() });
+  },
+
   async obterEnergia() {
     return chamar("/admin/energia", { headers: headersComToken() });
   },

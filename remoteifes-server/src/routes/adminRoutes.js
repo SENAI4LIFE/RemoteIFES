@@ -8,6 +8,7 @@ const notificacoesService = require("../services/notificacoesService");
 const monitoramentoService = require("../services/monitoramentoService");
 const auditoriaService = require("../services/auditoriaService");
 const energiaService = require("../services/energiaService");
+const heatmapService = require("../services/heatmapService");
 const logger = require("../utils/logger");
 
 const router = express.Router();
@@ -163,6 +164,21 @@ router.delete("/admin/sessoes/historico", (req, res) => {
 
 router.get("/admin/monitoramento", exigirSuperAdmin, (req, res) => {
   res.json({ ok: true, monitoramento: monitoramentoService.coletar() });
+});
+
+router.get("/admin/heatmap", exigirSuperAdmin, (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    res.json({
+      ok: true,
+      metricas: heatmapService.metricasPublicas(),
+      periodos: heatmapService.periodosPublicos(),
+      ...heatmapService.obter(req.query.metrica, req.query.periodo),
+    });
+  } catch (erro) {
+    logger.warn("heatmap-consulta-falhou", { mensagem: erro.message });
+    res.status(503).json({ ok: false, erro: "mapa de calor temporariamente indisponivel" });
+  }
 });
 
 router.get("/admin/energia", exigirSuperAdmin, (req, res) => {

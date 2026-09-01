@@ -37,7 +37,7 @@ const MobileApp = (() => {
           </dl>
           ${disponivel
             ? `<button type="button" class="btn btn-on btn-block mobile-app-download-btn">${ICONE_BAIXAR}<span>Baixar APK</span></button><p class="mobile-app-verify hint" role="status" aria-live="polite">O arquivo é verificado pelo SHA-256 acima antes de ser salvo.</p>`
-            : `<p class="mobile-app-unavailable" role="status">Nenhum APK de produção assinado está publicado neste servidor no momento. Nenhum APK de teste ou sem assinatura é oferecido — use a instalação como PWA abaixo.</p>`}
+            : `<p class="mobile-app-unavailable" role="status">Nenhum APK de produção assinado está publicado neste servidor no momento. Nenhum APK de teste ou sem assinatura é oferecido: use a instalação como PWA abaixo.</p>`}
           ${!android && disponivel ? `<p class="hint">O download é destinado a aparelhos Android; em outros sistemas ele serve apenas para transferir o arquivo verificado.</p>` : ""}
         </section>
         <section class="mobile-app-card ${!android || !disponivel ? "is-recommended" : ""}"><h3>Instalar como PWA</h3><p>No navegador compatível, use <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>. É a opção indicada para iPhone, iPad e computadores, e a alternativa quando não há APK publicado.</p></section>
@@ -49,7 +49,7 @@ const MobileApp = (() => {
         <li>Abra o aplicativo. Se ele não vier pré-configurado, informe o endereço do servidor fornecido pela equipe local e entre com sua conta RemoteIFES.</li>
       </ol></section>
       <section class="mobile-app-instructions"><h2>Atualizações</h2><ol>
-        <li>Volte a esta página quando uma nova versão for publicada — a versão e o SHA-256 acima mudam.</li>
+        <li>Volte a esta página quando uma nova versão for publicada: a versão e o SHA-256 acima mudam.</li>
         <li>Baixe o novo APK e instale por cima do anterior; os dados de sessão e o endereço do servidor são preservados.</li>
         <li>A PWA se atualiza sozinha ao reabrir com conexão ao servidor.</li>
       </ol></section>

@@ -62,7 +62,7 @@ const Esp32Admin = (() => {
     let badge;
     if (!c.provisionado) badge = `<span class="esp32-conn-badge off">sem credencial (só MAC)</span>`;
     else if (c.revogado) badge = `<span class="esp32-conn-badge off">credencial revogada</span>`;
-    else if (c.graceRotacaoAtivo) badge = `<span class="esp32-conn-badge modo">rotação — tolerância ativa</span>`;
+    else if (c.graceRotacaoAtivo) badge = `<span class="esp32-conn-badge modo">rotação: tolerância ativa</span>`;
     else badge = `<span class="esp32-conn-badge on">credencial ativa</span>`;
 
     const idLinha = c.provisionado
@@ -100,7 +100,7 @@ const Esp32Admin = (() => {
         const p = document.createElement("p");
         p.className = "hint";
         p.textContent = r.enviadoAoDispositivo
-          ? "A credencial foi enviada ao dispositivo conectado — ele vai reconectar já autenticado. Guarde o segredo abaixo mesmo assim, ele não será exibido de novo."
+          ? "A credencial foi enviada ao dispositivo conectado: ele vai reconectar já autenticado. Guarde o segredo abaixo mesmo assim, ele não será exibido de novo."
           : "Informe estes dois valores no portal de setup do ESP32. O segredo não será exibido novamente.";
         const box = document.createElement("div");
         box.className = "esp32-cred-segredo";

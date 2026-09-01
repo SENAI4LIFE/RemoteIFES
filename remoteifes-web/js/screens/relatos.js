@@ -83,7 +83,7 @@ const Relatos = {
     if (novos > 0) {
       badge.textContent = novos > 99 ? "99+" : String(novos);
       badge.classList.remove("hidden");
-      if (botao) botao.setAttribute("aria-label", `Relatar problema — ${novos} ${novos === 1 ? "relato novo" : "relatos novos"}`);
+      if (botao) botao.setAttribute("aria-label", `Relatar problema: ${novos} ${novos === 1 ? "relato novo" : "relatos novos"}`);
     } else {
       badge.classList.add("hidden");
       if (botao) botao.setAttribute("aria-label", "Relatar problema");
@@ -98,9 +98,11 @@ const Relatos = {
     else this.abrirPainel();
   },
 
+  // Os dois popovers de rodape sao mutuamente exclusivos: abrir um fecha o outro.
   abrirPainel() {
     const painel = document.getElementById("relatosPanel");
     if (!painel) return;
+    if (typeof Notificacoes !== "undefined") Notificacoes.fecharPainel();
     this._painelAberto = true;
     painel.classList.remove("hidden");
     const botao = document.getElementById("bugReportBtn");
@@ -237,7 +239,7 @@ const Relatos = {
             salas.forEach((s) => {
               const opt = document.createElement("option");
               opt.value = s.sala;
-              opt.textContent = `${RoomsData.rotulo(s.sala)} — ${s.nome}`;
+              opt.textContent = `${RoomsData.rotulo(s.sala)}: ${s.nome}`;
               sel.appendChild(opt);
             });
             if (state.salaAtual) sel.value = state.salaAtual;
@@ -420,6 +422,8 @@ const Relatos = {
   }
   document.addEventListener("click", () => Relatos.fecharPainel());
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && Relatos._painelAberto) Relatos.fecharPainel();
+    if (e.key !== "Escape" || !Relatos._painelAberto) return;
+    Relatos.fecharPainel();
+    if (botao) botao.focus();
   });
 })();
