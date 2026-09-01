@@ -28,7 +28,7 @@ const adminSections = [
 const superSections = [
   { id: "energia", titulo: "Energia estimada dos aparelhos", papel: "superadmin", verNoApp: "/admin/energia", corpo: [
     { t: "p", texto: "Em <strong>Administração &rsaquo; Energia</strong>, configure opcionalmente a potência elétrica nominal de entrada, em watts, e informe se o aparelho é inverter ou de velocidade fixa. Potência elétrica não é capacidade de refrigeração em BTU/h." },
-    { t: "p", texto: "A estimativa usa <code>kWh = kW nominal × tempo ligado × fator de carga estimado</code>. Aparelhos fixos usam 100% enquanto ligados. Para inverter, o fator permanece entre 35% e 100% e considera somente a diferença entre temperatura ambiente e alvo; sem telemetria recente, usa 65% e reduz a confiança." },
+    { t: "p", texto: "A estimativa usa <code>kWh = kW nominal × tempo ligado × fator de carga estimado</code>. Aparelhos fixos usam 100% enquanto ligados. Para inverter, o fator permanece entre 35% e 100% e considera somente a diferença entre temperatura ambiente e alvo; sem telemetria recente, usa 65% e a estimativa é marcada como parcial." },
     { t: "p", texto: "Os resumos diários compactos preservam tempo ligado, carga ponderada e cobertura por até 45 dias. Intervalos sem observação não são inventados, e o resultado é sempre identificado como estimativa, não como medição de faturamento." },
     { t: "nota", texto: "A área é somente analítica: não liga ou desliga aparelhos, não muda temperaturas ou agendas e não participa da comunicação de controle com o ESP32. Sem potência configurada, o restante do RemoteIFES continua funcionando normalmente." },
   ] },
@@ -113,7 +113,7 @@ const adminHelp = {
 };
 
 const superHelp = {
-  energia: { titulo: "Como usar: Energia", itens: [{ titulo: "Estimativas", texto: "Configure watts de entrada e tipo do aparelho; compare consumo, carga, tempo ligado e cobertura sem alterar o controle das salas." }] },
+  energia: { titulo: "Como usar: Energia", itens: [{ titulo: "Estimativas", texto: "Configure watts de entrada e tipo do aparelho; compare consumo, carga e tempo ligado sem alterar o controle das salas. Estimativas incompletas aparecem marcadas como parciais." }] },
   macs: { titulo: "Como usar: ESP32 / Salas", itens: [{ titulo: "Vínculo", texto: "Associe dispositivos detectados, limites e acesso às salas corretas." }] },
   config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Escopo", texto: "Mudanças globais afetam segurança, sessões, rede e todos os controladores." }] },
   esp32: { titulo: "Como usar: ESP32", itens: [{ titulo: "Operação avançada", texto: "Use configuração, IR, OTA, credenciais e reset somente no dispositivo selecionado." }] },

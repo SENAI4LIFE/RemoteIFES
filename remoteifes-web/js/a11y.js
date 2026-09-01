@@ -30,6 +30,7 @@
   const LARGURA_PARAGRAFO_PASSOS = ["none", "80ch", "70ch", "60ch", "52ch", "44ch", "36ch"];
   const LARGURA_PARAGRAFO_ROTULOS = ["Padrão", "80ch", "70ch", "60ch", "52ch", "44ch", "36ch"];
   const LARGURA_PARAGRAFO_PADRAO = 0;
+  const ALINHAMENTO_PADRAO = "left";
 
   const COR_PADRAO = "#1f2b23";
 
@@ -138,7 +139,7 @@
   let corFonte = lerTexto(CHAVE_FONT_COLOR, "");
   let corTexto = lerTexto(CHAVE_TEXT_COLOR, "");
   let larguraParagrafo = lerInteiro(CHAVE_PARAGRAFO, LARGURA_PARAGRAFO_PADRAO);
-  let alinhamento = lerTexto(CHAVE_ALINHAMENTO, "left");
+  let alinhamento = lerTexto(CHAVE_ALINHAMENTO, ALINHAMENTO_PADRAO);
 
   aplicarFonte(escalaFonte);
   aplicarEspacamento(espacamento);
@@ -205,7 +206,9 @@
 
     function atualizarGrupoExclusivo(botoes, valorAtivo, dataAttr) {
       botoes.forEach((btn) => {
-        btn.classList.toggle("is-active", btn.dataset[dataAttr] === valorAtivo);
+        const ativo = btn.dataset[dataAttr] === valorAtivo;
+        btn.classList.toggle("is-active", ativo);
+        btn.setAttribute("aria-pressed", String(ativo));
       });
     }
 
@@ -305,7 +308,10 @@
       atualizarFontUI();
     }
     if (fontSlider) {
-      fontSlider.addEventListener("input", () => atualizarPreenchimentoSlider(fontSlider));
+      fontSlider.addEventListener("input", () => {
+        atualizarPreenchimentoSlider(fontSlider);
+        if (fontValue) fontValue.textContent = `${Math.round(parseFloat(fontSlider.value) * 100)}%`;
+      });
       fontSlider.addEventListener("change", () => definirFonte(parseFloat(fontSlider.value)));
     }
     if (fontDecreaseBtn) fontDecreaseBtn.addEventListener("click", () => definirFonte(escalaFonte - FONTE_PASSO));
@@ -319,7 +325,10 @@
       atualizarSpacingUI();
     }
     if (spacingSlider) {
-      spacingSlider.addEventListener("input", () => atualizarPreenchimentoSlider(spacingSlider));
+      spacingSlider.addEventListener("input", () => {
+        atualizarPreenchimentoSlider(spacingSlider);
+        if (spacingValue) spacingValue.textContent = parseFloat(spacingSlider.value).toFixed(2).replace(/\.?0+$/, "") || "0";
+      });
       spacingSlider.addEventListener("change", () => definirEspacamento(parseFloat(spacingSlider.value)));
     }
     if (spacingDecreaseBtn) spacingDecreaseBtn.addEventListener("click", () => definirEspacamento(espacamento - ESPACAMENTO_PASSO));
@@ -333,7 +342,10 @@
       atualizarLineUI();
     }
     if (lineSlider) {
-      lineSlider.addEventListener("input", () => atualizarPreenchimentoSlider(lineSlider));
+      lineSlider.addEventListener("input", () => {
+        atualizarPreenchimentoSlider(lineSlider);
+        if (lineValue) lineValue.textContent = parseFloat(lineSlider.value).toFixed(1);
+      });
       lineSlider.addEventListener("change", () => definirAltura(parseFloat(lineSlider.value)));
     }
     if (lineDecreaseBtn) lineDecreaseBtn.addEventListener("click", () => definirAltura(altura - ALTURA_PASSO));
@@ -356,7 +368,10 @@
       atualizarParagraphUI();
     }
     if (paragraphSlider) {
-      paragraphSlider.addEventListener("input", () => atualizarPreenchimentoSlider(paragraphSlider));
+      paragraphSlider.addEventListener("input", () => {
+        atualizarPreenchimentoSlider(paragraphSlider);
+        if (paragraphValue) paragraphValue.textContent = LARGURA_PARAGRAFO_ROTULOS[parseInt(paragraphSlider.value, 10)] || "Padrão";
+      });
       paragraphSlider.addEventListener("change", () => definirLarguraParagrafo(parseInt(paragraphSlider.value, 10)));
     }
     if (paragraphDecreaseBtn) paragraphDecreaseBtn.addEventListener("click", () => definirLarguraParagrafo(larguraParagrafo - 1));
@@ -439,7 +454,7 @@
       corFonte = "";
       corTexto = "";
       larguraParagrafo = LARGURA_PARAGRAFO_PADRAO;
-      alinhamento = "left";
+      alinhamento = ALINHAMENTO_PADRAO;
 
       aplicarFonte(escalaFonte);
       aplicarEspacamento(espacamento);

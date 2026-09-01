@@ -233,7 +233,13 @@ const ServerStatus = (() => {
     });
 
     socket.addEventListener("error", () => {
-      if (idConexao === conexaoId && ws === socket) socket.close();
+      if (idConexao !== conexaoId || ws !== socket) return;
+      if (socket.readyState === WebSocket.CLOSED) {
+        ws = null;
+        agendarReconexao();
+        return;
+      }
+      socket.close();
     });
   }
 
