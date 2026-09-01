@@ -14,6 +14,7 @@ const Floorplan = {
       showSection(sectionId) {
         this.zoomMultiplier = 1;
         this.zoomOrigin = null;
+        this._ultimoAjuste = null;
         this.root.querySelectorAll(".fp-section").forEach((el) => {
           el.classList.toggle("hidden", el.dataset.fpSection !== sectionId);
         });
@@ -56,6 +57,10 @@ const Floorplan = {
         } else {
           scale = Math.min(3, Math.max(LEGIVEL_MIN, fitScale * this.zoomMultiplier));
         }
+
+        const assinatura = `${scale}|${availableWidth}|${availableHeight}|${naturalWidth}|${naturalHeight}|${this.zoomOrigin ? `${this.zoomOrigin.x},${this.zoomOrigin.y}` : ""}`;
+        if (this._ultimoAjuste === assinatura) return;
+        this._ultimoAjuste = assinatura;
 
         plan.style.transform = `scale(${scale})`;
         plan.style.transformOrigin = this.zoomOrigin ? `${this.zoomOrigin.x}px ${this.zoomOrigin.y}px` : "top left";
