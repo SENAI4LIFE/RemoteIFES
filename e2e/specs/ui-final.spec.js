@@ -211,7 +211,7 @@ test("os glifos dos controles fixos não crescem com a ampliação do texto", as
 
 // ---------------------------------------------------------------- reflow com fonte maxima
 
-const SUBABAS = ["usuarios", "notificacoes", "monitoramento", "energia"];
+const SUBABAS = ["usuarios", "notificacoes", "monitoramento", "energia", "config", "esp32", "macs", "auditoria"];
 
 for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
   test(`Administração continua utilizável na fonte máxima em ${tamanhoNome}`, async ({ page, context }) => {
@@ -223,7 +223,24 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
       await expect(page.locator(`#adminSub-${sub}`)).toBeVisible({ timeout: 15_000 });
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
-      expect(await semRolagemHorizontal(page), `${sub} em ${tamanhoNome} sem rolagem horizontal da página`).toBe(true);
+      const semOverflow = await semRolagemHorizontal(page);
+      const ofensores = semOverflow ? [] : await page.evaluate(() => {
+        const limite = document.documentElement.clientWidth;
+        const antes = document.documentElement.scrollWidth;
+        const achados = [];
+        for (const el of document.querySelectorAll("body *")) {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) continue;
+          const display = el.style.display;
+          el.style.display = "none";
+          const depois = document.documentElement.scrollWidth;
+          el.style.display = display;
+          if (depois < antes) achados.push(`${el.tagName.toLowerCase()}#${el.id}.${el.className} right=${Math.round(r.right)}/${limite}`);
+          if (achados.length > 6) break;
+        }
+        return achados;
+      });
+      expect(semOverflow, `${sub} em ${tamanhoNome} sem rolagem horizontal da página: ${ofensores.join(" | ")}`).toBe(true);
 
       const problemas = await page.evaluate((subAtual) => {
         const achados = [];
