@@ -94,6 +94,8 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     const energia = page.locator("#adminSub-energia");
     await page.locator('.admin-subtab-btn[data-sub="energia"]').click();
     await expect(energia.locator(".energy-table-wrap")).toBeVisible();
+    await expect(energia.locator("#energyTableBody tr").first()).toBeVisible({ timeout: 20_000 });
+    await expect(energia.locator("#energyTableBody .energy-save").first()).toBeAttached();
     const largura = await energia.evaluate((el) => ({ secao: el.clientWidth, tabela: el.querySelector(".energy-table-wrap").clientWidth }));
     expect(largura.tabela).toBeGreaterThan(largura.secao * 0.9);
     const extremosVisiveis = await energia.evaluate((el) => {

@@ -96,6 +96,7 @@ button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
 
 body {
   font-size: calc(16px * var(--a11y-font-scale));
+  overflow-wrap: break-word;
 }
 body, p, li, label, .room-sub, .help-list li, .hint {
   letter-spacing: var(--a11y-letter-spacing);
@@ -2045,9 +2046,11 @@ button.btn:disabled {
 }
 .config-list-item {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   padding: 16px 4px;
   border-bottom: 1px solid var(--border);
+  min-width: 0;
 }
 .config-list-item:last-child { border-bottom: none; }
 .config-list-icon {
@@ -2062,7 +2065,7 @@ button.btn:disabled {
   font-size: calc(16px * var(--a11y-font-scale));
   flex-shrink: 0;
 }
-.config-list-content { flex: 1; min-width: 0; }
+.config-list-content { flex: 1 1 12rem; min-width: 0; }
 .config-list-title { font-weight: 600; font-size: calc(15px * var(--a11y-font-scale)); margin-bottom: 4px; }
 .config-list-desc { font-size: calc(13px * var(--a11y-font-scale)); color: var(--text-muted); margin: 0 0 12px; }
 
@@ -2171,7 +2174,8 @@ button.btn:disabled {
   width: 100%;
   margin-inline: auto;
 }
-.admin-sub > * { width: 100%; max-width: var(--admin-col); min-width: 0; margin: 0 auto; }
+.admin-sub, .admin-sub > * { min-width: 0; }
+.admin-sub > * { width: 100%; max-width: var(--admin-col); margin: 0 auto; }
 .admin-sub > .admin-fp-picker,
 .admin-sub > .mapa-grid,
 #adminSub-energia > * { max-width: var(--admin-col-wide); }
@@ -2179,8 +2183,10 @@ button.btn:disabled {
 
 #adminSub-macs .mac-input { max-width: 22rem; }
 #adminSub-macs .mac-actions { align-items: baseline; gap: 8px 16px; }
-#adminSub-macs .mac-actions > .link-btn { flex: 0 0 auto; }
-#adminSub-macs .mac-actions > .hint { flex: 0 0 auto; margin: 0; }
+/* Não crescem, mas precisam encolher: com a fonte ampliada, "flex: 0 0 auto"
+   deixava o rótulo estourar a largura do cartão. */
+#adminSub-macs .mac-actions > .link-btn { flex: 0 1 auto; min-width: 0; }
+#adminSub-macs .mac-actions > .hint { flex: 0 1 auto; min-width: 0; margin: 0; }
 
 @media (min-width: 900px) {
   #app:has(#screen-rooms:not(.hidden)) { max-width: 1000px; }
@@ -2748,11 +2754,12 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
 
 .esp32-metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(110px * var(--a11y-font-scale))), 1fr));
   gap: 10px;
   margin-top: 14px;
 }
 .esp32-metric {
+  min-width: 0;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2840,7 +2847,8 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
   grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(240px * var(--a11y-font-scale))), 1fr));
   gap: 12px;
 }
-.mon-card { min-width: 0; }
+.mon-card { min-width: 0; overflow-wrap: break-word; }
+.mon-card > *, .mon-row > * { min-width: 0; max-width: 100%; }
 .mon-card h4 { margin: 0 0 8px; font-size: calc(14px * var(--a11y-font-scale)); }
 .mon-row {
   display: flex;
@@ -2878,7 +2886,7 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
   margin-bottom: 12px;
   font-size: calc(13px * var(--a11y-font-scale));
 }
-.mon-alertas ul { margin: 6px 0 0; padding-left: 18px; }
+.mon-alertas ul { margin: 6px 0 0; padding-left: 18px; overflow-wrap: break-word; }
 
 .esp32-config-form {
   display: flex;
@@ -3880,7 +3888,7 @@ textarea {
 .status-chip.status-loading { background: #eef0ee; color: var(--text-muted); border-color: var(--border); }
 .a11y-high-contrast .status-chip { border-color: currentColor; }
 
-.mon-card h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.mon-card h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-width: 0; overflow-wrap: break-word; }
 .mon-erro {
   display: flex;
   align-items: center;
