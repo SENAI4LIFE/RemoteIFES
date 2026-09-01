@@ -22,7 +22,7 @@ const Schedule = {
 
     const salas = await Api.listarSalas();
     agendaSalaSelect.innerHTML = salas
-      .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))} — ${escapeHtml(s.nome)}</option>`)
+      .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))}: ${escapeHtml(s.nome)}</option>`)
       .join("");
     agendaSalaSelect.dataset.carregado = "1";
   },

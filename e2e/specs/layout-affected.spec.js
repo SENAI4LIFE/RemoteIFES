@@ -42,13 +42,18 @@ async function verificarControleAcessibilidade(page) {
     return {
       dentro: a11y.left >= 0 && a11y.right <= innerWidth && a11y.top >= 0 && a11y.bottom <= innerHeight,
       faixaVertical: a11y.top / innerHeight,
+      // O controle fica logo acima do de ajuda, na mesma coluna da direita.
+      folgaAteAjuda: ajuda ? ajuda.top - a11y.bottom : null,
+      desalinhamento: ajuda ? Math.abs(a11y.right - ajuda.right) : null,
       sobrepoeAjuda: sobrepoe(a11y, ajuda),
       sobrepoeNavegacao: sobrepoe(a11y, navegacao),
     };
   });
   expect(medida.dentro).toBe(true);
   expect(medida.faixaVertical).toBeGreaterThan(0.45);
-  expect(medida.faixaVertical).toBeLessThan(0.8);
+  expect(medida.folgaAteAjuda).toBeGreaterThan(0);
+  expect(medida.folgaAteAjuda).toBeLessThanOrEqual(40);
+  expect(medida.desalinhamento).toBeLessThanOrEqual(1);
   expect(medida.sobrepoeAjuda).toBe(false);
   expect(medida.sobrepoeNavegacao).toBe(false);
 

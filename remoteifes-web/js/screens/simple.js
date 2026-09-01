@@ -17,7 +17,7 @@ const SimpleWizard = {
     this.pararAutoRefresh();
     this.bloco = bloco;
     document.getElementById("simpleScreenTitle").textContent = "Selecione o andar";
-    document.getElementById("simpleAndarTitulo").textContent = `Bloco ${bloco} — escolha o andar`;
+    document.getElementById("simpleAndarTitulo").textContent = `Bloco ${bloco}: escolha o andar`;
     document.getElementById("simpleStepBloco").classList.add("hidden");
     document.getElementById("simpleStepAndar").classList.remove("hidden");
     document.getElementById("simpleStepSala").classList.add("hidden");
@@ -30,7 +30,7 @@ const SimpleWizard = {
     grid.classList.toggle("is-second-floor", String(andar) === "2");
     grid.classList.toggle("is-bloco-b-second-floor", this.bloco === "B" && String(andar) === "2");
     grid.classList.add("is-loading");
-    document.getElementById("simpleSalaTitulo").textContent = `Bloco ${this.bloco} — ${andar}º andar`;
+    document.getElementById("simpleSalaTitulo").textContent = `Bloco ${this.bloco}, ${andar}º andar`;
     document.getElementById("simpleStepBloco").classList.add("hidden");
     document.getElementById("simpleStepAndar").classList.add("hidden");
     document.getElementById("simpleStepSala").classList.remove("hidden");

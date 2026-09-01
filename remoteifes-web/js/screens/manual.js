@@ -288,8 +288,8 @@ const Manual = (() => {
         // Sem isto, o fechamento global por clique no documento fecharia o painel de relatos recém-aberto.
         evento.stopPropagation();
         document.getElementById("helpFabPanel").classList.add("hidden");
-        const relatar = document.getElementById("bugReportBtn");
-        if (relatar) relatar.click();
+        // Abre explicitamente (Relatos fecha o painel de notificações), sem alternar.
+        if (typeof Relatos !== "undefined") Relatos.abrirPainel();
       });
       primarios.querySelector('[data-help-action="mobile"]').addEventListener("click", () => {
         document.getElementById("helpFabPanel").classList.add("hidden");

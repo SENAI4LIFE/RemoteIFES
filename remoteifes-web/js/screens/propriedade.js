@@ -9,7 +9,7 @@ const ScreenPropriedade = {
     if (!Array.isArray(this._salas)) this._salas = [];
 
     select.innerHTML = this._salas
-      .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))} — ${escapeHtml(s.nome)}</option>`)
+      .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))}: ${escapeHtml(s.nome)}</option>`)
       .join("");
 
     if (this._salas.length === 0) {
