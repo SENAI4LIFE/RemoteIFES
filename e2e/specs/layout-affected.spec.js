@@ -42,7 +42,6 @@ async function verificarControleAcessibilidade(page) {
     return {
       dentro: a11y.left >= 0 && a11y.right <= innerWidth && a11y.top >= 0 && a11y.bottom <= innerHeight,
       faixaVertical: a11y.top / innerHeight,
-      // O controle fica logo acima do de ajuda, na mesma coluna da direita.
       folgaAteAjuda: ajuda ? ajuda.top - a11y.bottom : null,
       desalinhamento: ajuda ? Math.abs(a11y.right - ajuda.right) : null,
       sobrepoeAjuda: sobrepoe(a11y, ajuda),
@@ -76,6 +75,24 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     expect(await semRolagemHorizontal(page)).toBe(true);
     await verificarContainerCentralizado(page, "#app");
     await expect(page.locator(".admin-subtabs")).toBeVisible();
+    const workspaceUsuarios = await page.locator(".admin-layout").evaluate((layout) => {
+      const sidebar = layout.querySelector(".admin-subtabs").getBoundingClientRect();
+      const content = layout.querySelector(".admin-content").getBoundingClientRect();
+      const card = layout.querySelector("#adminSub-usuarios .card").getBoundingClientRect();
+      const ladoALado = sidebar.bottom > content.top && sidebar.top < content.bottom && sidebar.right <= content.left + 1;
+      return {
+        ladoALado,
+        vao: card.left - sidebar.right,
+        margemEsquerda: card.left - content.left,
+        margemDireita: content.right - card.right,
+        proporcao: card.width / content.width,
+      };
+    });
+    if (workspaceUsuarios.ladoALado) {
+      expect(workspaceUsuarios.vao).toBeLessThanOrEqual(80);
+      expect(Math.abs(workspaceUsuarios.margemEsquerda - workspaceUsuarios.margemDireita)).toBeLessThanOrEqual(1);
+      expect(workspaceUsuarios.proporcao).toBeGreaterThan(0.9);
+    }
 
     for (const sub of ["usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "monitoramento", "auditoria", "energia", "relatos"]) {
       await page.locator(`.admin-subtab-btn[data-sub="${sub}"]`).click();
@@ -91,13 +108,42 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
       expect(semOverflow, `${sub} sem rolagem horizontal da página: ${ofensores.join(", ")}`).toBe(true);
     }
 
+    await page.locator('.admin-subtab-btn[data-sub="notificacoes"]').click();
+    const proporcaoNormal = await page.locator("#adminSub-notificacoes").evaluate((sub) => {
+      const content = sub.closest(".admin-content").getBoundingClientRect();
+      const card = sub.querySelector(".card").getBoundingClientRect();
+      return card.width / content.width;
+    });
+    expect(proporcaoNormal).toBeGreaterThan(0.9);
+
     const energia = page.locator("#adminSub-energia");
     await page.locator('.admin-subtab-btn[data-sub="energia"]').click();
     await expect(energia.locator(".energy-table-wrap")).toBeVisible();
     await expect(energia.locator("#energyTableBody tr").first()).toBeVisible({ timeout: 20_000 });
     await expect(energia.locator("#energyTableBody .energy-save").first()).toBeAttached();
-    const largura = await energia.evaluate((el) => ({ secao: el.clientWidth, tabela: el.querySelector(".energy-table-wrap").clientWidth }));
+    const largura = await energia.evaluate((el) => {
+      const sidebar = document.querySelector(".admin-subtabs").getBoundingClientRect();
+      const content = el.closest(".admin-content").getBoundingClientRect();
+      const tabela = el.querySelector(".energy-table-wrap");
+      const area = tabela.getBoundingClientRect();
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      return {
+        secao: el.clientWidth,
+        tabela: tabela.clientWidth,
+        scrollMaximo: tabela.scrollWidth - tabela.clientWidth,
+        cabeSemRolagem: tabela.clientWidth >= 60 * rem,
+        contida: area.left >= content.left - 1 && area.right <= content.right + 1,
+        sidebarVisivel: sidebar.width > 0 && sidebar.left >= 0 && sidebar.right <= innerWidth,
+      };
+    });
     expect(largura.tabela).toBeGreaterThan(largura.secao * 0.9);
+    if (largura.cabeSemRolagem) {
+      expect(largura.scrollMaximo, JSON.stringify(largura)).toBeLessThanOrEqual(1);
+    } else {
+      expect(largura.scrollMaximo, JSON.stringify(largura)).toBeGreaterThan(0);
+    }
+    expect(largura.contida).toBe(true);
+    expect(largura.sidebarVisivel).toBe(true);
     const extremosVisiveis = await energia.evaluate((el) => {
       const areaEl = el.querySelector(".energy-table-wrap");
       areaEl.scrollLeft = 0;
@@ -119,7 +165,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     await verificarControleAcessibilidade(page);
   });
 
-  test(`Agendamentos centralizado e íntegro em ${nome}`, async ({ page, context }) => {
+  test(`Agendamentos ocupa a largura do conteúdo e permanece íntegro em ${nome}`, async ({ page, context }) => {
     await abrir(page, context, "/#/agenda", tamanho);
     await expect(page.locator("#screen-agenda")).toBeVisible();
     await esperarLayout(page);
@@ -127,16 +173,31 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     await verificarContainerCentralizado(page, "#app");
     const form = page.locator("#screen-agenda > .card");
     await expect(form).toBeVisible();
+    await expect(page.locator("#agendaEmpty")).toBeVisible();
     const alinhamento = await form.evaluate((el) => {
-      const tela = document.getElementById("screen-agenda").getBoundingClientRect();
+      const screen = document.getElementById("screen-agenda");
+      const tela = screen.getBoundingClientRect();
       const card = el.getBoundingClientRect();
       const label = el.querySelector("label");
+      const bordas = [screen.querySelector(".screen-head"), screen.querySelector(":scope > .hint"), el, screen.querySelector("#agendaEmpty")].map((item) => {
+        const rect = item.getBoundingClientRect();
+        return { esquerda: Math.abs(rect.left - tela.left), direita: Math.abs(rect.right - tela.right) };
+      });
       return {
-        diferenca: Math.abs((card.left - tela.left) - (tela.right - card.right)),
+        esquerda: Math.abs(card.left - tela.left),
+        direita: Math.abs(card.right - tela.right),
+        largura: Math.abs(card.width - tela.width),
+        bordas,
         texto: getComputedStyle(label).textAlign,
       };
     });
-    expect(alinhamento.diferenca).toBeLessThanOrEqual(1);
+    expect(alinhamento.esquerda).toBeLessThanOrEqual(1);
+    expect(alinhamento.direita).toBeLessThanOrEqual(1);
+    expect(alinhamento.largura).toBeLessThanOrEqual(1);
+    alinhamento.bordas.forEach((bordas) => {
+      expect(bordas.esquerda).toBeLessThanOrEqual(1);
+      expect(bordas.direita).toBeLessThanOrEqual(1);
+    });
     expect(["left", "start"]).toContain(alinhamento.texto);
     await verificarControleAcessibilidade(page);
   });
@@ -173,3 +234,26 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     expect(await semRolagemHorizontal(page)).toBe(true);
   });
 }
+
+test("Agendamentos mantém largura integral com acessibilidade máxima", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    localStorage.setItem("remoteifes_font_scale", "2");
+    localStorage.setItem("remoteifes_line_height", "3");
+    localStorage.setItem("remoteifes_letter_spacing", "0.25");
+  });
+  await abrir(page, context, "/#/agenda", VIEWPORTS["mobile-portrait"]);
+  const geometria = await page.locator("#screen-agenda > .card").evaluate((card) => {
+    const tela = document.getElementById("screen-agenda").getBoundingClientRect();
+    const rect = card.getBoundingClientRect();
+    const botao = card.querySelector("#criarAgendaBtn").getBoundingClientRect();
+    return {
+      esquerda: Math.abs(rect.left - tela.left),
+      direita: Math.abs(rect.right - tela.right),
+      botaoDentro: botao.left >= rect.left && botao.right <= rect.right && botao.top >= rect.top && botao.bottom <= rect.bottom,
+    };
+  });
+  expect(geometria.esquerda).toBeLessThanOrEqual(1);
+  expect(geometria.direita).toBeLessThanOrEqual(1);
+  expect(geometria.botaoDentro).toBe(true);
+  expect(await semRolagemHorizontal(page)).toBe(true);
+});

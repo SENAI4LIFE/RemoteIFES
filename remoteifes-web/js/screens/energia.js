@@ -2,25 +2,25 @@ const Energia = (() => {
   let salas = [];
   let floorplan = null;
 
+  function semValor(valor) {
+    return valor === null || valor === undefined;
+  }
+
   function numero(valor, casas = 1) {
-    if (valor === null || valor === undefined || !Number.isFinite(Number(valor))) return "—";
+    if (semValor(valor) || !Number.isFinite(Number(valor))) return "—";
     return Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
   }
 
   function kwh(valor) {
-    return valor === null || valor === undefined ? "Potência não configurada" : `${numero(valor, 3)} kWh estimados`;
+    return semValor(valor) ? "Potência não configurada" : `${numero(valor, 3)} kWh estimados`;
   }
 
   function horas(valor) {
-    return valor === null || valor === undefined ? "—" : `${numero(valor, 2)} h`;
+    return semValor(valor) ? "—" : `${numero(valor, 2)} h`;
   }
 
   function watts(valor) {
-    return valor === null || valor === undefined ? "Potência não configurada" : `${numero(valor, 0)} W estimados`;
-  }
-
-  function confianca(valor) {
-    return ({ alta: "alta", media: "média", baixa: "baixa", nao_aplicavel: "não aplicável" })[valor] || "—";
+    return semValor(valor) ? "Potência não configurada" : `${numero(valor, 0)} W estimados`;
   }
 
   function valorMetrica(sala, metrica) {
@@ -88,7 +88,7 @@ const Energia = (() => {
       const intensidade = maximo > 0 ? Math.max(0.08, valor / maximo) : 0.08;
       el.classList.add("energy-room-value");
       el.style.setProperty("--energy-intensity", String(intensidade));
-      el.title = `${RoomsData.rotulo(sala.sala)} · ${rotuloMetrica(sala, metrica)} · confiança ${confianca(sala.confianca)}`;
+      el.title = `${RoomsData.rotulo(sala.sala)} · ${rotuloMetrica(sala, metrica)}`;
     });
     if (floorplan) floorplan.fitToWidth();
   }
@@ -123,11 +123,10 @@ const Energia = (() => {
           </div>
           <span class="energy-btu-note">Informe watts elétricos, não BTU/h.</span>
         </td>
-        <td><strong>${sala.configuracao ? `${numero(sala.cargaAtualPercentual, 0)}%` : "—"}</strong><span>${watts(sala.potenciaAtualEstimadaWatts)}</span><span>alvo ${numero(sala.temperaturaAlvo, 0)} °C · ambiente ${sala.temperaturaAmbiente === null ? "indisponível" : `${numero(sala.temperaturaAmbiente, 1)} °C`}</span></td>
-        <td><strong>${kwh(sala.hoje.kwhEstimado)}</strong><span>${horas(sala.hoje.horasLigado)} ligadas</span></td>
-        <td><strong>${kwh(sala.seteDias.kwhEstimado)}</strong><span>${horas(sala.seteDias.horasLigado)} ligadas</span></td>
-        <td><strong>${kwh(sala.trintaDias.kwhEstimado)}</strong><span>${horas(sala.trintaDias.horasLigado)} ligadas</span><span>potência média ${watts(sala.trintaDias.potenciaMediaEstimadaWatts)}</span><span>alvo médio ${sala.trintaDias.temperaturaAlvoMedia === null ? "—" : `${numero(sala.trintaDias.temperaturaAlvoMedia, 1)} °C`}</span><span>ambiente médio ${sala.trintaDias.temperaturaAmbienteMedia === null ? "indisponível" : `${numero(sala.trintaDias.temperaturaAmbienteMedia, 1)} °C`}</span></td>
-        <td><strong>Confiança ${confianca(sala.confianca)}</strong><span>estado ${numero(sala.trintaDias.coberturaObservacaoPercentual, 1)}%</span><span>telemetria ${sala.trintaDias.coberturaTelemetriaPercentual === null ? "—" : `${numero(sala.trintaDias.coberturaTelemetriaPercentual, 1)}%`}</span>${sala.parcial ? "<span class=\"energy-partial\">estimativa parcial</span>" : ""}</td>
+        <td>${sala.configuracao ? `<strong>${numero(sala.cargaAtualPercentual, 0)}%</strong>` : ""}<span>${watts(sala.potenciaAtualEstimadaWatts)}</span><span>alvo ${numero(sala.temperaturaAlvo, 0)} °C · ambiente ${semValor(sala.temperaturaAmbiente) ? "indisponível" : `${numero(sala.temperaturaAmbiente, 1)} °C`}</span></td>
+        <td><strong>${kwh(sala.hoje.kwhEstimado)}</strong>${semValor(sala.hoje.horasLigado) ? "" : `<span>${horas(sala.hoje.horasLigado)} ligadas</span>`}</td>
+        <td><strong>${kwh(sala.seteDias.kwhEstimado)}</strong>${semValor(sala.seteDias.horasLigado) ? "" : `<span>${horas(sala.seteDias.horasLigado)} ligadas</span>`}</td>
+        <td><strong>${kwh(sala.trintaDias.kwhEstimado)}</strong>${semValor(sala.trintaDias.horasLigado) ? "" : `<span>${horas(sala.trintaDias.horasLigado)} ligadas</span>`}${semValor(sala.trintaDias.potenciaMediaEstimadaWatts) ? "" : `<span>potência média ${watts(sala.trintaDias.potenciaMediaEstimadaWatts)}</span>`}${semValor(sala.trintaDias.temperaturaAlvoMedia) ? "" : `<span>alvo médio ${numero(sala.trintaDias.temperaturaAlvoMedia, 1)} °C</span>`}<span>ambiente médio ${semValor(sala.trintaDias.temperaturaAmbienteMedia) ? "indisponível" : `${numero(sala.trintaDias.temperaturaAmbienteMedia, 1)} °C`}</span>${sala.parcial ? "<span class=\"energy-partial\">estimativa parcial</span>" : ""}</td>
       `;
       tr.querySelector(".energy-type").value = sala.configuracao?.tipo || "inverter";
       tr.querySelector(".energy-save").addEventListener("click", async (event) => {

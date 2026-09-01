@@ -85,12 +85,16 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
         const vw = document.documentElement.clientWidth;
         const btn = document.querySelector(".mobile-app-download-btn").getBoundingClientRect();
         const hash = document.querySelector(".mobile-app-hash");
+        const limite = hash.parentElement.getBoundingClientRect();
+        const linhas = [...hash.getClientRects()];
         return {
           botaoVaza: Math.round(btn.x + btn.width - vw),
-          hashVaza: hash.scrollWidth - hash.clientWidth,
+          hashLinhas: linhas.length,
+          hashVaza: Math.round(Math.max(0, ...linhas.map((linha) => linha.right - limite.right))),
         };
       });
       expect(medidas.botaoVaza, "botão de download cabe na largura").toBeLessThanOrEqual(1);
+      expect(medidas.hashLinhas, "SHA-256 renderizado").toBeGreaterThan(0);
       expect(medidas.hashVaza, "o SHA-256 quebra dentro do cartão").toBeLessThanOrEqual(1);
     } finally {
       await despublicarApkFixture(request);
