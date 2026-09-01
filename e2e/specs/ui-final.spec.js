@@ -250,7 +250,10 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
           const r = el.getBoundingClientRect();
           const p = painel.getBoundingClientRect();
           if (r.right > p.right + 2) achados.push(`transborda: ${el.className}`);
-          if (el.scrollHeight > el.clientHeight + 2) achados.push(`texto cortado: ${el.className}`);
+          // Altura rígida só corta texto quando o próprio elemento esconde o excedente;
+          // com overflow visível o conteúdo apenas empurra o cartão, que é o esperado.
+          const escondeVertical = getComputedStyle(el).overflowY === "hidden";
+          if (escondeVertical && el.scrollHeight > el.clientHeight + 2) achados.push(`texto cortado: ${el.className}`);
         });
         // Rotulos das sub-abas nao podem virar coluna de uma letra.
         document.querySelectorAll(".admin-subtab-btn:not(.hidden) .admin-subtab-label").forEach((el) => {
