@@ -4,7 +4,6 @@ async function abrirMonitoramento(page, context, papel = "superadmin", tamanho =
   await injetarSessao(context, papel);
   await page.setViewportSize(tamanho);
   await page.goto("/#/admin/monitoramento");
-  // Garante documento novo mesmo quando so o fragmento mudaria.
   await page.reload();
   await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
 }
@@ -24,7 +23,6 @@ test("o mapa de calor é exclusivo do superadministrador", async ({ page, contex
     expect(resp.status(), `HTTP para ${papel}`).toBe(status);
   }
 
-  // O administrador comum nem chega a ver a aba que hospeda a secao.
   await abrirMonitoramento(page, context, "admin");
   await expect(page.locator('.admin-subtab-btn[data-sub="monitoramento"]')).toBeHidden();
   await expect(page.locator("#heatmapBloco")).toBeHidden();
@@ -39,14 +37,12 @@ test("nada é calculado antes de a seção ser aberta", async ({ page, context }
 
   await abrirMonitoramento(page, context);
   await expect(page.locator("#heatmapBloco")).toBeVisible({ timeout: 15_000 });
-  // Monitoramento atualiza a cada 20 s; o mapa de calor fechado nao deve acompanhar.
   await page.waitForTimeout(3000);
   expect(chamadas, "consulta emitida com a seção fechada").toEqual([]);
 
   await abrirHeatmap(page);
   expect(chamadas.length).toBe(1);
 
-  // Sem polling: a secao aberta e parada nao dispara novas consultas.
   await page.waitForTimeout(4000);
   expect(chamadas.length).toBe(1);
 });
@@ -102,7 +98,6 @@ test("a escala de cor cobre frio a quente e o estado Sem dados é distinto", asy
   await abrirMonitoramento(page, context);
   await abrirHeatmap(page);
 
-  // Disponibilidade: metrica onde maior e melhor, com inversao explicita na legenda.
   await expect(page.locator("#heatmapLegendaMin")).toContainText("melhor");
   await expect(page.locator("#heatmapLegendaMax")).toContainText("pior");
   await expect(page.locator(".heatmap-escala")).toBeVisible();

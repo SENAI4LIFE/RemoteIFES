@@ -68,8 +68,6 @@ test("PWA instalada atualiza A para B, remove cache obsoleto e continua offline"
 
   await page.evaluate(() => fetch("/__release/b", { method: "POST" }));
 
-  // A aba aberta é atualizada pelo próprio worker: sem recarga manual, sem limpar armazenamento,
-  // sem desregistrar o worker e sem janela anônima.
   const naPagina = (fn) => page.evaluate(fn).catch(() => null);
   await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration();

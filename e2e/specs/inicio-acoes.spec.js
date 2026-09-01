@@ -10,7 +10,6 @@ async function abrirInicio(page, context, role, viewport) {
 
 const card = (page, chave) => page.locator(`.hub-card[data-hub-card="${chave}"]`);
 
-// Cada ação visível de Início, com o resultado observável que ela precisa produzir.
 const ACOES = {
   salas: { hash: "#/salas", visivel: "#screen-simple" },
   planta: { hash: /^#\/salas\/planta(\/|$)/, visivel: "#screen-floorplan" },
@@ -21,6 +20,12 @@ const ACOES = {
   ajuda: { visivel: "#screen-manual" },
   aplicativo: { visivel: "#screen-mobile-app" },
 };
+
+test("o Início exibe a saudação sem o rótulo RemoteIFES redundante", async ({ page, context }) => {
+  await abrirInicio(page, context, "superadmin");
+  await expect(page.locator("#hubHeroTitulo")).toHaveText("Olá, Superadministrador");
+  await expect(page.locator(".hub-hero-eyebrow")).toHaveCount(0);
+});
 
 for (const role of ["user", "admin", "superadmin"]) {
   test(`todas as ações visíveis de Início funcionam para ${role}`, async ({ page, context }) => {
@@ -34,7 +39,6 @@ for (const role of ["user", "admin", "superadmin"]) {
       expect(esperado, `ação "${chave}" de Início sem cobertura`).toBeTruthy();
 
       const alvo = card(page, chave);
-      // Ícone e rótulo pertencem ao mesmo botão: não existe ícone com alvo de clique separado.
       await expect(alvo.locator(".hub-card-icon")).toHaveCount(1);
       await expect(alvo.locator(".hub-card-title")).toHaveCount(1);
       await expect(alvo).toBeVisible();
@@ -49,7 +53,6 @@ for (const role of ["user", "admin", "superadmin"]) {
         await expect.poll(() => page.evaluate(() => location.hash)).toBe(esperado.hash);
       }
 
-      // Fecha sobreposições (manual, aplicativo, painéis) antes da próxima ação.
       await page.keyboard.press("Escape");
       await page.goto("/#/inicio");
       await page.reload();
@@ -68,7 +71,6 @@ test("Relatar problema abre o painel de relatos pelo teclado e permanece aberto"
   await page.keyboard.press("Enter");
   await expect(page.locator("#relatosPanel")).toBeVisible();
   await expect(page.locator("#relatosPanel")).toContainText("Relatar problema", { timeout: 15_000 });
-  // O painel não pode ser fechado pelo próprio clique que o abriu.
   await page.waitForTimeout(300);
   await expect(page.locator("#relatosPanel")).toBeVisible();
   await expect(page.locator("#bugReportBtn")).toHaveAttribute("aria-expanded", "true");

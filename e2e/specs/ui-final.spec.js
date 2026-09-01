@@ -1,6 +1,5 @@
 const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
-// Ajustes de acessibilidade no maximo suportado (a11y.js: fonte 2x, entrelinha 3, espacamento .25em).
 const MAXIMO_A11Y = {
   remoteifes_font_scale: "2",
   remoteifes_line_height: "3",
@@ -18,14 +17,10 @@ async function abrir(page, context, papel, rota, tamanho, a11yMaximo = false) {
   }
   if (tamanho) await page.setViewportSize(tamanho);
   await page.goto(rota);
-  // Um goto que so troca o fragmento nao recarrega o documento, e os init scripts
-  // (sessao e ajustes de acessibilidade) nao chegariam a rodar.
   await page.reload();
   await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
-
-// ---------------------------------------------------------------- titulos centralizados
 
 const TITULOS = {
   "#/salas/planta": { tela: "#screen-floorplan", texto: "Plantas baixas" },
@@ -35,9 +30,9 @@ const TITULOS = {
 };
 
 for (const [rota, alvo] of Object.entries(TITULOS)) {
-  test(`o título "${alvo.texto}" fica centralizado na própria área de conteúdo`, async ({ page, context }) => {
+  test(`o título "${alvo.texto}" mantém o alinhamento natural à esquerda`, async ({ page, context }) => {
     await abrir(page, context, "superadmin", rota, VIEWPORTS.notebook);
-    const cabecalho = page.locator(`${alvo.tela} .screen-head-centralizado`).first();
+    const cabecalho = page.locator(`${alvo.tela} .screen-head`).first();
     await expect(cabecalho.locator("h1")).toHaveText(alvo.texto);
 
     const medida = await cabecalho.evaluate((head) => {
@@ -45,34 +40,99 @@ for (const [rota, alvo] of Object.entries(TITULOS)) {
       const rh = head.getBoundingClientRect();
       const rt = h1.getBoundingClientRect();
       return {
-        desvio: Math.abs((rt.left + rt.right) / 2 - (rh.left + rh.right) / 2),
+        desvio: Math.abs(rt.left - rh.left),
         largura: rh.width,
         alinhamento: getComputedStyle(h1).textAlign,
       };
     });
     expect(medida.largura).toBeGreaterThan(0);
-    expect(medida.desvio, `desvio do centro em ${alvo.texto}`).toBeLessThanOrEqual(2);
-    expect(medida.alinhamento).toBe("center");
+    expect(medida.desvio, `recuo inesperado em ${alvo.texto}`).toBeLessThanOrEqual(2);
+    expect(["start", "left"]).toContain(medida.alinhamento);
   });
 }
 
-test("o texto comum das páginas continua alinhado à esquerda", async ({ page, context }) => {
+test("subtítulos, seleções e rótulos de formulário permanecem à esquerda", async ({ page, context }) => {
   await abrir(page, context, "superadmin", "#/agenda", VIEWPORTS.notebook);
-  const alinhamentos = await page.$$eval("#screen-agenda .hint, #screen-agenda label", (els) =>
-    els.filter((e) => e.offsetParent !== null).map((e) => getComputedStyle(e).textAlign)
+  const alinhamentos = await page.$$eval("#screen-agenda > .screen-head + .hint, #screen-agenda label", (els) =>
+    els.filter((el) => el.offsetParent !== null).map((el) => getComputedStyle(el).textAlign)
   );
   expect(alinhamentos.length).toBeGreaterThan(0);
-  alinhamentos.forEach((a) => expect(["start", "left"]).toContain(a));
+  alinhamentos.forEach((alinhamento) => expect(["start", "left"]).toContain(alinhamento));
+
+  await page.goto("/#/salas");
+  await expect(page.locator("#simpleScreenTitle")).toHaveText("Selecione o bloco");
+  await expect(page.locator("#simpleScreenTitle")).toHaveCSS("text-align", /^(start|left)$/);
+
+  await page.goto("/#/admin/usuarios");
+  await expect(page.locator("#adminSub-usuarios h2")).toHaveCSS("text-align", /^(start|left)$/);
+  await expect(page.locator("#adminSub-usuarios > .hint")).toHaveCSS("text-align", /^(start|left)$/);
 });
 
-// ---------------------------------------------------------------- popovers exclusivos
+test("o alinhamento padrão é à esquerda e uma preferência salva é preservada", async ({ page, context }) => {
+  await page.goto("/");
+  await expect(page.locator("body")).toHaveClass(/a11y-align-left/);
+  await expect(page.locator("#a11yAlignLeftBtn")).toHaveClass(/is-active/);
+  await expect(page.locator("#a11yAlignLeftBtn")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#a11yAlignLeftBtn")).toHaveText("Esquerda");
+  expect(await page.evaluate(() => window.localStorage.getItem("remoteifes_text_align"))).toBeNull();
+
+  await context.addInitScript(() => window.localStorage.setItem("remoteifes_text_align", "right"));
+  await page.reload();
+  await expect(page.locator("body")).toHaveClass(/a11y-align-right/);
+  await expect(page.locator("#a11yAlignRightBtn")).toHaveClass(/is-active/);
+  await expect(page.locator("#a11yAlignRightBtn")).toHaveAttribute("aria-pressed", "true");
+  expect(await page.evaluate(() => window.localStorage.getItem("remoteifes_text_align"))).toBe("right");
+});
+
+test("o acesso mantém o botão centralizado e o título à esquerda com acessibilidade máxima", async ({ page, context }) => {
+  await context.addInitScript((ajustes) => {
+    Object.entries(ajustes).forEach(([chave, valor]) => window.localStorage.setItem(chave, valor));
+  }, MAXIMO_A11Y);
+  await page.setViewportSize(VIEWPORTS["mobile-portrait"]);
+  await page.goto("/");
+  await page.locator("#a11yToggleBtn").click();
+  const painel = await page.locator("#a11yPanel").evaluate((el) => {
+    const opcao = el.querySelector("#a11yAlignCenterBtn");
+    const estilo = getComputedStyle(opcao);
+    return {
+      semOverflowHorizontal: el.scrollWidth <= el.clientWidth + 1 && opcao.scrollWidth <= opcao.clientWidth + 1,
+      larguraOpcao: opcao.getBoundingClientRect().width,
+      tamanhoFonte: parseFloat(estilo.fontSize),
+    };
+  });
+  expect(painel.semOverflowHorizontal).toBe(true);
+  expect(painel.larguraOpcao).toBeGreaterThan(painel.tamanhoFonte * 4);
+  await page.locator("#a11yCloseBtn").click();
+  await page.locator('.portal-option[data-tipo="admin"]').click();
+
+  const medida = await page.locator("#loginVoltarBtn").evaluate((el) => {
+    const estilo = getComputedStyle(el);
+    const retangulo = el.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const texto = range.getBoundingClientRect();
+    return {
+      display: estilo.display,
+      alinhamento: estilo.textAlign,
+      desvioHorizontal: Math.abs((texto.left + texto.right) / 2 - (retangulo.left + retangulo.right) / 2),
+      desvioVertical: Math.abs((texto.top + texto.bottom) / 2 - (retangulo.top + retangulo.bottom) / 2),
+      dentro: texto.left >= retangulo.left - 1 && texto.right <= retangulo.right + 1 && texto.top >= retangulo.top - 1 && texto.bottom <= retangulo.bottom + 1,
+    };
+  });
+  expect(medida.display).toContain("flex");
+  expect(medida.alinhamento).toBe("center");
+  expect(medida.desvioHorizontal).toBeLessThanOrEqual(2);
+  expect(medida.desvioVertical).toBeLessThanOrEqual(2);
+  expect(medida.dentro).toBe(true);
+  await expect(page.locator("#loginTitulo")).toHaveCSS("text-align", /^(start|left)$/);
+  expect(await semRolagemHorizontal(page)).toBe(true);
+});
 
 test("Notificações e Relatar problema nunca ficam abertos ao mesmo tempo", async ({ page, context }) => {
   await abrir(page, context, "admin", "#/inicio", VIEWPORTS.notebook);
   const notif = page.locator("#notifPanel");
   const relatos = page.locator("#relatosPanel");
 
-  // Sino primeiro, depois o cartão de relato: o sino precisa fechar.
   await page.locator("#notifBellBtn").click();
   await expect(notif).toBeVisible();
   await expect(page.locator("#notifBellBtn")).toHaveAttribute("aria-expanded", "true");
@@ -83,7 +143,6 @@ test("Notificações e Relatar problema nunca ficam abertos ao mesmo tempo", asy
   await expect(page.locator("#notifBellBtn")).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#bugReportBtn")).toHaveAttribute("aria-expanded", "true");
 
-  // Caminho inverso: abrir o sino fecha o painel de relatos.
   await page.locator("#notifBellBtn").click();
   await expect(notif).toBeVisible();
   await expect(relatos).toBeHidden();
@@ -100,7 +159,6 @@ test("o menu rápido de ajuda e o botão de inseto usam o mesmo estado dos pain�
   await expect(page.locator("#relatosPanel")).toBeVisible();
   await expect(page.locator("#notifPanel")).toBeHidden();
 
-  // Escape fecha e devolve o foco ao disparador.
   await page.keyboard.press("Escape");
   await expect(page.locator("#relatosPanel")).toBeHidden();
   await expect(page.locator("#bugReportBtn")).toBeFocused();
@@ -110,8 +168,6 @@ test("o menu rápido de ajuda e o botão de inseto usam o mesmo estado dos pain�
   await page.locator("#bugReportBtn").click();
   await expect(page.locator("#relatosPanel")).toBeHidden();
 });
-
-// ---------------------------------------------------------------- planta baixa
 
 async function abrirPlantaB2(page, context) {
   await abrir(page, context, "user", "#/salas/planta", VIEWPORTS.desktop);
@@ -129,7 +185,6 @@ test("a geometria de B-207 corresponde à planta baixa original e escala junto c
     return {
       inline: sala.getAttribute("style"),
       codigo: sala.querySelector(".num").textContent,
-      // A escala do mapa e uniforme: a razao renderizada tem de bater com a razao das medidas base.
       razaoLargura: s.width / v.width,
       razaoAltura: s.height / v.height,
     };
@@ -140,7 +195,6 @@ test("a geometria de B-207 corresponde à planta baixa original e escala junto c
   expect(medida.inline).toContain("top:90px");
   expect(medida.inline).toContain("width:100px");
   expect(medida.inline).toContain("height:190px");
-  // B-206 tem 170x180 na planta: a razao renderizada precisa reproduzir 100/170 e 190/180.
   expect(medida.razaoLargura).toBeCloseTo(100 / 170, 2);
   expect(medida.razaoAltura).toBeCloseTo(190 / 180, 2);
 });
@@ -154,8 +208,6 @@ test("os identificadores de sala mantêm o hífen original", async ({ page, cont
   expect(texto).toContain("B-207");
   expect(texto).not.toMatch(/\bB 20\d\b/);
 });
-
-// ---------------------------------------------------------------- controles flutuantes
 
 test("acessibilidade e ajuda ficam próximos, sem sobreposição, com alvos de 44px", async ({ page, context }) => {
   for (const [nome, tamanho] of Object.entries({
@@ -203,13 +255,10 @@ test("os glifos dos controles fixos não crescem com a ampliação do texto", as
 
   expect(ampliado.fonteAjuda).toBe(padrao.fonteAjuda);
   expect(ampliado.svg).toBe(padrao.svg);
-  // O alvo de toque continua o mesmo e continua acessivel.
   expect(ampliado.alvoAjuda).toBe(padrao.alvoAjuda);
   expect(ampliado.alvoA11y).toBe(padrao.alvoA11y);
   expect(ampliado.alvoAjuda).toBeGreaterThanOrEqual(44);
 });
-
-// ---------------------------------------------------------------- reflow com fonte maxima
 
 const SUBABAS = ["usuarios", "notificacoes", "monitoramento", "energia", "config", "esp32", "macs", "auditoria"];
 
@@ -245,17 +294,13 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
       const problemas = await page.evaluate((subAtual) => {
         const achados = [];
         const painel = document.getElementById(`adminSub-${subAtual}`);
-        // Conteudo tem de caber no proprio componente, sem transbordar o painel.
         painel.querySelectorAll(".card, .mon-card, .energy-summary-card").forEach((el) => {
           const r = el.getBoundingClientRect();
           const p = painel.getBoundingClientRect();
           if (r.right > p.right + 2) achados.push(`transborda: ${el.className}`);
-          // Altura rígida só corta texto quando o próprio elemento esconde o excedente;
-          // com overflow visível o conteúdo apenas empurra o cartão, que é o esperado.
           const escondeVertical = getComputedStyle(el).overflowY === "hidden";
           if (escondeVertical && el.scrollHeight > el.clientHeight + 2) achados.push(`texto cortado: ${el.className}`);
         });
-        // Rotulos das sub-abas nao podem virar coluna de uma letra.
         document.querySelectorAll(".admin-subtab-btn:not(.hidden) .admin-subtab-label").forEach((el) => {
           const r = el.getBoundingClientRect();
           const linhas = Math.round(r.height / parseFloat(getComputedStyle(el).fontSize));
@@ -263,7 +308,6 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
             achados.push(`rótulo quebrado letra a letra: ${el.textContent.trim()}`);
           }
         });
-        // Botoes precisam manter rotulo visivel.
         painel.querySelectorAll("button.btn:not(.hidden)").forEach((el) => {
           const r = el.getBoundingClientRect();
           if (r.width > 0 && el.textContent.trim() && r.height < 20) achados.push(`botão sem rótulo visível: ${el.id || el.className}`);
@@ -280,7 +324,6 @@ test("Energia e Monitoramento não cortam conteúdo à direita na fonte máxima"
   await expect(page.locator("#adminSub-energia")).toBeVisible();
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
-  // Tabela larga rola dentro do proprio componente, nao na pagina.
   const tabela = await page.locator(".energy-table-wrap").evaluate((el) => ({
     rolaNoComponente: el.scrollWidth > el.clientWidth,
     overflow: getComputedStyle(el).overflowX,
