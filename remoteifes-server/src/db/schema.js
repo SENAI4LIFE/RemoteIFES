@@ -221,6 +221,7 @@ function criarSchema() {
     CREATE INDEX IF NOT EXISTS idx_relatos_status_atualizado ON relatos(status, atualizadoEm);
 
     CREATE INDEX IF NOT EXISTS idx_comandos_log_criado ON comandos_log(criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_comandos_log_sala_criado ON comandos_log(sala, criadoEm);
     CREATE INDEX IF NOT EXISTS idx_esp_eventos_criado ON esp_eventos(criadoEm);
     CREATE INDEX IF NOT EXISTS idx_esp_eventos_status_criado ON esp_eventos(status, criadoEm);
     CREATE INDEX IF NOT EXISTS idx_esp_acessos_criado ON esp_acessos(criadoEm);

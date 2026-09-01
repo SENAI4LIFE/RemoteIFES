@@ -65,13 +65,30 @@ const Notificacoes = {
     await this.renderizar(document.getElementById("adminNotifList"), document.getElementById("adminNotifEmpty"));
   },
 
+  // Os dois popovers de rodape sao mutuamente exclusivos: abrir um fecha o outro.
   async abrirPainel() {
-    const lista = document.getElementById("notifList");
-    const empty = document.getElementById("notifEmpty");
-    await this.renderizar(lista, empty);
-
-    document.getElementById("notifPanel").classList.toggle("hidden");
+    const painel = document.getElementById("notifPanel");
+    if (!painel) return;
+    if (typeof Relatos !== "undefined") Relatos.fecharPainel();
+    await this.renderizar(document.getElementById("notifList"), document.getElementById("notifEmpty"));
+    painel.classList.remove("hidden");
     this.sincronizarSino();
+  },
+
+  fecharPainel() {
+    const painel = document.getElementById("notifPanel");
+    if (painel) painel.classList.add("hidden");
+    this.sincronizarSino();
+  },
+
+  estaAberto() {
+    const painel = document.getElementById("notifPanel");
+    return !!painel && !painel.classList.contains("hidden");
+  },
+
+  async alternarPainel() {
+    if (this.estaAberto()) this.fecharPainel();
+    else await this.abrirPainel();
   },
 
   sincronizarSino() {
@@ -83,7 +100,7 @@ const Notificacoes = {
 
 document.getElementById("notifBellBtn").addEventListener("click", (e) => {
   e.stopPropagation();
-  Notificacoes.abrirPainel();
+  Notificacoes.alternarPainel();
 });
 
 document.getElementById("notifMarcarTodasBtn").addEventListener("click", async (e) => {
@@ -101,7 +118,11 @@ document.getElementById("adminNotifMarcarTodasBtn").addEventListener("click", as
 
 document.getElementById("notifPanel").addEventListener("click", (e) => e.stopPropagation());
 
-document.addEventListener("click", () => {
-  document.getElementById("notifPanel").classList.add("hidden");
-  Notificacoes.sincronizarSino();
+document.addEventListener("click", () => Notificacoes.fecharPainel());
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !Notificacoes.estaAberto()) return;
+  Notificacoes.fecharPainel();
+  const sino = document.getElementById("notifBellBtn");
+  if (sino) sino.focus();
 });

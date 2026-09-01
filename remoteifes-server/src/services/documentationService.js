@@ -35,16 +35,27 @@ const superSections = [
   { id: "esp32-cadastro", titulo: "Cadastro de ESP32 por sala", papel: "superadmin", verNoApp: "/admin/macs", corpo: [
     { t: "p", texto: "Associe cada sala ao MAC do controlador detectado, configure limites específicos e, quando necessário, restrinja o controle a usuários autorizados." },
   ] },
-  { id: "esp32-avancado", titulo: "ESP32 — funções avançadas", papel: "superadmin", verNoApp: "/admin/esp32", corpo: [
+  { id: "esp32-avancado", titulo: "ESP32: funções avançadas", papel: "superadmin", verNoApp: "/admin/esp32", corpo: [
     { t: "lista", itens: ["Entrar e sair do modo de configuração.", "Capturar e testar sinais infravermelhos.", "Selecionar protocolo, atualizar firmware por OTA e resetar a configuração Wi-Fi."] },
   ] },
   { id: "monitoramento", titulo: "Monitoramento e saúde do sistema", papel: "superadmin", verNoApp: "/admin/monitoramento", corpo: [
     { t: "p", texto: "Acompanhe serviço, banco, armazenamento, backups, controladores, credenciais e contadores de falha. A tela atualiza enquanto permanece aberta." },
   ] },
+  { id: "heatmap", titulo: "Mapa de calor operacional", papel: "superadmin", verNoApp: "/admin/monitoramento", corpo: [
+    { t: "p", texto: "Dentro de <strong>Administração &rsaquo; Monitoramento</strong>, a seção <strong>Mapa de calor operacional</strong> compara as salas em uma métrica de operação, sobre a mesma planta baixa usada no resto do sistema. É visível somente ao superadministrador." },
+    { t: "lista", itens: [
+      "Métricas disponíveis: disponibilidade do ESP32, tempo offline, quedas de conexão, comandos enviados, comandos com o dispositivo offline, agendamentos criados, execuções de agendamento, relatos de problema e relatos sem resolução.",
+      "Períodos: 24 horas, 7 dias ou 30 dias.",
+      "A escala vai do frio (azul) ao quente (vermelho) e o quente é sempre o extremo pior. Em disponibilidade, quanto menor a porcentagem, mais quente fica a sala.",
+      "A cor nunca aparece sozinha: cada sala mostra o valor numérico, a legenda indica os extremos e a tabela abaixo do mapa repete tudo em texto, ordenada da pior para a melhor sala.",
+      "Sala sem fonte confiável para a métrica aparece como <strong>Sem dados</strong>, com hachura, nunca como zero.",
+    ] },
+    { t: "nota", texto: "O cálculo acontece apenas quando a seção está aberta ou quando métrica e período mudam; nada roda em segundo plano e nenhum histórico novo é gravado. As métricas de conectividade dependem do histórico de indisponibilidade, que segue a retenção de auditoria: quando o período escolhido é maior que ela, um aviso aparece na própria seção. Consumo e energia estimada não entram aqui e continuam na aba Energia." },
+  ] },
   { id: "relatos-gestao", titulo: "Relatos de problemas (gestão)", papel: "superadmin", verNoApp: "/admin/relatos", corpo: [
     { t: "p", texto: "Em <strong>Administração &rsaquo; Relatos de problemas</strong>, o superadministrador filtra os relatos por situação (novo, aberto, em análise, resolvido), abre cada um para revisar o contexto, escreve uma resposta visível ao autor e move a situação: marcar em análise, resolver ou reabrir. Abrir um relato novo já o marca como aberto." },
     { t: "p", texto: "A janela de detalhe também permite <strong>excluir permanentemente</strong> um relato já enviado, após uma confirmação em duas etapas dentro da própria janela. A exclusão remove a descrição, a resposta e o histórico de revisão, não pode ser desfeita e não depende da situação do relato." },
-    { t: "nota", texto: "Os usuários enviam relatos pelo botão de inseto presente em qualquer tela; o formulário de envio não faz parte desta seção de gestão. Nenhum relato é removido automaticamente — a exclusão é sempre manual e deliberada." },
+    { t: "nota", texto: "Os usuários enviam relatos pelo botão de inseto presente em qualquer tela; o formulário de envio não faz parte desta seção de gestão. Nenhum relato é removido automaticamente; a exclusão é sempre manual e deliberada." },
   ] },
   { id: "auditoria", titulo: "Auditoria e histórico", papel: "superadmin", verNoApp: "/admin/auditoria", corpo: [
     { t: "p", texto: "Em <strong>Administração &rsaquo; Auditoria</strong>, consulte os eventos administrativos e os períodos de indisponibilidade dos ESP32, filtrando por intervalo de datas." },
@@ -81,7 +92,7 @@ const superSections = [
       "Defina o ambiente de produção, a origem CORS exata, a política de proxy confiável, o diretório persistente de dados e as redes autorizadas no arquivo de ambiente protegido do host.",
       "Use HTTPS sempre que o tráfego sair de uma rede local controlada. Não publique arquivos de ambiente, bancos, backups, keystores ou diretórios de release em hospedagem estática.",
       "Após alterar arquivos de <code>remoteifes-web</code>, avance a versão em <code>version.json</code> e nos demais pontos verificados pelo teste de versão do frontend, valide a atualização automática da PWA e sincronize novamente o projeto Cordova.",
-      "Para Android, gere com origem fixa e keystore de produção; publique somente após apksigner, verificação de debuggable, versão/build, SHA-256 e certificado. O APK servido fica preso à origem do build — outra implantação exige um APK novo.",
+      "Para Android, gere com origem fixa e keystore de produção; publique somente após apksigner, verificação de debuggable, versão/build, SHA-256 e certificado. O APK servido fica preso à origem do build (outra implantação exige um APK novo).",
       "Mantenha o keystore e as senhas de assinatura fora do controle de versão e com backup próprio em cofre ou mídia offline: perder a chave impede atualizações em aparelhos já instalados.",
     ] },
   ] },
@@ -107,6 +118,11 @@ const superHelp = {
   config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Escopo", texto: "Mudanças globais afetam segurança, sessões, rede e todos os controladores." }] },
   esp32: { titulo: "Como usar: ESP32", itens: [{ titulo: "Operação avançada", texto: "Use configuração, IR, OTA, credenciais e reset somente no dispositivo selecionado." }] },
   monitoramento: { titulo: "Como usar: Monitoramento", itens: [{ titulo: "Saúde", texto: "Revise alertas de serviço, banco, disco, backup, controladores e credenciais." }] },
+  heatmap: { titulo: "Como usar: Mapa de calor operacional", itens: [
+    { titulo: "Sob demanda", texto: "Abra a seção para calcular; escolha métrica e período (24 h, 7 ou 30 dias) e o servidor agrega na hora." },
+    { titulo: "Leitura", texto: "Frio é bom, quente é ruim, inclusive em disponibilidade, onde pouca porcentagem fica quente. Valor numérico, legenda e tabela acompanham a cor." },
+    { titulo: "Sem dados", texto: "Sala sem dispositivo ou sem histórico no período aparece hachurada como Sem dados, e não como zero." },
+  ] },
   auditoria: { titulo: "Como usar: Auditoria", itens: [{ titulo: "Consulta", texto: "Filtre eventos administrativos e indisponibilidades de ESP32 por período; a retenção configurada apaga registros antigos." }] },
   relatos: { titulo: "Como usar: Relatos de problemas", itens: [
     { titulo: "Fluxo", texto: "Filtre por situação, abra um relato para revisar o contexto, responda ao autor e mova entre em análise, resolvido e reaberto." },

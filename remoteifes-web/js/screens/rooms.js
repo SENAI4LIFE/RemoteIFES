@@ -6,7 +6,7 @@ async function loadRooms(bloco, andar) {
   _roomsBlocoAtual = bloco;
   _roomsAndarAtual = andar;
   const titulo = document.getElementById("roomsTitle");
-  titulo.textContent = `Bloco ${bloco} — ${andar}º andar`;
+  titulo.textContent = `Bloco ${bloco}, ${andar}º andar`;
   const salas = await Api.listarSalas({ bloco, andar });
   renderRooms(salas);
   iniciarAutoRefreshRooms();

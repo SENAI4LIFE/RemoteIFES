@@ -32,7 +32,7 @@ const Grade = {
     if (gradeSalaSelect.dataset.carregado !== "1") {
       const salas = await Api.listarSalas();
       gradeSalaSelect.innerHTML = salas
-        .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))} — ${escapeHtml(s.nome)}</option>`)
+        .map((s) => `<option value="${escapeHtml(s.sala)}">${escapeHtml(RoomsData.rotulo(s.sala))}: ${escapeHtml(s.nome)}</option>`)
         .join("");
       gradeSalaSelect.dataset.carregado = "1";
     }

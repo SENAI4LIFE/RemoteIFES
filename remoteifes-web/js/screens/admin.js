@@ -244,7 +244,7 @@ const Admin = {
       const salas = await Api.listarSalasAdmin();
       salaSelect.innerHTML =
         `<option value="">todas as salas</option>` +
-        salas.map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)}</option>`).join("");
+        salas.map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))}: ${escapeHtmlAdmin(s.nome)}</option>`).join("");
 
       const andares = [...new Set(salas.map((s) => s.andar))].sort((a, b) => a - b);
       andarSelect.innerHTML =
@@ -398,7 +398,7 @@ const Admin = {
       const div = document.createElement("div");
       const estado = !s.online ? "offline" : (s.ligado ? "online-ligado" : "online-desligado");
       div.className = `mapa-cell mapa-${estado}${s.agendadaAgora ? " mapa-reservada" : ""}`;
-      div.title = `${RoomsData.rotulo(s.sala)} — ${s.online ? (s.ligado ? "online, ligado" : "online, desligado") : "offline (comando enviado pode ainda não ter sido confirmado pelo dispositivo)"}${s.agendadaAgora ? " · reservada agora" : ""}`;
+      div.title = `${RoomsData.rotulo(s.sala)}: ${s.online ? (s.ligado ? "online, ligado" : "online, desligado") : "offline (comando enviado pode ainda não ter sido confirmado pelo dispositivo)"}${s.agendadaAgora ? " · reservada agora" : ""}`;
       const combinada = s.sala.match(/^([A-Za-z]+-\d+[a-z]?)-([A-Za-z]+-\d+[a-z]?)$/);
       if (combinada) {
         div.classList.add("mapa-cell-dupla");
@@ -544,7 +544,7 @@ const Admin = {
       li.id = `macCard-${s.sala}`;
       li.innerHTML = `
         <div class="mac-row" style="width:100%">
-          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
+          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))}: ${escapeHtmlAdmin(s.nome)} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
           <label>Endereço MAC do ESP32</label>
           <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${escapeHtmlAdmin(s.mac) || ""}" />
           <label>Limites de temperatura desta sala</label>
@@ -733,7 +733,7 @@ const Admin = {
         <div class="room-sub">Visto por último: ${Tempo.formatarDataHora(d.ultimaDeteccao)}</div>
         <select class="vincular-sala-select">
           <option value="">selecionar sala para vincular</option>
-          ${salas.map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)}</option>`).join("")}
+          ${salas.map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))}: ${escapeHtmlAdmin(s.nome)}</option>`).join("")}
         </select>
         <div class="detectado-card-actions">
           <button type="button" class="link-btn vincular-detectado">vincular</button>
@@ -852,7 +852,7 @@ const Admin = {
     if (!this._proprietariosSalas) {
       this._proprietariosSalas = await Api.listarSalasAdmin();
       select.innerHTML = this._proprietariosSalas
-        .map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))} — ${escapeHtmlAdmin(s.nome)}</option>`)
+        .map((s) => `<option value="${escapeHtmlAdmin(s.sala)}">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))}: ${escapeHtmlAdmin(s.nome)}</option>`)
         .join("");
       if (salaAnterior && this._proprietariosSalas.some((s) => s.sala === salaAnterior)) {
         select.value = salaAnterior;
@@ -990,8 +990,13 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "logs") await Admin.carregarLogs();
     if (sub === "dispositivos") await Admin.carregarDispositivos();
     if (sub === "notificacoes") await Notificacoes.carregarAdmin();
-    if (sub === "monitoramento") await Monitoramento.aoAbrir();
-    else Monitoramento.aoFechar();
+    if (sub === "monitoramento") {
+      await Monitoramento.aoAbrir();
+      Heatmap.aoAbrir();
+    } else {
+      Monitoramento.aoFechar();
+      Heatmap.aoFechar();
+    }
     if (sub === "relatos") await Admin.carregarRelatos();
     if (sub === "acessos") await Admin.carregarAcessos();
     if (sub === "proprietarios") await Admin.carregarProprietarios();

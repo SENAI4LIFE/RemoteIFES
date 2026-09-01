@@ -27,3 +27,22 @@ ServerStatus.aoFicarPronto(() => {
   restaurarSessaoSalva();
 });
 ServerStatus.conectar();
+
+// A faixa de senha padrão é sticky logo abaixo da barra superior. Outros elementos
+// sticky (as sub-abas de Administração) precisam da altura real dela, que muda com
+// a ampliação de texto e com a largura da tela.
+(function () {
+  const aviso = document.getElementById("defaultPasswordWarning");
+  if (!aviso) return;
+  const medir = () => {
+    const estilo = getComputedStyle(aviso);
+    const fixa = !aviso.classList.contains("hidden") && estilo.position === "sticky";
+    // Onde a faixa termina quando encostada: o proprio deslocamento sticky mais a altura.
+    const fim = fixa ? (parseFloat(estilo.top) || 0) + aviso.getBoundingClientRect().height : 0;
+    document.documentElement.style.setProperty("--aviso-seguranca-fim", `${Math.round(fim)}px`);
+  };
+  medir();
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(medir).observe(aviso);
+  new MutationObserver(medir).observe(aviso, { attributes: true, attributeFilter: ["class"] });
+  window.addEventListener("resize", medir);
+})();

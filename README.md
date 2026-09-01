@@ -52,6 +52,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)
 - [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)
 - [Monitoramento Operacional](#monitoramento-operacional)
+- [Mapa de Calor Operacional](#mapa-de-calor-operacional)
 - [Acessibilidade](#acessibilidade)
 - [Ajuda e Manual no App](#ajuda-e-manual-no-app)
 - [Requisitos](#requisitos)
@@ -754,6 +755,31 @@ Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma 
 - **Contadores de falha desde a inicialização** (em memória, zerados a cada reinício): persistência de telemetria, tarefas do agendador e execução de agendamentos, falhas de OTA, credenciais inválidas e reconexões anormais de dispositivo.
 
 A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição de alerta ativa, gera uma **notificação** (`tipo` `monitoramento`, no sino do administrador), sem repetir o mesmo alerta dentro de 6 horas. O endpoint bruto é `GET /admin/monitoramento`.
+
+## Mapa de Calor Operacional
+
+Dentro de `Admin > Monitoramento`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** entram aqui e continuam em [Energia Estimada](#energia-estimada).
+
+**Métricas** (`metrica=`), todas derivadas de históricos que o sistema já retém, nunca de dados inventados:
+
+| Métrica | Fonte | Sentido |
+| --- | --- | --- |
+| `disponibilidade` | `esp_indisponibilidades` | % do período com o dispositivo conectado (menor é pior) |
+| `indisponibilidade` | `esp_indisponibilidades` | minutos offline acumulados |
+| `quedas` | `esp_indisponibilidades` | número de desconexões |
+| `comandos` | `comandos_log` | comandos registrados para a sala |
+| `comandosOffline` | `comandos_log` × `esp_indisponibilidades` | comandos emitidos com o dispositivo fora do ar |
+| `agendamentos` | `agendamentos` | agendamentos criados no período |
+| `execucoes` | `agendamentos_execucoes` | acionamentos automáticos executados |
+| `relatos` / `relatosPendentes` | `relatos` | relatos da sala, todos ou ainda sem resolução |
+
+**Períodos** (`periodo=`): `24h`, `7d` e `30d`.
+
+**Cálculo sob demanda.** Nada é agregado enquanto a seção está fechada: a consulta só roda quando o superadministrador abre a seção ou troca métrica/período. Cada consulta é uma agregação SQL sobre os índices por data/hora que já existem (`idx_esp_indisp_sala_offline`, `idx_comandos_log_criado`, `idx_ag_execucoes_executado`, `idx_relatos_criado`), devolve um resumo por sala (`{sala, nome, valor}` mais `quedas`/`minutosOffline` nas métricas de conectividade) e nunca envia o histórico bruto ao navegador. Um cache em memória de 60 segundos evita repetir a mesma consulta. O recurso **não cria tabelas, escritas nem retenção novas**; a proteção de crescimento do banco permanece exatamente a mesma.
+
+**Leitura das cores.** A escala vai do frio ao quente (`azul → ciano → amarelo → laranja → vermelho`) e o quente é sempre o extremo pior. Em `disponibilidade`, onde maior é melhor, a inversão é aplicada: pouca disponibilidade fica vermelha. A cor nunca é o único canal — cada sala mostra o valor numérico, a legenda nomeia os extremos, o mapa expõe `aria-label`/tooltip por sala e a tabela abaixo repete tudo em texto, ordenada da pior para a melhor.
+
+**`Sem dados`.** Sala sem fonte confiável para a métrica (por exemplo, sem MAC cadastrado em uma métrica de conectividade) aparece hachurada como `Sem dados`, nunca como zero. Como o histórico de indisponibilidade segue a retenção de auditoria, escolher um período maior que ela exibe um aviso na própria seção informando quanto do período está de fato coberto.
 
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
 

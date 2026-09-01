@@ -39,7 +39,7 @@ const ManualContent = (() => {
       { t: "nota", texto: "Contas são criadas, reativadas e desbloqueadas pela equipe responsável. Nunca compartilhe sua senha." },
     ] },
     { id: "conexao", titulo: "Conexão, reconexão e estados do servidor", papel: "todos", corpo: [
-      { t: "p", texto: "O status das salas chega em tempo real. Se a conexão cair, a interface se recupera sozinha quando a rede volta — não é preciso recarregar nem sair." },
+      { t: "p", texto: "O status das salas chega em tempo real. Se a conexão cair, a interface se recupera sozinha quando a rede volta, sem precisar recarregar nem sair." },
       { t: "tabela", cabecalho: ["Tela", "Significado"], linhas: [["Sem conexão com o servidor", "queda momentânea; reconexão automática em andamento"], ["Sistema em manutenção", "manutenção programada; apenas o acesso administrativo é liberado"], ["Conectar este aplicativo", "app móvel ainda sem o endereço do servidor configurado"]] },
       { t: "nota", texto: "Um comando aceito enquanto o dispositivo está offline pode ficar pendente até o ESP32 reconectar." },
     ] },
@@ -63,10 +63,10 @@ const ManualContent = (() => {
       { t: "nota", texto: "Nunca inclua senhas, tokens, segredos ou credenciais de dispositivo na descrição." },
     ] },
     { id: "pwa-mobile", titulo: "PWA, celular e aplicativo", papel: "todos", verNoApp: "/aplicativo", corpo: [
-      { t: "lista", itens: ["Abra Aplicativo móvel no menu da conta ou na ajuda para ver a versão, o tamanho e o SHA-256 do APK.", "A PWA instalada se atualiza sozinha: ao abrir com rede, a versão nova é baixada, substitui a anterior e a tela recarrega já atualizada — sem desinstalar, limpar dados, usar janela anônima ou recarregar várias vezes.", "Sem rede, a PWA continua abrindo a última versão instalada; entrar, comandar salas e consultar agendamentos exigem o servidor.", "Quando há um APK publicado, use Baixar APK: o navegador confere o SHA-256 do arquivo antes de salvar e cancela o download se não bater.", "Em navegadores compatíveis, instale a PWA ou adicione-a à tela inicial — é a opção indicada quando não há APK publicado.", "Na primeira execução do aplicativo, informe o endereço do servidor da sua instalação quando ele for solicitado.", "O aplicativo Cordova usa o mesmo frontend e exige acesso ao servidor para autenticação, estado e comandos."] },
+      { t: "lista", itens: ["Abra Aplicativo móvel no menu da conta ou na ajuda para ver a versão, o tamanho e o SHA-256 do APK.", "A PWA instalada se atualiza sozinha: ao abrir com rede, a versão nova é baixada, substitui a anterior e a tela recarrega já atualizada, sem desinstalar, limpar dados, usar janela anônima ou recarregar várias vezes.", "Sem rede, a PWA continua abrindo a última versão instalada; entrar, comandar salas e consultar agendamentos exigem o servidor.", "Quando há um APK publicado, use Baixar APK: o navegador confere o SHA-256 do arquivo antes de salvar e cancela o download se não bater.", "Em navegadores compatíveis, instale a PWA ou adicione-a à tela inicial: é a opção indicada quando não há APK publicado.", "Na primeira execução do aplicativo, informe o endereço do servidor da sua instalação quando ele for solicitado.", "O aplicativo Cordova usa o mesmo frontend e exige acesso ao servidor para autenticação, estado e comandos."] },
     ] },
     { id: "acessibilidade", titulo: "Acessibilidade", papel: "todos", corpo: [
-      { t: "p", texto: "O botão de acessibilidade fica fixo na lateral direita, na altura central da tela, e abre um painel com ajustes válidos para toda a interface." },
+      { t: "p", texto: "O botão de acessibilidade fica fixo na lateral direita, logo acima do botão de ajuda, e abre um painel com ajustes válidos para toda a interface." },
       { t: "lista", itens: ["Cor, tipo e tamanho da fonte, incluindo uma opção voltada à dislexia.", "Espaçamento entre letras, altura da linha, largura do parágrafo e alinhamento do texto.", "Destaque de links, contraste, cor do texto e opção de ocultar imagens.", "<strong>Redefinir tudo</strong> volta ao padrão; cada ajuste também tem o próprio <strong>Redefinir</strong>."] },
       { t: "nota", texto: "As preferências ficam salvas neste aparelho e valem nas próximas aberturas. Toda a interface é navegável por teclado, com Tab, Enter e Esc." },
     ] },

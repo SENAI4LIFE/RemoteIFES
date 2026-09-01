@@ -173,6 +173,12 @@ const Floorplan = {
 
     instancia.fitToWidth();
     window.addEventListener("resize", () => instancia.fitToWidth());
+    // O contêiner pode não ter tamanho ainda quando o mapa é montado (aba oculta,
+    // barra lateral reposicionando). Sem isto, o ajuste de escala era descartado e
+    // a planta ficava sem escala nem rolagem até um resize da janela.
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => instancia.fitToWidth()).observe(rootEl);
+    }
 
     return instancia;
   },

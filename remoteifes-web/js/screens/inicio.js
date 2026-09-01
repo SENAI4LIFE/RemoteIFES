@@ -9,11 +9,6 @@ const Inicio = (() => {
     if (typeof Router !== "undefined") Router.ir(rota, { push: true });
   }
 
-  function clicar(id) {
-    const alvo = el(id);
-    if (alvo) alvo.click();
-  }
-
   const PRINCIPAIS = [
     {
       id: "salas", icon: "🌡️", titulo: "Salas",
@@ -44,7 +39,11 @@ const Inicio = (() => {
       id: "notificacoes", icon: "🔔", titulo: "Notificações",
       desc: "Avisos de conexão e falha dos dispositivos ESP32.",
       quando: () => !!state.isAdmin,
-      acao: (evento) => { if (evento) evento.stopPropagation(); clicar("notifBellBtn"); },
+      // Abre explicitamente: o cartao nao deve alternar nem depender do estado do sino.
+      acao: (evento) => {
+        if (evento) evento.stopPropagation();
+        if (typeof Notificacoes !== "undefined") Notificacoes.abrirPainel();
+      },
     },
     {
       id: "relatos", icon: "🐞", titulo: "Relatar problema",
