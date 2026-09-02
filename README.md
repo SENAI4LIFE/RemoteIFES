@@ -477,6 +477,7 @@ bash flash.sh
 
 ```bash
 cd remoteifes-esp32
+pio run --target erase        # opcional: apaga completamente a flash e remove configurações anteriores
 pio run                       # compila o firmware
 pio run --target uploadfs     # grava data/ (LittleFS) no dispositivo
 pio run --target upload       # grava o firmware
