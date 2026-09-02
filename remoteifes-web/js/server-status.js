@@ -15,6 +15,9 @@ const ServerStatus = (() => {
   let reconectarTimeoutId = null;
   let estadoConectandoTimeoutId = null;
   let tentativas = 0;
+  let ultimaMensagemMs = 0;
+  let sondaTimeoutId = null;
+  let ultimaObservacao = null;
   let confirmado = false;
   let acessoManualLiberado = false;
   let manutencaoAtiva = false;
@@ -22,6 +25,14 @@ const ServerStatus = (() => {
   const ouvintesMensagem = new Set();
   const ouvintesConectado = new Set();
   const ATRASO_TELA_CONECTANDO = 300;
+  // Um socket pode continuar em OPEN depois que o aparelho suspende, troca de rede ou
+  // perde o servidor: nada chega, nada falha e o app mostraria estado antigo como atual.
+  // O servidor reenvia o estado a cada 30s para sessões autenticadas e sempre responde a
+  // "observar", então silêncio acima disso (ou logo após retomar) pede prova de vida.
+  const SILENCIO_SUSPEITO_MS = 45000;
+  const SILENCIO_RETOMADA_MS = 1000;
+  const RESPOSTA_SONDA_MS = 5000;
+  const INTERVALO_VIGIA_MS = 10000;
 
   const tela = document.getElementById("screen-server-status");
   const spinner = document.getElementById("serverStatusSpinner");
@@ -75,6 +86,18 @@ const ServerStatus = (() => {
   function aplicarChip(estado, texto) {
     chipDot.className = `server-status-dot server-status-dot-${estado}`;
     chipLabel.textContent = texto;
+  }
+
+  function limparSonda() {
+    if (sondaTimeoutId) {
+      clearTimeout(sondaTimeoutId);
+      sondaTimeoutId = null;
+    }
+  }
+
+  function registrarTrafego() {
+    ultimaMensagemMs = Date.now();
+    limparSonda();
   }
 
   function limparEstadoConectandoAgendado() {
@@ -203,11 +226,13 @@ const ServerStatus = (() => {
     socket.addEventListener("open", () => {
       if (idConexao !== conexaoId || ws !== socket) return;
       tentativas = 0;
+      registrarTrafego();
       ouvintesConectado.forEach((cb) => cb());
     });
 
     socket.addEventListener("message", (event) => {
       if (idConexao !== conexaoId || ws !== socket) return;
+      registrarTrafego();
       let msg;
       try {
         msg = JSON.parse(event.data);
@@ -220,6 +245,7 @@ const ServerStatus = (() => {
     socket.addEventListener("close", (event) => {
       if (idConexao !== conexaoId || ws !== socket) return;
       ws = null;
+      limparSonda();
       if (event.code === 4001 && token) {
         if (typeof Api !== "undefined") Api.limparSessaoLocal();
         if (typeof state !== "undefined" && state.usuario) {
@@ -245,6 +271,7 @@ const ServerStatus = (() => {
 
   function reconectarComTokenAtual() {
     conexaoId += 1;
+    limparSonda();
     if (ws) {
       ws.close();
       ws = null;
@@ -280,6 +307,9 @@ const ServerStatus = (() => {
   }
 
   function enviar(obj) {
+    // A sonda de vida reenvia a última observação pedida, mesmo a que não chegou a sair:
+    // assim ela espelha o que a tela espera observar em vez de uma sala já abandonada.
+    if (obj && obj.tipo === "observar") ultimaObservacao = obj;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(obj));
       return true;
@@ -341,14 +371,35 @@ const ServerStatus = (() => {
     if (!acessoManualLiberado) aplicarEstadoManutencao();
   });
 
+  // Reaproveita "observar", que o servidor sempre responde, como prova de vida: se a
+  // resposta não vier, o socket estava morto apesar de OPEN e a conexão é reciclada.
+  function sondarConexao() {
+    if (sondaTimeoutId || !estaConectado()) return;
+    if (!enviar(ultimaObservacao || { tipo: "observar", sala: null })) return;
+    sondaTimeoutId = setTimeout(() => {
+      sondaTimeoutId = null;
+      if (estaConectado()) reconectarComTokenAtual();
+    }, RESPOSTA_SONDA_MS);
+  }
+
+  function verificarConexaoViva(limiteSilencioMs) {
+    if (document.visibilityState !== "visible" || !servidorConfigurado()) return;
+    if (!estaConectado()) return;
+    if (Date.now() - ultimaMensagemMs < limiteSilencioMs) return;
+    sondarConexao();
+  }
+
   function reconectarSeVisivelEDesconectado() {
-    if (document.visibilityState === "visible" && !estaConectado() && servidorConfigurado()) {
-      if (reconectarTimeoutId) {
-        clearTimeout(reconectarTimeoutId);
-        reconectarTimeoutId = null;
-      }
-      conectar();
+    if (document.visibilityState !== "visible" || !servidorConfigurado()) return;
+    if (estaConectado()) {
+      verificarConexaoViva(SILENCIO_RETOMADA_MS);
+      return;
     }
+    if (reconectarTimeoutId) {
+      clearTimeout(reconectarTimeoutId);
+      reconectarTimeoutId = null;
+    }
+    conectar();
   }
   function reconectarAoRetomar() {
     if (document.visibilityState === "visible" && servidorConfigurado()) {
@@ -358,6 +409,7 @@ const ServerStatus = (() => {
   document.addEventListener("visibilitychange", reconectarSeVisivelEDesconectado);
   document.addEventListener("resume", reconectarAoRetomar);
   window.addEventListener("online", reconectarAoRetomar);
+  setInterval(() => verificarConexaoViva(SILENCIO_SUSPEITO_MS), INTERVALO_VIGIA_MS);
 
   function emManutencao() {
     return manutencaoAtiva;
