@@ -2,6 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { verificar: verificarVersao } = require("./android-version");
 
 function executar(comando, argumentos, opcoes = {}) {
   const resultado = spawnSync(comando, argumentos, { stdio: "inherit", ...opcoes });
@@ -35,12 +36,30 @@ function exigirOrigemPublicavel(valor) {
   return url.origin;
 }
 
-function fixarServidorNoBundle(origem) {
-  const arquivo = path.join(__dirname, "www", "js", "config.js");
+function arquivoConfigDoBundle() {
+  return path.join(__dirname, "www", "js", "config.js");
+}
+
+function substituirNoBundle(esperado, substituto, descricao) {
+  const arquivo = arquivoConfigDoBundle();
   const atual = fs.readFileSync(arquivo, "utf8");
-  const esperado = 'const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());';
-  if (!atual.includes(esperado)) throw new Error("Não foi possível localizar a configuração de servidor do bundle Cordova.");
-  fs.writeFileSync(arquivo, atual.replace(esperado, `const serverUrl = salvo || (empacotado ? ${JSON.stringify(origem)} : servidorPadraoDoNavegador());`));
+  if (!atual.includes(esperado)) throw new Error(`Não foi possível localizar ${descricao} no bundle Cordova.`);
+  fs.writeFileSync(arquivo, atual.replace(esperado, substituto));
+}
+
+function fixarServidorNoBundle(origem) {
+  substituirNoBundle(
+    'const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());',
+    `const serverUrl = salvo || (empacotado ? ${JSON.stringify(origem)} : servidorPadraoDoNavegador());`,
+    "a configuração de servidor"
+  );
+}
+
+// O aplicativo instalado passa a conhecer a própria versão sem plugin nenhum: ela é gravada
+// no bundle no mesmo build que gera o APK, então não há como os dois discordarem.
+function fixarVersaoNoBundle({ versionName, versionCode }) {
+  substituirNoBundle("const appAndroidVersao = null;", `const appAndroidVersao = ${JSON.stringify(versionName)};`, "a versão do aplicativo");
+  substituirNoBundle("const appAndroidBuild = null;", `const appAndroidBuild = ${JSON.stringify(String(versionCode))};`, "o build do aplicativo");
 }
 
 function main() {
@@ -61,11 +80,19 @@ function main() {
     temporario = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-android-release-"));
     const buildConfig = path.join(temporario, "build.json");
     fs.writeFileSync(buildConfig, JSON.stringify({ android: { release } }), { mode: 0o600 });
+    const { problemas, dados } = verificarVersao();
+    if (problemas.length) throw new Error(`${problemas.join("; ")}. Rode \`npm run android-version -- --verificar\`.`);
     executar(process.execPath, [path.join(__dirname, "sync-www.js")]);
     fixarServidorNoBundle(origem);
+    fixarVersaoNoBundle(dados);
+    console.log(`Versão Android do build: ${dados.versionName} (versionCode ${dados.versionCode}).`);
     executar(process.execPath, [path.join(__dirname, "harden-config.js"), origem]);
     endurecido = true;
     executar(process.execPath, [caminhoCordova(), "build", "android", "--release", `--buildConfig=${buildConfig}`]);
+    const artefato = path.join(__dirname, "platforms", "android", "app", "build", "outputs", "apk", "release", "app-release.apk");
+    if (!fs.existsSync(artefato)) throw new Error(`o build terminou mas o APK assinado não apareceu em ${artefato}.`);
+    console.log(`APK assinado: ${artefato}`);
+    console.log(`Para publicar: REMOTEIFES_ANDROID_APK=${artefato} npm run publish-android-release`);
   } catch (erro) {
     console.error(erro.message);
     process.exitCode = erro.exitCode || 1;

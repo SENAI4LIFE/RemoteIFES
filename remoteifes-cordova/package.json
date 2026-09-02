@@ -8,6 +8,7 @@
     "sync": "node sync-www.js",
     "validate": "node validate-config.js",
     "harden-config": "node harden-config.js",
+    "android-version": "node android-version.js",
     "dev-config": "node harden-config.js --dev",
     "prepare-android": "npm run sync && cordova platform add android || true && cordova prepare android",
     "prepare-ios": "npm run sync && cordova platform add ios || true && cordova prepare ios",

@@ -37,6 +37,11 @@ function servidorPadraoDoNavegador() {
   return window.location.origin;
 }
 
+// Preenchidos só na cópia gerada para o APK assinado: no site e na PWA não há como saber
+// qual aplicativo está instalado no aparelho, e a página do Aplicativo não deve fingir que sabe.
+const appAndroidVersao = null;
+const appAndroidBuild = null;
+
 const empacotado = ehContextoEmpacotado();
 const salvo = lerServidorSalvo();
 const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());
@@ -44,6 +49,8 @@ const serverUrl = salvo || (empacotado ? "" : servidorPadraoDoNavegador());
 window.RemoteIFESConfig = {
   serverUrl,
   empacotado,
+  appAndroidVersao,
+  appAndroidBuild,
 
   definirServidor(valor) {
     if (!empacotado) return false;

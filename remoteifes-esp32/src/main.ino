@@ -48,6 +48,7 @@ const unsigned long INTERVALO_AP_RECUPERACAO_MS = 120000;
 const char SERVER_IDENTIFICACAO_PATH[] = "/dispositivo/identificar";
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
 const char DEVICE_WS_PATH[] = "/ws/dispositivo";
+const char AP_PASSWORD_PADRAO[] = "remoteifes";
 
 const unsigned long OTA_SELFTEST_TIMEOUT_MS = 90000;
 const unsigned long OTA_HTTP_TIMEOUT_MS = 20000;
@@ -197,13 +198,7 @@ void setup() {
   irsend.begin();
 
   preferences.begin("remoteifes", false);
-  apPassword = preferences.getString("apPass", "");
-  if (apPassword.length() < 12) {
-    char senhaGerada[17];
-    snprintf(senhaGerada, sizeof(senhaGerada), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
-    apPassword = senhaGerada;
-    preferences.putString("apPass", apPassword);
-  }
+  apPassword = AP_PASSWORD_PADRAO;
   String savedSSID = preferences.isKey("ssid") ? preferences.getString("ssid", "") : "";
   String savedPASS = preferences.isKey("pass") ? preferences.getString("pass", "") : "";
   if (preferences.isKey("sala")) preferences.remove("sala");

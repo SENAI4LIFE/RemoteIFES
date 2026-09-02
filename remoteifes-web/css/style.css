@@ -3879,15 +3879,20 @@ textarea {
 
 @media (max-width: 560px) {
   /* O sino e o inseto ficam no meio da barra superior, não na borda direita: um painel
-     quase tão largo quanto a tela, ancorado em "right: 0", sairia pela esquerda. */
+     quase tão largo quanto a tela, ancorado em "right: 0", sairia pela esquerda. Ancorar
+     na própria barra — que é sticky e ocupa a largura da tela — prende o painel à tela sem
+     fixar a borda de cima em uma altura constante: a barra quebra em mais de uma linha
+     quando a fonte cresce, e um topo constante passaria por cima dos próprios botões. */
+  .notif-wrap,
+  .bug-wrap {
+    position: static;
+  }
   .relatos-panel,
   .notif-panel {
-    position: fixed;
     left: 8px;
     right: 8px;
-    top: calc(var(--topbar-h) + var(--safe-top) - 4px);
     width: auto;
-    max-height: calc(100dvh - var(--topbar-h) - var(--safe-top) - 20px);
+    max-height: calc(100dvh - 100% - 30px);
   }
   .topbar-right { gap: 8px; }
 }
@@ -3984,7 +3989,30 @@ body.mobile-app-open { overflow: hidden; }
 .mobile-app-verify-erro { color: var(--danger); font-weight: 600; }
 .mobile-app-instructions { margin-bottom: 16px; }
 .mobile-app-instructions li { margin-bottom: 8px; }
-@media (max-width: 640px) { .mobile-app-grid { grid-template-columns: 1fr; } .mobile-app-hero img { width: 76px; height: 76px; } .mobile-app-topbar h1 { font-size: 14px; } .mobile-app-topbar .link-btn { font-size: 12px; } }
+.mobile-app-status { margin: 24px 0 0; padding: clamp(16px, 3vw, 25px); border: 1px solid var(--border); border-left-width: 5px; border-radius: var(--radius); background: var(--surface); }
+.mobile-app-status h2 { margin: 8px 0 6px; font-size: calc(19px * var(--a11y-font-scale)); color: var(--ifes-green-dark); }
+.mobile-app-status p { margin: 0; }
+.mobile-app-selo { display: inline-block; padding: 3px 10px; border-radius: var(--radius-pill); font-size: calc(12px * var(--a11y-font-scale)); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.mobile-app-status.is-atualizada { border-left-color: var(--ifes-green); }
+.mobile-app-status.is-atualizada .mobile-app-selo { background: var(--ifes-green-soft); color: var(--ifes-green-dark); }
+.mobile-app-status.is-desatualizada { border-left-color: #b98000; }
+.mobile-app-status.is-desatualizada .mobile-app-selo { background: var(--warn-soft); color: var(--warn); }
+.mobile-app-status.is-desconhecida, .mobile-app-status.is-indisponivel { border-left-color: var(--text-muted); }
+.mobile-app-status.is-desconhecida .mobile-app-selo, .mobile-app-status.is-indisponivel .mobile-app-selo { background: var(--bg); color: var(--text-muted); }
+.mobile-app-status.is-navegador { border-left-color: var(--ifes-green); }
+.mobile-app-status.is-navegador .mobile-app-selo { background: var(--ifes-green-soft); color: var(--ifes-green-dark); }
+.mobile-app-versao { margin: 0 0 12px; }
+.mobile-app-notas { margin-top: 14px; }
+.mobile-app-notas h4 { margin: 0 0 6px; font-size: calc(14px * var(--a11y-font-scale)); color: var(--ifes-green-dark); }
+.mobile-app-notas ul { margin: 0; padding-left: 20px; }
+.mobile-app-notas li { margin-bottom: 4px; }
+.mobile-app-detalhes { margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.mobile-app-detalhes > summary { padding: 14px clamp(16px, 3vw, 25px); min-height: var(--tap-min); display: flex; align-items: center; font-weight: 700; color: var(--ifes-green-dark); cursor: pointer; }
+.mobile-app-detalhes > :not(summary) { padding: 0 clamp(16px, 3vw, 25px) 16px; }
+.mobile-app-detalhes dl { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 6px 12px; margin: 0; }
+.mobile-app-detalhes dt { font-weight: 700; }
+.mobile-app-detalhes dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .mobile-app-grid { grid-template-columns: 1fr; } .mobile-app-hero img { width: 76px; height: 76px; } .mobile-app-topbar h1 { font-size: 14px; } .mobile-app-topbar .link-btn { font-size: 12px; } .mobile-app-detalhes dl, .mobile-app-integrity { grid-template-columns: 1fr; gap: 2px; } .mobile-app-detalhes dd, .mobile-app-integrity dd { margin-bottom: 8px; } }
 .manual-overlay {
   position: fixed;
   inset: 0;

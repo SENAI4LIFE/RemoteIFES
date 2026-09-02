@@ -21,6 +21,15 @@ function contar(texto, regex) {
   return (texto.match(regex) || []).length;
 }
 
+function tolera(fn) {
+  try {
+    fn();
+    return true;
+  } catch (erro) {
+    return false;
+  }
+}
+
 console.log("config.xml — estrutura");
 const original = fs.readFileSync(CONFIG, "utf8");
 checar(original.startsWith("<?xml"), "declaração XML presente");
@@ -39,6 +48,42 @@ checar(publishScript.includes('"verify", "--verbose"') && publishScript.includes
 checar(publishScript.includes('"manifest", "version-name"') && publishScript.includes('"manifest", "version-code"'), "publicação confere versão e build no manifesto do APK");
 checar(publishScript.includes('"manifest", "min-sdk"') && publishScript.includes('"manifest", "target-sdk"'), "publicação confere minSdk e targetSdk no manifesto do APK");
 checar(publishScript.includes('localhost') && releaseScript.includes('localhost'), "build e publicação recusam origem loopback para APK de produção");
+checar(publishScript.includes("conferirAvanco"), "publicação recusa um build que não avança sobre o já publicado");
+checar(releaseScript.includes("fixarVersaoNoBundle"), "build de release grava a versão Android no bundle para o app saber a própria versão");
+
+console.log("versão Android — fonte única");
+const { problemas: problemasVersao, dados: versaoAndroid } = require("./android-version").verificar();
+problemasVersao.forEach((p) => console.log(`      ${p}`));
+checar(problemasVersao.length === 0, "config.xml e android-release.json declaram a mesma versão e o mesmo versionCode");
+checar(versaoAndroid.versionCode >= require("./android-version").codigoDerivado(versaoAndroid.versionName), "versionCode não é anterior ao derivado da versão");
+checar(!publishScript.includes("REMOTEIFES_ANDROID_VERSION") && !publishScript.includes("REMOTEIFES_ANDROID_BUILD"), "publicação lê a versão da fonte única, sem repetir versão/build no ambiente");
+const { codigoDerivado, proximoCodigo } = require("./android-version");
+checar(codigoDerivado("1.0.0") === 10000 && codigoDerivado("1.2.3") === 10203 && codigoDerivado("2.0.0") === 20000, "versionCode derivado da versão é previsível (1.2.3 -> 10203)");
+checar(proximoCodigo("1.0.1", 10000) === 10001 && proximoCodigo("1.1.0", 10005) === 10100, "uma versão nova adota o código derivado dela");
+checar(proximoCodigo("1.0.0", 10000) === 10001 && proximoCodigo("1.0.1", 10050) === 10051, "recompilar a mesma versão avança o versionCode em vez de repeti-lo");
+checar([["1.0.0", 0], ["9.9.9", 0]].every(([v, base]) => proximoCodigo(v, base) > base), "o versionCode sempre cresce sobre o anterior");
+
+console.log("publicação — consistência da release");
+const { conferirAvanco, limparSuperados } = require("./publish-android-release");
+const temporario = fs.mkdtempSync(path.join(require("os").tmpdir(), "remoteifes-release-check-"));
+try {
+  const metadados = path.join(temporario, "release.json");
+  const publicado = { file: "RemoteIFES-1.0.0-10000.apk", build: "10000", sha256: "a".repeat(64) };
+  fs.writeFileSync(metadados, JSON.stringify(publicado));
+  checar(tolera(() => conferirAvanco(temporario, "10001", "b".repeat(64))), "um build maior pode ser publicado");
+  checar(!tolera(() => conferirAvanco(temporario, "10000", "b".repeat(64))), "o mesmo build com outro arquivo é recusado");
+  checar(!tolera(() => conferirAvanco(temporario, "9999", "b".repeat(64))), "um build anterior ao publicado é recusado");
+  checar(tolera(() => conferirAvanco(temporario, "10000", "a".repeat(64))), "republicar o mesmo artefato é aceito");
+
+  fs.writeFileSync(path.join(temporario, "RemoteIFES-1.0.0-10000.apk"), "antigo");
+  fs.writeFileSync(path.join(temporario, "RemoteIFES-1.0.1-10001.apk"), "novo");
+  fs.writeFileSync(path.join(temporario, ".sobra.tmp"), "parcial");
+  limparSuperados(temporario, "RemoteIFES-1.0.1-10001.apk");
+  const restantes = fs.readdirSync(temporario).sort();
+  checar(restantes.join(",") === "RemoteIFES-1.0.1-10001.apk,release.json", "publicar remove APKs superados e sobras parciais");
+} finally {
+  fs.rmSync(temporario, { recursive: true, force: true });
+}
 
 console.log("harden-config.js — reversibilidade");
 try {
