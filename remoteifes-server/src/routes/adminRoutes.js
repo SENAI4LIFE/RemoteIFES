@@ -7,7 +7,6 @@ const configuracoesService = require("../services/configuracoesService");
 const notificacoesService = require("../services/notificacoesService");
 const monitoramentoService = require("../services/monitoramentoService");
 const auditoriaService = require("../services/auditoriaService");
-const energiaService = require("../services/energiaService");
 const heatmapService = require("../services/heatmapService");
 const logger = require("../utils/logger");
 
@@ -178,34 +177,6 @@ router.get("/admin/heatmap", exigirSuperAdmin, (req, res) => {
   } catch (erro) {
     logger.warn("heatmap-consulta-falhou", { mensagem: erro.message });
     res.status(503).json({ ok: false, erro: "mapa de calor temporariamente indisponivel" });
-  }
-});
-
-router.get("/admin/energia", exigirSuperAdmin, (req, res) => {
-  try {
-    res.set("Cache-Control", "no-store");
-    res.json({ ok: true, salas: energiaService.listar(), modelo: energiaService.modelo() });
-  } catch (erro) {
-    logger.warn("energia-consulta-falhou", { mensagem: erro.message });
-    res.status(503).json({ ok: false, erro: "estimativas de energia temporariamente indisponiveis" });
-  }
-});
-
-router.patch("/admin/energia/:sala", exigirSuperAdmin, (req, res) => {
-  try {
-    const configuracao = energiaService.configurar(req.params.sala, req.body || {});
-    auditar({
-      tipo: configuracao ? "energia_configuracao_alterada" : "energia_configuracao_removida",
-      ator: req.usuario,
-      alvoTipo: "sala",
-      alvoId: req.params.sala,
-      alvoRotulo: req.params.sala,
-      descricao: configuracao ? `Configuracao energetica da sala ${req.params.sala} alterada` : `Configuracao energetica da sala ${req.params.sala} removida`,
-      camposAlterados: ["potenciaWatts", "tipo"],
-    });
-    res.json({ ok: true, configuracao });
-  } catch (erro) {
-    res.status(400).json({ ok: false, erro: erro.message });
   }
 });
 

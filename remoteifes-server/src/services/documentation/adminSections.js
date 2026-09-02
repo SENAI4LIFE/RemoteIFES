@@ -16,7 +16,7 @@ const adminSections = [
         ["Proprietários de sala", "delegar gestão de acesso"],
         ["Mapa", "visão geral somente de leitura"],
       ] },
-      { t: "nota", texto: "Configurações globais, restrição da sala, MACs, credenciais, IR, OTA, Monitoramento, Energia, Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou controle antigo tente abri-los." },
+      { t: "nota", texto: "Configurações globais, restrição da sala, MACs, credenciais, IR, OTA, Monitoramento, Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou controle antigo tente abri-los." },
     ],
   },
   {

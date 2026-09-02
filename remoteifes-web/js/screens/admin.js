@@ -431,6 +431,7 @@ const Admin = {
     document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
     document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
     document.getElementById("cfgEspCredenciaisObrigatorias").checked = !!cfg.espCredenciaisObrigatorias;
+    document.getElementById("cfgEspApExigirCredencial").checked = !!cfg.espApExigirCredencial;
     document.getElementById("cfgRetencaoAuditoria").value = cfg.retencaoAuditoriaDias ?? 7;
   },
 
@@ -1004,7 +1005,6 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "macs") await Admin.carregarMacs();
     if (sub === "config") await Admin.carregarConfiguracoes();
     if (sub === "auditoria") await Admin.carregarAuditoria();
-    if (sub === "energia") await Energia.aoAbrir();
     if (sub === "esp32") await Esp32Admin.aoAbrir();
     else Esp32Admin.aoFechar();
 
@@ -1032,6 +1032,7 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
       .filter(Boolean),
     modoManutencao: document.getElementById("cfgModoManutencao").checked,
     espCredenciaisObrigatorias: document.getElementById("cfgEspCredenciaisObrigatorias").checked,
+    espApExigirCredencial: document.getElementById("cfgEspApExigirCredencial").checked,
     retencaoAuditoriaDias: Number(document.getElementById("cfgRetencaoAuditoria").value),
   };
 

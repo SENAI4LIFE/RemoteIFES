@@ -44,7 +44,6 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Relatos de Problema](#relatos-de-problema)
 - [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade)
 - [Auditoria (Logs, Dispositivos e Acessos)](#auditoria-logs-dispositivos-e-acessos)
-- [Energia Estimada](#energia-estimada)
 - [Restrição de Rede](#restrição-de-rede)
 - [Segurança](#segurança)
 - [Tempo Real (WebSocket)](#tempo-real-websocket)
@@ -226,18 +225,10 @@ O servidor encerra sessões sem atividade e continua sendo a autoridade sobre o 
 Em `Admin`, três sub-abas registram o histórico operacional do sistema, todas filtráveis por data e com opção de apagar registros (ação irreversível):
 
 - **Logs**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o comando parte da interface local do próprio dispositivo).
-- **Dispositivos**: eventos de conexão — sempre que um ESP32 fica online ou offline, incluindo o desligamento automático de salas cujo ESP32 parou de responder (após 90 segundos sem heartbeat).
+- **Dispositivos**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
 - **Acessos ESP32**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
 
 O superadministrador dispõe ainda de **`Administração > Auditoria`**, uma visão paginada e filtrável de ações administrativas importantes, como criação, alteração e exclusão de contas, mudanças de papel e configuração e operações relevantes sobre ESP32. Os registros contêm apenas metadados concisos — nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e duração calculada quando há reconexão. Interface e APIs exigem `superadmin`; a retenção padrão é 7 dias, configurável entre 1 e 365 dias em Administração.
-
-## Energia Estimada
-
-**`Administração > Energia`** é uma área analítica exclusiva do superadministrador e separada do mapa operacional. A potência elétrica nominal de entrada, em watts, e o tipo do aparelho (`inverter` ou velocidade fixa) podem ser configurados opcionalmente por sala. Watts elétricos não representam capacidade térmica em BTU/h; sem essa configuração o RemoteIFES continua operando normalmente e não calcula consumo para a sala.
-
-A tela compara carga e potência atuais estimadas, consumo estimado hoje/em 7/em 30 dias, tempo ligado e temperaturas disponíveis; períodos com observação insuficiente são marcados como estimativa parcial. O mapa da própria aba oferece somente modos energéticos e não adiciona essas métricas ao mapa operacional. O modelo é deliberadamente simples e limitado: `kWh estimado = kW nominal × horas ligadas × fator de carga estimado`; aparelhos fixos usam fator 1 enquanto ligados, e inverter usa um fator entre 0,35 e 1 baseado apenas na diferença entre temperatura ambiente e alvo. Sem temperatura recente, o fator conservador é 0,65 e a estimativa é marcada como parcial. Os valores são estimativas operacionais, nunca medições para faturamento.
-
-Não há persistência por segundo nem nova coleta de temperatura: o servidor agrega o estado e a telemetria já existentes em resumos diários compactos por sala, mantidos por 45 dias além do dia corrente. A consulta ocorre ao abrir a aba e a consolidação periódica roda a cada 15 minutos, sem polling contínuo no navegador. Falhas do estimador são isoladas e não podem ligar/desligar aparelhos, alterar temperatura ou agendas nem interromper a comunicação com o ESP32.
 
 ### Manutenção automática do banco
 
@@ -252,7 +243,6 @@ O servidor roda uma rotina de retenção a cada 6 horas (e uma vez na inicializa
 | `agendamentos` com data já passada (o agendamento é sempre do dia; após esse prazo já cumpriu seu efeito) e as execuções ligadas a eles | 90 dias | `RETENCAO_DIAS_AGENDAMENTOS` |
 | `esp_detectados` sem vínculo com sala | 30 dias sem nova detecção | `RETENCAO_DIAS_DETECCOES` |
 | `auditoria_eventos`, `esp_indisponibilidades` | 7 dias | Administração, de 1 a 365 dias |
-| `energia_resumos_diarios` | 45 dias além do dia corrente | fixo; cobre as comparações de 30 dias com margem operacional |
 | `relatos` **apenas com status `resolvido`** | desligado (`0`); defina para ativar | `RETENCAO_DIAS_RELATOS_RESOLVIDOS` |
 
 Usuários, salas, agendamentos do dia atual, configurações e **relatos de problema não resolvidos nunca são removidos** por essa rotina — a retenção de relatos resolvidos vem **desligada** e só apaga relatos já marcados como `resolvido` quando `RETENCAO_DIAS_RELATOS_RESOLVIDOS` recebe um número de dias. Notificações não lidas sobrevivem a `RETENCAO_DIAS_NOTIFICACOES` (365 dias por padrão) antes de serem descartadas, para uma caixa esquecida não crescer sem limite. As tabelas de histórico têm índices por data/hora para que a limpeza e as consultas de faixa de tempo (monitoramento, listas administrativas) continuem baratas mesmo com o banco cheio. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
@@ -308,7 +298,7 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o superadministrador associa seu MAC a uma sala em `Admin > ESP32 / MACs`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits, guardado só como hash SHA-256): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação com tolerância de 24 h, revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
 - **Atualização de firmware (OTA)**: a imagem publicada no servidor é verificada por SHA-256 pelo ESP32 antes de ser instalada; a gravação usa um segundo slot de aplicação e o bootloader reverte sozinho se o novo firmware não passar no autoteste pós-boot. OTA concorrente para a mesma sala é recusada e a gravação por USB continua como caminho de recuperação. Veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32).
 - **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do superadministrador no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
-- **Ponto de acesso de configuração**: a rede protegida `RemoteIFES-Setup` existe no primeiro provisionamento, depois de um reset explícito de Wi-Fi ou como recuperação após 2 minutos contínuos sem conexão. Todos os dispositivos usam a mesma senha padrão, `remoteifes`, também exibida no console serial físico. O firmware continua tentando reconectar em paralelo e fecha o ponto de acesso quando a rede volta. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura.
+- **Ponto de acesso de configuração**: a rede `RemoteIFES-Setup` fica **permanentemente no ar**, inclusive durante a operação normal — o ESP32 opera em AP+STA, mantendo ao mesmo tempo o ponto de acesso, a conexão com a rede institucional e o WebSocket com o servidor. Ela não é aberta nem fechada conforme o estado da rede. A exigência de senha é decidida pela opção global **Exigir senha na rede de configuração dos ESP32** em `Admin > Configurações`: **desativada por padrão**, deixando a rede aberta; quando ativada, o ponto de acesso passa a usar a senha padrão do firmware, `remoteifes`, também exibida no console serial físico. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura. Com a rede aberta, qualquer pessoa ao alcance do rádio pode abrir o portal e reprovisionar o dispositivo: ative a exigência de senha onde o acesso físico à área não for controlado.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 - **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
 - **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
@@ -335,7 +325,7 @@ O firmware do ESP32 tem dois modos de funcionamento bem separados, com uma trans
 Isso substitui a antiga interface web local completa do dispositivo. Hoje, o ESP32 expõe localmente apenas:
 
 - Uma página de **status somente leitura**, mostrando sala, MAC, IP, servidor configurado e versão do firmware — para conferência visual direta no equipamento.
-- O **portal de provisionamento** na rede aberta `RemoteIFES-Setup`, usado na configuração inicial, após um reset explícito de Wi-Fi ou na recuperação de uma indisponibilidade contínua da rede — veja [Segurança](#segurança).
+- O **portal de provisionamento** na rede `RemoteIFES-Setup`, disponível o tempo todo — na configuração inicial, após um reset de Wi-Fi e também durante a operação normal — veja [Segurança](#segurança).
 
 Todas as funções antes exclusivas da interface local do dispositivo (entrar/sair do modo de configuração, ativar o modo clonagem, iniciar/parar captura de infravermelho, testar um sinal capturado, resetar o Wi-Fi remotamente) agora ficam em uma aba dedicada da aplicação principal, **`Admin > ESP32`**, visível apenas ao superadministrador:
 
@@ -488,7 +478,7 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 
 `pio device monitor -b 115200` abre o monitor serial na mesma taxa configurada pelo firmware (`Serial.begin(115200)`), útil para acompanhar o boot, o IP obtido, o estado da conexão Wi-Fi/WebSocket com o servidor e mensagens de erro em tempo real. Se houver mais de uma porta serial conectada, informe-a explicitamente: `pio device monitor -b 115200 -p /dev/ttyUSB0` (Linux/Raspberry Pi) ou `pio device monitor -b 115200 -p /dev/cu.usbserial-XXXX` (macOS). Rode `pio device list` para listar as portas disponíveis.
 
-**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. No primeiro boot, o ESP32 sobe o ponto de acesso aberto `RemoteIFES-Setup` para receber as credenciais da rede local, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o superadministrador o vincula à sala em `Admin > ESP32 / MACs`. Em falhas de Wi-Fi, o firmware tenta reconectar sem bloquear o restante da operação; depois de 2 minutos contínuos sem conexão, também abre o ponto de acesso de recuperação e mantém as tentativas em paralelo. O ponto de acesso é fechado automaticamente quando a rede volta.
+**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. Em todo boot, o ESP32 sobe o ponto de acesso `RemoteIFES-Setup` e o mantém ativo junto com a conexão à rede local (modo AP+STA). Pelo portal em `192.168.4.1` ele recebe as credenciais da rede, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o superadministrador o vincula à sala em `Admin > ESP32 / MACs`. Em falhas de Wi-Fi, o firmware tenta reconectar a cada 30 segundos sem bloquear o restante da operação e sem precisar abrir ou fechar o ponto de acesso, que permanece disponível o tempo todo para reconfiguração local.
 
 A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.0.0`) e é reportada ao servidor na telemetria, no heartbeat e na página de status local. A partição do ESP32 usa o layout `min_spiffs.csv` (dois slots de aplicação de ~1,9 MB — o firmware atual ocupa ~63% de um slot), o que reserva um slot ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32) com reversão automática. **A gravação por USB (`flash.sh` / `pio run --target upload`) continua sendo o caminho de recuperação**: ela regrava o slot ativo e não depende do estado do OTA.
 
@@ -528,6 +518,7 @@ Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba 
 | Tempo de inatividade administrativo | 720 minutos | Limite de inatividade aplicado a administradores e superadministrador |
 | Aviso de logout automático | 60 segundos | Duração da contagem regressiva exibida antes do logout por inatividade |
 | Limiar de presença online | 5 minutos | Minutos sem uso após os quais um usuário com sessão aberta passa de "online" para "inativo" na aba Ativos |
+| Exigir senha na rede de configuração dos ESP32 | **desativado** | Controla apenas a rede Wi-Fi local `RemoteIFES-Setup`, que fica permanentemente ativa no dispositivo. Desativado, ela é aberta; ativado, passa a exigir a senha padrão do firmware (`remoteifes`). A mudança é propagada pelo WebSocket aos ESP32 conectados e aplicada no próximo handshake pelos demais. **Não tem relação com a autenticação do ESP32 no servidor**, que é a opção seguinte. |
 | Exigir credencial por dispositivo em todos os ESP32 | ativado em instalações normais novas | Nenhum ESP32 se conecta apenas pelo MAC enquanto esta opção estiver ativa — toda sala precisa de uma credencial provisionada. Para um controlador novo, provisione a credencial da sala no painel e informe `deviceId` e segredo junto com o Wi-Fi no portal `RemoteIFES-Setup`; em uma migração de controladores antigos, siga o fluxo gradual da seção [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). O ambiente automatizado de testes começa com a opção desativada para exercitar também o modo legado. |
 
 ### ESP32 por MAC e limites por sala (via `Admin > ESP32 / MACs`)
@@ -684,7 +675,7 @@ Com o frontend e o servidor central ambos em HTTPS e domínios próprios, o sist
 
 ### HTTPS entre o ESP32 e o servidor
 
-O firmware do ESP32 também pode se conectar ao servidor central via HTTPS, além do HTTP tradicional. Essa opção é escolhida no portal de configuração de cada dispositivo (a rede Wi-Fi `RemoteIFES-Setup`, exibida quando o ESP32 ainda não está configurado, após um reset de Wi-Fi ou durante a recuperação de uma indisponibilidade contínua da rede), no campo "Conexão com o servidor":
+O firmware do ESP32 também pode se conectar ao servidor central via HTTPS, além do HTTP tradicional. Essa opção é escolhida no portal de configuração de cada dispositivo (a rede Wi-Fi `RemoteIFES-Setup`, sempre disponível no dispositivo), no campo "Conexão com o servidor":
 
 - **HTTPS com certificado válido (recomendado)**: valida o certificado do servidor contra a cadeia raiz pública da Let's Encrypt (embarcada no firmware); use quando o servidor estiver atrás do `https-setup.sh` (Nginx + Certbot) ou de qualquer outro certificado emitido por essa autoridade.
 - **HTTPS sem validar certificado — desenvolvimento**: criptografa a conexão mas não confirma a identidade do servidor; use apenas de forma explícita em uma rede local controlada com certificado autoassinado.
@@ -762,7 +753,7 @@ A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição d
 
 ## Mapa de Calor Operacional
 
-Dentro de `Admin > Monitoramento`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** entram aqui e continuam em [Energia Estimada](#energia-estimada).
+Dentro de `Admin > Monitoramento`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
 
 **Métricas** (`metrica=`), todas derivadas de históricos que o sistema já retém, nunca de dados inventados:
 
@@ -977,13 +968,13 @@ Para um servidor HTTP em rede local, informe a origem `http://192.168.1.50:8080`
 
 ## Scripts Auxiliares
 
-Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (executados a partir da raiz do repositório, com `git` instalado e disponível no `PATH`):
+Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (executados a partir da raiz do repositório com Python 3, com `git` instalado e disponível no `PATH`):
 
-| Script | Função |
+| Comando | Função |
 |---|---|
-| `export.py` | Adiciona todas as alterações (`git add -A`), pede uma mensagem de commit (ou usa `update` como padrão) e envia (`git push origin main`) |
-| `import.py` | Atualiza a cópia local a partir do remoto (`git pull origin main`) |
-| `clear.py` | Recria o histórico do repositório do zero em um único commit (`checkout --orphan`) e, mediante confirmação explícita, sobrescreve o histórico remoto (`push -f`) — apaga permanentemente todo o histórico de commits anterior; use apenas se isso for intencional |
+| `python3 export.py` | Adiciona todas as alterações (`git add -A`), pede uma mensagem de commit (ou usa `update` como padrão) e envia (`git push origin main`) |
+| `python3 import.py` | Atualiza a cópia local a partir do remoto (`git pull origin main`) |
+| `python3 clear.py` | Recria o histórico do repositório do zero em um único commit (`checkout --orphan`) e, mediante confirmação explícita, sobrescreve o histórico remoto (`push -f`) — apaga permanentemente todo o histórico de commits anterior; use apenas se isso for intencional |
 
 O repositório inclui um `.gitignore` na raiz que já ignora `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas). Se você clonou uma cópia antiga do repositório em que esse arquivo não existia e chegou a commitar `.env` ou o banco, rode `git rm --cached` nesses arquivos antes de publicar o repositório.
 
@@ -1086,7 +1077,6 @@ remoteifes-web/
                         esp32-admin.js (painel avançado de cada ESP32 — status, config/clonagem IR, OTA e credenciais —
                         na aba "ESP32", restrito ao superadministrador),
                         monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao superadministrador),
-                        energia.js (estimativas energéticas agregadas, mapa e tabela exclusivos do superadministrador),
                         manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
                         mobile-app.js (página #/aplicativo: estado da versão instalada, instalação guiada, atualização e download do APK verificado)
 
@@ -1134,7 +1124,7 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao superadministrador, assim como `Admin > Configurações`.
 - **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / MACs`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
 - **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: vincule o MAC detectado a uma sala existente em `Admin > ESP32 / MACs`; o vínculo é recebido automaticamente na próxima consulta do dispositivo.
-- **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. Se o Wi-Fi continuar indisponível por mais de 2 minutos, ele também abre o ponto de acesso de recuperação `RemoteIFES-Setup` (mantendo as tentativas de reconexão em paralelo) para permitir a reconfiguração no local; assim que a rede volta, esse ponto de acesso é fechado sozinho. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
+- **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. O ponto de acesso `RemoteIFES-Setup` continua no ar durante a queda — como em qualquer outro momento — e permite reconfigurar o dispositivo no local sem esperar nada. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
 - **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Admin > ESP32 / MACs` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala (diretamente pelo admin, ou por um proprietário da sala).
 - **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`; a mesma restrição vale para a conexão WebSocket.
 - **Frontend não fala com o servidor depois do deploy**: na implantação same-origin, acesse a URL do próprio servidor/proxy e não configure `serverUrl` nem `CORS_ORIGIN`. Se o frontend estiver em outra origem (GitHub Pages ou Cordova), confirme `serverUrl` e inclua a origem dele em `CORS_ORIGIN`; isso também afeta a conexão WebSocket.

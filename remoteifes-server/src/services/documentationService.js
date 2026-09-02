@@ -30,7 +30,6 @@ const adminHelp = {
 };
 
 const superHelp = {
-  energia: { titulo: "Como usar: Energia", itens: [{ titulo: "Estimativa", texto: "Informe watts elétricos e tipo; confira cobertura/parcial antes de comparar. Não é medição para faturamento." }] },
   macs: { titulo: "Como usar: ESP32 / MACs", itens: [{ titulo: "Vínculo", texto: "Confirme fisicamente a placa, vincule o MAC à sala e valide limites, restrição e status." }] },
   config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Impacto global", texto: "Registre valores anteriores; salve só a mudança planejada e valide sessões, rede e dispositivos." }] },
   esp32: { titulo: "Como usar: ESP32", itens: [

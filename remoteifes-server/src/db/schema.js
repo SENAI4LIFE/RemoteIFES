@@ -183,6 +183,9 @@ function criarSchema() {
       duracaoSegundos INTEGER
     );
 
+    -- Tabelas remanescentes da estimativa de energia, que foi removida do sistema.
+    -- Nenhum código as lê ou escreve; ficam apenas para não exigir migração destrutiva
+    -- em bancos já existentes.
     CREATE TABLE IF NOT EXISTS energia_configuracoes (
       sala TEXT PRIMARY KEY REFERENCES salas(sala) ON DELETE CASCADE,
       potenciaWatts INTEGER NOT NULL,

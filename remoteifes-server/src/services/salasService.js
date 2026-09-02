@@ -10,16 +10,6 @@ const eventos = new EventEmitter();
 const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura", "turbo"];
 const TIMEOUT_OFFLINE_MS = 90 * 1000;
 
-function energiaAntes(sala) {
-  try { require("./energiaService").consolidarSala(sala); }
-  catch (erro) { logger.warn("energia-isolada-falhou", { sala, etapa: "consolidar", mensagem: erro.message }); }
-}
-
-function energiaDepois(sala) {
-  try { require("./energiaService").sincronizarSala(sala); }
-  catch (erro) { logger.warn("energia-isolada-falhou", { sala, etapa: "sincronizar", mensagem: erro.message }); }
-}
-
 function listar({ bloco, andar } = {}) {
   let query = "SELECT * FROM salas WHERE 1=1";
   const params = [];
@@ -297,25 +287,37 @@ function definirLimitesTemperatura(sala, { minima, maxima }) {
   return atualizada;
 }
 
+// Transição autoritativa para offline. Chamada assim que o servidor sabe que a conexão do
+// dispositivo acabou (fechamento do WebSocket) e também pelo varredor de heartbeat vencido.
+// É idempotente: uma sala já offline não gera evento, notificação nem broadcast de novo.
+function marcarOffline(sala, nome = null, motivo = "desconexao") {
+  const linha = db.prepare(`SELECT sala, nome, online FROM salas WHERE sala = ?`).get(sala);
+  if (!linha || !linha.online) return false;
+
+  db.prepare(`UPDATE salas SET online = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+  try {
+    require("./auditoriaService").registrarOffline(sala, new Date().toISOString());
+  } catch (erro) {
+    logger.warn("esp32-indisponibilidade-registro-falhou", { sala, mensagem: erro.message });
+  }
+  registrarEventoEsp(sala, "offline");
+  notificacoesService.criarEspOffline(sala, nome || linha.nome);
+  logger.warn("esp32-offline", { sala, motivo });
+  return true;
+}
+
 function verificarTimeouts() {
   const limite = new Date(Date.now() - TIMEOUT_OFFLINE_MS).toISOString().slice(0, 19).replace("T", " ");
   const salasParaDesligar = db.prepare(`
     SELECT sala, nome FROM salas WHERE online = 1 AND (ultimoHeartbeat IS NULL OR ultimoHeartbeat < ?)
   `).all(limite);
 
+  let mudou = false;
   for (const { sala, nome } of salasParaDesligar) {
-    db.prepare(`UPDATE salas SET online = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
-    try {
-      require("./auditoriaService").registrarOffline(sala, new Date().toISOString());
-    } catch (erro) {
-      logger.warn("esp32-indisponibilidade-registro-falhou", { sala, mensagem: erro.message });
-    }
-    registrarEventoEsp(sala, "offline");
-    notificacoesService.criarEspOffline(sala, nome);
-    logger.warn("esp32-offline", { sala });
+    if (marcarOffline(sala, nome, "heartbeat-vencido")) mudou = true;
   }
 
-  if (salasParaDesligar.length > 0) eventos.emit("mudanca");
+  if (mudou) eventos.emit("mudanca");
 }
 
 function listarEventosEsp({ sala, data } = {}) {
@@ -446,8 +448,6 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
     }
   }
 
-  energiaAntes(sala);
-
   if (cmd === "ligar") {
     db.prepare(`UPDATE salas SET ligado = 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
   } else if (cmd === "desligar") {
@@ -474,7 +474,6 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
 
   eventos.emit("mudanca");
   const salaAtualizada = buscar(sala);
-  energiaDepois(sala);
   enviarEstadoIRParaDispositivo(salaAtualizada);
 
   return {
@@ -560,7 +559,6 @@ function aplicarInicioAgendamento(sala, temperatura) {
     throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
   }
 
-  energiaAntes(sala);
   db.exec("BEGIN");
   try {
     db.prepare(`UPDATE salas SET ligado = 1, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
@@ -573,7 +571,6 @@ function aplicarInicioAgendamento(sala, temperatura) {
   }
 
   const atualizada = buscar(sala);
-  energiaDepois(sala);
   eventos.emit("mudanca");
   enviarEstadoIRParaDispositivo(atualizada);
   return atualizada;
@@ -654,4 +651,5 @@ module.exports = {
   listarDetectados,
   removerDetectado,
   heartbeatDispositivo,
+  marcarOffline,
 };

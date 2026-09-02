@@ -9,7 +9,6 @@ const { executarLimpezaRetencao } = require("../services/retencaoService");
 const { criarBackup, normalizarInteiro } = require("../services/backupService");
 const otaService = require("../services/otaService");
 const monitoramentoService = require("../services/monitoramentoService");
-const energiaService = require("../services/energiaService");
 const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
 const logger = require("../utils/logger");
 
@@ -18,7 +17,6 @@ const VERIFICACAO_TIMEOUT_MS = 30 * 1000;
 const VERIFICACAO_SESSOES_MS = 15 * 60 * 1000;
 const VERIFICACAO_RETENCAO_MS = 6 * 60 * 60 * 1000;
 const VERIFICACAO_MONITORAMENTO_MS = 5 * 60 * 1000;
-const AGREGACAO_ENERGIA_MS = 15 * 60 * 1000;
 
 const BACKUP_AUTOMATICO = String(
   process.env.BACKUP_AUTOMATICO ?? (process.env.NODE_ENV === "production" ? "true" : "false")
@@ -83,7 +81,6 @@ function iniciarScheduler() {
   agendarPeriodico(verificarTimeouts, VERIFICACAO_TIMEOUT_MS, "timeouts-esp32");
   agendarPeriodico(otaService.verificarTimeouts, VERIFICACAO_TIMEOUT_MS, "timeouts-ota");
   agendarPeriodico(monitoramentoService.avaliar, VERIFICACAO_MONITORAMENTO_MS, "monitoramento");
-  agendarPeriodico(energiaService.consolidarTodas, AGREGACAO_ENERGIA_MS, "energia");
   agendarPeriodico(encerrarSessoesAbandonadas, VERIFICACAO_SESSOES_MS, "sessoes-abandonadas");
   agendarPeriodico(executarLimpezaRetencao, VERIFICACAO_RETENCAO_MS, "retencao");
   executarProtegido(encerrarSessoesAbandonadas, "sessoes-abandonadas-inicial");

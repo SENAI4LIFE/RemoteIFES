@@ -26,7 +26,6 @@ const LIMITES_LINHAS = {
   notificacoes: 20000,
   sessoes: 50000,
   agendamentos_execucoes: 50000,
-  energia_resumos_diarios: 50000,
 };
 let cacheEstatisticas = null;
 let cacheEstatisticasEm = 0;
@@ -41,7 +40,6 @@ function alvosTemporais() {
   const alvos = [
     { nome: "auditoria_eventos", sql: "DELETE FROM auditoria_eventos WHERE criadoEm < datetime('now', ?)", dias: diasHistorico },
     { nome: "esp_indisponibilidades", sql: "DELETE FROM esp_indisponibilidades WHERE offlineEm < datetime('now', ?)", dias: diasHistorico },
-    { nome: "energia_resumos_diarios", sql: "DELETE FROM energia_resumos_diarios WHERE data < date(?, ?)", dias: 45, dataLocal: true },
     { nome: "comandos_log", sql: "DELETE FROM comandos_log WHERE criadoEm < datetime('now', ?)", dias: DIAS_LOGS },
     { nome: "esp_eventos", sql: "DELETE FROM esp_eventos WHERE criadoEm < datetime('now', ?)", dias: DIAS_LOGS },
     { nome: "esp_acessos", sql: "DELETE FROM esp_acessos WHERE criadoEm < datetime('now', ?)", dias: DIAS_LOGS },
@@ -65,12 +63,7 @@ function aplicarLimite(tabela, limite) {
       SELECT id FROM sessoes WHERE logout IS NOT NULL ORDER BY COALESCE(logout, login) DESC LIMIT -1 OFFSET ?
     )`).run(limite).changes;
   }
-  const coluna = tabela === "esp_indisponibilidades" ? "offlineEm" : tabela === "agendamentos_execucoes" ? "executadoEm" : tabela === "energia_resumos_diarios" ? "data" : "criadoEm";
-  if (tabela === "energia_resumos_diarios") {
-    return db.prepare(`DELETE FROM energia_resumos_diarios WHERE rowid IN (
-      SELECT rowid FROM energia_resumos_diarios ORDER BY data DESC, sala DESC LIMIT -1 OFFSET ?
-    )`).run(limite).changes;
-  }
+  const coluna = tabela === "esp_indisponibilidades" ? "offlineEm" : tabela === "agendamentos_execucoes" ? "executadoEm" : "criadoEm";
   return db.prepare(`DELETE FROM ${tabela} WHERE id IN (
     SELECT id FROM ${tabela} ORDER BY ${coluna} DESC, id DESC LIMIT -1 OFFSET ?
   )`).run(limite).changes;
