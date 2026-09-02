@@ -75,9 +75,15 @@ test("download Android exige sessão e não publica artefato ausente", async ({ 
 });
 
 test("assets públicos não contêm procedimentos privilegiados", async ({ request }) => {
-  const manual = await (await request.get("/js/manual-content.js")).text();
+  const caminhosManuais = [
+    "/js/manual-content.js",
+    "/js/manual/common-start.js",
+    "/js/manual/common-rooms.js",
+    "/js/manual/common-account.js",
+  ];
+  const manuais = await Promise.all(caminhosManuais.map(async (caminho) => (await request.get(caminho)).text()));
   const ajuda = await (await request.get("/js/help.js")).text();
-  for (const conteudo of [manual, ajuda]) {
+  for (const conteudo of [...manuais, ajuda]) {
     expect(conteudo).not.toContain("deploy.sh");
     expect(conteudo).not.toContain("restore-backup.js");
     expect(conteudo).not.toContain("operacao-admin\", titulo");

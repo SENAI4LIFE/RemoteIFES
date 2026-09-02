@@ -6,6 +6,12 @@ const Manual = (() => {
   const buscaEl = document.getElementById("manualBusca");
 
   const ATALHOS = ["inicio", "selecao-sala", "controlador", "solucao-problemas"];
+  const MODULOS_PUBLICOS = [
+    "js/manual-content.js",
+    "js/manual/common-start.js",
+    "js/manual/common-rooms.js",
+    "js/manual/common-account.js",
+  ];
 
   const ALIAS_SECAO = {
     ota: "ota-credenciais",
@@ -31,6 +37,11 @@ const Manual = (() => {
     historico: "auditoria",
     notificacao: "notificacoes",
     acessibilidade: "acessibilidade",
+    backup: "backup-restauracao",
+    deploy: "implantacao-rollback",
+    firmware: "firmware-ota",
+    android: "android-release",
+    rede: "servidor-rede",
   };
 
   function resolverSecao(id) {
@@ -74,29 +85,40 @@ const Manual = (() => {
     return true;
   }
 
-  function textoPlano(corpo) {
-    return (corpo || [])
-      .map((b) => {
-        if (b.texto) return b.texto;
-        if (b.itens) return b.itens.join(" ");
-        if (b.linhas) return b.linhas.map((l) => l.join(" ")).join(" ");
-        if (b.titulo) return b.titulo;
-        return "";
-      })
-      .join(" ")
-      .replace(/<[^>]+>/g, " ");
+  function textoPlano(valor) {
+    if (Array.isArray(valor)) return valor.map(textoPlano).join(" ");
+    if (valor && typeof valor === "object") return Object.values(valor).map(textoPlano).join(" ");
+    return String(valor || "").replace(/<[^>]+>/g, " ");
   }
 
   function bloco(b) {
     if (b.t === "p") return `<p>${b.texto}</p>`;
-    if (b.t === "nota") return `<p class="manual-nota">${b.texto}</p>`;
+    if (b.t === "nota") return `<p class="manual-nota${b.nivel ? ` manual-nota-${escapeHtml(b.nivel)}` : ""}">${b.texto}</p>`;
     if (b.t === "sub") return `<h3>${escapeHtml(b.titulo)}</h3>`;
     if (b.t === "lista") return `<ul>${b.itens.map((i) => `<li>${i}</li>`).join("")}</ul>`;
     if (b.t === "passos") return `<ol>${b.itens.map((i) => `<li>${i}</li>`).join("")}</ol>`;
-    if (b.t === "diagrama") {
-      const raw = ManualContent.diagramas[b.chave] || "";
-      const rot = (ManualContent.rotulos || {})[b.chave] || "Diagrama do manual";
-      return `<figure class="manual-figura">${raw.replace("<defs>", `<title>${escapeHtml(rot)}</title><defs>`)}</figure>`;
+    if (b.t === "fluxo") {
+      const itens = (b.itens || []).map((item, indice) =>
+        `<li class="manual-flow-item manual-flow-${escapeHtml(item.tipo || "step")}"><span class="manual-flow-num" aria-hidden="true">${indice + 1}</span><span>${escapeHtml(item.texto)}</span></li>`
+      ).join("");
+      return `<figure class="manual-flow" aria-label="${escapeHtml(b.titulo || "Fluxo")}"><figcaption>${escapeHtml(b.titulo || "Fluxo")}</figcaption><ol>${itens}</ol></figure>`;
+    }
+    if (b.t === "links") {
+      const itens = (b.itens || []).map((item) =>
+        `<li><button type="button" class="link-btn manual-crosslink" data-sec="${escapeHtml(item.id)}">${escapeHtml(item.texto || item.id)} &rarr;</button></li>`
+      ).join("");
+      return `<nav class="manual-links" aria-label="${escapeHtml(b.titulo || "Tópicos relacionados")}"><strong>${escapeHtml(b.titulo || "Tópicos relacionados")}</strong><ul>${itens}</ul></nav>`;
+    }
+    if (b.t === "comando") {
+      const comandos = (b.comandos || (b.comando ? [b.comando] : []))
+        .map((comando) => `<pre><code>${escapeHtml(comando)}</code></pre>`).join("");
+      const detalhes = [
+        b.quando ? ["Quando", b.quando] : null,
+        b.preRequisitos ? ["Pré-requisitos", b.preRequisitos] : null,
+        b.resultado ? ["Resultado esperado", b.resultado] : null,
+        b.risco ? ["Atenção", b.risco] : null,
+      ].filter(Boolean).map(([termo, valor]) => `<dt>${escapeHtml(termo)}</dt><dd>${escapeHtml(valor)}</dd>`).join("");
+      return `<aside class="manual-command"><h4>${escapeHtml(b.titulo || "Comando")}</h4>${comandos}${detalhes ? `<dl>${detalhes}</dl>` : ""}</aside>`;
     }
     if (b.t === "tabela") {
       return (
@@ -121,11 +143,21 @@ const Manual = (() => {
     if (renderRole === assinatura) return;
     renderRole = assinatura;
     const privadas = typeof RoleDocumentation !== "undefined" ? RoleDocumentation.secoes() : [];
-    const secoes = [...ManualContent.secoes, ...privadas].filter((s) => papelPermitido(s.papel));
+    const categorias = ManualContent.categorias || {};
+    const secoes = [...ManualContent.secoes, ...privadas]
+      .filter((s) => papelPermitido(s.papel))
+      .sort((a, b) => (categorias[a.categoria]?.ordem || 999) - (categorias[b.categoria]?.ordem || 999));
 
-    tocEl.innerHTML = secoes
-      .map((s) => `<li><button type="button" class="manual-toc-link" data-sec="${s.id}">${escapeHtml(s.titulo)}</button></li>`)
-      .join("");
+    let categoriaAtual = null;
+    tocEl.innerHTML = secoes.map((s) => {
+      const categoria = s.categoria || "comecar";
+      const tituloCategoria = categorias[categoria]?.titulo || categoria;
+      const cabecalho = categoria !== categoriaAtual
+        ? `<li class="manual-toc-category" data-category-heading="${escapeHtml(categoria)}">${escapeHtml(tituloCategoria)}</li>`
+        : "";
+      categoriaAtual = categoria;
+      return `${cabecalho}<li data-category="${escapeHtml(categoria)}"><button type="button" class="manual-toc-link" data-sec="${escapeHtml(s.id)}">${escapeHtml(s.titulo)}</button></li>`;
+    }).join("");
 
     conteudoEl.innerHTML = secoes
       .map((s) => {
@@ -134,8 +166,8 @@ const Manual = (() => {
             ? `<p><button type="button" class="link-btn manual-ver-app" data-rota="${escapeHtml(s.verNoApp)}">Ver no app &rarr;</button></p>`
             : "";
         return (
-          `<section class="manual-secao" id="manual-sec-${s.id}" data-busca="${escapeHtml(normalizar(s.titulo + " " + textoPlano(s.corpo)))}">` +
-          `<h2>${escapeHtml(s.titulo)}</h2>${verNoApp}${s.corpo.map(bloco).join("")}` +
+          `<section class="manual-secao" id="manual-sec-${escapeHtml(s.id)}" data-category="${escapeHtml(s.categoria || "comecar")}" data-busca="${escapeHtml(normalizar(`${s.titulo} ${(s.tags || []).join(" ")} ${textoPlano(s.corpo)}`))}">` +
+          `<p class="manual-category-label">${escapeHtml(categorias[s.categoria]?.titulo || "Manual")}</p><h2>${escapeHtml(s.titulo)}</h2>${verNoApp}${s.corpo.map(bloco).join("")}` +
           `</section>`
         );
       })
@@ -149,6 +181,15 @@ const Manual = (() => {
         const rota = btn.dataset.rota;
         fechar({ semRestaurar: true });
         if (typeof Router !== "undefined") Router.ir(rota, { push: true });
+      });
+    });
+    conteudoEl.querySelectorAll(".manual-crosslink").forEach((btn) => {
+      const permitido = !!document.getElementById(`manual-sec-${btn.dataset.sec}`);
+      btn.closest("li").classList.toggle("hidden", !permitido);
+      if (permitido) btn.addEventListener("click", () => {
+        buscaEl.value = "";
+        filtrar();
+        irParaSecao(btn.dataset.sec);
       });
     });
   }
@@ -174,20 +215,31 @@ const Manual = (() => {
       if (link) link.parentElement.classList.toggle("hidden", !ok);
       if (ok) visiveis += 1;
     });
+    tocEl.querySelectorAll(".manual-toc-category").forEach((cabecalho) => {
+      const categoria = cabecalho.dataset.categoryHeading;
+      const algum = Array.from(tocEl.querySelectorAll(`[data-category="${CSS.escape(categoria)}"]`))
+        .some((item) => !item.classList.contains("hidden"));
+      cabecalho.classList.toggle("hidden", !algum);
+    });
     tocVazioEl.classList.toggle("hidden", visiveis !== 0);
   }
 
   async function garantirConteudo() {
-    if (typeof ManualContent !== "undefined") return;
+    if (typeof ManualContent !== "undefined" && ManualContent.secoes.length) return;
     if (!carregando) {
-      carregando = new Promise((resolve) => {
-        const s = document.createElement("script");
+      carregando = (async () => {
         const versao = window.REMOTEIFES_FRONTEND_VERSION || "unknown";
-        s.src = `js/manual-content.js?v=${encodeURIComponent(versao)}`;
-        s.onload = resolve;
-        s.onerror = resolve;
-        document.head.appendChild(s);
-      });
+        for (const caminho of MODULOS_PUBLICOS) {
+          if (caminho.endsWith("manual-content.js") && typeof ManualContent !== "undefined") continue;
+          await new Promise((resolve) => {
+            const s = document.createElement("script");
+            s.src = `${caminho}?v=${encodeURIComponent(versao)}`;
+            s.onload = resolve;
+            s.onerror = resolve;
+            document.head.appendChild(s);
+          });
+        }
+      })();
     }
     await carregando;
   }
@@ -235,12 +287,13 @@ const Manual = (() => {
     const alvoId = resolverSecao(secaoId);
     secaoAtual = alvoId || null;
     if (alvoId) {
+      conteudoEl.focus({ preventScroll: true });
       irParaSecao(alvoId);
     } else {
       conteudoEl.scrollTop = 0;
+      buscaEl.focus();
     }
 
-    (buscaEl || conteudoEl).focus();
     if (typeof Router !== "undefined") Router.sync();
   }
 
@@ -274,9 +327,16 @@ const Manual = (() => {
       const id = document.querySelector("#mainApp .screen.tab-content:not(.hidden)")?.id || "";
       if (id === "screen-admin") {
         const sub = document.querySelector(".admin-subtab-btn.active")?.dataset.sub;
-        return ({ energia: "energia", monitoramento: "monitoramento", macs: "esp32-cadastro", config: "operacao-admin", esp32: "esp32-avancado", relatos: "relatos-gestao" })[sub] || "administracao";
+        return ({
+          usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "ativos-sessoes",
+          logs: "logs-dispositivos", dispositivos: "logs-dispositivos", acessos: "logs-dispositivos",
+          notificacoes: "notificacoes", proprietarios: "proprietarios-admin", mapa: "proprietarios-admin",
+          energia: "energia", monitoramento: "monitoramento", macs: "esp32-cadastro",
+          config: "configuracoes-globais", esp32: "esp32-avancado", relatos: "relatos-gestao",
+          auditoria: "auditoria",
+        })[sub] || "administracao";
       }
-      return ({ "screen-panel": "controlador", "screen-agenda": "agenda-grade", "screen-grade": "agenda-grade", "screen-propriedade": "papeis" })[id] || "selecao-sala";
+      return ({ "screen-panel": "controlador", "screen-agenda": "agenda-grade", "screen-grade": "agenda-grade", "screen-propriedade": "controle-acesso-sala", "screen-inicio": "inicio-acoes" })[id] || "selecao-sala";
     })();
     if (primarios) {
       primarios.innerHTML = `<button type="button" class="btn btn-on btn-block" data-sec="${contextual}">Ajuda desta página</button><button type="button" id="helpFabManualBtn" class="btn btn-off btn-block" data-sec="">Manual completo</button><button type="button" class="link-btn" data-sec="solucao-problemas">Solução de problemas</button><button type="button" class="link-btn" data-help-action="report">Relatar problema</button><button type="button" class="link-btn" data-help-action="mobile">Aplicativo móvel</button>`;
