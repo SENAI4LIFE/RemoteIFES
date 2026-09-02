@@ -164,3 +164,55 @@ test("falha no bootstrap da sessão não deixa o overlay de conexão preso", asy
 
   await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 20_000 });
 });
+
+// Um aparelho que suspende, troca de rede ou perde o servidor pode deixar o socket em
+// OPEN sem que nada chegue e sem evento de fechamento. Sem prova de vida ao retomar, o
+// app seguiria mostrando salas e telemetria antigas como se fossem o estado atual.
+test("socket que ficou meio-aberto é detectado ao retomar e reconectado", async ({ page, context, sessaoComo }) => {
+  await context.addInitScript(() => {
+    const WebSocketNativo = window.WebSocket;
+    window.__e2eConexoes = 0;
+    window.__e2eCongelar = null;
+    window.WebSocket = new Proxy(WebSocketNativo, {
+      construct(Alvo, argumentos) {
+        window.__e2eConexoes += 1;
+        const real = Reflect.construct(Alvo, argumentos);
+        let congelado = false;
+        // Reproduz o socket meio-aberto: continua reportando OPEN, mas nada entra e nada sai.
+        const fantasma = new Proxy(real, {
+          get(alvo, prop) {
+            if (prop === "readyState") return congelado ? WebSocketNativo.OPEN : alvo.readyState;
+            if (prop === "addEventListener") {
+              return (tipo, fn, opcoes) =>
+                alvo.addEventListener(tipo, (evento) => { if (!congelado) fn(evento); }, opcoes);
+            }
+            if (prop === "send") return (dados) => { if (!congelado) alvo.send(dados); };
+            const valor = alvo[prop];
+            return typeof valor === "function" ? valor.bind(alvo) : valor;
+          },
+          set(alvo, prop, valor) { alvo[prop] = valor; return true; },
+        });
+        window.__e2eCongelar = () => { congelado = true; real.close(); };
+        return fantasma;
+      },
+    });
+  });
+
+  await sessaoComo("user");
+  await expect.poll(() => page.evaluate(() => window.__e2eConexoes)).toBe(1);
+
+  await page.evaluate(() => window.__e2eCongelar());
+  expect(await page.evaluate(() => ServerStatus.estaConectado()), "o socket morto ainda se diz conectado").toBe(true);
+
+  const definirVisibilidade = (estado) => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => estado });
+    document.dispatchEvent(new Event("visibilitychange"));
+  };
+  await page.evaluate(definirVisibilidade, "hidden");
+  await page.waitForTimeout(1500);
+  await page.evaluate(definirVisibilidade, "visible");
+
+  await expect.poll(() => page.evaluate(() => window.__e2eConexoes), { timeout: 20_000 }).toBeGreaterThan(1);
+  await expect(page.locator("#mainApp")).toBeVisible();
+  await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 20_000 });
+});

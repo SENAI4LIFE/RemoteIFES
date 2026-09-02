@@ -121,3 +121,41 @@ test("rotação retrato -> paisagem preserva a tela e o estado do controlador", 
   await page.locator("#btnPower").click();
   await expect(page.locator("#modoValue")).toHaveText("Off");
 });
+
+// Os painéis suspensos da barra superior são ancorados ao botão que os abre. O sino e o
+// inseto não ficam na borda direita, então em telas estreitas um painel largo sairia pela
+// esquerda — sem criar rolagem horizontal e, por isso, sem ser pego pelas medições acima.
+for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "tablet-compact"]) {
+  test(`os painéis da barra superior abrem inteiros dentro da tela (${nome})`, async ({ page, context }) => {
+    await injetarSessao(context, "admin");
+    await page.setViewportSize(VIEWPORTS[nome]);
+    await page.goto("/");
+    await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
+
+    for (const [botao, painel, titulo] of [
+      ["#notifBellBtn", "#notifPanel", "#notifPanel .notif-panel-head h3"],
+      ["#bugReportBtn", "#relatosPanel", "#relatosPanel .relatos-panel-head h3"],
+    ]) {
+      await page.locator(botao).click();
+      await expect(page.locator(painel)).toBeVisible();
+      const medida = await page.evaluate(([sPainel, sTitulo]) => {
+        const vw = document.documentElement.clientWidth;
+        const p = document.querySelector(sPainel).getBoundingClientRect();
+        const t = document.querySelector(sTitulo);
+        const tr = t.getBoundingClientRect();
+        return {
+          painelEsquerda: Math.round(p.x),
+          painelDireita: Math.round(vw - p.right),
+          tituloEsquerda: Math.round(tr.x),
+          tituloDireita: Math.round(vw - tr.right),
+          tituloCortado: t.scrollWidth > t.clientWidth + 1,
+        };
+      }, [painel, titulo]);
+      expect(medida.painelEsquerda, `${painel} não sai pela esquerda`).toBeGreaterThanOrEqual(-1);
+      expect(medida.painelDireita, `${painel} não sai pela direita`).toBeGreaterThanOrEqual(-1);
+      expect(medida.tituloEsquerda, `título de ${painel} inteiro à esquerda`).toBeGreaterThanOrEqual(-1);
+      expect(medida.tituloDireita, `título de ${painel} inteiro à direita`).toBeGreaterThanOrEqual(-1);
+      expect(medida.tituloCortado, `título de ${painel} não truncado`).toBe(false);
+    }
+  });
+}
