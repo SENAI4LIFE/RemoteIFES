@@ -1,140 +1,83 @@
-const adminSections = [
-  { id: "agenda-grade", titulo: "Agendamentos e Grade", papel: "admin", verNoApp: "/agenda", corpo: [
-    { t: "p", texto: "Em <strong>Agenda</strong>, escolha sala, horário, temperatura e se a reserva apenas bloqueia o período ou também liga o aparelho." },
-    { t: "p", texto: "Em <strong>Grade</strong>, consulte os períodos livres, reservados ou ligados antes de criar um agendamento." },
-  ] },
-  { id: "notificacoes", titulo: "Notificações de dispositivos", papel: "admin", verNoApp: "/admin/notificacoes", corpo: [
-    { t: "p", texto: "Os avisos de conexão, indisponibilidade e atualização dos ESP32 ficam em dois lugares que mostram exatamente a mesma lista: o <strong>sino</strong> da barra superior e a aba <strong>Administração &rsaquo; Notificações de dispositivos</strong>, indicada para revisar o histórico com mais espaço." },
-    { t: "lista", itens: [
-      "Clicar em uma notificação não lida a marca como lida nos dois lugares.",
-      "<strong>Marcar todas como lidas</strong> zera o indicador do sino e o selo do cartão Notificações em Início.",
-      "A lista é a mesma para todos os administradores; não existe fila separada por usuário.",
-    ] },
-    { t: "nota", texto: "As notificações são geradas pelo próprio servidor a partir do estado dos dispositivos; não há cadastro manual de avisos." },
-  ] },
-  { id: "administracao", titulo: "Administração", papel: "admin", verNoApp: "/admin/usuarios", corpo: [
-    { t: "p", texto: "Administradores gerenciam usuários comuns, sessões, logs, eventos de dispositivos, acessos, proprietários de sala e o mapa geral." },
-    { t: "lista", itens: [
-      "<strong>Usuários</strong>: criar contas, atualizar identificação e senha, controlar ativação e permissões operacionais.",
-      "<strong>Ativos e Sessões</strong>: acompanhar presença e histórico de acesso.",
-      "<strong>Logs, Dispositivos e Acessos ESP32</strong>: consultar a auditoria disponível ao administrador.",
-      "<strong>Notificações de dispositivos</strong>: revisar e dar baixa nos avisos dos ESP32, com o mesmo conteúdo do sino.",
-      "<strong>Proprietários de sala</strong>: delegar a gestão de acesso de salas específicas.",
-    ] },
-    { t: "nota", texto: "Configuração global, credenciais, OTA, monitoramento, relatos de problemas e infraestrutura não fazem parte do acesso de administrador comum." },
-  ] },
+const adminSections = require("./documentation/adminSections");
+const superSections = [
+  ...require("./documentation/superDevices"),
+  ...require("./documentation/superOperations"),
+  ...require("./documentation/superInfrastructure"),
+  ...require("./documentation/superRelease"),
 ];
 
-const superSections = [
-  { id: "energia", titulo: "Energia estimada dos aparelhos", papel: "superadmin", verNoApp: "/admin/energia", corpo: [
-    { t: "p", texto: "Em <strong>Administração &rsaquo; Energia</strong>, configure opcionalmente a potência elétrica nominal de entrada, em watts, e informe se o aparelho é inverter ou de velocidade fixa. Potência elétrica não é capacidade de refrigeração em BTU/h." },
-    { t: "p", texto: "A estimativa usa <code>kWh = kW nominal × tempo ligado × fator de carga estimado</code>. Aparelhos fixos usam 100% enquanto ligados. Para inverter, o fator permanece entre 35% e 100% e considera somente a diferença entre temperatura ambiente e alvo; sem telemetria recente, usa 65% e a estimativa é marcada como parcial." },
-    { t: "p", texto: "Os resumos diários compactos preservam tempo ligado, carga ponderada e cobertura por até 45 dias. Intervalos sem observação não são inventados, e o resultado é sempre identificado como estimativa, não como medição de faturamento." },
-    { t: "nota", texto: "A área é somente analítica: não liga ou desliga aparelhos, não muda temperaturas ou agendas e não participa da comunicação de controle com o ESP32. Sem potência configurada, o restante do RemoteIFES continua funcionando normalmente." },
-  ] },
-  { id: "esp32-cadastro", titulo: "Cadastro de ESP32 por sala", papel: "superadmin", verNoApp: "/admin/macs", corpo: [
-    { t: "p", texto: "Associe cada sala ao MAC do controlador detectado, configure limites específicos e, quando necessário, restrinja o controle a usuários autorizados." },
-  ] },
-  { id: "esp32-avancado", titulo: "ESP32: funções avançadas", papel: "superadmin", verNoApp: "/admin/esp32", corpo: [
-    { t: "lista", itens: ["Entrar e sair do modo de configuração.", "Capturar e testar sinais infravermelhos.", "Selecionar protocolo, atualizar firmware por OTA e resetar a configuração Wi-Fi."] },
-  ] },
-  { id: "monitoramento", titulo: "Monitoramento e saúde do sistema", papel: "superadmin", verNoApp: "/admin/monitoramento", corpo: [
-    { t: "p", texto: "Acompanhe serviço, banco, armazenamento, backups, controladores, credenciais e contadores de falha. A tela atualiza enquanto permanece aberta." },
-  ] },
-  { id: "heatmap", titulo: "Mapa de calor operacional", papel: "superadmin", verNoApp: "/admin/monitoramento", corpo: [
-    { t: "p", texto: "Dentro de <strong>Administração &rsaquo; Monitoramento</strong>, a seção <strong>Mapa de calor operacional</strong> compara as salas em uma métrica de operação, sobre a mesma planta baixa usada no resto do sistema. É visível somente ao superadministrador." },
-    { t: "lista", itens: [
-      "Métricas disponíveis: disponibilidade do ESP32, tempo offline, quedas de conexão, comandos enviados, comandos com o dispositivo offline, agendamentos criados, execuções de agendamento, relatos de problema e relatos sem resolução.",
-      "Períodos: 24 horas, 7 dias ou 30 dias.",
-      "A escala vai do frio (azul) ao quente (vermelho) e o quente é sempre o extremo pior. Em disponibilidade, quanto menor a porcentagem, mais quente fica a sala.",
-      "A cor nunca aparece sozinha: cada sala mostra o valor numérico, a legenda indica os extremos e a tabela abaixo do mapa repete tudo em texto, ordenada da pior para a melhor sala.",
-      "Sala sem fonte confiável para a métrica aparece como <strong>Sem dados</strong>, com hachura, nunca como zero.",
-    ] },
-    { t: "nota", texto: "O cálculo acontece apenas quando a seção está aberta ou quando métrica e período mudam; nada roda em segundo plano e nenhum histórico novo é gravado. As métricas de conectividade dependem do histórico de indisponibilidade, que segue a retenção de auditoria: quando o período escolhido é maior que ela, um aviso aparece na própria seção. Consumo e energia estimada não entram aqui e continuam na aba Energia." },
-  ] },
-  { id: "relatos-gestao", titulo: "Relatos de problemas (gestão)", papel: "superadmin", verNoApp: "/admin/relatos", corpo: [
-    { t: "p", texto: "Em <strong>Administração &rsaquo; Relatos de problemas</strong>, o superadministrador filtra os relatos por situação (novo, aberto, em análise, resolvido), abre cada um para revisar o contexto, escreve uma resposta visível ao autor e move a situação: marcar em análise, resolver ou reabrir. Abrir um relato novo já o marca como aberto." },
-    { t: "p", texto: "A janela de detalhe também permite <strong>excluir permanentemente</strong> um relato já enviado, após uma confirmação em duas etapas dentro da própria janela. A exclusão remove a descrição, a resposta e o histórico de revisão, não pode ser desfeita e não depende da situação do relato." },
-    { t: "nota", texto: "Os usuários enviam relatos pelo botão de inseto presente em qualquer tela; o formulário de envio não faz parte desta seção de gestão. Nenhum relato é removido automaticamente; a exclusão é sempre manual e deliberada." },
-  ] },
-  { id: "auditoria", titulo: "Auditoria e histórico", papel: "superadmin", verNoApp: "/admin/auditoria", corpo: [
-    { t: "p", texto: "Em <strong>Administração &rsaquo; Auditoria</strong>, consulte os eventos administrativos e os períodos de indisponibilidade dos ESP32, filtrando por intervalo de datas." },
-    { t: "lista", itens: [
-      "A retenção atual aparece no topo da aba e é configurável; registros mais antigos expiram automaticamente.",
-      "Logs de comando, eventos de dispositivo e acessos ESP32 continuam nas próprias abas, disponíveis também ao administrador comum.",
-      "A auditoria é somente de leitura: nada aqui liga, desliga ou reconfigura aparelhos.",
-    ] },
-    { t: "nota", texto: "Exporte ou preserve fora do sistema qualquer registro que precise sobreviver à retenção configurada." },
-  ] },
-  { id: "backup", titulo: "Backup e recuperação", papel: "superadmin", corpo: [
-    { t: "p", texto: "Confira a execução e a idade dos backups no monitoramento. No host, use <code>cd remoteifes-server && npm run backup</code> para uma cópia manual verificada." },
-    { t: "passos", itens: ["Pare o serviço antes da restauração.", "Execute <code>npm run restore</code> para listar as cópias ou <code>npm run restore -- &lt;arquivo&gt;</code> para escolher uma.", "Reinicie o serviço, execute a verificação de saúde e confirme autenticação, banco e controladores."] },
-    { t: "nota", texto: "Guarde cópias fora do host e teste a restauração periodicamente. Nunca copie apenas o arquivo SQLite ativo ignorando o WAL." },
-  ] },
-  { id: "ota-credenciais", titulo: "OTA e credenciais por dispositivo", papel: "superadmin", verNoApp: "/admin/esp32", corpo: [
-    { t: "p", texto: "A publicação OTA usa imagem versionada e SHA-256; o dispositivo valida antes de gravar e pode reverter após falha de inicialização." },
-    { t: "p", texto: "Credenciais exclusivas podem ser provisionadas, rotacionadas, substituídas ou revogadas. O segredo é mostrado uma única vez e nunca integra esta documentação." },
-  ] },
-  { id: "operacao-admin", titulo: "Operação, implantação e manutenção", papel: "superadmin", corpo: [
-    { t: "p", texto: "Procedimentos de terminal, configuração do servidor, implantação, reversão, serviços, diagnóstico e manutenção são exclusivos do superadministrador." },
-    { t: "lista", itens: [
-      "<strong>Preparação</strong>: <code>cd remoteifes-server &amp;&amp; npm ci &amp;&amp; npm run setup</code>.",
-      "<strong>Serviço</strong>: use <code>npm run install-service</code> na instalação e o gerenciador de serviços do host para iniciar, parar, reiniciar e consultar o estado.",
-      "<strong>Implantação</strong>: execute <code>npm run deploy</code>; confirme o backup prévio, a versão alvo e o retorno saudável.",
-      "<strong>Reversão</strong>: execute <code>npm run rollback</code> quando a verificação pós-implantação falhar.",
-      "<strong>Diagnóstico</strong>: execute <code>npm run health</code> e revise os logs do serviço sem copiar tokens ou segredos.",
-      "Mantenha restrição de rede, HTTPS, variáveis de produção, backups e cache da aplicação alinhados à instalação.",
-      "Nunca registre senhas, tokens, credenciais de dispositivo ou conteúdo de arquivos de ambiente no manual ou em relatos.",
-    ] },
-  ] },
-  { id: "configuracao-servidor", titulo: "Configuração do servidor e do website", papel: "superadmin", corpo: [
-    { t: "lista", itens: [
-      "Defina o ambiente de produção, a origem CORS exata, a política de proxy confiável, o diretório persistente de dados e as redes autorizadas no arquivo de ambiente protegido do host.",
-      "Use HTTPS sempre que o tráfego sair de uma rede local controlada. Não publique arquivos de ambiente, bancos, backups, keystores ou diretórios de release em hospedagem estática.",
-      "Após alterar arquivos de <code>remoteifes-web</code>, avance a versão em <code>version.json</code> e nos demais pontos verificados pelo teste de versão do frontend, valide a atualização automática da PWA e sincronize novamente o projeto Cordova.",
-      "Para Android, gere com origem fixa e keystore de produção; publique somente após apksigner, verificação de debuggable, versão/build, SHA-256 e certificado. O APK servido fica preso à origem do build (outra implantação exige um APK novo).",
-      "Mantenha o keystore e as senhas de assinatura fora do controle de versão e com backup próprio em cofre ou mídia offline: perder a chave impede atualizações em aparelhos já instalados.",
-    ] },
-  ] },
-];
+const PUBLIC_SECTION_IDS = new Set([
+  "inicio", "navegacao", "inicio-acoes", "papeis", "selecao-sala", "estados-sala",
+  "controlador", "controle-acesso-sala", "conta-sessao", "conexao", "relatos",
+  "pwa-mobile", "acessibilidade", "solucao-problemas",
+]);
 
 const adminHelp = {
-  agenda: { titulo: "Como usar: Agendamentos", itens: [{ titulo: "Reserva", texto: "Escolha sala, período e comportamento; conflitos são recusados pelo servidor." }] },
-  grade: { titulo: "Como usar: Grade do dia", itens: [{ titulo: "Consulta", texto: "Selecione sala e data para conferir períodos livres, reservados e ligados." }] },
-  usuarios: { titulo: "Como usar: Usuários", itens: [{ titulo: "Contas", texto: "Crie e atualize somente contas que seu nível pode administrar." }] },
-  ativos: { titulo: "Como usar: Ativos", itens: [{ titulo: "Presença", texto: "A lista diferencia sessões online, inativas e encerradas." }] },
-  sessoes: { titulo: "Como usar: Sessões", itens: [{ titulo: "Histórico", texto: "Filtre por data e preserve registros necessários para auditoria." }] },
-  logs: { titulo: "Como usar: Logs", itens: [{ titulo: "Comandos", texto: "Consulte ação, sala, origem e horário dos comandos registrados." }] },
-  dispositivos: { titulo: "Como usar: Dispositivos", itens: [{ titulo: "Eventos", texto: "Consulte mudanças de conexão dos controladores." }] },
-  notificacoes: { titulo: "Como usar: Notificações de dispositivos", itens: [{ titulo: "Mesma lista do sino", texto: "Esta aba mostra as notificações de ESP32 já exibidas pelo sino; marcar como lida vale nos dois lugares." }] },
-  acessos: { titulo: "Como usar: Acessos ESP32", itens: [{ titulo: "Auditoria", texto: "Consulte requisições dos dispositivos dentro da permissão administrativa." }] },
-  proprietarios: { titulo: "Como usar: Proprietários de sala", itens: [{ titulo: "Delegação", texto: "Associe um usuário comum somente às salas que ele deverá administrar." }] },
-  mapa: { titulo: "Como usar: Mapa", itens: [{ titulo: "Visão geral", texto: "As cores refletem conexão, energia e reserva das salas." }] },
+  agenda: { titulo: "Como usar: Agendamentos", itens: [
+    { titulo: "Criar", texto: "Escolha sala, horário, temperatura e comportamento; o servidor recusa conflito e dados fora dos limites." },
+    { titulo: "Corrigir", texto: "Não há edição: desative ou exclua o item e recrie com os dados corretos." },
+  ] },
+  grade: { titulo: "Como usar: Grade do dia", itens: [{ titulo: "Consulta", texto: "Selecione sala e data para comparar períodos livres, reservados e ligados antes de agendar." }] },
+  usuarios: { titulo: "Como usar: Usuários", itens: [{ titulo: "Limite do papel", texto: "Admin mantém contas comuns; somente Superadministrador promove ou altera administradores." }] },
+  ativos: { titulo: "Como usar: Ativos", itens: [{ titulo: "Presença", texto: "A lista diferencia online, inativo e offline pelo uso da sessão e limiar configurado." }] },
+  sessoes: { titulo: "Como usar: Sessões", itens: [{ titulo: "Histórico", texto: "Filtre por data; preserve registros exigidos antes de usar exclusão irreversível." }] },
+  logs: { titulo: "Como usar: Logs", itens: [{ titulo: "Comandos", texto: "Filtre sala/data e compare comando, usuário ou sistema, origem e horário." }] },
+  dispositivos: { titulo: "Como usar: Dispositivos", itens: [{ titulo: "Eventos", texto: "Correlacione quedas e retornos do controlador com comandos e relatos." }] },
+  notificacoes: { titulo: "Como usar: Notificações de dispositivos", itens: [{ titulo: "Fila compartilhada", texto: "A aba e o sino mostram a mesma lista; marcar como lida vale para todos os administradores." }] },
+  acessos: { titulo: "Como usar: Acessos ESP32", itens: [{ titulo: "Evidência", texto: "Filtre os acessos registrados pelos controladores; eles não confirmam resposta física do ar-condicionado." }] },
+  proprietarios: { titulo: "Como usar: Proprietários de sala", itens: [{ titulo: "Delegação", texto: "Associe usuário comum à sala; ele passará a manter a lista de acesso em Config." }] },
+  mapa: { titulo: "Como usar: Mapa", itens: [{ titulo: "Triagem", texto: "Use conexão, energia e reserva como visão geral e abra a sala ou histórico para investigar." }] },
 };
 
 const superHelp = {
-  energia: { titulo: "Como usar: Energia", itens: [{ titulo: "Estimativas", texto: "Configure watts de entrada e tipo do aparelho; compare consumo, carga e tempo ligado sem alterar o controle das salas. Estimativas incompletas aparecem marcadas como parciais." }] },
-  macs: { titulo: "Como usar: ESP32 / Salas", itens: [{ titulo: "Vínculo", texto: "Associe dispositivos detectados, limites e acesso às salas corretas." }] },
-  config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Escopo", texto: "Mudanças globais afetam segurança, sessões, rede e todos os controladores." }] },
-  esp32: { titulo: "Como usar: ESP32", itens: [{ titulo: "Operação avançada", texto: "Use configuração, IR, OTA, credenciais e reset somente no dispositivo selecionado." }] },
-  monitoramento: { titulo: "Como usar: Monitoramento", itens: [{ titulo: "Saúde", texto: "Revise alertas de serviço, banco, disco, backup, controladores e credenciais." }] },
-  heatmap: { titulo: "Como usar: Mapa de calor operacional", itens: [
-    { titulo: "Sob demanda", texto: "Abra a seção para calcular; escolha métrica e período (24 h, 7 ou 30 dias) e o servidor agrega na hora." },
-    { titulo: "Leitura", texto: "Frio é bom, quente é ruim, inclusive em disponibilidade, onde pouca porcentagem fica quente. Valor numérico, legenda e tabela acompanham a cor." },
-    { titulo: "Sem dados", texto: "Sala sem dispositivo ou sem histórico no período aparece hachurada como Sem dados, e não como zero." },
+  energia: { titulo: "Como usar: Energia", itens: [{ titulo: "Estimativa", texto: "Informe watts elétricos e tipo; confira cobertura/parcial antes de comparar. Não é medição para faturamento." }] },
+  macs: { titulo: "Como usar: ESP32 / MACs", itens: [{ titulo: "Vínculo", texto: "Confirme fisicamente a placa, vincule o MAC à sala e valide limites, restrição e status." }] },
+  config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Impacto global", texto: "Registre valores anteriores; salve só a mudança planejada e valide sessões, rede e dispositivos." }] },
+  esp32: { titulo: "Como usar: ESP32", itens: [
+    { titulo: "Manutenção", texto: "Use configuração/IR em uma sala por vez e retorne a placa ao modo de operação." },
+    { titulo: "Segurança", texto: "OTA, credenciais e Resetar Wi-Fi exigem plano de validação ou acesso físico." },
   ] },
-  auditoria: { titulo: "Como usar: Auditoria", itens: [{ titulo: "Consulta", texto: "Filtre eventos administrativos e indisponibilidades de ESP32 por período; a retenção configurada apaga registros antigos." }] },
+  monitoramento: { titulo: "Como usar: Monitoramento", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },
+  heatmap: { titulo: "Como usar: Mapa de calor operacional", itens: [
+    { titulo: "Sob demanda", texto: "Expanda, escolha métrica/período e atualize; a consulta agrega históricos existentes." },
+    { titulo: "Leitura", texto: "Frio é melhor e quente é pior; números, legenda e tabela sempre acompanham a cor." },
+  ] },
+  auditoria: { titulo: "Como usar: Auditoria", itens: [{ titulo: "Consulta", texto: "Filtre evento/ator/alvo e indisponibilidades; preserve externamente o que precisar superar a retenção." }] },
   relatos: { titulo: "Como usar: Relatos de problemas", itens: [
-    { titulo: "Fluxo", texto: "Filtre por situação, abra um relato para revisar o contexto, responda ao autor e mova entre em análise, resolvido e reaberto." },
-    { titulo: "Envio", texto: "Novos relatos chegam pelo botão de inseto usado pelos usuários; esta seção é só de gestão." },
-    { titulo: "Exclusão", texto: "A janela de detalhe permite excluir um relato de forma permanente, após confirmação em duas etapas; a ação não pode ser desfeita." },
+    { titulo: "Fluxo", texto: "Revise contexto, mova para análise, responda, resolva ou reabra." },
+    { titulo: "Exclusão", texto: "Duas confirmações removem conteúdo e histórico permanentemente; auditoria guarda só metadados." },
   ] },
 };
 
-function para(usuario) {
-  if (!usuario || !usuario.isAdmin) return { secoes: [], ajuda: {} };
-  if (usuario.nivel === 3) return { secoes: [...adminSections, ...superSections], ajuda: { ...adminHelp, ...superHelp } };
-  return { secoes: adminSections, ajuda: adminHelp };
+function validar() {
+  const todas = [...adminSections, ...superSections];
+  const ids = new Set(PUBLIC_SECTION_IDS);
+  for (const secao of todas) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(secao.id || "")) throw new Error(`ID inválido na documentação: ${secao.id}`);
+    if (ids.has(secao.id)) throw new Error(`ID duplicado na documentação: ${secao.id}`);
+    ids.add(secao.id);
+    if (!['admin', 'superadmin'].includes(secao.papel)) throw new Error(`papel inválido em ${secao.id}`);
+    if (!secao.categoria || !Array.isArray(secao.corpo)) throw new Error(`seção incompleta: ${secao.id}`);
+  }
+  for (const secao of todas) {
+    for (const bloco of secao.corpo) {
+      if (bloco.t !== "links") continue;
+      for (const link of bloco.itens || []) {
+        if (!ids.has(link.id)) throw new Error(`link quebrado em ${secao.id}: ${link.id}`);
+      }
+    }
+  }
+  return true;
 }
 
-module.exports = { para };
+validar();
+
+function para(usuario) {
+  if (!usuario || !usuario.isAdmin) return { secoes: [], ajuda: {} };
+  if (usuario.nivel === 3) {
+    return { secoes: [...adminSections, ...superSections], ajuda: { ...adminHelp, ...superHelp } };
+  }
+  return { secoes: [...adminSections], ajuda: { ...adminHelp } };
+}
+
+module.exports = { para, validar, _adminSections: adminSections, _superSections: superSections };

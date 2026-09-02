@@ -36,6 +36,18 @@ test("o manual mostra as seções de administração ao superadministrador", asy
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#manual-sec-monitoramento")).toHaveCount(1);
   await expect(page.locator("#manual-sec-administracao")).toHaveCount(1);
+  await expect(page.locator("#manual-sec-operacao-admin")).toHaveCount(1);
+  await expect(page.locator("#manual-sec-android-release .manual-command")).not.toHaveCount(0);
+});
+
+test("admin herda o manual comum e administrativo, sem procedimentos Superadministrador", async ({ page, context }) => {
+  await injetarSessao(context, "admin");
+  await page.goto("/#/ajuda/usuarios-admin");
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#manual-sec-controlador")).toHaveCount(1);
+  await expect(page.locator("#manual-sec-usuarios-admin")).toHaveCount(1);
+  await expect(page.locator("#manual-sec-operacao-admin")).toHaveCount(0);
+  await expect(page.locator("#manualConteudo .manual-command")).toHaveCount(0);
 });
 
 test("busca do manual filtra as seções", async ({ page, context }) => {
@@ -96,6 +108,36 @@ test("o manual não faz requisições externas e cabe no celular", async ({ page
   expect(await semRolagemHorizontal(page)).toBe(true);
 });
 
+test("fluxos conceituais permanecem legíveis no celular com fonte ampliada", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    localStorage.setItem("remoteifes_font_scale", "2");
+    localStorage.setItem("remoteifes_line_height", "3");
+    localStorage.setItem("remoteifes_letter_spacing", "0.25");
+  });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await injetarSessao(context, "user");
+  await page.goto("/#/ajuda/controlador");
+  await expect(page.locator("#manual-sec-controlador .manual-flow")).toBeVisible({ timeout: 20_000 });
+  const geometria = await page.locator("#manual-sec-controlador .manual-flow").evaluate((fluxo) => {
+    const caixa = fluxo.getBoundingClientRect();
+    return Array.from(fluxo.querySelectorAll(".manual-flow-item")).map((item) => {
+      const r = item.getBoundingClientRect();
+      return { dentro: r.left >= caixa.left - 1 && r.right <= caixa.right + 1, largura: r.width };
+    });
+  });
+  expect(geometria.length).toBeGreaterThanOrEqual(4);
+  expect(geometria.every((item) => item.dentro && item.largura > 0)).toBe(true);
+  expect(await semRolagemHorizontal(page)).toBe(true);
+});
+
+test("referência cruzada atualiza o deep link sem depender da posição visual", async ({ page, context }) => {
+  await injetarSessao(context, "user");
+  await page.goto("/#/ajuda/papeis");
+  await expect(page.locator("#manual-sec-papeis")).toBeVisible({ timeout: 20_000 });
+  await page.locator('#manual-sec-papeis .manual-crosslink[data-sec="controle-acesso-sala"]').click();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/ajuda/controle-acesso-sala");
+});
+
 test("a Ajuda pública cobre Início, conta, conexão, acessibilidade e PWA", async ({ page, context }) => {
   await abrirApp(page, context, "user");
   await abrirManualPeloFab(page);
@@ -119,6 +161,11 @@ test("todo item do sumário da Ajuda aponta para uma seção existente", async (
   const rotas = await page.$$eval("#manualConteudo .manual-ver-app", (bs) => bs.map((b) => b.dataset.rota));
   expect(rotas.length).toBeGreaterThan(0);
   expect(rotas.filter((r) => !/^\/(inicio|salas|agenda|grade|config|aplicativo|admin\/[a-z0-9-]+)$/.test(r))).toEqual([]);
+  const linksQuebrados = await page.$$eval("#manualConteudo .manual-crosslink:not(.hidden)", (bs) =>
+    bs.map((b) => b.dataset.sec).filter((id) => !document.getElementById(`manual-sec-${id}`))
+  );
+  expect(linksQuebrados).toEqual([]);
+  await expect(page.locator("#manualToc .manual-toc-category")).not.toHaveCount(0);
 });
 
 test("Notificações de dispositivos está na Ajuda do administrador e leva à aba correta", async ({ page, context }) => {

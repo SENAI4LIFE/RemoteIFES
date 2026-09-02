@@ -1,4 +1,4 @@
-const FRONTEND_VERSION = "2026.09.02.2";
+const FRONTEND_VERSION = "2026.09.02.3";
 const CACHE_PREFIX = "remoteifes-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${FRONTEND_VERSION}`;
 const VERSION_QUERY = `v=${encodeURIComponent(FRONTEND_VERSION)}`;
@@ -9,7 +9,8 @@ const VERSIONED_SHELL = [
   "js/version.js", "js/state.js", "js/config.js", "js/toast.js", "js/server-status.js",
   "js/tempo.js", "js/rooms-data.js", "js/api.js", "js/rtstatus.js", "js/nav.js",
   "js/idle-timer.js", "js/a11y.js", "js/ui-dialog.js", "js/ui-status.js", "js/help.js",
-  "js/manual-content.js",
+  "js/manual-content.js", "js/manual/common-start.js", "js/manual/common-rooms.js",
+  "js/manual/common-account.js",
   "js/screens/notifications.js", "js/screens/relatos.js", "js/screens/login.js",
   "js/screens/portal-funcoes.js", "js/screens/location.js", "js/screens/simple.js",
   "js/floorplan.js", "js/screens/floorplan.js", "js/screens/rooms.js", "js/screens/panel.js",
