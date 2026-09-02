@@ -138,8 +138,11 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null, opcoes 
     sala
   );
 
-  eventos.emit("mudanca");
-  return buscar(sala);
+  const atualizada = buscar(sala);
+  const mudouNaListagem = !salaRow.online !== !atualizada.online || !salaRow.ligado !== !atualizada.ligado;
+  if (mudouNaListagem) eventos.emit("mudanca");
+  else if (salaRow.temperatura !== atualizada.temperatura) eventos.emit("mudanca-sala", { sala });
+  return atualizada;
 }
 
 function cadastrarMac(sala, mac) {

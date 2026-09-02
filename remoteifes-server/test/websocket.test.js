@@ -157,3 +157,81 @@ test("inatividade expirada revoga a conexão WebSocket autenticada", async () =>
   cliente.ws.send(JSON.stringify({ tipo: "observar", sala: "A-103a" }));
   assert.equal(await cliente.fechada(), 4001);
 });
+
+function coletarPor(cliente, ms) {
+  return new Promise((resolve) => {
+    const recebidas = [];
+    const ouvir = (dados) => {
+      try {
+        recebidas.push(JSON.parse(dados.toString()));
+      } catch (err) {
+        /* frame ignorado */
+      }
+    };
+    cliente.ws.on("message", ouvir);
+    setTimeout(() => {
+      cliente.ws.off("message", ouvir);
+      resolve(recebidas);
+    }, ms);
+  });
+}
+
+async function clienteObservando(sufixo, sala) {
+  const usuario = usuariosService.criar(
+    { usuario: `teste-ws-hb-${sufixo}`, senha: "senhaSegura123", nome: "Usuario WS HB", podeControlar: true },
+    { nivel: 3 }
+  );
+  const token = tokenService.gerarToken(usuario.id);
+  const cliente = criarClienteComFila([token]);
+  await cliente.aberta();
+  cliente.ws.send(JSON.stringify({ tipo: "observar", sala }));
+  await coletarPor(cliente, 300);
+  return cliente;
+}
+
+test("heartbeat sem mudanca de estado nao retransmite a lista de salas", async () => {
+  const salasService = require("../src/services/salasService");
+  const sala = salasService.listar()[0].sala;
+  salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
+
+  const cliente = await clienteObservando("estavel", sala);
+  salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
+  const tipos = (await coletarPor(cliente, 400)).map((m) => m.tipo);
+  assert.deepEqual(tipos, [], `heartbeat sem mudanca nao deveria gerar trafego, veio ${JSON.stringify(tipos)}`);
+  cliente.ws.close();
+});
+
+test("heartbeat que muda so a temperatura avisa apenas quem observa a sala", async () => {
+  const salasService = require("../src/services/salasService");
+  const sala = salasService.listar()[1].sala;
+  salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
+
+  const observador = await clienteObservando("observador", sala);
+  const alheio = await clienteObservando("alheio", salasService.listar()[2].sala);
+
+  const doObservador = coletarPor(observador, 500);
+  const doAlheio = coletarPor(alheio, 500);
+  salasService.marcarOnline(sala, { ligado: false, temperatura: 25.5 }, null, "127.0.0.1", { viaCredencial: true });
+
+  const recebidas = await doObservador;
+  assert.deepEqual(recebidas.map((m) => m.tipo), ["status"]);
+  assert.equal(recebidas[0].status.sala, sala);
+  assert.equal(recebidas[0].status.temperatura, 25.5);
+  assert.deepEqual((await doAlheio).map((m) => m.tipo), []);
+
+  observador.ws.close();
+  alheio.ws.close();
+});
+
+test("heartbeat que muda ligado retransmite a lista de salas", async () => {
+  const salasService = require("../src/services/salasService");
+  const sala = salasService.listar()[3].sala;
+  salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
+
+  const cliente = await clienteObservando("ligado", sala);
+  const coleta = coletarPor(cliente, 500);
+  salasService.marcarOnline(sala, { ligado: true, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
+  const tipos = (await coleta).map((m) => m.tipo);
+  assert.ok(tipos.includes("salas"), `esperava uma retransmissao de salas, veio ${JSON.stringify(tipos)}`);
+  cliente.ws.close();
+});
