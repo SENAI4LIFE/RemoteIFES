@@ -61,7 +61,31 @@ const { codigoDerivado, proximoCodigo } = require("./android-version");
 checar(codigoDerivado("1.0.0") === 10000 && codigoDerivado("1.2.3") === 10203 && codigoDerivado("2.0.0") === 20000, "versionCode derivado da versão é previsível (1.2.3 -> 10203)");
 checar(proximoCodigo("1.0.1", 10000) === 10001 && proximoCodigo("1.1.0", 10005) === 10100, "uma versão nova adota o código derivado dela");
 checar(proximoCodigo("1.0.0", 10000) === 10001 && proximoCodigo("1.0.1", 10050) === 10051, "recompilar a mesma versão avança o versionCode em vez de repeti-lo");
-checar([["1.0.0", 0], ["9.9.9", 0]].every(([v, base]) => proximoCodigo(v, base) > base), "o versionCode sempre cresce sobre o anterior");
+// Um versionCode repetido faz o Android recusar a atualização, então o invariante não é
+// "cresce sobre o último" e sim "supera todos os já publicados". O passo de risco é 1.2.3
+// recompilado, que ocupa 10204 — exatamente o código que 1.2.4 deriva.
+function percorrerVersoes(passos, inicio) {
+  let versao = null;
+  let codigo = inicio;
+  const historico = [inicio];
+  for (const passo of passos) {
+    if (passo !== "--rebuild") versao = passo;
+    codigo = proximoCodigo(versao, codigo);
+    historico.push(codigo);
+  }
+  return historico;
+}
+
+function superaTodosOsAnteriores(historico) {
+  return historico.every((codigo, i) => i === 0 || historico.slice(0, i).every((anterior) => codigo > anterior));
+}
+
+const sequencia = percorrerVersoes(["1.2.3", "--rebuild", "1.2.4", "--rebuild", "1.2.9", "1.3.0"], 10000);
+checar(sequencia.join(",") === "10000,10203,10204,10205,10206,10209,10300", `1.2.3 -> recompilação -> 1.2.4 -> recompilação -> 1.2.9 -> 1.3.0 gera ${sequencia.join(" -> ")}`);
+checar(superaTodosOsAnteriores(sequencia), "cada release supera todos os versionCode anteriores, sem repetir nenhum");
+checar(codigoDerivado("1.2.4") === 10204 && proximoCodigo("1.2.4", 10204) === 10205, "versão nova cujo derivado já foi usado por uma recompilação avança em vez de colidir");
+checar(proximoCodigo("1.3.0", percorrerVersoes(["1.2.9", ...Array(95).fill("--rebuild")], 10209).at(-1)) === 10306, "recompilações que passam do derivado da versão seguinte não fazem o código estacionar");
+checar(proximoCodigo("1.2.4", 10300) === 10301, "até um retrocesso de versionName recebe um versionCode maior");
 
 console.log("publicação — consistência da release");
 const { conferirAvanco, limparSuperados } = require("./publish-android-release");
