@@ -21,7 +21,8 @@ test("página móvel é autenticada, responsiva e não oferece APK não publicad
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/#/aplicativo");
   await expect(page.locator("#screen-mobile-app")).toBeVisible();
-  await expect(page.locator(".mobile-app-unavailable")).toContainText("Nenhum APK de produção assinado está publicado");
+  await expect(page.locator(".mobile-app-unavailable")).toContainText("Nenhum APK de produção assinado está disponível aqui");
+  await expect(page.locator(".mobile-app-status")).toHaveClass(/is-indisponivel/);
   await expect(page.locator(".mobile-app-download-btn")).toHaveCount(0);
   await expect(page.locator(".mobile-app-card.is-recommended h3")).toHaveText("Instalar como PWA");
   expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);

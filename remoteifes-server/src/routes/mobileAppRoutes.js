@@ -27,6 +27,8 @@ function dadosPublicados(req) {
     if (!/^[a-f0-9]{64}$/.test(String(meta.certificateSha256 || ""))) return null;
     if (meta.artifactType !== "release" || meta.signed !== true || meta.debuggable !== false) return null;
     if (meta.minSdk !== 24 || !Number.isInteger(meta.targetSdk) || meta.targetSdk < 35) return null;
+    if (meta.releaseDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(meta.releaseDate))) return null;
+    if (meta.notes !== undefined && (!Array.isArray(meta.notes) || meta.notes.some((n) => typeof n !== "string"))) return null;
     if (typeof meta.serverOrigin !== "string" || !/^https?:\/\/[^/]+$/.test(meta.serverOrigin)) return null;
     if (process.env.NODE_ENV !== "test" && origemLoopback(meta.serverOrigin)) return null;
     if (meta.serverOrigin !== `${req.protocol}://${req.get("host")}`) return null;
@@ -66,6 +68,8 @@ router.get("/mobile-app/info", exigirLogin, (req, res) => {
       tamanho: tamanho(release.tamanhoBytes),
       minSdk: release.minSdk,
       targetSdk: release.targetSdk,
+      dataPublicacao: release.releaseDate || null,
+      notas: Array.isArray(release.notes) ? release.notes.filter((n) => n.trim()) : [],
       url: "/mobile-app/android",
     } : { disponivel: false },
   });

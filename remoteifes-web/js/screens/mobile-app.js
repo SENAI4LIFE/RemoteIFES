@@ -18,52 +18,144 @@ const MobileApp = (() => {
     return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
+  // Só o aplicativo empacotado sabe qual versão está instalada: ela é gravada no bundle no
+  // mesmo build que gera o APK. No site e na PWA esse dado não existe, e a página diz isso
+  // em vez de adivinhar o que está instalado no aparelho de quem está lendo.
+  function versaoInstalada() {
+    const cfg = window.RemoteIFESConfig || {};
+    if (!cfg.empacotado) return null;
+    if (!cfg.appAndroidBuild) return { conhecida: false };
+    return { conhecida: true, versao: cfg.appAndroidVersao || "—", build: String(cfg.appAndroidBuild) };
+  }
+
+  function estadoDaVersao(apk) {
+    const instalada = versaoInstalada();
+    if (!instalada) return { chave: "navegador" };
+    if (!instalada.conhecida) return { chave: "desconhecida" };
+    const atual = Number(instalada.build);
+    const publicado = Number(apk.build);
+    if (!Number.isFinite(atual) || !Number.isFinite(publicado)) return { chave: "desconhecida" };
+    return { chave: publicado > atual ? "desatualizada" : "atualizada", instalada };
+  }
+
+  function dataPorExtenso(iso) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ""))) return null;
+    return String(iso).split("-").reverse().join("/");
+  }
+
+  function cartaoStatus(estado, versao, apk) {
+    const instalada = estado.instalada;
+    if (estado.chave === "atualizada") {
+      return { classe: "is-atualizada", selo: "Atualizado", titulo: "Você já está na versão mais recente",
+        texto: `Versão instalada ${escapeHtml(instalada.versao)} (build ${escapeHtml(instalada.build)}). Não é preciso fazer nada.` };
+    }
+    if (estado.chave === "desatualizada") {
+      return { classe: "is-desatualizada", selo: "Atualização disponível", titulo: "Há uma versão mais nova do aplicativo",
+        texto: `Instalada: ${escapeHtml(instalada.versao)} (build ${escapeHtml(instalada.build)}). Publicada: ${escapeHtml(versao)} (build ${escapeHtml(apk.build)}). Baixe abaixo e instale por cima.` };
+    }
+    if (estado.chave === "desconhecida") {
+      return { classe: "is-desconhecida", selo: "Versão instalada indisponível", titulo: "Não foi possível identificar a versão instalada",
+        texto: `Este servidor publica a versão ${escapeHtml(versao)}. Instalar por cima é seguro: se a instalada já for essa, o Android avisa e nada muda.` };
+    }
+    return { classe: "is-navegador", selo: "Versão disponível", titulo: `Aplicativo Android ${escapeHtml(versao)}`,
+      texto: "Você está no navegador, então não dá para saber qual versão está instalada no celular. Abra esta página no aparelho Android para instalar ou atualizar." };
+  }
+
+  function passosDeInstalacao(atualizando) {
+    if (atualizando) {
+      return [
+        "Toque em <strong>Baixar atualização</strong> e aguarde a conferência do arquivo.",
+        "Abra o arquivo baixado (pelo aviso de download ou pela pasta <strong>Downloads</strong>).",
+        "Toque em <strong>Atualizar</strong>: a nova versão é instalada por cima da atual e sua conta e o endereço do servidor continuam salvos.",
+        "A atualização só está concluída quando o Android confirma a instalação e o aplicativo abre na versão nova.",
+      ];
+    }
+    return [
+      "Toque em <strong>Baixar aplicativo</strong>. O arquivo é conferido automaticamente antes de ser salvo.",
+      "Abra o arquivo baixado (pelo aviso de download ou pela pasta <strong>Downloads</strong>).",
+      "Se o Android disser que não pode instalar desta fonte, toque em <strong>Configurações</strong> e ative <strong>Permitir desta fonte</strong> apenas para o aplicativo que abriu o arquivo. Depois de instalar você pode desativar de novo; não desligue outras proteções do aparelho.",
+      "Toque em <strong>Instalar</strong> e depois em <strong>Abrir</strong>. Entre com a mesma conta que você usa no RemoteIFES.",
+    ];
+  }
+
   function render(info) {
     const android = plataforma() === "android";
     const disponivel = !!(info && info.android && info.android.disponivel);
     const versao = info && info.versao ? info.versao : "1.0.0";
     const apk = info && info.android ? info.android : {};
+    const estado = disponivel ? estadoDaVersao(apk) : { chave: "navegador" };
+    const atualizando = estado.chave === "desatualizada";
+    const status = disponivel ? cartaoStatus(estado, versao, apk) : null;
+    const publicacao = dataPorExtenso(apk.dataPublicacao);
+    const notas = Array.isArray(apk.notas) ? apk.notas : [];
+    const servidor = (window.RemoteIFESConfig && window.RemoteIFESConfig.serverUrl) || window.location.origin;
+
     conteudo.innerHTML = `
       <section class="mobile-app-hero">
         <div><span class="mobile-app-kicker">REMOTEIFES NO CELULAR</span><h2>Controle as salas com a mesma segurança do site</h2><p>O aplicativo empacota a interface mantida do RemoteIFES e conecta somente ao servidor configurado para a sua instalação.</p></div>
         <img src="assets/icons/icon-192.png?v=${encodeURIComponent(window.REMOTEIFES_FRONTEND_VERSION || "unknown")}" alt="" width="128" height="128" />
       </section>
+
+      ${status
+        ? `<section class="mobile-app-status ${status.classe}" role="status"><span class="mobile-app-selo">${escapeHtml(status.selo)}</span><h2>${status.titulo}</h2><p>${status.texto}</p></section>`
+        : `<section class="mobile-app-status is-indisponivel" role="status"><span class="mobile-app-selo">Sem aplicativo publicado</span><h2>Este servidor ainda não publicou o aplicativo Android</h2><p class="mobile-app-unavailable">Nenhum APK de produção assinado está disponível aqui. Nenhuma versão de teste ou sem assinatura é oferecida: use a instalação como PWA, ao lado.</p></section>`}
+
       <div class="mobile-app-grid">
-        <section class="mobile-app-card mobile-app-download ${android ? "is-recommended" : ""}"><h3>Android</h3>
-          <dl class="mobile-app-integrity">
-            <dt>Versão</dt><dd>${escapeHtml(versao)}${apk.build ? ` (build ${escapeHtml(apk.build)})` : ""}</dd>
-            <dt>Compatibilidade</dt><dd>Android 7.0 (API 24) ou posterior</dd>
-            ${disponivel ? `<dt>Tamanho</dt><dd>${escapeHtml(apk.tamanho || "—")}</dd><dt>SHA-256</dt><dd><code class="mobile-app-hash">${escapeHtml(apk.sha256)}</code></dd><dt>Certificado</dt><dd><code class="mobile-app-hash">${escapeHtml(apk.certificateSha256)}</code></dd>` : ""}
-          </dl>
+        <section class="mobile-app-card mobile-app-download ${android && disponivel ? "is-recommended" : ""}"><h3>Aplicativo Android</h3>
           ${disponivel
-            ? `<button type="button" class="btn btn-on btn-block mobile-app-download-btn">${ICONE_BAIXAR}<span>Baixar APK</span></button><p class="mobile-app-verify hint" role="status" aria-live="polite">O arquivo é verificado pelo SHA-256 acima antes de ser salvo.</p>`
-            : `<p class="mobile-app-unavailable" role="status">Nenhum APK de produção assinado está publicado neste servidor no momento. Nenhum APK de teste ou sem assinatura é oferecido: use a instalação como PWA abaixo.</p>`}
-          ${!android && disponivel ? `<p class="hint">O download é destinado a aparelhos Android; em outros sistemas ele serve apenas para transferir o arquivo verificado.</p>` : ""}
+            ? `<p class="mobile-app-versao">Versão <strong>${escapeHtml(versao)}</strong>${publicacao ? ` · publicada em ${escapeHtml(publicacao)}` : ""} · ${escapeHtml(apk.tamanho || "—")}</p>
+               <button type="button" class="btn btn-on btn-block mobile-app-download-btn">${ICONE_BAIXAR}<span>${atualizando ? "Baixar atualização" : "Baixar aplicativo"}</span></button>
+               <p class="mobile-app-verify hint" role="status" aria-live="polite">O arquivo é conferido pelo servidor antes de ser salvo no aparelho.</p>
+               ${notas.length ? `<div class="mobile-app-notas"><h4>Novidades desta versão</h4><ul>${notas.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul></div>` : ""}
+               ${!android ? `<p class="hint">O arquivo serve para aparelhos Android; em outros sistemas ele só é transferido.</p>` : ""}`
+            : `<p class="hint">Assim que a equipe publicar uma versão, ela aparece aqui com o botão de instalação.</p>`}
         </section>
-        <section class="mobile-app-card ${!android || !disponivel ? "is-recommended" : ""}"><h3>Instalar como PWA</h3><p>No navegador compatível, use <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>. É a opção indicada para iPhone, iPad e computadores, e a alternativa quando não há APK publicado.</p></section>
+        <section class="mobile-app-card ${!android || !disponivel ? "is-recommended" : ""}"><h3>Instalar como PWA</h3><p>No navegador compatível, use <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>. É a opção indicada para iPhone, iPad e computadores, e a alternativa quando não há aplicativo Android publicado.</p></section>
       </div>
-      <section class="mobile-app-instructions"><h2>Instalação</h2><ol>
-        <li>Baixe apenas por esta página, servida pelo servidor RemoteIFES da sua instalação.</li>
-        <li>Confira que o SHA-256 mostrado aqui é igual ao do arquivo baixado (a página valida isso automaticamente antes de salvar).</li>
-        <li>No Android, abra o arquivo e confirme a instalação. Autorize somente esta instalação quando o sistema pedir; não desligue a proteção do aparelho de forma permanente.</li>
-        <li>Abra o aplicativo. Se ele não vier pré-configurado, informe o endereço do servidor fornecido pela equipe local e entre com sua conta RemoteIFES.</li>
-      </ol></section>
-      <section class="mobile-app-instructions"><h2>Atualizações</h2><ol>
-        <li>Volte a esta página quando uma nova versão for publicada: a versão e o SHA-256 acima mudam.</li>
-        <li>Baixe o novo APK e instale por cima do anterior; os dados de sessão e o endereço do servidor são preservados.</li>
-        <li>A PWA se atualiza sozinha ao reabrir com conexão ao servidor.</li>
-      </ol></section>
-      <section class="mobile-app-security"><h2>Segurança e funcionamento</h2><p>O aplicativo não instala nada silenciosamente, não inclui credenciais de desenvolvimento e não substitui as permissões do servidor. A interface e o manual comum podem abrir sem Internet; comandos, estado em tempo real e autenticação exigem acesso ao servidor local.</p></section>`;
+
+      ${disponivel ? `<section class="mobile-app-instructions"><h2>${atualizando ? "Como atualizar" : "Como instalar"}</h2><ol>${passosDeInstalacao(atualizando).map((p) => `<li>${p}</li>`).join("")}</ol></section>` : ""}
+
+      <section class="mobile-app-instructions"><h2>Atualizações</h2>
+        <p>Novas versões são publicadas por esta mesma página, pelo servidor da sua instalação — não pela Play Store. Abra esta página de vez em quando${versaoInstalada() ? " ou reabra o aplicativo" : ""}: quando houver uma versão mais nova, o aviso aparece aqui em cima. Nada é instalado sozinho; a instalação sempre passa pela sua confirmação no Android.</p>
+      </section>
+
+      <section class="mobile-app-security"><h2>Para funcionar</h2>
+        <p>O aparelho precisa alcançar o servidor <code>${escapeHtml(servidor)}</code> — em geral pela rede Wi-Fi da instituição, não pelos dados móveis. A interface e o manual comum abrem sem Internet; comandos, estado em tempo real e login exigem o servidor. O aplicativo não instala nada silenciosamente, não inclui credenciais de desenvolvimento e não substitui as permissões da sua conta.</p>
+      </section>
+
+      <details class="mobile-app-detalhes"><summary>Problemas comuns</summary>
+        <dl>
+          <dt>“Aplicativo não instalado”</dt><dd>Normalmente o arquivo é igual ou mais antigo que o já instalado, ou veio de outra origem. Baixe de novo por esta página. Se continuar, desinstale o aplicativo e instale outra vez — você precisará informar o endereço do servidor e entrar de novo.</dd>
+          <dt>O download não abre ou é recusado</dt><dd>Confira o espaço livre e baixe de novo. Um arquivo que chega corrompido é descartado automaticamente e não chega a ser salvo.</dd>
+          <dt>O Android não deixa instalar desta fonte</dt><dd>Ative <strong>Permitir desta fonte</strong> apenas para o aplicativo que abriu o arquivo, instale e desative em seguida. Não é preciso desligar nenhuma outra proteção.</dd>
+          <dt>O aplicativo abre mas não conecta</dt><dd>Confirme que o aparelho está na mesma rede do servidor <code>${escapeHtml(servidor)}</code> e que o Wi-Fi está ativo.</dd>
+        </dl>
+      </details>
+
+      ${disponivel
+        ? `<details class="mobile-app-detalhes mobile-app-tecnico"><summary>Detalhes técnicos</summary>
+             <dl class="mobile-app-integrity">
+               <dt>Versão</dt><dd>${escapeHtml(versao)} (build ${escapeHtml(apk.build)})</dd>
+               <dt>Compatibilidade</dt><dd>Android 7.0 (API 24) ou posterior</dd>
+               <dt>Tamanho</dt><dd>${escapeHtml(apk.tamanho || "—")}</dd>
+               <dt>SHA-256 do arquivo</dt><dd><code class="mobile-app-hash">${escapeHtml(apk.sha256)}</code></dd>
+               <dt>SHA-256 do certificado</dt><dd><code class="mobile-app-hash">${escapeHtml(apk.certificateSha256)}</code></dd>
+               <dt>Servidor de origem</dt><dd><code>${escapeHtml(servidor)}</code></dd>
+             </dl>
+             <p class="hint">O navegador recalcula o SHA-256 dos bytes recebidos e cancela o salvamento se ele não bater com o publicado.</p>
+           </details>`
+        : ""}`;
 
     const baixar = conteudo.querySelector(".mobile-app-download-btn");
     const verificacao = conteudo.querySelector(".mobile-app-verify");
+    const textoPadrao = "O arquivo é conferido pelo servidor antes de ser salvo no aparelho.";
     if (baixar) baixar.addEventListener("click", async () => {
       baixar.disabled = true;
-      if (verificacao) { verificacao.classList.remove("mobile-app-verify-erro"); verificacao.textContent = "Baixando e verificando o arquivo…"; }
+      if (verificacao) { verificacao.classList.remove("mobile-app-verify-erro"); verificacao.textContent = "Baixando e conferindo o arquivo…"; }
       const resultado = await Api.baixarMobileApk();
       if (!resultado.ok) {
         baixar.disabled = false;
-        if (verificacao) verificacao.textContent = "O arquivo é verificado pelo SHA-256 acima antes de ser salvo.";
+        if (verificacao) verificacao.textContent = textoPadrao;
         return Toast.erro(resultado.erro);
       }
       try {
@@ -71,16 +163,16 @@ const MobileApp = (() => {
         const hash = await sha256Hex(bytes);
         if (apk.sha256 && hash !== String(apk.sha256).toLowerCase()) {
           baixar.disabled = false;
-          if (verificacao) { verificacao.classList.add("mobile-app-verify-erro"); verificacao.textContent = "Falha na verificação de integridade: o arquivo baixado não corresponde ao SHA-256 publicado. O download foi cancelado."; }
+          if (verificacao) { verificacao.classList.add("mobile-app-verify-erro"); verificacao.textContent = "Falha na verificação de integridade: o arquivo baixado não corresponde ao publicado. O download foi cancelado."; }
           return Toast.erro("APK descartado: SHA-256 diferente do publicado.");
         }
         const url = URL.createObjectURL(resultado.blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = resultado.nome;
+        link.download = apk.build ? `RemoteIFES-${versao}-${apk.build}.apk` : resultado.nome;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        if (verificacao) verificacao.textContent = `Integridade confirmada (SHA-256 ${hash.slice(0, 12)}…). Instale o arquivo baixado.`;
+        if (verificacao) verificacao.textContent = "Integridade confirmada. Abra o arquivo baixado e confirme a instalação no Android.";
       } catch (err) {
         if (verificacao) { verificacao.classList.add("mobile-app-verify-erro"); verificacao.textContent = "Não foi possível verificar a integridade do arquivo; o download foi cancelado."; }
         Toast.erro("não foi possível verificar o APK");
@@ -118,7 +210,7 @@ const MobileApp = (() => {
   overlay.addEventListener("keydown", (event) => {
     if (event.key === "Escape") return fechar();
     if (event.key !== "Tab") return;
-    const itens = Array.from(overlay.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])')).filter((el) => el.offsetParent !== null);
+    const itens = Array.from(overlay.querySelectorAll('button, summary, [href], [tabindex]:not([tabindex="-1"])')).filter((el) => el.offsetParent !== null);
     if (!itens.length) return;
     const primeiro = itens[0];
     const ultimo = itens[itens.length - 1];
@@ -129,6 +221,14 @@ const MobileApp = (() => {
       event.preventDefault();
       primeiro.focus();
     }
+  });
+
+  // Sem sondagem periódica: a versão publicada é relida só ao abrir a página e quando o
+  // aparelho volta ao primeiro plano com ela aberta, que é quando o dado pode ter mudado.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (overlay.classList.contains("hidden")) return;
+    carregar();
   });
 
   return { abrir, fechar, estaAberto: () => !overlay.classList.contains("hidden") };

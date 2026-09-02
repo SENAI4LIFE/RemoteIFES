@@ -9,6 +9,13 @@ const agendaIntervaloRow = document.getElementById("agendaIntervaloRow");
 
 const agendaDataInput = document.getElementById("agendaData");
 
+// Cada leitura da lista recebe um número de ordem e uma remoção confirmada fica anotada
+// com o número da leitura vigente: uma resposta emitida antes da remoção ainda traz o
+// agendamento apagado e não pode repintá-lo na tela como se ele continuasse existindo.
+let agendaLeituraAtual = 0;
+let agendaLeiturasPendentes = 0;
+const agendaRemovidos = new Map();
+
 const Schedule = {
   async aoAbrir() {
     agendaDataInput.value = Tempo.dataAtualBrasiliaISO().split("-").reverse().join("/");
@@ -49,14 +56,25 @@ const Schedule = {
     const empty = document.getElementById("agendaEmpty");
     list.innerHTML = "";
 
-    const agendamentos = await Api.listarAgendamentos(sala);
-    if (agendamentos.length === 0) {
+    const leitura = (agendaLeituraAtual += 1);
+    agendaLeiturasPendentes += 1;
+    let agendamentos;
+    try {
+      agendamentos = await Api.listarAgendamentos(sala);
+    } finally {
+      agendaLeiturasPendentes -= 1;
+    }
+    if (leitura !== agendaLeituraAtual) return;
+    for (const [id, marca] of agendaRemovidos) if (leitura > marca) agendaRemovidos.delete(id);
+    const visiveis = agendamentos.filter((a) => !agendaRemovidos.has(a.id));
+
+    if (visiveis.length === 0) {
       empty.classList.remove("hidden");
       return;
     }
     empty.classList.add("hidden");
 
-    agendamentos.forEach((a) => {
+    visiveis.forEach((a) => {
       const souDono = a.usuarioLogin === state.usuario;
       const podeGerenciar = souDono || state.isAdmin;
       const detalheModo = a.modo === "ligar_intervalo"
@@ -81,8 +99,16 @@ const Schedule = {
           await this.carregarAgendamentos();
         });
         li.querySelector(".agenda-remover").addEventListener("click", async () => {
-          await Api.removerAgendamento(a.id);
-          await this.carregarAgendamentos();
+          const resp = await Api.removerAgendamento(a.id);
+          if (!resp || resp.ok !== true) {
+            Toast.erro((resp && resp.erro) || "não foi possível remover o agendamento");
+            return;
+          }
+          // A linha sai na hora: aguardar uma releitura completa deixava na tela um
+          // agendamento que o servidor já apagou, e ainda podia trazê-lo de volta.
+          agendaRemovidos.set(a.id, agendaLeituraAtual);
+          li.remove();
+          if (!list.children.length && !agendaLeiturasPendentes) empty.classList.remove("hidden");
         });
       }
       list.appendChild(li);
