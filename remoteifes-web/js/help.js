@@ -9,9 +9,9 @@ const HelpContent = {
 
 const MANUAL_SECAO_POR_AJUDA = {
   cards: "selecao-sala", localizacao: "selecao-sala", planta: "selecao-sala", salas: "selecao-sala", painel: "controlador",
-  agenda: "agenda-grade", grade: "agenda-grade", usuarios: "administracao", ativos: "administracao", sessoes: "administracao",
-  logs: "administracao", dispositivos: "administracao", acessos: "administracao", proprietarios: "administracao", propriedade: "papeis",
-  mapa: "administracao", macs: "esp32-cadastro", config: "operacao-admin", esp32: "esp32-avancado", monitoramento: "monitoramento",
+  agenda: "agenda-grade", grade: "agenda-grade", usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "ativos-sessoes",
+  logs: "logs-dispositivos", dispositivos: "logs-dispositivos", acessos: "logs-dispositivos", proprietarios: "proprietarios-admin", propriedade: "controle-acesso-sala",
+  mapa: "proprietarios-admin", macs: "esp32-cadastro", config: "configuracoes-globais", esp32: "esp32-avancado", monitoramento: "monitoramento",
   relatos: "relatos-gestao", notificacoes: "notificacoes", auditoria: "auditoria", energia: "energia",
   heatmap: "heatmap",
 };
