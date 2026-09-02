@@ -77,7 +77,7 @@ const Manual = (() => {
     if (typeof state === "undefined" || !state.usuario) return false;
     if (rota.startsWith("/admin/")) {
       const sub = rota.slice(7);
-      if (["monitoramento", "macs", "config", "esp32", "auditoria", "energia"].includes(sub)) return !!state.isSuperAdmin;
+      if (["monitoramento", "macs", "config", "esp32", "auditoria"].includes(sub)) return !!state.isSuperAdmin;
       return !!state.isAdmin;
     }
     if (rota === "/agenda" || rota === "/grade") return !!state.isAdmin;
@@ -331,7 +331,7 @@ const Manual = (() => {
           usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "ativos-sessoes",
           logs: "logs-dispositivos", dispositivos: "logs-dispositivos", acessos: "logs-dispositivos",
           notificacoes: "notificacoes", proprietarios: "proprietarios-admin", mapa: "proprietarios-admin",
-          energia: "energia", monitoramento: "monitoramento", macs: "esp32-cadastro",
+          monitoramento: "monitoramento", macs: "esp32-cadastro",
           config: "configuracoes-globais", esp32: "esp32-avancado", relatos: "relatos-gestao",
           auditoria: "auditoria",
         })[sub] || "administracao";

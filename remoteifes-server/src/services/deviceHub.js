@@ -122,6 +122,18 @@ function enviarComando(sala, payload) {
   return true;
 }
 
+// Propaga a política do ponto de acesso local para quem já está conectado; quem estiver
+// fora recebe a mesma configuração no próximo handshake.
+function difundirPoliticaAp(exigirCredencial) {
+  const payload = { tipo: "config_ap", exigirCredencial: !!exigirCredencial };
+  let enviados = 0;
+  conexoes.forEach((_, sala) => {
+    if (enviarComando(sala, payload)) enviados += 1;
+  });
+  logger.info("device-politica-ap-difundida", { exigirCredencial: !!exigirCredencial, enviados });
+  return enviados;
+}
+
 function dispositivoConectado(sala) {
   const entrada = conexoes.get(sala);
   if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN) return false;
@@ -274,6 +286,11 @@ function iniciar(server) {
     eventos.emit("conexao", { sala, conectado: true });
     const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
     if (comandoInicial) ws.send(JSON.stringify(comandoInicial));
+    try {
+      ws.send(JSON.stringify(require("./configuracoesService").politicaApDispositivo()));
+    } catch (erro) {
+      logger.warn("device-ws-politica-ap-falhou", { sala, mensagem: erro.message });
+    }
 
     ws.on("message", (dados) => {
       const agoraMs = Date.now();
@@ -331,12 +348,14 @@ function iniciar(server) {
     ws.on("close", (code, motivo) => {
       if (conexoes.get(sala) === entrada) {
         conexoes.delete(sala);
-        try {
-          require("./auditoriaService").registrarOffline(sala, new Date().toISOString());
-        } catch (erro) {
-          logger.warn("esp32-indisponibilidade-registro-falhou", { sala, mensagem: erro.message });
-        }
         logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString() });
+        // O fechamento do socket é a informação autoritativa de que o dispositivo saiu: a sala
+        // fica offline agora, sem esperar o heartbeat vencer no varredor periódico.
+        try {
+          if (salasService.marcarOffline(sala, null, "websocket-fechado")) salasService.eventos.emit("mudanca");
+        } catch (erro) {
+          logger.warn("device-ws-marcar-offline-falhou", { sala, mensagem: erro.message });
+        }
         try {
           require("./otaService").aoDesconectarDispositivo(sala);
         } catch (erro) {
@@ -386,6 +405,7 @@ module.exports = {
   listarEstados,
   enviarComando,
   enviarAtualizacaoCredencial,
+  difundirPoliticaAp,
   dispositivoConectado,
   desconectarSala,
 };

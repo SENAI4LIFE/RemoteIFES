@@ -30,12 +30,12 @@ module.exports = [
   },
   {
     id: "esp32-setup-ap",
-    titulo: "Setup AP e provisionamento inicial",
+    titulo: "Setup AP permanente e provisionamento",
     papel: "superadmin",
     categoria: "super_dispositivos",
-    tags: ["RemoteIFES-Setup", "192.168.4.1", "Wi-Fi", "TLS", "provisionamento"],
+    tags: ["RemoteIFES-Setup", "192.168.4.1", "Wi-Fi", "TLS", "provisionamento", "AP permanente"],
     corpo: [
-      { t: "p", texto: "O portal local prepara Wi-Fi, servidor e, quando adotada, a credencial do ESP32. Ele é servido apenas pela interface do ponto de acesso da placa." },
+      { t: "p", texto: "A rede <strong>RemoteIFES-Setup</strong> fica no ar o tempo todo, inclusive durante a operação normal: a placa mantém AP e STA ao mesmo tempo, sem fechar o ponto de acesso quando o Wi-Fi volta. O portal local prepara Wi-Fi, servidor e, quando adotada, a credencial do ESP32, e é servido apenas pela interface desse ponto de acesso." },
       { t: "fluxo", titulo: "Provisionamento", itens: [
         { tipo: "device", texto: "ESP32 em setup AP" },
         { tipo: "action", texto: "Conectar a RemoteIFES-Setup" },
@@ -45,14 +45,14 @@ module.exports = [
         { tipo: "server", texto: "Detectar, vincular MAC e validar" },
       ] },
       { t: "passos", itens: [
-        "Coloque a placa no modo de setup: primeiro boot sem rede, <strong>Resetar Wi-Fi</strong> ou cerca de dois minutos de perda contínua do Wi-Fi podem abrir o AP.",
-        "No equipamento de manutenção, conecte à rede <strong>RemoteIFES-Setup</strong> com a senha padrão do firmware <strong>remoteifes</strong> e abra <code>http://192.168.4.1</code>.",
+        "Não é preciso preparar nada para o AP aparecer: ele sobe em todo boot e permanece ativo com o dispositivo em operação.",
+        "No equipamento de manutenção, conecte à rede <strong>RemoteIFES-Setup</strong> e abra <code>http://192.168.4.1</code>. Por padrão a rede é aberta; ela só pede a senha padrão do firmware (<strong>remoteifes</strong>) quando a opção global de exigir senha estiver ativada em Configurações.",
         "Informe SSID e senha da rede, host e porta do servidor. Escolha HTTPS com CA válida em produção; HTTPS sem validação ou HTTP são opções de desenvolvimento em rede controlada.",
         "Se usar credencial, informe <strong>deviceId</strong> e segredo juntos. Deixar ambos vazios preserva uma credencial já gravada.",
         "Salve. A placa reinicia, conecta ao Wi-Fi e ao WebSocket do servidor. Confirme detecção, vínculo da sala, IP e versão na aplicação.",
       ] },
-      { t: "nota", nivel: "seguranca", texto: "O AP e HTTP/HTTPS inseguro expõem configuração a quem estiver na rede próxima. Faça o setup em janela controlada, feche o AP ao terminar e nunca registre o segredo no manual, em relato ou em log." },
-      { t: "p", texto: "Se falhar, use o monitor serial para distinguir autenticação Wi-Fi, DNS/host, porta, TLS e WebSocket. Se o Wi-Fi voltar durante o AP de recuperação, o firmware pode fechar o setup e retomar a operação automaticamente." },
+      { t: "nota", nivel: "seguranca", texto: "Com o AP permanente e sem senha, qualquer pessoa ao alcance do rádio alcança o portal e pode reprovisionar a placa. Onde o acesso físico não for controlado, ative <strong>Exigir senha na rede de configuração dos ESP32</strong> em Configurações. Essa opção é do Wi-Fi local e não substitui a credencial do dispositivo no servidor; nunca registre o segredo no manual, em relato ou em log." },
+      { t: "p", texto: "Se falhar, use o monitor serial para distinguir autenticação Wi-Fi, DNS/host, porta, TLS e WebSocket. O ponto de acesso continua no ar durante a falha e depois dela, então a reconfiguração local não depende do estado da rede institucional." },
     ],
   },
   {
@@ -74,7 +74,7 @@ module.exports = [
       ] },
       { t: "p", texto: "O modo de clonagem é temporário e não deve permanecer ativo. Captura ou teste errado pode acionar outro aparelho; isole o ambiente e trabalhe com uma sala por vez." },
       { t: "sub", titulo: "Resetar Wi-Fi" },
-      { t: "nota", nivel: "atencao", texto: "<strong>Resetar Wi-Fi</strong> apaga rede e endereço do servidor da NVS, reinicia a placa e reabre RemoteIFES-Setup. A credencial exclusiva do dispositivo é preservada. Tenha acesso físico e os dados corretos antes de confirmar." },
+      { t: "nota", nivel: "atencao", texto: "<strong>Resetar Wi-Fi</strong> apaga rede e endereço do servidor da NVS e reinicia a placa; RemoteIFES-Setup já estava no ar e continua. A credencial exclusiva do dispositivo é preservada. Tenha acesso físico e os dados corretos antes de confirmar." },
     ],
   },
   {

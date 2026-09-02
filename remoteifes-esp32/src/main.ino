@@ -44,7 +44,6 @@ const unsigned long WS_RECONNECT_INTERVAL_MS = 5000;
 const unsigned long IDENTIFICACAO_INTERVAL_MS = 60000;
 const unsigned long IDENTIFICACAO_PENDENTE_INTERVAL_MS = 15000;
 const unsigned long INTERVALO_RECONEXAO_WIFI_MS = 30000;
-const unsigned long INTERVALO_AP_RECUPERACAO_MS = 120000;
 const char SERVER_IDENTIFICACAO_PATH[] = "/dispositivo/identificar";
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
 const char DEVICE_WS_PATH[] = "/ws/dispositivo";
@@ -96,7 +95,9 @@ decode_results results;
 
 bool isCapturing = false;
 bool apModeActive = false;
-bool apRecuperacaoAtivo = false;
+bool apIniciado = false;
+bool apExigirCredencial = false;
+String apPasswordAtiva;
 RuntimeMode runtimeMode = RUNTIME_OPERATION;
 WifiState estadoWifi = WIFI_ESTADO_DESCONECTADO;
 ServerWsState estadoWsServidor = WS_ESTADO_DESCONECTADO;
@@ -137,8 +138,8 @@ unsigned long lastComandoAceito = 0;
 const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
 void startAPMode();
-void iniciarApRecuperacao();
-void encerrarApRecuperacao();
+void aplicarPontoDeAcesso();
+void aplicarPoliticaApDoServidor(JsonDocument& doc);
 void iniciarServicosOperacao();
 void handleRoot();
 void handleInfo();
@@ -198,7 +199,9 @@ void setup() {
   irsend.begin();
 
   preferences.begin("remoteifes", false);
-  apPassword = AP_PASSWORD_PADRAO;
+  apPassword = preferences.isKey("apPass") ? preferences.getString("apPass", AP_PASSWORD_PADRAO) : String(AP_PASSWORD_PADRAO);
+  if (apPassword.length() < 8) apPassword = AP_PASSWORD_PADRAO;
+  apExigirCredencial = preferences.isKey("apAuth") ? preferences.getBool("apAuth", false) : false;
   String savedSSID = preferences.isKey("ssid") ? preferences.getString("ssid", "") : "";
   String savedPASS = preferences.isKey("pass") ? preferences.getString("pass", "") : "";
   if (preferences.isKey("sala")) preferences.remove("sala");
@@ -211,9 +214,12 @@ void setup() {
   deviceId = preferences.isKey("devId") ? preferences.getString("devId", "") : "";
   deviceSecret = preferences.isKey("devSec") ? preferences.getString("devSec", "") : "";
 
+  // O ponto de acesso de configuracao fica no ar tambem durante a operacao normal: AP e STA
+  // coexistem, entao provisionar ou reconfigurar no local nao depende de perder a rede antes.
+  aplicarPontoDeAcesso();
+
   if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
-    WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(false);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
@@ -225,14 +231,14 @@ void setup() {
 }
 
 void loop() {
+  dnsServer.processNextRequest();
+
   if (apModeActive) {
-    dnsServer.processNextRequest();
     server.handleClient();
     if (reinicioAgendadoEm != 0 && (long)(millis() - reinicioAgendadoEm) >= 0) ESP.restart();
     return;
   }
 
-  if (apRecuperacaoAtivo) dnsServer.processNextRequest();
   gerenciarConexaoWifi();
   server.handleClient();
   wsCliente.loop();
@@ -299,7 +305,6 @@ void gerenciarConexaoWifi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     wifiDesconectadoDesde = 0;
-    if (apRecuperacaoAtivo) encerrarApRecuperacao();
     if (!wifiConectadoAnteriormente) {
       Serial.println("Wi-Fi reconectado.");
       Serial.print("IP: ");
@@ -319,10 +324,6 @@ void gerenciarConexaoWifi() {
   }
   wifiConectadoAnteriormente = false;
   if (wifiDesconectadoDesde == 0) wifiDesconectadoDesde = agora;
-
-  if (!apRecuperacaoAtivo && agora - wifiDesconectadoDesde >= INTERVALO_AP_RECUPERACAO_MS) {
-    iniciarApRecuperacao();
-  }
 
   if (ultimaTentativaReconexao == 0 || agora - ultimaTentativaReconexao >= INTERVALO_RECONEXAO_WIFI_MS) {
     ultimaTentativaReconexao = agora;
@@ -392,7 +393,7 @@ void handleSaveSetup() {
 }
 
 bool requisicaoPortalPermitida() {
-  if (!apModeActive && !apRecuperacaoAtivo) return false;
+  if (!apIniciado) return false;
   return server.client().localIP() == WiFi.softAPIP();
 }
 
@@ -406,35 +407,55 @@ String escaparHtml(const String& valor) {
   return saida;
 }
 
-void iniciarApRecuperacao() {
+// Sobe (ou reconfigura) o ponto de acesso. Sai sem tocar no radio quando a configuracao
+// desejada ja e a que esta no ar, para nao reiniciar o AP nem derrubar clientes a toa.
+void aplicarPontoDeAcesso() {
+  String senhaAlvo = apExigirCredencial ? apPassword : String("");
+  if (apIniciado && senhaAlvo == apPasswordAtiva) return;
+
   WiFi.mode(WIFI_AP_STA);
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-  if (!WiFi.softAP("RemoteIFES-Setup", apPassword.c_str())) return;
-  dnsServer.start(53, "*", apIP);
-  apRecuperacaoAtivo = true;
-  Serial.println("Senha do portal de recuperacao: " + apPassword);
-  Serial.println("Wi-Fi indisponivel por 2 minutos. Portal de recuperacao aberto em 192.168.4.1; tentativas STA continuam.");
+  if (!WiFi.softAP("RemoteIFES-Setup", senhaAlvo.length() > 0 ? senhaAlvo.c_str() : NULL)) {
+    Serial.println("Falha ao abrir o ponto de acesso 'RemoteIFES-Setup'.");
+    return;
+  }
+
+  if (!apIniciado) dnsServer.start(53, "*", apIP);
+  apIniciado = true;
+  apPasswordAtiva = senhaAlvo;
+  if (senhaAlvo.length() > 0) {
+    Serial.println("Ponto de acesso 'RemoteIFES-Setup' ativo com senha: " + senhaAlvo);
+  } else {
+    Serial.println("Ponto de acesso 'RemoteIFES-Setup' ativo sem senha (politica do servidor).");
+  }
+  Serial.println("Portal de configuracao permanente em 192.168.4.1.");
 }
 
-void encerrarApRecuperacao() {
-  dnsServer.stop();
-  WiFi.softAPdisconnect(true);
-  apRecuperacaoAtivo = false;
-  Serial.println("Wi-Fi restabelecido. Portal de recuperacao encerrado.");
+void aplicarPoliticaApDoServidor(JsonDocument& doc) {
+  bool exigir = doc["exigirCredencial"] | false;
+  String senha = doc["senha"] | "";
+  bool mudou = false;
+
+  if (senha.length() >= 8 && senha != apPassword) {
+    apPassword = senha;
+    preferences.putString("apPass", apPassword);
+    mudou = true;
+  }
+  if (exigir != apExigirCredencial) {
+    apExigirCredencial = exigir;
+    preferences.putBool("apAuth", apExigirCredencial);
+    mudou = true;
+  }
+  if (!mudou) return;
+
+  reportComando("config_ap", apExigirCredencial ? "com_credencial" : "aberto");
+  aplicarPontoDeAcesso();
 }
 
 void startAPMode() {
   apModeActive = true;
-  WiFi.mode(WIFI_AP);
-
-  IPAddress apIP(192, 168, 4, 1);
-  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-  WiFi.softAP("RemoteIFES-Setup", apPassword.c_str());
-  Serial.println("Ponto de acesso de configuracao 'RemoteIFES-Setup' aberto.");
-  Serial.println("Senha do ponto de acesso: " + apPassword);
-
-  dnsServer.start(53, "*", apIP);
+  aplicarPontoDeAcesso();
 
   server.on("/", handleSetup);
   server.on("/save", HTTP_POST, handleSaveSetup);
@@ -614,6 +635,8 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     iniciarOtaOferta(doc);
   } else if (strcmp(tipo, "credencial_provisionar") == 0 || strcmp(tipo, "credencial_rotacionar") == 0) {
     aplicarCredencial(doc);
+  } else if (strcmp(tipo, "config_ap") == 0) {
+    aplicarPoliticaApDoServidor(doc);
   }
 }
 
@@ -682,7 +705,7 @@ void enviarTelemetriaWs() {
 }
 
 void handleRoot() {
-  if (apRecuperacaoAtivo) {
+  if (requisicaoPortalPermitida()) {
     handleSetup();
     return;
   }

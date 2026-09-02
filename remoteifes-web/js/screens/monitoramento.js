@@ -93,7 +93,6 @@ const Monitoramento = (() => {
       notificacoes: "Notificações",
       sessoes: "Sessões",
       agendamentos_execucoes: "Execuções de agenda",
-      energia_resumos_diarios: "Resumos de energia",
     };
 
     const grid = [

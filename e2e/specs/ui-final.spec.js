@@ -260,7 +260,7 @@ test("os glifos dos controles fixos não crescem com a ampliação do texto", as
   expect(ampliado.alvoAjuda).toBeGreaterThanOrEqual(44);
 });
 
-const SUBABAS = ["usuarios", "notificacoes", "monitoramento", "energia", "config", "esp32", "macs", "auditoria"];
+const SUBABAS = ["usuarios", "notificacoes", "monitoramento", "config", "esp32", "macs", "auditoria"];
 
 for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
   test(`Administração continua utilizável na fonte máxima em ${tamanhoNome}`, async ({ page, context }) => {
@@ -294,7 +294,7 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
       const problemas = await page.evaluate((subAtual) => {
         const achados = [];
         const painel = document.getElementById(`adminSub-${subAtual}`);
-        painel.querySelectorAll(".card, .mon-card, .energy-summary-card").forEach((el) => {
+        painel.querySelectorAll(".card, .mon-card").forEach((el) => {
           const r = el.getBoundingClientRect();
           const p = painel.getBoundingClientRect();
           if (r.right > p.right + 2) achados.push(`transborda: ${el.className}`);
@@ -319,21 +319,11 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
   });
 }
 
-test("Energia e Monitoramento não cortam conteúdo à direita na fonte máxima", async ({ page, context }) => {
-  await abrir(page, context, "superadmin", "#/admin/energia", VIEWPORTS.notebook, true);
-  await expect(page.locator("#adminSub-energia")).toBeVisible();
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-
-  const tabela = await page.locator(".energy-table-wrap").evaluate((el) => ({
-    rolaNoComponente: el.scrollWidth > el.clientWidth,
-    overflow: getComputedStyle(el).overflowX,
-  }));
-  expect(tabela.overflow).toBe("auto");
-  expect(await semRolagemHorizontal(page)).toBe(true);
-  expect(tabela.rolaNoComponente).toBe(true);
-
-  await page.locator('.admin-subtab-btn[data-sub="monitoramento"]').click();
+test("Monitoramento não corta conteúdo à direita na fonte máxima", async ({ page, context }) => {
+  await abrir(page, context, "superadmin", "#/admin/monitoramento", VIEWPORTS.notebook, true);
   await expect(page.locator("#adminSub-monitoramento")).toBeVisible();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  expect(await semRolagemHorizontal(page)).toBe(true);
   await expect.poll(async () => page.locator("#monGrid .mon-card").count(), { timeout: 20_000 }).toBeGreaterThan(0);
   expect(await semRolagemHorizontal(page)).toBe(true);
   const cortados = await page.$$eval("#monGrid .mon-card .mon-row", (els) =>

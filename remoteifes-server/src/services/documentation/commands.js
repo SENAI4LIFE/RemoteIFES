@@ -112,8 +112,8 @@ module.exports = Object.freeze({
     "python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0",
   ]),
   git: Object.freeze([
-    "python export.py",
-    "python import.py",
-    "python clear.py",
+    "python3 export.py",
+    "python3 import.py",
+    "python3 clear.py",
   ]),
 });

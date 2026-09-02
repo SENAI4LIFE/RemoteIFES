@@ -4,9 +4,9 @@ const Router = (() => {
 
   const ADMIN_SUBS = [
     "usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "monitoramento",
-    "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "relatos", "auditoria", "energia",
+    "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "relatos", "auditoria",
   ];
-  const ADMIN_SUBS_SUPERADMIN = ["monitoramento", "macs", "config", "esp32", "relatos", "auditoria", "energia"];
+  const ADMIN_SUBS_SUPERADMIN = ["monitoramento", "macs", "config", "esp32", "relatos", "auditoria"];
   const FP_SECOES = ["a-terreo", "a-2pav", "a-3pav", "b-terreo", "b-2pav", "b-3pav"];
   const RAIZES_COM_PARAMETRO = ["agenda", "agendamentos", "grade", "config", "ajuda"];
 
