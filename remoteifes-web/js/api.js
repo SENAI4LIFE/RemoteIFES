@@ -528,18 +528,6 @@ const Api = {
     return chamar(`/admin/heatmap?${q}`, { headers: headersComToken() });
   },
 
-  async obterEnergia() {
-    return chamar("/admin/energia", { headers: headersComToken() });
-  },
-
-  async configurarEnergiaSala(sala, dados) {
-    return chamar(`/admin/energia/${encodeURIComponent(sala)}`, {
-      method: "PATCH",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify(dados),
-    });
-  },
-
   async listarAuditoria(filtros = {}) {
     const params = new URLSearchParams();
     Object.entries(filtros).forEach(([chave, valor]) => {

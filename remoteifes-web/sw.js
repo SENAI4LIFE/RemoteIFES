@@ -1,4 +1,4 @@
-const FRONTEND_VERSION = "2026.09.02.3";
+const FRONTEND_VERSION = "2026.09.02.4";
 const CACHE_PREFIX = "remoteifes-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${FRONTEND_VERSION}`;
 const VERSION_QUERY = `v=${encodeURIComponent(FRONTEND_VERSION)}`;
@@ -15,7 +15,7 @@ const VERSIONED_SHELL = [
   "js/screens/portal-funcoes.js", "js/screens/location.js", "js/screens/simple.js",
   "js/floorplan.js", "js/screens/floorplan.js", "js/screens/rooms.js", "js/screens/panel.js",
   "js/screens/schedule.js", "js/screens/grade.js", "js/screens/propriedade.js",
-  "js/screens/monitoramento.js", "js/screens/heatmap.js", "js/screens/energia.js", "js/screens/inicio.js",
+  "js/screens/monitoramento.js", "js/screens/heatmap.js", "js/screens/inicio.js",
   "js/screens/admin.js", "js/screens/esp32-admin.js", "js/screens/manual.js",
   "js/screens/mobile-app.js", "js/account-menu.js", "js/router.js", "js/app.js",
   "assets/ifes-logo.png", "assets/remoteifes-logo.png",

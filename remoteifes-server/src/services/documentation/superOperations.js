@@ -4,7 +4,7 @@ module.exports = [
     titulo: "Configurações globais",
     papel: "superadmin",
     categoria: "super_seguranca",
-    tags: ["Configurações", "sessão", "temperatura", "Turbo", "modo de teste", "manutenção", "retenção"],
+    tags: ["Configurações", "sessão", "temperatura", "Turbo", "modo de teste", "manutenção", "retenção", "RemoteIFES-Setup"],
     verNoApp: "/admin/config",
     corpo: [
       { t: "p", texto: "<strong>Administração &gt; Configurações</strong> aplica política global. Leia todos os campos e registre os valores anteriores antes de salvar." },
@@ -17,6 +17,7 @@ module.exports = [
         ["Redes autorizadas", "uma faixa CIDR por linha para acesso normal em produção"],
         ["Modo de manutenção", "bloqueia login e uso de usuários comuns; administradores continuam"],
         ["Credenciais obrigatórias", "recusa todo ESP32 que ainda se autentique somente por MAC"],
+        ["Senha na rede RemoteIFES-Setup", "desligada por padrão: o AP permanente do ESP32 fica aberto. Ligada, ele passa a exigir a senha padrão do firmware. Só afeta o Wi-Fi local, não a autenticação no servidor"],
         ["Retenção", "1–365 dias para auditoria e indisponibilidade; limpeza é automática"],
       ] },
       { t: "passos", itens: [
@@ -25,7 +26,7 @@ module.exports = [
         "Espere <strong>Configurações salvas</strong>. Mudanças de temperatura/Turbo propagam o estado desejado aos dispositivos configurados; sessões recebem o novo prazo.",
         "Valide Início, uma sala piloto, Ativos e Monitoramento. Em falha, restaure os valores registrados e salve novamente.",
       ] },
-      { t: "nota", nivel: "seguranca", texto: "Modo de teste pode expor o sistema fora das redes autorizadas; use apenas durante um teste supervisionado e desligue em seguida. Não ative credenciais obrigatórias enquanto Monitoramento ainda mostrar salas Só MAC." },
+      { t: "nota", nivel: "seguranca", texto: "Modo de teste pode expor o sistema fora das redes autorizadas; use apenas durante um teste supervisionado e desligue em seguida. Não ative credenciais obrigatórias enquanto Monitoramento ainda mostrar salas Só MAC. A senha do RemoteIFES-Setup é um controle separado: ative-a onde o acesso físico às salas não for controlado." },
       { t: "links", itens: [{ id: "esp32-credenciais", texto: "Migrar credenciais antes da exigência global" }, { id: "servidor-rede", texto: "Rede, proxy e HTTPS no host" }] },
     ],
   },
@@ -60,7 +61,7 @@ module.exports = [
       { t: "lista", itens: [
         "O cabeçalho mostra a retenção vigente. Eventos e indisponibilidades mais antigos são removidos automaticamente.",
         "Logs, Dispositivos, Acessos ESP32, Sessões e Notificações mantêm históricos próprios com limites e políticas diferentes.",
-        "Alteração de configuração, vínculo, credencial, energia, relato e outras ações sensíveis deixam eventos com metadados, sem segredos.",
+        "Alteração de configuração, vínculo, credencial, relato e outras ações sensíveis deixam eventos com metadados, sem segredos.",
         "Se uma exigência institucional superar a retenção, exporte/preserve os registros autorizados fora do sistema antes da expiração.",
       ] },
       { t: "p", texto: "Para investigar uma queda: filtre a sala e o período em indisponibilidades, confira eventos administrativos próximos e então correlacione Dispositivos, Logs e notificações." },
@@ -111,26 +112,7 @@ module.exports = [
         "Valor numérico, detalhe e tabela repetem a cor. A tabela ordena da pior para a melhor sala.",
         "Sem fonte confiável aparece <strong>Sem dados</strong>, nunca zero. Métricas de conectividade exigem MAC e dependem da retenção; a tela avisa quando o período a excede.",
       ] },
-      { t: "nota", texto: "Use para comparar e priorizar, não para concluir causalidade. Energia estimada é um modelo separado em Administração &gt; Energia." },
-    ],
-  },
-  {
-    id: "energia",
-    titulo: "Energia estimada dos aparelhos",
-    papel: "superadmin",
-    categoria: "super_seguranca",
-    tags: ["Energia", "watts", "kWh", "inverter", "fixo", "parcial"],
-    verNoApp: "/admin/energia",
-    corpo: [
-      { t: "p", texto: "<strong>Administração &gt; Energia</strong> estima consumo; não mede faturamento e não participa do controle. Informe a potência elétrica nominal de entrada em watts (100–100.000), nunca capacidade em BTU/h, e escolha <strong>Inverter</strong> ou <strong>Velocidade fixa</strong>. Campo vazio remove a configuração da sala." },
-      { t: "passos", itens: [
-        "Obtenha a potência de entrada na placa/manual do aparelho e identifique o tipo.",
-        "Na linha da sala, informe watts, escolha o tipo e use <strong>salvar</strong>.",
-        "Confira carga/potência atual e estimativas de hoje, 7 e 30 dias. Use o seletor do mapa para comparar kWh, carga, horas ou potência média.",
-        "Revise <strong>estimativa parcial</strong> e cobertura antes de comparar salas. Remova a potência se o dado de entrada for incerto.",
-      ] },
-      { t: "p", texto: "O modelo é <code>kWh = kW nominal × horas ligadas × fator de carga</code>. Fixo usa 100% quando ligado. Inverter usa 35%–100% conforme diferença ambiente–alvo; sem telemetria recente usa 65%. Resumos diários são retidos por até 45 dias." },
-      { t: "nota", nivel: "atencao", texto: "Não use esses valores para cobrança, dimensionamento elétrico ou comprovação de economia. Intervalos sem observação não são inventados, e cobertura baixa reduz a confiança." },
+      { t: "nota", texto: "Use para comparar e priorizar, não para concluir causalidade." },
     ],
   },
 ];

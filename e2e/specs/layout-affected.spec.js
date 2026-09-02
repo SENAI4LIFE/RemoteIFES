@@ -94,7 +94,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
       expect(workspaceUsuarios.proporcao).toBeGreaterThan(0.9);
     }
 
-    for (const sub of ["usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "monitoramento", "auditoria", "energia", "relatos"]) {
+    for (const sub of ["usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "monitoramento", "auditoria", "relatos"]) {
       await page.locator(`.admin-subtab-btn[data-sub="${sub}"]`).click();
       await expect(page.locator(`#adminSub-${sub}`)).toBeVisible();
       const semOverflow = await semRolagemHorizontal(page);
@@ -116,46 +116,6 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     });
     expect(proporcaoNormal).toBeGreaterThan(0.9);
 
-    const energia = page.locator("#adminSub-energia");
-    await page.locator('.admin-subtab-btn[data-sub="energia"]').click();
-    await expect(energia.locator(".energy-table-wrap")).toBeVisible();
-    await expect(energia.locator("#energyTableBody tr").first()).toBeVisible({ timeout: 20_000 });
-    await expect(energia.locator("#energyTableBody .energy-save").first()).toBeAttached();
-    const largura = await energia.evaluate((el) => {
-      const sidebar = document.querySelector(".admin-subtabs").getBoundingClientRect();
-      const content = el.closest(".admin-content").getBoundingClientRect();
-      const tabela = el.querySelector(".energy-table-wrap");
-      const area = tabela.getBoundingClientRect();
-      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-      return {
-        secao: el.clientWidth,
-        tabela: tabela.clientWidth,
-        scrollMaximo: tabela.scrollWidth - tabela.clientWidth,
-        cabeSemRolagem: tabela.clientWidth >= 60 * rem,
-        contida: area.left >= content.left - 1 && area.right <= content.right + 1,
-        sidebarVisivel: sidebar.width > 0 && sidebar.left >= 0 && sidebar.right <= innerWidth,
-      };
-    });
-    expect(largura.tabela).toBeGreaterThan(largura.secao * 0.9);
-    if (largura.cabeSemRolagem) {
-      expect(largura.scrollMaximo, JSON.stringify(largura)).toBeLessThanOrEqual(1);
-    } else {
-      expect(largura.scrollMaximo, JSON.stringify(largura)).toBeGreaterThan(0);
-    }
-    expect(largura.contida).toBe(true);
-    expect(largura.sidebarVisivel).toBe(true);
-    const extremosVisiveis = await energia.evaluate((el) => {
-      const areaEl = el.querySelector(".energy-table-wrap");
-      areaEl.scrollLeft = 0;
-      const area = areaEl.getBoundingClientRect();
-      const salvar = el.querySelector("#energyTableBody .energy-save").getBoundingClientRect();
-      const configuracao = salvar.left >= area.left - 1 && salvar.right <= area.right + 1;
-      areaEl.scrollLeft = areaEl.scrollWidth;
-      const ultima = el.querySelector("#energyTableBody tr td:last-child").getBoundingClientRect();
-      const colunaFinal = ultima.left >= area.left - 1 && ultima.right <= area.right + 1;
-      return { configuracao, colunaFinal };
-    });
-    expect(extremosVisiveis).toEqual({ configuracao: true, colunaFinal: true });
     const margens = await page.locator(".admin-content").evaluate((content) => {
       const sub = content.querySelector(".admin-sub:not(.hidden)").getBoundingClientRect();
       const area = content.getBoundingClientRect();

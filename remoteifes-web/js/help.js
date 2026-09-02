@@ -12,7 +12,7 @@ const MANUAL_SECAO_POR_AJUDA = {
   agenda: "agenda-grade", grade: "agenda-grade", usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "ativos-sessoes",
   logs: "logs-dispositivos", dispositivos: "logs-dispositivos", acessos: "logs-dispositivos", proprietarios: "proprietarios-admin", propriedade: "controle-acesso-sala",
   mapa: "proprietarios-admin", macs: "esp32-cadastro", config: "configuracoes-globais", esp32: "esp32-avancado", monitoramento: "monitoramento",
-  relatos: "relatos-gestao", notificacoes: "notificacoes", auditoria: "auditoria", energia: "energia",
+  relatos: "relatos-gestao", notificacoes: "notificacoes", auditoria: "auditoria",
   heatmap: "heatmap",
 };
 

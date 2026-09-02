@@ -17,12 +17,15 @@ const PADROES = {
   redesAutorizadas: [],
   modoManutencao: false,
   espCredenciaisObrigatorias: process.env.NODE_ENV !== "test",
+  // Política do ponto de acesso local do ESP32 (RemoteIFES-Setup). Não tem relação com a
+  // autenticação do dispositivo no servidor, que continua em espCredenciaisObrigatorias.
+  espApExigirCredencial: false,
 };
 
 const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
 
 const CHAVES_NUMERICAS = ["timeoutInatividadeMinutos", "timeoutInatividadeAdminMinutos", "retencaoAuditoriaDias", "popupAvisoSegundos", "limiarOnlineMinutos"];
-const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias"];
+const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias", "espApExigirCredencial"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
 const CHAVES_TEXTO_CRITICAS = ["turboFuncaoExtra"];
@@ -76,6 +79,10 @@ function limitesEfetivosDaSala(salaRow) {
 
 function turboFuncaoExtra() {
   return obter().turboFuncaoExtra;
+}
+
+function politicaApDispositivo() {
+  return { tipo: "config_ap", exigirCredencial: !!obter().espApExigirCredencial };
 }
 
 function acessoRestritoAtivo() {
@@ -194,6 +201,9 @@ function validarEAtualizar(patch, requisitante) {
   if (Object.prototype.hasOwnProperty.call(patch, "modoManutencao")) {
     eventos.emit("mudanca-manutencao", !!configuracoes.modoManutencao);
   }
+  if (proximo.espApExigirCredencial !== atual.espApExigirCredencial) {
+    require("./deviceHub").difundirPoliticaAp(!!configuracoes.espApExigirCredencial);
+  }
   const estadoIRAlterado = proximo.temperaturaMinima !== atual.temperaturaMinima
     || proximo.temperaturaMaxima !== atual.temperaturaMaxima
     || proximo.turboFuncaoExtra !== atual.turboFuncaoExtra;
@@ -217,6 +227,7 @@ module.exports = {
   limitesTemperatura,
   limitesEfetivosDaSala,
   turboFuncaoExtra,
+  politicaApDispositivo,
   acessoRestritoAtivo,
   modoManutencaoAtivo,
   eventos,

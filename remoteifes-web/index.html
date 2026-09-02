@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>RemoteIFES</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2026.09.02.3" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.09.02.4" />
   <meta name="theme-color" content="#1c6b3c" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemoteIFES" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.02.3" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.02.3" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.02.3" />
-  <meta name="remoteifes-version" content="2026.09.02.3" />
-  <link rel="stylesheet" href="css/style.css?v=2026.09.02.3" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.02.4" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.02.4" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.02.4" />
+  <meta name="remoteifes-version" content="2026.09.02.4" />
+  <link rel="stylesheet" href="css/style.css?v=2026.09.02.4" />
 </head>
 <body>
 
@@ -47,7 +47,7 @@
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
-      <img src="assets/remoteifes-logo.png?v=2026.09.02.3" alt="RemoteIFES" />
+      <img src="assets/remoteifes-logo.png?v=2026.09.02.4" alt="RemoteIFES" />
       <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
@@ -113,7 +113,7 @@
             </div>
           </div>
           <div class="portal-footer">
-            <img src="assets/ifes-logo.png?v=2026.09.02.3" alt="Instituto Federal do Espírito Santo" />
+            <img src="assets/ifes-logo.png?v=2026.09.02.4" alt="Instituto Federal do Espírito Santo" />
             <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
@@ -792,7 +792,6 @@
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">ESP32</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Monitoramento</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="auditoria"><span class="admin-subtab-icon">🛡️</span><span class="admin-subtab-label">Auditoria</span></button>
-          <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="energia"><span class="admin-subtab-icon">⚡</span><span class="admin-subtab-label">Energia</span></button>
           <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="relatos"><span class="admin-subtab-icon">🐞</span><span class="admin-subtab-label">Relatos de problemas</span><span id="adminRelatosSubBadge" class="admin-subtab-badge hidden"></span></button>
         </div>
 
@@ -912,7 +911,7 @@
               <span class="heatmap-summary-nota">Calculado somente ao abrir esta seção</span>
             </summary>
             <p class="hint">
-              Compara as salas em uma métrica operacional no período escolhido, sobre a planta baixa. Não inclui consumo de energia, que continua na aba Energia.
+              Compara as salas em uma métrica operacional no período escolhido, sobre a planta baixa.
               <button type="button" class="help-icon-btn" data-help="heatmap" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
             </p>
             <div class="heatmap-toolbar">
@@ -991,40 +990,6 @@
             <span id="connectPageInfo" class="hint"></span>
             <button type="button" id="connectNextBtn" class="link-btn">Próxima →</button>
           </div>
-        </div>
-
-        <div id="adminSub-energia" class="admin-sub hidden">
-          <div class="energy-estimate-banner" role="note">
-            <strong>Estimativas, não medições para faturamento.</strong>
-            Potência significa entrada elétrica nominal em watts, não capacidade térmica em BTU/h. A configuração é opcional e nunca interfere no controle dos aparelhos.
-            <span>Modelo: kWh estimado = potência nominal em kW × horas ligadas × fator de carga estimado.</span>
-            <button type="button" class="help-icon-btn" data-help="energia" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </div>
-          <div id="energySummary" class="energy-summary"></div>
-          <div class="card energy-toolbar">
-            <div>
-              <label for="energyMetric">Mapa energético</label>
-              <select id="energyMetric">
-                <option value="kwh30">Consumo estimado · 30 dias</option>
-                <option value="kwhHoje">Consumo estimado · hoje</option>
-                <option value="carga">Carga atual estimada</option>
-                <option value="horas">Tempo ligado · 30 dias</option>
-                <option value="potenciaMedia">Potência média estimada · 30 dias</option>
-              </select>
-            </div>
-            <div class="energy-legend"><span>menor</span><i></i><span>maior</span><span class="energy-unset-key">cinza: potência não configurada</span></div>
-          </div>
-          <div class="card energy-map-card">
-            <div class="fp-tabs" id="energyFpTabs"></div>
-            <div class="fp-scale-outer"><div class="fp-scale-inner floorplan-scope energy-floorplan" id="energyFpInner"></div></div>
-          </div>
-          <div class="energy-table-wrap">
-            <table class="energy-table">
-              <thead><tr><th>Sala / configuração</th><th>Agora</th><th>Hoje</th><th>7 dias</th><th>30 dias</th></tr></thead>
-              <tbody id="energyTableBody"></tbody>
-            </table>
-          </div>
-          <p id="energyError" class="error hidden" role="alert"></p>
         </div>
 
         <div id="adminSub-relatos" class="admin-sub hidden">
@@ -1226,6 +1191,11 @@
                     <input type="checkbox" id="cfgEspCredenciaisObrigatorias" /> Exigir credencial por dispositivo em todos os ESP32
                   </label>
                   <p class="hint">Quando ativo, nenhum ESP32 se conecta apenas pelo MAC: cada sala precisa de uma credencial provisionada em Admin &gt; ESP32. Ative só depois de provisionar todos os controladores.</p>
+
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfgEspApExigirCredencial" /> Exigir senha na rede de configuração dos ESP32 (RemoteIFES-Setup)
+                  </label>
+                  <p class="hint">A rede local <code>RemoteIFES-Setup</code> fica no ar também durante a operação normal. Desativado (padrão), ela é aberta. Ativado, passa a exigir a senha padrão do firmware. Não afeta a autenticação do ESP32 no servidor, configurada acima.</p>
 
                   <label for="cfgRetencaoAuditoria">Retenção de auditoria e indisponibilidade (dias)</label>
                   <input type="number" id="cfgRetencaoAuditoria" min="1" max="365" value="7" />
@@ -1447,44 +1417,43 @@
     </div>
   </div>
 
-  <script src="js/version.js?v=2026.09.02.3"></script>
-  <script src="js/state.js?v=2026.09.02.3"></script>
-  <script src="js/config.js?v=2026.09.02.3"></script>
-  <script src="js/toast.js?v=2026.09.02.3"></script>
-  <script src="js/server-status.js?v=2026.09.02.3"></script>
-  <script src="js/tempo.js?v=2026.09.02.3"></script>
-  <script src="js/rooms-data.js?v=2026.09.02.3"></script>
-  <script src="js/api.js?v=2026.09.02.3"></script>
-  <script src="js/rtstatus.js?v=2026.09.02.3"></script>
-  <script src="js/nav.js?v=2026.09.02.3"></script>
-  <script src="js/idle-timer.js?v=2026.09.02.3"></script>
-  <script src="js/a11y.js?v=2026.09.02.3"></script>
-  <script src="js/ui-dialog.js?v=2026.09.02.3"></script>
-  <script src="js/ui-status.js?v=2026.09.02.3"></script>
-  <script src="js/help.js?v=2026.09.02.3"></script>
-  <script src="js/screens/notifications.js?v=2026.09.02.3"></script>
-  <script src="js/screens/relatos.js?v=2026.09.02.3"></script>
-  <script src="js/screens/login.js?v=2026.09.02.3"></script>
-  <script src="js/screens/portal-funcoes.js?v=2026.09.02.3"></script>
-  <script src="js/screens/location.js?v=2026.09.02.3"></script>
-  <script src="js/screens/simple.js?v=2026.09.02.3"></script>
-  <script src="js/floorplan.js?v=2026.09.02.3"></script>
-  <script src="js/screens/floorplan.js?v=2026.09.02.3"></script>
-  <script src="js/screens/rooms.js?v=2026.09.02.3"></script>
-  <script src="js/screens/panel.js?v=2026.09.02.3"></script>
-  <script src="js/screens/schedule.js?v=2026.09.02.3"></script>
-  <script src="js/screens/grade.js?v=2026.09.02.3"></script>
-  <script src="js/screens/propriedade.js?v=2026.09.02.3"></script>
-  <script src="js/screens/monitoramento.js?v=2026.09.02.3"></script>
-  <script src="js/screens/heatmap.js?v=2026.09.02.3"></script>
-  <script src="js/screens/energia.js?v=2026.09.02.3"></script>
-  <script src="js/screens/inicio.js?v=2026.09.02.3"></script>
-  <script src="js/screens/admin.js?v=2026.09.02.3"></script>
-  <script src="js/screens/esp32-admin.js?v=2026.09.02.3"></script>
-  <script src="js/screens/manual.js?v=2026.09.02.3"></script>
-  <script src="js/screens/mobile-app.js?v=2026.09.02.3"></script>
-  <script src="js/account-menu.js?v=2026.09.02.3"></script>
-  <script src="js/router.js?v=2026.09.02.3"></script>
-  <script src="js/app.js?v=2026.09.02.3"></script>
+  <script src="js/version.js?v=2026.09.02.4"></script>
+  <script src="js/state.js?v=2026.09.02.4"></script>
+  <script src="js/config.js?v=2026.09.02.4"></script>
+  <script src="js/toast.js?v=2026.09.02.4"></script>
+  <script src="js/server-status.js?v=2026.09.02.4"></script>
+  <script src="js/tempo.js?v=2026.09.02.4"></script>
+  <script src="js/rooms-data.js?v=2026.09.02.4"></script>
+  <script src="js/api.js?v=2026.09.02.4"></script>
+  <script src="js/rtstatus.js?v=2026.09.02.4"></script>
+  <script src="js/nav.js?v=2026.09.02.4"></script>
+  <script src="js/idle-timer.js?v=2026.09.02.4"></script>
+  <script src="js/a11y.js?v=2026.09.02.4"></script>
+  <script src="js/ui-dialog.js?v=2026.09.02.4"></script>
+  <script src="js/ui-status.js?v=2026.09.02.4"></script>
+  <script src="js/help.js?v=2026.09.02.4"></script>
+  <script src="js/screens/notifications.js?v=2026.09.02.4"></script>
+  <script src="js/screens/relatos.js?v=2026.09.02.4"></script>
+  <script src="js/screens/login.js?v=2026.09.02.4"></script>
+  <script src="js/screens/portal-funcoes.js?v=2026.09.02.4"></script>
+  <script src="js/screens/location.js?v=2026.09.02.4"></script>
+  <script src="js/screens/simple.js?v=2026.09.02.4"></script>
+  <script src="js/floorplan.js?v=2026.09.02.4"></script>
+  <script src="js/screens/floorplan.js?v=2026.09.02.4"></script>
+  <script src="js/screens/rooms.js?v=2026.09.02.4"></script>
+  <script src="js/screens/panel.js?v=2026.09.02.4"></script>
+  <script src="js/screens/schedule.js?v=2026.09.02.4"></script>
+  <script src="js/screens/grade.js?v=2026.09.02.4"></script>
+  <script src="js/screens/propriedade.js?v=2026.09.02.4"></script>
+  <script src="js/screens/monitoramento.js?v=2026.09.02.4"></script>
+  <script src="js/screens/heatmap.js?v=2026.09.02.4"></script>
+  <script src="js/screens/inicio.js?v=2026.09.02.4"></script>
+  <script src="js/screens/admin.js?v=2026.09.02.4"></script>
+  <script src="js/screens/esp32-admin.js?v=2026.09.02.4"></script>
+  <script src="js/screens/manual.js?v=2026.09.02.4"></script>
+  <script src="js/screens/mobile-app.js?v=2026.09.02.4"></script>
+  <script src="js/account-menu.js?v=2026.09.02.4"></script>
+  <script src="js/router.js?v=2026.09.02.4"></script>
+  <script src="js/app.js?v=2026.09.02.4"></script>
 </body>
 </html>

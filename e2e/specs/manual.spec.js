@@ -178,7 +178,7 @@ test("Notificações de dispositivos está na Ajuda do administrador e leva à a
   await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 15_000 });
 });
 
-test("Auditoria e Energia só aparecem na Ajuda do superadministrador", async ({ page, context }) => {
+test("Auditoria só aparece na Ajuda do superadministrador e Energia não existe mais", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/#/ajuda");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -192,7 +192,8 @@ test("Auditoria e Energia só aparecem na Ajuda do superadministrador", async ({
   await page.reload();
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#manual-sec-auditoria")).toContainText("retenção");
-  await expect(page.locator("#manual-sec-energia")).toContainText("estimativa");
+  await expect(page.locator("#manual-sec-energia")).toHaveCount(0);
+  await expect(page.locator("#screen-manual")).not.toContainText("Energia estimada");
 });
 
 test("os ícones de ajuda das abas novas de Administração abrem a orientação correta", async ({ page, context }) => {
