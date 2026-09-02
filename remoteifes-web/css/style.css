@@ -1942,7 +1942,7 @@ button.btn:disabled {
   flex-direction: column;
   justify-content: center;
 }
-.login-info h2 { color: var(--warn); font-size: calc(15px * var(--a11y-font-scale)); margin: 0 0 8px; text-align: center; }
+.login-info h2 { color: var(--warn); font-size: calc(15px * var(--a11y-font-scale)); margin: 0 0 8px; text-align: left; }
 .login-info-lead {
   margin: 0 0 14px;
   color: var(--text-muted);
@@ -3878,7 +3878,10 @@ textarea {
 }
 
 @media (max-width: 560px) {
-  .relatos-panel {
+  /* O sino e o inseto ficam no meio da barra superior, não na borda direita: um painel
+     quase tão largo quanto a tela, ancorado em "right: 0", sairia pela esquerda. */
+  .relatos-panel,
+  .notif-panel {
     position: fixed;
     left: 8px;
     right: 8px;
