@@ -135,6 +135,16 @@ function notificarTodos() {
   });
 }
 
+function notificarObservadoresDaSala({ sala }) {
+  if (!wss) return;
+  wss.clients.forEach((ws) => {
+    if (!ws.usuario || salaObservadaPorCliente.get(ws) !== sala) return;
+    if (!revalidarCliente(ws) || !ws.usuario) return;
+    const status = salasService.statusCompleto(sala, ws.usuario);
+    if (status) enviar(ws, { tipo: "status", status });
+  });
+}
+
 function notificarStatusServidorParaTodos() {
   if (!wss) return;
   wss.clients.forEach((ws) => {
@@ -263,6 +273,7 @@ function iniciar(server) {
   intervaloRebroadcast.unref();
 
   salasService.eventos.on("mudanca", notificarTodos);
+  salasService.eventos.on("mudanca-sala", notificarObservadoresDaSala);
   configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
 }
 
@@ -276,6 +287,7 @@ function encerrar() {
     intervaloRebroadcast = null;
   }
   salasService.eventos.removeListener("mudanca", notificarTodos);
+  salasService.eventos.removeListener("mudanca-sala", notificarObservadoresDaSala);
   configuracoesService.eventos.removeListener("mudanca-manutencao", notificarStatusServidorParaTodos);
   if (wss) {
     wss.clients.forEach((ws) => {
