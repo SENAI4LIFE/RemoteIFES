@@ -266,7 +266,7 @@ O servidor foi pensado para rodar por anos em hardware modesto (classe **Raspber
 - **Notificações de ESP32 offline**: uma nova notificação para a mesma sala é suprimida se já existe uma não lida na última hora, evitando enxurrada por um dispositivo instável.
 - **Estado de OTA em memória e em `estados-ota.json`**: entradas em fase terminal (`concluído`, `falhou`) são descartadas após 7 dias; só uma imagem de firmware `.bin` é mantida por vez.
 - **Backups e pré-restaurações**: rotacionados por contagem (`BACKUP_RETENCAO`, 14; pré-restaurações, 5); temporários órfãos são varridos após 10 minutos.
-- **APK de produção**: apenas o release publicado em `data/releases/mobile/` é servido; nada é acumulado.
+- **APK de produção**: apenas o release publicado em `data/releases/mobile/` é servido; a publicação remove os APKs superados e nada é acumulado.
 - **Estado em memória**: mapas por sala (conexões de dispositivo, última reconexão, capturas de IR — no máximo 20 por sala) e por conexão WebSocket (`WeakMap`, limpos no `close`); o limitador de taxa expira entradas por janela. As listas administrativas usam `LIMIT` no servidor (300–500 linhas) e nunca devolvem a tabela inteira.
 - **Transmissão para os navegadores**: a lista de salas só é retransmitida quando muda algo que ela mostra (uma sala fica online/offline, liga ou desliga). A telemetria periódica de temperatura vai apenas para quem está com aquela sala aberta, e o rebroadcast de segurança continua a cada 30 s. Sem esse cuidado, cada quadro de telemetria custaria uma retransmissão da lista inteira para todos os navegadores conectados, e o custo cresceria com o produto salas × navegadores.
 - **Logs**: o servidor escreve em `stdout`/`stderr`; a rotação é do coletor (o `journald` do systemd, com seus próprios limites de tamanho, quando instalado via `install-service.sh`).
@@ -308,7 +308,7 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o superadministrador associa seu MAC a uma sala em `Admin > ESP32 / MACs`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits, guardado só como hash SHA-256): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação com tolerância de 24 h, revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
 - **Atualização de firmware (OTA)**: a imagem publicada no servidor é verificada por SHA-256 pelo ESP32 antes de ser instalada; a gravação usa um segundo slot de aplicação e o bootloader reverte sozinho se o novo firmware não passar no autoteste pós-boot. OTA concorrente para a mesma sala é recusada e a gravação por USB continua como caminho de recuperação. Veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32).
 - **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do superadministrador no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
-- **Ponto de acesso de configuração**: a rede protegida `RemoteIFES-Setup` existe no primeiro provisionamento, depois de um reset explícito de Wi-Fi ou como recuperação após 2 minutos contínuos sem conexão. Cada dispositivo gera e preserva uma senha aleatória própria, exibida apenas no console serial físico. O firmware continua tentando reconectar em paralelo e fecha o ponto de acesso quando a rede volta. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura.
+- **Ponto de acesso de configuração**: a rede protegida `RemoteIFES-Setup` existe no primeiro provisionamento, depois de um reset explícito de Wi-Fi ou como recuperação após 2 minutos contínuos sem conexão. Todos os dispositivos usam a mesma senha padrão, `remoteifes`, também exibida no console serial físico. O firmware continua tentando reconectar em paralelo e fecha o ponto de acesso quando a rede volta. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 - **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
 - **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
@@ -787,9 +787,20 @@ Dentro de `Admin > Monitoramento`, a seção recolhível **Mapa de calor operaci
 
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
 
-Usuários autenticados podem abrir `#/aplicativo` pelo menu da conta ou pela Ajuda. A página detecta Android, explica a instalação nativa e a alternativa PWA, e consulta o servidor para obter versão, build, tamanho, SHA-256 e SHA-256 do certificado de assinatura. O APK só aparece quando existe uma publicação válida em `remoteifes-server/data/releases/mobile/release.json` **e** o `serverOrigin` gravado nesse arquivo coincide com a origem pela qual o servidor está sendo acessado; o download exige a sessão RemoteIFES e é servido pelo próprio servidor com `Cache-Control: private, no-store`.
+Usuários autenticados podem abrir `#/aplicativo` pelo menu da conta ou pela Ajuda. A página é escrita para quem nunca instalou um aplicativo fora da loja: ela abre com um **cartão de estado** que responde "o que eu preciso fazer agora", seguido do botão de instalação, do passo a passo e do que é preciso para o aplicativo funcionar. O APK só aparece quando existe uma publicação válida em `remoteifes-server/data/releases/mobile/release.json` **e** o `serverOrigin` gravado nesse arquivo coincide com a origem pela qual o servidor está sendo acessado; o download exige a sessão RemoteIFES e é servido pelo próprio servidor com `Cache-Control: private, no-store`.
 
-Quando há um APK publicado, a página mostra um botão **Baixar APK** (com ícone de download), a versão e o build, a compatibilidade (Android 7.0 / API 24 ou posterior), o tamanho, o SHA-256 do arquivo e do certificado, e instruções de instalação, de atualização e da alternativa PWA. Ao baixar, o próprio navegador recalcula o SHA-256 dos bytes recebidos e **cancela o salvamento** se ele não bater com o hash anunciado — o arquivo só é entregue ao usuário depois de confirmada a integridade. Enquanto não há APK, a mensagem de "não publicado" aparece e o cartão da PWA é marcado como recomendado; o item continua visível no menu rápido de ajuda.
+O cartão de estado tem quatro situações, e só o **aplicativo empacotado** afirma o que está instalado — a versão instalada é gravada no bundle pelo mesmo build que gera o APK, sem plugin nenhum:
+
+| Situação | Quando aparece | O que a página diz |
+| --- | --- | --- |
+| **Atualizado** | app instalado com o mesmo `versionCode` publicado | nada a fazer |
+| **Atualização disponível** | app instalado com `versionCode` menor | versão instalada, versão publicada e botão **Baixar atualização** |
+| **Versão instalada indisponível** | app empacotado sem a versão gravada | oferece instalar por cima, sem afirmar o que está instalado |
+| **Versão disponível** | site ou PWA no navegador | mostra a versão publicada e diz explicitamente que não dá para saber a instalada |
+
+Quando há um APK publicado, a página mostra o botão **Baixar aplicativo** (ou **Baixar atualização**), a versão, a data de publicação, o tamanho, as novidades da versão, o passo a passo de instalação — incluindo como liberar **Permitir desta fonte** só para o aplicativo que abre o arquivo — e um bloco recolhido de **Problemas comuns**. O SHA-256 do arquivo e do certificado, a compatibilidade e a origem do servidor ficam em **Detalhes técnicos**, recolhidos, fora do fluxo de quem só quer instalar. Ao baixar, o próprio navegador recalcula o SHA-256 dos bytes recebidos e **cancela o salvamento** se ele não bater com o hash anunciado — o arquivo só é entregue ao usuário depois de confirmada a integridade. Enquanto não há APK, a mensagem de "não publicado" aparece e o cartão da PWA é marcado como recomendado; o item continua visível no menu rápido de ajuda.
+
+Nada é instalado em segundo plano: a atualização é sempre um download que o usuário confirma no instalador do Android, e a página só a considera concluída quando o sistema instala o pacote. A versão publicada é relida ao abrir a página e quando o aparelho volta ao primeiro plano com ela aberta — não há sondagem periódica —, e `/mobile-app/info` responde com `Cache-Control: no-store`, então nenhum cache de navegador esconde uma versão nova.
 
 O servidor valida novamente o SHA-256 do arquivo antes de anunciar ou entregar a versão. Na ausência de um APK de produção assinado e de metadados coerentes, a interface informa que o download não foi publicado. APKs `debug`, não assinados ou copiados apenas de `platforms/android/app/build/outputs/` não devem ser colocados nesse diretório. Atrás de proxy reverso HTTPS, defina `TRUST_PROXY=1` para que a origem calculada (`https://…`) confira com o `serverOrigin` publicado.
 
@@ -926,7 +937,39 @@ npm run build-android-release
 
 Variáveis de assinatura exigidas: `REMOTEIFES_ANDROID_KEYSTORE` (caminho do keystore), `REMOTEIFES_ANDROID_KEYSTORE_TYPE` (`pkcs12` ou `jks`; padrão `jks`), `REMOTEIFES_ANDROID_KEY_ALIAS`, `REMOTEIFES_ANDROID_STORE_PASSWORD` e `REMOTEIFES_ANDROID_KEY_PASSWORD`, além de `REMOTEIFES_SERVER_URL`. Mantenha-as em `remoteifes-cordova/.signing/signing.env` (fora do Git) e carregue-as no ambiente antes do build. O build precisa de JDK 17, do Android SDK (build-tools e plataforma da API 36) e de um `gradle` do sistema (a cordova-android 15 não usa o wrapper).
 
-Antes de disponibilizar o APK pelo servidor, execute `npm run publish-android-release` com `REMOTEIFES_ANDROID_APK`, `REMOTEIFES_MOBILE_RELEASE_DIR` (aponta para o `MOBILE_APP_RELEASE_DIR` lido pelo servidor — por padrão `remoteifes-server/data/releases/mobile/`), `REMOTEIFES_ANDROID_VERSION`, `REMOTEIFES_ANDROID_BUILD`, `REMOTEIFES_SERVER_URL`, `ANDROID_APKSIGNER` e `ANDROID_APKANALYZER`. A publicação recusa nomes `debug`/`unsigned` e origens loopback, valida a assinatura, confirma `debuggable=false`, versão, build, `minSdk=24` e `targetSdk` atual (35 ou posterior), registra o SHA-256 do arquivo e do certificado, grava o `serverOrigin` e escreve `release.json` de forma atômica. Sem todos esses dados coerentes — ou se a origem da requisição não for igual ao `serverOrigin` —, `/mobile-app/android` responde 404 e a interface não oferece download. No Windows, o script chama `apksigner.bat`/`apkanalyzer.bat` via `cmd.exe /c`.
+#### Versão do aplicativo Android
+
+A versão publicável do Android tem **uma única fonte**: `remoteifes-cordova/android-release.json`, com `versionName`, `versionCode`, `releaseDate` e as notas de versão. O script `android-version.js` é quem escreve esse arquivo e propaga `version` e `android-versionCode` para o `config.xml`; ninguém digita a mesma versão em dois lugares. Essa versão é independente da versão do frontend web/PWA (`remoteifes-web/version.json`), que existe para invalidar o cache do service worker e continua com o seu próprio ciclo.
+
+```bash
+cd remoteifes-cordova
+npm run android-version                    # mostra a versão publicável atual
+npm run android-version -- 1.1.0           # define a versão e avança o versionCode
+npm run android-version -- --rebuild       # mantém a versão e só avança o versionCode
+npm run android-version -- --verificar     # confere config.xml contra android-release.json
+```
+
+O `versionCode` nasce da própria versão (`1.2.3` → `10203`), o que o mantém previsível e legível, e **nunca deixa de crescer**: recompilar a mesma versão avança em um, porque o Android recusa instalar por cima um pacote cujo `versionCode` não aumentou. Depois de definir a versão, revise as notas em `android-release.json` — elas aparecem como "Novidades desta versão" na página do aplicativo.
+
+#### Fluxo de release
+
+```bash
+cd remoteifes-cordova
+npm run android-version -- 1.1.0     # 1. versão e versionCode na fonte única
+npm run validate                     # 2. valida config.xml, scripts e coerência da versão
+set -a && . ./.signing/signing.env && set +a
+REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br npm run build-android-release   # 3. build assinado
+REMOTEIFES_ANDROID_APK=platforms/android/app/build/outputs/apk/release/app-release.apk \
+REMOTEIFES_MOBILE_RELEASE_DIR=../remoteifes-server/data/releases/mobile \
+REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br \
+ANDROID_APKSIGNER=$ANDROID_HOME/build-tools/36.0.0/apksigner \
+ANDROID_APKANALYZER=$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer \
+npm run publish-android-release      # 4. verifica o artefato e publica
+```
+
+O build recusa começar se `config.xml` e `android-release.json` discordarem, grava a versão no bundle gerado (é assim que o aplicativo instalado sabe a própria versão) e, ao terminar, imprime o caminho do APK assinado pronto para a etapa de publicação.
+
+A publicação (`npm run publish-android-release`) lê versão e build da fonte única — não há `REMOTEIFES_ANDROID_VERSION` nem `REMOTEIFES_ANDROID_BUILD` para digitar de novo — e exige `REMOTEIFES_ANDROID_APK`, `REMOTEIFES_MOBILE_RELEASE_DIR` (aponta para o `MOBILE_APP_RELEASE_DIR` lido pelo servidor — por padrão `remoteifes-server/data/releases/mobile/`), `REMOTEIFES_SERVER_URL`, `ANDROID_APKSIGNER` e `ANDROID_APKANALYZER`. Ela recusa nomes `debug`/`unsigned` e origens loopback, valida a assinatura, confirma `debuggable=false`, versão, build, `minSdk=24` e `targetSdk` atual (35 ou posterior), **recusa um build que não avança sobre o já publicado** (o mesmo build só é aceito se for exatamente o mesmo arquivo), registra o SHA-256 do arquivo e do certificado, grava `serverOrigin`, data e notas, escreve `release.json` de forma atômica e só então remove os APKs superados. O arquivo entra inteiro antes dos metadados: até a troca atômica do `release.json` o servidor continua anunciando a publicação anterior, nunca uma release pela metade. Sem todos esses dados coerentes — ou se a origem da requisição não for igual ao `serverOrigin` —, `/mobile-app/android` responde 404 e a interface não oferece download. No Windows, o script chama `apksigner.bat`/`apkanalyzer.bat` via `cmd.exe /c`.
 
 Para um servidor HTTP em rede local, informe a origem `http://192.168.1.50:8080`; o Android e o iOS manterão somente a exceção necessária para rede local.
 
@@ -952,7 +995,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 |---|---|---|
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`) e o monitoramento operacional (`test/monitoramento.test.js`). |
 | Frontend end-to-end | `cd e2e && npm install && npx playwright install chromium && npx playwright test` | A instalação do pacote npm não baixa o navegador automaticamente; `npx playwright install chromium` instala a versão compatível. Em uma imagem Ubuntu mínima que ainda não tenha as bibliotecas do Chromium, use uma vez `sudo npx playwright install-deps chromium`. Para usar um canal do sistema, defina `E2E_BROWSER_CHANNEL` (por exemplo, `chrome` ou `msedge`). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`inicio.spec.js`), o gate do Monitoramento por superadministrador e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
-| Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
+| Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a coerência entre `config.xml` e `android-release.json`, a geração e a monotonia do `versionCode`, as recusas de publicação inconsistente, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
 | ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
 
@@ -1045,7 +1088,7 @@ remoteifes-web/
                         monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao superadministrador),
                         energia.js (estimativas energéticas agregadas, mapa e tabela exclusivos do superadministrador),
                         manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
-                        mobile-app.js (página #/aplicativo: instalação PWA/Android e download do APK de produção verificado pelo servidor)
+                        mobile-app.js (página #/aplicativo: estado da versão instalada, instalação guiada, atualização e download do APK verificado)
 
 remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev, partição min_spiffs.csv para OTA)
   platformio.ini           configuração do projeto, versão do firmware (-DFW_VERSAO) e dependências
@@ -1064,7 +1107,9 @@ remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento com
   config.xml             configuração do app (id, nome, ícone, splash, permissões de rede) — modo de desenvolvimento por padrão
   harden-config.js       reescreve config.xml para produção (origem única) ou de volta para desenvolvimento (--dev)
   validate-config.js     valida config.xml, a reversibilidade de harden-config.js e a saída de sync-www.js (npm run validate)
-  package.json            scripts de sync/build/run/harden-config e plugins Cordova do projeto
+  android-release.json    fonte única da versão Android publicável (versionName, versionCode, data, notas)
+  android-version.js      define a versão, avança o versionCode e propaga para o config.xml
+  package.json            scripts de sync/build/run/harden-config/android-version e plugins Cordova do projeto
   sync-www.js             copia remoteifes-web para www/ antes de cada build (não editar www/ manualmente)
   resources/              imagens-fonte (icon.png, splash.png) usadas por cordova-res
   www/                    cópia gerada de remoteifes-web (gitignored fora de commits manuais, se preferir)

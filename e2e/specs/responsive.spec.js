@@ -159,3 +159,45 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "tablet
     }
   });
 }
+
+// A barra superior quebra em mais de uma linha quando a fonte é ampliada. Um painel preso a
+// uma altura constante de barra passava por cima do sino e do inseto e engolia o toque,
+// impedindo trocar de Notificações para Relatar problema sem antes fechar o painel aberto.
+for (const nome of ["mobile-compact", "mobile-portrait"]) {
+  test(`com a barra superior em duas linhas um painel aberto não cobre os outros botões (${nome})`, async ({ page, context }) => {
+    await injetarSessao(context, "admin");
+    await context.addInitScript((ajustes) => {
+      try {
+        Object.entries(ajustes).forEach(([k, v]) => window.localStorage.setItem(k, v));
+      } catch (e) {}
+    }, { remoteifes_font_scale: "2", remoteifes_line_height: "3", remoteifes_letter_spacing: "0.25" });
+    await page.setViewportSize(VIEWPORTS[nome]);
+    await page.goto("/#/inicio");
+    await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
+
+    await page.locator("#notifBellBtn").click();
+    await expect(page.locator("#notifPanel")).toBeVisible();
+
+    const medida = await page.evaluate(() => {
+      const barra = document.querySelector(".topbar").getBoundingClientRect();
+      const painel = document.querySelector("#notifPanel").getBoundingClientRect();
+      const botao = document.querySelector("#bugReportBtn").getBoundingClientRect();
+      const noCentro = document.elementFromPoint(botao.x + botao.width / 2, botao.y + botao.height / 2);
+      return {
+        barraEmDuasLinhas: barra.height > 90,
+        painelAbaixoDaBarra: Math.round(painel.top - barra.bottom),
+        painelDentroDaTela: Math.round(window.innerHeight - painel.bottom),
+        botaoRecebeToque: !!document.querySelector("#bugReportBtn").contains(noCentro),
+      };
+    });
+    expect(medida.barraEmDuasLinhas, "a fonte ampliada realmente alarga a barra").toBe(true);
+    expect(medida.painelAbaixoDaBarra, "o painel começa abaixo da barra real, não de uma altura fixa").toBeGreaterThanOrEqual(0);
+    expect(medida.painelDentroDaTela, "o painel termina dentro da tela").toBeGreaterThanOrEqual(0);
+    expect(medida.botaoRecebeToque, "o botão de relatar problema recebe o toque").toBe(true);
+
+    await page.locator("#bugReportBtn").click();
+    await expect(page.locator("#relatosPanel")).toBeVisible();
+    await expect(page.locator("#notifPanel")).toBeHidden();
+    await expect(page.locator("#notifBellBtn")).toHaveAttribute("aria-expanded", "false");
+  });
+}
