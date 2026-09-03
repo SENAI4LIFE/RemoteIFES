@@ -213,3 +213,44 @@ test("os ícones de ajuda das abas novas de Administração abrem a orientação
   await expect(page.locator("#helpModal")).toBeVisible();
   await expect(page.locator("#helpModalTitle")).toContainText("Auditoria");
 });
+
+test("o manual do admin apresenta a Administração agrupada e o grupo Dispositivos", async ({ page, context }) => {
+  await injetarSessao(context, "admin");
+  await page.goto("/#/ajuda/administracao");
+  const secao = page.locator("#manual-sec-administracao");
+  await expect(secao).toBeVisible({ timeout: 20_000 });
+
+  for (const termo of ["Gestão", "Dispositivos", "Monitoramento", "Sistema", "Cadastro", "Histórico", "Notificações", "Firmware / OTA"]) {
+    await expect(secao, `manual precisa citar ${termo}`).toContainText(termo);
+  }
+  await expect(secao).not.toContainText("ESP32 / MACs");
+  await expect(secao).toContainText("Administração > Grupo > Função");
+});
+
+test("o manual do superadministrador documenta o cadastro imediato e cadastrado ≠ online", async ({ page, context }) => {
+  await injetarSessao(context, "superadmin");
+  await page.goto("/#/ajuda/esp32-cadastro");
+  const secao = page.locator("#manual-sec-esp32-cadastro");
+  await expect(secao).toBeVisible({ timeout: 20_000 });
+
+  await expect(secao).toContainText("Administração > Dispositivos > Cadastro");
+  await expect(secao).toContainText("sem recarregar a página nem reabrir a aba");
+  await expect(secao).toContainText("segunda sessão autorizada");
+  await expect(secao).toContainText("costuma aparecer offline");
+  await expect(secao).not.toContainText("Administração > ESP32 / MACs");
+
+  await secao.locator(".manual-ver-app").click();
+  await expect(page.locator("#adminSub-macs")).toBeVisible({ timeout: 15_000 });
+});
+
+test("nenhum tópico visível do manual usa a navegação antiga de Administração", async ({ page, context }) => {
+  await injetarSessao(context, "superadmin");
+  await page.goto("/#/ajuda");
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
+  const texto = await page.locator("#manualConteudo").innerText();
+  for (const obsoleto of ["Administração > ESP32", "Administração > Notificações de dispositivos", "Admin > ESP32"]) {
+    expect(texto, `navegação obsoleta no manual: ${obsoleto}`).not.toContain(obsoleto);
+  }
+  expect(texto).toContain("Administração > Dispositivos > Cadastro");
+  expect(texto).toContain("Administração > Dispositivos > Firmware / OTA");
+});

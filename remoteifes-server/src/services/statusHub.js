@@ -145,6 +145,20 @@ function notificarObservadoresDaSala({ sala }) {
   });
 }
 
+function notificarAdministradores(payload) {
+  if (!wss) return;
+  wss.clients.forEach((ws) => {
+    if (!revalidarCliente(ws)) return;
+    if (ws.usuario && ws.usuario.nivel >= NIVEL_ADMIN) enviar(ws, payload);
+  });
+}
+
+function notificarCadastroDeDispositivo({ sala }) {
+  const cadastro = salasService.buscarAdministrativo(sala);
+  if (!cadastro) return;
+  notificarAdministradores({ tipo: "dispositivo_cadastro", sala, cadastro });
+}
+
 function notificarStatusServidorParaTodos() {
   if (!wss) return;
   wss.clients.forEach((ws) => {
@@ -274,6 +288,7 @@ function iniciar(server) {
 
   salasService.eventos.on("mudanca", notificarTodos);
   salasService.eventos.on("mudanca-sala", notificarObservadoresDaSala);
+  salasService.eventos.on("cadastro-dispositivo", notificarCadastroDeDispositivo);
   configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
 }
 
@@ -288,6 +303,7 @@ function encerrar() {
   }
   salasService.eventos.removeListener("mudanca", notificarTodos);
   salasService.eventos.removeListener("mudanca-sala", notificarObservadoresDaSala);
+  salasService.eventos.removeListener("cadastro-dispositivo", notificarCadastroDeDispositivo);
   configuracoesService.eventos.removeListener("mudanca-manutencao", notificarStatusServidorParaTodos);
   if (wss) {
     wss.clients.forEach((ws) => {

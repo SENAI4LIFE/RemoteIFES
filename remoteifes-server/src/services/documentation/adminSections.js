@@ -7,16 +7,20 @@ const adminSections = [
     tags: ["Admin", "permissões", "limites"],
     verNoApp: "/admin/usuarios",
     corpo: [
-      { t: "p", texto: "A seção <strong>Admin</strong> reúne a operação administrativa. O admin herda o uso comum e pode gerenciar contas comuns, presença, históricos operacionais, notificações, proprietários, acessos e o mapa; funções de infraestrutura permanecem exclusivas do Superadministrador." },
-      { t: "tabela", cabecalho: ["Aba", "Uso principal"], linhas: [
-        ["Usuários", "criar e manter contas permitidas pelo seu nível"],
-        ["Ativos / Sessões", "acompanhar presença atual e histórico de login"],
-        ["Logs / Dispositivos / Acessos ESP32", "investigar comandos e atividade de controladores"],
-        ["Notificações de dispositivos", "revisar avisos compartilhados"],
-        ["Proprietários de sala", "delegar gestão de acesso"],
-        ["Mapa", "visão geral somente de leitura"],
+      { t: "p", texto: "A seção <strong>Admin</strong> reúne a operação administrativa em quatro grupos — <strong>Gestão</strong>, <strong>Dispositivos</strong>, <strong>Monitoramento</strong> e <strong>Sistema</strong> —, sempre em dois níveis: <strong>Administração &gt; Grupo &gt; Função</strong>. O admin herda o uso comum e enxerga apenas as funções que seu nível autoriza; funções de infraestrutura permanecem exclusivas do Superadministrador e nem sequer aparecem no grupo." },
+      { t: "tabela", cabecalho: ["Grupo", "Funções e uso principal"], linhas: [
+        ["Gestão", "Usuários, Proprietários de sala e (Superadministrador) Relatos de problemas: a operação administrativa de rotina"],
+        ["Dispositivos", "Cadastro, Histórico, Notificações e Firmware / OTA: o ciclo de vida dos ESP32"],
+        ["Monitoramento", "Ativos, Mapa e (Superadministrador) Saúde do sistema: observação de estado e diagnóstico"],
+        ["Sistema", "Sessões, Logs, Acessos ESP32 e (Superadministrador) Configurações e Auditoria: configuração, segurança e trilhas de histórico"],
       ] },
-      { t: "nota", texto: "Configurações globais, restrição da sala, MACs, credenciais, IR, OTA, Monitoramento, Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou controle antigo tente abri-los." },
+      { t: "fluxo", titulo: "Grupo Dispositivos", itens: [
+        { tipo: "screen", texto: "Cadastro: vincular o ESP32 à sala" },
+        { tipo: "status", texto: "Histórico: conexões e quedas do dispositivo" },
+        { tipo: "status", texto: "Notificações: avisos compartilhados" },
+        { tipo: "device", texto: "Firmware / OTA: atualizar e manter a placa" },
+      ] },
+      { t: "nota", texto: "Configurações globais, restrição da sala, Cadastro de ESP32, credenciais, IR, Firmware / OTA, Saúde do sistema, Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou um atalho antigo tente abri-los." },
     ],
   },
   {
@@ -64,7 +68,7 @@ const adminSections = [
     corpo: [
       { t: "sub", titulo: "Criar conta" },
       { t: "passos", itens: [
-        "Abra <strong>Administração &gt; Usuários</strong> e use a ação de nova conta.",
+        "Abra <strong>Administração &gt; Gestão &gt; Usuários</strong> e use a ação de nova conta.",
         "Informe login (letras, números, ponto, sublinhado, hífen ou @; sem espaços; até 60 caracteres), nome (até 120) e senha de 8 a 128 caracteres.",
         "Defina se a conta <strong>pode controlar</strong>. Admin comum cria somente usuário comum; apenas Superadministrador pode conceder papel administrativo.",
         "Salve e confirme a nova conta na lista. Entregue a senha por um canal apropriado e solicite troca conforme a política local.",
@@ -88,16 +92,16 @@ const adminSections = [
     tags: ["Proprietários de sala", "Mapa", "acesso", "delegar"],
     verNoApp: "/admin/proprietarios",
     corpo: [
-      { t: "p", texto: "Em <strong>Proprietários de sala</strong>, associe usuários comuns ativos às salas que eles poderão administrar pela aba <strong>Config.</strong>. A delegação permite conceder e revogar acesso, mas não permite ativar a própria restrição." },
+      { t: "p", texto: "Em <strong>Administração &gt; Gestão &gt; Proprietários de sala</strong>, associe usuários comuns ativos às salas que eles poderão administrar pela aba <strong>Config.</strong>. A delegação permite conceder e revogar acesso, mas não permite ativar a própria restrição." },
       { t: "passos", itens: [
         "Selecione a sala e o usuário comum.",
         "Conceda a propriedade e confirme o vínculo listado.",
         "Oriente o proprietário a abrir <strong>Config.</strong> e administrar os usuários daquela sala.",
         "Revogue a propriedade quando a responsabilidade terminar; revise separadamente os acessos que já tenham sido concedidos.",
       ] },
-      { t: "p", texto: "<strong>Mapa</strong> consolida conexão, ligado/desligado e reservas por sala. É uma visão de triagem: selecione a sala ou use as abas específicas para investigar; o mapa não executa manutenção." },
+      { t: "p", texto: "<strong>Administração &gt; Monitoramento &gt; Mapa</strong> consolida conexão, ligado/desligado e reservas por sala. É uma visão de triagem: selecione a sala ou use as funções específicas para investigar; o mapa não executa manutenção." },
       { t: "nota", texto: "A opção que torna a sala restrita é aplicada pelo servidor somente para Superadministrador. Admin comum pode manter proprietários e listas permitidas, mas não mudar esse estado." },
-      { t: "links", itens: [{ id: "controle-acesso-sala", texto: "Procedimento do proprietário" }, { id: "esp32-cadastro", texto: "Restrição e limites por sala (Superadmin)" }] },
+      { t: "links", itens: [{ id: "controle-acesso-sala", texto: "Procedimento do proprietário" }, { id: "esp32-cadastro", texto: "Cadastro, restrição e limites por sala (Superadmin)" }] },
     ],
   },
   {
@@ -108,8 +112,8 @@ const adminSections = [
     tags: ["online", "inativo", "login", "logout", "histórico"],
     verNoApp: "/admin/ativos",
     corpo: [
-      { t: "p", texto: "<strong>Ativos</strong> mostra presença recente: online, inativo ou offline conforme sessão e limiar configurado. Use-o para operação corrente, não como registro definitivo de frequência." },
-      { t: "p", texto: "<strong>Sessões</strong> mantém login, logout e duração. Filtre pela data quando investigar acesso. Reiniciar o servidor fecha sessões que estavam abertas; expiração, saída e troca de senha também alteram o histórico." },
+      { t: "p", texto: "<strong>Administração &gt; Monitoramento &gt; Ativos</strong> mostra presença recente: online, inativo ou offline conforme sessão e limiar configurado. Use-o para operação corrente, não como registro definitivo de frequência." },
+      { t: "p", texto: "<strong>Administração &gt; Sistema &gt; Sessões</strong> mantém login, logout e duração. Filtre pela data quando investigar acesso. Reiniciar o servidor fecha sessões que estavam abertas; expiração, saída e troca de senha também alteram o histórico." },
       { t: "sub", titulo: "Excluir histórico" },
       { t: "lista", itens: [
         "<strong>Excluir data</strong> remove os registros do dia filtrado; <strong>Excluir tudo</strong> remove todo o histórico da aba.",
@@ -120,24 +124,24 @@ const adminSections = [
   },
   {
     id: "logs-dispositivos",
-    titulo: "Logs, Dispositivos e Acessos ESP32",
+    titulo: "Logs, Histórico de dispositivos e Acessos ESP32",
     papel: "admin",
     categoria: "admin_historicos",
-    tags: ["Logs", "Dispositivos", "Acessos ESP32", "comando", "origem"],
+    tags: ["Logs", "Histórico", "Dispositivos", "Acessos ESP32", "comando", "origem"],
     verNoApp: "/admin/logs",
     corpo: [
-      { t: "tabela", cabecalho: ["Aba", "Evidência disponível"], linhas: [
-        ["Logs", "comando, valor, sala, usuário/sistema, origem e horário; até 300 resultados por consulta"],
-        ["Dispositivos", "eventos de conexão dos controladores, filtráveis por data"],
-        ["Acessos ESP32", "acessos registrados pelos controladores à interface/serviço local, filtráveis por data"],
+      { t: "tabela", cabecalho: ["Função", "Evidência disponível"], linhas: [
+        ["Sistema > Logs", "comando, valor, sala, usuário/sistema, origem e horário; até 300 resultados por consulta"],
+        ["Dispositivos > Histórico", "eventos de conexão dos controladores, filtráveis por data"],
+        ["Sistema > Acessos ESP32", "acessos registrados pelos controladores à interface/serviço local, filtráveis por data"],
       ] },
       { t: "passos", itens: [
         "Comece pela sala e pelo intervalo relatados.",
-        "Em <strong>Logs</strong>, filtre data, sala ou andar e compare a origem: manual, agendamento ou sistema.",
-        "Em <strong>Dispositivos</strong>, confirme quedas e retornos próximos ao comando.",
-        "Use <strong>Acessos ESP32</strong> como evidência complementar, não como confirmação de que o ar respondeu ao infravermelho.",
+        "Em <strong>Administração &gt; Sistema &gt; Logs</strong>, filtre data, sala ou andar e compare a origem: manual, agendamento ou sistema.",
+        "Em <strong>Administração &gt; Dispositivos &gt; Histórico</strong>, confirme quedas e retornos próximos ao comando.",
+        "Use <strong>Administração &gt; Sistema &gt; Acessos ESP32</strong> como evidência complementar, não como confirmação de que o ar respondeu ao infravermelho.",
       ] },
-      { t: "nota", nivel: "atencao", texto: "Logs e Acessos ESP32 permitem excluir a data filtrada ou tudo, com confirmação e sem recuperação. Dispositivos é somente consulta. Nenhuma dessas abas mede o efeito físico no aparelho." },
+      { t: "nota", nivel: "atencao", texto: "Logs e Acessos ESP32 permitem excluir a data filtrada ou tudo, com confirmação e sem recuperação. O Histórico de dispositivos é somente consulta. Nenhuma dessas funções mede o efeito físico no aparelho." },
     ],
   },
   {
@@ -148,11 +152,11 @@ const adminSections = [
     tags: ["sino", "lidas", "offline", "OTA", "monitoramento"],
     verNoApp: "/admin/notificacoes",
     corpo: [
-      { t: "p", texto: "O sino e <strong>Administração &gt; Notificações de dispositivos</strong> exibem a mesma fila global. O servidor cria avisos de dispositivo offline, resultado de OTA e alertas de monitoramento; não existe criação manual." },
+      { t: "p", texto: "O sino e <strong>Administração &gt; Dispositivos &gt; Notificações</strong> exibem a mesma fila global. O servidor cria avisos de dispositivo offline, resultado de OTA e alertas de monitoramento; não existe criação manual." },
       { t: "lista", itens: [
         "Selecione uma notificação não lida para marcá-la como lida nos dois lugares.",
         "<strong>Marcar todas como lidas</strong> zera o indicador para a fila compartilhada, portanto afeta o que todos os administradores verão como pendente.",
-        "Ler não resolve a causa. Abra Dispositivos, Monitoramento ou ESP32 conforme o tipo e registre a intervenção quando necessário.",
+        "Ler não resolve a causa. Abra <strong>Dispositivos &gt; Histórico</strong>, <strong>Monitoramento &gt; Saúde do sistema</strong> ou <strong>Dispositivos &gt; Firmware / OTA</strong> conforme o tipo e registre a intervenção quando necessário.",
       ] },
     ],
   },
