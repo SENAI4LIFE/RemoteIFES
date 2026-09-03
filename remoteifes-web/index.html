@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>RemoteIFES</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2026.09.03.1" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.09.03.2" />
   <meta name="theme-color" content="#1c6b3c" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemoteIFES" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.03.1" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.03.1" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.03.1" />
-  <meta name="remoteifes-version" content="2026.09.03.1" />
-  <link rel="stylesheet" href="css/style.css?v=2026.09.03.1" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.03.2" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.03.2" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.03.2" />
+  <meta name="remoteifes-version" content="2026.09.03.2" />
+  <link rel="stylesheet" href="css/style.css?v=2026.09.03.2" />
 </head>
 <body>
 
@@ -47,7 +47,7 @@
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
-      <img src="assets/remoteifes-logo.png?v=2026.09.03.1" alt="RemoteIFES" />
+      <img src="assets/remoteifes-logo.png?v=2026.09.03.2" alt="RemoteIFES" />
       <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
@@ -113,7 +113,7 @@
             </div>
           </div>
           <div class="portal-footer">
-            <img src="assets/ifes-logo.png?v=2026.09.03.1" alt="Instituto Federal do Espírito Santo" />
+            <img src="assets/ifes-logo.png?v=2026.09.03.2" alt="Instituto Federal do Espírito Santo" />
             <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
@@ -782,6 +782,9 @@
             <button type="button" class="admin-group-btn" data-grupo="gestao"><span class="admin-group-label">Gestão</span></button>
             <button type="button" class="admin-subtab-btn active" aria-current="page" data-sub="usuarios"><span class="admin-subtab-icon">👥</span><span class="admin-subtab-label">Usuários</span></button>
             <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span><span class="admin-subtab-label">Proprietários de sala</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span><span class="admin-subtab-label">Sessões</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="ativos"><span class="admin-subtab-icon">🟢</span><span class="admin-subtab-label">Ativos</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span><span class="admin-subtab-label">Mapa</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="relatos"><span class="admin-subtab-icon">🐞</span><span class="admin-subtab-label">Relatos de problemas</span><span id="adminRelatosSubBadge" class="admin-subtab-badge hidden"></span></button>
           </div>
           <div class="admin-subtab-group" data-grupo="dispositivos">
@@ -791,17 +794,10 @@
             <button type="button" class="admin-subtab-btn" data-sub="notificacoes"><span class="admin-subtab-icon">🔔</span><span class="admin-subtab-label">Notificações</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">Firmware / OTA</span></button>
           </div>
-          <div class="admin-subtab-group" data-grupo="monitoramento">
-            <button type="button" class="admin-group-btn" data-grupo="monitoramento"><span class="admin-group-label">Monitoramento</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="ativos"><span class="admin-subtab-icon">🟢</span><span class="admin-subtab-label">Ativos</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span><span class="admin-subtab-label">Mapa</span></button>
-            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Saúde do sistema</span></button>
-          </div>
           <div class="admin-subtab-group" data-grupo="sistema">
             <button type="button" class="admin-group-btn" data-grupo="sistema"><span class="admin-group-label">Sistema</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span><span class="admin-subtab-label">Sessões</span></button>
             <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span><span class="admin-subtab-label">Logs</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="acessos"><span class="admin-subtab-icon">🔑</span><span class="admin-subtab-label">Acessos ESP32</span></button>
+            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Status</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="auditoria"><span class="admin-subtab-icon">🛡️</span><span class="admin-subtab-label">Auditoria</span></button>
           </div>
@@ -858,23 +854,46 @@
         </div>
 
         <div id="adminSub-logs" class="admin-sub hidden">
-          <p class="hint">
-            Histórico de comandos enviados aos ares-condicionados (ligar, desligar, temperatura).
-            <button type="button" class="help-icon-btn" data-help="logs" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card">
-            <label for="logsFiltroData">Filtrar por data</label>
-            <input type="date" id="logsFiltroData" />
-            <label for="logsFiltroSala">Filtrar por sala</label>
-            <select id="logsFiltroSala"></select>
-            <label for="logsFiltroAndar">Filtrar por andar</label>
-            <select id="logsFiltroAndar"></select>
-            <div class="two-col">
-              <button type="button" id="logsApagarData" class="admin-apagar-btn">Apagar logs da data</button>
-              <button type="button" id="logsApagarTudo" class="admin-apagar-btn">Apagar todos os logs</button>
-            </div>
+          <div class="admin-inner-tabs" role="tablist" aria-label="Seções de Logs">
+            <button type="button" class="admin-inner-tab-btn active" data-log-aba="comandos" role="tab" aria-selected="true" aria-controls="logsAba-comandos">Comandos</button>
+            <button type="button" class="admin-inner-tab-btn" data-log-aba="acesso" role="tab" aria-selected="false" aria-controls="logsAba-acesso">Acesso</button>
           </div>
-          <ul id="logsList" class="room-list"></ul>
+
+          <div id="logsAba-comandos" class="admin-inner-tab" role="tabpanel">
+            <p class="hint">
+              Histórico de comandos enviados aos ares-condicionados (ligar, desligar, temperatura).
+              <button type="button" class="help-icon-btn" data-help="logs" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="card">
+              <label for="logsFiltroData">Filtrar por data</label>
+              <input type="date" id="logsFiltroData" />
+              <label for="logsFiltroSala">Filtrar por sala</label>
+              <select id="logsFiltroSala"></select>
+              <label for="logsFiltroAndar">Filtrar por andar</label>
+              <select id="logsFiltroAndar"></select>
+              <div class="two-col">
+                <button type="button" id="logsApagarData" class="admin-apagar-btn">Apagar logs da data</button>
+                <button type="button" id="logsApagarTudo" class="admin-apagar-btn">Apagar todos os logs</button>
+              </div>
+            </div>
+            <ul id="logsList" class="room-list"></ul>
+          </div>
+
+          <div id="logsAba-acesso" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">
+              Registro de cada requisição feita por um ESP32 ao servidor.
+              <button type="button" class="help-icon-btn" data-help="acessos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="card">
+              <label for="acessosFiltroData">Filtrar por data</label>
+              <input type="date" id="acessosFiltroData" />
+              <div class="two-col">
+                <button type="button" id="acessosApagarData" class="admin-apagar-btn">Apagar acessos da data</button>
+                <button type="button" id="acessosApagarTudo" class="admin-apagar-btn">Apagar todos os acessos</button>
+              </div>
+            </div>
+            <ul id="acessosList" class="room-list"></ul>
+          </div>
         </div>
 
         <div id="adminSub-dispositivos" class="admin-sub hidden">
@@ -1013,22 +1032,6 @@
           <div id="adminRelatosFiltros" class="relato-filtros" role="group" aria-label="Filtrar relatos por situação"></div>
           <ul id="adminRelatosLista" class="relato-lista" aria-live="polite"></ul>
           <p id="adminRelatosVazio" class="hint relato-vazio hidden">Nenhum relato para este filtro.</p>
-        </div>
-
-        <div id="adminSub-acessos" class="admin-sub hidden">
-          <p class="hint">
-            Registro de cada requisição feita por um ESP32 ao servidor.
-            <button type="button" class="help-icon-btn" data-help="acessos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card">
-            <label for="acessosFiltroData">Filtrar por data</label>
-            <input type="date" id="acessosFiltroData" />
-            <div class="two-col">
-              <button type="button" id="acessosApagarData" class="admin-apagar-btn">Apagar acessos da data</button>
-              <button type="button" id="acessosApagarTudo" class="admin-apagar-btn">Apagar todos os acessos</button>
-            </div>
-          </div>
-          <ul id="acessosList" class="room-list"></ul>
         </div>
 
         <div id="adminSub-proprietarios" class="admin-sub hidden">
@@ -1429,43 +1432,43 @@
     </div>
   </div>
 
-  <script src="js/version.js?v=2026.09.03.1"></script>
-  <script src="js/state.js?v=2026.09.03.1"></script>
-  <script src="js/config.js?v=2026.09.03.1"></script>
-  <script src="js/toast.js?v=2026.09.03.1"></script>
-  <script src="js/server-status.js?v=2026.09.03.1"></script>
-  <script src="js/tempo.js?v=2026.09.03.1"></script>
-  <script src="js/rooms-data.js?v=2026.09.03.1"></script>
-  <script src="js/api.js?v=2026.09.03.1"></script>
-  <script src="js/rtstatus.js?v=2026.09.03.1"></script>
-  <script src="js/nav.js?v=2026.09.03.1"></script>
-  <script src="js/idle-timer.js?v=2026.09.03.1"></script>
-  <script src="js/a11y.js?v=2026.09.03.1"></script>
-  <script src="js/ui-dialog.js?v=2026.09.03.1"></script>
-  <script src="js/ui-status.js?v=2026.09.03.1"></script>
-  <script src="js/help.js?v=2026.09.03.1"></script>
-  <script src="js/screens/notifications.js?v=2026.09.03.1"></script>
-  <script src="js/screens/relatos.js?v=2026.09.03.1"></script>
-  <script src="js/screens/login.js?v=2026.09.03.1"></script>
-  <script src="js/screens/portal-funcoes.js?v=2026.09.03.1"></script>
-  <script src="js/screens/location.js?v=2026.09.03.1"></script>
-  <script src="js/screens/simple.js?v=2026.09.03.1"></script>
-  <script src="js/floorplan.js?v=2026.09.03.1"></script>
-  <script src="js/screens/floorplan.js?v=2026.09.03.1"></script>
-  <script src="js/screens/rooms.js?v=2026.09.03.1"></script>
-  <script src="js/screens/panel.js?v=2026.09.03.1"></script>
-  <script src="js/screens/schedule.js?v=2026.09.03.1"></script>
-  <script src="js/screens/grade.js?v=2026.09.03.1"></script>
-  <script src="js/screens/propriedade.js?v=2026.09.03.1"></script>
-  <script src="js/screens/monitoramento.js?v=2026.09.03.1"></script>
-  <script src="js/screens/heatmap.js?v=2026.09.03.1"></script>
-  <script src="js/screens/inicio.js?v=2026.09.03.1"></script>
-  <script src="js/screens/admin.js?v=2026.09.03.1"></script>
-  <script src="js/screens/esp32-admin.js?v=2026.09.03.1"></script>
-  <script src="js/screens/manual.js?v=2026.09.03.1"></script>
-  <script src="js/screens/mobile-app.js?v=2026.09.03.1"></script>
-  <script src="js/account-menu.js?v=2026.09.03.1"></script>
-  <script src="js/router.js?v=2026.09.03.1"></script>
-  <script src="js/app.js?v=2026.09.03.1"></script>
+  <script src="js/version.js?v=2026.09.03.2"></script>
+  <script src="js/state.js?v=2026.09.03.2"></script>
+  <script src="js/config.js?v=2026.09.03.2"></script>
+  <script src="js/toast.js?v=2026.09.03.2"></script>
+  <script src="js/server-status.js?v=2026.09.03.2"></script>
+  <script src="js/tempo.js?v=2026.09.03.2"></script>
+  <script src="js/rooms-data.js?v=2026.09.03.2"></script>
+  <script src="js/api.js?v=2026.09.03.2"></script>
+  <script src="js/rtstatus.js?v=2026.09.03.2"></script>
+  <script src="js/nav.js?v=2026.09.03.2"></script>
+  <script src="js/idle-timer.js?v=2026.09.03.2"></script>
+  <script src="js/a11y.js?v=2026.09.03.2"></script>
+  <script src="js/ui-dialog.js?v=2026.09.03.2"></script>
+  <script src="js/ui-status.js?v=2026.09.03.2"></script>
+  <script src="js/help.js?v=2026.09.03.2"></script>
+  <script src="js/screens/notifications.js?v=2026.09.03.2"></script>
+  <script src="js/screens/relatos.js?v=2026.09.03.2"></script>
+  <script src="js/screens/login.js?v=2026.09.03.2"></script>
+  <script src="js/screens/portal-funcoes.js?v=2026.09.03.2"></script>
+  <script src="js/screens/location.js?v=2026.09.03.2"></script>
+  <script src="js/screens/simple.js?v=2026.09.03.2"></script>
+  <script src="js/floorplan.js?v=2026.09.03.2"></script>
+  <script src="js/screens/floorplan.js?v=2026.09.03.2"></script>
+  <script src="js/screens/rooms.js?v=2026.09.03.2"></script>
+  <script src="js/screens/panel.js?v=2026.09.03.2"></script>
+  <script src="js/screens/schedule.js?v=2026.09.03.2"></script>
+  <script src="js/screens/grade.js?v=2026.09.03.2"></script>
+  <script src="js/screens/propriedade.js?v=2026.09.03.2"></script>
+  <script src="js/screens/monitoramento.js?v=2026.09.03.2"></script>
+  <script src="js/screens/heatmap.js?v=2026.09.03.2"></script>
+  <script src="js/screens/inicio.js?v=2026.09.03.2"></script>
+  <script src="js/screens/admin.js?v=2026.09.03.2"></script>
+  <script src="js/screens/esp32-admin.js?v=2026.09.03.2"></script>
+  <script src="js/screens/manual.js?v=2026.09.03.2"></script>
+  <script src="js/screens/mobile-app.js?v=2026.09.03.2"></script>
+  <script src="js/account-menu.js?v=2026.09.03.2"></script>
+  <script src="js/router.js?v=2026.09.03.2"></script>
+  <script src="js/app.js?v=2026.09.03.2"></script>
 </body>
 </html>

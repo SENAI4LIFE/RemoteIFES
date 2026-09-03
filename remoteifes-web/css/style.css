@@ -2189,6 +2189,42 @@ button.btn:disabled {
 .admin-sub > .mapa-grid { max-width: var(--admin-col-wide); }
 .admin-sub > .room-list > li:last-child { margin-bottom: 0; }
 
+.admin-inner-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.admin-inner-tab-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-height: var(--tap-min);
+  font-size: calc(12.5px * var(--a11y-font-scale));
+  font-weight: 500;
+  line-height: var(--a11y-line-height);
+  overflow-wrap: break-word;
+  cursor: pointer;
+}
+.admin-inner-tab-btn.active {
+  background: var(--ifes-green-soft);
+  border-color: var(--ifes-green);
+  color: var(--ifes-green-dark);
+  font-weight: 600;
+}
+.admin-inner-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  min-width: 0;
+}
+.admin-inner-tab > * { min-width: 0; }
+.admin-inner-tab > .room-list > li:last-child { margin-bottom: 0; }
+
 #adminSub-macs .mac-input { max-width: 22rem; }
 #adminSub-macs .mac-actions { align-items: baseline; gap: 8px 16px; }
 #adminSub-macs .mac-actions > .link-btn { flex: 0 1 auto; min-width: 0; }

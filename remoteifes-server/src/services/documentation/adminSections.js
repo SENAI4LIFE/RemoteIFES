@@ -7,12 +7,11 @@ const adminSections = [
     tags: ["Admin", "permissões", "limites"],
     verNoApp: "/admin/usuarios",
     corpo: [
-      { t: "p", texto: "A seção <strong>Admin</strong> reúne a operação administrativa em quatro grupos — <strong>Gestão</strong>, <strong>Dispositivos</strong>, <strong>Monitoramento</strong> e <strong>Sistema</strong> —, sempre em dois níveis: <strong>Administração &gt; Grupo &gt; Função</strong>. O admin herda o uso comum e enxerga apenas as funções que seu nível autoriza; funções de infraestrutura permanecem exclusivas do Superadministrador e nem sequer aparecem no grupo." },
+      { t: "p", texto: "A seção <strong>Admin</strong> reúne a operação administrativa em três grupos — <strong>Gestão</strong>, <strong>Dispositivos</strong> e <strong>Sistema</strong> —, sempre em dois níveis: <strong>Administração &gt; Grupo &gt; Função</strong>. O admin herda o uso comum e enxerga apenas as funções que seu nível autoriza; funções de infraestrutura permanecem exclusivas do Superadministrador e nem sequer aparecem no grupo." },
       { t: "tabela", cabecalho: ["Grupo", "Funções e uso principal"], linhas: [
-        ["Gestão", "Usuários, Proprietários de sala e (Superadministrador) Relatos de problemas: a operação administrativa de rotina"],
+        ["Gestão", "Usuários, Proprietários de sala, Sessões, Ativos, Mapa e (Superadministrador) Relatos de problemas: pessoas, acesso e acompanhamento de uso"],
         ["Dispositivos", "Cadastro, Histórico, Notificações e Firmware / OTA: o ciclo de vida dos ESP32"],
-        ["Monitoramento", "Ativos, Mapa e (Superadministrador) Saúde do sistema: observação de estado e diagnóstico"],
-        ["Sistema", "Sessões, Logs, Acessos ESP32 e (Superadministrador) Configurações e Auditoria: configuração, segurança e trilhas de histórico"],
+        ["Sistema", "Logs (com a visão interna Acesso) e, para o Superadministrador, Status, Configurações e Auditoria: trilhas, diagnóstico e configuração"],
       ] },
       { t: "fluxo", titulo: "Grupo Dispositivos", itens: [
         { tipo: "screen", texto: "Cadastro: vincular o ESP32 à sala" },
@@ -20,7 +19,7 @@ const adminSections = [
         { tipo: "status", texto: "Notificações: avisos compartilhados" },
         { tipo: "device", texto: "Firmware / OTA: atualizar e manter a placa" },
       ] },
-      { t: "nota", texto: "Configurações globais, restrição da sala, Cadastro de ESP32, credenciais, IR, Firmware / OTA, Saúde do sistema, Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou um atalho antigo tente abri-los." },
+      { t: "nota", texto: "Configurações globais, restrição da sala, Cadastro de ESP32, credenciais, IR, Firmware / OTA, Status, Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou um atalho antigo tente abri-los." },
     ],
   },
   {
@@ -99,7 +98,7 @@ const adminSections = [
         "Oriente o proprietário a abrir <strong>Config.</strong> e administrar os usuários daquela sala.",
         "Revogue a propriedade quando a responsabilidade terminar; revise separadamente os acessos que já tenham sido concedidos.",
       ] },
-      { t: "p", texto: "<strong>Administração &gt; Monitoramento &gt; Mapa</strong> consolida conexão, ligado/desligado e reservas por sala. É uma visão de triagem: selecione a sala ou use as funções específicas para investigar; o mapa não executa manutenção." },
+      { t: "p", texto: "<strong>Administração &gt; Gestão &gt; Mapa</strong> consolida conexão, ligado/desligado e reservas por sala. É uma visão de triagem: selecione a sala ou use as funções específicas para investigar; o mapa não executa manutenção." },
       { t: "nota", texto: "A opção que torna a sala restrita é aplicada pelo servidor somente para Superadministrador. Admin comum pode manter proprietários e listas permitidas, mas não mudar esse estado." },
       { t: "links", itens: [{ id: "controle-acesso-sala", texto: "Procedimento do proprietário" }, { id: "esp32-cadastro", texto: "Cadastro, restrição e limites por sala (Superadmin)" }] },
     ],
@@ -112,8 +111,8 @@ const adminSections = [
     tags: ["online", "inativo", "login", "logout", "histórico"],
     verNoApp: "/admin/ativos",
     corpo: [
-      { t: "p", texto: "<strong>Administração &gt; Monitoramento &gt; Ativos</strong> mostra presença recente: online, inativo ou offline conforme sessão e limiar configurado. Use-o para operação corrente, não como registro definitivo de frequência." },
-      { t: "p", texto: "<strong>Administração &gt; Sistema &gt; Sessões</strong> mantém login, logout e duração. Filtre pela data quando investigar acesso. Reiniciar o servidor fecha sessões que estavam abertas; expiração, saída e troca de senha também alteram o histórico." },
+      { t: "p", texto: "<strong>Administração &gt; Gestão &gt; Ativos</strong> mostra presença recente: online, inativo ou offline conforme sessão e limiar configurado. Use-o para operação corrente, não como registro definitivo de frequência." },
+      { t: "p", texto: "<strong>Administração &gt; Gestão &gt; Sessões</strong> mantém login, logout e duração. Filtre pela data quando investigar acesso. Reiniciar o servidor fecha sessões que estavam abertas; expiração, saída e troca de senha também alteram o histórico." },
       { t: "sub", titulo: "Excluir histórico" },
       { t: "lista", itens: [
         "<strong>Excluir data</strong> remove os registros do dia filtrado; <strong>Excluir tudo</strong> remove todo o histórico da aba.",
@@ -124,24 +123,24 @@ const adminSections = [
   },
   {
     id: "logs-dispositivos",
-    titulo: "Logs, Histórico de dispositivos e Acessos ESP32",
+    titulo: "Logs, Acesso e Histórico de dispositivos",
     papel: "admin",
     categoria: "admin_historicos",
-    tags: ["Logs", "Histórico", "Dispositivos", "Acessos ESP32", "comando", "origem"],
+    tags: ["Logs", "Acesso", "Histórico", "Dispositivos", "comando", "origem"],
     verNoApp: "/admin/logs",
     corpo: [
       { t: "tabela", cabecalho: ["Função", "Evidência disponível"], linhas: [
-        ["Sistema > Logs", "comando, valor, sala, usuário/sistema, origem e horário; até 300 resultados por consulta"],
+        ["Sistema > Logs > Comandos", "comando, valor, sala, usuário/sistema, origem e horário; até 300 resultados por consulta"],
+        ["Sistema > Logs > Acesso", "requisições registradas pelos controladores ao servidor, com IP de origem e filtro por data"],
         ["Dispositivos > Histórico", "eventos de conexão dos controladores, filtráveis por data"],
-        ["Sistema > Acessos ESP32", "acessos registrados pelos controladores à interface/serviço local, filtráveis por data"],
       ] },
       { t: "passos", itens: [
         "Comece pela sala e pelo intervalo relatados.",
-        "Em <strong>Administração &gt; Sistema &gt; Logs</strong>, filtre data, sala ou andar e compare a origem: manual, agendamento ou sistema.",
+        "Em <strong>Administração &gt; Sistema &gt; Logs</strong>, use a aba <strong>Comandos</strong> e filtre data, sala ou andar comparando a origem: manual, agendamento ou sistema.",
         "Em <strong>Administração &gt; Dispositivos &gt; Histórico</strong>, confirme quedas e retornos próximos ao comando.",
-        "Use <strong>Administração &gt; Sistema &gt; Acessos ESP32</strong> como evidência complementar, não como confirmação de que o ar respondeu ao infravermelho.",
+        "Na mesma tela, a aba <strong>Acesso</strong> reúne as requisições dos controladores ao servidor: use-a como evidência complementar, não como confirmação de que o ar respondeu ao infravermelho.",
       ] },
-      { t: "nota", nivel: "atencao", texto: "Logs e Acessos ESP32 permitem excluir a data filtrada ou tudo, com confirmação e sem recuperação. O Histórico de dispositivos é somente consulta. Nenhuma dessas funções mede o efeito físico no aparelho." },
+      { t: "nota", nivel: "atencao", texto: "As duas abas de <strong>Logs</strong> permitem excluir a data filtrada ou tudo, com confirmação e sem recuperação. O Histórico de dispositivos é somente consulta. Nenhuma dessas funções mede o efeito físico no aparelho." },
     ],
   },
   {
@@ -156,7 +155,7 @@ const adminSections = [
       { t: "lista", itens: [
         "Selecione uma notificação não lida para marcá-la como lida nos dois lugares.",
         "<strong>Marcar todas como lidas</strong> zera o indicador para a fila compartilhada, portanto afeta o que todos os administradores verão como pendente.",
-        "Ler não resolve a causa. Abra <strong>Dispositivos &gt; Histórico</strong>, <strong>Monitoramento &gt; Saúde do sistema</strong> ou <strong>Dispositivos &gt; Firmware / OTA</strong> conforme o tipo e registre a intervenção quando necessário.",
+        "Ler não resolve a causa. Abra <strong>Dispositivos &gt; Histórico</strong>, <strong>Sistema &gt; Status</strong> ou <strong>Dispositivos &gt; Firmware / OTA</strong> conforme o tipo e registre a intervenção quando necessário.",
       ] },
     ],
   },
