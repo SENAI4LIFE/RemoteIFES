@@ -153,7 +153,35 @@ function cadastrarMac(sala, mac) {
   const deviceHub = require("./deviceHub");
   deviceHub.desconectarSala(sala);
   logger.info("sala-mac-cadastrado", { sala, mac: macLimpo });
-  return buscar(sala);
+  const atualizada = buscar(sala);
+  eventos.emit("cadastro-dispositivo", { sala });
+  eventos.emit("mudanca");
+  return atualizada;
+}
+
+function linhaAdministrativa(salaRow) {
+  return {
+    sala: salaRow.sala,
+    nome: salaRow.nome,
+    bloco: salaRow.bloco,
+    andar: salaRow.andar,
+    online: !!salaRow.online,
+    ligado: !!salaRow.ligado,
+    ipEsp32: salaRow.ipEsp32,
+    mac: salaRow.mac,
+    temperaturaMinima: salaRow.temperaturaMinima,
+    temperaturaMaxima: salaRow.temperaturaMaxima,
+    acessoRestrito: !!salaRow.acessoRestrito,
+  };
+}
+
+function listarAdministrativo() {
+  return listar().map(linhaAdministrativa);
+}
+
+function buscarAdministrativo(sala) {
+  const salaRow = buscar(sala);
+  return salaRow ? linhaAdministrativa(salaRow) : null;
 }
 
 function definirAcessoRestrito(sala, restrito) {
@@ -287,9 +315,6 @@ function definirLimitesTemperatura(sala, { minima, maxima }) {
   return atualizada;
 }
 
-// Transição autoritativa para offline. Chamada assim que o servidor sabe que a conexão do
-// dispositivo acabou (fechamento do WebSocket) e também pelo varredor de heartbeat vencido.
-// É idempotente: uma sala já offline não gera evento, notificação nem broadcast de novo.
 function marcarOffline(sala, nome = null, motivo = "desconexao") {
   const linha = db.prepare(`SELECT sala, nome, online FROM salas WHERE sala = ?`).get(sala);
   if (!linha || !linha.online) return false;
@@ -631,6 +656,8 @@ module.exports = {
   listarAcessosEsp,
   apagarAcessosEsp,
   cadastrarMac,
+  listarAdministrativo,
+  buscarAdministrativo,
   identificarDispositivo,
   comandoEstadoIR,
   definirLimitesTemperatura,

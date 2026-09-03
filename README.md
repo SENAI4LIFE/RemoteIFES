@@ -47,7 +47,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Restrição de Rede](#restrição-de-rede)
 - [Segurança](#segurança)
 - [Tempo Real (WebSocket)](#tempo-real-websocket)
-- [Interface Local do ESP32 e Painel Avançado (Admin > ESP32)](#interface-local-do-esp32-e-painel-avançado-admin--esp32)
+- [Interface Local do ESP32 e Painel Avançado (Administração > Dispositivos > Firmware / OTA)](#interface-local-do-esp32-e-painel-avançado-administração--dispositivos--firmware--ota)
 - [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)
 - [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)
 - [Monitoramento Operacional](#monitoramento-operacional)
@@ -96,7 +96,7 @@ O sistema tem três níveis de usuário:
 |---|---|---|
 | 1 | Usuário comum | Ligar/desligar e ajustar a temperatura das salas liberadas para controle; enviar relatos de problema pelo ícone de inseto no topo |
 | 2 | Administrador (`admin`) | Tudo do nível 1, além de gerenciar agendamentos, grade de horários, notificações de dispositivos, sessões, logs, dispositivos e usuários comuns |
-| 3 | Superadministrador (`superadmin`) | Tudo do nível 2, além de alterar configurações globais, limites globais e por sala, função extra do Turbo, redes autorizadas, modo de teste, cadastro de ESP32 por MAC, o painel avançado de cada ESP32 (`Admin > ESP32`) e a gestão dos relatos de problema enviados pelos usuários — inclusive a exclusão permanente de um relato — em `Admin > Relatos de problemas` |
+| 3 | Superadministrador (`superadmin`) | Tudo do nível 2, além de alterar configurações globais, limites globais e por sala, função extra do Turbo, redes autorizadas, modo de teste, cadastro de ESP32 por MAC, o painel avançado de cada ESP32 (`Administração > Dispositivos > Firmware / OTA`) e a gestão dos relatos de problema enviados pelos usuários — inclusive a exclusão permanente de um relato — em `Administração > Gestão > Relatos de problemas` |
 
 A conta padrão do nível 3 usa o login `superadmin` (nome exibido "Superadministrador"). Instalações anteriores que usavam o login `admin` são migradas automaticamente para `superadmin` no primeiro boot após a atualização, preservando id, hash de senha, nível e permissões; o identificador interno do papel continua sendo `superadmin`.
 
@@ -108,7 +108,20 @@ Todas as permissões são impostas no backend (não apenas escondidas na interfa
 
 ### Início (hub)
 
-Após o login o aplicativo abre no **Início** (`#/inicio`, também a aba "Início" e o logotipo no topo): um painel visual que reúne as ações principais em cartões, na ordem de uso mais comum — selecionar sala, planta baixa, agenda e grade (administrador), notificações (administrador), relatar um problema, ajuda/manual e aplicativo móvel. Os cartões respeitam o papel do usuário e apenas abrem telas já existentes (nenhuma função é duplicada). Abaixo das ações operacionais, administradores veem atalhos para as sub-abas de **Administração**; o superadministrador vê ainda uma faixa curta com o estado do banco, do armazenamento, dos ESP32 e dos backups, com link para o Monitoramento. No celular o hub vira uma lista de cartões de toque em coluna única. O hub não altera o roteamento: todos os endereços e o comportamento de refresh/histórico continuam iguais.
+Após o login o aplicativo abre no **Início** (`#/inicio`, também a aba "Início" e o logotipo no topo): um painel visual que reúne as ações principais em cartões, na ordem de uso mais comum — selecionar sala, planta baixa, agenda e grade (administrador), notificações (administrador), relatar um problema, ajuda/manual e aplicativo móvel. Os cartões respeitam o papel do usuário e apenas abrem telas já existentes (nenhuma função é duplicada). Abaixo das ações operacionais, administradores veem atalhos para as funções de **Administração**, cada um identificado pelo grupo a que pertence (`Dispositivos · Cadastro`, por exemplo); o superadministrador vê ainda uma faixa curta com o estado do banco, do armazenamento, dos ESP32 e dos backups, com link para o Monitoramento. No celular o hub vira uma lista de cartões de toque em coluna única. O hub não altera o roteamento: todos os endereços e o comportamento de refresh/histórico continuam iguais.
+
+### Organização da Administração
+
+A aba **Admin** organiza suas funções em quatro grupos, sempre em dois níveis (`Administração > Grupo > Função`), na mesma barra de navegação lateral (ou rolável, em telas estreitas) usada antes:
+
+| Grupo | Funções |
+| --- | --- |
+| **Gestão** | Usuários, Proprietários de sala, Relatos de problemas |
+| **Dispositivos** | Cadastro, Histórico, Notificações, Firmware / OTA |
+| **Monitoramento** | Ativos, Mapa, Saúde do sistema |
+| **Sistema** | Sessões, Logs, Acessos ESP32, Configurações, Auditoria |
+
+O agrupamento é apenas de apresentação: cada função mantém a permissão que já tinha, os endereços `#/admin/<função>` continuam os mesmos e um grupo cujas funções estejam todas fora do nível do usuário não é exibido. Para um administrador comum, por exemplo, **Dispositivos** mostra apenas Histórico e Notificações.
 
 ### Formas de chegar a uma sala
 
@@ -136,7 +149,7 @@ A estratégia é **hash routing** (fragmento), não History API, por ser a únic
 
 A versão canônica do frontend fica em `remoteifes-web/version.json` e também é exposta pelo meta `remoteifes-version` e por `window.REMOTEIFES_FRONTEND_VERSION`. HTML, scripts, estilos e imagens usam essa versão na URL. O service worker instala o novo app-shell de forma atômica, usa rede primeiro para navegações, remove somente caches RemoteIFES obsoletos e mantém o shell novo para uso offline. Toda alteração publicada em `remoteifes-web` deve avançar essa versão nos pontos validados por `remoteifes-server/test/frontend-version.test.js`; o teste falha se HTML, manifesto, JavaScript ou worker ficarem desencontrados.
 
-Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do superadministrador sem esse nível cai em `Admin > Usuários`; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
+Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do superadministrador sem esse nível cai em `Administração > Gestão > Usuários`; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
 
 As 86 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio. Um código de sala pode representar duas salas físicas controladas pelo mesmo ESP32 (ex.: `B-105-B-106`); nesse caso a interface exibe as duas etiquetas empilhadas no mesmo bloco do mapa.
 
@@ -146,7 +159,7 @@ Além da permissão geral "pode controlar" (nível de usuário), existem dois me
 
 ### Acesso restrito por sala
 
-Em `Admin > ESP32 / MACs` (ou em `Admin > Proprietários de sala`), o superadministrador pode marcar uma sala como **acesso restrito**:
+Em `Administração > Dispositivos > Cadastro` (ou em `Administração > Gestão > Proprietários de sala`), o superadministrador pode marcar uma sala como **acesso restrito**:
 
 1. Isso impede que qualquer usuário comum a controle, mesmo com a permissão geral ativa — exceto os usuários explicitamente autorizados para aquela sala.
 2. Usuários autorizados são concedidos/revogados individualmente, por sala.
@@ -156,7 +169,7 @@ A verificação é feita no backend (`aplicarComando`), então mesmo chamadas di
 
 ### Proprietários de sala
 
-Qualquer administrador pode tornar um usuário comum **proprietário** de uma sala específica, em `Admin > Proprietários de sala`. Um proprietário:
+Qualquer administrador pode tornar um usuário comum **proprietário** de uma sala específica, em `Administração > Gestão > Proprietários de sala`. Um proprietário:
 
 - Ganha acesso a uma aba própria ("Config.", intitulada "Configurações de sala") onde vê apenas as salas das quais é dono.
 - Pode, nessa aba, conceder e revogar o acesso de controle de outros usuários comuns à(s) sua(s) sala(s) — sem precisar de privilégios administrativos e sem enxergar o restante do painel de administração.
@@ -186,15 +199,15 @@ A aba **Grade** (visível apenas para administradores) mostra, para uma sala e d
 
 O controlador possui somente as ações fixas necessárias: diminuir temperatura à esquerda, ligar/desligar ao centro, aumentar temperatura à direita e Turbo abaixo do botão de energia. A disposição não pode ser arrastada nem editada.
 
-O superadministrador configura os limites globais de temperatura, inicialmente 23 °C e 25 °C. Cada sala pode substituir apenas o mínimo, apenas o máximo ou os dois em `Admin > ESP32 / MACs`; um campo deixado vazio herda seu valor global correspondente. Os limites efetivos são aplicados aos comandos manuais, agendamentos e testes de infravermelho. Ao estreitar um intervalo, temperaturas alvo e agendadas existentes são ajustadas para o novo intervalo.
+O superadministrador configura os limites globais de temperatura, inicialmente 23 °C e 25 °C. Cada sala pode substituir apenas o mínimo, apenas o máximo ou os dois em `Administração > Dispositivos > Cadastro`; um campo deixado vazio herda seu valor global correspondente. Os limites efetivos são aplicados aos comandos manuais, agendamentos e testes de infravermelho. Ao estreitar um intervalo, temperaturas alvo e agendadas existentes são ajustadas para o novo intervalo.
 
-O Turbo transmite o modo turbo suportado pelo protocolo IR da sala. Em `Admin > Configurações`, o superadministrador também pode configurar o Turbo para acionar simultaneamente a oscilação vertical, ou deixá-lo sem função adicional.
+O Turbo transmite o modo turbo suportado pelo protocolo IR da sala. Em `Administração > Sistema > Configurações`, o superadministrador também pode configurar o Turbo para acionar simultaneamente a oscilação vertical, ou deixá-lo sem função adicional.
 
 ## Notificações
 
 O topo da interface tem dois indicadores com significados distintos, cada um com seu rótulo acessível:
 
-- **Sino** — notificações de dispositivos/ESP32, visível apenas a administradores. O sistema gera notificações automáticas quando um ESP32 que estava online fica offline (timeout de heartbeat), quando uma atualização de firmware por OTA conclui ou falha, e quando o [monitoramento operacional](#monitoramento-operacional) detecta uma condição de alerta (disco baixo, backup atrasado, ESP32 instável etc.), sem repetir o mesmo alerta dentro de 6 horas. O painel permite ver a lista mais recente com data/hora, marcar uma notificação como lida (ao clicar nela) e marcar todas de uma vez. O ponto vermelho no sino reflete a contagem de não lidas.
+- **Sino** — notificações de dispositivos/ESP32, visível apenas a administradores. O sistema gera notificações automáticas quando um ESP32 que estava online fica offline (timeout de heartbeat), quando uma atualização de firmware por OTA conclui ou falha, e quando o [monitoramento operacional](#monitoramento-operacional) detecta uma condição de alerta (disco baixo, backup atrasado, ESP32 instável etc.), sem repetir o mesmo alerta dentro de 6 horas. O painel permite ver a lista mais recente com data/hora, marcar uma notificação como lida (ao clicar nela) e marcar todas de uma vez. O ponto vermelho no sino reflete a contagem de não lidas. A mesma fila aparece em `Administração > Dispositivos > Notificações`.
 - **Inseto (bug)** — relatos de problema enviados pelos usuários (veja a seção abaixo).
 
 ## Relatos de Problema
@@ -203,7 +216,7 @@ Qualquer usuário autenticado pode abrir o painel do ícone de inseto no topo e 
 
 Cada relato guarda: id único, usuário (com nome/login preservados mesmo se a conta for removida depois), data de criação e de última atualização, categoria, sala/página, contexto técnico, status e a resposta/anotação da equipe.
 
-**Envio e gestão são separados.** Qualquer usuário — inclusive o superadministrador — envia relatos pelo painel do ícone de inseto, que mostra também os **próprios** relatos e o status de cada um; esse painel nunca contém a fila de gestão. A gestão fica em **`Administração > Relatos de problemas`**, uma sub-aba exclusiva do superadministrador com contadores por situação, filtros (novos, abertos, em análise, resolvidos), abertura de cada relato com autor, horário e detalhes, e as ações de marcar em análise, resolver ou reabrir, com uma resposta opcional que fica visível ao autor. Abrir um relato ainda `novo` o marca automaticamente como `aberto`. Essa sub-aba trata apenas relatos **já enviados** pelos usuários; não há formulário de envio nela. Tanto o ícone de inseto quanto a própria sub-aba exibem um contador discreto com a quantidade de relatos novos ainda não vistos; o painel de envio do superadmin traz um atalho para essa sub-aba.
+**Envio e gestão são separados.** Qualquer usuário — inclusive o superadministrador — envia relatos pelo painel do ícone de inseto, que mostra também os **próprios** relatos e o status de cada um; esse painel nunca contém a fila de gestão. A gestão fica em **`Administração > Gestão > Relatos de problemas`**, uma sub-aba exclusiva do superadministrador com contadores por situação, filtros (novos, abertos, em análise, resolvidos), abertura de cada relato com autor, horário e detalhes, e as ações de marcar em análise, resolver ou reabrir, com uma resposta opcional que fica visível ao autor. Abrir um relato ainda `novo` o marca automaticamente como `aberto`. Essa sub-aba trata apenas relatos **já enviados** pelos usuários; não há formulário de envio nela. Tanto o ícone de inseto quanto a própria sub-aba exibem um contador discreto com a quantidade de relatos novos ainda não vistos; o painel de envio do superadmin traz um atalho para essa sub-aba.
 
 Dentro da janela de detalhe, o superadministrador pode ainda **excluir permanentemente** um relato. A exclusão fica atrás de uma confirmação em duas etapas dentro da própria janela (não usa `confirm()` do navegador), avisa que a ação não pode ser desfeita e remove a descrição, a resposta e o histórico de revisão. O backend expõe `DELETE /superadmin/relatos/:id` sob `exigirSuperAdmin` e registra apenas metadados no log (`relato-removido`: id, status anterior, quem removeu) — nunca o texto.
 
@@ -213,22 +226,22 @@ A tabela `relatos` é criada automaticamente na inicialização do servidor (`CR
 
 ## Sessões e Tempo de Inatividade
 
-O servidor registra cada login como uma sessão (token, horário de início, último uso e, ao sair, horário de logout). Isso alimenta duas sub-abas em `Admin`:
+O servidor registra cada login como uma sessão (token, horário de início, último uso e, ao sair, horário de logout). Isso alimenta duas funções da Administração:
 
-- **Ativos**: usuários com uma sessão em aberto, com um cronômetro de tempo de sessão em tempo real e um status calculado a partir do último uso — `online` (dentro do limiar configurado), `inativo` (sessão aberta, mas sem uso recente) ou `offline`.
-- **Sessões**: histórico de logins/logouts, com duração de cada sessão, filtrável por data e removível (por data ou por completo).
+- **`Administração > Monitoramento > Ativos`**: usuários com uma sessão em aberto, com um cronômetro de tempo de sessão em tempo real e um status calculado a partir do último uso — `online` (dentro do limiar configurado), `inativo` (sessão aberta, mas sem uso recente) ou `offline`.
+- **`Administração > Sistema > Sessões`**: histórico de logins/logouts, com duração de cada sessão, filtrável por data e removível (por data ou por completo).
 
 O servidor encerra sessões sem atividade e continua sendo a autoridade sobre o prazo, inclusive para REST e WebSocket. A interface mostra uma contagem regressiva junto às iniciais da conta, atualizada localmente a partir do prazo informado pelo servidor, sem consultas a cada segundo. Clique, mouse, tecla ou toque renovam o prazo pelo mecanismo de sessão existente; o aviso prévio permite continuar conectado. Atividade, logout e expiração são sincronizados entre abas. Os padrões são 60 minutos para usuários e 720 minutos para administradores e superadministrador. Além disso, **toda reinicialização do servidor encerra as sessões em aberto**: depois de um restart, os usuários precisam entrar novamente.
 
 ## Auditoria (Logs, Dispositivos e Acessos)
 
-Em `Admin`, três sub-abas registram o histórico operacional do sistema, todas filtráveis por data e com opção de apagar registros (ação irreversível):
+Três funções da Administração registram o histórico operacional do sistema, todas filtráveis por data e com opção de apagar registros (ação irreversível):
 
-- **Logs**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o comando parte da interface local do próprio dispositivo).
-- **Dispositivos**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
-- **Acessos ESP32**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
+- **`Administração > Sistema > Logs`**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o comando parte da interface local do próprio dispositivo).
+- **`Administração > Dispositivos > Histórico`**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
+- **`Administração > Sistema > Acessos ESP32`**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
 
-O superadministrador dispõe ainda de **`Administração > Auditoria`**, uma visão paginada e filtrável de ações administrativas importantes, como criação, alteração e exclusão de contas, mudanças de papel e configuração e operações relevantes sobre ESP32. Os registros contêm apenas metadados concisos — nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e duração calculada quando há reconexão. Interface e APIs exigem `superadmin`; a retenção padrão é 7 dias, configurável entre 1 e 365 dias em Administração.
+O superadministrador dispõe ainda de **`Administração > Sistema > Auditoria`**, uma visão paginada e filtrável de ações administrativas importantes, como criação, alteração e exclusão de contas, mudanças de papel e configuração e operações relevantes sobre ESP32. Os registros contêm apenas metadados concisos — nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e duração calculada quando há reconexão. Interface e APIs exigem `superadmin`; a retenção padrão é 7 dias, configurável entre 1 e 365 dias em Administração.
 
 ### Manutenção automática do banco
 
@@ -295,10 +308,10 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 - **Senhas**: armazenadas como hash `bcrypt` (nunca em texto puro); mínimo de 8 caracteres.
 - **Sessões**: o token de sessão retornado no login é aleatório (`crypto.randomBytes`), mas o valor gravado no banco (`sessoes.token`) é o hash SHA-256 do token, não o token em si — um vazamento do banco de dados não permite sequestrar sessões ativas diretamente. Sessões inativas por mais de 24h são encerradas automaticamente pelo servidor.
 - **Autorização**: todos os papéis (usuário, administrador, superadministrador) e as permissões pontuais (proprietário de sala, acesso restrito) são checados no backend em cada rota, nunca apenas escondidos na interface.
-- **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o superadministrador associa seu MAC a uma sala em `Admin > ESP32 / MACs`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits, guardado só como hash SHA-256): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação com tolerância de 24 h, revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
+- **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o superadministrador associa seu MAC a uma sala em `Administração > Dispositivos > Cadastro`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits, guardado só como hash SHA-256): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação com tolerância de 24 h, revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
 - **Atualização de firmware (OTA)**: a imagem publicada no servidor é verificada por SHA-256 pelo ESP32 antes de ser instalada; a gravação usa um segundo slot de aplicação e o bootloader reverte sozinho se o novo firmware não passar no autoteste pós-boot. OTA concorrente para a mesma sala é recusada e a gravação por USB continua como caminho de recuperação. Veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32).
 - **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do superadministrador no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria.
-- **Ponto de acesso de configuração**: a rede `RemoteIFES-Setup` fica **permanentemente no ar**, inclusive durante a operação normal — o ESP32 opera em AP+STA, mantendo ao mesmo tempo o ponto de acesso, a conexão com a rede institucional e o WebSocket com o servidor. Ela não é aberta nem fechada conforme o estado da rede. A exigência de senha é decidida pela opção global **Exigir senha na rede de configuração dos ESP32** em `Admin > Configurações`: **desativada por padrão**, deixando a rede aberta; quando ativada, o ponto de acesso passa a usar a senha padrão do firmware, `remoteifes`, também exibida no console serial físico. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura. Com a rede aberta, qualquer pessoa ao alcance do rádio pode abrir o portal e reprovisionar o dispositivo: ative a exigência de senha onde o acesso físico à área não for controlado.
+- **Ponto de acesso de configuração**: a rede `RemoteIFES-Setup` fica **permanentemente no ar**, inclusive durante a operação normal — o ESP32 opera em AP+STA, mantendo ao mesmo tempo o ponto de acesso, a conexão com a rede institucional e o WebSocket com o servidor. Ela não é aberta nem fechada conforme o estado da rede. A exigência de senha é decidida pela opção global **Exigir senha na rede de configuração dos ESP32** em `Administração > Sistema > Configurações`: **desativada por padrão**, deixando a rede aberta; quando ativada, o ponto de acesso passa a usar a senha padrão do firmware, `remoteifes`, também exibida no console serial físico. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso; pela rede operacional, a interface local permanece somente leitura. Com a rede aberta, qualquer pessoa ao alcance do rádio pode abrir o portal e reprovisionar o dispositivo: ative a exigência de senha onde o acesso físico à área não for controlado.
 - **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
 - **Rate limiting**: tentativas de login, chamadas dos dispositivos (`/dispositivo/*`), comandos manuais (`/comando`) e envio de relatos de problema (`/relatos`) têm limites por IP para reduzir força bruta, tempestades de comando e spam; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
 - **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
@@ -311,11 +324,13 @@ Resumo das principais medidas de segurança implementadas no servidor central (d
 
 O servidor expõe um endpoint WebSocket em `/ws`. Quando o cliente já está autenticado, o token de sessão é enviado pelo campo padrão `Sec-WebSocket-Protocol` do handshake (não por query string) — isso evita que o token fique registrado em logs de acesso de proxies reversos, que costumam gravar a URL completa da requisição. Ao conectar autenticado, o cliente recebe a lista de salas e pode "observar" uma sala específica para receber atualizações do seu status assim que qualquer mudança ocorrer (comando manual, agendamento ou heartbeat do ESP32), sem precisar recarregar a tela. A conexão é também retransmitida periodicamente (a cada 30 segundos) como reforço, e o frontend reconecta automaticamente com espera crescente caso a conexão caia. Um aparelho que suspende ou troca de rede pode deixar o socket aberto sem tráfego e sem evento de fechamento; por isso, ao voltar ao primeiro plano — e enquanto a tela estiver visível, se o reforço de 30 segundos não chegar — o frontend pede uma prova de vida pelo próprio canal e recicla a conexão quando ela não responde, em vez de seguir exibindo o último estado recebido como se fosse o atual. Esse canal alimenta o assistente simples, a lista de salas, o mapa da planta baixa e o painel de controle de cada sala.
 
+Esse mesmo canal transporta as mudanças administrativas que precisam ser vistas na hora: ao gravar o vínculo de um MAC com uma sala, o servidor emite o estado autoritativo daquele cadastro para as sessões de nível administrativo conectadas, e `Administração > Dispositivos > Cadastro` se atualiza sem recarregar, em qualquer sessão aberta. O broadcast parte sempre do estado já persistido no servidor, nunca de uma suposição do navegador.
+
 O frontend mantém uma única conexão WebSocket por aba (compartilhada entre a tela de status do servidor e o canal de salas/status), em vez de abrir conexões redundantes. O servidor também limita a quantidade de mensagens que uma conexão autenticada pode enviar em uma janela de tempo curta, encerrando a conexão em caso de flood.
 
 Se você configurar um proxy reverso manualmente, garanta que ele propague os cabeçalhos `Upgrade` e `Connection` do handshake WebSocket — sem isso, `/ws` não funciona atrás do proxy. `lan-setup.sh` e `https-setup.sh` já geram a configuração de Nginx correta para isso.
 
-## Interface Local do ESP32 e Painel Avançado (Admin > ESP32)
+## Interface Local do ESP32 e Painel Avançado (Administração > Dispositivos > Firmware / OTA)
 
 O firmware do ESP32 tem dois modos de funcionamento bem separados, com uma transição explícita entre eles:
 
@@ -327,7 +342,7 @@ Isso substitui a antiga interface web local completa do dispositivo. Hoje, o ESP
 - Uma página de **status somente leitura**, mostrando sala, MAC, IP, servidor configurado e versão do firmware — para conferência visual direta no equipamento.
 - O **portal de provisionamento** na rede `RemoteIFES-Setup`, disponível o tempo todo — na configuração inicial, após um reset de Wi-Fi e também durante a operação normal — veja [Segurança](#segurança).
 
-Todas as funções antes exclusivas da interface local do dispositivo (entrar/sair do modo de configuração, ativar o modo clonagem, iniciar/parar captura de infravermelho, testar um sinal capturado, resetar o Wi-Fi remotamente) agora ficam em uma aba dedicada da aplicação principal, **`Admin > ESP32`**, visível apenas ao superadministrador:
+Todas as funções antes exclusivas da interface local do dispositivo (entrar/sair do modo de configuração, ativar o modo clonagem, iniciar/parar captura de infravermelho, testar um sinal capturado, resetar o Wi-Fi remotamente) ficam, junto com o firmware e a atualização OTA, em **`Administração > Dispositivos > Firmware / OTA`**, visível apenas ao superadministrador:
 
 - Para cada sala com MAC cadastrado, mostra separadamente se o dispositivo está **online na rede Wi-Fi** e se está **conectado ao servidor** (dois estados distintos e independentes — um ESP32 pode estar na rede sem conseguir manter o WebSocket com o servidor, e vice-versa por um curto período).
 - Exibe a última leitura de temperatura e umidade, o sinal Wi-Fi (RSSI) e o **último comando infravermelho transmitido** pelo dispositivo (sinal bruto reenviado ou estado conhecido — temperatura/ligado/turbo/ventilação), tudo atualizado em tempo real.
@@ -339,11 +354,13 @@ Todas as funções antes exclusivas da interface local do dispositivo (entrar/sa
 
 Essa comunicação usa um canal WebSocket dedicado (`/ws/dispositivo`, distinto do `/ws` usado pelos navegadores) pelo qual o próprio ESP32 se conecta ao servidor como cliente. A conexão é associada à sala pelo MAC cadastrado ou pela credencial do dispositivo e é reaproveitada para telemetria, comandos administrativos e OTA, sem abrir portas adicionais no dispositivo nem exigir que o servidor alcance o ESP32 diretamente. O ESP32 reconecta automaticamente caso a conexão caia, e o servidor reaplica o estado desejado depois da reconexão.
 
-Em `Admin > ESP32 / MACs`, o botão "acessar interface do ESP32" continua disponível e abre, em uma nova aba, a página de status somente leitura do dispositivo no IP mais recente reportado — útil para conferência visual direta no equipamento, sem substituir as funções administrativas, que agora ficam em `Admin > ESP32`.
+Em `Administração > Dispositivos > Cadastro`, o botão "acessar interface do ESP32" continua disponível e abre, em uma nova aba, a página de status somente leitura do dispositivo no IP mais recente reportado — útil para conferência visual direta no equipamento, sem substituir as funções administrativas, que agora ficam em `Administração > Dispositivos > Firmware / OTA`.
 
 ### Detecção automática de ESP32 na rede
 
-Todo ESP32 consulta o servidor com seu MAC após entrar na rede. Mesmo sem vínculo com uma sala, ele é registrado automaticamente como detectado. Em `Admin > ESP32 / MACs`, a seção "ESP32 detectados na rede" lista esses dispositivos (MAC, IP, última vez visto) e permite vincular cada um a uma sala existente com um único clique. O dispositivo recebe a associação na próxima consulta, sem reconfiguração ou reinicialização. Um seletor de planta baixa com zoom e um campo de busca ajudam a localizar a sala.
+Todo ESP32 consulta o servidor com seu MAC após entrar na rede. Mesmo sem vínculo com uma sala, ele é registrado automaticamente como detectado. Em `Administração > Dispositivos > Cadastro`, a seção "ESP32 detectados na rede" lista esses dispositivos (MAC, IP, última vez visto) e permite vincular cada um a uma sala existente com um único clique. O dispositivo recebe a associação na próxima consulta, sem reconfiguração ou reinicialização. Um seletor de planta baixa com zoom e um campo de busca ajudam a localizar a sala.
+
+Assim que o servidor grava o vínculo, ele avisa pelo próprio WebSocket todas as sessões administrativas conectadas: o cadastro passa a constar imediatamente em `Administração > Dispositivos > Cadastro` — inclusive em uma segunda sessão autorizada aberta ao mesmo tempo — **sem recarregar a página nem reabrir a aba**. Um cadastro que o servidor recusa não aparece. Cadastrado e online continuam sendo estados distintos: cada sala mostra um selo de cadastro e outro de conexão, e um ESP32 recém-cadastrado costuma aparecer offline até estabelecer sua própria conexão.
 
 ## Acessibilidade
 
@@ -478,7 +495,7 @@ Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instal
 
 `pio device monitor -b 115200` abre o monitor serial na mesma taxa configurada pelo firmware (`Serial.begin(115200)`), útil para acompanhar o boot, o IP obtido, o estado da conexão Wi-Fi/WebSocket com o servidor e mensagens de erro em tempo real. Se houver mais de uma porta serial conectada, informe-a explicitamente: `pio device monitor -b 115200 -p /dev/ttyUSB0` (Linux/Raspberry Pi) ou `pio device monitor -b 115200 -p /dev/cu.usbserial-XXXX` (macOS). Rode `pio device list` para listar as portas disponíveis.
 
-**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. Em todo boot, o ESP32 sobe o ponto de acesso `RemoteIFES-Setup` e o mantém ativo junto com a conexão à rede local (modo AP+STA). Pelo portal em `192.168.4.1` ele recebe as credenciais da rede, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o superadministrador o vincula à sala em `Admin > ESP32 / MACs`. Em falhas de Wi-Fi, o firmware tenta reconectar a cada 30 segundos sem bloquear o restante da operação e sem precisar abrir ou fechar o ponto de acesso, que permanece disponível o tempo todo para reconfiguração local.
+**Em ambos os casos**, o mesmo firmware serve para qualquer sala: nenhum dado é fixado em tempo de compilação. Em todo boot, o ESP32 sobe o ponto de acesso `RemoteIFES-Setup` e o mantém ativo junto com a conexão à rede local (modo AP+STA). Pelo portal em `192.168.4.1` ele recebe as credenciais da rede, o endereço do servidor central e, se já provisionada, a credencial exclusiva do dispositivo. Depois de conectado, o servidor detecta o MAC e o superadministrador o vincula à sala em `Administração > Dispositivos > Cadastro`. Em falhas de Wi-Fi, o firmware tenta reconectar a cada 30 segundos sem bloquear o restante da operação e sem precisar abrir ou fechar o ponto de acesso, que permanece disponível o tempo todo para reconfiguração local.
 
 A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.0.0`) e é reportada ao servidor na telemetria, no heartbeat e na página de status local. A partição do ESP32 usa o layout `min_spiffs.csv` (dois slots de aplicação de ~1,9 MB — o firmware atual ocupa ~63% de um slot), o que reserva um slot ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32) com reversão automática. **A gravação por USB (`flash.sh` / `pio run --target upload`) continua sendo o caminho de recuperação**: ela regrava o slot ativo e não depende do estado do OTA.
 
@@ -504,7 +521,7 @@ A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualme
 
 Para a operação de produção local (na rede da instituição), veja [Deploy](#deploy): o servidor entrega o frontend na mesma origem e um proxy reverso HTTP (`lan-setup.sh`) basta. HTTPS com domínio próprio (`https-setup.sh`) é necessário apenas para expor o sistema fora da rede local ou para o PWA/Cordova em domínio público, já que os aparelhos móveis exigem conteúdo servido por HTTPS.
 
-### Configurações globais (banco de dados, via `Admin > Configurações`)
+### Configurações globais (banco de dados, via `Administração > Sistema > Configurações`)
 
 Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba **Configurações** só é visível e acessível ao superadministrador — nenhum outro administrador pode ver ou alterar esses valores.
 
@@ -521,7 +538,7 @@ Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba 
 | Exigir senha na rede de configuração dos ESP32 | **desativado** | Controla apenas a rede Wi-Fi local `RemoteIFES-Setup`, que fica permanentemente ativa no dispositivo. Desativado, ela é aberta; ativado, passa a exigir a senha padrão do firmware (`remoteifes`). A mudança é propagada pelo WebSocket aos ESP32 conectados e aplicada no próximo handshake pelos demais. **Não tem relação com a autenticação do ESP32 no servidor**, que é a opção seguinte. |
 | Exigir credencial por dispositivo em todos os ESP32 | ativado em instalações normais novas | Nenhum ESP32 se conecta apenas pelo MAC enquanto esta opção estiver ativa — toda sala precisa de uma credencial provisionada. Para um controlador novo, provisione a credencial da sala no painel e informe `deviceId` e segredo junto com o Wi-Fi no portal `RemoteIFES-Setup`; em uma migração de controladores antigos, siga o fluxo gradual da seção [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). O ambiente automatizado de testes começa com a opção desativada para exercitar também o modo legado. |
 
-### ESP32 por MAC e limites por sala (via `Admin > ESP32 / MACs`)
+### ESP32 por MAC e limites por sala (via `Administração > Dispositivos > Cadastro`)
 
 O superadministrador cadastra o endereço MAC de cada ESP32 autorizado para uma sala — manualmente ou vinculando um dispositivo já detectado na rede (veja [Detecção automática de ESP32 na rede](#detecção-automática-de-esp32-na-rede)). Isso:
 
@@ -561,7 +578,7 @@ npm run redes                                   # mostra o estado atual
 sudo systemctl restart remoteifes.service
 ```
 
-As rotas `/dispositivo/*` (usadas pelos ESP32) e o acesso por `localhost` (útil para um túnel SSH) nunca dependem dessa lista. Alternativamente, para uma rede local isolada e confiável, o modo de teste pode ser deixado ligado em `Admin > Configurações`, mas o cadastro das faixas é a opção recomendada.
+As rotas `/dispositivo/*` (usadas pelos ESP32) e o acesso por `localhost` (útil para um túnel SSH) nunca dependem dessa lista. Alternativamente, para uma rede local isolada e confiável, o modo de teste pode ser deixado ligado em `Administração > Sistema > Configurações`, mas o cadastro das faixas é a opção recomendada.
 
 ### Proxy reverso na porta 80 (rede local, sem Internet)
 
@@ -641,11 +658,11 @@ Cada sala continua com seu próprio ESP32 fazendo a ponte com o ar-condicionado 
 Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo permanente. Confira estes pontos antes de deixá-la assim:
 
 - **Defina `SENHA_ADMIN_INICIAL`** no `.env` antes de criar o banco, ou leia a senha aleatória no arquivo local indicado pelo primeiro boot e troque-a no diálogo obrigatório.
-- **Mantenha o modo de teste desativado** (`Admin > Configurações > Modo de teste`) e cadastre as faixas de IP em `Redes autorizadas` para restringir o acesso à rede autorizada; em uma instalação nova de produção o modo de teste começa desativado.
+- **Mantenha o modo de teste desativado** (`Administração > Sistema > Configurações > Modo de teste`) e cadastre as faixas de IP em `Redes autorizadas` para restringir o acesso à rede autorizada; em uma instalação nova de produção o modo de teste começa desativado.
 - **Exponha apenas a porta do proxy** (80 no `lan-setup.sh`, 443 no `https-setup.sh`), nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 80` ou `ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o TLS e a checagem de `TRUST_PROXY`.
 - **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
 - **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
-- **Cadastre o MAC de cada ESP32 assim que possível** (`Admin > ESP32 / MACs`) e migre depois para a credencial exclusiva: as rotas `/dispositivo/*` não passam pela restrição de rede porque os controladores precisam alcançá-las. Sem vínculo, o dispositivo aparece apenas como detectado e não controla uma sala; com o MAC vinculado, as chamadas precisam corresponder ao cadastro; com credencial provisionada, o MAC sozinho deixa de autenticar aquela sala.
+- **Cadastre o MAC de cada ESP32 assim que possível** (`Administração > Dispositivos > Cadastro`) e migre depois para a credencial exclusiva: as rotas `/dispositivo/*` não passam pela restrição de rede porque os controladores precisam alcançá-las. Sem vínculo, o dispositivo aparece apenas como detectado e não controla uma sala; com o MAC vinculado, as chamadas precisam corresponder ao cadastro; com credencial provisionada, o MAC sozinho deixa de autenticar aquela sala.
 - **Confirme que os backups estão sendo gravados** em `<REMOTEIFES_DATA_DIR>/backups/` (`data/backups/` por padrão; em produção o backup automático já vem ligado, e `deploy.sh`/`rollback.sh` também geram um antes de cada troca de versão) e copie essa pasta para fora da Pi periodicamente. Teste a restauração ao menos uma vez com `npm run restore` num ambiente separado — um backup nunca verificado não é um backup. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
 
 ### Frontend no GitHub Pages (opcional, para demonstração)
@@ -697,7 +714,7 @@ npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.0.1 "
 
 A imagem é validada (byte mágico `0xE9`, tamanho plausível), tem o SHA-256 calculado e é gravada em `<REMOTEIFES_DATA_DIR>/firmware/` junto de um `manifesto.json`. Só uma imagem fica publicada por vez; o número de versão deve casar com o `-DFW_VERSAO` compilado nela.
 
-**Enviar a atualização a uma sala:** em `Admin > ESP32`, cada dispositivo online mostra a versão instalada, a versão publicada e um botão **Atualizar firmware (OTA)** com barra de progresso. Também é possível pela API: `POST /admin/esp32/:sala/ota` (apenas superadministrador).
+**Enviar a atualização a uma sala:** em `Administração > Dispositivos > Firmware / OTA`, cada dispositivo online mostra a versão instalada, a versão publicada e um botão **Atualizar firmware (OTA)** com barra de progresso. Também é possível pela API: `POST /admin/esp32/:sala/ota` (apenas superadministrador).
 
 O que o processo garante:
 
@@ -715,7 +732,7 @@ O modelo atual evita adulteração acidental e publicação inconsistente por SH
 
 Além da identificação por MAC, cada sala pode ter uma **credencial exclusiva** de dispositivo: um `deviceId` (`esp_…`) e um segredo aleatório de 256 bits. O servidor guarda apenas o hash SHA-256 do segredo; o valor em texto é exibido uma única vez, no momento em que é gerado, e nunca aparece em logs nem em respostas de estado.
 
-Gestão em `Admin > ESP32` (apenas superadministrador), ou pela linha de comando na máquina do servidor:
+Gestão em `Administração > Dispositivos > Firmware / OTA` (apenas superadministrador), ou pela linha de comando na máquina do servidor:
 
 ```bash
 npm run credencial -- A-101 --provisionar   # cria a credencial e imprime deviceId + segredo uma vez
@@ -731,7 +748,7 @@ O ESP32 envia a credencial no cabeçalho (`X-Device-Id` / `X-Device-Secret`) no 
 
 **Migração dos controladores atuais (padrão: brando):**
 
-1. Enquanto a opção global **Exigir credencial por dispositivo em todos os ESP32** (em `Admin > Configurações`) está desligada, uma sala **sem** credencial provisionada continua aceitando conexão só por MAC, exatamente como antes. Uma sala **com** credencial provisionada já passa a exigi-la.
+1. Enquanto a opção global **Exigir credencial por dispositivo em todos os ESP32** (em `Administração > Sistema > Configurações`) está desligada, uma sala **sem** credencial provisionada continua aceitando conexão só por MAC, exatamente como antes. Uma sala **com** credencial provisionada já passa a exigi-la.
 2. Provisione a credencial de cada sala (o painel marca as que ainda estão "só MAC"; o resumo aparece também em `GET /admin/esp32/migracao` e no [Monitoramento](#monitoramento-operacional)).
 3. Quando todas estiverem provisionadas e verdes, ligue a opção global para recusar conexões só por MAC em qualquer sala. A mudança é reversível.
 
@@ -739,7 +756,7 @@ Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma 
 
 ## Monitoramento Operacional
 
-`Admin > Monitoramento` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
+`Administração > Monitoramento > Saúde do sistema` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
 
 - **Serviço:** ambiente, tempo no ar, memória (RSS), carga de 1 minuto, versão do Node e PID.
 - **Banco de dados:** se responde e em quanto tempo, tamanho do arquivo e do WAL.
@@ -753,7 +770,7 @@ A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição d
 
 ## Mapa de Calor Operacional
 
-Dentro de `Admin > Monitoramento`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
+Dentro de `Administração > Monitoramento > Saúde do sistema`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
 
 **Métricas** (`metrica=`), todas derivadas de históricos que o sistema já retém, nunca de dados inventados:
 
@@ -1119,18 +1136,18 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Live Server abre a interface, mas não representa a implantação**: ele é apenas o modo opcional de [frontend em origem separada](#frontend-em-origem-separada-desenvolvimento-opcional). Para teste integrado, pare-o e use `http://localhost:8080` ou `http://IP_DO_SERVIDOR:8080`.
 - **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
 - **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`). No Ubuntu 24.04, não contorne a proteção de Python gerenciado com `pip --break-system-packages`: instale `pipx` pelo gerenciador de pacotes e rode `flash.sh` novamente.
-- **ESP32 não aparece como online**: confirme que o dispositivo aparece em `Admin > ESP32 / MACs`, vincule seu MAC a uma sala e verifique se ele alcança o endereço/porta do servidor pela rede local. `pio device monitor -b 115200 -p /dev/ttyUSB0` mostra o estado de Wi-Fi, identificação e WebSocket em tempo real.
-- **Botão "Iniciar captura IR" fica desabilitado em `Admin > ESP32`**: a captura só é permitida em modo clonagem; ative "Ativar modo clonagem" primeiro (o dispositivo precisa já estar em modo de configuração).
-- **Aba "ESP32" não aparece no painel administrativo**: ela é restrita ao superadministrador, assim como `Admin > Configurações`.
-- **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Admin > ESP32 / MACs`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
-- **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: vincule o MAC detectado a uma sala existente em `Admin > ESP32 / MACs`; o vínculo é recebido automaticamente na próxima consulta do dispositivo.
+- **ESP32 não aparece como online**: confirme que o dispositivo aparece em `Administração > Dispositivos > Cadastro`, vincule seu MAC a uma sala e verifique se ele alcança o endereço/porta do servidor pela rede local. `pio device monitor -b 115200 -p /dev/ttyUSB0` mostra o estado de Wi-Fi, identificação e WebSocket em tempo real.
+- **Botão "Iniciar captura IR" fica desabilitado em `Administração > Dispositivos > Firmware / OTA`**: a captura só é permitida em modo clonagem; ative "Ativar modo clonagem" primeiro (o dispositivo precisa já estar em modo de configuração).
+- **`Dispositivos > Firmware / OTA` não aparece no painel administrativo**: essa função é restrita ao superadministrador, assim como `Dispositivos > Cadastro` e `Sistema > Configurações`; um grupo cujas funções estejam todas fora do seu nível nem chega a ser exibido.
+- **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Administração > Dispositivos > Cadastro`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
+- **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: vincule o MAC detectado a uma sala existente em `Administração > Dispositivos > Cadastro`; o vínculo é recebido automaticamente na próxima consulta do dispositivo.
 - **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. O ponto de acesso `RemoteIFES-Setup` continua no ar durante a queda — como em qualquer outro momento — e permite reconfigurar o dispositivo no local sem esperar nada. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
-- **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Admin > ESP32 / MACs` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala (diretamente pelo admin, ou por um proprietário da sala).
-- **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Admin > Configurações`; a mesma restrição vale para a conexão WebSocket.
+- **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Administração > Dispositivos > Cadastro` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala (diretamente pelo admin, ou por um proprietário da sala).
+- **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Administração > Sistema > Configurações`; a mesma restrição vale para a conexão WebSocket.
 - **Frontend não fala com o servidor depois do deploy**: na implantação same-origin, acesse a URL do próprio servidor/proxy e não configure `serverUrl` nem `CORS_ORIGIN`. Se o frontend estiver em outra origem (GitHub Pages ou Cordova), confirme `serverUrl` e inclua a origem dele em `CORS_ORIGIN`; isso também afeta a conexão WebSocket.
 - **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos. Depois de o celular voltar do segundo plano, a prova de vida da conexão pode levar alguns segundos até reconectar — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
 - **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
-- **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Admin > Proprietários de sala`.
+- **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Administração > Gestão > Proprietários de sala`.
 - **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend está em HTTPS e que o navegador atende aos demais critérios de instalação. O `serverUrl` também deve usar HTTPS para a API funcionar sem bloqueio de conteúdo misto, mas não é ele que determina se o navegador oferece a instalação.
 - **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_HOME` aponta para o Android SDK, que Platform 36/Build Tools 36 estão instalados, que o JDK 17 está em `JAVA_HOME`/`PATH` e que o Gradle 8.14.2 está no `PATH` para inicializar o wrapper; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
 - **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org`); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `npm run setup` novamente.

@@ -32,7 +32,7 @@ ManualContent.registrar([
         "Confira a rede do aparelho e se outras páginas internas abrem.",
         "Aguarde a reconexão automática; evite repetir comandos cujo aceite já apareceu.",
         "No app Android configurável, confirme a origem completa do servidor e se ela é alcançável pela mesma rede.",
-        "Se somente uma sala estiver offline, relate a sala e o horário; administradores podem consultar <strong>Dispositivos</strong>.",
+        "Se somente uma sala estiver offline, relate a sala e o horário; administradores podem consultar <strong>Administração &gt; Dispositivos &gt; Histórico</strong>.",
       ] },
       { t: "nota", nivel: "atencao", texto: "O shell da PWA pode abrir sem rede, mas login, estados, comandos, relatos e dados administrativos exigem o servidor." },
     ],
@@ -121,7 +121,7 @@ ManualContent.registrar([
         ["APK recusado", "build superior, mesma assinatura, origem publicável e permissão de instalação"],
         ["Manual sem tópico administrativo", "entre com o papel correto; conteúdo privilegiado vem do servidor"],
       ] },
-      { t: "p", texto: "Ao relatar, registre a ação tentada, a mensagem exibida, a sala e o horário. Não envie segredos. Administradores podem correlacionar o evento em <strong>Logs</strong> e <strong>Dispositivos</strong>." },
+      { t: "p", texto: "Ao relatar, registre a ação tentada, a mensagem exibida, a sala e o horário. Não envie segredos. Administradores podem correlacionar o evento em <strong>Administração &gt; Sistema &gt; Logs</strong> e <strong>Administração &gt; Dispositivos &gt; Histórico</strong>." },
       { t: "links", itens: [
         { id: "conexao", texto: "Conexão e modo offline" },
         { id: "relatos", texto: "Abrir um relato útil" },

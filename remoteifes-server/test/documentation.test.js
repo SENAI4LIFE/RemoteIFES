@@ -106,3 +106,62 @@ test("procedimentos de host aparecem só no conjunto Superadministrador", () => 
     assert.ok(superadmin.includes(trecho), `Superadministrador não recebeu: ${trecho}`);
   }
 });
+
+test("manual e README descrevem a Administração agrupada em vigor", () => {
+  const manual = carregarManualPublico();
+  const documentacao = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
+
+  for (const caminho of [
+    "Administração &gt; Dispositivos &gt; Cadastro",
+    "Administração &gt; Dispositivos &gt; Histórico",
+    "Administração &gt; Dispositivos &gt; Notificações",
+    "Administração &gt; Dispositivos &gt; Firmware / OTA",
+    "Administração &gt; Gestão &gt; Usuários",
+    "Administração &gt; Sistema &gt; Configurações",
+    "Administração &gt; Sistema &gt; Auditoria",
+    "Administração &gt; Monitoramento &gt; Saúde do sistema",
+  ]) {
+    assert.ok(documentacao.includes(caminho), `caminho ausente no manual: ${caminho}`);
+  }
+
+  for (const obsoleto of [
+    /Administração &gt; ESP32/,
+    /Administração &gt; Notificações de dispositivos/,
+    /Administração &gt; Auditoria</,
+    /Administração &gt; Monitoramento</,
+    /Administração &gt; Configurações</,
+    /Administração &gt; Relatos de problemas</,
+    /Admin &gt; ESP32/,
+  ]) {
+    assert.ok(!obsoleto.test(documentacao), `navegação obsoleta ainda no manual: ${obsoleto}`);
+  }
+
+  for (const caminho of [
+    "Administração > Dispositivos > Cadastro",
+    "Administração > Dispositivos > Histórico",
+    "Administração > Dispositivos > Firmware / OTA",
+    "Administração > Sistema > Configurações",
+    "Administração > Monitoramento > Saúde do sistema",
+  ]) {
+    assert.ok(README.includes(caminho), `caminho ausente no README: ${caminho}`);
+  }
+
+  for (const obsoleto of [/`Admin > /, /Admin > ESP32/, /ESP32 \/ MACs/, /Notificações de dispositivos`/]) {
+    assert.ok(!obsoleto.test(README), `navegação obsoleta ainda no README: ${obsoleto}`);
+  }
+
+  for (const grupo of ["Gestão", "Dispositivos", "Monitoramento", "Sistema"]) {
+    assert.ok(documentacao.includes(grupo), `grupo ausente no manual: ${grupo}`);
+    assert.ok(README.includes(`**${grupo}**`), `grupo ausente na tabela do README: ${grupo}`);
+  }
+});
+
+test("o manual explica o cadastro imediato de ESP32 e a diferença entre cadastrado e online", () => {
+  const cadastro = service._superSections.find((secao) => secao.id === "esp32-cadastro");
+  const texto = JSON.stringify(cadastro);
+  assert.match(texto, /sem recarregar a página/);
+  assert.match(texto, /segunda sessão autorizada/);
+  assert.match(texto, /Cadastrado<\/strong> e <strong>conectado\/online/);
+  assert.match(texto, /costuma aparecer offline/);
+  assert.match(README, /sem recarregar a página nem reabrir a aba/);
+});

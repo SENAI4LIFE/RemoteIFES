@@ -25,7 +25,7 @@ test("administrador vê Admin, Agenda, Grade e o sino, mas não as sub-abas de s
   await expect(page.locator('.admin-subtab-btn[data-sub="esp32"]')).toBeHidden();
 });
 
-test("superadministrador vê as sub-abas exclusivas (Configurações, ESP32/MACs, ESP32)", async ({ page, sessaoComo }) => {
+test("superadministrador vê as sub-abas exclusivas (Configurações, Cadastro, Firmware / OTA)", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
   await expect(page.locator("#screen-admin")).toBeVisible();
