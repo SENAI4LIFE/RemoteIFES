@@ -3,18 +3,18 @@ const C = require("./commands");
 module.exports = [
   {
     id: "esp32-cadastro",
-    titulo: "ESP32 / MACs: detectar e vincular salas",
+    titulo: "Cadastro: detectar e vincular ESP32 às salas",
     papel: "superadmin",
     categoria: "super_dispositivos",
-    tags: ["MAC", "detectado", "vincular", "limites", "restrição"],
+    tags: ["Cadastro", "MAC", "detectado", "vincular", "limites", "restrição"],
     verNoApp: "/admin/macs",
     corpo: [
-      { t: "p", texto: "<strong>Administração &gt; ESP32 / MACs</strong> é a fonte operacional para associar uma placa a uma sala. A área separa dispositivos detectados ainda sem vínculo e as salas da planta." },
+      { t: "p", texto: "<strong>Administração &gt; Dispositivos &gt; Cadastro</strong> é a fonte operacional para associar uma placa a uma sala. A área separa dispositivos detectados ainda sem vínculo e as salas da planta. É a primeira função do grupo <strong>Dispositivos</strong>, que segue com <strong>Histórico</strong>, <strong>Notificações</strong> e <strong>Firmware / OTA</strong>." },
       { t: "sub", titulo: "Vincular um dispositivo detectado" },
       { t: "passos", itens: [
-        "Ligue o ESP32 já configurado para alcançar o servidor e aguarde aparecer em <strong>Detectados sem sala</strong> com MAC, IP, sala informada e último contato.",
+        "Ligue o ESP32 já configurado para alcançar o servidor e aguarde aparecer em <strong>ESP32 detectados na rede</strong> com MAC, IP, sala informada e último contato.",
         "Confirme fisicamente qual placa e ambiente estão sendo atendidos. Selecione a sala correta e use <strong>Vincular</strong>.",
-        "Confira o MAC e o estado na sala. O servidor rejeita MAC já associado a outra sala ou identificação incompatível.",
+        "Confira o MAC e o estado na sala. Assim que o servidor grava o vínculo, ele avisa em tempo real toda sessão administrativa aberta: o cadastro aparece sozinho, sem recarregar a página nem reabrir a aba, inclusive em uma segunda sessão autorizada. Se o salvamento falhar, nada passa a constar como cadastrado. O servidor rejeita MAC já associado a outra sala ou identificação incompatível.",
         "Use <strong>Descartar</strong> somente para remover uma detecção que não será aproveitada; a placa pode reaparecer se continuar se apresentando.",
       ] },
       { t: "sub", titulo: "Configuração por sala" },
@@ -24,6 +24,7 @@ module.exports = [
         "<strong>Acesso restrito</strong> exige autorização explícita de usuário comum. Prepare proprietários e acessos antes de ativar para evitar bloqueio inesperado.",
         "Quando há IP recente, a ação da interface local abre a página somente de status do ESP32; ela não substitui o portal de setup.",
       ] },
+      { t: "nota", texto: "<strong>Cadastrado</strong> e <strong>conectado/online</strong> são estados independentes. O cartão da sala traz os dois selos: o de cadastro confirma que o servidor guardou o vínculo do MAC; o de conexão só fica online quando a placa realmente se apresenta. Um ESP32 recém-cadastrado costuma aparecer offline até estabelecer sua própria conexão, e isso não indica falha no cadastro." },
       { t: "nota", nivel: "atencao", texto: "Trocar MAC, limites ou restrição afeta a operação real. Registre a sala, preserve o vínculo anterior e valide status, controle e agendamento depois de salvar." },
       { t: "links", itens: [{ id: "esp32-setup-ap", texto: "Provisionar rede e servidor pelo setup AP" }, { id: "esp32-credenciais", texto: "Credencial exclusiva do dispositivo" }] },
     ],
@@ -42,14 +43,14 @@ module.exports = [
         { tipo: "screen", texto: "Abrir 192.168.4.1" },
         { tipo: "action", texto: "Wi-Fi · servidor · segurança · credencial" },
         { tipo: "device", texto: "Salvar e reiniciar" },
-        { tipo: "server", texto: "Detectar, vincular MAC e validar" },
+        { tipo: "server", texto: "Detectar, vincular o MAC em Dispositivos > Cadastro e validar" },
       ] },
       { t: "passos", itens: [
         "Não é preciso preparar nada para o AP aparecer: ele sobe em todo boot e permanece ativo com o dispositivo em operação.",
         "No equipamento de manutenção, conecte à rede <strong>RemoteIFES-Setup</strong> e abra <code>http://192.168.4.1</code>. Por padrão a rede é aberta; ela só pede a senha padrão do firmware (<strong>remoteifes</strong>) quando a opção global de exigir senha estiver ativada em Configurações.",
         "Informe SSID e senha da rede, host e porta do servidor. Escolha HTTPS com CA válida em produção; HTTPS sem validação ou HTTP são opções de desenvolvimento em rede controlada.",
         "Se usar credencial, informe <strong>deviceId</strong> e segredo juntos. Deixar ambos vazios preserva uma credencial já gravada.",
-        "Salve. A placa reinicia, conecta ao Wi-Fi e ao WebSocket do servidor. Confirme detecção, vínculo da sala, IP e versão na aplicação.",
+        "Salve. A placa reinicia, conecta ao Wi-Fi e ao WebSocket do servidor. Confirme detecção, vínculo da sala, IP e versão em <strong>Administração &gt; Dispositivos &gt; Cadastro</strong>.",
       ] },
       { t: "nota", nivel: "seguranca", texto: "Com o AP permanente e sem senha, qualquer pessoa ao alcance do rádio alcança o portal e pode reprovisionar a placa. Onde o acesso físico não for controlado, ative <strong>Exigir senha na rede de configuração dos ESP32</strong> em Configurações. Essa opção é do Wi-Fi local e não substitui a credencial do dispositivo no servidor; nunca registre o segredo no manual, em relato ou em log." },
       { t: "p", texto: "Se falhar, use o monitor serial para distinguir autenticação Wi-Fi, DNS/host, porta, TLS e WebSocket. O ponto de acesso continua no ar durante a falha e depois dela, então a reconfiguração local não depende do estado da rede institucional." },
@@ -63,7 +64,7 @@ module.exports = [
     tags: ["configuração", "clonagem", "IR", "capturar", "protocolo", "Resetar Wi-Fi"],
     verNoApp: "/admin/esp32",
     corpo: [
-      { t: "p", texto: "Em <strong>Administração &gt; ESP32</strong>, cada cartão distingue Wi-Fi/telemetria do servidor e conexão WebSocket ativa, além de versão, RSSI, temperatura, protocolo IR, modo e último comando." },
+      { t: "p", texto: "Em <strong>Administração &gt; Dispositivos &gt; Firmware / OTA</strong>, cada cartão distingue Wi-Fi/telemetria do servidor e conexão WebSocket ativa, além de versão, RSSI, temperatura, protocolo IR, modo e último comando. Além do firmware, é ali que ficam a credencial, o modo de configuração, o infravermelho e o reset de Wi-Fi de cada placa." },
       { t: "sub", titulo: "Aprender ou trocar o protocolo IR" },
       { t: "passos", itens: [
         "Selecione uma sala conectada e use <strong>Entrar em modo de configuração</strong>. Operação normal fica suspensa para essa manutenção.",
@@ -114,7 +115,7 @@ module.exports = [
       { t: "sub", titulo: "Migração de só MAC" },
       { t: "passos", itens: [
         "Mantenha <strong>Exigir credencial por dispositivo em todos os ESP32</strong> desligado.",
-        "Provisione e valide cada sala; acompanhe <strong>Só MAC</strong> em Monitoramento.",
+        "Provisione e valide cada sala; acompanhe <strong>Só MAC</strong> em <strong>Administração &gt; Monitoramento &gt; Saúde do sistema</strong>.",
         "Quando todas estiverem autenticadas, ative a exigência global e confirme que nenhuma sala caiu.",
         "Em falha ampla, desative temporariamente a exigência, corrija as salas e refaça a validação.",
       ] },
@@ -147,14 +148,14 @@ module.exports = [
     corpo: [
       { t: "comando", titulo: "Compilar e publicar a imagem", comandos: C.firmwareOta, quando: "Depois de validar o firmware e antes de oferecer OTA às salas.", preRequisitos: "PlatformIO; execute as duas últimas linhas em remoteifes-server; a versão deve corresponder ao firmware e seguir x.y.z.", resultado: "firmware.bin válido (64 KiB–3 MiB), SHA-256 e manifesto atômico passam a representar a única versão publicada.", risco: "Publicar troca a oferta para todos; valide em bancada e preserve o caminho USB de recuperação." },
       { t: "passos", itens: [
-        "Em <strong>Administração &gt; ESP32</strong>, compare a versão publicada com a instalada e escolha primeiro uma sala piloto conectada.",
+        "Em <strong>Administração &gt; Dispositivos &gt; Firmware / OTA</strong>, compare a versão publicada com a instalada e escolha primeiro uma sala piloto conectada.",
         "Use a ação OTA. O servidor limita a duas atualizações simultâneas e recusa downgrade, versão já instalada ou uma segunda operação na mesma sala.",
         "Acompanhe ofertado, baixando, gravado e reiniciando. A conclusão exige a placa voltar e reportar a versão nova; falha ou versão antiga indica erro/reversão.",
         "Valide conexão, telemetria e comandos na sala piloto antes de avançar em lotes pequenos.",
       ] },
       { t: "p", texto: "O ESP32 confere tamanho e SHA-256 antes de gravar. A imagem usa partições A/B e tem até 90 segundos após iniciar para validar Wi-Fi e WebSocket; se isso falhar, o bootloader reverte. O servidor mantém o estado por reinício e aplica timeouts de transferência e retorno." },
       { t: "nota", nivel: "atencao", texto: "OTA preserva NVS e vínculo da sala, mas sempre pode exigir recuperação física. Não atualize todos os dispositivos ao mesmo tempo e não desligue energia durante download/gravação." },
-      { t: "links", itens: [{ id: "firmware-usb", texto: "Recuperar por USB" }, { id: "monitoramento", texto: "Investigar falha e notificações" }] },
+      { t: "links", itens: [{ id: "firmware-usb", texto: "Recuperar por USB" }, { id: "monitoramento", texto: "Investigar falha e notificações" }, { id: "esp32-cadastro", texto: "Cadastro do dispositivo na sala" }] },
     ],
   },
 ];

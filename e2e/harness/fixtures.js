@@ -3,6 +3,7 @@ const path = require("path");
 const base = require("@playwright/test");
 
 const API_URL = process.env.E2E_API_URL || "http://127.0.0.1:8791";
+const WEB_URL = process.env.E2E_WEB_URL || "http://127.0.0.1:8790";
 const ARQUIVO_TOKENS = path.join(__dirname, ".tokens.json");
 
 const USERS = {
@@ -145,6 +146,7 @@ module.exports = {
   test,
   expect,
   API_URL,
+  WEB_URL,
   USERS,
   SALA_ONLINE,
   VIEWPORTS,

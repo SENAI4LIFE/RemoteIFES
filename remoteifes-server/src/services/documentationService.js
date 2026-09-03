@@ -22,21 +22,24 @@ const adminHelp = {
   ativos: { titulo: "Como usar: Ativos", itens: [{ titulo: "Presença", texto: "A lista diferencia online, inativo e offline pelo uso da sessão e limiar configurado." }] },
   sessoes: { titulo: "Como usar: Sessões", itens: [{ titulo: "Histórico", texto: "Filtre por data; preserve registros exigidos antes de usar exclusão irreversível." }] },
   logs: { titulo: "Como usar: Logs", itens: [{ titulo: "Comandos", texto: "Filtre sala/data e compare comando, usuário ou sistema, origem e horário." }] },
-  dispositivos: { titulo: "Como usar: Dispositivos", itens: [{ titulo: "Eventos", texto: "Correlacione quedas e retornos do controlador com comandos e relatos." }] },
-  notificacoes: { titulo: "Como usar: Notificações de dispositivos", itens: [{ titulo: "Fila compartilhada", texto: "A aba e o sino mostram a mesma lista; marcar como lida vale para todos os administradores." }] },
+  dispositivos: { titulo: "Como usar: Dispositivos > Histórico", itens: [{ titulo: "Eventos", texto: "Correlacione quedas e retornos do controlador com comandos e relatos." }] },
+  notificacoes: { titulo: "Como usar: Notificações de dispositivos", itens: [{ titulo: "Fila compartilhada", texto: "Dispositivos > Notificações e o sino mostram a mesma lista; marcar como lida vale para todos os administradores." }] },
   acessos: { titulo: "Como usar: Acessos ESP32", itens: [{ titulo: "Evidência", texto: "Filtre os acessos registrados pelos controladores; eles não confirmam resposta física do ar-condicionado." }] },
   proprietarios: { titulo: "Como usar: Proprietários de sala", itens: [{ titulo: "Delegação", texto: "Associe usuário comum à sala; ele passará a manter a lista de acesso em Config." }] },
   mapa: { titulo: "Como usar: Mapa", itens: [{ titulo: "Triagem", texto: "Use conexão, energia e reserva como visão geral e abra a sala ou histórico para investigar." }] },
 };
 
 const superHelp = {
-  macs: { titulo: "Como usar: ESP32 / MACs", itens: [{ titulo: "Vínculo", texto: "Confirme fisicamente a placa, vincule o MAC à sala e valide limites, restrição e status." }] },
+  macs: { titulo: "Como usar: Dispositivos > Cadastro", itens: [
+    { titulo: "Vínculo", texto: "Confirme fisicamente a placa, vincule o MAC à sala e valide limites, restrição e status." },
+    { titulo: "Confirmação", texto: "O cadastro confirmado pelo servidor aparece sozinho na lista, sem recarregar; cadastrado não significa online." },
+  ] },
   config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Impacto global", texto: "Registre valores anteriores; salve só a mudança planejada e valide sessões, rede e dispositivos." }] },
-  esp32: { titulo: "Como usar: ESP32", itens: [
+  esp32: { titulo: "Como usar: Dispositivos > Firmware / OTA", itens: [
     { titulo: "Manutenção", texto: "Use configuração/IR em uma sala por vez e retorne a placa ao modo de operação." },
     { titulo: "Segurança", texto: "OTA, credenciais e Resetar Wi-Fi exigem plano de validação ou acesso físico." },
   ] },
-  monitoramento: { titulo: "Como usar: Monitoramento", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },
+  monitoramento: { titulo: "Como usar: Monitoramento > Saúde do sistema", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },
   heatmap: { titulo: "Como usar: Mapa de calor operacional", itens: [
     { titulo: "Sob demanda", texto: "Expanda, escolha métrica/período e atualize; a consulta agrega históricos existentes." },
     { titulo: "Leitura", texto: "Frio é melhor e quente é pior; números, legenda e tabela sempre acompanham a cor." },

@@ -7,7 +7,7 @@ module.exports = [
     tags: ["Configurações", "sessão", "temperatura", "Turbo", "modo de teste", "manutenção", "retenção", "RemoteIFES-Setup"],
     verNoApp: "/admin/config",
     corpo: [
-      { t: "p", texto: "<strong>Administração &gt; Configurações</strong> aplica política global. Leia todos os campos e registre os valores anteriores antes de salvar." },
+      { t: "p", texto: "<strong>Administração &gt; Sistema &gt; Configurações</strong> aplica política global. Leia todos os campos e registre os valores anteriores antes de salvar." },
       { t: "tabela", cabecalho: ["Grupo", "Efeito"], linhas: [
         ["Sessão por inatividade", "prazos distintos para usuários e administradores e antecedência do aviso"],
         ["Presença online", "tempo sem uso ainda classificado como online em Ativos"],
@@ -24,9 +24,9 @@ module.exports = [
         "Confirme a janela operacional e o impacto nos usuários/dispositivos.",
         "Altere apenas o grupo necessário e use <strong>Salvar configurações</strong>.",
         "Espere <strong>Configurações salvas</strong>. Mudanças de temperatura/Turbo propagam o estado desejado aos dispositivos configurados; sessões recebem o novo prazo.",
-        "Valide Início, uma sala piloto, Ativos e Monitoramento. Em falha, restaure os valores registrados e salve novamente.",
+        "Valide Início, uma sala piloto, <strong>Monitoramento &gt; Ativos</strong> e <strong>Monitoramento &gt; Saúde do sistema</strong>. Em falha, restaure os valores registrados e salve novamente.",
       ] },
-      { t: "nota", nivel: "seguranca", texto: "Modo de teste pode expor o sistema fora das redes autorizadas; use apenas durante um teste supervisionado e desligue em seguida. Não ative credenciais obrigatórias enquanto Monitoramento ainda mostrar salas Só MAC. A senha do RemoteIFES-Setup é um controle separado: ative-a onde o acesso físico às salas não for controlado." },
+      { t: "nota", nivel: "seguranca", texto: "Modo de teste pode expor o sistema fora das redes autorizadas; use apenas durante um teste supervisionado e desligue em seguida. Não ative credenciais obrigatórias enquanto a Saúde do sistema ainda mostrar salas Só MAC. A senha do RemoteIFES-Setup é um controle separado: ative-a onde o acesso físico às salas não for controlado." },
       { t: "links", itens: [{ id: "esp32-credenciais", texto: "Migrar credenciais antes da exigência global" }, { id: "servidor-rede", texto: "Rede, proxy e HTTPS no host" }] },
     ],
   },
@@ -38,10 +38,10 @@ module.exports = [
     tags: ["Relatos de problemas", "responder", "resolver", "reabrir", "excluir"],
     verNoApp: "/admin/relatos",
     corpo: [
-      { t: "p", texto: "Em <strong>Administração &gt; Relatos de problemas</strong>, filtre por novo, aberto, em análise ou resolvido. Abrir um relato novo já o move para aberto." },
+      { t: "p", texto: "Em <strong>Administração &gt; Gestão &gt; Relatos de problemas</strong>, filtre por novo, aberto, em análise ou resolvido. Abrir um relato novo já o move para aberto." },
       { t: "passos", itens: [
         "Abra o item e confira autor, categoria, data, sala, página e contexto técnico.",
-        "Reproduza com segurança e correlacione horário/sala em Logs, Dispositivos ou Monitoramento.",
+        "Reproduza com segurança e correlacione horário/sala em <strong>Sistema &gt; Logs</strong>, <strong>Dispositivos &gt; Histórico</strong> ou <strong>Monitoramento &gt; Saúde do sistema</strong>.",
         "Use <strong>Marcar em análise</strong> durante a investigação, escreva uma resposta legível ao autor e use <strong>Resolver</strong> quando houver conclusão.",
         "Use <strong>Reabrir</strong> se o problema voltar. O autor acompanha situação e resposta no próprio painel.",
       ] },
@@ -57,14 +57,14 @@ module.exports = [
     tags: ["Auditoria", "eventos", "indisponibilidade", "retenção", "histórico"],
     verNoApp: "/admin/auditoria",
     corpo: [
-      { t: "p", texto: "<strong>Administração &gt; Auditoria</strong> é somente leitura. Consulte eventos administrativos por tipo, ator e alvo e períodos offline/online dos ESP32, usando intervalo de datas e paginação." },
+      { t: "p", texto: "<strong>Administração &gt; Sistema &gt; Auditoria</strong> é somente leitura. Consulte eventos administrativos por tipo, ator e alvo e períodos offline/online dos ESP32, usando intervalo de datas e paginação." },
       { t: "lista", itens: [
         "O cabeçalho mostra a retenção vigente. Eventos e indisponibilidades mais antigos são removidos automaticamente.",
-        "Logs, Dispositivos, Acessos ESP32, Sessões e Notificações mantêm históricos próprios com limites e políticas diferentes.",
+        "Logs, Histórico de dispositivos, Acessos ESP32, Sessões e Notificações mantêm históricos próprios com limites e políticas diferentes.",
         "Alteração de configuração, vínculo, credencial, relato e outras ações sensíveis deixam eventos com metadados, sem segredos.",
         "Se uma exigência institucional superar a retenção, exporte/preserve os registros autorizados fora do sistema antes da expiração.",
       ] },
-      { t: "p", texto: "Para investigar uma queda: filtre a sala e o período em indisponibilidades, confira eventos administrativos próximos e então correlacione Dispositivos, Logs e notificações." },
+      { t: "p", texto: "Para investigar uma queda: filtre a sala e o período em indisponibilidades, confira eventos administrativos próximos e então correlacione <strong>Dispositivos &gt; Histórico</strong>, <strong>Sistema &gt; Logs</strong> e as notificações." },
     ],
   },
   {
@@ -75,7 +75,7 @@ module.exports = [
     tags: ["Serviço", "banco", "WAL", "disco", "backup", "falhas", "saúde"],
     verNoApp: "/admin/monitoramento",
     corpo: [
-      { t: "p", texto: "<strong>Administração &gt; Monitoramento</strong> atualiza a cada 20 segundos enquanto está aberta. É diagnóstico detalhado; o <code>/health</code> continua sendo a checagem mínima de serviço e banco." },
+      { t: "p", texto: "<strong>Administração &gt; Monitoramento &gt; Saúde do sistema</strong> atualiza a cada 20 segundos enquanto está aberta. É diagnóstico detalhado; o <code>/health</code> continua sendo a checagem mínima de serviço e banco." },
       { t: "tabela", cabecalho: ["Cartão", "Como usar"], linhas: [
         ["Serviço", "uptime, ambiente, memória RSS, carga, Node e PID; reinício zera contadores em memória"],
         ["Banco de dados", "resposta, latência, arquivo, WAL e espaço reutilizável"],
@@ -104,7 +104,7 @@ module.exports = [
     tags: ["Mapa de calor", "disponibilidade", "quedas", "comandos", "24 horas", "7 dias", "30 dias"],
     verNoApp: "/admin/monitoramento",
     corpo: [
-      { t: "p", texto: "Expanda <strong>Mapa de calor operacional</strong> em Monitoramento. O servidor agrega sob demanda os históricos existentes; não cria telemetria nova nem roda a consulta quando a área está fechada." },
+      { t: "p", texto: "Expanda <strong>Mapa de calor operacional</strong> em <strong>Administração &gt; Monitoramento &gt; Saúde do sistema</strong>. O servidor agrega sob demanda os históricos existentes; não cria telemetria nova nem roda a consulta quando a área está fechada." },
       { t: "lista", itens: [
         "Métricas: disponibilidade, minutos offline, quedas, comandos, comandos durante offline, agendamentos criados, execuções, relatos e relatos pendentes.",
         "Períodos: 24 horas, 7 dias e 30 dias. Consultas repetidas podem usar cache de até 60 segundos.",
