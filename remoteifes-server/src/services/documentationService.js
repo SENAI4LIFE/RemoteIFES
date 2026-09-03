@@ -19,14 +19,17 @@ const adminHelp = {
   ] },
   grade: { titulo: "Como usar: Grade do dia", itens: [{ titulo: "Consulta", texto: "Selecione sala e data para comparar períodos livres, reservados e ligados antes de agendar." }] },
   usuarios: { titulo: "Como usar: Usuários", itens: [{ titulo: "Limite do papel", texto: "Admin mantém contas comuns; somente Superadministrador promove ou altera administradores." }] },
-  ativos: { titulo: "Como usar: Ativos", itens: [{ titulo: "Presença", texto: "A lista diferencia online, inativo e offline pelo uso da sessão e limiar configurado." }] },
-  sessoes: { titulo: "Como usar: Sessões", itens: [{ titulo: "Histórico", texto: "Filtre por data; preserve registros exigidos antes de usar exclusão irreversível." }] },
-  logs: { titulo: "Como usar: Logs", itens: [{ titulo: "Comandos", texto: "Filtre sala/data e compare comando, usuário ou sistema, origem e horário." }] },
+  ativos: { titulo: "Como usar: Gestão > Ativos", itens: [{ titulo: "Presença", texto: "A lista diferencia online, inativo e offline pelo uso da sessão e limiar configurado." }] },
+  sessoes: { titulo: "Como usar: Gestão > Sessões", itens: [{ titulo: "Histórico", texto: "Filtre por data; preserve registros exigidos antes de usar exclusão irreversível." }] },
+  logs: { titulo: "Como usar: Logs", itens: [
+    { titulo: "Comandos", texto: "Filtre sala/data e compare comando, usuário ou sistema, origem e horário." },
+    { titulo: "Acesso", texto: "A segunda aba da mesma tela reúne as requisições dos controladores ao servidor, com IP e data." },
+  ] },
   dispositivos: { titulo: "Como usar: Dispositivos > Histórico", itens: [{ titulo: "Eventos", texto: "Correlacione quedas e retornos do controlador com comandos e relatos." }] },
   notificacoes: { titulo: "Como usar: Notificações de dispositivos", itens: [{ titulo: "Fila compartilhada", texto: "Dispositivos > Notificações e o sino mostram a mesma lista; marcar como lida vale para todos os administradores." }] },
-  acessos: { titulo: "Como usar: Acessos ESP32", itens: [{ titulo: "Evidência", texto: "Filtre os acessos registrados pelos controladores; eles não confirmam resposta física do ar-condicionado." }] },
+  acessos: { titulo: "Como usar: Logs > Acesso", itens: [{ titulo: "Evidência", texto: "Filtre por data as requisições registradas pelos controladores; elas não confirmam resposta física do ar-condicionado." }] },
   proprietarios: { titulo: "Como usar: Proprietários de sala", itens: [{ titulo: "Delegação", texto: "Associe usuário comum à sala; ele passará a manter a lista de acesso em Config." }] },
-  mapa: { titulo: "Como usar: Mapa", itens: [{ titulo: "Triagem", texto: "Use conexão, energia e reserva como visão geral e abra a sala ou histórico para investigar." }] },
+  mapa: { titulo: "Como usar: Gestão > Mapa", itens: [{ titulo: "Triagem", texto: "Use conexão, energia e reserva como visão geral e abra a sala ou histórico para investigar." }] },
 };
 
 const superHelp = {
@@ -39,7 +42,7 @@ const superHelp = {
     { titulo: "Manutenção", texto: "Use configuração/IR em uma sala por vez e retorne a placa ao modo de operação." },
     { titulo: "Segurança", texto: "OTA, credenciais e Resetar Wi-Fi exigem plano de validação ou acesso físico." },
   ] },
-  monitoramento: { titulo: "Como usar: Monitoramento > Saúde do sistema", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },
+  monitoramento: { titulo: "Como usar: Sistema > Status", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },
   heatmap: { titulo: "Como usar: Mapa de calor operacional", itens: [
     { titulo: "Sob demanda", texto: "Expanda, escolha métrica/período e atualize; a consulta agrega históricos existentes." },
     { titulo: "Leitura", texto: "Frio é melhor e quente é pior; números, legenda e tabela sempre acompanham a cor." },

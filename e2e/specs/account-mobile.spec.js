@@ -129,6 +129,6 @@ test("atalhos do menu de ajuda de superadmin incluem infraestrutura", async ({ p
   await page.goto("/");
   await expect(page.locator("#adminTabBtn")).toBeVisible();
   await page.locator("#helpFabToggleBtn").click();
-  await expect(page.locator("#helpFabLinks")).toContainText("Monitoramento");
+  await expect(page.locator("#helpFabLinks")).toContainText("Status e saúde do sistema");
   await expect(page.locator("#helpFabLinks")).toContainText("Operação, implantação e manutenção");
 });

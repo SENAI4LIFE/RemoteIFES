@@ -220,10 +220,11 @@ test("o manual do admin apresenta a Administração agrupada e o grupo Dispositi
   const secao = page.locator("#manual-sec-administracao");
   await expect(secao).toBeVisible({ timeout: 20_000 });
 
-  for (const termo of ["Gestão", "Dispositivos", "Monitoramento", "Sistema", "Cadastro", "Histórico", "Notificações", "Firmware / OTA"]) {
+  for (const termo of ["Gestão", "Dispositivos", "Sistema", "Cadastro", "Histórico", "Notificações", "Firmware / OTA", "Sessões", "Ativos", "Mapa", "Status"]) {
     await expect(secao, `manual precisa citar ${termo}`).toContainText(termo);
   }
   await expect(secao).not.toContainText("ESP32 / MACs");
+  await expect(secao).not.toContainText("Saúde do sistema");
   await expect(secao).toContainText("Administração > Grupo > Função");
 });
 
@@ -248,9 +249,19 @@ test("nenhum tópico visível do manual usa a navegação antiga de Administraç
   await page.goto("/#/ajuda");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
   const texto = await page.locator("#manualConteudo").innerText();
-  for (const obsoleto of ["Administração > ESP32", "Administração > Notificações de dispositivos", "Admin > ESP32"]) {
+  for (const obsoleto of [
+    "Administração > ESP32",
+    "Administração > Notificações de dispositivos",
+    "Admin > ESP32",
+    "Administração > Monitoramento",
+    "Administração > Sistema > Sessões",
+    "Acessos ESP32",
+    "Saúde do sistema",
+  ]) {
     expect(texto, `navegação obsoleta no manual: ${obsoleto}`).not.toContain(obsoleto);
   }
   expect(texto).toContain("Administração > Dispositivos > Cadastro");
   expect(texto).toContain("Administração > Dispositivos > Firmware / OTA");
+  expect(texto).toContain("Administração > Gestão > Sessões");
+  expect(texto).toContain("Administração > Sistema > Status");
 });
