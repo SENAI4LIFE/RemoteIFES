@@ -94,7 +94,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
       expect(workspaceUsuarios.proporcao).toBeGreaterThan(0.9);
     }
 
-    for (const sub of ["usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "acessos", "proprietarios", "mapa", "macs", "config", "esp32", "monitoramento", "auditoria", "relatos"]) {
+    for (const sub of ["usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "proprietarios", "mapa", "macs", "config", "esp32", "monitoramento", "auditoria", "relatos"]) {
       await page.locator(`.admin-subtab-btn[data-sub="${sub}"]`).click();
       await expect(page.locator(`#adminSub-${sub}`)).toBeVisible();
       const semOverflow = await semRolagemHorizontal(page);

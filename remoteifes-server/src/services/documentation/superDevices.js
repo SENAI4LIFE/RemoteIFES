@@ -115,7 +115,7 @@ module.exports = [
       { t: "sub", titulo: "Migração de só MAC" },
       { t: "passos", itens: [
         "Mantenha <strong>Exigir credencial por dispositivo em todos os ESP32</strong> desligado.",
-        "Provisione e valide cada sala; acompanhe <strong>Só MAC</strong> em <strong>Administração &gt; Monitoramento &gt; Saúde do sistema</strong>.",
+        "Provisione e valide cada sala; acompanhe <strong>Só MAC</strong> em <strong>Administração &gt; Sistema &gt; Status</strong>.",
         "Quando todas estiverem autenticadas, ative a exigência global e confirme que nenhuma sala caiu.",
         "Em falha ampla, desative temporariamente a exigência, corrija as salas e refaça a validação.",
       ] },

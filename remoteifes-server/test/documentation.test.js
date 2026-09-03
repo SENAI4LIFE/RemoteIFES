@@ -117,9 +117,13 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
     "Administração &gt; Dispositivos &gt; Notificações",
     "Administração &gt; Dispositivos &gt; Firmware / OTA",
     "Administração &gt; Gestão &gt; Usuários",
+    "Administração &gt; Gestão &gt; Sessões",
+    "Administração &gt; Gestão &gt; Ativos",
+    "Administração &gt; Gestão &gt; Mapa",
+    "Administração &gt; Sistema &gt; Logs",
+    "Administração &gt; Sistema &gt; Status",
     "Administração &gt; Sistema &gt; Configurações",
     "Administração &gt; Sistema &gt; Auditoria",
-    "Administração &gt; Monitoramento &gt; Saúde do sistema",
   ]) {
     assert.ok(documentacao.includes(caminho), `caminho ausente no manual: ${caminho}`);
   }
@@ -128,9 +132,12 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
     /Administração &gt; ESP32/,
     /Administração &gt; Notificações de dispositivos/,
     /Administração &gt; Auditoria</,
-    /Administração &gt; Monitoramento</,
+    /Administração &gt; Monitoramento/,
     /Administração &gt; Configurações</,
     /Administração &gt; Relatos de problemas</,
+    /Administração &gt; Sistema &gt; Sessões/,
+    /Administração &gt; Sistema &gt; Acessos ESP32/,
+    /Saúde do sistema/,
     /Admin &gt; ESP32/,
   ]) {
     assert.ok(!obsoleto.test(documentacao), `navegação obsoleta ainda no manual: ${obsoleto}`);
@@ -140,20 +147,44 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
     "Administração > Dispositivos > Cadastro",
     "Administração > Dispositivos > Histórico",
     "Administração > Dispositivos > Firmware / OTA",
+    "Administração > Gestão > Sessões",
+    "Administração > Gestão > Ativos",
+    "Administração > Sistema > Logs > Acesso",
+    "Administração > Sistema > Status",
     "Administração > Sistema > Configurações",
-    "Administração > Monitoramento > Saúde do sistema",
   ]) {
     assert.ok(README.includes(caminho), `caminho ausente no README: ${caminho}`);
   }
 
-  for (const obsoleto of [/`Admin > /, /Admin > ESP32/, /ESP32 \/ MACs/, /Notificações de dispositivos`/]) {
+  for (const obsoleto of [
+    /`Admin > /,
+    /Admin > ESP32/,
+    /ESP32 \/ MACs/,
+    /Notificações de dispositivos`/,
+    /Administração > Monitoramento >/,
+    /Administração > Sistema > Sessões/,
+    /Administração > Sistema > Acessos ESP32/,
+    /Saúde do sistema/,
+    /\*\*Monitoramento\*\* \| /,
+  ]) {
     assert.ok(!obsoleto.test(README), `navegação obsoleta ainda no README: ${obsoleto}`);
   }
 
-  for (const grupo of ["Gestão", "Dispositivos", "Monitoramento", "Sistema"]) {
+  for (const grupo of ["Gestão", "Dispositivos", "Sistema"]) {
     assert.ok(documentacao.includes(grupo), `grupo ausente no manual: ${grupo}`);
     assert.ok(README.includes(`**${grupo}**`), `grupo ausente na tabela do README: ${grupo}`);
   }
+});
+
+test("a documentação mantém o Acesso dentro de Logs, sem função autônoma", () => {
+  const manual = carregarManualPublico();
+  const documentacao = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
+
+  assert.match(documentacao, /Sistema &gt; Logs/);
+  assert.match(documentacao, /aba <strong>Acesso<\/strong>/);
+  assert.ok(!/Acessos ESP32/.test(documentacao), "Acessos ESP32 não pode mais aparecer como função da Administração");
+  assert.match(README, /Logs > Acesso/);
+  assert.match(README, /#\/admin\/logs\/acesso/);
 });
 
 test("o manual explica o cadastro imediato de ESP32 e a diferença entre cadastrado e online", () => {

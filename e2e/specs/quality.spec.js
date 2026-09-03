@@ -1,6 +1,6 @@
 const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
-const ADMIN_COMUM = ["usuarios", "proprietarios", "dispositivos", "notificacoes", "ativos", "mapa", "sessoes", "logs", "acessos"];
+const ADMIN_COMUM = ["usuarios", "proprietarios", "sessoes", "ativos", "mapa", "dispositivos", "notificacoes", "logs"];
 const SUPERADMIN = [...ADMIN_COMUM, "relatos", "macs", "esp32", "monitoramento", "config", "auditoria"];
 
 for (const [papel, subtabs] of [["admin", ADMIN_COMUM], ["superadmin", SUPERADMIN]]) {

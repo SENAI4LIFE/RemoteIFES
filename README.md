@@ -108,20 +108,21 @@ Todas as permissões são impostas no backend (não apenas escondidas na interfa
 
 ### Início (hub)
 
-Após o login o aplicativo abre no **Início** (`#/inicio`, também a aba "Início" e o logotipo no topo): um painel visual que reúne as ações principais em cartões, na ordem de uso mais comum — selecionar sala, planta baixa, agenda e grade (administrador), notificações (administrador), relatar um problema, ajuda/manual e aplicativo móvel. Os cartões respeitam o papel do usuário e apenas abrem telas já existentes (nenhuma função é duplicada). Abaixo das ações operacionais, administradores veem atalhos para as funções de **Administração**, cada um identificado pelo grupo a que pertence (`Dispositivos · Cadastro`, por exemplo); o superadministrador vê ainda uma faixa curta com o estado do banco, do armazenamento, dos ESP32 e dos backups, com link para o Monitoramento. No celular o hub vira uma lista de cartões de toque em coluna única. O hub não altera o roteamento: todos os endereços e o comportamento de refresh/histórico continuam iguais.
+Após o login o aplicativo abre no **Início** (`#/inicio`, também a aba "Início" e o logotipo no topo): um painel visual que reúne as ações principais em cartões, na ordem de uso mais comum — selecionar sala, planta baixa, agenda e grade (administrador), notificações (administrador), relatar um problema, ajuda/manual e aplicativo móvel. Os cartões respeitam o papel do usuário e apenas abrem telas já existentes (nenhuma função é duplicada). Abaixo das ações operacionais, administradores veem atalhos para as funções de **Administração**, cada um identificado pelo grupo a que pertence (`Dispositivos · Cadastro`, por exemplo); o superadministrador vê ainda uma faixa curta com o estado do banco, do armazenamento, dos ESP32 e dos backups, com link para o Status. No celular o hub vira uma lista de cartões de toque em coluna única. O hub não altera o roteamento: todos os endereços e o comportamento de refresh/histórico continuam iguais.
 
 ### Organização da Administração
 
-A aba **Admin** organiza suas funções em quatro grupos, sempre em dois níveis (`Administração > Grupo > Função`), na mesma barra de navegação lateral (ou rolável, em telas estreitas) usada antes:
+A aba **Admin** organiza suas funções em três grupos, sempre em dois níveis (`Administração > Grupo > Função`), na mesma barra de navegação lateral (ou rolável, em telas estreitas) usada antes:
 
 | Grupo | Funções |
 | --- | --- |
-| **Gestão** | Usuários, Proprietários de sala, Relatos de problemas |
+| **Gestão** | Usuários, Proprietários de sala, Sessões, Ativos, Mapa, Relatos de problemas |
 | **Dispositivos** | Cadastro, Histórico, Notificações, Firmware / OTA |
-| **Monitoramento** | Ativos, Mapa, Saúde do sistema |
-| **Sistema** | Sessões, Logs, Acessos ESP32, Configurações, Auditoria |
+| **Sistema** | Logs, Status, Configurações, Auditoria |
 
-O agrupamento é apenas de apresentação: cada função mantém a permissão que já tinha, os endereços `#/admin/<função>` continuam os mesmos e um grupo cujas funções estejam todas fora do nível do usuário não é exibido. Para um administrador comum, por exemplo, **Dispositivos** mostra apenas Histórico e Notificações.
+**Logs** é a única função com abas internas: **Comandos** (o histórico de comandos enviados às salas) e **Acesso** (as requisições registradas pelos controladores ao servidor, com IP de origem, filtro por data e exclusão). Elas ficam dentro da própria tela de Logs, sem criar mais um nível de navegação de Administração; `#/admin/logs/acesso` abre a segunda aba diretamente e o endereço antigo `#/admin/acessos` continua resolvendo para ela.
+
+O agrupamento é apenas de apresentação: cada função mantém a permissão que já tinha, os endereços `#/admin/<função>` continuam os mesmos e um grupo cujas funções estejam todas fora do nível do usuário não é exibido. Para um administrador comum, por exemplo, **Dispositivos** mostra apenas Histórico e Notificações e **Sistema** mostra apenas Logs.
 
 ### Formas de chegar a uma sala
 
@@ -228,18 +229,18 @@ A tabela `relatos` é criada automaticamente na inicialização do servidor (`CR
 
 O servidor registra cada login como uma sessão (token, horário de início, último uso e, ao sair, horário de logout). Isso alimenta duas funções da Administração:
 
-- **`Administração > Monitoramento > Ativos`**: usuários com uma sessão em aberto, com um cronômetro de tempo de sessão em tempo real e um status calculado a partir do último uso — `online` (dentro do limiar configurado), `inativo` (sessão aberta, mas sem uso recente) ou `offline`.
-- **`Administração > Sistema > Sessões`**: histórico de logins/logouts, com duração de cada sessão, filtrável por data e removível (por data ou por completo).
+- **`Administração > Gestão > Ativos`**: usuários com uma sessão em aberto, com um cronômetro de tempo de sessão em tempo real e um status calculado a partir do último uso — `online` (dentro do limiar configurado), `inativo` (sessão aberta, mas sem uso recente) ou `offline`.
+- **`Administração > Gestão > Sessões`**: histórico de logins/logouts, com duração de cada sessão, filtrável por data e removível (por data ou por completo).
 
 O servidor encerra sessões sem atividade e continua sendo a autoridade sobre o prazo, inclusive para REST e WebSocket. A interface mostra uma contagem regressiva junto às iniciais da conta, atualizada localmente a partir do prazo informado pelo servidor, sem consultas a cada segundo. Clique, mouse, tecla ou toque renovam o prazo pelo mecanismo de sessão existente; o aviso prévio permite continuar conectado. Atividade, logout e expiração são sincronizados entre abas. Os padrões são 60 minutos para usuários e 720 minutos para administradores e superadministrador. Além disso, **toda reinicialização do servidor encerra as sessões em aberto**: depois de um restart, os usuários precisam entrar novamente.
 
 ## Auditoria (Logs, Dispositivos e Acessos)
 
-Três funções da Administração registram o histórico operacional do sistema, todas filtráveis por data e com opção de apagar registros (ação irreversível):
+O histórico operacional do sistema fica em três visões — as duas abas de **Logs** e o **Histórico** de dispositivos —, todas filtráveis por data e, nas de Logs, com opção de apagar registros (ação irreversível):
 
-- **`Administração > Sistema > Logs`**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o comando parte da interface local do próprio dispositivo).
+- **`Administração > Sistema > Logs > Comandos`**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o comando parte da interface local do próprio dispositivo).
 - **`Administração > Dispositivos > Histórico`**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
-- **`Administração > Sistema > Acessos ESP32`**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
+- **`Administração > Sistema > Logs > Acesso`**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
 
 O superadministrador dispõe ainda de **`Administração > Sistema > Auditoria`**, uma visão paginada e filtrável de ações administrativas importantes, como criação, alteração e exclusão de contas, mudanças de papel e configuração e operações relevantes sobre ESP32. Os registros contêm apenas metadados concisos — nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e duração calculada quando há reconexão. Interface e APIs exigem `superadmin`; a retenção padrão é 7 dias, configurável entre 1 e 365 dias em Administração.
 
@@ -749,14 +750,14 @@ O ESP32 envia a credencial no cabeçalho (`X-Device-Id` / `X-Device-Secret`) no 
 **Migração dos controladores atuais (padrão: brando):**
 
 1. Enquanto a opção global **Exigir credencial por dispositivo em todos os ESP32** (em `Administração > Sistema > Configurações`) está desligada, uma sala **sem** credencial provisionada continua aceitando conexão só por MAC, exatamente como antes. Uma sala **com** credencial provisionada já passa a exigi-la.
-2. Provisione a credencial de cada sala (o painel marca as que ainda estão "só MAC"; o resumo aparece também em `GET /admin/esp32/migracao` e no [Monitoramento](#monitoramento-operacional)).
+2. Provisione a credencial de cada sala (o painel marca as que ainda estão "só MAC"; o resumo aparece também em `GET /admin/esp32/migracao` e no [Status](#monitoramento-operacional)).
 3. Quando todas estiverem provisionadas e verdes, ligue a opção global para recusar conexões só por MAC em qualquer sala. A mudança é reversível.
 
 Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma recomendada em produção; mantenha o tráfego ESP32 ↔ servidor em rede administrada ou sob HTTPS.
 
 ## Monitoramento Operacional
 
-`Administração > Monitoramento > Saúde do sistema` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
+`Administração > Sistema > Status` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
 
 - **Serviço:** ambiente, tempo no ar, memória (RSS), carga de 1 minuto, versão do Node e PID.
 - **Banco de dados:** se responde e em quanto tempo, tamanho do arquivo e do WAL.
@@ -770,7 +771,7 @@ A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição d
 
 ## Mapa de Calor Operacional
 
-Dentro de `Administração > Monitoramento > Saúde do sistema`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
+Dentro de `Administração > Sistema > Status`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
 
 **Métricas** (`metrica=`), todas derivadas de históricos que o sistema já retém, nunca de dados inventados:
 
@@ -1002,7 +1003,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 | Alvo | Comando | Observações |
 |---|---|---|
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`) e o monitoramento operacional (`test/monitoramento.test.js`). |
-| Frontend end-to-end | `cd e2e && npm install && npx playwright install chromium && npx playwright test` | A instalação do pacote npm não baixa o navegador automaticamente; `npx playwright install chromium` instala a versão compatível. Em uma imagem Ubuntu mínima que ainda não tenha as bibliotecas do Chromium, use uma vez `sudo npx playwright install-deps chromium`. Para usar um canal do sistema, defina `E2E_BROWSER_CHANNEL` (por exemplo, `chrome` ou `msedge`). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`inicio.spec.js`), o gate do Monitoramento por superadministrador e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
+| Frontend end-to-end | `cd e2e && npm install && npx playwright install chromium && npx playwright test` | A instalação do pacote npm não baixa o navegador automaticamente; `npx playwright install chromium` instala a versão compatível. Em uma imagem Ubuntu mínima que ainda não tenha as bibliotecas do Chromium, use uma vez `sudo npx playwright install-deps chromium`. Para usar um canal do sistema, defina `E2E_BROWSER_CHANNEL` (por exemplo, `chrome` ou `msedge`). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`inicio.spec.js`), o gate do Status por superadministrador e a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas. |
 | Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a coerência entre `config.xml` e `android-release.json`, a geração e a monotonia do `versionCode`, as recusas de publicação inconsistente, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
 | ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
@@ -1093,7 +1094,7 @@ remoteifes-web/
                         portal-funcoes.js (vitrine de funcionalidades na tela inicial), admin.js (painel administrativo),
                         esp32-admin.js (painel avançado de cada ESP32 — status, config/clonagem IR, OTA e credenciais —
                         na aba "ESP32", restrito ao superadministrador),
-                        monitoramento.js (aba "Monitoramento" do painel administrativo, restrita ao superadministrador),
+                        monitoramento.js (aba "Status" do painel administrativo, restrita ao superadministrador),
                         manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
                         mobile-app.js (página #/aplicativo: estado da versão instalada, instalação guiada, atualização e download do APK verificado)
 

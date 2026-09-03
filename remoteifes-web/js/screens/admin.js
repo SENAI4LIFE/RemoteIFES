@@ -291,6 +291,14 @@ const Admin = {
     });
   },
 
+  async carregarAbaLogs() {
+    if (abaLogsAtiva() === "acesso") {
+      await this.carregarAcessos(document.getElementById("acessosFiltroData").value || undefined);
+      return;
+    }
+    await this.carregarLogs();
+  },
+
   async carregarAcessos(data) {
     const list = document.getElementById("acessosList");
     list.innerHTML = "";
@@ -1022,6 +1030,26 @@ document.getElementById("criarUsuarioBtn").addEventListener("click", async (e) =
   }
 });
 
+function abaLogsAtiva() {
+  const btn = document.querySelector("#adminSub-logs .admin-inner-tab-btn.active");
+  return (btn && btn.dataset.logAba) || "comandos";
+}
+
+document.querySelectorAll("#adminSub-logs .admin-inner-tab-btn").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    document.querySelectorAll("#adminSub-logs .admin-inner-tab-btn").forEach((b) => {
+      const ativo = b === btn;
+      b.classList.toggle("active", ativo);
+      b.setAttribute("aria-selected", ativo ? "true" : "false");
+    });
+    document.querySelectorAll("#adminSub-logs .admin-inner-tab").forEach((painel) => {
+      painel.classList.toggle("hidden", painel.id !== `logsAba-${btn.dataset.logAba}`);
+    });
+    await Admin.carregarAbaLogs();
+    if (typeof Router !== "undefined") Router.sync();
+  });
+});
+
 function revelarSubAdmin(btn) {
   const barra = btn.closest(".admin-subtabs");
   if (!barra) return;
@@ -1074,7 +1102,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
 
     if (sub === "ativos") await Admin.carregarAtivos();
     if (sub === "sessoes") await Admin.carregarSessoes();
-    if (sub === "logs") await Admin.carregarLogs();
+    if (sub === "logs") await Admin.carregarAbaLogs();
     if (sub === "dispositivos") await Admin.carregarDispositivos();
     if (sub === "notificacoes") await Notificacoes.carregarAdmin();
     if (sub === "monitoramento") {
@@ -1085,7 +1113,6 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
       Heatmap.aoFechar();
     }
     if (sub === "relatos") await Admin.carregarRelatos();
-    if (sub === "acessos") await Admin.carregarAcessos();
     if (sub === "proprietarios") await Admin.carregarProprietarios();
     if (sub === "mapa") await Admin.carregarMapa();
     if (sub === "macs") await Admin.aoAbrirMacs();
