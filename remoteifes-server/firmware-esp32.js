@@ -47,7 +47,7 @@ try {
   console.log(`Tamanho: ${(manifesto.tamanho / 1024).toFixed(1)} KiB`);
   console.log(`SHA-256: ${manifesto.sha256}`);
   console.log("");
-  console.log("Ofereça a atualização por sala em Admin > ESP32 (painel) ou pela rota POST /admin/esp32/:sala/ota.");
+  console.log("Ofereça a atualização por sala em Administração > Dispositivos > Firmware / OTA ou pela rota POST /admin/esp32/:sala/ota.");
   process.exit(0);
 } catch (erro) {
   console.error(`Falha ao publicar firmware: ${erro.message}`);

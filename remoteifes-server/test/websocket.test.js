@@ -165,7 +165,6 @@ function coletarPor(cliente, ms) {
       try {
         recebidas.push(JSON.parse(dados.toString()));
       } catch (err) {
-        /* frame ignorado */
       }
     };
     cliente.ws.on("message", ouvir);
@@ -234,4 +233,99 @@ test("heartbeat que muda ligado retransmite a lista de salas", async () => {
   const tipos = (await coleta).map((m) => m.tipo);
   assert.ok(tipos.includes("salas"), `esperava uma retransmissao de salas, veio ${JSON.stringify(tipos)}`);
   cliente.ws.close();
+});
+
+async function clienteAutenticado(sufixo, nivel) {
+  const usuario = usuariosService.criar(
+    { usuario: `teste-ws-cad-${sufixo}`, senha: "senhaSegura123", nome: "Usuario WS Cadastro", podeControlar: true, isAdmin: nivel >= 2 },
+    { nivel: 3 }
+  );
+  if (nivel === 3) db.prepare("UPDATE usuarios SET nivel = 3 WHERE id = ?").run(usuario.id);
+  const token = tokenService.gerarToken(usuario.id);
+  const cliente = criarClienteComFila([token]);
+  await cliente.aberta();
+  await coletarPor(cliente, 300);
+  return cliente;
+}
+
+function salaSemDispositivo() {
+  const salasService = require("../src/services/salasService");
+  const sala = salasService.listar().find((s) => !s.mac && !s.online);
+  assert.ok(sala, "o cenário precisa de uma sala sem ESP32 cadastrado e offline");
+  return sala.sala;
+}
+
+test("cadastrar o MAC de uma sala avisa em tempo real todas as sessões administrativas", async () => {
+  const salasService = require("../src/services/salasService");
+  const sala = salaSemDispositivo();
+
+  const superadmin = await clienteAutenticado("super", 3);
+  const admin = await clienteAutenticado("admin", 2);
+  const comum = await clienteAutenticado("comum", 1);
+
+  try {
+    const doSuper = coletarPor(superadmin, 500);
+    const doAdmin = coletarPor(admin, 500);
+    const doComum = coletarPor(comum, 500);
+
+    salasService.cadastrarMac(sala, "AA:BB:CC:11:22:33");
+
+    const avisosSuper = (await doSuper).filter((m) => m.tipo === "dispositivo_cadastro");
+    const avisosAdmin = (await doAdmin).filter((m) => m.tipo === "dispositivo_cadastro");
+    const avisosComum = (await doComum).filter((m) => m.tipo === "dispositivo_cadastro");
+
+    assert.equal(avisosSuper.length, 1, "a sessão que cadastrou recebe exatamente um aviso");
+    assert.equal(avisosAdmin.length, 1, "uma segunda sessão autorizada recebe o mesmo aviso");
+    assert.equal(avisosComum.length, 0, "usuário comum não recebe dados de cadastro de dispositivo");
+
+    const aviso = avisosSuper[0];
+    assert.equal(aviso.sala, sala);
+    assert.equal(aviso.cadastro.sala, sala);
+    assert.equal(aviso.cadastro.mac, "AA:BB:CC:11:22:33");
+    assert.equal(aviso.cadastro.online, false, "cadastrado não implica online");
+    assert.deepEqual(avisosAdmin[0], aviso);
+  } finally {
+    superadmin.ws.close();
+    admin.ws.close();
+    comum.ws.close();
+  }
+});
+
+test("cadastro recusado não gera aviso de dispositivo cadastrado", async () => {
+  const salasService = require("../src/services/salasService");
+  const sala = salaSemDispositivo();
+  const cliente = await clienteAutenticado("recusa", 3);
+
+  try {
+    const coleta = coletarPor(cliente, 400);
+    assert.throws(() => salasService.cadastrarMac(sala, "mac-invalido"));
+    const avisos = (await coleta).filter((m) => m.tipo === "dispositivo_cadastro");
+    assert.deepEqual(avisos, [], "um cadastro recusado não pode ser anunciado como persistido");
+    assert.equal(salasService.buscar(sala).mac, null);
+  } finally {
+    cliente.ws.close();
+  }
+});
+
+test("cadastrar o mesmo MAC de novo não duplica o vínculo nem troca a sala", async () => {
+  const salasService = require("../src/services/salasService");
+  const sala = salaSemDispositivo();
+  const mac = "AA:BB:CC:44:55:66";
+  const cliente = await clienteAutenticado("idempotente", 3);
+
+  try {
+    const coleta = coletarPor(cliente, 600);
+    salasService.cadastrarMac(sala, mac);
+    salasService.cadastrarMac(sala, mac);
+    const avisos = (await coleta).filter((m) => m.tipo === "dispositivo_cadastro");
+
+    assert.ok(avisos.length >= 1);
+    avisos.forEach((aviso) => {
+      assert.equal(aviso.cadastro.sala, sala);
+      assert.equal(aviso.cadastro.mac, mac);
+    });
+    assert.equal(salasService.listar().filter((s) => s.mac === mac).length, 1);
+  } finally {
+    cliente.ws.close();
+  }
 });

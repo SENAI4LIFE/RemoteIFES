@@ -39,7 +39,6 @@ const Inicio = (() => {
       id: "notificacoes", icon: "🔔", titulo: "Notificações",
       desc: "Avisos de conexão e falha dos dispositivos ESP32.",
       quando: () => !!state.isAdmin,
-      // Abre explicitamente: o cartao nao deve alternar nem depender do estado do sino.
       acao: (evento) => {
         if (evento) evento.stopPropagation();
         if (typeof Notificacoes !== "undefined") Notificacoes.abrirPainel();
@@ -50,7 +49,6 @@ const Inicio = (() => {
       desc: "Envie um problema para a equipe e acompanhe seus relatos.",
       quando: () => true,
       acao: (evento) => {
-        // O fechamento global por clique no documento fecharia o painel logo depois de abri-lo.
         if (evento) evento.stopPropagation();
         if (typeof Relatos !== "undefined") Relatos.abrirPainel();
       },
@@ -70,20 +68,21 @@ const Inicio = (() => {
   ];
 
   const ADMIN = [
-    { sub: "usuarios", icon: "👥", titulo: "Usuários" },
-    { sub: "ativos", icon: "🟢", titulo: "Ativos" },
-    { sub: "sessoes", icon: "🕒", titulo: "Sessões" },
-    { sub: "logs", icon: "📜", titulo: "Logs" },
-    { sub: "dispositivos", icon: "📡", titulo: "Dispositivos" },
-    { sub: "acessos", icon: "🔑", titulo: "Acessos ESP32" },
-    { sub: "proprietarios", icon: "🗝️", titulo: "Proprietários" },
-    { sub: "mapa", icon: "🗺️", titulo: "Mapa" },
-    { sub: "macs", icon: "🔧", titulo: "ESP32 / MACs", exigeSuper: true },
-    { sub: "config", icon: "⚙️", titulo: "Configurações", exigeSuper: true },
-    { sub: "esp32", icon: "📶", titulo: "ESP32", exigeSuper: true },
-    { sub: "monitoramento", icon: "🩺", titulo: "Monitoramento", exigeSuper: true },
-    { sub: "auditoria", icon: "🛡️", titulo: "Auditoria", exigeSuper: true },
-    { sub: "relatos", icon: "🐞", titulo: "Relatos", exigeSuper: true },
+    { sub: "usuarios", icon: "👥", titulo: "Usuários", grupo: "Gestão" },
+    { sub: "proprietarios", icon: "🗝️", titulo: "Proprietários", grupo: "Gestão" },
+    { sub: "relatos", icon: "🐞", titulo: "Relatos", grupo: "Gestão", exigeSuper: true },
+    { sub: "macs", icon: "🔧", titulo: "Cadastro", grupo: "Dispositivos", exigeSuper: true },
+    { sub: "dispositivos", icon: "📡", titulo: "Histórico", grupo: "Dispositivos" },
+    { sub: "notificacoes", icon: "🔔", titulo: "Notificações", grupo: "Dispositivos" },
+    { sub: "esp32", icon: "📶", titulo: "Firmware / OTA", grupo: "Dispositivos", exigeSuper: true },
+    { sub: "ativos", icon: "🟢", titulo: "Ativos", grupo: "Monitoramento" },
+    { sub: "mapa", icon: "🗺️", titulo: "Mapa", grupo: "Monitoramento" },
+    { sub: "monitoramento", icon: "🩺", titulo: "Saúde do sistema", grupo: "Monitoramento", exigeSuper: true },
+    { sub: "sessoes", icon: "🕒", titulo: "Sessões", grupo: "Sistema" },
+    { sub: "logs", icon: "📜", titulo: "Logs", grupo: "Sistema" },
+    { sub: "acessos", icon: "🔑", titulo: "Acessos ESP32", grupo: "Sistema" },
+    { sub: "config", icon: "⚙️", titulo: "Configurações", grupo: "Sistema", exigeSuper: true },
+    { sub: "auditoria", icon: "🛡️", titulo: "Auditoria", grupo: "Sistema", exigeSuper: true },
   ];
 
   function criarCard(def, compacto) {
@@ -180,7 +179,7 @@ const Inicio = (() => {
     ADMIN
       .filter((d) => !d.exigeSuper || state.isSuperAdmin)
       .forEach((d) => g.appendChild(criarCard({
-        chave: `adm-${d.sub}`, icon: d.icon, titulo: d.titulo,
+        chave: `adm-${d.sub}`, icon: d.icon, titulo: `${d.grupo} · ${d.titulo}`,
         acao: () => irRota(`/admin/${d.sub}`),
       }, true)));
   }

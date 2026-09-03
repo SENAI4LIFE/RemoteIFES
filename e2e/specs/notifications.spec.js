@@ -6,10 +6,11 @@ test("API de notificações exige autorização administrativa", async ({ reques
   expect((await request.get(`${API_URL}/admin/notificacoes`, { headers: { Authorization: `Bearer ${tokenDe("admin")}` } })).status()).toBe(200);
 });
 
-test("Administração oferece a seção Notificações de dispositivos sem duplicar dados", async ({ page, context }) => {
+test("Dispositivos > Notificações mostra a mesma fila do sino sem duplicar dados", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/admin/notificacoes");
-  await expect(page.locator('.admin-subtab-btn[data-sub="notificacoes"]')).toContainText("Notificações de dispositivos");
+  await expect(page.locator('.admin-subtab-btn[data-sub="notificacoes"]')).toContainText("Notificações");
+  await expect(page.locator('.admin-subtab-group[data-grupo="dispositivos"] .admin-group-btn')).toContainText("Dispositivos");
   await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#adminNotifList .notif-item").first()).toContainText("offline");
 });

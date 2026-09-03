@@ -37,8 +37,6 @@
   --safe-right: 0px;
 
   --topbar-h: 72px;
-  /* Borda inferior da faixa sticky de senha padrao (0 quando ela nao esta fixa),
-     publicada por app.js: outros elementos sticky param abaixo dela. */
   --aviso-seguranca-fim: 0px;
   --tabbar-h: 54px;
 
@@ -1084,6 +1082,8 @@ button.btn:disabled {
   min-width: 0;
 }
 .admin-subtabs {
+  --admin-nav-topo: max(74px, var(--aviso-seguranca-fim));
+  --admin-nav-rodape: max(calc(74px + var(--safe-bottom)), calc(58px * var(--a11y-font-scale)));
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
@@ -1094,8 +1094,8 @@ button.btn:disabled {
   margin-bottom: 16px;
   overflow: hidden;
   position: sticky;
-  top: max(74px, var(--aviso-seguranca-fim));
-  max-height: max(140px, calc(100dvh - 90px - var(--aviso-seguranca-fim)));
+  top: var(--admin-nav-topo);
+  max-height: max(140px, calc(100dvh - var(--admin-nav-topo) - var(--admin-nav-rodape) - 8px));
   overflow-y: auto;
 }
 .admin-subtab-btn {
@@ -1117,11 +1117,44 @@ button.btn:disabled {
   font-weight: 600;
   cursor: pointer;
 }
-.admin-subtab-btn:last-child { border-bottom: none; }
+.admin-subtab-group:last-child .admin-subtab-btn:last-child { border-bottom: none; }
 .admin-subtab-label {
   min-width: 0;
   overflow-wrap: break-word;
   hyphens: auto;
+}
+.admin-subtab-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.admin-subtab-group:not(:has(.admin-subtab-btn:not(.hidden))) { display: none; }
+.admin-group-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text-muted);
+  padding: 7px 6px;
+  font-size: calc(9.5px * var(--a11y-font-scale));
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.admin-group-label {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.admin-subtab-group.is-active .admin-group-btn {
+  background: var(--ifes-green-dark);
+  color: #fff;
 }
 
 @media (max-width: 619px) {
@@ -1145,13 +1178,23 @@ button.btn:disabled {
     border-right: 1px solid var(--border);
     padding: 10px 12px;
   }
-  .admin-subtab-btn:last-child { border-right: none; }
+  .admin-subtab-group:last-child .admin-subtab-btn:last-child { border-right: none; }
   .admin-subtab-label { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
   .admin-content { width: 100%; }
+  .admin-subtab-group { display: contents; }
+  .admin-group-btn {
+    flex: 0 0 auto;
+    width: auto;
+    align-self: stretch;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
 }
 
 @media (min-width: 620px) {
-  .admin-subtabs { width: min(calc(240px * var(--a11y-font-scale)), 42vw); top: max(84px, var(--aviso-seguranca-fim)); }
+  .admin-subtabs { width: min(calc(240px * var(--a11y-font-scale)), 42vw); --admin-nav-topo: max(84px, var(--aviso-seguranca-fim)); }
   .admin-subtab-btn {
     flex-direction: row;
     align-items: center;
@@ -1161,9 +1204,14 @@ button.btn:disabled {
     font-size: calc(14px * var(--a11y-font-scale));
   }
   .admin-subtab-label { flex: 1; }
+  .admin-group-btn {
+    justify-content: flex-start;
+    padding: 9px 16px;
+    font-size: calc(11px * var(--a11y-font-scale));
+  }
 }
 @media (min-width: 700px) {
-  .admin-subtabs { top: max(62px, var(--aviso-seguranca-fim)); }
+  .admin-subtabs { --admin-nav-topo: max(62px, var(--aviso-seguranca-fim)); }
   .admin-subtab-btn { padding: 11px 16px; }
 }
 .admin-subtab-btn.active {
@@ -2143,8 +2191,6 @@ button.btn:disabled {
 
 #adminSub-macs .mac-input { max-width: 22rem; }
 #adminSub-macs .mac-actions { align-items: baseline; gap: 8px 16px; }
-/* Não crescem, mas precisam encolher: com a fonte ampliada, "flex: 0 0 auto"
-   deixava o rótulo estourar a largura do cartão. */
 #adminSub-macs .mac-actions > .link-btn { flex: 0 1 auto; min-width: 0; }
 #adminSub-macs .mac-actions > .hint { flex: 0 1 auto; min-width: 0; margin: 0; }
 
@@ -2511,7 +2557,6 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
   border: none;
   background: var(--ifes-green-dark);
   color: #fff;
-  /* Glifo de infraestrutura: tamanho estavel mesmo com o texto ampliado. */
   font-size: 20px;
   line-height: 1;
   font-weight: 700;
@@ -3846,11 +3891,6 @@ textarea {
 }
 
 @media (max-width: 560px) {
-  /* O sino e o inseto ficam no meio da barra superior, não na borda direita: um painel
-     quase tão largo quanto a tela, ancorado em "right: 0", sairia pela esquerda. Ancorar
-     na própria barra — que é sticky e ocupa a largura da tela — prende o painel à tela sem
-     fixar a borda de cima em uma altura constante: a barra quebra em mais de uma linha
-     quando a fonte cresce, e um topo constante passaria por cima dos próprios botões. */
   .notif-wrap,
   .bug-wrap {
     position: static;
@@ -4153,7 +4193,6 @@ body.mobile-app-open { overflow: hidden; }
   .manual-command dd { margin-bottom: 6px; }
 }
 
-/* Mapa de calor operacional: escala fria->quente reaproveitando a planta baixa. */
 .heatmap-bloco { margin-top: 16px; }
 .heatmap-summary {
   cursor: pointer;

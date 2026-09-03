@@ -223,22 +223,7 @@ router.delete("/admin/acessos", (req, res) => {
 });
 
 router.get("/admin/salas", (req, res) => {
-  const salas = salasService.listar();
-  res.json(
-    salas.map((s) => ({
-      sala: s.sala,
-      nome: s.nome,
-      bloco: s.bloco,
-      andar: s.andar,
-      online: !!s.online,
-      ligado: !!s.ligado,
-      ipEsp32: s.ipEsp32,
-      mac: s.mac,
-      temperaturaMinima: s.temperaturaMinima,
-      temperaturaMaxima: s.temperaturaMaxima,
-      acessoRestrito: !!s.acessoRestrito,
-    }))
-  );
+  res.json(salasService.listarAdministrativo());
 });
 
 router.get("/admin/esp32/detectados", exigirSuperAdmin, (req, res) => {

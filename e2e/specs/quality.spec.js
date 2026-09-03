@@ -1,7 +1,7 @@
 const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
-const ADMIN_COMUM = ["usuarios", "ativos", "sessoes", "logs", "dispositivos", "acessos", "proprietarios", "mapa"];
-const SUPERADMIN = [...ADMIN_COMUM, "macs", "config", "esp32", "monitoramento", "relatos"];
+const ADMIN_COMUM = ["usuarios", "proprietarios", "dispositivos", "notificacoes", "ativos", "mapa", "sessoes", "logs", "acessos"];
+const SUPERADMIN = [...ADMIN_COMUM, "relatos", "macs", "esp32", "monitoramento", "config", "auditoria"];
 
 for (const [papel, subtabs] of [["admin", ADMIN_COMUM], ["superadmin", SUPERADMIN]]) {
   for (const viewport of ["mobile-compact", "desktop-compact"]) {

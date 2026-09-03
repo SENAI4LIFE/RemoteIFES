@@ -7,6 +7,8 @@ const Admin = {
   _auditPages: 1,
   _connectPage: 1,
   _connectPages: 1,
+  _detectadosSeq: 0,
+  _macsPararWs: null,
 
   async aoAbrir() {
     document.getElementById("novoUsuarioAdminLabel").classList.toggle("hidden", !state.isSuperAdmin);
@@ -545,9 +547,9 @@ const Admin = {
       li.id = `macCard-${s.sala}`;
       li.innerHTML = `
         <div class="mac-row" style="width:100%">
-          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))}: ${escapeHtmlAdmin(s.nome)} <span class="status-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span></div>
+          <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(s.sala))}: ${escapeHtmlAdmin(s.nome)} <span class="status-badge mac-conexao-badge ${s.online ? "on" : "off"}">${s.online ? "online" : "offline"}</span> <span class="status-badge mac-cadastro-badge ${s.mac ? "on" : "off"}">${s.mac ? "ESP32 cadastrado" : "sem ESP32 cadastrado"}</span></div>
           <label>Endereço MAC do ESP32</label>
-          <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${escapeHtmlAdmin(s.mac) || ""}" />
+          <input type="text" class="mac-input" placeholder="AA:BB:CC:DD:EE:FF" value="${escapeHtmlAdmin(s.mac) || ""}" data-mac-salvo="${escapeHtmlAdmin(s.mac) || ""}" />
           <label>Limites de temperatura desta sala</label>
           <div class="two-col room-limit-row">
             <div>
@@ -688,6 +690,52 @@ const Admin = {
     }
   },
 
+  aoAbrirMacs() {
+    if (!this._macsPararWs && typeof ServerStatus !== "undefined") {
+      this._macsPararWs = ServerStatus.aoMensagem((msg) => {
+        if (msg && msg.tipo === "dispositivo_cadastro" && msg.cadastro) {
+          this.aplicarCadastroDispositivo(msg.cadastro);
+        }
+      });
+    }
+    return this.carregarMacs();
+  },
+
+  aoFecharMacs() {
+    if (!this._macsPararWs) return;
+    this._macsPararWs();
+    this._macsPararWs = null;
+  },
+
+  aplicarCadastroDispositivo(cadastro) {
+    const li = document.getElementById(`macCard-${cadastro.sala}`);
+    if (!li) return;
+    const mac = cadastro.mac || "";
+
+    const input = li.querySelector(".mac-input");
+    if (input) {
+      const salvoAnterior = input.dataset.macSalvo || "";
+      if (document.activeElement !== input && input.value.trim() === salvoAnterior) input.value = mac;
+      input.dataset.macSalvo = mac;
+    }
+
+    const conexao = li.querySelector(".mac-conexao-badge");
+    if (conexao) {
+      conexao.classList.toggle("on", !!cadastro.online);
+      conexao.classList.toggle("off", !cadastro.online);
+      conexao.textContent = cadastro.online ? "online" : "offline";
+    }
+
+    const cadastroBadge = li.querySelector(".mac-cadastro-badge");
+    if (cadastroBadge) {
+      cadastroBadge.classList.toggle("on", !!mac);
+      cadastroBadge.classList.toggle("off", !mac);
+      cadastroBadge.textContent = mac ? "ESP32 cadastrado" : "sem ESP32 cadastrado";
+    }
+
+    this.carregarDetectados();
+  },
+
   filtrarMacsList(query) {
     const normalizar = (texto) => texto
       .normalize("NFD")
@@ -711,9 +759,11 @@ const Admin = {
   async carregarDetectados() {
     const list = document.getElementById("detectadosList");
     const empty = document.getElementById("detectadosEmpty");
-    list.innerHTML = "";
+    const seq = ++this._detectadosSeq;
     const detectados = await Api.listarDetectados();
     const salas = await Api.listarSalasAdmin();
+    if (seq !== this._detectadosSeq) return;
+    list.innerHTML = "";
 
     if (!Array.isArray(detectados) || detectados.length === 0) {
       empty.classList.remove("hidden");
@@ -972,10 +1022,46 @@ document.getElementById("criarUsuarioBtn").addEventListener("click", async (e) =
   }
 });
 
+function revelarSubAdmin(btn) {
+  const barra = btn.closest(".admin-subtabs");
+  if (!barra) return;
+  const alvo = btn.getBoundingClientRect();
+  const area = barra.getBoundingClientRect();
+  if (barra.scrollWidth > barra.clientWidth) {
+    if (alvo.left < area.left) barra.scrollLeft += alvo.left - area.left - 8;
+    else if (alvo.right > area.right) barra.scrollLeft += alvo.right - area.right + 8;
+  }
+  if (barra.scrollHeight > barra.clientHeight) {
+    if (alvo.top < area.top) barra.scrollTop += alvo.top - area.top - 8;
+    else if (alvo.bottom > area.bottom) barra.scrollTop += alvo.bottom - area.bottom + 8;
+  }
+}
+
+function marcarSubAdminAtiva(btn) {
+  document.querySelectorAll(".admin-subtab-btn").forEach((b) => {
+    b.classList.remove("active");
+    b.removeAttribute("aria-current");
+  });
+  btn.classList.add("active");
+  btn.setAttribute("aria-current", "page");
+  document.querySelectorAll(".admin-subtab-group").forEach((grupo) => {
+    grupo.classList.toggle("is-active", grupo.contains(btn));
+  });
+  requestAnimationFrame(() => revelarSubAdmin(btn));
+}
+
+document.querySelectorAll(".admin-group-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const grupo = btn.closest(".admin-subtab-group");
+    const alvo = grupo && grupo.querySelector(".admin-subtab-btn:not(.hidden)");
+    if (alvo && !alvo.classList.contains("active")) alvo.click();
+    else if (alvo) revelarSubAdmin(alvo);
+  });
+});
+
 document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
-    document.querySelectorAll(".admin-subtab-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
+    marcarSubAdminAtiva(btn);
 
     document.querySelectorAll(".admin-sub").forEach((el) => el.classList.add("hidden"));
     const sub = btn.dataset.sub;
@@ -1002,7 +1088,8 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "acessos") await Admin.carregarAcessos();
     if (sub === "proprietarios") await Admin.carregarProprietarios();
     if (sub === "mapa") await Admin.carregarMapa();
-    if (sub === "macs") await Admin.carregarMacs();
+    if (sub === "macs") await Admin.aoAbrirMacs();
+    else Admin.aoFecharMacs();
     if (sub === "config") await Admin.carregarConfiguracoes();
     if (sub === "auditoria") await Admin.carregarAuditoria();
     if (sub === "esp32") await Esp32Admin.aoAbrir();
