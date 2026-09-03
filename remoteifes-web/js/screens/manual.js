@@ -329,7 +329,7 @@ const Manual = (() => {
         const sub = document.querySelector(".admin-subtab-btn.active")?.dataset.sub;
         return ({
           usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "ativos-sessoes",
-          logs: "logs-dispositivos", dispositivos: "logs-dispositivos", acessos: "logs-dispositivos",
+          logs: "logs-dispositivos", dispositivos: "logs-dispositivos",
           notificacoes: "notificacoes", proprietarios: "proprietarios-admin", mapa: "proprietarios-admin",
           monitoramento: "monitoramento", macs: "esp32-cadastro",
           config: "configuracoes-globais", esp32: "esp32-avancado", relatos: "relatos-gestao",
@@ -345,10 +345,8 @@ const Manual = (() => {
         abrir(btn.dataset.sec || null);
       }));
       primarios.querySelector('[data-help-action="report"]').addEventListener("click", (evento) => {
-        // Sem isto, o fechamento global por clique no documento fecharia o painel de relatos recém-aberto.
         evento.stopPropagation();
         document.getElementById("helpFabPanel").classList.add("hidden");
-        // Abre explicitamente (Relatos fecha o painel de notificações), sem alternar.
         if (typeof Relatos !== "undefined") Relatos.abrirPainel();
       });
       primarios.querySelector('[data-help-action="mobile"]').addEventListener("click", () => {

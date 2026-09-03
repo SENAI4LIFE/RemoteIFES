@@ -67,7 +67,7 @@ ManualContent.registrar([
         ["Ajuda e manual", "abre esta referência"],
         ["Aplicativo móvel", "mostra PWA, APK e orientações de instalação"],
       ] },
-      { t: "p", texto: "Selos mostram pendências ou totais, como salas online, notificações não lidas e relatos novos. O Superadministrador também vê um resumo da saúde do serviço; os detalhes ficam em <strong>Administração &gt; Monitoramento &gt; Saúde do sistema</strong>." },
+      { t: "p", texto: "Selos mostram pendências ou totais, como salas online, notificações não lidas e relatos novos. O Superadministrador também vê um resumo da saúde do serviço; os detalhes ficam em <strong>Administração &gt; Sistema &gt; Status</strong>." },
     ],
   },
   {
