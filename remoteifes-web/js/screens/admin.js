@@ -1045,8 +1045,8 @@ document.querySelectorAll("#adminSub-logs .admin-inner-tab-btn").forEach((btn) =
     document.querySelectorAll("#adminSub-logs .admin-inner-tab").forEach((painel) => {
       painel.classList.toggle("hidden", painel.id !== `logsAba-${btn.dataset.logAba}`);
     });
-    await Admin.carregarAbaLogs();
     if (typeof Router !== "undefined") Router.sync();
+    await Admin.carregarAbaLogs();
   });
 });
 
@@ -1094,6 +1094,7 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     document.querySelectorAll(".admin-sub").forEach((el) => el.classList.add("hidden"));
     const sub = btn.dataset.sub;
     document.getElementById(`adminSub-${sub}`).classList.remove("hidden");
+    if (typeof Router !== "undefined") Router.sync();
 
     if (sub !== "ativos" && Admin._ativosIntervalId) {
       clearInterval(Admin._ativosIntervalId);
@@ -1122,7 +1123,6 @@ document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
     if (sub === "esp32") await Esp32Admin.aoAbrir();
     else Esp32Admin.aoFechar();
 
-    if (typeof Router !== "undefined") Router.sync();
   });
 });
 
