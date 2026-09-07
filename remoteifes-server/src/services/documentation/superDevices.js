@@ -111,6 +111,7 @@ module.exports = [
         ["Revogar", "invalida a identidade e encerra a conexão; exige novo provisionamento para voltar"],
       ] },
       { t: "p", texto: "Provisionar ou rotacionar envia o novo valor automaticamente a uma placa ainda conectada pelo vínculo atual. Substituir nunca envia a identidade nova à placa antiga: informe-a no setup da substituta. O servidor guarda somente o hash e mostra o segredo uma única vez." },
+      { t: "p", texto: "Revogar mantém a exigência de credencial na sala, mesmo com a opção global desligada: o MAC sozinho não recupera o acesso. Para reconectar, provisione ou substitua a credencial e informe o novo valor no setup do dispositivo." },
       { t: "comando", titulo: "Gerenciar no host", comandos: C.credenciais, quando: "Quando a interface não estiver disponível ou a operação fizer parte de uma janela controlada.", preRequisitos: "Execute em remoteifes-server, com o mesmo .env e diretório de dados do serviço; troque A-101 pela sala real.", resultado: "O estado é exibido sem segredo; ações de criação mostram deviceId e segredo somente nessa execução.", risco: "Capture o segredo em canal seguro. Substituir ou revogar derruba a identidade anterior." },
       { t: "sub", titulo: "Migração de só MAC" },
       { t: "passos", itens: [

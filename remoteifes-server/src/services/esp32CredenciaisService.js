@@ -197,7 +197,7 @@ function estado(sala) {
 function exigidoPara(salaRow) {
   if (!salaRow) return false;
   if (configuracoesService.obter().espCredenciaisObrigatorias) return true;
-  const linha = db.prepare(`SELECT 1 FROM esp_credenciais WHERE sala = ? AND revogadoEm IS NULL`).get(salaRow.sala);
+  const linha = db.prepare(`SELECT 1 FROM esp_credenciais WHERE sala = ?`).get(salaRow.sala);
   return !!linha;
 }
 
@@ -208,10 +208,14 @@ function resumoMigracao() {
     WHERE c.revogadoEm IS NULL AND s.mac IS NOT NULL
   `).get().n;
   const revogadas = db.prepare(`SELECT COUNT(*) n FROM esp_credenciais WHERE revogadoEm IS NOT NULL`).get().n;
+  const somenteMac = db.prepare(`
+    SELECT COUNT(*) n FROM salas s WHERE s.mac IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM esp_credenciais c WHERE c.sala = s.sala)
+  `).get().n;
   return {
     controladoresComMac: total,
     comCredencial,
-    somenteMac: Math.max(0, total - comCredencial),
+    somenteMac,
     revogadas,
     obrigatorio: !!configuracoesService.obter().espCredenciaisObrigatorias,
   };

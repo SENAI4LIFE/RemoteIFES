@@ -1,6 +1,6 @@
 const db = require("../config/database");
 const { buscar: buscarSala } = require("./salasService");
-const { dataAtualBrasiliaISO } = require("../utils/tempo");
+const { dataAtualBrasiliaISO, horaAtualBrasilia } = require("../utils/tempo");
 
 const MODOS_VALIDOS = ["reserva", "ligar_completo", "ligar_intervalo"];
 const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -58,12 +58,25 @@ function listar({ sala, usuarioId } = {}) {
 }
 
 function salasComAgendamentoAtivo() {
-  const { bloqueioAtivo } = require("./salasService");
-  const salas = db.prepare("SELECT sala FROM salas").all();
+  const hora = horaAtualBrasilia();
+  const reservas = db.prepare(`
+    SELECT a.*, u.nome AS usuarioNome, u.usuario AS usuarioLogin
+    FROM agendamentos a
+    JOIN usuarios u ON u.id = a.usuarioId
+    WHERE a.ativo = 1 AND a.data = ? AND a.horaInicio <= ? AND a.horaFim >= ?
+    ORDER BY a.id
+  `).all(dataAtualBrasiliaISO(), hora, hora);
   const resultado = {};
-  for (const { sala } of salas) {
-    const bloqueio = bloqueioAtivo(sala);
-    if (bloqueio) resultado[sala] = bloqueio;
+  for (const ag of reservas) {
+    if (Object.hasOwn(resultado, ag.sala)) continue;
+    resultado[ag.sala] = {
+      agendamentoId: ag.id,
+      usuarioId: ag.usuarioId,
+      usuarioNome: ag.usuarioNome,
+      usuarioLogin: ag.usuarioLogin,
+      horaInicio: ag.horaInicio,
+      horaFim: ag.horaFim,
+    };
   }
   return resultado;
 }
@@ -150,6 +163,7 @@ function alternar(id, ativo, requisitante) {
   if (ag.usuarioId !== requisitante.id && !requisitante.isAdmin) {
     throw new Error("apenas o autor ou um administrador pode alterar este agendamento");
   }
+  if (ativo) validarConflito(ag.sala, ag, ag.id);
   db.prepare("UPDATE agendamentos SET ativo = ? WHERE id = ?").run(ativo ? 1 : 0, id);
   return buscarPorId(id);
 }
@@ -193,6 +207,7 @@ function listarAtivosParaAgendador(dataISO = dataAtualBrasiliaISO()) {
     FROM agendamentos a
     JOIN usuarios u ON u.id = a.usuarioId
     WHERE a.ativo = 1 AND a.data = ?
+    ORDER BY a.horaInicio, a.id
   `).all(dataISO);
 }
 
