@@ -48,7 +48,7 @@ const adminSections = [
       ] },
       { t: "sub", titulo: "Manter e corrigir" },
       { t: "lista", itens: [
-        "Use o controle de ativo para suspender ou reativar um agendamento sem apagá-lo.",
+        "Use o controle de ativo para suspender ou reativar um agendamento sem apagá-lo. A reativação é recusada se houver conflito com outra reserva ativa na mesma sala e data.",
         "Use <strong>remover</strong> no agendamento desejado para remoção definitiva; recrie se precisar alterar sala, horário, temperatura ou modo.",
         "Sobreposição com outro agendamento ativo na mesma sala e data é recusada.",
         "Também são recusados horário invertido, intervalo de acionamento fora da reserva, temperatura fora dos limites, sala/data inválida e excesso do limite administrativo.",

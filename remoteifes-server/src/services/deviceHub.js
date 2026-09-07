@@ -122,8 +122,6 @@ function enviarComando(sala, payload) {
   return true;
 }
 
-// Propaga a política do ponto de acesso local para quem já está conectado; quem estiver
-// fora recebe a mesma configuração no próximo handshake.
 function difundirPoliticaAp(exigirCredencial) {
   const payload = { tipo: "config_ap", exigirCredencial: !!exigirCredencial };
   let enviados = 0;
@@ -293,6 +291,7 @@ function iniciar(server) {
     }
 
     ws.on("message", (dados) => {
+      if (conexoes.get(sala) !== entrada || ws.readyState !== ws.OPEN) return;
       const agoraMs = Date.now();
       if (agoraMs - ws.janelaMensagensInicio >= JANELA_MENSAGENS_MS) {
         ws.janelaMensagensInicio = agoraMs;
@@ -349,8 +348,6 @@ function iniciar(server) {
       if (conexoes.get(sala) === entrada) {
         conexoes.delete(sala);
         logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString() });
-        // O fechamento do socket é a informação autoritativa de que o dispositivo saiu: a sala
-        // fica offline agora, sem esperar o heartbeat vencer no varredor periódico.
         try {
           if (salasService.marcarOffline(sala, null, "websocket-fechado")) salasService.eventos.emit("mudanca");
         } catch (erro) {

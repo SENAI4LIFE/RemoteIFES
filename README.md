@@ -192,6 +192,8 @@ Cada agendamento reserva a sala durante um período (`horaInicio`–`horaFim`) e
 
 O agendador do servidor verifica agendamentos ativos a cada minuto e não repete uma mesma ação (ligar/desligar) mais de uma vez no mesmo dia. Um agendamento desativado permanece salvo, mas não é executado; o autor do agendamento ou um administrador podem ativá-lo, desativá-lo ou removê-lo — outros usuários comuns só podem visualizar.
 
+A reativação é recusada se houver conflito com outra reserva ativa na mesma sala e data; o agendamento permanece desativado até que o conflito seja resolvido.
+
 ## Grade de Horários
 
 A aba **Grade** (visível apenas para administradores) mostra, para uma sala e data escolhidas, uma grade com os períodos de aula fixos do campus (07:00 às 22:10, em blocos de aproximadamente 50 minutos), indicando para cada período se a sala está livre, apenas reservada ou com o ar-condicionado ligado, e por quem. É útil para identificar rapidamente conflitos de horário ou janelas livres antes de criar um novo agendamento.
@@ -744,6 +746,8 @@ npm run credencial -- A-101                 # mostra o estado (sem expor o segre
 ```
 
 O ESP32 envia a credencial no cabeçalho (`X-Device-Id` / `X-Device-Secret`) no handshake do WebSocket e nas rotas `/dispositivo/*`. Ela pode ser informada no portal de setup (`RemoteIFES-Setup`) ou, para um dispositivo já conectado por MAC, **enviada pelo próprio servidor pela conexão existente** ao provisionar/rotacionar — o dispositivo grava na NVS e reconecta já autenticado, sem visita ao local. Resetar ou reconfigurar apenas Wi-Fi/servidor preserva essa credencial; deixar os dois campos de dispositivo vazios no portal também preserva o valor existente.
+
+Revogar mantém a exigência de credencial na sala, mesmo com a opção global desligada: o MAC sozinho não recupera o acesso. Para reconectar, provisione ou substitua a credencial e informe o novo valor no setup do dispositivo.
 
 **Substituição de hardware é deliberadamente diferente:** a nova credencial nunca é enviada à conexão da placa antiga. O servidor invalida o `deviceId` anterior, encerra sua sessão e mostra o novo par uma vez para ser informado no portal da placa substituta.
 

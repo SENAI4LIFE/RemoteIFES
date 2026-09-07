@@ -1,4 +1,7 @@
 let _panelPararStatus = null;
+let _panelGeracao = 0;
+let _panelRevisao = 0;
+let _panelConsulta = 0;
 
 const _panelAplicarAvisoOfflineToast = Toast.criarAvisoDeEstado(
   "panelAvisoOffline",
@@ -10,8 +13,11 @@ async function openRoom(sala, nome) {
   document.getElementById("panelRoomName").textContent = `${RoomsData.rotulo(sala)}: ${nome}`;
   showScreen("panel");
   if (typeof Router !== "undefined") Router.sync();
-  await refreshStatus();
   iniciarAutoRefreshPanel();
+  for (const id of ["btnPower", "tempDown", "tempUp", "btnTurbo"]) {
+    document.getElementById(id).disabled = true;
+  }
+  await refreshStatus();
 }
 
 function iniciarAutoRefreshPanel() {
@@ -21,6 +27,7 @@ function iniciarAutoRefreshPanel() {
 }
 
 function pararAutoRefreshPanel() {
+  _panelGeracao += 1;
   if (_panelPararStatus) {
     _panelPararStatus();
     _panelPararStatus = null;
@@ -54,6 +61,8 @@ function aplicarBloqueio(dados) {
 }
 
 function aplicarStatusNoPainel(status) {
+  if (!_panelPararStatus || status.sala !== state.salaAtual) return;
+  _panelRevisao += 1;
   const temperaturaAmbiente = Number(status.temperatura);
   document.getElementById("tempValue").textContent = Number.isFinite(temperaturaAmbiente)
     ? `${temperaturaAmbiente.toFixed(1)} °C`
@@ -88,12 +97,19 @@ function aplicarStatusNoPainel(status) {
 }
 
 async function refreshStatus() {
+  const sala = state.salaAtual;
+  const geracao = _panelGeracao;
+  const revisao = _panelRevisao;
+  const consulta = ++_panelConsulta;
+  const vigente = () => _panelPararStatus && sala === state.salaAtual
+    && geracao === _panelGeracao && revisao === _panelRevisao && consulta === _panelConsulta;
   try {
-    const status = await Api.statusSala(state.salaAtual);
+    const status = await Api.statusSala(sala);
+    if (!vigente()) return;
     if (status.erro) throw new Error(status.erro);
     aplicarStatusNoPainel(status);
   } catch (erro) {
-    Toast.erro("não foi possível falar com o servidor");
+    if (vigente()) Toast.erro("não foi possível falar com o servidor");
   }
 }
 

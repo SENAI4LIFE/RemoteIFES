@@ -6,7 +6,7 @@ const vm = require("vm");
 
 const service = require("../src/services/documentationService");
 const commands = require("../src/services/documentation/commands");
-const README = fs.readFileSync(path.join(__dirname, "..", "..", "README.md"), "utf8");
+const README = fs.readFileSync(path.join(__dirname, "..", "..", "README.md"), "utf8").replace(/\r\n/g, "\n");
 const WEB = path.join(__dirname, "..", "..", "remoteifes-web");
 
 function carregarManualPublico() {
