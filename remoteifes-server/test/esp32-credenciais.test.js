@@ -169,6 +169,28 @@ test("rotação: segredo antigo continua válido durante o período de tolerânc
   assert.equal(credenciaisService.estado("cred-5").graceRotacaoAtivo, true);
 });
 
+test("revogacao nao permite voltar a autenticar apenas pelo MAC", async () => {
+  const sala = "cred-revogada-mac";
+  const mac = "AA:CC:00:00:00:20";
+  novaSalaComMac(sala, mac);
+  credenciaisService.provisionar(sala);
+  const somenteMac = credenciaisService.resumoMigracao().somenteMac;
+  credenciaisService.revogar(sala);
+  assert.equal(credenciaisService.resumoMigracao().somenteMac, somenteMac);
+  const ws = abrirWs({ "x-device-sala": sala, "x-device-mac": mac });
+  await esperaRecusada(ws);
+  for (const rota of ["identificar", "heartbeat", "comando", "acesso"]) {
+    const resposta = await fetch(`${baseUrl}/dispositivo/${rota}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-device-mac": mac },
+      body: JSON.stringify({ sala, mac, cmd: "controle_nativo" }),
+    });
+    assert.equal(resposta.status, 401, rota);
+  }
+  const nova = credenciaisService.provisionar(sala);
+  assert.ok(credenciaisService.verificar(nova.deviceId, nova.segredo));
+});
+
 test("modo brando: MAC-only continua funcionando quando não há credencial", async () => {
   novaSalaComMac("cred-6", "AA:CC:00:00:00:06");
   const ws = abrirWs({ "x-device-sala": "cred-6", "x-device-mac": "AA:CC:00:00:00:06" });
