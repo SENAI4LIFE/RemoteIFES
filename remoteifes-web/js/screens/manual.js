@@ -77,7 +77,7 @@ const Manual = (() => {
     if (typeof state === "undefined" || !state.usuario) return false;
     if (rota.startsWith("/admin/")) {
       const sub = rota.slice(7);
-      if (["monitoramento", "macs", "config", "esp32", "auditoria"].includes(sub)) return !!state.isSuperAdmin;
+      if (["macs", "config", "esp32", "logs/auditoria", "status/sistema"].includes(sub)) return !!state.isSuperAdmin;
       return !!state.isAdmin;
     }
     if (rota === "/agenda" || rota === "/grade") return !!state.isAdmin;
@@ -327,14 +327,16 @@ const Manual = (() => {
       const id = document.querySelector("#mainApp .screen.tab-content:not(.hidden)")?.id || "";
       if (id === "screen-admin") {
         const sub = document.querySelector(".admin-subtab-btn.active")?.dataset.sub;
+        const aba = document.querySelector(`#adminSub-${sub} .admin-inner-tab-btn.active`)?.dataset.aba;
         return ({
-          usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "ativos-sessoes",
-          logs: "logs-dispositivos", dispositivos: "logs-dispositivos",
-          notificacoes: "notificacoes", proprietarios: "proprietarios-admin", mapa: "proprietarios-admin",
-          monitoramento: "monitoramento", macs: "esp32-cadastro",
+          "usuarios:contas": "usuarios-admin", "usuarios:proprietarios": "proprietarios-admin",
+          "logs:comandos": "logs-dispositivos", "logs:acesso": "logs-dispositivos",
+          "logs:dispositivos": "logs-dispositivos", "logs:sessoes": "ativos-sessoes",
+          "logs:auditoria": "auditoria", "status:ativos": "ativos-sessoes",
+          "status:mapa": "proprietarios-admin", "status:sistema": "monitoramento",
+          notificacoes: "notificacoes", macs: "esp32-cadastro",
           config: "configuracoes-globais", esp32: "esp32-avancado", relatos: "relatos-gestao",
-          auditoria: "auditoria",
-        })[sub] || "administracao";
+        })[aba ? `${sub}:${aba}` : sub] || "administracao";
       }
       return ({ "screen-panel": "controlador", "screen-agenda": "agenda-grade", "screen-grade": "agenda-grade", "screen-propriedade": "controle-acesso-sala", "screen-inicio": "inicio-acoes" })[id] || "selecao-sala";
     })();

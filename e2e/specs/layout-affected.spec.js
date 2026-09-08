@@ -94,9 +94,14 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
       expect(workspaceUsuarios.proporcao).toBeGreaterThan(0.9);
     }
 
-    for (const sub of ["usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "proprietarios", "mapa", "macs", "config", "esp32", "monitoramento", "auditoria", "relatos"]) {
+    for (const rota of ["usuarios", "usuarios/proprietarios", "notificacoes", "logs", "logs/acesso", "logs/dispositivos", "logs/sessoes", "logs/auditoria", "status", "status/mapa", "status/sistema", "macs", "config", "esp32", "relatos"]) {
+      const [sub, aba] = rota.split("/");
       await page.locator(`.admin-subtab-btn[data-sub="${sub}"]`).click();
       await expect(page.locator(`#adminSub-${sub}`)).toBeVisible();
+      if (aba) {
+        await page.locator(`#adminSub-${sub} .admin-inner-tab-btn[data-aba="${aba}"]`).click();
+        await expect(page.locator(`#${sub}Aba-${aba}`)).toBeVisible();
+      }
       const semOverflow = await semRolagemHorizontal(page);
       const ofensores = semOverflow ? [] : await page.evaluate(() => [...document.querySelectorAll("body *")]
         .filter((el) => {
@@ -105,7 +110,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
         })
         .slice(0, 8)
         .map((el) => `${el.tagName.toLowerCase()}#${el.id}.${el.className}`));
-      expect(semOverflow, `${sub} sem rolagem horizontal da página: ${ofensores.join(", ")}`).toBe(true);
+      expect(semOverflow, `${rota} sem rolagem horizontal da página: ${ofensores.join(", ")}`).toBe(true);
     }
 
     await page.locator('.admin-subtab-btn[data-sub="notificacoes"]').click();

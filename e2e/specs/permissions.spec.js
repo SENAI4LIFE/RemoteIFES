@@ -38,7 +38,7 @@ test("o Monitoramento é exclusivo do superadministrador (interface e API)", asy
   await sessaoComo("admin");
   await page.locator("#adminTabBtn").click();
   await expect(page.locator("#screen-admin")).toBeVisible();
-  await expect(page.locator('.admin-subtab-btn[data-sub="monitoramento"]')).toBeHidden();
+  await expect(page.locator('#adminSub-status .admin-inner-tab-btn[data-aba="sistema"]')).toBeHidden();
 
   const comAdmin = await request.get(`${API_URL}/admin/monitoramento`, {
     headers: { Authorization: `Bearer ${tokens.admin}` },
@@ -53,8 +53,9 @@ test("o Monitoramento é exclusivo do superadministrador (interface e API)", asy
 test("o superadministrador abre o Monitoramento com selos de estado", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
-  await page.locator('.admin-subtab-btn[data-sub="monitoramento"]').click();
-  await expect(page.locator("#adminSub-monitoramento")).toBeVisible();
+  await page.locator('.admin-subtab-btn[data-sub="status"]').click();
+  await page.locator('#adminSub-status .admin-inner-tab-btn[data-aba="sistema"]').click();
+  await expect(page.locator("#statusAba-sistema")).toBeVisible();
   await expect(page.locator("#monGrid .mon-card")).not.toHaveCount(0);
   await expect(page.locator("#monGrid .status-chip").first()).toBeVisible({ timeout: 10_000 });
 });

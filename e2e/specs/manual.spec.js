@@ -160,7 +160,7 @@ test("todo item do sumário da Ajuda aponta para uma seção existente", async (
   expect(orfas).toEqual([]);
   const rotas = await page.$$eval("#manualConteudo .manual-ver-app", (bs) => bs.map((b) => b.dataset.rota));
   expect(rotas.length).toBeGreaterThan(0);
-  expect(rotas.filter((r) => !/^\/(inicio|salas|agenda|grade|config|aplicativo|admin\/[a-z0-9-]+)$/.test(r))).toEqual([]);
+  expect(rotas.filter((r) => !/^\/(inicio|salas|agenda|grade|config|aplicativo|admin\/[a-z0-9-]+(\/[a-z0-9-]+)?)$/.test(r))).toEqual([]);
   const linksQuebrados = await page.$$eval("#manualConteudo .manual-crosslink:not(.hidden)", (bs) =>
     bs.map((b) => b.dataset.sec).filter((id) => !document.getElementById(`manual-sec-${id}`))
   );
@@ -172,7 +172,7 @@ test("Notificações de dispositivos está na Ajuda do administrador e leva à a
   await injetarSessao(context, "admin");
   await page.goto("/#/ajuda/notificacoes");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator("#manual-sec-notificacoes")).toContainText("Administração");
+  await expect(page.locator("#manual-sec-notificacoes")).toContainText("Administração > Dispositivos > Alertas");
   await expect(page.locator("#manual-sec-auditoria")).toHaveCount(0);
   await page.locator("#manual-sec-notificacoes .manual-ver-app").click();
   await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 15_000 });
@@ -208,8 +208,8 @@ test("os ícones de ajuda das abas novas de Administração abrem a orientação
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/ajuda/notificacoes");
 
   await page.goto("/#/admin/auditoria");
-  await expect(page.locator("#adminSub-auditoria")).toBeVisible({ timeout: 20_000 });
-  await page.locator('#adminSub-auditoria .help-icon-btn').click();
+  await expect(page.locator("#logsAba-auditoria")).toBeVisible({ timeout: 20_000 });
+  await page.locator('#logsAba-auditoria .help-icon-btn').click();
   await expect(page.locator("#helpModal")).toBeVisible();
   await expect(page.locator("#helpModalTitle")).toContainText("Auditoria");
 });
@@ -220,7 +220,11 @@ test("o manual do admin apresenta a Administração agrupada e o grupo Dispositi
   const secao = page.locator("#manual-sec-administracao");
   await expect(secao).toBeVisible({ timeout: 20_000 });
 
-  for (const termo of ["Gestão", "Dispositivos", "Sistema", "Cadastro", "Histórico", "Notificações", "Firmware / OTA", "Sessões", "Ativos", "Mapa", "Status"]) {
+  for (const termo of [
+    "Gestão", "Dispositivos", "Sistema", "Usuários", "Contas", "Proprietários de sala",
+    "Cadastro", "Firmware / OTA", "Alertas", "Logs", "Acessos", "Sessões", "Auditoria",
+    "Status", "Usuários ativos", "Mapa", "Configurações",
+  ]) {
     await expect(secao, `manual precisa citar ${termo}`).toContainText(termo);
   }
   await expect(secao).not.toContainText("ESP32 / MACs");
@@ -244,6 +248,24 @@ test("o manual do superadministrador documenta o cadastro imediato e cadastrado 
   await expect(page.locator("#adminSub-macs")).toBeVisible({ timeout: 15_000 });
 });
 
+test("\"Ver no app\" das seções movidas abre a aba interna correspondente", async ({ page, context }) => {
+  test.setTimeout(90_000);
+  await injetarSessao(context, "superadmin");
+  for (const [secao, painel, rota] of [
+    ["proprietarios-admin", "#usuariosAba-proprietarios", "#/admin/usuarios/proprietarios"],
+    ["ativos-sessoes", "#statusAba-ativos", "#/admin/status"],
+    ["logs-dispositivos", "#logsAba-comandos", "#/admin/logs"],
+    ["auditoria", "#logsAba-auditoria", "#/admin/logs/auditoria"],
+    ["monitoramento", "#statusAba-sistema", "#/admin/status/sistema"],
+  ]) {
+    await page.goto(`/#/ajuda/${secao}`);
+    await expect(page.locator(`#manual-sec-${secao} .manual-ver-app`)).toBeVisible({ timeout: 20_000 });
+    await page.locator(`#manual-sec-${secao} .manual-ver-app`).click();
+    await expect(page.locator(painel), `${secao} → ${painel}`).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe(rota);
+  }
+});
+
 test("nenhum tópico visível do manual usa a navegação antiga de Administração", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/ajuda");
@@ -255,6 +277,13 @@ test("nenhum tópico visível do manual usa a navegação antiga de Administraç
     "Admin > ESP32",
     "Administração > Monitoramento",
     "Administração > Sistema > Sessões",
+    "Administração > Gestão > Sessões",
+    "Administração > Gestão > Ativos",
+    "Administração > Gestão > Mapa",
+    "Administração > Gestão > Proprietários de sala",
+    "Administração > Dispositivos > Histórico",
+    "Administração > Dispositivos > Notificações",
+    "Administração > Sistema > Auditoria",
     "Acessos ESP32",
     "Saúde do sistema",
   ]) {
@@ -262,6 +291,12 @@ test("nenhum tópico visível do manual usa a navegação antiga de Administraç
   }
   expect(texto).toContain("Administração > Dispositivos > Cadastro");
   expect(texto).toContain("Administração > Dispositivos > Firmware / OTA");
-  expect(texto).toContain("Administração > Gestão > Sessões");
-  expect(texto).toContain("Administração > Sistema > Status");
+  expect(texto).toContain("Administração > Dispositivos > Alertas");
+  expect(texto).toContain("Administração > Gestão > Usuários > Proprietários de sala");
+  expect(texto).toContain("Administração > Sistema > Logs > Sessões");
+  expect(texto).toContain("Administração > Sistema > Logs > Dispositivos");
+  expect(texto).toContain("Administração > Sistema > Logs > Auditoria");
+  expect(texto).toContain("Administração > Sistema > Status > Usuários ativos");
+  expect(texto).toContain("Administração > Sistema > Status > Mapa");
+  expect(texto).toContain("Administração > Sistema > Status > Sistema");
 });

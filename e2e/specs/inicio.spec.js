@@ -41,12 +41,12 @@ test("hub do administrador: agenda/grade/notificações e atalhos de administra�
 test("hub do superadministrador: atalhos completos e faixa de saúde do sistema", async ({ page, context }) => {
   await abrir(page, context, "superadmin");
   const adm = await chaves(page, "#hubGridAdmin");
-  expect(adm).toEqual(expect.arrayContaining(["adm-macs", "adm-config", "adm-monitoramento", "adm-relatos"]));
+  expect(adm).toEqual(expect.arrayContaining(["adm-macs", "adm-config", "adm-status", "adm-relatos"]));
   await expect(page.locator("#hubResumo")).toBeVisible();
   await expect(page.locator("#hubResumo .status-chip").first()).toBeVisible();
   await page.locator("#hubResumo .hub-resumo-link").click();
-  await expect(page.locator("#adminSub-monitoramento")).toBeVisible({ timeout: 15_000 });
-  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/monitoramento");
+  await expect(page.locator("#statusAba-sistema")).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/status/sistema");
 });
 
 test("um card do hub navega para a seção e o voltar retorna ao início", async ({ page, context }) => {

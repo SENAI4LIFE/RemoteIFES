@@ -1,7 +1,7 @@
 const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
-const ADMIN_COMUM = ["usuarios", "proprietarios", "sessoes", "ativos", "mapa", "dispositivos", "notificacoes", "logs"];
-const SUPERADMIN = [...ADMIN_COMUM, "relatos", "macs", "esp32", "monitoramento", "config", "auditoria"];
+const ADMIN_COMUM = ["usuarios", "usuarios/proprietarios", "notificacoes", "logs", "logs/acesso", "logs/dispositivos", "logs/sessoes", "status", "status/mapa"];
+const SUPERADMIN = [...ADMIN_COMUM, "relatos", "macs", "esp32", "config", "logs/auditoria", "status/sistema"];
 
 for (const [papel, subtabs] of [["admin", ADMIN_COMUM], ["superadmin", SUPERADMIN]]) {
   for (const viewport of ["mobile-compact", "desktop-compact"]) {
@@ -17,10 +17,12 @@ for (const [papel, subtabs] of [["admin", ADMIN_COMUM], ["superadmin", SUPERADMI
         if (res.status() >= 400) erros.push(`http ${res.status()}: ${res.url()}`);
       });
 
-      for (const subtab of subtabs) {
-        await page.goto(`/#/admin/${subtab}`);
-        await expect(page.locator(`#adminSub-${subtab}`)).toBeVisible({ timeout: 20_000 });
-        expect(await semRolagemHorizontal(page), `${subtab} sem rolagem horizontal`).toBe(true);
+      for (const rota of subtabs) {
+        const [sub, aba] = rota.split("/");
+        await page.goto(`/#/admin/${rota}`);
+        await expect(page.locator(`#adminSub-${sub}`)).toBeVisible({ timeout: 20_000 });
+        if (aba) await expect(page.locator(`#${sub}Aba-${aba}`)).toBeVisible({ timeout: 20_000 });
+        expect(await semRolagemHorizontal(page), `${rota} sem rolagem horizontal`).toBe(true);
       }
 
       expect(erros).toEqual([]);
