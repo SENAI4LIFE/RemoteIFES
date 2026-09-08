@@ -113,17 +113,19 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
 
   for (const caminho of [
     "Administração &gt; Dispositivos &gt; Cadastro",
-    "Administração &gt; Dispositivos &gt; Histórico",
-    "Administração &gt; Dispositivos &gt; Notificações",
     "Administração &gt; Dispositivos &gt; Firmware / OTA",
+    "Administração &gt; Dispositivos &gt; Alertas",
     "Administração &gt; Gestão &gt; Usuários",
-    "Administração &gt; Gestão &gt; Sessões",
-    "Administração &gt; Gestão &gt; Ativos",
-    "Administração &gt; Gestão &gt; Mapa",
+    "Administração &gt; Gestão &gt; Usuários &gt; Proprietários de sala",
     "Administração &gt; Sistema &gt; Logs",
+    "Administração &gt; Sistema &gt; Logs &gt; Sessões",
+    "Administração &gt; Sistema &gt; Logs &gt; Dispositivos",
+    "Administração &gt; Sistema &gt; Logs &gt; Auditoria",
     "Administração &gt; Sistema &gt; Status",
+    "Administração &gt; Sistema &gt; Status &gt; Usuários ativos",
+    "Administração &gt; Sistema &gt; Status &gt; Mapa",
+    "Administração &gt; Sistema &gt; Status &gt; Sistema",
     "Administração &gt; Sistema &gt; Configurações",
-    "Administração &gt; Sistema &gt; Auditoria",
   ]) {
     assert.ok(documentacao.includes(caminho), `caminho ausente no manual: ${caminho}`);
   }
@@ -136,7 +138,14 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
     /Administração &gt; Configurações</,
     /Administração &gt; Relatos de problemas</,
     /Administração &gt; Sistema &gt; Sessões/,
+    /Administração &gt; Sistema &gt; Auditoria/,
     /Administração &gt; Sistema &gt; Acessos ESP32/,
+    /Administração &gt; Gestão &gt; Sessões/,
+    /Administração &gt; Gestão &gt; Ativos/,
+    /Administração &gt; Gestão &gt; Mapa/,
+    /Administração &gt; Gestão &gt; Proprietários de sala/,
+    /Administração &gt; Dispositivos &gt; Histórico/,
+    /Administração &gt; Dispositivos &gt; Notificações/,
     /Saúde do sistema/,
     /Admin &gt; ESP32/,
   ]) {
@@ -145,12 +154,16 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
 
   for (const caminho of [
     "Administração > Dispositivos > Cadastro",
-    "Administração > Dispositivos > Histórico",
     "Administração > Dispositivos > Firmware / OTA",
-    "Administração > Gestão > Sessões",
-    "Administração > Gestão > Ativos",
-    "Administração > Sistema > Logs > Acesso",
-    "Administração > Sistema > Status",
+    "Administração > Dispositivos > Alertas",
+    "Administração > Gestão > Usuários > Proprietários de sala",
+    "Administração > Sistema > Logs > Comandos",
+    "Administração > Sistema > Logs > Acessos",
+    "Administração > Sistema > Logs > Dispositivos",
+    "Administração > Sistema > Logs > Sessões",
+    "Administração > Sistema > Logs > Auditoria",
+    "Administração > Sistema > Status > Usuários ativos",
+    "Administração > Sistema > Status > Sistema",
     "Administração > Sistema > Configurações",
   ]) {
     assert.ok(README.includes(caminho), `caminho ausente no README: ${caminho}`);
@@ -163,7 +176,14 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
     /Notificações de dispositivos`/,
     /Administração > Monitoramento >/,
     /Administração > Sistema > Sessões/,
+    /Administração > Sistema > Auditoria`/,
     /Administração > Sistema > Acessos ESP32/,
+    /Administração > Gestão > Sessões/,
+    /Administração > Gestão > Ativos/,
+    /Administração > Gestão > Mapa/,
+    /Administração > Gestão > Proprietários de sala/,
+    /Administração > Dispositivos > Histórico/,
+    /Administração > Dispositivos > Notificações/,
     /Saúde do sistema/,
     /\*\*Monitoramento\*\* \| /,
   ]) {
@@ -176,15 +196,32 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
   }
 });
 
-test("a documentação mantém o Acesso dentro de Logs, sem função autônoma", () => {
+test("a documentação apresenta Logs e Status como abas internas, sem função autônoma", () => {
   const manual = carregarManualPublico();
   const documentacao = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
 
   assert.match(documentacao, /Sistema &gt; Logs/);
-  assert.match(documentacao, /aba <strong>Acesso<\/strong>/);
+  assert.match(documentacao, /Sistema &gt; Status/);
+  assert.match(documentacao, /aba <strong>Acessos<\/strong>/);
+  assert.match(documentacao, /aba <strong>Dispositivos<\/strong>/);
   assert.ok(!/Acessos ESP32/.test(documentacao), "Acessos ESP32 não pode mais aparecer como função da Administração");
-  assert.match(README, /Logs > Acesso/);
-  assert.match(README, /#\/admin\/logs\/acesso/);
+
+  const secaoLogs = service._adminSections.find((secao) => secao.id === "logs-dispositivos");
+  const abasLogs = secaoLogs.corpo.find((bloco) => bloco.t === "tabela").linhas.map(([aba]) => aba);
+  assert.deepEqual(abasLogs, ["Comandos", "Acessos", "Dispositivos", "Sessões", "Auditoria (Superadministrador)"]);
+
+  const visaoGeral = service._adminSections.find((secao) => secao.id === "administracao");
+  const tabelaAbas = visaoGeral.corpo.filter((bloco) => bloco.t === "tabela")[1].linhas;
+  assert.deepEqual(tabelaAbas, [
+    ["Gestão > Usuários", "Contas · Proprietários de sala"],
+    ["Sistema > Logs", "Comandos · Acessos · Dispositivos · Sessões · Auditoria"],
+    ["Sistema > Status", "Usuários ativos · Mapa · Sistema"],
+  ]);
+
+  assert.match(README, /Logs > Acessos/);
+  assert.match(README, /#\/admin\/logs\/sessoes/);
+  assert.match(README, /#\/admin\/usuarios\/proprietarios/);
+  assert.match(README, /#\/admin\/acessos/);
 });
 
 test("o manual explica o cadastro imediato de ESP32 e a diferença entre cadastrado e online", () => {

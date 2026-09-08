@@ -64,8 +64,13 @@ test("subtítulos, seleções e rótulos de formulário permanecem à esquerda",
   await expect(page.locator("#simpleScreenTitle")).toHaveCSS("text-align", /^(start|left)$/);
 
   await page.goto("/#/admin/usuarios");
-  await expect(page.locator("#adminSub-usuarios h2")).toHaveCSS("text-align", /^(start|left)$/);
-  await expect(page.locator("#adminSub-usuarios > .hint")).toHaveCSS("text-align", /^(start|left)$/);
+  await expect(page.locator("#usuariosAba-contas h2")).toHaveCSS("text-align", /^(start|left)$/);
+  await expect(page.locator("#usuariosAba-contas > .hint")).toHaveCSS("text-align", /^(start|left)$/);
+  const alinhamentosAdmin = await page.$$eval("#adminSub-usuarios h2, #adminSub-usuarios .hint, #adminSub-usuarios label", (els) =>
+    els.filter((el) => el.offsetParent !== null).map((el) => getComputedStyle(el).textAlign)
+  );
+  expect(alinhamentosAdmin.length).toBeGreaterThan(0);
+  alinhamentosAdmin.forEach((alinhamento) => expect(["start", "left"]).toContain(alinhamento));
 });
 
 test("o alinhamento padrão é à esquerda e uma preferência salva é preservada", async ({ page, context }) => {
@@ -260,16 +265,21 @@ test("os glifos dos controles fixos não crescem com a ampliação do texto", as
   expect(ampliado.alvoAjuda).toBeGreaterThanOrEqual(44);
 });
 
-const SUBABAS = ["usuarios", "notificacoes", "monitoramento", "config", "esp32", "macs", "auditoria"];
+const SUBABAS = ["usuarios", "usuarios/proprietarios", "notificacoes", "status/sistema", "config", "esp32", "macs", "logs/auditoria"];
 
 for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
   test(`Administração continua utilizável na fonte máxima em ${tamanhoNome}`, async ({ page, context }) => {
     test.setTimeout(90_000);
     await abrir(page, context, "superadmin", "#/admin", VIEWPORTS[tamanhoNome], true);
 
-    for (const sub of SUBABAS) {
+    for (const rota of SUBABAS) {
+      const [sub, aba] = rota.split("/");
       await page.locator(`.admin-subtab-btn[data-sub="${sub}"]`).click();
       await expect(page.locator(`#adminSub-${sub}`)).toBeVisible({ timeout: 15_000 });
+      if (aba) {
+        await page.locator(`#adminSub-${sub} .admin-inner-tab-btn[data-aba="${aba}"]`).click();
+        await expect(page.locator(`#${sub}Aba-${aba}`)).toBeVisible({ timeout: 15_000 });
+      }
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
       const semOverflow = await semRolagemHorizontal(page);
@@ -289,7 +299,7 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
         }
         return achados;
       });
-      expect(semOverflow, `${sub} em ${tamanhoNome} sem rolagem horizontal da página: ${ofensores.join(" | ")}`).toBe(true);
+      expect(semOverflow, `${rota} em ${tamanhoNome} sem rolagem horizontal da página: ${ofensores.join(" | ")}`).toBe(true);
 
       const problemas = await page.evaluate((subAtual) => {
         const achados = [];
@@ -312,16 +322,20 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
           const r = el.getBoundingClientRect();
           if (r.width > 0 && el.textContent.trim() && r.height < 20) achados.push(`botão sem rótulo visível: ${el.id || el.className}`);
         });
+        painel.querySelectorAll(".admin-inner-tab-btn:not(.hidden)").forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && el.scrollWidth > el.clientWidth + 1) achados.push(`aba interna cortada: ${el.dataset.aba}`);
+        });
         return achados;
       }, sub);
-      expect(problemas, `${sub} em ${tamanhoNome}`).toEqual([]);
+      expect(problemas, `${rota} em ${tamanhoNome}`).toEqual([]);
     }
   });
 }
 
-test("Monitoramento não corta conteúdo à direita na fonte máxima", async ({ page, context }) => {
-  await abrir(page, context, "superadmin", "#/admin/monitoramento", VIEWPORTS.notebook, true);
-  await expect(page.locator("#adminSub-monitoramento")).toBeVisible();
+test("Status > Sistema não corta conteúdo à direita na fonte máxima", async ({ page, context }) => {
+  await abrir(page, context, "superadmin", "#/admin/status/sistema", VIEWPORTS.notebook, true);
+  await expect(page.locator("#statusAba-sistema")).toBeVisible();
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   expect(await semRolagemHorizontal(page)).toBe(true);
   await expect.poll(async () => page.locator("#monGrid .mon-card").count(), { timeout: 20_000 }).toBeGreaterThan(0);

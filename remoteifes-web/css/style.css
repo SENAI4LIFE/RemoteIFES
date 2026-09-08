@@ -2185,8 +2185,7 @@ button.btn:disabled {
 }
 .admin-sub, .admin-sub > * { min-width: 0; }
 .admin-sub > * { width: 100%; max-width: var(--admin-col); margin: 0 auto; }
-.admin-sub > .admin-fp-picker,
-.admin-sub > .mapa-grid { max-width: var(--admin-col-wide); }
+.admin-sub > .admin-fp-picker { max-width: var(--admin-col-wide); }
 .admin-sub > .room-list > li:last-child { margin-bottom: 0; }
 
 .admin-inner-tabs {
@@ -2259,7 +2258,8 @@ button.btn:disabled {
   #screen-admin .card > input[type="date"],
   #screen-admin .card > input[type="time"] { max-width: 14rem; }
   #screen-admin .card > input[type="number"] { max-width: 10rem; }
-  #screen-admin .admin-sub > .card > .btn-block { max-width: 30rem; }
+  #screen-admin .admin-sub > .card > .btn-block,
+  #screen-admin .admin-inner-tab > .card > .btn-block { max-width: 30rem; }
 }
 
 @media (min-width: 900px) {

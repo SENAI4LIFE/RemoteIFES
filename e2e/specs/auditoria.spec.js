@@ -12,18 +12,19 @@ test("histórico administrativo rejeita usuário e admin e aceita somente supera
 test("superadmin abre auditoria paginada e vê retenção configurada", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/admin/auditoria");
-  await expect(page.locator("#adminSub-auditoria")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#logsAba-auditoria")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#auditRetentionCurrent")).toHaveText("7 dias");
   await expect(page.locator("#auditPageInfo")).toContainText("Página 1 de");
   await expect(page.locator("#connectPageInfo")).toContainText("Página 1 de");
-  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/auditoria");
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/logs/auditoria");
 });
 
 test("admin comum não abre auditoria por rota direta", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/admin/auditoria");
-  await expect(page.locator("#adminSub-usuarios")).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator('.admin-subtab-btn[data-sub="auditoria"]')).toBeHidden();
+  await expect(page.locator("#logsAba-comandos")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#logsAba-auditoria")).toBeHidden();
+  await expect(page.locator('#adminSub-logs .admin-inner-tab-btn[data-aba="auditoria"]')).toBeHidden();
 });
 
 for (const nome of ["mobile-compact", "mobile-landscape", "desktop-compact"]) {
@@ -31,7 +32,7 @@ for (const nome of ["mobile-compact", "mobile-landscape", "desktop-compact"]) {
     await injetarSessao(context, "superadmin");
     await page.setViewportSize(VIEWPORTS[nome]);
     await page.goto("/#/admin/auditoria");
-    await expect(page.locator("#adminSub-auditoria")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("#logsAba-auditoria")).toBeVisible({ timeout: 20_000 });
     expect(await semRolagemHorizontal(page)).toBe(true);
     await expect(page.locator("#auditFiltrarBtn")).toBeVisible();
     await expect(page.locator("#connectFiltrarBtn")).toBeVisible();

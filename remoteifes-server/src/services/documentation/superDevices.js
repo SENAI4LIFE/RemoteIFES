@@ -9,7 +9,7 @@ module.exports = [
     tags: ["Cadastro", "MAC", "detectado", "vincular", "limites", "restrição"],
     verNoApp: "/admin/macs",
     corpo: [
-      { t: "p", texto: "<strong>Administração &gt; Dispositivos &gt; Cadastro</strong> é a fonte operacional para associar uma placa a uma sala. A área separa dispositivos detectados ainda sem vínculo e as salas da planta. É a primeira função do grupo <strong>Dispositivos</strong>, que segue com <strong>Histórico</strong>, <strong>Notificações</strong> e <strong>Firmware / OTA</strong>." },
+      { t: "p", texto: "<strong>Administração &gt; Dispositivos &gt; Cadastro</strong> é a fonte operacional para associar uma placa a uma sala. A área separa dispositivos detectados ainda sem vínculo e as salas da planta. É a primeira função do grupo <strong>Dispositivos</strong>, que segue com <strong>Firmware / OTA</strong> e <strong>Alertas</strong>." },
       { t: "sub", titulo: "Vincular um dispositivo detectado" },
       { t: "passos", itens: [
         "Ligue o ESP32 já configurado para alcançar o servidor e aguarde aparecer em <strong>ESP32 detectados na rede</strong> com MAC, IP, sala informada e último contato.",
@@ -116,7 +116,7 @@ module.exports = [
       { t: "sub", titulo: "Migração de só MAC" },
       { t: "passos", itens: [
         "Mantenha <strong>Exigir credencial por dispositivo em todos os ESP32</strong> desligado.",
-        "Provisione e valide cada sala; acompanhe <strong>Só MAC</strong> em <strong>Administração &gt; Sistema &gt; Status</strong>.",
+        "Provisione e valide cada sala; acompanhe <strong>Só MAC</strong> em <strong>Administração &gt; Sistema &gt; Status &gt; Sistema</strong>.",
         "Quando todas estiverem autenticadas, ative a exigência global e confirme que nenhuma sala caiu.",
         "Em falha ampla, desative temporariamente a exigência, corrija as salas e refaça a validação.",
       ] },

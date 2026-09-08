@@ -24,7 +24,7 @@ test("o mapa de calor é exclusivo do superadministrador", async ({ page, contex
   }
 
   await abrirMonitoramento(page, context, "admin");
-  await expect(page.locator('.admin-subtab-btn[data-sub="monitoramento"]')).toBeHidden();
+  await expect(page.locator('#adminSub-status .admin-inner-tab-btn[data-aba="sistema"]')).toBeHidden();
   await expect(page.locator("#heatmapBloco")).toBeHidden();
 });
 

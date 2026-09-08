@@ -2,13 +2,16 @@ const Router = (() => {
   let restaurando = false;
   let salasCache = null;
 
-  const ADMIN_SUBS = [
-    "usuarios", "ativos", "sessoes", "logs", "dispositivos", "notificacoes", "monitoramento",
-    "proprietarios", "mapa", "macs", "config", "esp32", "relatos", "auditoria",
-  ];
-  const ADMIN_SUBS_SUPERADMIN = ["monitoramento", "macs", "config", "esp32", "relatos", "auditoria"];
-  const ADMIN_ALIAS = { acessos: ["logs", "acesso"] };
-  const LOGS_ABAS = ["comandos", "acesso"];
+  const ADMIN_ALIAS = {
+    proprietarios: ["usuarios", "proprietarios"],
+    acessos: ["logs", "acesso"],
+    dispositivos: ["logs", "dispositivos"],
+    sessoes: ["logs", "sessoes"],
+    auditoria: ["logs", "auditoria"],
+    ativos: ["status", "ativos"],
+    mapa: ["status", "mapa"],
+    monitoramento: ["status", "sistema"],
+  };
   const FP_SECOES = ["a-terreo", "a-2pav", "a-3pav", "b-terreo", "b-2pav", "b-3pav"];
   const RAIZES_COM_PARAMETRO = ["agenda", "agendamentos", "grade", "config", "ajuda"];
 
@@ -74,10 +77,9 @@ const Router = (() => {
       case "screen-admin": {
         const ativa = document.querySelector(".admin-subtab-btn.active");
         const sub = (ativa && ativa.dataset.sub) || "usuarios";
-        if (sub === "logs") {
-          const aba = document.querySelector("#adminSub-logs .admin-inner-tab-btn.active");
-          if (aba && aba.dataset.logAba !== "comandos") return `/admin/logs/${aba.dataset.logAba}`;
-        }
+        const abas = document.querySelectorAll(`#adminSub-${sub} .admin-inner-tab-btn`);
+        const aba = document.querySelector(`#adminSub-${sub} .admin-inner-tab-btn.active`);
+        if (aba && abas.length && aba !== abas[0]) return `/admin/${sub}/${aba.dataset.aba}`;
         return `/admin/${sub}`;
       }
       default:
@@ -124,17 +126,16 @@ const Router = (() => {
   }
 
   function clicarSubAdmin(sub, aba) {
-    const [subAlias, abaAlias] = Object.prototype.hasOwnProperty.call(ADMIN_ALIAS, sub) ? ADMIN_ALIAS[sub] : [sub, aba];
-    const alvo = ADMIN_SUBS.includes(subAlias) ? subAlias : "usuarios";
-    const permitido =
-      !ADMIN_SUBS_SUPERADMIN.includes(alvo) || (typeof state !== "undefined" && state.isSuperAdmin);
-    const escolhido = permitido ? alvo : "usuarios";
-    const btn = document.querySelector(`.admin-subtab-btn[data-sub="${escolhido}"]`);
-    if (btn && !btn.classList.contains("hidden")) btn.click();
-    if (escolhido !== "logs") return;
-    const abaAlvo = LOGS_ABAS.includes(abaAlias) ? abaAlias : "comandos";
-    const abaBtn = document.querySelector(`#adminSub-logs .admin-inner-tab-btn[data-log-aba="${abaAlvo}"]`);
-    if (abaBtn && !abaBtn.classList.contains("active")) abaBtn.click();
+    const nome = (valor) => (/^[a-z0-9]+$/.test(String(valor || "")) ? String(valor) : "");
+    const [subAlias, abaAlias] = ADMIN_ALIAS[nome(sub)] || [nome(sub), nome(aba)];
+    const visivel = (seletor) => document.querySelector(`${seletor}:not(.hidden)`);
+    const btn = visivel(`.admin-subtab-btn[data-sub="${subAlias}"]`) || visivel('.admin-subtab-btn[data-sub="usuarios"]');
+    if (!btn) return;
+    const escolhido = btn.dataset.sub;
+    const abaBtn =
+      (escolhido === subAlias && abaAlias && visivel(`#adminSub-${escolhido} .admin-inner-tab-btn[data-aba="${abaAlias}"]`)) ||
+      visivel(`#adminSub-${escolhido} .admin-inner-tab-btn`);
+    (abaBtn || btn).click();
   }
 
   function abrirRelatos() {
