@@ -108,21 +108,33 @@ Todas as permissões são impostas no backend (não apenas escondidas na interfa
 
 ### Início (hub)
 
-Após o login o aplicativo abre no **Início** (`#/inicio`, também a aba "Início" e o logotipo no topo): um painel visual que reúne as ações principais em cartões, na ordem de uso mais comum — selecionar sala, planta baixa, agenda e grade (administrador), notificações (administrador), relatar um problema, ajuda/manual e aplicativo móvel. Os cartões respeitam o papel do usuário e apenas abrem telas já existentes (nenhuma função é duplicada). Abaixo das ações operacionais, administradores veem atalhos para as funções de **Administração**, cada um identificado pelo grupo a que pertence (`Dispositivos · Cadastro`, por exemplo); o superadministrador vê ainda uma faixa curta com o estado do banco, do armazenamento, dos ESP32 e dos backups, com link para o Status. No celular o hub vira uma lista de cartões de toque em coluna única. O hub não altera o roteamento: todos os endereços e o comportamento de refresh/histórico continuam iguais.
+Após o login o aplicativo abre no **Início** (`#/inicio`, também a aba "Início" e o logotipo no topo): um painel visual que reúne as ações principais em cartões, na ordem de uso mais comum — selecionar sala, planta baixa, agenda e grade (administrador), notificações (administrador), relatar um problema, ajuda/manual e aplicativo móvel. Os cartões respeitam o papel do usuário e apenas abrem telas já existentes (nenhuma função é duplicada). Abaixo das ações operacionais, administradores veem um atalho para cada função de **Administração**, identificado pelo grupo a que pertence (`Dispositivos · Cadastro`, por exemplo); o superadministrador vê ainda uma faixa curta com o estado do banco, do armazenamento, dos ESP32 e dos backups, com link para `Sistema > Status > Sistema`. No celular o hub vira uma lista de cartões de toque em coluna única. O hub não altera o roteamento: todos os endereços e o comportamento de refresh/histórico continuam iguais.
 
 ### Organização da Administração
 
-A aba **Admin** organiza suas funções em três grupos, sempre em dois níveis (`Administração > Grupo > Função`), na mesma barra de navegação lateral (ou rolável, em telas estreitas) usada antes:
+A aba **Admin** organiza suas funções em três grupos, sempre em dois níveis (`Administração > Grupo > Função`), na mesma barra de navegação lateral (ou rolável, em telas estreitas) usada antes. Cada grupo responde a uma pergunta diferente:
 
-| Grupo | Funções |
+| Grupo | Conceito | Funções |
+| --- | --- | --- |
+| **Gestão** | quem são as pessoas e por quais salas respondem | Usuários, Relatos de problemas |
+| **Dispositivos** | administração dos ESP32 e os avisos operacionais que eles geram | Cadastro, Firmware / OTA, Alertas |
+| **Sistema** | o que está acontecendo agora, o que já aconteceu e como o sistema é configurado | Logs, Status, Configurações |
+
+Dentro de **Sistema**, a separação é entre tempo presente e passado: **Status** concentra a informação **corrente/ao vivo** e **Logs** concentra a informação **persistida/histórica**. **Configurações** é a configuração do sistema.
+
+Três funções se desdobram em **abas internas**, dentro da própria tela, sem criar mais um nível na navegação de Administração:
+
+| Função | Abas internas |
 | --- | --- |
-| **Gestão** | Usuários, Proprietários de sala, Sessões, Ativos, Mapa, Relatos de problemas |
-| **Dispositivos** | Cadastro, Histórico, Notificações, Firmware / OTA |
-| **Sistema** | Logs, Status, Configurações, Auditoria |
+| **Gestão > Usuários** | **Contas** (criar, alterar, desativar e excluir contas) · **Proprietários de sala** (atribuir e revogar a responsabilidade por uma sala) |
+| **Sistema > Logs** | **Comandos** · **Acessos** · **Dispositivos** · **Sessões** · **Auditoria** |
+| **Sistema > Status** | **Usuários ativos** · **Mapa** · **Sistema** |
 
-**Logs** é a única função com abas internas: **Comandos** (o histórico de comandos enviados às salas) e **Acesso** (as requisições registradas pelos controladores ao servidor, com IP de origem, filtro por data e exclusão). Elas ficam dentro da própria tela de Logs, sem criar mais um nível de navegação de Administração; `#/admin/logs/acesso` abre a segunda aba diretamente e o endereço antigo `#/admin/acessos` continua resolvendo para ela.
+O agrupamento é apenas de apresentação: cada função e cada aba interna mantêm a permissão que já tinham, e um grupo cujas funções estejam todas fora do nível do usuário não é exibido. `Alertas` é o mesmo painel de notificações de dispositivo do sino — só o rótulo visível mudou; a fila, os dados e as APIs são os mesmos.
 
-O agrupamento é apenas de apresentação: cada função mantém a permissão que já tinha, os endereços `#/admin/<função>` continuam os mesmos e um grupo cujas funções estejam todas fora do nível do usuário não é exibido. Para um administrador comum, por exemplo, **Dispositivos** mostra apenas Histórico e Notificações e **Sistema** mostra apenas Logs.
+A permissão vale **por aba interna**, não pela tela que a contém. **Status** é aberto a qualquer administrador por causa de *Usuários ativos* e *Mapa*, mas a aba *Sistema* (o diagnóstico técnico) continua exclusiva do superadministrador; do mesmo modo, **Logs** é aberto ao admin comum, mas a aba *Auditoria* não. As abas exclusivas nem aparecem para quem não tem nível, e o servidor recusa as chamadas correspondentes de qualquer forma. Para um administrador comum, **Dispositivos** mostra apenas Alertas e **Sistema** mostra Logs (sem Auditoria) e Status (sem Sistema).
+
+Os endereços acompanham a hierarquia: `#/admin/<função>` para a função e `#/admin/<função>/<aba>` para uma aba interna que não seja a primeira — `#/admin/usuarios/proprietarios`, `#/admin/logs/sessoes`, `#/admin/status/mapa`. Os endereços das funções que mudaram de lugar continuam válidos como apelidos e resolvem para o novo local, sem manter tela nem código duplicado: `#/admin/proprietarios`, `#/admin/sessoes`, `#/admin/dispositivos`, `#/admin/acessos`, `#/admin/ativos`, `#/admin/mapa`, `#/admin/auditoria` e `#/admin/monitoramento`.
 
 ### Formas de chegar a uma sala
 
@@ -140,9 +152,9 @@ Qualquer usuário autenticado pode visualizar o estado de todas as salas — iss
 
 ### Endereço, refresh e histórico
 
-O frontend reflete a tela atual no endereço da página como um **fragmento** (`#/inicio`, `#/salas`, `#/sala/A-108`, `#/salas/planta/a-terreo`, `#/agenda`, `#/admin`, `#/admin/esp32`, `#/admin/monitoramento`, `#/admin/relatos`, `#/relatos`, `#/ajuda`, `#/ajuda/ota`…). Um endereço vazio equivale a `#/inicio`. Isso dá o comportamento de um site tradicional:
+O frontend reflete a tela atual no endereço da página como um **fragmento** (`#/inicio`, `#/salas`, `#/sala/A-108`, `#/salas/planta/a-terreo`, `#/agenda`, `#/admin`, `#/admin/esp32`, `#/admin/logs/sessoes`, `#/admin/status/sistema`, `#/admin/relatos`, `#/relatos`, `#/ajuda`, `#/ajuda/ota`…). Um endereço vazio equivale a `#/inicio`. Isso dá o comportamento de um site tradicional:
 
-- recarregar a página mantém onde você estava (aba, subtela, sub-aba de Administração, sala aberta, seção do mapa);
+- recarregar a página mantém onde você estava (aba, subtela, sub-aba de Administração, aba interna dessa sub-aba, sala aberta, seção do mapa);
 - **voltar/avançar do navegador** percorrem as seções visitadas (cada navegação entre seções gera uma entrada de histórico; trocar apenas um filtro — sala ou data na Grade/Agenda — não gera);
 - qualquer seção pode ser aberta direto pela URL, e links do sistema e da documentação podem apontar para uma seção específica (o botão **Abrir no manual** de cada ajuda e o `Ver no app` do manual usam esse mesmo endereçamento). Apelidos curtos de seção do manual são resolvidos (`#/ajuda/ota` → `#/ajuda/ota-credenciais`).
 
@@ -150,7 +162,7 @@ A estratégia é **hash routing** (fragmento), não History API, por ser a únic
 
 A versão canônica do frontend fica em `remoteifes-web/version.json` e também é exposta pelo meta `remoteifes-version` e por `window.REMOTEIFES_FRONTEND_VERSION`. HTML, scripts, estilos e imagens usam essa versão na URL. O service worker instala o novo app-shell de forma atômica, usa rede primeiro para navegações, remove somente caches RemoteIFES obsoletos e mantém o shell novo para uso offline. Toda alteração publicada em `remoteifes-web` deve avançar essa versão nos pontos validados por `remoteifes-server/test/frontend-version.test.js`; o teste falha se HTML, manifesto, JavaScript ou worker ficarem desencontrados.
 
-Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do superadministrador sem esse nível cai em `Administração > Gestão > Usuários`; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
+Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do superadministrador sem esse nível cai em `Administração > Gestão > Usuários`, e aba interna exclusiva sem esse nível cai na primeira aba autorizada da mesma função; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
 
 As 86 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio. Um código de sala pode representar duas salas físicas controladas pelo mesmo ESP32 (ex.: `B-105-B-106`); nesse caso a interface exibe as duas etiquetas empilhadas no mesmo bloco do mapa.
 
@@ -160,7 +172,7 @@ Além da permissão geral "pode controlar" (nível de usuário), existem dois me
 
 ### Acesso restrito por sala
 
-Em `Administração > Dispositivos > Cadastro` (ou em `Administração > Gestão > Proprietários de sala`), o superadministrador pode marcar uma sala como **acesso restrito**:
+Em `Administração > Dispositivos > Cadastro` (ou em `Administração > Gestão > Usuários > Proprietários de sala`), o superadministrador pode marcar uma sala como **acesso restrito**:
 
 1. Isso impede que qualquer usuário comum a controle, mesmo com a permissão geral ativa — exceto os usuários explicitamente autorizados para aquela sala.
 2. Usuários autorizados são concedidos/revogados individualmente, por sala.
@@ -170,7 +182,7 @@ A verificação é feita no backend (`aplicarComando`), então mesmo chamadas di
 
 ### Proprietários de sala
 
-Qualquer administrador pode tornar um usuário comum **proprietário** de uma sala específica, em `Administração > Gestão > Proprietários de sala`. Um proprietário:
+Qualquer administrador pode tornar um usuário comum **proprietário** de uma sala específica, em `Administração > Gestão > Usuários > Proprietários de sala`. Um proprietário:
 
 - Ganha acesso a uma aba própria ("Config.", intitulada "Configurações de sala") onde vê apenas as salas das quais é dono.
 - Pode, nessa aba, conceder e revogar o acesso de controle de outros usuários comuns à(s) sua(s) sala(s) — sem precisar de privilégios administrativos e sem enxergar o restante do painel de administração.
@@ -210,7 +222,7 @@ O Turbo transmite o modo turbo suportado pelo protocolo IR da sala. Em `Administ
 
 O topo da interface tem dois indicadores com significados distintos, cada um com seu rótulo acessível:
 
-- **Sino** — notificações de dispositivos/ESP32, visível apenas a administradores. O sistema gera notificações automáticas quando um ESP32 que estava online fica offline (timeout de heartbeat), quando uma atualização de firmware por OTA conclui ou falha, e quando o [monitoramento operacional](#monitoramento-operacional) detecta uma condição de alerta (disco baixo, backup atrasado, ESP32 instável etc.), sem repetir o mesmo alerta dentro de 6 horas. O painel permite ver a lista mais recente com data/hora, marcar uma notificação como lida (ao clicar nela) e marcar todas de uma vez. O ponto vermelho no sino reflete a contagem de não lidas. A mesma fila aparece em `Administração > Dispositivos > Notificações`.
+- **Sino** — notificações de dispositivos/ESP32, visível apenas a administradores. O sistema gera notificações automáticas quando um ESP32 que estava online fica offline (timeout de heartbeat), quando uma atualização de firmware por OTA conclui ou falha, e quando o [monitoramento operacional](#monitoramento-operacional) detecta uma condição de alerta (disco baixo, backup atrasado, ESP32 instável etc.), sem repetir o mesmo alerta dentro de 6 horas. O painel permite ver a lista mais recente com data/hora, marcar uma notificação como lida (ao clicar nela) e marcar todas de uma vez. O ponto vermelho no sino reflete a contagem de não lidas. A mesma fila aparece em `Administração > Dispositivos > Alertas`.
 - **Inseto (bug)** — relatos de problema enviados pelos usuários (veja a seção abaixo).
 
 ## Relatos de Problema
@@ -231,20 +243,21 @@ A tabela `relatos` é criada automaticamente na inicialização do servidor (`CR
 
 O servidor registra cada login como uma sessão (token, horário de início, último uso e, ao sair, horário de logout). Isso alimenta duas funções da Administração:
 
-- **`Administração > Gestão > Ativos`**: usuários com uma sessão em aberto, com um cronômetro de tempo de sessão em tempo real e um status calculado a partir do último uso — `online` (dentro do limiar configurado), `inativo` (sessão aberta, mas sem uso recente) ou `offline`.
-- **`Administração > Gestão > Sessões`**: histórico de logins/logouts, com duração de cada sessão, filtrável por data e removível (por data ou por completo).
+- **`Administração > Sistema > Status > Usuários ativos`**: usuários com uma sessão em aberto, com um cronômetro de tempo de sessão em tempo real e um status calculado a partir do último uso — `online` (dentro do limiar configurado), `inativo` (sessão aberta, mas sem uso recente) ou `offline`.
+- **`Administração > Sistema > Logs > Sessões`**: histórico de logins/logouts, com duração de cada sessão, filtrável por data e removível (por data ou por completo).
 
 O servidor encerra sessões sem atividade e continua sendo a autoridade sobre o prazo, inclusive para REST e WebSocket. A interface mostra uma contagem regressiva junto às iniciais da conta, atualizada localmente a partir do prazo informado pelo servidor, sem consultas a cada segundo. Clique, mouse, tecla ou toque renovam o prazo pelo mecanismo de sessão existente; o aviso prévio permite continuar conectado. Atividade, logout e expiração são sincronizados entre abas. Os padrões são 60 minutos para usuários e 720 minutos para administradores e superadministrador. Além disso, **toda reinicialização do servidor encerra as sessões em aberto**: depois de um restart, os usuários precisam entrar novamente.
 
 ## Auditoria (Logs, Dispositivos e Acessos)
 
-O histórico operacional do sistema fica em três visões — as duas abas de **Logs** e o **Histórico** de dispositivos —, todas filtráveis por data e, nas de Logs, com opção de apagar registros (ação irreversível):
+O histórico operacional do sistema fica reunido nas abas internas de **`Administração > Sistema > Logs`**, todas filtráveis por data; **Comandos**, **Acessos** e **Sessões** oferecem ainda a exclusão de registros (ação irreversível), enquanto **Dispositivos** é somente consulta:
 
 - **`Administração > Sistema > Logs > Comandos`**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o comando parte da interface local do próprio dispositivo).
-- **`Administração > Dispositivos > Histórico`**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
-- **`Administração > Sistema > Logs > Acesso`**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
+- **`Administração > Sistema > Logs > Dispositivos`**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
+- **`Administração > Sistema > Logs > Acessos`**: cada requisição feita à interface web local de um ESP32, com o IP de origem — útil para diagnosticar problemas de rede ou identificar acessos incomuns ao dispositivo.
+- **`Administração > Sistema > Logs > Sessões`**: o histórico de login/logout descrito em [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade).
 
-O superadministrador dispõe ainda de **`Administração > Sistema > Auditoria`**, uma visão paginada e filtrável de ações administrativas importantes, como criação, alteração e exclusão de contas, mudanças de papel e configuração e operações relevantes sobre ESP32. Os registros contêm apenas metadados concisos — nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e duração calculada quando há reconexão. Interface e APIs exigem `superadmin`; a retenção padrão é 7 dias, configurável entre 1 e 365 dias em Administração.
+O superadministrador dispõe ainda de **`Administração > Sistema > Logs > Auditoria`**, uma visão paginada e filtrável de ações administrativas importantes, como criação, alteração e exclusão de contas, mudanças de papel e configuração e operações relevantes sobre ESP32. Os registros contêm apenas metadados concisos — nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e duração calculada quando há reconexão. Interface e APIs exigem `superadmin`; a retenção padrão é 7 dias, configurável entre 1 e 365 dias em Administração.
 
 ### Manutenção automática do banco
 
@@ -761,7 +774,7 @@ Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma 
 
 ## Monitoramento Operacional
 
-`Administração > Sistema > Status` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
+`Administração > Sistema > Status > Sistema` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
 
 - **Serviço:** ambiente, tempo no ar, memória (RSS), carga de 1 minuto, versão do Node e PID.
 - **Banco de dados:** se responde e em quanto tempo, tamanho do arquivo e do WAL.
@@ -775,7 +788,7 @@ A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição d
 
 ## Mapa de Calor Operacional
 
-Dentro de `Administração > Sistema > Status`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
+Dentro de `Administração > Sistema > Status > Sistema`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
 
 **Métricas** (`metrica=`), todas derivadas de históricos que o sistema já retém, nunca de dados inventados:
 
@@ -1152,7 +1165,7 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 - **Frontend não fala com o servidor depois do deploy**: na implantação same-origin, acesse a URL do próprio servidor/proxy e não configure `serverUrl` nem `CORS_ORIGIN`. Se o frontend estiver em outra origem (GitHub Pages ou Cordova), confirme `serverUrl` e inclua a origem dele em `CORS_ORIGIN`; isso também afeta a conexão WebSocket.
 - **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos. Depois de o celular voltar do segundo plano, a prova de vida da conexão pode levar alguns segundos até reconectar — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
 - **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
-- **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Administração > Gestão > Proprietários de sala`.
+- **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Administração > Gestão > Usuários > Proprietários de sala`.
 - **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend está em HTTPS e que o navegador atende aos demais critérios de instalação. O `serverUrl` também deve usar HTTPS para a API funcionar sem bloqueio de conteúdo misto, mas não é ele que determina se o navegador oferece a instalação.
 - **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_HOME` aponta para o Android SDK, que Platform 36/Build Tools 36 estão instalados, que o JDK 17 está em `JAVA_HOME`/`PATH` e que o Gradle 8.14.2 está no `PATH` para inicializar o wrapper; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
 - **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org`); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `npm run setup` novamente.

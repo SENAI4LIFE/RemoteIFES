@@ -69,19 +69,13 @@ const Inicio = (() => {
 
   const ADMIN = [
     { sub: "usuarios", icon: "👥", titulo: "Usuários", grupo: "Gestão" },
-    { sub: "proprietarios", icon: "🗝️", titulo: "Proprietários", grupo: "Gestão" },
-    { sub: "sessoes", icon: "🕒", titulo: "Sessões", grupo: "Gestão" },
-    { sub: "ativos", icon: "🟢", titulo: "Ativos", grupo: "Gestão" },
-    { sub: "mapa", icon: "🗺️", titulo: "Mapa", grupo: "Gestão" },
     { sub: "relatos", icon: "🐞", titulo: "Relatos", grupo: "Gestão", exigeSuper: true },
     { sub: "macs", icon: "🔧", titulo: "Cadastro", grupo: "Dispositivos", exigeSuper: true },
-    { sub: "dispositivos", icon: "📡", titulo: "Histórico", grupo: "Dispositivos" },
-    { sub: "notificacoes", icon: "🔔", titulo: "Notificações", grupo: "Dispositivos" },
     { sub: "esp32", icon: "📶", titulo: "Firmware / OTA", grupo: "Dispositivos", exigeSuper: true },
+    { sub: "notificacoes", icon: "🔔", titulo: "Alertas", grupo: "Dispositivos" },
     { sub: "logs", icon: "📜", titulo: "Logs", grupo: "Sistema" },
-    { sub: "monitoramento", icon: "🩺", titulo: "Status", grupo: "Sistema", exigeSuper: true },
+    { sub: "status", icon: "🩺", titulo: "Status", grupo: "Sistema" },
     { sub: "config", icon: "⚙️", titulo: "Configurações", grupo: "Sistema", exigeSuper: true },
-    { sub: "auditoria", icon: "🛡️", titulo: "Auditoria", grupo: "Sistema", exigeSuper: true },
   ];
 
   function criarCard(def, compacto) {
@@ -251,9 +245,9 @@ const Inicio = (() => {
     box.classList.toggle("hub-resumo-alerta", alertas > 0);
     box.innerHTML =
       `<div class="hub-resumo-chips">${chips.join("")}</div>` +
-      `<button type="button" class="hub-resumo-link">${alertas > 0 ? `${alertas} alerta${alertas > 1 ? "s" : ""} · ` : ""}Abrir monitoramento &rarr;</button>`;
+      `<button type="button" class="hub-resumo-link">${alertas > 0 ? `${alertas} alerta${alertas > 1 ? "s" : ""} · ` : ""}Abrir Status do sistema &rarr;</button>`;
     const lnk = box.querySelector(".hub-resumo-link");
-    if (lnk) lnk.addEventListener("click", () => irRota("/admin/monitoramento"));
+    if (lnk) lnk.addEventListener("click", () => irRota("/admin/status/sistema"));
   }
 
   async function aoAbrir() {

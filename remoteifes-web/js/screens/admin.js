@@ -291,14 +291,6 @@ const Admin = {
     });
   },
 
-  async carregarAbaLogs() {
-    if (abaLogsAtiva() === "acesso") {
-      await this.carregarAcessos(document.getElementById("acessosFiltroData").value || undefined);
-      return;
-    }
-    await this.carregarLogs();
-  },
-
   async carregarAcessos(data) {
     const list = document.getElementById("acessosList");
     list.innerHTML = "";
@@ -1030,25 +1022,49 @@ document.getElementById("criarUsuarioBtn").addEventListener("click", async (e) =
   }
 });
 
-function abaLogsAtiva() {
-  const btn = document.querySelector("#adminSub-logs .admin-inner-tab-btn.active");
-  return (btn && btn.dataset.logAba) || "comandos";
+const ADMIN_CARGA = {
+  "usuarios:contas": () => Admin.carregarUsuarios(),
+  "usuarios:proprietarios": () => Admin.carregarProprietarios(),
+  "logs:comandos": () => Admin.carregarLogs(),
+  "logs:acesso": () => Admin.carregarAcessos(document.getElementById("acessosFiltroData").value || undefined),
+  "logs:dispositivos": () => Admin.carregarDispositivos(document.getElementById("dispositivosFiltroData").value || undefined),
+  "logs:sessoes": () => Admin.carregarSessoes(document.getElementById("sessoesFiltroData").value || undefined),
+  "logs:auditoria": () => Admin.carregarAuditoria(),
+  "status:ativos": () => Admin.carregarAtivos(),
+  "status:mapa": () => Admin.carregarMapa(),
+  "status:sistema": async () => {
+    await Monitoramento.aoAbrir();
+    Heatmap.aoAbrir();
+  },
+  relatos: () => Admin.carregarRelatos(),
+  macs: () => Admin.aoAbrirMacs(),
+  esp32: () => Esp32Admin.aoAbrir(),
+  notificacoes: () => Notificacoes.carregarAdmin(),
+  config: () => Admin.carregarConfiguracoes(),
+};
+
+function abasAdmin(sub) {
+  return Array.from(document.querySelectorAll(`#adminSub-${sub} .admin-inner-tab-btn`));
 }
 
-document.querySelectorAll("#adminSub-logs .admin-inner-tab-btn").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    document.querySelectorAll("#adminSub-logs .admin-inner-tab-btn").forEach((b) => {
-      const ativo = b === btn;
-      b.classList.toggle("active", ativo);
-      b.setAttribute("aria-selected", ativo ? "true" : "false");
-    });
-    document.querySelectorAll("#adminSub-logs .admin-inner-tab").forEach((painel) => {
-      painel.classList.toggle("hidden", painel.id !== `logsAba-${btn.dataset.logAba}`);
-    });
-    if (typeof Router !== "undefined") Router.sync();
-    await Admin.carregarAbaLogs();
+function selecionarAbaAdmin(sub, aba) {
+  const botoes = abasAdmin(sub);
+  const visiveis = botoes.filter((b) => !b.classList.contains("hidden"));
+  if (!visiveis.length) return null;
+  const alvo =
+    visiveis.find((b) => b.dataset.aba === aba) ||
+    visiveis.find((b) => b.classList.contains("active")) ||
+    visiveis[0];
+  botoes.forEach((b) => {
+    const ativo = b === alvo;
+    b.classList.toggle("active", ativo);
+    b.setAttribute("aria-selected", ativo ? "true" : "false");
   });
-});
+  document.querySelectorAll(`#adminSub-${sub} .admin-inner-tab`).forEach((painel) => {
+    painel.classList.toggle("hidden", painel.id !== `${sub}Aba-${alvo.dataset.aba}`);
+  });
+  return alvo.dataset.aba;
+}
 
 function revelarSubAdmin(btn) {
   const barra = btn.closest(".admin-subtabs");
@@ -1078,51 +1094,54 @@ function marcarSubAdminAtiva(btn) {
   requestAnimationFrame(() => revelarSubAdmin(btn));
 }
 
+function encerrarAdminAtivo(chave) {
+  if (chave !== "status:ativos" && Admin._ativosIntervalId) {
+    clearInterval(Admin._ativosIntervalId);
+    Admin._ativosIntervalId = null;
+  }
+  if (chave !== "status:sistema") {
+    Monitoramento.aoFechar();
+    Heatmap.aoFechar();
+  }
+  if (chave !== "macs") Admin.aoFecharMacs();
+  if (chave !== "esp32") Esp32Admin.aoFechar();
+}
+
+async function abrirAdminSub(sub, aba) {
+  const painel = document.getElementById(`adminSub-${sub}`);
+  if (!painel) return;
+  if (painel.classList.contains("hidden")) {
+    const btn = document.querySelector(`.admin-subtab-btn[data-sub="${sub}"]`);
+    if (btn) marcarSubAdminAtiva(btn);
+    document.querySelectorAll(".admin-sub").forEach((el) => el.classList.add("hidden"));
+    painel.classList.remove("hidden");
+  }
+  const abaAtiva = selecionarAbaAdmin(sub, aba);
+  const chave = abaAtiva ? `${sub}:${abaAtiva}` : sub;
+  if (typeof Router !== "undefined") Router.sync();
+  encerrarAdminAtivo(chave);
+  const carregar = ADMIN_CARGA[chave];
+  if (carregar) await carregar();
+}
+
 document.querySelectorAll(".admin-group-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     const grupo = btn.closest(".admin-subtab-group");
     const alvo = grupo && grupo.querySelector(".admin-subtab-btn:not(.hidden)");
-    if (alvo && !alvo.classList.contains("active")) alvo.click();
-    else if (alvo) revelarSubAdmin(alvo);
+    if (!alvo) return;
+    if (alvo.classList.contains("active")) revelarSubAdmin(alvo);
+    else alvo.click();
   });
 });
 
 document.querySelectorAll(".admin-subtab-btn").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    marcarSubAdminAtiva(btn);
+  btn.addEventListener("click", () => abrirAdminSub(btn.dataset.sub));
+});
 
-    document.querySelectorAll(".admin-sub").forEach((el) => el.classList.add("hidden"));
-    const sub = btn.dataset.sub;
-    document.getElementById(`adminSub-${sub}`).classList.remove("hidden");
-    if (typeof Router !== "undefined") Router.sync();
-
-    if (sub !== "ativos" && Admin._ativosIntervalId) {
-      clearInterval(Admin._ativosIntervalId);
-      Admin._ativosIntervalId = null;
-    }
-
-    if (sub === "ativos") await Admin.carregarAtivos();
-    if (sub === "sessoes") await Admin.carregarSessoes();
-    if (sub === "logs") await Admin.carregarAbaLogs();
-    if (sub === "dispositivos") await Admin.carregarDispositivos();
-    if (sub === "notificacoes") await Notificacoes.carregarAdmin();
-    if (sub === "monitoramento") {
-      await Monitoramento.aoAbrir();
-      Heatmap.aoAbrir();
-    } else {
-      Monitoramento.aoFechar();
-      Heatmap.aoFechar();
-    }
-    if (sub === "relatos") await Admin.carregarRelatos();
-    if (sub === "proprietarios") await Admin.carregarProprietarios();
-    if (sub === "mapa") await Admin.carregarMapa();
-    if (sub === "macs") await Admin.aoAbrirMacs();
-    else Admin.aoFecharMacs();
-    if (sub === "config") await Admin.carregarConfiguracoes();
-    if (sub === "auditoria") await Admin.carregarAuditoria();
-    if (sub === "esp32") await Esp32Admin.aoAbrir();
-    else Esp32Admin.aoFechar();
-
+document.querySelectorAll(".admin-inner-tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const painel = btn.closest(".admin-sub");
+    if (painel) abrirAdminSub(painel.id.replace("adminSub-", ""), btn.dataset.aba);
   });
 });
 

@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>RemoteIFES</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2026.09.06.1" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.09.08.1" />
   <meta name="theme-color" content="#1c6b3c" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemoteIFES" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.06.1" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.06.1" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.06.1" />
-  <meta name="remoteifes-version" content="2026.09.06.1" />
-  <link rel="stylesheet" href="css/style.css?v=2026.09.06.1" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.08.1" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.08.1" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.08.1" />
+  <meta name="remoteifes-version" content="2026.09.08.1" />
+  <link rel="stylesheet" href="css/style.css?v=2026.09.08.1" />
 </head>
 <body>
 
@@ -47,7 +47,7 @@
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
-      <img src="assets/remoteifes-logo.png?v=2026.09.06.1" alt="RemoteIFES" />
+      <img src="assets/remoteifes-logo.png?v=2026.09.08.1" alt="RemoteIFES" />
       <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
@@ -113,7 +113,7 @@
             </div>
           </div>
           <div class="portal-footer">
-            <img src="assets/ifes-logo.png?v=2026.09.06.1" alt="Instituto Federal do Espírito Santo" />
+            <img src="assets/ifes-logo.png?v=2026.09.08.1" alt="Instituto Federal do Espírito Santo" />
             <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
@@ -781,245 +781,88 @@
           <div class="admin-subtab-group is-active" data-grupo="gestao">
             <button type="button" class="admin-group-btn" data-grupo="gestao"><span class="admin-group-label">Gestão</span></button>
             <button type="button" class="admin-subtab-btn active" aria-current="page" data-sub="usuarios"><span class="admin-subtab-icon">👥</span><span class="admin-subtab-label">Usuários</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="proprietarios"><span class="admin-subtab-icon">🗝️</span><span class="admin-subtab-label">Proprietários de sala</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="sessoes"><span class="admin-subtab-icon">🕒</span><span class="admin-subtab-label">Sessões</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="ativos"><span class="admin-subtab-icon">🟢</span><span class="admin-subtab-label">Ativos</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="mapa"><span class="admin-subtab-icon">🗺️</span><span class="admin-subtab-label">Mapa</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="relatos"><span class="admin-subtab-icon">🐞</span><span class="admin-subtab-label">Relatos de problemas</span><span id="adminRelatosSubBadge" class="admin-subtab-badge hidden"></span></button>
           </div>
           <div class="admin-subtab-group" data-grupo="dispositivos">
             <button type="button" class="admin-group-btn" data-grupo="dispositivos"><span class="admin-group-label">Dispositivos</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span><span class="admin-subtab-label">Cadastro</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="dispositivos"><span class="admin-subtab-icon">📡</span><span class="admin-subtab-label">Histórico</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="notificacoes"><span class="admin-subtab-icon">🔔</span><span class="admin-subtab-label">Notificações</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">Firmware / OTA</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="notificacoes"><span class="admin-subtab-icon">🔔</span><span class="admin-subtab-label">Alertas</span></button>
           </div>
           <div class="admin-subtab-group" data-grupo="sistema">
             <button type="button" class="admin-group-btn" data-grupo="sistema"><span class="admin-group-label">Sistema</span></button>
             <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span><span class="admin-subtab-label">Logs</span></button>
-            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="monitoramento"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Status</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="status"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Status</span></button>
             <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
-            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="auditoria"><span class="admin-subtab-icon">🛡️</span><span class="admin-subtab-label">Auditoria</span></button>
           </div>
         </nav>
 
         <div class="admin-content">
         <div id="adminSub-usuarios" class="admin-sub">
-          <p class="hint">
-            Cadastro de usuários e permissões do sistema.
-            <button type="button" class="help-icon-btn" data-help="usuarios" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card">
-            <h2>Novo usuário</h2>
-            <label for="novoUsuarioLogin">Login</label>
-            <input type="text" id="novoUsuarioLogin" />
-            <label for="novoUsuarioNome">Nome</label>
-            <input type="text" id="novoUsuarioNome" />
-            <label for="novoUsuarioSenha">Senha inicial</label>
-            <input type="password" id="novoUsuarioSenha" />
-            <label class="checkbox-label">
-              <input type="checkbox" id="novoUsuarioControlar" checked /> Pode controlar salas
-            </label>
-            <label class="checkbox-label hidden" id="novoUsuarioAdminLabel">
-              <input type="checkbox" id="novoUsuarioAdmin" /> Conceder permissão de administrador
-            </label>
-            <button type="button" id="criarUsuarioBtn" class="btn btn-on btn-block">Criar usuário</button>
-          </div>
-          <ul id="usuariosList" class="room-list"></ul>
-        </div>
-
-        <div id="adminSub-ativos" class="admin-sub hidden">
-          <p class="hint">
-            Usuários que já acessaram o sistema, com status em tempo real.
-            <button type="button" class="help-icon-btn" data-help="ativos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <ul id="ativosList" class="room-list"></ul>
-          <p id="ativosEmpty" class="hint hidden">Nenhum usuário acessou o sistema ainda.</p>
-        </div>
-
-        <div id="adminSub-sessoes" class="admin-sub hidden">
-          <p class="hint">
-            Histórico de login e logout de cada usuário.
-            <button type="button" class="help-icon-btn" data-help="sessoes" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card">
-            <label for="sessoesFiltroData">Filtrar por data</label>
-            <input type="date" id="sessoesFiltroData" />
-            <div class="two-col">
-              <button type="button" id="sessoesApagarData" class="admin-apagar-btn">Apagar histórico da data</button>
-              <button type="button" id="sessoesApagarTudo" class="admin-apagar-btn">Apagar todo o histórico</button>
-            </div>
-          </div>
-          <ul id="sessoesList" class="room-list"></ul>
-        </div>
-
-        <div id="adminSub-logs" class="admin-sub hidden">
-          <div class="admin-inner-tabs" role="tablist" aria-label="Seções de Logs">
-            <button type="button" class="admin-inner-tab-btn active" data-log-aba="comandos" role="tab" aria-selected="true" aria-controls="logsAba-comandos">Comandos</button>
-            <button type="button" class="admin-inner-tab-btn" data-log-aba="acesso" role="tab" aria-selected="false" aria-controls="logsAba-acesso">Acesso</button>
+          <div class="admin-inner-tabs" role="tablist" aria-label="Seções de Usuários">
+            <button type="button" class="admin-inner-tab-btn active" data-aba="contas" role="tab" aria-selected="true" aria-controls="usuariosAba-contas">Contas</button>
+            <button type="button" class="admin-inner-tab-btn" data-aba="proprietarios" role="tab" aria-selected="false" aria-controls="usuariosAba-proprietarios">Proprietários de sala</button>
           </div>
 
-          <div id="logsAba-comandos" class="admin-inner-tab" role="tabpanel">
+          <div id="usuariosAba-contas" class="admin-inner-tab" role="tabpanel">
             <p class="hint">
-              Histórico de comandos enviados aos ares-condicionados (ligar, desligar, temperatura).
-              <button type="button" class="help-icon-btn" data-help="logs" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+              Cadastro de usuários e permissões do sistema.
+              <button type="button" class="help-icon-btn" data-help="usuarios" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
             </p>
             <div class="card">
-              <label for="logsFiltroData">Filtrar por data</label>
-              <input type="date" id="logsFiltroData" />
-              <label for="logsFiltroSala">Filtrar por sala</label>
-              <select id="logsFiltroSala"></select>
-              <label for="logsFiltroAndar">Filtrar por andar</label>
-              <select id="logsFiltroAndar"></select>
-              <div class="two-col">
-                <button type="button" id="logsApagarData" class="admin-apagar-btn">Apagar logs da data</button>
-                <button type="button" id="logsApagarTudo" class="admin-apagar-btn">Apagar todos os logs</button>
-              </div>
+              <h2>Novo usuário</h2>
+              <label for="novoUsuarioLogin">Login</label>
+              <input type="text" id="novoUsuarioLogin" />
+              <label for="novoUsuarioNome">Nome</label>
+              <input type="text" id="novoUsuarioNome" />
+              <label for="novoUsuarioSenha">Senha inicial</label>
+              <input type="password" id="novoUsuarioSenha" />
+              <label class="checkbox-label">
+                <input type="checkbox" id="novoUsuarioControlar" checked /> Pode controlar salas
+              </label>
+              <label class="checkbox-label hidden" id="novoUsuarioAdminLabel">
+                <input type="checkbox" id="novoUsuarioAdmin" /> Conceder permissão de administrador
+              </label>
+              <button type="button" id="criarUsuarioBtn" class="btn btn-on btn-block">Criar usuário</button>
             </div>
-            <ul id="logsList" class="room-list"></ul>
+            <ul id="usuariosList" class="room-list"></ul>
           </div>
 
-          <div id="logsAba-acesso" class="admin-inner-tab hidden" role="tabpanel">
+          <div id="usuariosAba-proprietarios" class="admin-inner-tab hidden" role="tabpanel">
             <p class="hint">
-              Registro de cada requisição feita por um ESP32 ao servidor.
-              <button type="button" class="help-icon-btn" data-help="acessos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+              Atribua a uma sala um usuário "proprietário": ele poderá conceder ou revogar o controle
+              dessa sala para outros usuários, sem ganhar nenhuma outra função de administrador. Como
+              administrador, você continua com controle total sobre a sala, sobre o proprietário e
+              sobre qualquer acesso que ele conceder.
+              <button type="button" class="help-icon-btn" data-help="proprietarios" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
             </p>
             <div class="card">
-              <label for="acessosFiltroData">Filtrar por data</label>
-              <input type="date" id="acessosFiltroData" />
+              <label for="proprietariosSala">Sala</label>
+              <select id="proprietariosSala"></select>
+
+              <label class="checkbox-label">
+                <input type="checkbox" id="proprietariosAcessoRestritoCheck" /> Restringir controle desta sala a usuários específicos
+              </label>
+              <p class="hint">Necessário para que o acesso concedido pelo proprietário tenha efeito.</p>
+            </div>
+
+            <div class="card">
+              <h2>Proprietário(s) desta sala</h2>
+              <label for="proprietariosDonoSelect">Tornar proprietário</label>
               <div class="two-col">
-                <button type="button" id="acessosApagarData" class="admin-apagar-btn">Apagar acessos da data</button>
-                <button type="button" id="acessosApagarTudo" class="admin-apagar-btn">Apagar todos os acessos</button>
+                <select id="proprietariosDonoSelect"></select>
+                <button type="button" id="proprietariosConcederDonoBtn" class="link-btn">tornar proprietário</button>
               </div>
+              <ul id="proprietariosDonosList" class="room-list"></ul>
+              <p id="proprietariosDonosEmpty" class="hint hidden">nenhum proprietário atribuído a esta sala</p>
             </div>
-            <ul id="acessosList" class="room-list"></ul>
-          </div>
-        </div>
 
-        <div id="adminSub-dispositivos" class="admin-sub hidden">
-          <p class="hint">
-            Histórico de conexão e desconexão dos ESP32 na rede.
-            <button type="button" class="help-icon-btn" data-help="dispositivos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card">
-            <label for="dispositivosFiltroData">Filtrar por data</label>
-            <input type="date" id="dispositivosFiltroData" />
-          </div>
-          <ul id="dispositivosList" class="room-list"></ul>
-        </div>
-
-        <div id="adminSub-notificacoes" class="admin-sub hidden">
-          <p class="hint">
-            Avisos de conexão, indisponibilidade e atualização dos dispositivos ESP32. Esta seção usa as mesmas notificações exibidas pelo sino.
-            <button type="button" class="help-icon-btn" data-help="notificacoes" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card admin-notificacoes-card">
-            <div class="admin-notificacoes-head">
-              <h2>Notificações de dispositivos</h2>
-              <button type="button" id="adminNotifMarcarTodasBtn" class="link-btn">Marcar todas como lidas</button>
+            <div class="card">
+              <h2>Quem pode controlar esta sala</h2>
+              <p class="hint">Inclui acessos concedidos por você e pelos proprietários da sala.</p>
+              <ul id="proprietariosAcessoList" class="room-list"></ul>
+              <p id="proprietariosAcessoEmpty" class="hint hidden">nenhum usuário com acesso concedido ainda</p>
             </div>
-            <ul id="adminNotifList" class="notif-list admin-notif-list" aria-live="polite"></ul>
-            <p id="adminNotifEmpty" class="hint notif-empty hidden">Nenhuma notificação por enquanto.</p>
-          </div>
-        </div>
-
-        <div id="adminSub-monitoramento" class="admin-sub hidden">
-          <p class="hint">
-            Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32: leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta. Visível apenas ao superadministrador.
-            <button type="button" class="help-icon-btn" data-help="monitoramento" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <p class="hint"><button type="button" class="link-btn" data-manual="monitoramento">Abrir no manual &rarr;</button></p>
-          <div id="monAlertas" class="mon-alertas hidden" role="status" aria-live="polite"></div>
-          <div id="monGrid" class="mon-grid" aria-busy="false"></div>
-          <div id="monErro" class="mon-erro hidden" role="alert">
-            <span>Não foi possível carregar o monitoramento.</span>
-            <button type="button" id="monRetryBtn" class="btn btn-off">Tentar de novo</button>
-          </div>
-
-          <details id="heatmapBloco" class="card heatmap-bloco">
-            <summary class="heatmap-summary">
-              <span class="heatmap-summary-titulo">Mapa de calor operacional</span>
-              <span class="heatmap-summary-nota">Calculado somente ao abrir esta seção</span>
-            </summary>
-            <p class="hint">
-              Compara as salas em uma métrica operacional no período escolhido, sobre a planta baixa.
-              <button type="button" class="help-icon-btn" data-help="heatmap" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-            </p>
-            <div class="heatmap-toolbar">
-              <div>
-                <label for="heatmapMetrica">Métrica</label>
-                <select id="heatmapMetrica"></select>
-              </div>
-              <div>
-                <label for="heatmapPeriodo">Período</label>
-                <select id="heatmapPeriodo"></select>
-              </div>
-              <button type="button" id="heatmapAtualizarBtn" class="btn btn-off">Atualizar</button>
-            </div>
-            <p id="heatmapDescricao" class="hint heatmap-descricao"></p>
-            <p id="heatmapAviso" class="hint heatmap-aviso hidden" role="note"></p>
-            <div class="heatmap-legenda" id="heatmapLegenda">
-              <span id="heatmapLegendaMin">frio</span>
-              <i class="heatmap-escala" aria-hidden="true"></i>
-              <span id="heatmapLegendaMax">quente</span>
-              <span class="heatmap-legenda-chave"><i class="heatmap-chave-sem-dados" aria-hidden="true"></i> sem dados</span>
-            </div>
-            <div class="heatmap-map-card">
-              <div class="fp-tabs" id="heatmapFpTabs"></div>
-              <div class="fp-scale-outer"><div class="fp-scale-inner floorplan-scope heatmap-floorplan" id="heatmapFpInner"></div></div>
-            </div>
-            <div id="heatmapDetalhe" class="heatmap-detalhe" role="status" aria-live="polite">Selecione uma sala no mapa para ver os números dela.</div>
-            <div class="heatmap-tabela-wrap">
-              <table class="heatmap-tabela">
-                <caption id="heatmapTabelaCaption">Valores por sala</caption>
-                <thead><tr><th scope="col">Sala</th><th scope="col">Valor</th><th scope="col">Faixa</th></tr></thead>
-                <tbody id="heatmapTabelaCorpo"></tbody>
-              </table>
-            </div>
-            <p id="heatmapErro" class="error hidden" role="alert"></p>
-          </details>
-        </div>
-
-        <div id="adminSub-auditoria" class="admin-sub hidden">
-          <p class="hint">
-            Histórico administrativo e períodos de indisponibilidade dos ESP32. Visível apenas ao superadministrador. Os registros expiram automaticamente.
-            <button type="button" class="help-icon-btn" data-help="auditoria" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card audit-filter-card">
-            <div class="audit-heading-row">
-              <h2>Eventos administrativos</h2>
-              <span class="hint">Retenção atual: <strong id="auditRetentionCurrent">7 dias</strong></span>
-            </div>
-            <div class="audit-filters">
-              <div><label for="auditFiltroData">Data</label><input type="date" id="auditFiltroData" /></div>
-              <div><label for="auditFiltroTipo">Tipo</label><select id="auditFiltroTipo"><option value="">Todos</option></select></div>
-              <div><label for="auditFiltroAtor">Ator</label><input type="search" id="auditFiltroAtor" maxlength="60" placeholder="login" /></div>
-              <div><label for="auditFiltroAlvo">Usuário, ESP32 ou recurso</label><input type="search" id="auditFiltroAlvo" maxlength="120" placeholder="nome, login ou sala" /></div>
-            </div>
-            <button type="button" id="auditFiltrarBtn" class="btn btn-off">Aplicar filtros</button>
-          </div>
-          <ul id="auditList" class="room-list audit-list" aria-live="polite"></ul>
-          <p id="auditEmpty" class="hint hidden">Nenhum evento encontrado.</p>
-          <div class="audit-pagination">
-            <button type="button" id="auditPrevBtn" class="link-btn">← Anterior</button>
-            <span id="auditPageInfo" class="hint"></span>
-            <button type="button" id="auditNextBtn" class="link-btn">Próxima →</button>
-          </div>
-
-          <div class="card audit-filter-card audit-connectivity-heading">
-            <h2>Indisponibilidade dos ESP32</h2>
-            <div class="audit-filters audit-filters-connectivity">
-              <div><label for="connectFiltroData">Data</label><input type="date" id="connectFiltroData" /></div>
-              <div><label for="connectFiltroSala">ESP32 / sala</label><input type="search" id="connectFiltroSala" maxlength="100" placeholder="ex.: A-108" /></div>
-            </div>
-            <button type="button" id="connectFiltrarBtn" class="btn btn-off">Aplicar filtros</button>
-          </div>
-          <ul id="connectList" class="room-list audit-list" aria-live="polite"></ul>
-          <p id="connectEmpty" class="hint hidden">Nenhuma indisponibilidade encontrada.</p>
-          <div class="audit-pagination">
-            <button type="button" id="connectPrevBtn" class="link-btn">← Anterior</button>
-            <span id="connectPageInfo" class="hint"></span>
-            <button type="button" id="connectNextBtn" class="link-btn">Próxima →</button>
           </div>
         </div>
 
@@ -1032,57 +875,6 @@
           <div id="adminRelatosFiltros" class="relato-filtros" role="group" aria-label="Filtrar relatos por situação"></div>
           <ul id="adminRelatosLista" class="relato-lista" aria-live="polite"></ul>
           <p id="adminRelatosVazio" class="hint relato-vazio hidden">Nenhum relato para este filtro.</p>
-        </div>
-
-        <div id="adminSub-proprietarios" class="admin-sub hidden">
-          <p class="hint">
-            Atribua a uma sala um usuário "proprietário": ele poderá conceder ou revogar o controle
-            dessa sala para outros usuários, sem ganhar nenhuma outra função de administrador. Como
-            administrador, você continua com controle total sobre a sala, sobre o proprietário e
-            sobre qualquer acesso que ele conceder.
-            <button type="button" class="help-icon-btn" data-help="proprietarios" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="card">
-            <label for="proprietariosSala">Sala</label>
-            <select id="proprietariosSala"></select>
-
-            <label class="checkbox-label">
-              <input type="checkbox" id="proprietariosAcessoRestritoCheck" /> Restringir controle desta sala a usuários específicos
-            </label>
-            <p class="hint">Necessário para que o acesso concedido pelo proprietário tenha efeito.</p>
-          </div>
-
-          <div class="card">
-            <h2>Proprietário(s) desta sala</h2>
-            <label for="proprietariosDonoSelect">Tornar proprietário</label>
-            <div class="two-col">
-              <select id="proprietariosDonoSelect"></select>
-              <button type="button" id="proprietariosConcederDonoBtn" class="link-btn">tornar proprietário</button>
-            </div>
-            <ul id="proprietariosDonosList" class="room-list"></ul>
-            <p id="proprietariosDonosEmpty" class="hint hidden">nenhum proprietário atribuído a esta sala</p>
-          </div>
-
-          <div class="card">
-            <h2>Quem pode controlar esta sala</h2>
-            <p class="hint">Inclui acessos concedidos por você e pelos proprietários da sala.</p>
-            <ul id="proprietariosAcessoList" class="room-list"></ul>
-            <p id="proprietariosAcessoEmpty" class="hint hidden">nenhum usuário com acesso concedido ainda</p>
-          </div>
-        </div>
-
-        <div id="adminSub-mapa" class="admin-sub hidden">
-          <p class="hint">
-            Visão geral do status de todas as salas ao mesmo tempo.
-            <button type="button" class="help-icon-btn" data-help="mapa" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <div class="mapa-legenda">
-            <span><i class="mapa-cell mapa-offline"></i> offline</span>
-            <span><i class="mapa-cell mapa-online-desligado"></i> online, desligado</span>
-            <span><i class="mapa-cell mapa-online-ligado"></i> online, ligado</span>
-            <span><i class="mapa-cell mapa-reservada"></i> reservada agora</span>
-          </div>
-          <div id="mapaGrid" class="mapa-grid"></div>
         </div>
 
         <div id="adminSub-macs" class="admin-sub hidden">
@@ -1122,6 +914,235 @@
 
           <ul id="macsList" class="room-list"></ul>
           <p id="macsListEmpty" class="hint hidden">Nenhuma sala encontrada para esta busca.</p>
+        </div>
+
+        <div id="adminSub-esp32" class="admin-sub hidden">
+          <p class="hint">
+            Firmware e atualização OTA de cada ESP32 e as demais funções avançadas do dispositivo: credencial exclusiva, modo de configuração, aprendizado e testes de infravermelho, protocolo do ar-condicionado e reset de Wi-Fi.
+            <button type="button" class="help-icon-btn" data-help="esp32" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+          </p>
+          <ul id="esp32DeviceList" class="esp32-device-list"></ul>
+          <p id="esp32DeviceListEmpty" class="esp32-empty hidden">Nenhum ESP32 com MAC cadastrado ainda. Cadastre o MAC da sala em Dispositivos &gt; Cadastro.</p>
+        </div>
+
+        <div id="adminSub-notificacoes" class="admin-sub hidden">
+          <p class="hint">
+            Avisos de conexão, indisponibilidade e atualização dos dispositivos ESP32. Esta seção usa as mesmas notificações exibidas pelo sino.
+            <button type="button" class="help-icon-btn" data-help="notificacoes" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+          </p>
+          <div class="card admin-notificacoes-card">
+            <div class="admin-notificacoes-head">
+              <h2>Notificações de dispositivos</h2>
+              <button type="button" id="adminNotifMarcarTodasBtn" class="link-btn">Marcar todas como lidas</button>
+            </div>
+            <ul id="adminNotifList" class="notif-list admin-notif-list" aria-live="polite"></ul>
+            <p id="adminNotifEmpty" class="hint notif-empty hidden">Nenhuma notificação por enquanto.</p>
+          </div>
+        </div>
+
+        <div id="adminSub-logs" class="admin-sub hidden">
+          <div class="admin-inner-tabs" role="tablist" aria-label="Seções de Logs">
+            <button type="button" class="admin-inner-tab-btn active" data-aba="comandos" role="tab" aria-selected="true" aria-controls="logsAba-comandos">Comandos</button>
+            <button type="button" class="admin-inner-tab-btn" data-aba="acesso" role="tab" aria-selected="false" aria-controls="logsAba-acesso">Acessos</button>
+            <button type="button" class="admin-inner-tab-btn" data-aba="dispositivos" role="tab" aria-selected="false" aria-controls="logsAba-dispositivos">Dispositivos</button>
+            <button type="button" class="admin-inner-tab-btn" data-aba="sessoes" role="tab" aria-selected="false" aria-controls="logsAba-sessoes">Sessões</button>
+            <button type="button" class="admin-inner-tab-btn superadmin-only hidden" data-aba="auditoria" role="tab" aria-selected="false" aria-controls="logsAba-auditoria">Auditoria</button>
+          </div>
+
+          <div id="logsAba-comandos" class="admin-inner-tab" role="tabpanel">
+            <p class="hint">
+              Histórico de comandos enviados aos ares-condicionados (ligar, desligar, temperatura).
+              <button type="button" class="help-icon-btn" data-help="logs" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="card">
+              <label for="logsFiltroData">Filtrar por data</label>
+              <input type="date" id="logsFiltroData" />
+              <label for="logsFiltroSala">Filtrar por sala</label>
+              <select id="logsFiltroSala"></select>
+              <label for="logsFiltroAndar">Filtrar por andar</label>
+              <select id="logsFiltroAndar"></select>
+              <div class="two-col">
+                <button type="button" id="logsApagarData" class="admin-apagar-btn">Apagar logs da data</button>
+                <button type="button" id="logsApagarTudo" class="admin-apagar-btn">Apagar todos os logs</button>
+              </div>
+            </div>
+            <ul id="logsList" class="room-list"></ul>
+          </div>
+
+          <div id="logsAba-acesso" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">
+              Registro de cada requisição feita por um ESP32 ao servidor.
+              <button type="button" class="help-icon-btn" data-help="acessos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="card">
+              <label for="acessosFiltroData">Filtrar por data</label>
+              <input type="date" id="acessosFiltroData" />
+              <div class="two-col">
+                <button type="button" id="acessosApagarData" class="admin-apagar-btn">Apagar acessos da data</button>
+                <button type="button" id="acessosApagarTudo" class="admin-apagar-btn">Apagar todos os acessos</button>
+              </div>
+            </div>
+            <ul id="acessosList" class="room-list"></ul>
+          </div>
+
+          <div id="logsAba-dispositivos" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">
+              Histórico de conexão e desconexão dos ESP32 na rede.
+              <button type="button" class="help-icon-btn" data-help="dispositivos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="card">
+              <label for="dispositivosFiltroData">Filtrar por data</label>
+              <input type="date" id="dispositivosFiltroData" />
+            </div>
+            <ul id="dispositivosList" class="room-list"></ul>
+          </div>
+
+          <div id="logsAba-sessoes" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">
+              Histórico de login e logout de cada usuário.
+              <button type="button" class="help-icon-btn" data-help="sessoes" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="card">
+              <label for="sessoesFiltroData">Filtrar por data</label>
+              <input type="date" id="sessoesFiltroData" />
+              <div class="two-col">
+                <button type="button" id="sessoesApagarData" class="admin-apagar-btn">Apagar histórico da data</button>
+                <button type="button" id="sessoesApagarTudo" class="admin-apagar-btn">Apagar todo o histórico</button>
+              </div>
+            </div>
+            <ul id="sessoesList" class="room-list"></ul>
+          </div>
+
+          <div id="logsAba-auditoria" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">
+              Histórico administrativo e períodos de indisponibilidade dos ESP32. Visível apenas ao superadministrador. Os registros expiram automaticamente.
+              <button type="button" class="help-icon-btn" data-help="auditoria" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="card audit-filter-card">
+              <div class="audit-heading-row">
+                <h2>Eventos administrativos</h2>
+                <span class="hint">Retenção atual: <strong id="auditRetentionCurrent">7 dias</strong></span>
+              </div>
+              <div class="audit-filters">
+                <div><label for="auditFiltroData">Data</label><input type="date" id="auditFiltroData" /></div>
+                <div><label for="auditFiltroTipo">Tipo</label><select id="auditFiltroTipo"><option value="">Todos</option></select></div>
+                <div><label for="auditFiltroAtor">Ator</label><input type="search" id="auditFiltroAtor" maxlength="60" placeholder="login" /></div>
+                <div><label for="auditFiltroAlvo">Usuário, ESP32 ou recurso</label><input type="search" id="auditFiltroAlvo" maxlength="120" placeholder="nome, login ou sala" /></div>
+              </div>
+              <button type="button" id="auditFiltrarBtn" class="btn btn-off">Aplicar filtros</button>
+            </div>
+            <ul id="auditList" class="room-list audit-list" aria-live="polite"></ul>
+            <p id="auditEmpty" class="hint hidden">Nenhum evento encontrado.</p>
+            <div class="audit-pagination">
+              <button type="button" id="auditPrevBtn" class="link-btn">← Anterior</button>
+              <span id="auditPageInfo" class="hint"></span>
+              <button type="button" id="auditNextBtn" class="link-btn">Próxima →</button>
+            </div>
+
+            <div class="card audit-filter-card audit-connectivity-heading">
+              <h2>Indisponibilidade dos ESP32</h2>
+              <div class="audit-filters audit-filters-connectivity">
+                <div><label for="connectFiltroData">Data</label><input type="date" id="connectFiltroData" /></div>
+                <div><label for="connectFiltroSala">ESP32 / sala</label><input type="search" id="connectFiltroSala" maxlength="100" placeholder="ex.: A-108" /></div>
+              </div>
+              <button type="button" id="connectFiltrarBtn" class="btn btn-off">Aplicar filtros</button>
+            </div>
+            <ul id="connectList" class="room-list audit-list" aria-live="polite"></ul>
+            <p id="connectEmpty" class="hint hidden">Nenhuma indisponibilidade encontrada.</p>
+            <div class="audit-pagination">
+              <button type="button" id="connectPrevBtn" class="link-btn">← Anterior</button>
+              <span id="connectPageInfo" class="hint"></span>
+              <button type="button" id="connectNextBtn" class="link-btn">Próxima →</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="adminSub-status" class="admin-sub hidden">
+          <div class="admin-inner-tabs" role="tablist" aria-label="Seções de Status">
+            <button type="button" class="admin-inner-tab-btn active" data-aba="ativos" role="tab" aria-selected="true" aria-controls="statusAba-ativos">Usuários ativos</button>
+            <button type="button" class="admin-inner-tab-btn" data-aba="mapa" role="tab" aria-selected="false" aria-controls="statusAba-mapa">Mapa</button>
+            <button type="button" class="admin-inner-tab-btn superadmin-only hidden" data-aba="sistema" role="tab" aria-selected="false" aria-controls="statusAba-sistema">Sistema</button>
+          </div>
+
+          <div id="statusAba-ativos" class="admin-inner-tab" role="tabpanel">
+            <p class="hint">
+              Usuários que já acessaram o sistema, com status em tempo real.
+              <button type="button" class="help-icon-btn" data-help="ativos" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <ul id="ativosList" class="room-list"></ul>
+            <p id="ativosEmpty" class="hint hidden">Nenhum usuário acessou o sistema ainda.</p>
+          </div>
+
+          <div id="statusAba-mapa" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">
+              Visão geral do status de todas as salas ao mesmo tempo.
+              <button type="button" class="help-icon-btn" data-help="mapa" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <div class="mapa-legenda">
+              <span><i class="mapa-cell mapa-offline"></i> offline</span>
+              <span><i class="mapa-cell mapa-online-desligado"></i> online, desligado</span>
+              <span><i class="mapa-cell mapa-online-ligado"></i> online, ligado</span>
+              <span><i class="mapa-cell mapa-reservada"></i> reservada agora</span>
+            </div>
+            <div id="mapaGrid" class="mapa-grid"></div>
+          </div>
+
+          <div id="statusAba-sistema" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">
+              Saúde do servidor, do banco, do armazenamento, dos backups e dos ESP32: leitura leve e local, atualizada a cada 20 s enquanto esta aba está aberta. Visível apenas ao superadministrador.
+              <button type="button" class="help-icon-btn" data-help="monitoramento" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+            </p>
+            <p class="hint"><button type="button" class="link-btn" data-manual="monitoramento">Abrir no manual &rarr;</button></p>
+            <div id="monAlertas" class="mon-alertas hidden" role="status" aria-live="polite"></div>
+            <div id="monGrid" class="mon-grid" aria-busy="false"></div>
+            <div id="monErro" class="mon-erro hidden" role="alert">
+              <span>Não foi possível carregar o monitoramento.</span>
+              <button type="button" id="monRetryBtn" class="btn btn-off">Tentar de novo</button>
+            </div>
+
+            <details id="heatmapBloco" class="card heatmap-bloco">
+              <summary class="heatmap-summary">
+                <span class="heatmap-summary-titulo">Mapa de calor operacional</span>
+                <span class="heatmap-summary-nota">Calculado somente ao abrir esta seção</span>
+              </summary>
+              <p class="hint">
+                Compara as salas em uma métrica operacional no período escolhido, sobre a planta baixa.
+                <button type="button" class="help-icon-btn" data-help="heatmap" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
+              </p>
+              <div class="heatmap-toolbar">
+                <div>
+                  <label for="heatmapMetrica">Métrica</label>
+                  <select id="heatmapMetrica"></select>
+                </div>
+                <div>
+                  <label for="heatmapPeriodo">Período</label>
+                  <select id="heatmapPeriodo"></select>
+                </div>
+                <button type="button" id="heatmapAtualizarBtn" class="btn btn-off">Atualizar</button>
+              </div>
+              <p id="heatmapDescricao" class="hint heatmap-descricao"></p>
+              <p id="heatmapAviso" class="hint heatmap-aviso hidden" role="note"></p>
+              <div class="heatmap-legenda" id="heatmapLegenda">
+                <span id="heatmapLegendaMin">frio</span>
+                <i class="heatmap-escala" aria-hidden="true"></i>
+                <span id="heatmapLegendaMax">quente</span>
+                <span class="heatmap-legenda-chave"><i class="heatmap-chave-sem-dados" aria-hidden="true"></i> sem dados</span>
+              </div>
+              <div class="heatmap-map-card">
+                <div class="fp-tabs" id="heatmapFpTabs"></div>
+                <div class="fp-scale-outer"><div class="fp-scale-inner floorplan-scope heatmap-floorplan" id="heatmapFpInner"></div></div>
+              </div>
+              <div id="heatmapDetalhe" class="heatmap-detalhe" role="status" aria-live="polite">Selecione uma sala no mapa para ver os números dela.</div>
+              <div class="heatmap-tabela-wrap">
+                <table class="heatmap-tabela">
+                  <caption id="heatmapTabelaCaption">Valores por sala</caption>
+                  <thead><tr><th scope="col">Sala</th><th scope="col">Valor</th><th scope="col">Faixa</th></tr></thead>
+                  <tbody id="heatmapTabelaCorpo"></tbody>
+                </table>
+              </div>
+              <p id="heatmapErro" class="error hidden" role="alert"></p>
+            </details>
+          </div>
         </div>
 
         <div id="adminSub-config" class="admin-sub hidden">
@@ -1222,15 +1243,6 @@
 
           <button type="button" id="salvarConfigBtn" class="btn btn-on btn-block">Salvar configurações</button>
           <p id="configSavedHint" class="config-saved-hint hidden" role="status">Configurações salvas.</p>
-        </div>
-
-        <div id="adminSub-esp32" class="admin-sub hidden">
-          <p class="hint">
-            Firmware e atualização OTA de cada ESP32 e as demais funções avançadas do dispositivo: credencial exclusiva, modo de configuração, aprendizado e testes de infravermelho, protocolo do ar-condicionado e reset de Wi-Fi.
-            <button type="button" class="help-icon-btn" data-help="esp32" aria-label="Ajuda: como usar esta página" title="Ajuda">?</button>
-          </p>
-          <ul id="esp32DeviceList" class="esp32-device-list"></ul>
-          <p id="esp32DeviceListEmpty" class="esp32-empty hidden">Nenhum ESP32 com MAC cadastrado ainda. Cadastre o MAC da sala em Dispositivos &gt; Cadastro.</p>
         </div>
         </div>
         </div>
@@ -1432,43 +1444,43 @@
     </div>
   </div>
 
-  <script src="js/version.js?v=2026.09.06.1"></script>
-  <script src="js/state.js?v=2026.09.06.1"></script>
-  <script src="js/config.js?v=2026.09.06.1"></script>
-  <script src="js/toast.js?v=2026.09.06.1"></script>
-  <script src="js/server-status.js?v=2026.09.06.1"></script>
-  <script src="js/tempo.js?v=2026.09.06.1"></script>
-  <script src="js/rooms-data.js?v=2026.09.06.1"></script>
-  <script src="js/api.js?v=2026.09.06.1"></script>
-  <script src="js/rtstatus.js?v=2026.09.06.1"></script>
-  <script src="js/nav.js?v=2026.09.06.1"></script>
-  <script src="js/idle-timer.js?v=2026.09.06.1"></script>
-  <script src="js/a11y.js?v=2026.09.06.1"></script>
-  <script src="js/ui-dialog.js?v=2026.09.06.1"></script>
-  <script src="js/ui-status.js?v=2026.09.06.1"></script>
-  <script src="js/help.js?v=2026.09.06.1"></script>
-  <script src="js/screens/notifications.js?v=2026.09.06.1"></script>
-  <script src="js/screens/relatos.js?v=2026.09.06.1"></script>
-  <script src="js/screens/login.js?v=2026.09.06.1"></script>
-  <script src="js/screens/portal-funcoes.js?v=2026.09.06.1"></script>
-  <script src="js/screens/location.js?v=2026.09.06.1"></script>
-  <script src="js/screens/simple.js?v=2026.09.06.1"></script>
-  <script src="js/floorplan.js?v=2026.09.06.1"></script>
-  <script src="js/screens/floorplan.js?v=2026.09.06.1"></script>
-  <script src="js/screens/rooms.js?v=2026.09.06.1"></script>
-  <script src="js/screens/panel.js?v=2026.09.06.1"></script>
-  <script src="js/screens/schedule.js?v=2026.09.06.1"></script>
-  <script src="js/screens/grade.js?v=2026.09.06.1"></script>
-  <script src="js/screens/propriedade.js?v=2026.09.06.1"></script>
-  <script src="js/screens/monitoramento.js?v=2026.09.06.1"></script>
-  <script src="js/screens/heatmap.js?v=2026.09.06.1"></script>
-  <script src="js/screens/inicio.js?v=2026.09.06.1"></script>
-  <script src="js/screens/admin.js?v=2026.09.06.1"></script>
-  <script src="js/screens/esp32-admin.js?v=2026.09.06.1"></script>
-  <script src="js/screens/manual.js?v=2026.09.06.1"></script>
-  <script src="js/screens/mobile-app.js?v=2026.09.06.1"></script>
-  <script src="js/account-menu.js?v=2026.09.06.1"></script>
-  <script src="js/router.js?v=2026.09.06.1"></script>
-  <script src="js/app.js?v=2026.09.06.1"></script>
+  <script src="js/version.js?v=2026.09.08.1"></script>
+  <script src="js/state.js?v=2026.09.08.1"></script>
+  <script src="js/config.js?v=2026.09.08.1"></script>
+  <script src="js/toast.js?v=2026.09.08.1"></script>
+  <script src="js/server-status.js?v=2026.09.08.1"></script>
+  <script src="js/tempo.js?v=2026.09.08.1"></script>
+  <script src="js/rooms-data.js?v=2026.09.08.1"></script>
+  <script src="js/api.js?v=2026.09.08.1"></script>
+  <script src="js/rtstatus.js?v=2026.09.08.1"></script>
+  <script src="js/nav.js?v=2026.09.08.1"></script>
+  <script src="js/idle-timer.js?v=2026.09.08.1"></script>
+  <script src="js/a11y.js?v=2026.09.08.1"></script>
+  <script src="js/ui-dialog.js?v=2026.09.08.1"></script>
+  <script src="js/ui-status.js?v=2026.09.08.1"></script>
+  <script src="js/help.js?v=2026.09.08.1"></script>
+  <script src="js/screens/notifications.js?v=2026.09.08.1"></script>
+  <script src="js/screens/relatos.js?v=2026.09.08.1"></script>
+  <script src="js/screens/login.js?v=2026.09.08.1"></script>
+  <script src="js/screens/portal-funcoes.js?v=2026.09.08.1"></script>
+  <script src="js/screens/location.js?v=2026.09.08.1"></script>
+  <script src="js/screens/simple.js?v=2026.09.08.1"></script>
+  <script src="js/floorplan.js?v=2026.09.08.1"></script>
+  <script src="js/screens/floorplan.js?v=2026.09.08.1"></script>
+  <script src="js/screens/rooms.js?v=2026.09.08.1"></script>
+  <script src="js/screens/panel.js?v=2026.09.08.1"></script>
+  <script src="js/screens/schedule.js?v=2026.09.08.1"></script>
+  <script src="js/screens/grade.js?v=2026.09.08.1"></script>
+  <script src="js/screens/propriedade.js?v=2026.09.08.1"></script>
+  <script src="js/screens/monitoramento.js?v=2026.09.08.1"></script>
+  <script src="js/screens/heatmap.js?v=2026.09.08.1"></script>
+  <script src="js/screens/inicio.js?v=2026.09.08.1"></script>
+  <script src="js/screens/admin.js?v=2026.09.08.1"></script>
+  <script src="js/screens/esp32-admin.js?v=2026.09.08.1"></script>
+  <script src="js/screens/manual.js?v=2026.09.08.1"></script>
+  <script src="js/screens/mobile-app.js?v=2026.09.08.1"></script>
+  <script src="js/account-menu.js?v=2026.09.08.1"></script>
+  <script src="js/router.js?v=2026.09.08.1"></script>
+  <script src="js/app.js?v=2026.09.08.1"></script>
 </body>
 </html>

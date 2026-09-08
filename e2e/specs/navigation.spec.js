@@ -54,11 +54,14 @@ test("usuário comum com link direto para a administração cai nas salas", asyn
   ).toBeVisible();
 });
 
-test("administrador comum com link direto para o monitoramento cai em Usuários", async ({ page, context }) => {
+test("administrador comum com link direto para o Status técnico cai em Usuários ativos", async ({ page, context }) => {
   await abrirComo(page, context, "admin", "/admin/monitoramento");
   await expect(page.locator("#screen-admin")).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator("#adminSub-usuarios")).toBeVisible();
-  await expect(page.locator("#adminSub-monitoramento")).toBeHidden();
+  await expect(page.locator("#adminSub-status")).toBeVisible();
+  await expect(page.locator("#statusAba-ativos")).toBeVisible();
+  await expect(page.locator("#statusAba-sistema")).toBeHidden();
+  await expect(page.locator('#adminSub-status .admin-inner-tab-btn[data-aba="sistema"]')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/status");
 });
 
 test("uma rota desconhecida recai no Início e normaliza o endereço", async ({ page, context }) => {
@@ -114,15 +117,16 @@ test("voltar e avançar do navegador percorrem as seções visitadas", async ({ 
 test("voltar percorre as sub-abas de administração visitadas", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin");
   await page.locator("#adminTabBtn").click();
-  await page.locator('.admin-subtab-btn[data-sub="dispositivos"]').click();
-  await expect(page.locator("#adminSub-dispositivos")).toBeVisible();
+  await page.locator('.admin-subtab-btn[data-sub="logs"]').click();
+  await page.locator('#adminSub-logs .admin-inner-tab-btn[data-aba="dispositivos"]').click();
+  await expect(page.locator("#logsAba-dispositivos")).toBeVisible();
   await page.locator('.admin-subtab-btn[data-sub="esp32"]').click();
   await expect(page.locator("#adminSub-esp32")).toBeVisible();
 
   await page.goBack();
-  await expect(page.locator("#adminSub-dispositivos")).toBeVisible();
+  await expect(page.locator("#logsAba-dispositivos")).toBeVisible();
   await expect(page.locator("#adminSub-esp32")).toBeHidden();
-  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/dispositivos");
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/logs/dispositivos");
 });
 
 test("voltar troca a seção ativa da planta baixa", async ({ page, context }) => {
@@ -197,8 +201,9 @@ test("a navegação nunca altera o caminho da URL, apenas o fragmento (Cordova/f
 
   await page.locator("#gradeTabBtn").click();
   await page.locator("#adminTabBtn").click();
-  await page.locator('.admin-subtab-btn[data-sub="mapa"]').click();
-  await expect(page.locator("#adminSub-mapa")).toBeVisible();
+  await page.locator('.admin-subtab-btn[data-sub="status"]').click();
+  await page.locator('#adminSub-status .admin-inner-tab-btn[data-aba="mapa"]').click();
+  await expect(page.locator("#statusAba-mapa")).toBeVisible();
 
   expect(await page.evaluate(() => location.pathname)).toBe(caminho);
   expect(await page.evaluate(() => location.search)).toBe("");
