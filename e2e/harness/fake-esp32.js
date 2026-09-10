@@ -1,11 +1,13 @@
 const WebSocket = require("ws");
 
-function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5 }) {
+function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5, firmware = "4.0.0" }) {
   let ws = null;
   let telemetriaTimer = null;
   let parado = false;
   let ligado = false;
   let powerConhecido = false;
+  let versao = firmware;
+  let comportamentoOta = "ok";
 
   function enviarTelemetria() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -15,6 +17,7 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5 }) {
       hum: 55,
       rssi: -58,
       modo: "operation",
+      fw: versao,
     };
     if (powerConhecido) quadro.ligado = ligado;
     ws.send(JSON.stringify(quadro));
@@ -44,6 +47,7 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5 }) {
         powerConhecido = true;
         setTimeout(enviarTelemetria, 40);
       }
+      if (msg && msg.tipo === "ota_oferta") responderOta(msg);
     });
 
     ws.on("close", () => {
@@ -59,9 +63,33 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5 }) {
     });
   }
 
+  function responderOta(oferta) {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ tipo: "ota_progresso", recebido: Math.round(oferta.tamanho / 2), total: oferta.tamanho }));
+    if (comportamentoOta === "erro") {
+      ws.send(JSON.stringify({ tipo: "ota_resultado", resultado: "erro", erro: "sha256 divergente" }));
+      return;
+    }
+    ws.send(JSON.stringify({ tipo: "ota_resultado", resultado: "ok" }));
+    setTimeout(() => {
+      if (comportamentoOta !== "rollback") versao = oferta.versao;
+      try {
+        ws.close();
+      } catch {}
+    }, 120);
+  }
+
   conectar();
 
   return {
+    definirComportamentoOta(modo) {
+      comportamentoOta = modo;
+    },
+    definirFirmware(fw) {
+      versao = fw;
+      enviarTelemetria();
+    },
+    firmware: () => versao,
     resetar() {
       ligado = false;
       powerConhecido = false;

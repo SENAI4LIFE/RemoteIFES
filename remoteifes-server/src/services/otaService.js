@@ -68,10 +68,10 @@ function carregarEstados() {
   }
 }
 
-function erroConflito(mensagem) {
+function erroConflito(mensagem, extras) {
   const err = new Error(mensagem);
   err.conflito = true;
-  return err;
+  return Object.assign(err, extras || {});
 }
 
 function dirFirmware() {
@@ -213,6 +213,32 @@ function contarAtivos() {
   return total;
 }
 
+function vagasDisponiveis() {
+  return Math.max(0, OTA_MAX_SIMULTANEOS - contarAtivos());
+}
+
+function avaliarElegibilidade(sala, manifestoAtual) {
+  const manifesto = manifestoAtual === undefined ? lerManifesto() : manifestoAtual;
+  const deviceHub = require("./deviceHub");
+  const publico = deviceHub.estadoPublico(sala);
+  const base = {
+    versaoPublicada: manifesto ? manifesto.versao : null,
+    versaoDispositivo: publico.fwVersao || null,
+    conectado: !!publico.conectado,
+  };
+  const recusar = (codigo, motivo) => ({ elegivel: false, codigo, motivo, ...base });
+  if (!manifesto) return recusar("sem-firmware", "nenhum firmware publicado");
+  if (!deviceHub.dispositivoConectado(sala)) return recusar("desconectado", "dispositivo não está conectado no momento");
+  const atual = estados.get(sala);
+  if (atual && FASES_ATIVAS.has(atual.fase)) return recusar("ota-em-andamento", "já existe uma atualização de firmware em andamento para esta sala");
+  if (publico.modo && publico.modo !== "operation") return recusar("modo-config", "dispositivo em modo de configuração");
+  if (base.versaoDispositivo === manifesto.versao) return recusar("ja-atualizado", "já está na versão publicada");
+  if (compararVersoes(manifesto.versao, base.versaoDispositivo) === -1) {
+    return recusar("downgrade", `downgrade bloqueado: dispositivo em ${base.versaoDispositivo}, firmware publicado ${manifesto.versao}`);
+  }
+  return { elegivel: true, codigo: null, motivo: null, ...base };
+}
+
 function emitir(sala) {
   const deviceHub = require("./deviceHub");
   deviceHub.eventos.emit("ota", { sala, estado: estadoDaSala(sala) });
@@ -246,7 +272,7 @@ function ofertar(sala) {
     throw erroConflito("já existe uma atualização de firmware em andamento para esta sala");
   }
   if (contarAtivos() >= OTA_MAX_SIMULTANEOS) {
-    throw erroConflito(`limite de ${OTA_MAX_SIMULTANEOS} atualizações simultâneas atingido — aguarde as em andamento terminarem`);
+    throw erroConflito(`limite de ${OTA_MAX_SIMULTANEOS} atualizações simultâneas atingido — aguarde as em andamento terminarem`, { limite: true });
   }
 
   const versaoDispositivo = deviceHub.estadoPublico(sala).fwVersao || null;
@@ -260,6 +286,7 @@ function ofertar(sala) {
     total: manifesto.tamanho,
     recebido: 0,
     erro: null,
+    causa: null,
     iniciadoEm: new Date().toISOString(),
   });
 
@@ -304,7 +331,7 @@ function registrarResultado(sala, msg) {
     return;
   }
   const erro = typeof msg.erro === "string" ? msg.erro.slice(0, 200) : "falha não especificada";
-  definirEstado(sala, { fase: "falhou", erro });
+  definirEstado(sala, { fase: "falhou", erro, causa: "transferencia" });
   logger.warn("ota-falhou", { sala, versao: estado.versao, erro });
   notificarConcluido(sala, false, `A atualização de firmware da sala ${sala} falhou: ${erro}`);
 }
@@ -313,7 +340,7 @@ function aoDesconectarDispositivo(sala) {
   const estado = estados.get(sala);
   if (!estado) return;
   if (estado.fase === "ofertado" || estado.fase === "baixando") {
-    definirEstado(sala, { fase: "falhou", erro: "a conexão do dispositivo caiu durante a transferência do firmware" });
+    definirEstado(sala, { fase: "falhou", erro: "a conexão do dispositivo caiu durante a transferência do firmware", causa: "transferencia" });
     logger.warn("ota-conexao-perdida", { sala, versao: estado.versao });
   } else if (estado.fase === "gravado") {
     definirEstado(sala, { fase: "reiniciando" });
@@ -324,14 +351,14 @@ function aoReconectarDispositivo(sala, fwVersao) {
   const estado = estados.get(sala);
   if (!estado || estado.fase === "concluido" || estado.fase === "ocioso") return;
   if (fwVersao && estado.versao && fwVersao === estado.versao) {
-    definirEstado(sala, { fase: "concluido", recebido: estado.total, erro: null });
+    definirEstado(sala, { fase: "concluido", recebido: estado.total, erro: null, causa: null });
     logger.info("ota-concluida", { sala, versao: estado.versao });
     notificarConcluido(sala, true, `A sala ${sala} foi atualizada para o firmware ${estado.versao}.`);
     return;
   }
   if (estado.fase !== "gravado" && estado.fase !== "reiniciando") return;
   const erro = "o dispositivo voltou com a versão anterior após a atualização (rollback automático)";
-  definirEstado(sala, { fase: "falhou", erro });
+  definirEstado(sala, { fase: "falhou", erro, causa: "rollback" });
   logger.warn("ota-rollback", { sala, versaoAlvo: estado.versao, versaoAtual: fwVersao || null });
   notificarConcluido(sala, false, `A atualização da sala ${sala} não foi validada e o dispositivo reverteu para a versão anterior.`);
 }
@@ -355,11 +382,11 @@ function verificarTimeouts() {
       return;
     }
     if ((estado.fase === "ofertado" || estado.fase === "baixando") && idadeMs > OTA_TIMEOUT_TRANSFERENCIA_MS) {
-      definirEstado(sala, { fase: "falhou", erro: "tempo esgotado durante a transferência do firmware" });
+      definirEstado(sala, { fase: "falhou", erro: "tempo esgotado durante a transferência do firmware", causa: "transferencia" });
       logger.warn("ota-timeout-transferencia", { sala, versao: estado.versao });
       notificarConcluido(sala, false, `A atualização de firmware da sala ${sala} expirou durante a transferência.`);
     } else if ((estado.fase === "gravado" || estado.fase === "reiniciando") && idadeMs > OTA_TIMEOUT_REINICIO_MS) {
-      definirEstado(sala, { fase: "falhou", erro: "o dispositivo não voltou a se conectar após gravar o firmware" });
+      definirEstado(sala, { fase: "falhou", erro: "o dispositivo não voltou a se conectar após gravar o firmware", causa: "reinicio" });
       logger.warn("ota-timeout-reinicio", { sala, versao: estado.versao });
       notificarConcluido(sala, false, `A sala ${sala} não voltou a se conectar após gravar o firmware.`);
     }
@@ -380,10 +407,13 @@ module.exports = {
   DIR_FIRMWARE,
   ARQUIVO_ESTADOS,
   CAMINHO_DOWNLOAD,
+  MAX_SIMULTANEOS: OTA_MAX_SIMULTANEOS,
   publicarFirmware,
   lerManifesto,
   caminhoBinPublicado,
   ofertar,
+  vagasDisponiveis,
+  avaliarElegibilidade,
   registrarProgresso,
   registrarResultado,
   aoDesconectarDispositivo,

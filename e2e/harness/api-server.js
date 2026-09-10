@@ -14,6 +14,7 @@ process.env.NODE_ENV = "test";
 process.env.BACKUP_AUTOMATICO = "false";
 process.env.SENHA_ADMIN_INICIAL = "";
 process.env.MOBILE_APP_RELEASE_DIR = RELEASE_DIR_E2E;
+process.env.REMOTEIFES_FIRMWARE_DIR = path.join(TMP, "firmware");
 
 const PORT = Number(process.env.E2E_API_PORT || 8791);
 
@@ -24,6 +25,8 @@ const deviceHub = require(path.join(RAIZ_SERVIDOR, "src", "services", "deviceHub
 const usuariosService = require(path.join(RAIZ_SERVIDOR, "src", "services", "usuariosService"));
 const salasService = require(path.join(RAIZ_SERVIDOR, "src", "services", "salasService"));
 const notificacoesService = require(path.join(RAIZ_SERVIDOR, "src", "services", "notificacoesService"));
+
+const otaService = require(path.join(RAIZ_SERVIDOR, "src", "services", "otaService"));
 
 const { iniciarFakeEsp32 } = require("./fake-esp32");
 
@@ -156,6 +159,33 @@ app.post("/__e2e/despublicar-apk", (req, res) => {
   } catch (erro) {
     res.status(500).json({ ok: false, erro: erro.message });
   }
+});
+
+app.post("/__e2e/publicar-firmware", (req, res) => {
+  try {
+    const versao = typeof req.query.versao === "string" && req.query.versao ? req.query.versao : "4.1.0";
+    const origem = path.join(TMP, "firmware-e2e.bin");
+    const bytes = Buffer.alloc(128 * 1024, 3);
+    bytes[0] = 0xe9;
+    fs.writeFileSync(origem, bytes);
+    res.json({ ok: true, manifesto: otaService.publicarFirmware({ origem, versao, notas: "fixture e2e" }) });
+  } catch (erro) {
+    res.status(500).json({ ok: false, erro: erro.message });
+  }
+});
+
+app.post("/__e2e/comportamento-ota/:modo", (req, res) => {
+  if (fake) fake.definirComportamentoOta(req.params.modo);
+  res.json({ ok: true });
+});
+
+app.post("/__e2e/remover-firmware", (req, res) => {
+  fs.rmSync(path.join(TMP, "firmware"), { recursive: true, force: true });
+  if (fake) {
+    fake.definirComportamentoOta("ok");
+    fake.definirFirmware("4.0.0");
+  }
+  res.json({ ok: true });
 });
 
 app.post("/__e2e/encerrar", (req, res) => {

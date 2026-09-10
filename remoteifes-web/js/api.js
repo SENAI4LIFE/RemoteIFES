@@ -515,6 +515,22 @@ const Api = {
     return chamar(`/admin/esp32/${encodeURIComponent(sala)}/ota`, { method: "POST", headers: headersComToken() });
   },
 
+  async rolloutEsp32() {
+    return chamar("/admin/esp32/rollout", { headers: headersComToken() });
+  },
+
+  async iniciarRolloutEsp32(dados) {
+    return chamar("/admin/esp32/rollout", {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify(dados),
+    });
+  },
+
+  async comandarRolloutEsp32(acao) {
+    return chamar(`/admin/esp32/rollout/${encodeURIComponent(acao)}`, { method: "POST", headers: headersComToken() });
+  },
+
   async migracaoEsp32() {
     return chamar("/admin/esp32/migracao", { headers: headersComToken() });
   },
