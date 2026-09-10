@@ -4,24 +4,63 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>RemoteIFES</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2026.09.08.1" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.09.10.1" />
   <meta name="theme-color" content="#1c6b3c" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemoteIFES" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.08.1" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.08.1" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.08.1" />
-  <meta name="remoteifes-version" content="2026.09.08.1" />
-  <link rel="stylesheet" href="css/style.css?v=2026.09.08.1" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.10.1" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.10.1" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.10.1" />
+  <meta name="remoteifes-version" content="2026.09.10.1" />
+  <link rel="stylesheet" href="css/style.css?v=2026.09.10.1" />
 </head>
 <body>
+
+  <svg class="icone-sprite" aria-hidden="true" focusable="false" width="0" height="0">
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M11.1 2.4h1.8v9.4h-1.8z"/><path d="M16.45 6.08a8.4 8.4 0 1 1-8.9 0l1.06 1.69a6.4 6.4 0 1 0 6.78 0z"/></symbol>
+    <symbol id="i-usuario" viewBox="0 0 24 24"><path d="M12 12.2a4.3 4.3 0 1 0 0-8.6 4.3 4.3 0 0 0 0 8.6Z"/><path d="M12 14.1c-4.2 0-7.6 2.3-7.6 5.1v1.2h15.2v-1.2c0-2.8-3.4-5.1-7.6-5.1Z"/></symbol>
+    <symbol id="i-usuarios" viewBox="0 0 24 24"><path d="M9.1 11.6a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4Z"/><path d="M16.8 12.2a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Z"/><path d="M9.1 13.3c-3.7 0-6.7 2-6.7 4.4v2.1h13.4v-2.1c0-2.4-3-4.4-6.7-4.4Z"/><path d="M16.8 13.8c-.8 0-1.5.1-2.2.3a6 6 0 0 1 2.6 3.6v2.1h4.4v-1.9c0-2.3-2.2-4.1-4.8-4.1Z"/></symbol>
+    <symbol id="i-ferramenta" viewBox="0 0 24 24"><path d="M20.9 4.2a6.2 6.2 0 0 1-7.7 8.1l-7.4 7.4a2.3 2.3 0 0 1-3.3-3.3l7.4-7.4a6.2 6.2 0 0 1 8.1-7.7l-3.4 3.4 2.9 2.9 3.4-3.4Z"/></symbol>
+    <symbol id="i-cadastro" viewBox="0 0 24 24"><path d="M9 2.6h1.8v2.1H9zm4.2 0H15v2.1h-1.8zM2.6 9h2.1v1.8H2.6zm0 4.2h2.1V15H2.6zM19.3 9h2.1v1.8h-2.1zm0 4.2h2.1V15h-2.1zM9 19.3h1.8v2.1H9zm4.2 0H15v2.1h-1.8z"/><path d="M17.7 5.4H6.3a.9.9 0 0 0-.9.9v11.4c0 .5.4.9.9.9h11.4c.5 0 .9-.4.9-.9V6.3a.9.9 0 0 0-.9-.9Zm-4.8 7.5h-2v2h-1.8v-2h-2v-1.8h2v-2h1.8v2h2Z"/></symbol>
+    <symbol id="i-firmware" viewBox="0 0 24 24"><path d="M12 2.6 5.9 9.4h3.9v6.4h4.4V9.4h3.9z"/><path d="M4 18.4h16v2.9H4z"/></symbol>
+    <symbol id="i-logs" viewBox="0 0 24 24"><path d="M3 4.6h3.2v3.2H3zm5.6.5h12.4v2.2H8.6zM3 10.4h3.2v3.2H3zm5.6.5h12.4v2.2H8.6zM3 16.2h3.2v3.2H3zm5.6.5h12.4v2.2H8.6z"/></symbol>
+    <symbol id="i-status" viewBox="0 0 24 24"><path d="M2.4 11.1h4.2l2.5-6.4a1 1 0 0 1 1.9 0l3.6 12 2-4.9a1 1 0 0 1 .9-.6h4.1v2h-3.4l-2.9 7a1 1 0 0 1-1.9 0L9.7 8.4l-1.7 4.3a1 1 0 0 1-.9.6H2.4z"/></symbol>
+    <symbol id="i-config" viewBox="0 0 24 24"><path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm9 4.9-2.1-.3a7 7 0 0 1-.7 1.7l1.3 1.7-1.9 1.9-1.7-1.3a7 7 0 0 1-1.7.7l-.3 2.1h-2.7l-.3-2.1a7 7 0 0 1-1.7-.7l-1.7 1.3-1.9-1.9 1.3-1.7a7 7 0 0 1-.7-1.7L3 13.3v-2.7l2.1-.3c.16-.6.4-1.16.7-1.7L4.5 6.9l1.9-1.9 1.7 1.3c.54-.3 1.1-.54 1.7-.7L10.1 3.5h2.7l.3 2.1c.6.16 1.16.4 1.7.7l1.7-1.3 1.9 1.9-1.3 1.7c.3.54.54 1.1.7 1.7l2.1.3z"/></symbol>
+    <symbol id="i-auditoria" viewBox="0 0 24 24"><path d="M12 2.2 4 5.3v6c0 4.6 3.4 8.9 8 10.1 4.6-1.2 8-5.5 8-10.1v-6zm-1.2 13.3-3.4-3.4 1.4-1.4 2 2 4.6-4.6 1.4 1.4z"/></symbol>
+    <symbol id="i-dispositivo" viewBox="0 0 24 24"><path d="M9 2.6h1.8v2.1H9zm4.2 0H15v2.1h-1.8zM2.6 9h2.1v1.8H2.6zm0 4.2h2.1V15H2.6zM19.3 9h2.1v1.8h-2.1zm0 4.2h2.1V15h-2.1zM9 19.3h1.8v2.1H9zm4.2 0H15v2.1h-1.8z"/><path d="M17.7 5.4H6.3a.9.9 0 0 0-.9.9v11.4c0 .5.4.9.9.9h11.4c.5 0 .9-.4.9-.9V6.3a.9.9 0 0 0-.9-.9Zm-2.8 9.5H9.1V9.1h5.8Z"/></symbol>
+    <symbol id="i-sessoes" viewBox="0 0 24 24"><path d="M12 2.6A9.4 9.4 0 1 0 21.4 12 9.4 9.4 0 0 0 12 2.6Zm4.3 12.9-5.3-3.1V6.3h1.9v5l4.3 2.5z"/></symbol>
+    <symbol id="i-sino" viewBox="0 0 24 24"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6.36-6.4V10a6.36 6.36 0 0 0-4.9-6.19V3a1.46 1.46 0 0 0-2.92 0v.81A6.36 6.36 0 0 0 5.64 10v5.6L4 17.23V18h16v-.77Z"/></symbol>
+    <symbol id="i-relato" viewBox="0 0 24 24"><path d="M20 8h-2.81a5.99 5.99 0 0 0-1.82-1.96l1.31-1.31-1.42-1.42-1.75 1.76A6.05 6.05 0 0 0 12 4.75c-.5 0-.99.07-1.46.2L8.79 3.19 7.37 4.61l1.31 1.31A5.99 5.99 0 0 0 6.86 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81a6 6 0 0 0 10.38 0H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8Zm-7 9h-2v-6h2v6Z"/></symbol>
+    <symbol id="i-termostato" viewBox="0 0 24 24"><path d="M14.6 13.3V5.1a2.6 2.6 0 0 0-5.2 0v8.2a4.6 4.6 0 1 0 5.2 0Zm-2.6 6.6a2.6 2.6 0 0 1-1-5v-9.8a1 1 0 0 1 2 0v9.8a2.6 2.6 0 0 1-1 5Z"/><path d="M12.6 14.9V9.8h-1.2v5.1a1.9 1.9 0 1 0 1.2 0Z"/></symbol>
+    <symbol id="i-predio" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M3.4 2.2h11.2v19.6H3.4zm2.2 2.6h2.2v2.2H5.6zm4.4 0h2.2v2.2H10zM5.6 9h2.2v2.2H5.6zm4.4 0h2.2v2.2H10zm-4.4 4.2h2.2v2.2H5.6zm4.4 0h2.2v2.2H10zm-4.4 4.2h2.2v4.4H5.6zm4.4 0h2.2v4.4H10zM16 8.4h4.6v13.4H16zm1.6 2.4h1.6v1.8h-1.6zm0 3.6h1.6v1.8h-1.6zm0 3.6h1.6v1.8h-1.6z"/></symbol>
+    <symbol id="i-mapa" viewBox="0 0 24 24"><path d="M8.9 3.1 2.6 5.3v15.6l6.3-2.2 6.2 2.2 6.3-2.2V3.1l-6.3 2.2Zm-.9 14V5.4l6.2 2.2v11.7Z"/></symbol>
+    <symbol id="i-agenda" viewBox="0 0 24 24"><path d="M19 3.6h-1.6V2h-2v1.6H8.6V2h-2v1.6H5A2 2 0 0 0 3 5.6V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5.6a2 2 0 0 0-2-2Zm0 16.4H5V9.5h14Z"/><path d="M7.2 11.4h3.1v3.1H7.2zm6.5 0h3.1v3.1h-3.1zM7.2 16h3.1v2.6H7.2zm6.5 0h3.1v2.6h-3.1z"/></symbol>
+    <symbol id="i-grade" viewBox="0 0 24 24"><path d="M3.4 3.4h2v17.2h15.2v2H3.4z"/><path d="M7.6 15.9h2.5v3.1H7.6zm4.3-4.6h2.5v7.7h-2.5zm4.3-4.9h2.5v12.6h-2.5z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2.4A9.6 9.6 0 1 0 21.6 12 9.6 9.6 0 0 0 12 2.4Zm1 14.8h-2v-6h2Zm0-8h-2v-2h2Z"/></symbol>
+    <symbol id="i-manual" viewBox="0 0 24 24"><path d="M18.6 2.6H7.2A3.2 3.2 0 0 0 4 5.8v12.4a3.2 3.2 0 0 0 3.2 3.2h11.4a1 1 0 0 0 1-1V3.6a1 1 0 0 0-1-1ZM7.2 4.6h10.4v11.6H7.2a3.1 3.1 0 0 0-1.2.24V5.8a1.2 1.2 0 0 1 1.2-1.2Zm0 14.8a1.2 1.2 0 0 1 0-2.4h10.4v2.4Z"/><path d="M9 7.1h6.6v1.8H9zm0 3.3h6.6v1.8H9z"/></symbol>
+    <symbol id="i-celular" viewBox="0 0 24 24"><path d="M16.4 1.6H7.6a2.4 2.4 0 0 0-2.4 2.4v16a2.4 2.4 0 0 0 2.4 2.4h8.8a2.4 2.4 0 0 0 2.4-2.4V4a2.4 2.4 0 0 0-2.4-2.4Zm-4.4 19.2a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6Zm4.8-4.4H7.2V4.6h9.6Z"/></symbol>
+    <symbol id="i-chave" viewBox="0 0 24 24"><path d="M15.2 2.6a6.4 6.4 0 0 0-6.1 8.3L2.4 17.7v3.7h3.7v-2.2h2.2v-2.2h2.2l2.4-2.4a6.4 6.4 0 1 0 2.3-12Zm1.6 5.6a1.8 1.8 0 1 1 0-3.6 1.8 1.8 0 0 1 0 3.6Z"/></symbol>
+    <symbol id="i-cadeado" viewBox="0 0 24 24"><path d="M17.4 9.4h-1V7.2a4.4 4.4 0 0 0-8.8 0v2.2h-1a1.6 1.6 0 0 0-1.6 1.6v9.2a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-9.2a1.6 1.6 0 0 0-1.6-1.6ZM9.6 7.2a2.4 2.4 0 0 1 4.8 0v2.2H9.6ZM13 16.1v2.3h-2v-2.3a1.8 1.8 0 1 1 2 0Z"/></symbol>
+    <symbol id="i-suporte" viewBox="0 0 24 24"><path d="M12 2.4A9.6 9.6 0 1 0 21.6 12 9.6 9.6 0 0 0 12 2.4Zm0 2a7.5 7.5 0 0 1 3.7 1l-2.5 2.5a4 4 0 0 0-2.4 0L8.3 5.4a7.5 7.5 0 0 1 3.7-1ZM4.4 12a7.5 7.5 0 0 1 1-3.7l2.5 2.5a4 4 0 0 0 0 2.4l-2.5 2.5a7.5 7.5 0 0 1-1-3.7Zm7.6 7.6a7.5 7.5 0 0 1-3.7-1l2.5-2.5a4 4 0 0 0 2.4 0l2.5 2.5a7.5 7.5 0 0 1-3.7 1Zm0-5.6a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm6.6 1.7-2.5-2.5a4 4 0 0 0 0-2.4l2.5-2.5a7.5 7.5 0 0 1 0 7.4Z"/></symbol>
+    <symbol id="i-aviso" viewBox="0 0 24 24"><path d="M12 2.8 1.2 21.2h21.6Zm1 15.4h-2v-2h2Zm0-3.6h-2V9.4h2Z"/></symbol>
+    <symbol id="i-neve" viewBox="0 0 24 24"><path d="M21 10.9h-3.3l2.3-2.3-1.4-1.4L15 10.9h-2v-2l3.7-3.6-1.4-1.4-2.3 2.3V2.9h-2v3.3L8.7 3.9 7.3 5.3 11 8.9v2H9L5.4 7.2 4 8.6l2.3 2.3H3v2h3.3L4 15.2l1.4 1.4L9 12.9h2v2l-3.7 3.6 1.4 1.4 2.3-2.3v3.3h2v-3.3l2.3 2.3 1.4-1.4-3.7-3.6v-2h2l3.6 3.7 1.4-1.4-2.3-2.3H21Z"/></symbol>
+    <symbol id="i-zoom-reset" viewBox="0 0 24 24"><path d="M12 4.4V1.6L7.9 5.7 12 9.8V6.4a5.6 5.6 0 1 1-5.6 5.6h-2a7.6 7.6 0 1 0 7.6-7.6Z"/></symbol>
+    <symbol id="i-circulo-cheio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.4"/></symbol>
+    <symbol id="i-circulo-vazio" viewBox="0 0 24 24"><path d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8Zm0 12.8a5.4 5.4 0 1 1 0-10.8 5.4 5.4 0 0 1 0 10.8Z"/></symbol>
+    <symbol id="i-circulo-meio" viewBox="0 0 24 24"><path d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8Zm0 12.8a5.4 5.4 0 1 1 0-10.8Z"/></symbol>
+    <symbol id="i-circulo-x" viewBox="0 0 24 24"><path d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8Zm3 9-1.4 1.4-1.6-1.6-1.6 1.6L9 13.6 10.6 12 9 10.4 10.4 9l1.6 1.6L13.6 9 15 10.4 13.4 12Z"/></symbol>
+    <symbol id="i-circulo-cortado" viewBox="0 0 24 24"><path d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8Zm-5.4 7.4a5.4 5.4 0 0 1 8.5-4.4l-7.5 7.5a5.4 5.4 0 0 1-1-3.1Zm5.4 5.4a5.4 5.4 0 0 1-3.1-1l7.5-7.5a5.4 5.4 0 0 1-4.4 8.5Z"/></symbol>
+    <symbol id="i-circulo-reticencias" viewBox="0 0 24 24"><path d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8Zm-3.6 8.6a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Zm3.6 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Zm3.6 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Z"/></symbol>
+    <symbol id="i-circulo-exclamacao" viewBox="0 0 24 24"><path d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8Zm1 11.4h-2v-2h2Zm0-3.4h-2V8h2Z"/></symbol>
+    <symbol id="i-circulo-check" viewBox="0 0 24 24"><path d="M12 4.6a7.4 7.4 0 1 0 0 14.8 7.4 7.4 0 0 0 0-14.8Zm-1.2 10.9-3-3L9.2 11l1.6 1.6 4-4 1.4 1.4Z"/></symbol>
+  </svg>
 
   <section id="screen-server-status" class="hidden">
     <div class="server-status-card">
       <div class="server-status-spinner" id="serverStatusSpinner" aria-hidden="true"></div>
-      <div class="server-status-emoji hidden" id="serverStatusEmoji" aria-hidden="true"></div>
+      <div class="server-status-icone hidden" id="serverStatusIcone" aria-hidden="true"></div>
       <div class="server-status-chip" id="serverStatusChip">
         <span class="server-status-dot" id="serverStatusDot" aria-hidden="true"></span>
         <span id="serverStatusChipLabel">Offline</span>
@@ -34,7 +73,7 @@
 
   <section id="screen-server-config" class="server-config-screen hidden">
     <form id="serverConfigForm" class="server-status-card">
-      <div class="server-status-emoji" aria-hidden="true">📱</div>
+      <div class="server-status-icone" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-celular"></use></svg></div>
       <div class="server-status-chip"><span class="server-status-dot server-status-dot-config" aria-hidden="true"></span><span>Configuração inicial</span></div>
       <h2 class="server-status-title">Conectar este aplicativo</h2>
       <p class="server-status-desc">Este aplicativo ainda não possui o endereço da instalação RemoteIFES. Solicite-o à equipe responsável.</p>
@@ -47,13 +86,13 @@
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
-      <img src="assets/remoteifes-logo.png?v=2026.09.08.1" alt="RemoteIFES" />
+      <img src="assets/remoteifes-logo.png?v=2026.09.10.1" alt="RemoteIFES" />
       <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
       <div id="notifWrap" class="notif-wrap hidden">
         <button type="button" id="notifBellBtn" class="notif-bell-btn" aria-label="Notificações de dispositivos" aria-haspopup="true" aria-expanded="false" title="Notificações de dispositivos (ESP32)">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6.36-6.4V10a6.36 6.36 0 0 0-4.9-6.19V3a1.46 1.46 0 0 0-2.92 0v.81A6.36 6.36 0 0 0 5.64 10v5.6L4 17.23V18h16v-.77l-1.64-1.63Z"/></svg>
+          <svg class="icone icone-topbar" aria-hidden="true"><use href="#i-sino"></use></svg>
           <span id="notifDot" class="notif-dot hidden" aria-hidden="true"></span>
         </button>
         <div id="notifPanel" class="notif-panel hidden">
@@ -67,7 +106,7 @@
       </div>
       <div id="bugWrap" class="bug-wrap hidden">
         <button type="button" id="bugReportBtn" class="bug-report-btn" aria-label="Relatar problema" aria-haspopup="dialog" aria-expanded="false" title="Relatar problema">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M20 8h-2.81a5.99 5.99 0 0 0-1.82-1.96l1.31-1.31-1.42-1.42-1.75 1.76A6.05 6.05 0 0 0 12 4.75c-.5 0-.99.07-1.46.2L8.79 3.19 7.37 4.61l1.31 1.31A5.99 5.99 0 0 0 6.86 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81a6 6 0 0 0 10.38 0H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8Zm-7 9h-2v-6h2v6Z"/></svg>
+          <svg class="icone icone-topbar" aria-hidden="true"><use href="#i-relato"></use></svg>
           <span id="bugReportBadge" class="bug-report-badge hidden" aria-hidden="true"></span>
         </button>
         <div id="relatosPanel" class="relatos-panel hidden" role="region" aria-label="Relatos de problemas"></div>
@@ -99,21 +138,21 @@
           <div class="portal-wrap">
             <div class="portal-welcome">
               <p class="portal-eyebrow">BEM-VINDO</p>
-              <p id="portalManutencaoAviso" class="portal-manutencao-aviso hidden">🔧 Sistema em manutenção programada: no momento, apenas administradores conseguem entrar.</p>
+              <p id="portalManutencaoAviso" class="portal-manutencao-aviso hidden"><svg class="icone icone-inline" aria-hidden="true"><use href="#i-ferramenta"></use></svg> Sistema em manutenção programada: no momento, apenas administradores conseguem entrar.</p>
             </div>
             <div class="portal-options">
               <div class="portal-option" data-tipo="normal">
-                <span class="portal-option-icon">👤</span>
+                <span class="portal-option-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-usuario"></use></svg></span>
                 <span class="portal-option-label">USUÁRIO</span>
               </div>
               <div class="portal-option" data-tipo="admin">
-                <span class="portal-option-icon">🛠️</span>
+                <span class="portal-option-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-ferramenta"></use></svg></span>
                 <span class="portal-option-label">ADMINISTRADOR</span>
               </div>
             </div>
           </div>
           <div class="portal-footer">
-            <img src="assets/ifes-logo.png?v=2026.09.08.1" alt="Instituto Federal do Espírito Santo" />
+            <img src="assets/ifes-logo.png?v=2026.09.10.1" alt="Instituto Federal do Espírito Santo" />
             <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
@@ -125,28 +164,28 @@
           </div>
           <div class="portal-funcoes-grid">
             <button type="button" class="portal-funcao" data-funcao="salas">
-              <span class="portal-funcao-icon">🌡️</span>
+              <span class="portal-funcao-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-termostato"></use></svg></span>
               <span class="portal-funcao-label">Salas</span>
             </button>
             <button type="button" class="portal-funcao" data-funcao="planta">
-              <span class="portal-funcao-icon">🏢</span>
+              <span class="portal-funcao-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-predio"></use></svg></span>
               <span class="portal-funcao-label">Planta Baixa</span>
             </button>
             <button type="button" class="portal-funcao" data-funcao="agenda">
-              <span class="portal-funcao-icon">🗓️</span>
+              <span class="portal-funcao-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-agenda"></use></svg></span>
               <span class="portal-funcao-label">Agenda</span>
             </button>
             <button type="button" class="portal-funcao" data-funcao="grade">
-              <span class="portal-funcao-icon">📈</span>
+              <span class="portal-funcao-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-grade"></use></svg></span>
               <span class="portal-funcao-label">Grade</span>
             </button>
             <button type="button" class="portal-funcao" data-funcao="admin">
-              <span class="portal-funcao-icon">🔧</span>
+              <span class="portal-funcao-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-ferramenta"></use></svg></span>
               <span class="portal-funcao-label">Admin</span>
             </button>
           </div>
           <div id="portalFuncaoDetalhe" class="portal-funcao-detalhe" aria-live="polite">
-            <span id="portalFuncaoDetalheIcon" class="portal-funcao-detalhe-icon">ℹ️</span>
+            <span id="portalFuncaoDetalheIcon" class="portal-funcao-detalhe-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-info"></use></svg></span>
             <h3 id="portalFuncaoDetalheTitulo">Selecione uma função</h3>
             <p id="portalFuncaoDetalheTexto">Toque em um dos ícones acima para ver do que se trata.</p>
           </div>
@@ -172,9 +211,9 @@
           <h2>ACESSO AO SISTEMA</h2>
           <p class="login-info-lead">O login do RemoteIFES é próprio deste sistema, <br class="lead-break" />independente de outras plataformas do Ifes.</p>
           <ul class="login-info-tips">
-            <li><span class="icon-badge">🔑</span>Usuário e senha criados pelo administrador do RemoteIFES.</li>
-            <li><span class="icon-badge">🔒</span>Acesso individual: não compartilhe suas credenciais.</li>
-            <li><span class="icon-badge">🆘</span>Problemas para entrar? Procure o administrador do sistema.</li>
+            <li><span class="icon-badge" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-chave"></use></svg></span>Usuário e senha criados pelo administrador do RemoteIFES.</li>
+            <li><span class="icon-badge" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-cadeado"></use></svg></span>Acesso individual: não compartilhe suas credenciais.</li>
+            <li><span class="icon-badge" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-suporte"></use></svg></span>Problemas para entrar? Procure o administrador do sistema.</li>
           </ul>
         </div>
       </div>
@@ -183,7 +222,7 @@
     <section id="screen-manutencao-acesso" class="screen hidden">
       <div class="manutencao-acesso-wrap">
         <form id="manutencaoAcessoForm" class="card manutencao-acesso-card">
-          <span class="manutencao-acesso-emoji" aria-hidden="true">🔧</span>
+          <span class="manutencao-acesso-icone" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-ferramenta"></use></svg></span>
           <h2>Acesso de administrador</h2>
           <p class="hint">O RemoteIFES está em manutenção programada. Enquanto ela durar, só é possível entrar com uma conta de administrador.</p>
 
@@ -590,7 +629,7 @@
           </button>
           <button type="button" class="fp-zoom-btn" id="floorplanZoomInBtn" aria-label="Aumentar planta" title="Aumentar">+</button>
           <button type="button" class="fp-zoom-btn" id="floorplanZoomOutBtn" aria-label="Diminuir planta" title="Diminuir">−</button>
-          <button type="button" class="fp-zoom-btn" id="floorplanZoomResetBtn" aria-label="Restaurar zoom padrão" title="Zoom padrão">↺</button>
+          <button type="button" class="fp-zoom-btn" id="floorplanZoomResetBtn" aria-label="Restaurar zoom padrão" title="Zoom padrão"><svg class="icone" aria-hidden="true"><use href="#i-zoom-reset"></use></svg></button>
         </div>
 
       </section>
@@ -641,7 +680,7 @@
               </button>
               <div class="ac-remote-center-controls">
                 <button id="btnPower" type="button" class="ac-remote-power-btn" aria-label="Ligar ou desligar o ar-condicionado">
-                  <span class="ac-remote-power-icon">&#9211;</span>
+                  <span class="ac-remote-power-icon" aria-hidden="true"><svg class="icone ac-remote-power-glyph" aria-hidden="true"><use href="#i-power"></use></svg></span>
                   <span class="ac-remote-control-label">Power</span>
                 </button>
                 <button id="btnTurbo" type="button" class="ac-remote-turbo-btn" aria-label="Ativar ou desativar o modo turbo" aria-pressed="false">
@@ -780,20 +819,20 @@
         <nav class="admin-subtabs" aria-label="Áreas da Administração">
           <div class="admin-subtab-group is-active" data-grupo="gestao">
             <button type="button" class="admin-group-btn" data-grupo="gestao"><span class="admin-group-label">Gestão</span></button>
-            <button type="button" class="admin-subtab-btn active" aria-current="page" data-sub="usuarios"><span class="admin-subtab-icon">👥</span><span class="admin-subtab-label">Usuários</span></button>
-            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="relatos"><span class="admin-subtab-icon">🐞</span><span class="admin-subtab-label">Relatos de problemas</span><span id="adminRelatosSubBadge" class="admin-subtab-badge hidden"></span></button>
+            <button type="button" class="admin-subtab-btn active" aria-current="page" data-sub="usuarios"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-usuarios"></use></svg></span><span class="admin-subtab-label">Usuários</span></button>
+            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="relatos"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-relato"></use></svg></span><span class="admin-subtab-label">Relatos de problemas</span><span id="adminRelatosSubBadge" class="admin-subtab-badge hidden"></span></button>
           </div>
           <div class="admin-subtab-group" data-grupo="dispositivos">
             <button type="button" class="admin-group-btn" data-grupo="dispositivos"><span class="admin-group-label">Dispositivos</span></button>
-            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon">🔧</span><span class="admin-subtab-label">Cadastro</span></button>
-            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon">📶</span><span class="admin-subtab-label">Firmware / OTA</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="notificacoes"><span class="admin-subtab-icon">🔔</span><span class="admin-subtab-label">Alertas</span></button>
+            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="macs"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-cadastro"></use></svg></span><span class="admin-subtab-label">Cadastro</span></button>
+            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="esp32"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-firmware"></use></svg></span><span class="admin-subtab-label">Firmware / OTA</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="notificacoes"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-sino"></use></svg></span><span class="admin-subtab-label">Alertas</span></button>
           </div>
           <div class="admin-subtab-group" data-grupo="sistema">
             <button type="button" class="admin-group-btn" data-grupo="sistema"><span class="admin-group-label">Sistema</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon">📜</span><span class="admin-subtab-label">Logs</span></button>
-            <button type="button" class="admin-subtab-btn" data-sub="status"><span class="admin-subtab-icon">🩺</span><span class="admin-subtab-label">Status</span></button>
-            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon">⚙️</span><span class="admin-subtab-label">Configurações</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="logs"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-logs"></use></svg></span><span class="admin-subtab-label">Logs</span></button>
+            <button type="button" class="admin-subtab-btn" data-sub="status"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-status"></use></svg></span><span class="admin-subtab-label">Status</span></button>
+            <button type="button" class="admin-subtab-btn superadmin-only hidden" data-sub="config"><span class="admin-subtab-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-config"></use></svg></span><span class="admin-subtab-label">Configurações</span></button>
           </div>
         </nav>
 
@@ -896,7 +935,7 @@
               </button>
               <button type="button" class="fp-zoom-btn" id="macsFpZoomInBtn" aria-label="Aumentar planta" title="Aumentar">+</button>
               <button type="button" class="fp-zoom-btn" id="macsFpZoomOutBtn" aria-label="Diminuir planta" title="Diminuir">−</button>
-              <button type="button" class="fp-zoom-btn" id="macsFpZoomResetBtn" aria-label="Restaurar zoom padrão" title="Zoom padrão">↺</button>
+              <button type="button" class="fp-zoom-btn" id="macsFpZoomResetBtn" aria-label="Restaurar zoom padrão" title="Zoom padrão"><svg class="icone" aria-hidden="true"><use href="#i-zoom-reset"></use></svg></button>
             </div>
           </div>
 
@@ -1152,7 +1191,7 @@
           </p>
           <div class="config-list">
             <div class="config-list-item">
-              <div class="config-list-icon">⏱️</div>
+              <div class="config-list-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-sessoes"></use></svg></div>
               <div class="config-list-content">
                 <div class="config-list-title">Sessão por inatividade</div>
                 <p class="config-list-desc">
@@ -1173,7 +1212,7 @@
             </div>
 
             <div class="config-list-item">
-              <div class="config-list-icon">🟢</div>
+              <div class="config-list-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-circulo-check"></use></svg></div>
               <div class="config-list-content">
                 <div class="config-list-title">Presença online</div>
                 <p class="config-list-desc">Define por quanto tempo sem uso um usuário ainda é considerado online no sistema.</p>
@@ -1185,7 +1224,7 @@
             </div>
 
             <div class="config-list-item superadmin-only hidden" id="cfgCriticoCard">
-              <div class="config-list-icon">🔒</div>
+              <div class="config-list-icon" aria-hidden="true"><svg class="icone" aria-hidden="true"><use href="#i-cadeado"></use></svg></div>
               <div class="config-list-content">
                 <div class="config-list-title">Configurações críticas (superadministrador)</div>
                 <p class="config-list-desc">Estas opções alteram o comportamento global do sistema e só podem ser alteradas pelo superadministrador.</p>
@@ -1213,7 +1252,7 @@
                     <input type="checkbox" id="cfgModoTeste" /> Modo de teste (permite acesso fora da rede do IFES)
                   </label>
                   <p class="hint">Em produção, o acesso é restrito à rede do IFES. Ative o modo de teste temporariamente para testar fora da rede institucional.</p>
-                  <p id="cfgModoTesteAviso" class="lock-banner hidden">⚠ Modo de teste ativo: a restrição de acesso à rede do IFES está desativada e o sistema pode ser acessado pela internet. Desligue assim que terminar os testes.</p>
+                  <p id="cfgModoTesteAviso" class="lock-banner hidden"><svg class="icone icone-inline" aria-hidden="true"><use href="#i-aviso"></use></svg> Modo de teste ativo: a restrição de acesso à rede do IFES está desativada e o sistema pode ser acessado pela internet. Desligue assim que terminar os testes.</p>
 
                   <label for="cfgRedesAutorizadas">Redes autorizadas (uma por linha, formato CIDR, ex: 10.0.0.0/8)</label>
                   <textarea id="cfgRedesAutorizadas" rows="3" placeholder="10.0.0.0/8"></textarea>
@@ -1444,43 +1483,44 @@
     </div>
   </div>
 
-  <script src="js/version.js?v=2026.09.08.1"></script>
-  <script src="js/state.js?v=2026.09.08.1"></script>
-  <script src="js/config.js?v=2026.09.08.1"></script>
-  <script src="js/toast.js?v=2026.09.08.1"></script>
-  <script src="js/server-status.js?v=2026.09.08.1"></script>
-  <script src="js/tempo.js?v=2026.09.08.1"></script>
-  <script src="js/rooms-data.js?v=2026.09.08.1"></script>
-  <script src="js/api.js?v=2026.09.08.1"></script>
-  <script src="js/rtstatus.js?v=2026.09.08.1"></script>
-  <script src="js/nav.js?v=2026.09.08.1"></script>
-  <script src="js/idle-timer.js?v=2026.09.08.1"></script>
-  <script src="js/a11y.js?v=2026.09.08.1"></script>
-  <script src="js/ui-dialog.js?v=2026.09.08.1"></script>
-  <script src="js/ui-status.js?v=2026.09.08.1"></script>
-  <script src="js/help.js?v=2026.09.08.1"></script>
-  <script src="js/screens/notifications.js?v=2026.09.08.1"></script>
-  <script src="js/screens/relatos.js?v=2026.09.08.1"></script>
-  <script src="js/screens/login.js?v=2026.09.08.1"></script>
-  <script src="js/screens/portal-funcoes.js?v=2026.09.08.1"></script>
-  <script src="js/screens/location.js?v=2026.09.08.1"></script>
-  <script src="js/screens/simple.js?v=2026.09.08.1"></script>
-  <script src="js/floorplan.js?v=2026.09.08.1"></script>
-  <script src="js/screens/floorplan.js?v=2026.09.08.1"></script>
-  <script src="js/screens/rooms.js?v=2026.09.08.1"></script>
-  <script src="js/screens/panel.js?v=2026.09.08.1"></script>
-  <script src="js/screens/schedule.js?v=2026.09.08.1"></script>
-  <script src="js/screens/grade.js?v=2026.09.08.1"></script>
-  <script src="js/screens/propriedade.js?v=2026.09.08.1"></script>
-  <script src="js/screens/monitoramento.js?v=2026.09.08.1"></script>
-  <script src="js/screens/heatmap.js?v=2026.09.08.1"></script>
-  <script src="js/screens/inicio.js?v=2026.09.08.1"></script>
-  <script src="js/screens/admin.js?v=2026.09.08.1"></script>
-  <script src="js/screens/esp32-admin.js?v=2026.09.08.1"></script>
-  <script src="js/screens/manual.js?v=2026.09.08.1"></script>
-  <script src="js/screens/mobile-app.js?v=2026.09.08.1"></script>
-  <script src="js/account-menu.js?v=2026.09.08.1"></script>
-  <script src="js/router.js?v=2026.09.08.1"></script>
-  <script src="js/app.js?v=2026.09.08.1"></script>
+  <script src="js/version.js?v=2026.09.10.1"></script>
+  <script src="js/icons.js?v=2026.09.10.1"></script>
+  <script src="js/state.js?v=2026.09.10.1"></script>
+  <script src="js/config.js?v=2026.09.10.1"></script>
+  <script src="js/toast.js?v=2026.09.10.1"></script>
+  <script src="js/server-status.js?v=2026.09.10.1"></script>
+  <script src="js/tempo.js?v=2026.09.10.1"></script>
+  <script src="js/rooms-data.js?v=2026.09.10.1"></script>
+  <script src="js/api.js?v=2026.09.10.1"></script>
+  <script src="js/rtstatus.js?v=2026.09.10.1"></script>
+  <script src="js/nav.js?v=2026.09.10.1"></script>
+  <script src="js/idle-timer.js?v=2026.09.10.1"></script>
+  <script src="js/a11y.js?v=2026.09.10.1"></script>
+  <script src="js/ui-dialog.js?v=2026.09.10.1"></script>
+  <script src="js/ui-status.js?v=2026.09.10.1"></script>
+  <script src="js/help.js?v=2026.09.10.1"></script>
+  <script src="js/screens/notifications.js?v=2026.09.10.1"></script>
+  <script src="js/screens/relatos.js?v=2026.09.10.1"></script>
+  <script src="js/screens/login.js?v=2026.09.10.1"></script>
+  <script src="js/screens/portal-funcoes.js?v=2026.09.10.1"></script>
+  <script src="js/screens/location.js?v=2026.09.10.1"></script>
+  <script src="js/screens/simple.js?v=2026.09.10.1"></script>
+  <script src="js/floorplan.js?v=2026.09.10.1"></script>
+  <script src="js/screens/floorplan.js?v=2026.09.10.1"></script>
+  <script src="js/screens/rooms.js?v=2026.09.10.1"></script>
+  <script src="js/screens/panel.js?v=2026.09.10.1"></script>
+  <script src="js/screens/schedule.js?v=2026.09.10.1"></script>
+  <script src="js/screens/grade.js?v=2026.09.10.1"></script>
+  <script src="js/screens/propriedade.js?v=2026.09.10.1"></script>
+  <script src="js/screens/monitoramento.js?v=2026.09.10.1"></script>
+  <script src="js/screens/heatmap.js?v=2026.09.10.1"></script>
+  <script src="js/screens/inicio.js?v=2026.09.10.1"></script>
+  <script src="js/screens/admin.js?v=2026.09.10.1"></script>
+  <script src="js/screens/esp32-admin.js?v=2026.09.10.1"></script>
+  <script src="js/screens/manual.js?v=2026.09.10.1"></script>
+  <script src="js/screens/mobile-app.js?v=2026.09.10.1"></script>
+  <script src="js/account-menu.js?v=2026.09.10.1"></script>
+  <script src="js/router.js?v=2026.09.10.1"></script>
+  <script src="js/app.js?v=2026.09.10.1"></script>
 </body>
 </html>
