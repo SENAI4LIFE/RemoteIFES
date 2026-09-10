@@ -37,6 +37,8 @@ checar(contar(original, /<widget\b/g) === 1 && contar(original, /<\/widget>/g) =
 checar(contar(original, /<platform\b/g) === contar(original, /<\/platform>/g), "tags <platform> balanceadas");
 checar(/<content src="index\.html" \/>/.test(original), "<content src=\"index.html\" /> presente");
 checar(/<preference name="Orientation" value="default" \/>/.test(original), "Orientation = default (retrato e paisagem)");
+checar(/<preference name="scheme" value="http" \/>/.test(original), "a WebView Android carrega em http://localhost, o mesmo esquema dos servidores de rede local");
+checar(/android:enableOnBackInvokedCallback="false"/.test(original), "o botão Voltar do Android continua chegando à WebView (Cordova ainda navega pelo histórico)");
 checar(/<platform name="android">/.test(original) && /<platform name="ios">/.test(original), "plataformas android e ios declaradas");
 checar(fs.existsSync(caminhoCordova()), "launcher do build de release usa o Cordova local");
 const releaseScript = fs.readFileSync(path.join(RAIZ, "build-android-release.js"), "utf8");
@@ -116,6 +118,12 @@ try {
   checar(!/origin="\*"/.test(endurecido) && !/href="\*"/.test(endurecido), "endurecimento remove curingas de rede");
   checar(/origin="https:\/\/exemplo\.ifes\.edu\.br\/\*"/.test(endurecido), "endurecimento fixa a origem de produção");
   checar(/usesCleartextTraffic="false"/.test(endurecido), "endurecimento HTTPS bloqueia cleartext explicitamente");
+  checar(/<preference name="scheme" value="https" \/>/.test(endurecido), "endurecimento HTTPS carrega a página em https://localhost");
+  execFileSync("node", [path.join(RAIZ, "harden-config.js"), "http://192.168.1.50:8080"], { stdio: "pipe" });
+  const endurecidoHttp = fs.readFileSync(CONFIG, "utf8");
+  checar(/<preference name="scheme" value="http" \/>/.test(endurecidoHttp), "endurecimento HTTP carrega a página em http://localhost");
+  checar(/usesCleartextTraffic="true"/.test(endurecidoHttp), "endurecimento HTTP mantém o cleartext para a rede local");
+  checar((endurecido.match(/android:enableOnBackInvokedCallback="false"/g) || []).length === 1 && (endurecidoHttp.match(/android:enableOnBackInvokedCallback="false"/g) || []).length === 1, "o endurecimento preserva a política do botão Voltar nas duas origens");
   execFileSync("node", [path.join(RAIZ, "harden-config.js"), "--dev"], { stdio: "pipe" });
   const restaurado = fs.readFileSync(CONFIG, "utf8");
   if (restaurado !== original) {
