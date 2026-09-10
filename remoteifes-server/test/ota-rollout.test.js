@@ -325,7 +325,7 @@ test("queda de conexão durante a transferência falha o dispositivo e interromp
   await fechar(dispositivos[2]);
 });
 
-test("dispositivo que reconecta com a versão antiga é registrado como revertido", async () => {
+test("versão antiga após reconexão não comprova rollback", async () => {
   novaSala("rol-rb-1", "AA:BB:CC:F4:00:01");
   novaSala("rol-rb-2", "AA:BB:CC:F4:00:02");
   const canario = await abrirDispositivo("rol-rb-1", "AA:BB:CC:F4:00:01");
@@ -343,9 +343,9 @@ test("dispositivo que reconecta com a versão antiga é registrado como revertid
 
   const fim = await ateRollout((r) => r.estado === "interrompido", "distribuição interrompida");
   const revertido = dispositivoDoRollout(fim, "rol-rb-1");
-  assert.equal(revertido.estado, "revertido");
+  assert.equal(revertido.estado, "indeterminado");
   assert.equal(revertido.versaoAnterior, "4.0.0");
-  assert.match(fim.motivoParada, /versão anterior/);
+  assert.match(fim.motivoParada, /sem confirmação/);
   assert.equal(seguinte.ofertas().length, 0);
 
   await fechar(reconectado);
@@ -524,6 +524,9 @@ test("reinício do servidor reconcilia o andamento sem reofertar o firmware", as
     process.env.REMOTEIFES_FIRMWARE_DIR = ${JSON.stringify(process.env.REMOTEIFES_FIRMWARE_DIR)};
     process.env.NODE_ENV = 'test';
     const assert = require('node:assert/strict');
+    const db = require(${JSON.stringify(path.join(__dirname, '../src/config/database'))});
+    require(${JSON.stringify(path.join(__dirname, '../src/db/schema'))}).criarSchema();
+    db.prepare(\"INSERT INTO salas (sala, nome, bloco, andar, mac) VALUES ('rol-rs-1', 'Teste', 'R', 1, 'AA:BB:CC:FA:00:01'), ('rol-rs-2', 'Teste', 'R', 1, 'AA:BB:CC:FA:00:02')\").run();
     const ota = require(${JSON.stringify(path.join(__dirname, "../src/services/otaService"))});
     const rollout = require(${JSON.stringify(path.join(__dirname, "../src/services/otaRolloutService"))});
     rollout.tick();
@@ -588,8 +591,12 @@ test("apenas o superadministrador comanda a distribuição", async () => {
     assert.equal((await authFetch("/admin/esp32/rollout", token, { method: "POST", body: JSON.stringify({ salas: ["rol-pf-apto"] }) })).status, 403);
     assert.equal((await authFetch("/admin/esp32/rollout/pausar", token, { method: "POST" })).status, 403);
     assert.equal((await authFetch("/admin/esp32/rollout/cancelar", token, { method: "POST" })).status, 403);
+    assert.equal((await authFetch("/admin/esp32/rollout/retomar", token, { method: "POST" })).status, 403);
   }
   assert.equal((await fetch(`${baseUrl}/admin/esp32/rollout`)).status, 401);
+  for (const caminho of ["", "/pausar", "/retomar", "/cancelar"]) {
+    assert.equal((await fetch(`${baseUrl}/admin/esp32/rollout${caminho}`, { method: "POST" })).status, 401);
+  }
   assert.equal(otaRolloutService.ativo(), false, "tentativa não autorizada não pode criar distribuição");
 });
 
@@ -608,8 +615,8 @@ test("seleção inválida e início repetido são recusados", async () => {
   assert.equal((await authFetch("/admin/esp32/rollout/retomar", tokenSuper, { method: "POST" })).status, 409);
   assert.equal((await authFetch("/admin/esp32/rollout/cancelar", tokenSuper, { method: "POST" })).status, 409);
 
-  assert.equal((await iniciarRollout({ salas: ["rol-val-1"] })).status, 200);
-  assert.equal((await iniciarRollout({ salas: ["rol-val-1"] })).status, 409, "não pode haver duas distribuições ao mesmo tempo");
+  const concorrentes = await Promise.all([iniciarRollout({ salas: ["rol-val-1"] }), iniciarRollout({ salas: ["rol-val-1"] })]);
+  assert.deepEqual(concorrentes.map(r => r.status).sort(), [200, 409]);
   assert.equal(canario.ofertas().length, 1, "o pedido repetido não gera uma segunda oferta");
 
   await gravarEValidar(canario);

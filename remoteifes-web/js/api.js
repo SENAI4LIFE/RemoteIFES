@@ -107,11 +107,12 @@ const Api = {
 
   async logout() {
     if (!authToken) return;
-    try {
-      await chamar("/logout", { method: "POST", headers: headersComToken() });
-    } catch (err) {}
+    const headers = headersComToken();
     authToken = null;
     gravarTokenArmazenado(null);
+    try {
+      await chamar("/logout", { method: "POST", headers });
+    } catch (err) {}
   },
 
   async trocarMinhaSenha(novaSenha) {

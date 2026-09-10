@@ -12,7 +12,7 @@ function arquivosDoFrontend() {
     for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
       const alvo = path.join(dir, entrada.name);
       if (entrada.isDirectory()) varrer(alvo);
-      else if (/\.(html|js)$/.test(entrada.name)) encontrados.push(alvo);
+      else if (/\.(html|js|css)$/.test(entrada.name)) encontrados.push(alvo);
     }
   })(WEB_ROOT);
   return encontrados;
@@ -76,4 +76,10 @@ test("os ícones do sprite são decorativos e não substituem o nome acessível"
   const sprite = index.match(/<svg class="icone-sprite"[^>]*>/);
   assert.ok(sprite, "bloco do sprite ausente");
   assert.match(sprite[0], /aria-hidden="true"/, "o sprite precisa ficar fora da árvore de acessibilidade");
+});
+
+test("fontes do frontend não contêm controles de texto usados como glifos", () => {
+  for (const arquivo of arquivosDoFrontend()) {
+    assert.doesNotMatch(fs.readFileSync(arquivo, "utf8"), /[\x00-\x08\x0b\x0c\x0e-\x1f]/, path.relative(WEB_ROOT, arquivo));
+  }
 });
