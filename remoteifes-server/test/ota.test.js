@@ -198,7 +198,7 @@ test("progresso e resultado do dispositivo avançam o estado e concluem na recon
   ws.close();
 });
 
-test("dispositivo que reverte para a versão anterior marca a OTA como falha (rollback)", async () => {
+test("versão inesperada encerra a OTA sem comprovar rollback", async () => {
   novaSalaComMac("ota-sala-3", "AA:BB:CC:DD:0A:03");
   const token = await tokenSuperAdmin();
   const { ws } = await abrirDispositivo("ota-sala-3", "AA:BB:CC:DD:0A:03");
@@ -212,7 +212,8 @@ test("dispositivo que reverte para a versão anterior marca a OTA como falha (ro
 
   const estado = otaService.estadoDaSala("ota-sala-3");
   assert.equal(estado.fase, "falhou");
-  assert.match(estado.erro, /rollback|anterior/);
+  assert.equal(estado.causa, "indeterminado");
+  assert.match(estado.erro, /rollback não comprovado/);
 
   const respReofertar = await authFetch("/admin/esp32/ota-sala-3/ota", token, { method: "POST" });
   assert.equal(respReofertar.status, 200, "re-oferta é permitida após uma falha");

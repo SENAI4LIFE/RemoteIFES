@@ -37,12 +37,24 @@ test("atividade e continuar conectado renovam o prazo usando o ping autenticado"
 test("expiração automática revoga o token e volta ao login", async ({ appPage, loginComo, request }) => {
   await loginComo("user");
   const token = await appPage.evaluate(() => localStorage.getItem("remoteifes_token"));
-  await appPage.evaluate(() => {
-    IdleTimer.prazoServidorMs = IdleTimer._agoraServidor() - 1;
-    IdleTimer._checar();
+  let liberar;
+  const pendente = new Promise(resolve => { liberar = resolve; });
+  await appPage.route("**/logout", async rota => {
+    await pendente;
+    await rota.continue();
   });
-  await expect(appPage.locator("#screen-login")).toBeVisible();
-  await expect(appPage.locator("#mainApp")).toBeHidden();
+  try {
+    await appPage.evaluate(() => {
+      IdleTimer.prazoServidorMs = IdleTimer._agoraServidor() - 1;
+      IdleTimer._checar();
+    });
+    expect(await appPage.evaluate(() => Api.temTokenSalvo())).toBe(false);
+    await expect(appPage.locator("#screen-login")).toBeVisible();
+    await expect(appPage.locator("#mainApp")).toBeHidden();
+    await expect.poll(() => appPage.evaluate(() => ServerStatus.estaConectado())).toBe(true);
+  } finally {
+    liberar();
+  }
   await expect.poll(async () => (await request.get(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } })).status()).toBe(401);
 });
 

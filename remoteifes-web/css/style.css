@@ -3088,7 +3088,9 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
   border-radius: var(--radius-pill);
   background: var(--bg);
   color: var(--text-muted);
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .ota-rollout-estado.ok { background: var(--ifes-green-soft); border-color: var(--ifes-green); color: var(--ifes-green-dark); }
 .ota-rollout-estado.erro { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
@@ -4363,8 +4365,8 @@ body.mobile-app-open { overflow: hidden; }
   font-weight: 700;
 }
 .heatmap-summary::-webkit-details-marker { display: none; }
-.heatmap-summary::after { content: "B8"; margin-left: auto; color: var(--text-muted); }
-details[open] > .heatmap-summary::after { content: "BE"; }
+.heatmap-summary::after { content: ""; width: .5em; height: .5em; margin-left: auto; margin-right: .25em; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); flex-shrink: 0; }
+details[open] > .heatmap-summary::after { transform: rotate(45deg); }
 .heatmap-summary-titulo { font-size: calc(15px * var(--a11y-font-scale)); }
 .heatmap-summary-nota { font-weight: 400; color: var(--text-muted); font-size: calc(12px * var(--a11y-font-scale)); }
 .heatmap-toolbar {
