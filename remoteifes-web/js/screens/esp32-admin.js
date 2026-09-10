@@ -1,8 +1,16 @@
 const Esp32Admin = (() => {
   const listEl = document.getElementById("esp32DeviceList");
   const emptyEl = document.getElementById("esp32DeviceListEmpty");
+  const rolloutPainel = document.getElementById("otaRolloutPainel");
 
   let dispositivos = [];
+  let rollout = null;
+  let elegiveisRollout = [];
+  let limitesRollout = { loteMin: 1, loteMax: 5, lotePadrao: 2, maxSimultaneos: 2 };
+  let tamanhoLoteRollout = null;
+  let canarioRollout = null;
+  let assinaturaRollout = null;
+  const selecaoRollout = new Set();
   let salaObservada = null;
   let pararOuvirMensagens = null;
   let pararOuvirConexao = null;
@@ -43,7 +51,8 @@ const Esp32Admin = (() => {
       if (ota.fase === "falhou" && ota.erro) statusLinha += `: ${ota.erro}`;
     }
 
-    const podeAtualizar = conectado && versaoPublicada && !emAndamento && !atualizado;
+    const emRollout = salaNoRolloutAtivo(d.sala);
+    const podeAtualizar = conectado && versaoPublicada && !emAndamento && !atualizado && !emRollout;
     return `
       <div class="esp32-ota">
         <div class="esp32-ota-linha">
@@ -53,6 +62,7 @@ const Esp32Admin = (() => {
           <button type="button" class="btn btn-off ota-btn" ${podeAtualizar ? "" : "disabled"}>Atualizar firmware (OTA)</button>
         </div>
         ${statusLinha ? `<div class="esp32-ota-status ${ota.fase}">${escapeHtml(statusLinha)}</div>` : ""}
+        ${emRollout ? `<div class="esp32-ota-status">esta sala faz parte da distribuição em etapas em andamento</div>` : ""}
       </div>
     `;
   }
@@ -377,6 +387,265 @@ const Esp32Admin = (() => {
     return li;
   }
 
+  const ROLLOUT_ESTADO_ROTULOS = {
+    preflight: "verificando compatibilidade",
+    canario: "canário em atualização",
+    lotes: "atualizando em lotes",
+    pausado: "pausada",
+    concluido: "concluída",
+    interrompido: "interrompida",
+    cancelado: "cancelada",
+  };
+
+  const ROLLOUT_DISPOSITIVO_ROTULOS = {
+    pendente: "na fila",
+    atualizando: "atualizando",
+    reiniciando: "reiniciando para validar",
+    validado: "validado",
+    falhou: "falhou",
+    revertido: "revertido",
+    indeterminado: "sem confirmação",
+    ignorado: "não atualizado",
+    cancelado: "cancelado",
+  };
+
+  const ROLLOUT_CLASSES = {
+    validado: "ok",
+    falhou: "erro",
+    revertido: "erro",
+    indeterminado: "erro",
+    atualizando: "andamento",
+    reiniciando: "andamento",
+  };
+
+  function rolloutAtivo() {
+    return !!rollout && ["preflight", "canario", "lotes", "pausado"].includes(rollout.estado);
+  }
+
+  function etapaRollout() {
+    if (!rollout) return "";
+    if (rollout.estado === "pausado") return "pausada";
+    if (rollout.pausaSolicitada) return "pausando";
+    if (rollout.loteAtual === 0) return "canário";
+    const total = rollout.dispositivos.reduce((maior, d) => Math.max(maior, d.lote), 0);
+    return `lote ${rollout.loteAtual} de ${total}`;
+  }
+
+  function resumoRollout() {
+    const contagem = { validado: 0, falha: 0, naoAtualizado: 0, restante: 0 };
+    rollout.dispositivos.forEach((d) => {
+      if (d.estado === "validado") contagem.validado += 1;
+      else if (["falhou", "revertido", "indeterminado"].includes(d.estado)) contagem.falha += 1;
+      else if (["ignorado", "cancelado"].includes(d.estado)) contagem.naoAtualizado += 1;
+      else contagem.restante += 1;
+    });
+    return `${contagem.validado} validado(s) · ${contagem.falha} com falha · ${contagem.naoAtualizado} não atualizado(s) · ${contagem.restante} restante(s)`;
+  }
+
+  function renderLinhasRollout() {
+    return rollout.dispositivos
+      .map((d) => {
+        const etapa = d.lote === 0 ? "canário" : `lote ${d.lote}`;
+        const classe = ROLLOUT_CLASSES[d.estado] || "neutro";
+        return `
+          <li class="ota-rollout-item">
+            <span class="ota-rollout-sala">${escapeHtml(d.nome)} <span class="room-sub">(${escapeHtml(d.sala)})</span></span>
+            <span class="ota-rollout-etapa">${etapa}</span>
+            <span class="ota-rollout-estado ${classe}">${escapeHtml(ROLLOUT_DISPOSITIVO_ROTULOS[d.estado] || d.estado)}</span>
+            ${d.motivo ? `<span class="ota-rollout-motivo">${escapeHtml(d.motivo)}</span>` : ""}
+          </li>
+        `;
+      })
+      .join("");
+  }
+
+  function renderRolloutAtivo() {
+    const pausada = rollout.estado === "pausado" || rollout.pausaSolicitada;
+    const rotulo = rollout.estado !== "pausado" && rollout.pausaSolicitada
+      ? "pausando ao terminar o que já começou"
+      : ROLLOUT_ESTADO_ROTULOS[rollout.estado] || rollout.estado;
+    return `
+      <div class="ota-rollout-cabecalho">
+        <h3>Distribuição do firmware ${escapeHtml(rollout.versao)}</h3>
+        <span class="esp32-conn-badge ${pausada ? "modo" : "on"}">${escapeHtml(rotulo)}</span>
+      </div>
+      <p class="ota-rollout-status" aria-live="polite">Etapa: ${escapeHtml(etapaRollout())} · ${escapeHtml(resumoRollout())}</p>
+      <ul class="ota-rollout-lista">${renderLinhasRollout()}</ul>
+      <div class="esp32-actions">
+        ${pausada
+          ? `<button type="button" class="btn btn-on rollout-retomar-btn">Retomar</button>`
+          : `<button type="button" class="btn btn-off rollout-pausar-btn">Pausar</button>`}
+        <button type="button" class="link-btn danger rollout-cancelar-btn">Cancelar o que não começou</button>
+      </div>
+    `;
+  }
+
+  function renderRolloutEncerrado() {
+    if (!rollout) return "";
+    const erro = rollout.estado !== "concluido";
+    return `
+      <div class="ota-rollout-encerrada ${erro ? "erro" : "ok"}">
+        <strong>Última distribuição (${escapeHtml(rollout.versao)}): ${escapeHtml(ROLLOUT_ESTADO_ROTULOS[rollout.estado] || rollout.estado)}</strong>
+        ${rollout.motivoParada ? `<div class="ota-rollout-motivo">${escapeHtml(rollout.motivoParada)}</div>` : ""}
+        <div class="hint">${escapeHtml(resumoRollout())}</div>
+        <ul class="ota-rollout-lista">${renderLinhasRollout()}</ul>
+      </div>
+    `;
+  }
+
+  function renderSelecaoRollout() {
+    if (!manifestoFirmware) {
+      return `<p class="hint">Publique um firmware no servidor para distribuir uma atualização em etapas.</p>`;
+    }
+    if (!elegiveisRollout.length) {
+      return `<p class="hint">Nenhum ESP32 com MAC cadastrado para distribuir.</p>`;
+    }
+    const opcoes = elegiveisRollout
+      .map((e) => {
+        const marcado = selecaoRollout.has(e.sala);
+        const detalhe = e.elegivel
+          ? `firmware ${escapeHtml(e.versaoDispositivo || "desconhecido")}`
+          : `${escapeHtml(e.versaoDispositivo || "desconhecido")} — ${escapeHtml(e.motivo)}`;
+        return `
+          <li class="ota-rollout-opcao ${e.elegivel ? "" : "inapto"}">
+            <label>
+              <input type="checkbox" value="${escapeHtml(e.sala)}" ${marcado ? "checked" : ""} ${e.elegivel ? "" : "disabled"}>
+              <span class="ota-rollout-sala">${escapeHtml(e.nome)} <span class="room-sub">(${escapeHtml(e.sala)})</span></span>
+              <span class="ota-rollout-motivo">${detalhe}</span>
+            </label>
+          </li>
+        `;
+      })
+      .join("");
+    const canarios = [...selecaoRollout]
+      .map((sala) => `<option value="${escapeHtml(sala)}"${sala === canarioRollout ? " selected" : ""}>${escapeHtml(sala)}</option>`)
+      .join("");
+    const lotes = [];
+    for (let n = limitesRollout.loteMin; n <= limitesRollout.loteMax; n += 1) {
+      lotes.push(`<option value="${n}"${n === tamanhoLoteRollout ? " selected" : ""}>${n}</option>`);
+    }
+    return `
+      <ul class="ota-rollout-opcoes">${opcoes}</ul>
+      <div class="ota-rollout-form">
+        <label>Canário
+          <select class="rollout-canario-sel" ${selecaoRollout.size ? "" : "disabled"}>${canarios || "<option>—</option>"}</select>
+        </label>
+        <label>Dispositivos por lote
+          <select class="rollout-lote-sel">${lotes.join("")}</select>
+        </label>
+        <button type="button" class="btn btn-on rollout-iniciar-btn" ${selecaoRollout.size ? "" : "disabled"}>Iniciar distribuição</button>
+      </div>
+    `;
+  }
+
+  function renderRollout() {
+    if (!rolloutPainel) return;
+    const assinatura = JSON.stringify([rollout, elegiveisRollout, [...selecaoRollout], canarioRollout, tamanhoLoteRollout, manifestoFirmware && manifestoFirmware.versao]);
+    if (assinatura === assinaturaRollout) return;
+    assinaturaRollout = assinatura;
+    const ativo = rolloutAtivo();
+    rolloutPainel.innerHTML = `
+      <div class="ota-rollout-topo">
+        <h3>Distribuição em etapas</h3>
+        <p class="hint">Atualiza vários ESP32 em ondas: um canário primeiro e, só depois de ele voltar validado, lotes limitados pelo mesmo teto de ${limitesRollout.maxSimultaneos} atualizações simultâneas. Uma falha no canário ou em um lote para a distribuição.</p>
+      </div>
+      ${ativo ? renderRolloutAtivo() : `${renderRolloutEncerrado()}${renderSelecaoRollout()}`}
+    `;
+
+    rolloutPainel.querySelectorAll(".ota-rollout-opcao input").forEach((entrada) => {
+      entrada.addEventListener("change", () => {
+        if (entrada.checked) selecaoRollout.add(entrada.value);
+        else selecaoRollout.delete(entrada.value);
+        if (!selecaoRollout.has(canarioRollout)) canarioRollout = [...selecaoRollout][0] || null;
+        renderRollout();
+      });
+    });
+
+    const canarioSel = rolloutPainel.querySelector(".rollout-canario-sel");
+    if (canarioSel) canarioSel.addEventListener("change", () => { canarioRollout = canarioSel.value; });
+
+    const loteSel = rolloutPainel.querySelector(".rollout-lote-sel");
+    if (loteSel) loteSel.addEventListener("change", () => { tamanhoLoteRollout = Number(loteSel.value); });
+
+    const iniciarBtn = rolloutPainel.querySelector(".rollout-iniciar-btn");
+    if (iniciarBtn) iniciarBtn.addEventListener("click", iniciarRollout);
+
+    const pausarBtn = rolloutPainel.querySelector(".rollout-pausar-btn");
+    if (pausarBtn) pausarBtn.addEventListener("click", () => comandarRollout("pausar", "não foi possível pausar"));
+
+    const retomarBtn = rolloutPainel.querySelector(".rollout-retomar-btn");
+    if (retomarBtn) retomarBtn.addEventListener("click", () => comandarRollout("retomar", "não foi possível retomar"));
+
+    const cancelarBtn = rolloutPainel.querySelector(".rollout-cancelar-btn");
+    if (cancelarBtn) cancelarBtn.addEventListener("click", async () => {
+      const ok = await Dialog.confirmar({
+        titulo: "Cancelar distribuição",
+        mensagem: "Cancelar os dispositivos que ainda não começaram? Quem já está gravando o firmware continua até terminar, porque interromper uma gravação é o que mais arrisca o equipamento.",
+        confirmarTexto: "Cancelar pendentes",
+        perigo: true,
+      });
+      if (!ok) return;
+      comandarRollout("cancelar", "não foi possível cancelar");
+    });
+  }
+
+  async function comandarRollout(acao, erroPadrao) {
+    const resp = await Api.comandarRolloutEsp32(acao);
+    if (!resp.ok) return Toast.erro(resp.erro || erroPadrao);
+    rollout = resp.rollout;
+    renderRollout();
+  }
+
+  async function iniciarRollout() {
+    const salas = elegiveisRollout.filter((e) => selecaoRollout.has(e.sala)).map((e) => e.sala);
+    if (!salas.length) return;
+    const ok = await Dialog.confirmar({
+      titulo: "Iniciar distribuição em etapas",
+      mensagem: `Distribuir o firmware ${manifestoFirmware.versao} para ${salas.length} dispositivo(s)? O canário ${canarioRollout || salas[0]} é atualizado sozinho e os lotes só começam depois que ele reconectar com a versão nova.`,
+      confirmarTexto: "Iniciar distribuição",
+    });
+    if (!ok) return;
+    const resp = await Api.iniciarRolloutEsp32({ salas, canario: canarioRollout || salas[0], tamanhoLote: tamanhoLoteRollout });
+    if (!resp.ok) return Toast.erro(resp.erro || "não foi possível iniciar a distribuição");
+    rollout = resp.rollout;
+    selecaoRollout.clear();
+    canarioRollout = null;
+    renderRollout();
+  }
+
+  async function carregarRollout() {
+    const resp = await Api.rolloutEsp32();
+    if (!resp || !resp.ok) return;
+    rollout = resp.rollout;
+    elegiveisRollout = Array.isArray(resp.elegiveis) ? resp.elegiveis : [];
+    limitesRollout = resp.limites || limitesRollout;
+    if (!rolloutAtivo()) {
+      const aptas = new Set(elegiveisRollout.filter((e) => e.elegivel).map((e) => e.sala));
+      [...selecaoRollout].forEach((sala) => {
+        if (!aptas.has(sala)) selecaoRollout.delete(sala);
+      });
+      if (!selecaoRollout.has(canarioRollout)) canarioRollout = [...selecaoRollout][0] || null;
+    }
+    if (tamanhoLoteRollout === null) tamanhoLoteRollout = limitesRollout.lotePadrao;
+  }
+
+  function aplicarRolloutWs(proximo) {
+    const encerrou = rolloutAtivo() && proximo && !["preflight", "canario", "lotes", "pausado"].includes(proximo.estado);
+    rollout = proximo;
+    renderRollout();
+    render();
+    if (encerrou) {
+      Toast.aviso(`distribuição ${ROLLOUT_ESTADO_ROTULOS[proximo.estado] || proximo.estado}`);
+      carregarRollout().then(renderRollout);
+    }
+  }
+
+  function salaNoRolloutAtivo(sala) {
+    if (!rolloutAtivo()) return false;
+    const item = rollout.dispositivos.find((d) => d.sala === sala);
+    return !!item && ["pendente", "atualizando", "reiniciando"].includes(item.estado);
+  }
+
   function render() {
     listEl.innerHTML = "";
     if (dispositivos.length === 0) {
@@ -421,6 +690,8 @@ const Esp32Admin = (() => {
       aplicarCapturaDispositivo(msg.sala, msg.captura);
     } else if (msg.tipo === "dispositivo_ota") {
       aplicarOtaDispositivo(msg.sala, msg.ota);
+    } else if (msg.tipo === "dispositivo_rollout") {
+      aplicarRolloutWs(msg.rollout);
     } else if (msg.tipo === "dispositivo_erro") {
       Toast.erro(msg.mensagem || "erro reportado pelo dispositivo");
     }
@@ -445,8 +716,10 @@ const Esp32Admin = (() => {
     carregando = true;
     try {
       await carregarFirmware();
+      await carregarRollout();
       dispositivos = await Api.listarDispositivosEsp32();
       if (!Array.isArray(dispositivos)) dispositivos = [];
+      renderRollout();
       render();
       observarTodasAsSalas();
     } finally {

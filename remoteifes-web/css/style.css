@@ -3020,6 +3020,107 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
 .esp32-capture-hex { font-family: monospace; color: var(--text-muted); }
 .esp32-capture-item .link-btn { flex: 0 0 auto; }
 
+.ota-rollout {
+  margin-bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ota-rollout h3 {
+  margin: 0;
+  font-size: 1.02em;
+}
+.ota-rollout-topo { display: flex; flex-direction: column; gap: var(--space-1); }
+.ota-rollout-topo .hint { margin: 0; }
+.ota-rollout-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ota-rollout-status {
+  margin: 0;
+  font-size: 0.92em;
+  color: var(--text-muted);
+}
+.ota-rollout-lista,
+.ota-rollout-opcoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.ota-rollout-item,
+.ota-rollout-opcao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.92em;
+}
+.ota-rollout-opcao label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  width: 100%;
+  min-height: var(--tap-min-sm);
+  cursor: pointer;
+}
+.ota-rollout-opcao.inapto label { cursor: not-allowed; opacity: 0.75; }
+.ota-rollout-opcao input { flex: none; width: 20px; height: 20px; margin: 0; }
+.ota-rollout-sala { flex: 1 1 200px; min-width: 0; font-weight: 600; }
+.ota-rollout-etapa { color: var(--text-muted); }
+.ota-rollout-motivo {
+  flex: 1 1 100%;
+  color: var(--text-muted);
+  font-size: 0.94em;
+}
+.ota-rollout-opcao .ota-rollout-motivo { flex: 0 1 auto; text-align: right; }
+.ota-rollout-estado {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ota-rollout-estado.ok { background: var(--ifes-green-soft); border-color: var(--ifes-green); color: var(--ifes-green-dark); }
+.ota-rollout-estado.erro { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.ota-rollout-estado.andamento { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.ota-rollout-encerrada {
+  border-left: 3px solid var(--border);
+  padding-left: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.ota-rollout-encerrada.erro { border-left-color: var(--danger); }
+.ota-rollout-encerrada.ok { border-left-color: var(--ifes-green); }
+.ota-rollout-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.ota-rollout-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.9em;
+}
+.ota-rollout-form select { min-height: var(--tap-min-sm); padding: var(--space-1) var(--space-2); }
+body.a11y-high-contrast .ota-rollout-estado { background: #000000; border-color: currentColor; color: #ffffff; }
+body.a11y-high-contrast .ota-rollout-estado.ok { color: #00d26a; }
+body.a11y-high-contrast .ota-rollout-estado.erro { color: #ff9d9d; }
+body.a11y-high-contrast .ota-rollout-estado.andamento { color: #ffe000; }
+body.a11y-high-contrast .ota-rollout-encerrada.erro { border-left-color: #ff9d9d; }
+
 .esp32-empty {
   font-size: calc(13px * var(--a11y-font-scale));
   color: var(--text-muted);

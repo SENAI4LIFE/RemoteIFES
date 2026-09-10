@@ -40,6 +40,7 @@ const superHelp = {
   config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Impacto global", texto: "Registre valores anteriores; salve só a mudança planejada e valide sessões, rede e dispositivos." }] },
   esp32: { titulo: "Como usar: Dispositivos > Firmware / OTA", itens: [
     { titulo: "Manutenção", texto: "Use configuração/IR em uma sala por vez e retorne a placa ao modo de operação." },
+    { titulo: "Distribuição em etapas", texto: "Atualize vários ESP32 com canário e lotes; ela para sozinha na primeira falha real e só conta como validado quem reconecta na versão nova." },
     { titulo: "Segurança", texto: "OTA, credenciais e Resetar Wi-Fi exigem plano de validação ou acesso físico." },
   ] },
   monitoramento: { titulo: "Como usar: Status > Sistema", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },

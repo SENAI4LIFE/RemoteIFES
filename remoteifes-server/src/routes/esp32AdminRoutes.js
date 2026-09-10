@@ -3,6 +3,7 @@ const { exigirLogin, exigirAdmin, exigirSuperAdmin } = require("../middlewares/a
 const salasService = require("../services/salasService");
 const deviceHub = require("../services/deviceHub");
 const otaService = require("../services/otaService");
+const otaRolloutService = require("../services/otaRolloutService");
 const credenciaisService = require("../services/esp32CredenciaisService");
 const auditoriaService = require("../services/auditoriaService");
 const logger = require("../utils/logger");
@@ -62,6 +63,56 @@ router.get("/admin/esp32/dispositivos", (req, res) => {
 
 router.get("/admin/esp32/firmware", (req, res) => {
   res.json({ ok: true, manifesto: otaService.lerManifesto() });
+});
+
+function responderRollout(req, res, executar, tipo, descrever) {
+  try {
+    const rollout = executar();
+    auditar({ tipo, ator: req.usuario, alvoTipo: "esp32", alvoId: rollout.id, alvoRotulo: rollout.versao, descricao: descrever(rollout) });
+    res.json({ ok: true, rollout });
+  } catch (err) {
+    res.status(err.conflito ? 409 : 400).json({ ok: false, erro: err.message });
+  }
+}
+
+router.get("/admin/esp32/rollout", (req, res) => {
+  const manifesto = otaService.lerManifesto();
+  res.json({
+    ok: true,
+    manifesto,
+    rollout: otaRolloutService.atual(),
+    limites: {
+      loteMin: otaRolloutService.LOTE_MIN,
+      loteMax: otaRolloutService.LOTE_MAX,
+      lotePadrao: otaRolloutService.LOTE_PADRAO,
+      maxDispositivos: otaRolloutService.MAX_DISPOSITIVOS,
+      maxSimultaneos: otaService.MAX_SIMULTANEOS,
+    },
+    elegiveis: salasService.listar().filter((s) => s.mac).map((s) => otaRolloutService.elegibilidade(s, manifesto)),
+  });
+});
+
+router.post("/admin/esp32/rollout", (req, res) => {
+  const { salas, canario, tamanhoLote } = req.body || {};
+  responderRollout(
+    req,
+    res,
+    () => otaRolloutService.iniciar({ salas, canario, tamanhoLote, ator: req.usuario }),
+    "esp32_rollout_iniciado",
+    (r) => `Distribuicao do firmware ${r.versao} iniciada em ${r.dispositivos.length} dispositivo(s)`
+  );
+});
+
+router.post("/admin/esp32/rollout/pausar", (req, res) => {
+  responderRollout(req, res, () => otaRolloutService.pausar(), "esp32_rollout_pausado", (r) => `Distribuicao do firmware ${r.versao} pausada`);
+});
+
+router.post("/admin/esp32/rollout/retomar", (req, res) => {
+  responderRollout(req, res, () => otaRolloutService.retomar(), "esp32_rollout_retomado", (r) => `Distribuicao do firmware ${r.versao} retomada`);
+});
+
+router.post("/admin/esp32/rollout/cancelar", (req, res) => {
+  responderRollout(req, res, () => otaRolloutService.cancelar(), "esp32_rollout_cancelado", (r) => `Distribuicao do firmware ${r.versao} cancelada`);
 });
 
 router.post("/admin/esp32/:sala/ota", exigirSalaCadastrada, (req, res) => {
