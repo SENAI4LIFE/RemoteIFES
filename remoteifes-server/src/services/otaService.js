@@ -47,8 +47,10 @@ function persistirEstados() {
     const temporario = `${ARQUIVO_ESTADOS}.tmp`;
     fs.writeFileSync(temporario, JSON.stringify(Object.fromEntries(estados), null, 2), { mode: 0o600 });
     fs.renameSync(temporario, ARQUIVO_ESTADOS);
+    return true;
   } catch (erro) {
     logger.warn("ota-estados-persistir-falhou", { mensagem: erro.message });
+    return false;
   }
 }
 
@@ -244,11 +246,15 @@ function emitir(sala) {
   deviceHub.eventos.emit("ota", { sala, estado: estadoDaSala(sala) });
 }
 
-function definirEstado(sala, patch) {
+function definirEstado(sala, patch, exigirPersistencia = false) {
   const anterior = estados.get(sala) || {};
   const proximo = { ...anterior, ...patch, atualizadoEm: new Date().toISOString() };
   estados.set(sala, proximo);
-  persistirEstados();
+  if (!persistirEstados() && exigirPersistencia) {
+    if (anterior.fase) estados.set(sala, anterior);
+    else estados.delete(sala);
+    throw erroConflito("não foi possível persistir a atualização; nenhuma oferta enviada");
+  }
   if (proximo.fase === "falhou" && anterior.fase !== "falhou") {
     try {
       require("./monitoramentoService").registrar("otaFalha", { sala, erro: proximo.erro });
@@ -258,11 +264,21 @@ function definirEstado(sala, patch) {
   return proximo;
 }
 
-function ofertar(sala) {
+function identidadeDaSala(sala) {
+  const linha = require("./salasService").buscar(sala);
+  if (!linha || !linha.mac) return null;
+  const credencial = require("./esp32CredenciaisService").estado(sala);
+  return crypto.createHash("sha256").update(JSON.stringify([linha.mac.toUpperCase(), credencial.deviceId || null, !!credencial.revogado])).digest("hex");
+}
+
+function ofertar(sala, { rolloutId, tentativa, sha256 } = {}) {
+  const reserva = require("./otaRolloutService").reserva(sala);
+  if (reserva && reserva !== rolloutId) throw erroConflito("dispositivo reservado pela distribuição em andamento");
   const manifesto = lerManifesto();
   if (!manifesto) {
     throw erroConflito("nenhum firmware publicado — publique um com `npm run firmware` antes de ofertar a atualização");
   }
+  if (sha256 && manifesto.sha256 !== sha256) throw erroConflito("o firmware publicado mudou durante a distribuição");
   const deviceHub = require("./deviceHub");
   if (!deviceHub.dispositivoConectado(sala)) {
     throw erroConflito("dispositivo não está conectado no momento");
@@ -281,6 +297,9 @@ function ofertar(sala) {
   }
   definirEstado(sala, {
     fase: "ofertado",
+    tentativa: tentativa || crypto.randomUUID(),
+    identidade: identidadeDaSala(sala),
+    sha256: manifesto.sha256,
     versao: manifesto.versao,
     versaoAnterior: versaoDispositivo,
     total: manifesto.tamanho,
@@ -288,7 +307,7 @@ function ofertar(sala) {
     erro: null,
     causa: null,
     iniciadoEm: new Date().toISOString(),
-  });
+  }, true);
 
   const enviado = deviceHub.enviarComando(sala, {
     tipo: "ota_oferta",
@@ -314,6 +333,7 @@ function registrarProgresso(sala, msg) {
   const recebidoValido = Number.isFinite(recebido)
     ? Math.min(estado.total, Math.max(estado.recebido || 0, recebido))
     : estado.recebido;
+  if (recebidoValido <= (estado.recebido || 0)) return;
   definirEstado(sala, {
     fase: "baixando",
     recebido: recebidoValido,
@@ -350,6 +370,7 @@ function aoDesconectarDispositivo(sala) {
 function aoReconectarDispositivo(sala, fwVersao) {
   const estado = estados.get(sala);
   if (!estado || estado.fase === "concluido" || estado.fase === "ocioso") return;
+  if (estado.identidade && estado.identidade !== identidadeDaSala(sala)) return;
   if (fwVersao && estado.versao && fwVersao === estado.versao) {
     definirEstado(sala, { fase: "concluido", recebido: estado.total, erro: null, causa: null });
     logger.info("ota-concluida", { sala, versao: estado.versao });
@@ -357,10 +378,10 @@ function aoReconectarDispositivo(sala, fwVersao) {
     return;
   }
   if (estado.fase !== "gravado" && estado.fase !== "reiniciando") return;
-  const erro = "o dispositivo voltou com a versão anterior após a atualização (rollback automático)";
-  definirEstado(sala, { fase: "falhou", erro, causa: "rollback" });
-  logger.warn("ota-rollback", { sala, versaoAlvo: estado.versao, versaoAtual: fwVersao || null });
-  notificarConcluido(sala, false, `A atualização da sala ${sala} não foi validada e o dispositivo reverteu para a versão anterior.`);
+  const erro = "o dispositivo reportou uma versão inesperada após a gravação; rollback não comprovado";
+  definirEstado(sala, { fase: "falhou", erro, causa: "indeterminado" });
+  logger.warn("ota-versao-inesperada", { sala, versaoAlvo: estado.versao, versaoAtual: fwVersao || null });
+  notificarConcluido(sala, false, `A atualização da sala ${sala} não foi confirmada: versão inesperada após a gravação.`);
 }
 
 function notificarConcluido(sala, sucesso, mensagem) {
@@ -414,6 +435,7 @@ module.exports = {
   ofertar,
   vagasDisponiveis,
   avaliarElegibilidade,
+  identidadeDaSala,
   registrarProgresso,
   registrarResultado,
   aoDesconectarDispositivo,

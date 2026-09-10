@@ -79,10 +79,13 @@ function trocarBlocoRede(xml, linhas, original) {
 }
 
 function definirScheme(xml, valor, original) {
-  if (!RE_SCHEME.test(xml)) {
-    abortar('não encontrei <preference name="scheme" /> na plataforma Android de config.xml.', original);
+  const plataformas = [...xml.matchAll(/<platform name="android">[\s\S]*?<\/platform>/g)];
+  if (plataformas.length !== 1) abortar("esperava uma única plataforma Android em config.xml.", original);
+  const android = plataformas[0][0];
+  if ((android.match(/name="scheme"/g) || []).length !== 1 || !RE_SCHEME.test(android)) {
+    abortar('esperava uma única <preference name="scheme" /> válida na plataforma Android de config.xml.', original);
   }
-  return xml.replace(RE_SCHEME, `$1${valor}$2`);
+  return xml.replace(android, android.replace(RE_SCHEME, `$1${valor}$2`));
 }
 
 function definirCleartext(xml, ativo, original) {

@@ -57,7 +57,7 @@ test("a distribuição lista o dispositivo apto, roda o canário e conclui com a
   await expect(page.locator(`.esp32-device-card[data-sala="${SALA_ONLINE}"] .esp32-ota`)).toContainText("4.1.0");
 });
 
-test("um canário que reverte interrompe a distribuição e explica o motivo", async ({ page, context, request }) => {
+test("canário com versão inesperada interrompe sem alegar rollback", async ({ page, context, request }) => {
   await publicarFirmwareFixture(request, "4.1.0");
   await request.post(`${API_URL}/__e2e/comportamento-ota/rollback`);
   await abrirFirmware(page, context);
@@ -71,5 +71,14 @@ test("um canário que reverte interrompe a distribuição e explica o motivo", a
 
   await expect(painel.locator(".ota-rollout-encerrada strong")).toContainText("interrompida", { timeout: 30_000 });
   await expect(painel.locator(".ota-rollout-encerrada")).toContainText("canário não passou na validação");
-  await expect(painel.locator(".ota-rollout-estado")).toHaveText("revertido");
+  await expect(painel.locator(".ota-rollout-estado")).toHaveText("sem confirmação");
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty("--a11y-font-scale", "2");
+    document.documentElement.style.setProperty("--a11y-letter-spacing", "0.25em");
+    document.documentElement.style.setProperty("--a11y-line-height", "3");
+  });
+  for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 820, height: 1180 }]) {
+    await page.setViewportSize(viewport);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  }
 });

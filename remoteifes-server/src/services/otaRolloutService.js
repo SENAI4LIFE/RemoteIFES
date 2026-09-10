@@ -20,9 +20,9 @@ const TERMINAIS = new Set(["validado", "falhou", "revertido", "indeterminado", "
 const CODIGOS_TEMPORARIOS = new Set(["desconectado", "ota-em-andamento", "modo-config"]);
 
 const ROTULOS_FALHA = {
-  falhou: "falhou antes de gravar",
+  falhou: "falha na atualização",
   revertido: "reverteu para a versão anterior",
-  indeterminado: "não voltou a se conectar depois de gravar",
+  indeterminado: "atualização sem confirmação",
 };
 
 let rollout = null;
@@ -40,8 +40,10 @@ function persistir() {
     const temporario = `${ARQUIVO_ROLLOUT}.tmp`;
     fs.writeFileSync(temporario, JSON.stringify(rollout, null, 2), { mode: 0o600 });
     fs.renameSync(temporario, ARQUIVO_ROLLOUT);
+    return true;
   } catch (erro) {
     logger.warn("ota-rollout-persistir-falhou", { mensagem: erro.message });
+    return false;
   }
 }
 
@@ -55,8 +57,9 @@ function emitir() {
 
 function registrar() {
   rollout.atualizadoEm = agora();
-  persistir();
-  emitir();
+  const salvo = persistir();
+  if (salvo) emitir();
+  return salvo;
 }
 
 function ativo() {
@@ -79,7 +82,7 @@ function marcar(dispositivo, estado, motivo) {
   dispositivo.estado = estado;
   dispositivo.motivo = motivo || null;
   if (TERMINAIS.has(estado)) dispositivo.finalizadoEm = agora();
-  registrar();
+  return registrar();
 }
 
 function erroConflito(mensagem) {
@@ -101,6 +104,10 @@ function contarPorEstado() {
 }
 
 function iniciarDispositivo(dispositivo, manifesto) {
+  if (!dispositivo.identidade || dispositivo.identidade !== otaService.identidadeDaSala(dispositivo.sala)) {
+    marcar(dispositivo, "ignorado", "o vínculo do dispositivo selecionado mudou");
+    return "ignorado";
+  }
   const elegibilidade = otaService.avaliarElegibilidade(dispositivo.sala, manifesto);
   if (!elegibilidade.elegivel) {
     if (!CODIGOS_TEMPORARIOS.has(elegibilidade.codigo)) {
@@ -122,9 +129,13 @@ function iniciarDispositivo(dispositivo, manifesto) {
   dispositivo.aguardandoDesde = null;
   dispositivo.versaoAnterior = elegibilidade.versaoDispositivo;
   dispositivo.iniciadoEm = agora();
-  marcar(dispositivo, "atualizando", null);
+  dispositivo.tentativa = crypto.randomUUID();
+  if (!marcar(dispositivo, "atualizando", null)) {
+    marcar(dispositivo, "indeterminado", "não foi possível persistir a intenção de atualização; nenhuma oferta enviada");
+    return "ignorado";
+  }
   try {
-    otaService.ofertar(dispositivo.sala);
+    otaService.ofertar(dispositivo.sala, { rolloutId: rollout.id, tentativa: dispositivo.tentativa, sha256: rollout.sha256 });
   } catch (erro) {
     dispositivo.iniciadoEm = null;
     if (erro.limite) {
@@ -171,6 +182,10 @@ function encerrar(estado, motivo) {
 
 function passo() {
   while (ativo()) {
+    if (!persistir()) return;
+    for (const d of rollout.dispositivos.filter((d) => EM_VOO.has(d.estado))) {
+      aplicarOta(d, otaService.estadoDaSala(d.sala));
+    }
     const lote = doLote(rollout.loteAtual);
     const emVoo = lote.filter((d) => EM_VOO.has(d.estado)).length;
 
@@ -188,10 +203,18 @@ function passo() {
       return;
     }
 
+    const falhas = lote.filter((d) => FALHAS.has(d.estado));
+    if (falhas.length) {
+      if (emVoo > 0) return;
+      encerrar("interrompido", motivoDoLote(falhas));
+      return;
+    }
+
     const pendentes = lote.filter((d) => d.estado === "pendente");
     if (pendentes.length) {
       const manifesto = otaService.lerManifesto();
       if (!manifesto || manifesto.sha256 !== rollout.sha256 || manifesto.versao !== rollout.versao) {
+        if (emVoo > 0) return;
         encerrar("interrompido", "o firmware publicado mudou durante a distribuição");
         return;
       }
@@ -214,11 +237,6 @@ function passo() {
     }
     if (emVoo > 0) return;
 
-    const falhas = lote.filter((d) => FALHAS.has(d.estado));
-    if (falhas.length) {
-      encerrar("interrompido", motivoDoLote(falhas));
-      return;
-    }
     if (rollout.loteAtual === 0 && !lote.some((d) => d.estado === "validado")) {
       const canario = lote[0];
       encerrar("interrompido", `o canário ${canario ? canario.sala : ""} não foi atualizado: ${canario && canario.motivo ? canario.motivo : "sem resultado"}`);
@@ -256,13 +274,17 @@ function estadoDeDispositivo(ota) {
   if (ota.fase === "gravado" || ota.fase === "reiniciando") return { estado: "reiniciando", motivo: null };
   if (ota.fase === "concluido") return { estado: "validado", motivo: null };
   if (ota.fase !== "falhou") return null;
-  if (ota.causa === "rollback") return { estado: "revertido", motivo: ota.erro || null };
+  if (ota.causa === "rollback" || ota.causa === "indeterminado") return { estado: "indeterminado", motivo: ota.erro || null };
   if (ota.causa === "reinicio") return { estado: "indeterminado", motivo: ota.erro || null };
   return { estado: "falhou", motivo: ota.erro || null };
 }
 
 function aplicarOta(dispositivo, ota) {
   if (TERMINAIS.has(dispositivo.estado) || dispositivo.estado === "pendente") return;
+  if (!corresponde(dispositivo, ota) || (dispositivo.identidade && dispositivo.identidade !== otaService.identidadeDaSala(dispositivo.sala))) {
+    marcar(dispositivo, "indeterminado", "registro da tentativa ou vínculo do dispositivo indisponível ou alterado");
+    return;
+  }
   const proximo = estadoDeDispositivo(ota);
   if (!proximo || proximo.estado === dispositivo.estado) return;
   marcar(dispositivo, proximo.estado, proximo.motivo);
@@ -297,38 +319,37 @@ function carregar() {
     return;
   }
   if (!bruto || typeof bruto !== "object" || typeof bruto.id !== "string" || typeof bruto.estado !== "string") return;
-  if (!Array.isArray(bruto.dispositivos) || !bruto.dispositivos.every((d) => d && typeof d.sala === "string" && typeof d.estado === "string")) return;
+  if (!Number.isInteger(bruto.loteAtual) || bruto.loteAtual < 0 || typeof bruto.versao !== "string" || !/^[a-f0-9]{64}$/.test(bruto.sha256 || "")) return;
+  if (!Array.isArray(bruto.dispositivos) || !bruto.dispositivos.length || bruto.dispositivos.length > MAX_DISPOSITIVOS) return;
+  if (!bruto.dispositivos.every((d) => d && typeof d.sala === "string" && d.sala && Number.isInteger(d.lote) && d.lote >= 0 && (d.estado === "pendente" || EM_VOO.has(d.estado) || TERMINAIS.has(d.estado)))) return;
+  if (new Set(bruto.dispositivos.map((d) => d.sala)).size !== bruto.dispositivos.length || !bruto.dispositivos.some((d) => d.lote === bruto.loteAtual)) return;
+  for (const d of bruto.dispositivos) {
+    if (d.estado === "revertido") {
+      d.estado = "indeterminado";
+      d.motivo = "registro antigo de versão inesperada; rollback não comprovado";
+    }
+  }
   rollout = bruto;
+}
+
+function corresponde(dispositivo, ota) {
+  if (!ota || ota.fase === "ocioso" || ota.versao !== rollout.versao) return false;
+  if (dispositivo.tentativa) return ota.tentativa === dispositivo.tentativa;
+  return !!dispositivo.ofertadoEm && !!ota.iniciadoEm && ota.iniciadoEm >= dispositivo.iniciadoEm;
 }
 
 function reconciliar() {
   if (!ativo()) return;
-  let mudou = false;
   for (const dispositivo of rollout.dispositivos) {
-    if (TERMINAIS.has(dispositivo.estado) || dispositivo.estado === "pendente") continue;
+    if (!EM_VOO.has(dispositivo.estado)) continue;
     const ota = otaService.estadoDaSala(dispositivo.sala);
-    if (ota.fase === "ocioso") {
-      if (dispositivo.ofertadoEm) {
-        dispositivo.estado = "indeterminado";
-        dispositivo.motivo = "o servidor reiniciou sem registro do desfecho desta atualização";
-        dispositivo.finalizadoEm = agora();
-      } else {
-        dispositivo.estado = "pendente";
-        dispositivo.iniciadoEm = null;
-      }
-      mudou = true;
+    if (!corresponde(dispositivo, ota)) {
+      marcar(dispositivo, "indeterminado", "o servidor reiniciou sem registro inequívoco desta tentativa; oferta não será repetida");
       continue;
     }
     const proximo = estadoDeDispositivo(ota);
-    if (proximo && proximo.estado !== dispositivo.estado) {
-      dispositivo.estado = proximo.estado;
-      dispositivo.motivo = proximo.motivo;
-      if (TERMINAIS.has(proximo.estado)) dispositivo.finalizadoEm = agora();
-      mudou = true;
-    }
+    if (proximo && proximo.estado !== dispositivo.estado) marcar(dispositivo, proximo.estado, proximo.motivo);
   }
-  logger.info("ota-rollout-reconciliado", { rollout: rollout.id, estado: rollout.estado, ...contarPorEstado() });
-  if (mudou) registrar();
 }
 
 function validarSelecao(salas) {
@@ -371,6 +392,7 @@ function iniciar({ salas, canario, tamanhoLote, ator } = {}) {
 
   const ordenados = [linhas.find((l) => l.sala === salaCanario), ...linhas.filter((l) => l.sala !== salaCanario)];
 
+  const anterior = rollout;
   rollout = {
     id: `rol_${crypto.randomBytes(6).toString("hex")}`,
     versao: manifesto.versao,
@@ -391,6 +413,7 @@ function iniciar({ salas, canario, tamanhoLote, ator } = {}) {
       const numeroLote = indice === 0 ? 0 : Math.floor((indice - 1) / lote) + 1;
       return {
         sala: linha.sala,
+        identidade: otaService.identidadeDaSala(linha.sala),
         nome: linha.nome || linha.sala,
         lote: numeroLote,
         etapa: numeroLote === 0 ? "canario" : "lote",
@@ -405,7 +428,10 @@ function iniciar({ salas, canario, tamanhoLote, ator } = {}) {
     }),
   };
   rollout.estado = "canario";
-  registrar();
+  if (!registrar()) {
+    rollout = anterior;
+    throw erroConflito("não foi possível persistir a distribuição; nenhuma oferta enviada");
+  }
   logger.info("ota-rollout-iniciado", {
     rollout: rollout.id,
     versao: rollout.versao,
@@ -417,12 +443,19 @@ function iniciar({ salas, canario, tamanhoLote, ator } = {}) {
   return atual();
 }
 
+function registrarControle(anterior) {
+  if (registrar()) return;
+  rollout = anterior;
+  throw erroConflito("não foi possível persistir o controle da distribuição");
+}
+
 function pausar() {
   if (!ativo()) throw erroConflito("não há distribuição de firmware em andamento");
   if (rollout.cancelamentoSolicitado) throw erroConflito("a distribuição já está sendo cancelada");
   if (!rollout.pausaSolicitada) {
+    const anterior = atual();
     rollout.pausaSolicitada = true;
-    registrar();
+    registrarControle(anterior);
     avancar();
   }
   return atual();
@@ -430,15 +463,17 @@ function pausar() {
 
 function retomar() {
   if (!ativo() || (rollout.estado !== "pausado" && !rollout.pausaSolicitada)) throw erroConflito("não há distribuição pausada");
+  const anterior = atual();
   rollout.pausaSolicitada = false;
   rollout.estado = rollout.loteAtual === 0 ? "canario" : "lotes";
-  registrar();
+  registrarControle(anterior);
   avancar();
   return atual();
 }
 
 function cancelar() {
   if (!ativo()) throw erroConflito("não há distribuição de firmware em andamento");
+  const anterior = atual();
   rollout.cancelamentoSolicitado = true;
   rollout.pausaSolicitada = false;
   rollout.motivoParada = "cancelada pelo superadministrador";
@@ -449,7 +484,7 @@ function cancelar() {
       dispositivo.finalizadoEm = agora();
     }
   }
-  registrar();
+  registrarControle(anterior);
   avancar();
   return atual();
 }
@@ -457,6 +492,10 @@ function cancelar() {
 function tick() {
   if (!ativo()) return;
   avancar();
+}
+
+function reserva(sala) {
+  return ativo() && rollout.dispositivos.some((d) => d.sala === sala) ? rollout.id : null;
 }
 
 function elegibilidade(salaRow, manifesto) {
@@ -484,4 +523,5 @@ module.exports = {
   ativo,
   tick,
   elegibilidade,
+  reserva,
 };

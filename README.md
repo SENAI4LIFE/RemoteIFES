@@ -760,7 +760,7 @@ O fluxo é: seleção → verificação de compatibilidade → canário → lote
 - **Retomar** continua do ponto em que parou, no lote seguinte.
 - **Cancelar** marca como cancelado apenas o que ainda não começou; o que estiver em andamento é acompanhado até o desfecho e registrado normalmente.
 
-**Estado de cada dispositivo:** `na fila`, `atualizando`, `reiniciando para validar`, `validado`, `falhou` (erro antes de gravar), `revertido` (voltou reportando a versão anterior), `sem confirmação` (gravou e não voltou a se conectar), `não atualizado` (inapto, offline além da espera) e `cancelado`. Só `validado` conta como sucesso, e ele exige a reconexão com a versão esperada: download concluído ou gravação confirmada não bastam.
+**Estado de cada dispositivo:** `na fila`, `atualizando`, `reiniciando para validar`, `validado`, `falhou` (erro reportado, conexão perdida ou timeout durante a transferência), `sem confirmação` (retorno ausente ou versão inesperada, ou registro da tentativa indisponível; não comprova rollback), `não atualizado` (inapto, offline além da espera) e `cancelado`. Só `validado` conta como sucesso, e ele exige a reconexão com a versão esperada: download concluído ou gravação confirmada não bastam.
 
 **Compatibilidade:** a distribuição não altera o protocolo do ESP32 e não exige firmware novo. Ela usa as mensagens que o firmware em campo já entende (`ota_oferta`, `ota_progresso`, `ota_resultado`) e a versão que o dispositivo já reporta em `telemetria`/`info`. Um servidor atualizado continua operando a frota existente sem regravar nada, e a OTA avulsa permanece como caminho de exceção.
 
