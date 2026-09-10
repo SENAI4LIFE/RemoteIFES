@@ -281,6 +281,7 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
         await expect(page.locator(`#${sub}Aba-${aba}`)).toBeVisible({ timeout: 15_000 });
       }
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await expect(page.locator(`#adminSub-${sub} [aria-busy="true"]`)).toHaveCount(0);
 
       const semOverflow = await semRolagemHorizontal(page);
       const ofensores = semOverflow ? [] : await page.evaluate(() => {
@@ -325,6 +326,9 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
         painel.querySelectorAll(".admin-inner-tab-btn:not(.hidden)").forEach((el) => {
           const r = el.getBoundingClientRect();
           if (r.width > 0 && el.scrollWidth > el.clientWidth + 1) achados.push(`aba interna cortada: ${el.dataset.aba}`);
+        });
+        painel.querySelectorAll(".mon-card h4, .status-chip").forEach((el) => {
+          if (el.scrollWidth > el.clientWidth + 1) achados.push(`status transborda: ${el.textContent.trim()}`);
         });
         return achados;
       }, sub);

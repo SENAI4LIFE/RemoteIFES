@@ -4081,6 +4081,7 @@ textarea {
   overflow-wrap: break-word;
 }
 .status-chip-dot { font-size: 0.9em; line-height: 1; }
+.status-chip-label { overflow-wrap: anywhere; }
 .status-chip.status-ok { background: var(--ifes-green-soft); color: var(--ifes-green-dark); border-color: #bfe2cc; }
 .status-chip.status-warn { background: var(--warn-soft); color: var(--warn); border-color: #ecd9a3; }
 .status-chip.status-err { background: var(--danger-soft); color: var(--danger); border-color: #f0c4c1; }
@@ -4089,7 +4090,7 @@ textarea {
 .status-chip.status-loading { background: #eef0ee; color: var(--text-muted); border-color: var(--border); }
 .a11y-high-contrast .status-chip { border-color: currentColor; }
 
-.mon-card h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-width: 0; overflow-wrap: break-word; }
+.mon-card h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
 .mon-erro {
   display: flex;
   align-items: center;
