@@ -13,7 +13,7 @@ const BLOCO_DEV = [
 function blocoCleartext(ativo) {
   return [
     '        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application" xmlns:android="http://schemas.android.com/apk/res/android">',
-    `            <application android:usesCleartextTraffic="${ativo ? "true" : "false"}" />`,
+    `            <application android:usesCleartextTraffic="${ativo ? "true" : "false"}" android:enableOnBackInvokedCallback="false" />`,
     "        </edit-config>",
   ].join("\n");
 }
@@ -33,6 +33,7 @@ const RE_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="app\/src\/main\/AndroidMa
 const RE_IOS_EDIT_CONFIG = /[ \t]*<edit-config\b[^>]*file="\*-Info\.plist"[\s\S]*?<\/edit-config>\r?\n?/;
 const RE_ANDROID_CLEARTEXT_INSERTION = /([ \t]*<preference name="android-minSdkVersion" value="24" \/>\r?\n(?:[ \t]*<preference name="AndroidWindowSplashScreenAnimatedIcon"[^>]*\/>\r?\n)?)/;
 const RE_IOS_PLATFORM = /([ \t]*<platform name="ios">\r?\n)/;
+const RE_SCHEME = /(<preference name="scheme" value=")(?:http|https)("\s*\/>)/;
 const RE_CLEARTEXT_ON = /usesCleartextTraffic\s*=\s*"true"/;
 const RE_CLEARTEXT_OFF = /usesCleartextTraffic\s*=\s*"false"/;
 
@@ -77,6 +78,13 @@ function trocarBlocoRede(xml, linhas, original) {
   return xml.replace(RE_BLOCO_REDE, (_todo, indent) => linhas.map((l) => `${indent}${l}${eol}`).join(""));
 }
 
+function definirScheme(xml, valor, original) {
+  if (!RE_SCHEME.test(xml)) {
+    abortar('não encontrei <preference name="scheme" /> na plataforma Android de config.xml.', original);
+  }
+  return xml.replace(RE_SCHEME, `$1${valor}$2`);
+}
+
 function definirCleartext(xml, ativo, original) {
   let saida = xml.replace(RE_EDIT_CONFIG, "").replace(RE_IOS_EDIT_CONFIG, "");
   const eol = xml.includes("\r\n") ? "\r\n" : "\n";
@@ -110,6 +118,7 @@ let xml = original;
 if (arg === "--dev") {
   xml = trocarBlocoRede(xml, BLOCO_DEV, original);
   xml = definirCleartext(xml, true, original);
+  xml = definirScheme(xml, "http", original);
   xml = preservarQuebraFinal(xml, original);
   if (!RE_CLEARTEXT_ON.test(xml)) abortar("falha ao reativar o cleartext HTTP no Android.", original);
   fs.writeFileSync(ARQUIVO, xml);
@@ -126,6 +135,7 @@ const blocoProd = [
 
 xml = trocarBlocoRede(xml, blocoProd, original);
 xml = definirCleartext(xml, cleartext, original);
+xml = definirScheme(xml, cleartext ? "http" : "https", original);
 xml = preservarQuebraFinal(xml, original);
 
 if (cleartext && !RE_CLEARTEXT_ON.test(xml)) {
@@ -136,6 +146,10 @@ if (!cleartext && RE_CLEARTEXT_ON.test(xml)) {
 }
 if (!cleartext && !RE_CLEARTEXT_OFF.test(xml)) {
   abortar("a origem é HTTPS mas o bloqueio explícito de cleartext não foi aplicado no Android.", original);
+}
+const schemeEsperado = cleartext ? "http" : "https";
+if (!new RegExp(`<preference name="scheme" value="${schemeEsperado}"`).test(xml)) {
+  abortar(`a página precisa carregar em ${schemeEsperado}://localhost para falar com um servidor ${schemeEsperado}, e o esquema não foi aplicado.`, original);
 }
 if (xml.includes('origin="*"') || xml.includes('href="*"') || xml.includes('href="http://*/*"') || xml.includes('href="https://*/*"')) {
   abortar("ainda há regras de rede curinga (*) em config.xml após o endurecimento.", original);

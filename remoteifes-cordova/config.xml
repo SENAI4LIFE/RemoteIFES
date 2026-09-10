@@ -16,10 +16,11 @@
     <icon src="resources/icon.png" />
     <platform name="android">
         <preference name="AndroidXEnabled" value="true" />
+        <preference name="scheme" value="http" />
         <preference name="android-minSdkVersion" value="24" />
         <preference name="AndroidWindowSplashScreenAnimatedIcon" value="resources/icon.png" />
         <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application" xmlns:android="http://schemas.android.com/apk/res/android">
-            <application android:usesCleartextTraffic="true" />
+            <application android:usesCleartextTraffic="true" android:enableOnBackInvokedCallback="false" />
         </edit-config>
         <icon src="resources/icon.png" />
     </platform>
