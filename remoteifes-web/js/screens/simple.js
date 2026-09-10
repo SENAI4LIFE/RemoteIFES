@@ -92,7 +92,7 @@ const SimpleWizard = {
         tile.type = "button";
         tile.dataset.sala = s.sala;
         tile.innerHTML = `
-          <span class="simple-tile-icon">&#10052;&#65039;</span>
+          <span class="simple-tile-icon" aria-hidden="true">${Icones.markup("neve")}</span>
           <span class="simple-tile-label"></span>
           <span class="simple-tile-sub"></span>
         `;

@@ -1,4 +1,4 @@
-const FRONTEND_VERSION = "2026.09.08.1";
+const FRONTEND_VERSION = "2026.09.10.1";
 const CACHE_PREFIX = "remoteifes-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${FRONTEND_VERSION}`;
 const VERSION_QUERY = `v=${encodeURIComponent(FRONTEND_VERSION)}`;
@@ -6,7 +6,7 @@ const UPGRADE_MARKER = "./__remoteifes_upgrade__";
 
 const VERSIONED_SHELL = [
   "css/style.css",
-  "js/version.js", "js/state.js", "js/config.js", "js/toast.js", "js/server-status.js",
+  "js/version.js", "js/icons.js", "js/state.js", "js/config.js", "js/toast.js", "js/server-status.js",
   "js/tempo.js", "js/rooms-data.js", "js/api.js", "js/rtstatus.js", "js/nav.js",
   "js/idle-timer.js", "js/a11y.js", "js/ui-dialog.js", "js/ui-status.js", "js/help.js",
   "js/manual-content.js", "js/manual/common-start.js", "js/manual/common-rooms.js",
