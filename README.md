@@ -365,7 +365,7 @@ Todas as funções antes exclusivas da interface local do dispositivo (entrar/sa
 - Permite entrar em modo de configuração, alternar entre modo config e modo clonagem, iniciar/parar a captura de IR e sair de volta para a operação normal.
 - Sinais capturados em modo clonagem aparecem na hora nessa aba; cada um pode ser reenviado ("testar") e um protocolo de ar-condicionado compatível pode ser selecionado para a sala.
 - Um botão de **reset de Wi-Fi** remoto apaga a rede e o endereço do servidor, preserva a credencial exclusiva do dispositivo e o reinicia em modo de ponto de acesso, sem precisar ir fisicamente até o equipamento.
-- Mostra a **versão do firmware** instalada e a publicada, com um botão de **atualização por OTA** e barra de progresso (veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)).
+- Mostra a **versão do firmware** instalada e a publicada, com um botão de **atualização por OTA** e barra de progresso, e traz a **distribuição em etapas** para atualizar vários ESP32 com canário e lotes (veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)).
 - Gerencia a **credencial exclusiva do dispositivo** (provisionar, rotacionar, substituir, revogar), com o segredo exibido uma única vez (veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)).
 
 Essa comunicação usa um canal WebSocket dedicado (`/ws/dispositivo`, distinto do `/ws` usado pelos navegadores) pelo qual o próprio ESP32 se conecta ao servidor como cliente. A conexão é associada à sala pelo MAC cadastrado ou pela credencial do dispositivo e é reaproveitada para telemetria, comandos administrativos e OTA, sem abrir portas adicionais no dispositivo nem exigir que o servidor alcance o ESP32 diretamente. O ESP32 reconecta automaticamente caso a conexão caia, e o servidor reaplica o estado desejado depois da reconexão.
@@ -742,6 +742,42 @@ O que o processo garante:
 - **Configuração preservada:** OTA grava apenas a aplicação — as credenciais de Wi-Fi/servidor/dispositivo na NVS e a associação da sala (feita no servidor) não são tocadas.
 - **Recuperação:** a gravação por USB regrava o slot ativo e ignora o estado do OTA; é o caminho para um dispositivo que, por qualquer motivo, não aceite mais OTA.
 
+### Distribuição em etapas para vários ESP32
+
+Atualizar uma sala por vez continua sendo o caminho simples e não mudou. Para atualizar um conjunto de dispositivos, o mesmo painel `Administração > Dispositivos > Firmware / OTA` traz **Distribuição em etapas**, também exclusiva do superadministrador. Ela orquestra a OTA que já existia em vez de duplicá-la: cada sala passa exatamente pela mesma oferta, download autenticado, conferência de SHA-256, gravação no slot ocioso e validação por reconexão.
+
+O fluxo é: seleção → verificação de compatibilidade → canário → lotes controlados → conclusão.
+
+- **Verificação de compatibilidade:** antes de começar, cada sala selecionada é avaliada com o que o dispositivo já reporta. Quem está na versão publicada ou reporta uma versão maior (downgrade) entra como *não atualizado*, com o motivo registrado. Quem está apenas desconectado, em modo de configuração ou com uma OTA avulsa em andamento continua na fila e é reavaliado na sua vez.
+- **Canário:** um único dispositivo é atualizado primeiro — por padrão o primeiro apto da seleção, e o superadministrador pode escolher outro. Os lotes só começam depois que o canário reconecta reportando a versão nova. Canário que falha, reverte, não volta ou que não pôde ser atualizado interrompe a distribuição.
+- **Lotes:** os demais dispositivos são divididos em lotes de 1 a 5 (padrão 2). Um lote só começa quando o anterior terminou por completo e, dentro do lote, vale o mesmo teto de duas atualizações simultâneas do OTA avulso — a distribuição não cria paralelismo extra.
+- **Parada automática:** qualquer falha real em um lote (falhou, reverteu ou ficou sem confirmação) interrompe a distribuição, e o restante da frota permanece na versão anterior.
+- **Um dispositivo que continua offline** quando chega a sua vez espera dois minutos e então é registrado como *não atualizado*, nunca como atualizado.
+
+**Pausar, retomar e cancelar:**
+
+- **Pausar** impede que novos dispositivos comecem; quem já está baixando ou gravando segue até o fim, porque interromper uma gravação é o que mais arrisca o equipamento.
+- **Retomar** continua do ponto em que parou, no lote seguinte.
+- **Cancelar** marca como cancelado apenas o que ainda não começou; o que estiver em andamento é acompanhado até o desfecho e registrado normalmente.
+
+**Estado de cada dispositivo:** `na fila`, `atualizando`, `reiniciando para validar`, `validado`, `falhou` (erro antes de gravar), `revertido` (voltou reportando a versão anterior), `sem confirmação` (gravou e não voltou a se conectar), `não atualizado` (inapto, offline além da espera) e `cancelado`. Só `validado` conta como sucesso, e ele exige a reconexão com a versão esperada: download concluído ou gravação confirmada não bastam.
+
+**Compatibilidade:** a distribuição não altera o protocolo do ESP32 e não exige firmware novo. Ela usa as mensagens que o firmware em campo já entende (`ota_oferta`, `ota_progresso`, `ota_resultado`) e a versão que o dispositivo já reporta em `telemetria`/`info`. Um servidor atualizado continua operando a frota existente sem regravar nada, e a OTA avulsa permanece como caminho de exceção.
+
+**Reinício do servidor:** o andamento fica em `<REMOTEIFES_DATA_DIR>/firmware/rollout-ota.json`, ao lado do estado por dispositivo. Ao voltar, o servidor reconcilia cada dispositivo pelo estado de OTA persistido em vez de repetir a oferta: quem estava gravando ou reiniciando continua sendo acompanhado pelos mesmos tempos-limite; quem ainda não tinha recebido a oferta volta para a fila; quem já a recebeu e não deixou registro do desfecho fica como `sem confirmação`, para conferência manual. Nenhum dispositivo recebe uma segunda oferta apenas porque a memória do processo foi perdida.
+
+**O que a reversão garante e o que não garante:** a reversão é feita pelo próprio ESP32, pelo esquema A/B descrito acima. O servidor não guarda a imagem anterior e não consegue reinstalá-la — o que ele garante é detectar e registrar o desfecho de cada dispositivo, distinguindo falha antes de gravar, reversão confirmada e retorno indeterminado, e parar a distribuição antes de espalhar uma imagem ruim. Uma versão publicada com defeito não é desfeita pelo servidor: corrija, publique uma versão maior e rode uma nova distribuição, ou regrave por USB os dispositivos que não voltarem.
+
+Pela API, apenas para o superadministrador:
+
+```text
+GET  /admin/esp32/rollout                 estado atual, limites e aptidão de cada dispositivo
+POST /admin/esp32/rollout                 {"salas":["A-101","A-102"],"canario":"A-101","tamanhoLote":2}
+POST /admin/esp32/rollout/pausar
+POST /admin/esp32/rollout/retomar
+POST /admin/esp32/rollout/cancelar
+```
+
 O modelo atual evita adulteração acidental e publicação inconsistente por SHA-256, metadados restritos, autenticação do dispositivo e controle exclusivo do superadministrador. Assinatura assimétrica de firmware permanece uma opção de alta garantia para instalações que considerem comprometimento do próprio servidor de releases; ela não é obrigatória porque acrescentaria geração, proteção, rotação e recuperação de chaves ao fluxo normal de implantação.
 
 ## Credenciais por Dispositivo e Migração
@@ -1070,7 +1106,8 @@ remoteifes-server/
     routes/            rotas HTTP (login, documentação por papel, aplicativo móvel/APK, salas, comandos, agendamentos, admin, dispositivo, relatos)
     services/          regras de negócio (usuários, salas, agendamentos, configurações, notificações,
                         relatos de problema, sessões/tokens, status em tempo real, backup do banco,
-                        OTA de firmware (otaService), credenciais de dispositivo (esp32CredenciaisService),
+                        OTA de firmware (otaService) e sua distribuição em etapas (otaRolloutService),
+                        credenciais de dispositivo (esp32CredenciaisService),
                         monitoramento operacional (monitoramentoService),
                         documentação administrativa por papel (documentationService))
     scheduler/         verificação periódica de agendamentos, timeouts de ESP32 e de OTA, sessões abandonadas, monitoramento e backup

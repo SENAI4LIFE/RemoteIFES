@@ -346,6 +346,14 @@ deviceHub.eventos.on("ota", ({ sala, estado }) => {
   notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_ota", sala, ota: estado });
 });
 
+deviceHub.eventos.on("ota-rollout", ({ rollout }) => {
+  if (!wss) return;
+  wss.clients.forEach((ws) => {
+    if (!revalidarCliente(ws)) return;
+    if (ws.usuario?.nivel === NIVEL_SUPERADMIN) enviar(ws, { tipo: "dispositivo_rollout", rollout });
+  });
+});
+
 deviceHub.eventos.on("erro", ({ sala, mensagem }) => {
   notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_erro", sala, mensagem });
 });

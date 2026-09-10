@@ -127,6 +127,17 @@ async function despublicarApkFixture(request) {
   }
 }
 
+async function publicarFirmwareFixture(request, versao = "4.1.0") {
+  const resp = await request.post(`${API_URL}/__e2e/publicar-firmware?versao=${encodeURIComponent(versao)}`);
+  if (!resp.ok()) throw new Error(`/__e2e/publicar-firmware falhou (HTTP ${resp.status()}): ${await resp.text()}`);
+  return (await resp.json()).manifesto;
+}
+
+async function removerFirmwareFixture(request) {
+  const resp = await request.post(`${API_URL}/__e2e/remover-firmware`);
+  if (!resp.ok()) throw new Error(`/__e2e/remover-firmware falhou (HTTP ${resp.status()})`);
+}
+
 async function irParaSala(page, sala, andar = "1") {
   await page.locator('.tab-btn[data-tab="salas"]').click();
   await expect(page.locator("#screen-simple")).toBeVisible();
@@ -157,4 +168,6 @@ module.exports = {
   irParaSala,
   publicarApkFixture,
   despublicarApkFixture,
+  publicarFirmwareFixture,
+  removerFirmwareFixture,
 };
