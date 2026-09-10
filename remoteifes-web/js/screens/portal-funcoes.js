@@ -1,33 +1,33 @@
 const PORTAL_FUNCOES = {
   salas: {
-    icon: "🌡️",
+    icon: "termostato",
     titulo: "Salas",
     texto: "Veja as salas do campus, o status do ar-condicionado de cada uma e ligue ou desligue remotamente.",
   },
   planta: {
-    icon: "🏢",
+    icon: "predio",
     titulo: "Planta Baixa",
     texto: "Visualize o mapa dos blocos e andares para localizar rapidamente cada sala e seu equipamento.",
   },
   agenda: {
-    icon: "🗓️",
+    icon: "agenda",
     titulo: "Agenda",
     texto: "Programe horários de ligar e desligar o ar-condicionado das salas de acordo com o uso do campus.",
   },
   grade: {
-    icon: "📈",
+    icon: "grade",
     titulo: "Grade",
     texto: "Acompanhe em um painel único o status de todas as salas monitoradas ao mesmo tempo.",
   },
   admin: {
-    icon: "🔧",
+    icon: "ferramenta",
     titulo: "Admin",
     texto: "Gerencie usuários, permissões e configurações gerais do sistema RemoteIFES.",
   },
 };
 
 const PORTAL_FUNCAO_PLACEHOLDER = {
-  icon: "ℹ️",
+  icon: "info",
   titulo: "Selecione uma função",
   texto: "Toque em um dos ícones acima para ver do que se trata.",
 };
@@ -39,7 +39,7 @@ const portalFuncaoDetalheTitulo = document.getElementById("portalFuncaoDetalheTi
 const portalFuncaoDetalheTexto = document.getElementById("portalFuncaoDetalheTexto");
 
 function exibirPortalFuncaoDetalhe(info) {
-  portalFuncaoDetalheIcon.textContent = info.icon;
+  Icones.aplicar(portalFuncaoDetalheIcon, info.icon);
   portalFuncaoDetalheTitulo.textContent = info.titulo;
   portalFuncaoDetalheTexto.textContent = info.texto;
 }

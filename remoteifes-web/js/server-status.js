@@ -36,7 +36,7 @@ const ServerStatus = (() => {
 
   const tela = document.getElementById("screen-server-status");
   const spinner = document.getElementById("serverStatusSpinner");
-  const emoji = document.getElementById("serverStatusEmoji");
+  const icone = document.getElementById("serverStatusIcone");
   const titulo = document.getElementById("serverStatusTitulo");
   const desc = document.getElementById("serverStatusDesc");
   const acessoAdminBtn = document.getElementById("serverStatusAcessoAdmin");
@@ -72,14 +72,14 @@ const ServerStatus = (() => {
     return (typeof Api !== "undefined" && Api.obterToken()) || "";
   }
 
-  function mostrarEmoji(caractere) {
+  function mostrarIcone(nome) {
     spinner.classList.add("hidden");
-    emoji.textContent = caractere;
-    emoji.classList.remove("hidden");
+    Icones.aplicar(icone, nome);
+    icone.classList.remove("hidden");
   }
 
   function mostrarSpinner() {
-    emoji.classList.add("hidden");
+    icone.classList.add("hidden");
     spinner.classList.remove("hidden");
   }
 
@@ -137,7 +137,7 @@ const ServerStatus = (() => {
       return;
     }
     tela.classList.remove("hidden");
-    mostrarEmoji("🔧");
+    mostrarIcone("ferramenta");
     aplicarChip("manutencao", "Em manutenção");
     titulo.textContent = "Sistema em manutenção";
     desc.textContent = "O RemoteIFES está passando por uma manutenção programada. Tente novamente em alguns instantes.";

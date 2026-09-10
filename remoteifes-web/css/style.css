@@ -63,6 +63,27 @@
 
 * { box-sizing: border-box; }
 
+.icone-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.icone {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  fill: currentColor;
+  display: inline-block;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.icone-inline { vertical-align: -0.15em; }
+.icone-topbar { width: 20px; height: 20px; }
+.ac-remote-power-glyph { width: 1.6em; height: 1.6em; }
+
 html { scroll-padding-top: 72px; scroll-padding-bottom: 88px; }
 
 :focus-visible {
@@ -1598,7 +1619,7 @@ button.btn:disabled {
   background: var(--warn-soft);
   border: 1px solid #e6d7a8;
 }
-.manutencao-acesso-emoji {
+.manutencao-acesso-icone {
   font-size: calc(32px * var(--a11y-font-scale));
   line-height: 1;
   margin-bottom: 8px;
@@ -2717,12 +2738,12 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
-.server-status-emoji {
+.server-status-icone {
   font-size: calc(40px * var(--a11y-font-scale));
   line-height: 1;
   margin-bottom: 18px;
 }
-.server-status-emoji.hidden { display: none; }
+.server-status-icone.hidden { display: none; }
 .server-status-chip {
   display: inline-flex;
   align-items: center;

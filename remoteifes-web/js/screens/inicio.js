@@ -11,32 +11,32 @@ const Inicio = (() => {
 
   const PRINCIPAIS = [
     {
-      id: "salas", icon: "🌡️", titulo: "Salas",
+      id: "salas", icon: "termostato", titulo: "Salas",
       desc: "Escolha uma sala e ligue, desligue ou ajuste o ar-condicionado.",
       quando: () => true, acao: () => irRota("/salas"),
     },
     {
-      id: "planta", icon: "🗺️", titulo: "Planta baixa",
+      id: "planta", icon: "mapa", titulo: "Planta baixa",
       desc: "Encontre a sala pelo mapa dos blocos e andares do campus.",
       quando: () => true, acao: () => irRota("/salas/planta"),
     },
     {
-      id: "agenda", icon: "🗓️", titulo: "Agenda",
+      id: "agenda", icon: "agenda", titulo: "Agenda",
       desc: "Programe horários para ligar e desligar cada sala.",
       quando: () => !!state.isAdmin, acao: () => irRota("/agenda"),
     },
     {
-      id: "grade", icon: "📊", titulo: "Grade",
+      id: "grade", icon: "grade", titulo: "Grade",
       desc: "Acompanhe o status de todas as salas em um painel único.",
       quando: () => !!state.isAdmin, acao: () => irRota("/grade"),
     },
     {
-      id: "config", icon: "🗝️", titulo: "Config. de sala",
+      id: "config", icon: "chave", titulo: "Config. de sala",
       desc: "Gerencie quem pode controlar as salas sob sua responsabilidade.",
       quando: () => !state.isAdmin && !!state.temSalaComoProprietario, acao: () => irRota("/config"),
     },
     {
-      id: "notificacoes", icon: "🔔", titulo: "Notificações",
+      id: "notificacoes", icon: "sino", titulo: "Notificações",
       desc: "Avisos de conexão e falha dos dispositivos ESP32.",
       quando: () => !!state.isAdmin,
       acao: (evento) => {
@@ -45,7 +45,7 @@ const Inicio = (() => {
       },
     },
     {
-      id: "relatos", icon: "🐞", titulo: "Relatar problema",
+      id: "relatos", icon: "relato", titulo: "Relatar problema",
       desc: "Envie um problema para a equipe e acompanhe seus relatos.",
       quando: () => true,
       acao: (evento) => {
@@ -54,13 +54,13 @@ const Inicio = (() => {
       },
     },
     {
-      id: "ajuda", icon: "📖", titulo: "Ajuda e manual",
+      id: "ajuda", icon: "manual", titulo: "Ajuda e manual",
       desc: "Guia completo do RemoteIFES, com busca e diagramas.",
       quando: () => true,
       acao: () => { if (typeof Manual !== "undefined") Manual.abrir(); },
     },
     {
-      id: "aplicativo", icon: "📱", titulo: "Aplicativo móvel",
+      id: "aplicativo", icon: "celular", titulo: "Aplicativo móvel",
       desc: "Baixe e instale o aplicativo Android do RemoteIFES.",
       quando: () => true,
       acao: () => { if (typeof MobileApp !== "undefined") MobileApp.abrir(); },
@@ -68,14 +68,14 @@ const Inicio = (() => {
   ];
 
   const ADMIN = [
-    { sub: "usuarios", icon: "👥", titulo: "Usuários", grupo: "Gestão" },
-    { sub: "relatos", icon: "🐞", titulo: "Relatos", grupo: "Gestão", exigeSuper: true },
-    { sub: "macs", icon: "🔧", titulo: "Cadastro", grupo: "Dispositivos", exigeSuper: true },
-    { sub: "esp32", icon: "📶", titulo: "Firmware / OTA", grupo: "Dispositivos", exigeSuper: true },
-    { sub: "notificacoes", icon: "🔔", titulo: "Alertas", grupo: "Dispositivos" },
-    { sub: "logs", icon: "📜", titulo: "Logs", grupo: "Sistema" },
-    { sub: "status", icon: "🩺", titulo: "Status", grupo: "Sistema" },
-    { sub: "config", icon: "⚙️", titulo: "Configurações", grupo: "Sistema", exigeSuper: true },
+    { sub: "usuarios", icon: "usuarios", titulo: "Usuários", grupo: "Gestão" },
+    { sub: "relatos", icon: "relato", titulo: "Relatos", grupo: "Gestão", exigeSuper: true },
+    { sub: "macs", icon: "cadastro", titulo: "Cadastro", grupo: "Dispositivos", exigeSuper: true },
+    { sub: "esp32", icon: "firmware", titulo: "Firmware / OTA", grupo: "Dispositivos", exigeSuper: true },
+    { sub: "notificacoes", icon: "sino", titulo: "Alertas", grupo: "Dispositivos" },
+    { sub: "logs", icon: "logs", titulo: "Logs", grupo: "Sistema" },
+    { sub: "status", icon: "status", titulo: "Status", grupo: "Sistema" },
+    { sub: "config", icon: "config", titulo: "Configurações", grupo: "Sistema", exigeSuper: true },
   ];
 
   function criarCard(def, compacto) {
@@ -87,7 +87,7 @@ const Inicio = (() => {
     const ic = document.createElement("span");
     ic.className = "hub-card-icon";
     ic.setAttribute("aria-hidden", "true");
-    ic.textContent = def.icon;
+    Icones.aplicar(ic, def.icon);
     btn.appendChild(ic);
 
     const corpo = document.createElement("span");
