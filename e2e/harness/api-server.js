@@ -29,6 +29,7 @@ const notificacoesService = require(path.join(RAIZ_SERVIDOR, "src", "services", 
 const otaService = require(path.join(RAIZ_SERVIDOR, "src", "services", "otaService"));
 const protocolosIrService = require(path.join(RAIZ_SERVIDOR, "src", "services", "protocolosIrService"));
 const configuracoesService = require(path.join(RAIZ_SERVIDOR, "src", "services", "configuracoesService"));
+const monitoramentoService = require(path.join(RAIZ_SERVIDOR, "src", "services", "monitoramentoService"));
 
 const { iniciarFakeEsp32 } = require("./fake-esp32");
 
@@ -216,6 +217,83 @@ app.post("/__e2e/remover-firmware", (req, res) => {
     fake.definirComportamentoOta("ok");
     fake.definirFirmware("4.0.0");
   }
+  res.json({ ok: true });
+});
+
+function salaDoHistoricoSintetico() {
+  return db.prepare("SELECT sala FROM salas WHERE sala <> ? AND mac IS NULL ORDER BY sala DESC LIMIT 1").get(SALA_COM_DISPOSITIVO).sala;
+}
+
+function limparHistoricoMonitoramento() {
+  db.prepare("DELETE FROM monitoramento_amostras").run();
+  db.prepare("DELETE FROM monitoramento_horas").run();
+  db.prepare("DELETE FROM esp_eventos WHERE sala = ?").run(salaDoHistoricoSintetico());
+  db.prepare("DELETE FROM comandos_log WHERE usuario = 'e2e-historico'").run();
+  db.prepare("DELETE FROM notificacoes WHERE tipo IN ('esp32_ota_falha', 'esp32_ota_ok') AND mensagem LIKE 'e2e-historico%'").run();
+  monitoramentoService.limparCacheHistorico();
+}
+
+function semearHistoricoMonitoramento({ horas = 26, lacunaMinutos = 40, reinicioMinutos = 300 } = {}) {
+  limparHistoricoMonitoramento();
+  const minutosAtras = (min) => db.prepare("SELECT datetime('now', ?) d").get(`-${min} minutes`).d;
+  const totalMinutos = Math.round(horas * 60);
+  const bootA = minutosAtras(totalMinutos + 30);
+  const bootB = minutosAtras(reinicioMinutos);
+  for (let m = totalMinutos; m >= 1; m -= 1) {
+    if (m > reinicioMinutos + 20 && m <= reinicioMinutos + 20 + lacunaMinutos) continue;
+    if (m > reinicioMinutos && m <= reinicioMinutos + 3) continue;
+    const fase = (totalMinutos - m) / totalMinutos;
+    monitoramentoService.gravarAmostra({
+      inicioProcesso: m > reinicioMinutos ? bootA : bootB,
+      rssMB: m > reinicioMinutos ? 62 + fase * 30 + (m % 7) : 48 + (totalMinutos - m) * 0.01 + (m % 5),
+      cpuPercent: 2 + (m % 11) + (m % 97 === 0 ? 35 : 0),
+      carga1: 0.2,
+      bancoMs: 0.3 + (m % 13) / 10 + (m % 211 === 0 ? 9 : 0),
+      bancoBytes: 3_200_000 + (totalMinutos - m) * 120,
+      walBytes: (m % 60) * 4096,
+      discoLivreBytes: 21_000_000_000 - (totalMinutos - m) * 20_000,
+      discoTotalBytes: 64_000_000_000,
+      espComMac: 6,
+      espOnline: m % 180 < 12 ? 4 : 6,
+      espWs: m % 180 < 12 ? 4 : 6,
+      telemetriaFalhas: m % 240 === 0 ? 1 : 0,
+      credencialFalhas: m === 500 ? 2 : 0,
+      schedulerFalhas: 0,
+      bancoFalhas: 0,
+    }, minutosAtras(m));
+  }
+  const sala = salaDoHistoricoSintetico();
+  const evento = db.prepare("INSERT INTO esp_eventos (sala, status, criadoEm) VALUES (?, ?, ?)");
+  for (const m of [1400, 1100, 720, 400, 90]) {
+    evento.run(sala, "offline", minutosAtras(m + 2));
+    evento.run(sala, "online", minutosAtras(m));
+  }
+  const comando = db.prepare("INSERT INTO comandos_log (usuario, sala, cmd, valor, origem, criadoEm) VALUES ('e2e-historico', ?, ?, ?, ?, ?)");
+  for (let m = totalMinutos; m >= 1; m -= 47) {
+    comando.run(sala, "ligar", null, m % 3 === 0 ? "agendamento" : "manual", minutosAtras(m));
+    if (m % 5 === 0) comando.run(sala, "desligar", null, "esp32_local", minutosAtras(m));
+  }
+  const notificacao = db.prepare("INSERT INTO notificacoes (tipo, sala, mensagem, lida, criadoEm) VALUES (?, ?, ?, 1, ?)");
+  notificacao.run("esp32_ota_falha", sala, "e2e-historico falha", minutosAtras(650));
+  notificacao.run("esp32_ota_ok", sala, "e2e-historico ok", minutosAtras(600));
+  monitoramentoService.consolidarHoras();
+  monitoramentoService.limparCacheHistorico();
+  return {
+    amostras: db.prepare("SELECT COUNT(*) n FROM monitoramento_amostras").get().n,
+    horas: db.prepare("SELECT COUNT(*) n FROM monitoramento_horas").get().n,
+  };
+}
+
+app.post("/__e2e/monitoramento-historico", (req, res) => {
+  try {
+    res.json({ ok: true, ...semearHistoricoMonitoramento(req.body || {}) });
+  } catch (erro) {
+    res.status(500).json({ ok: false, erro: erro.message });
+  }
+});
+
+app.post("/__e2e/monitoramento-historico/limpar", (req, res) => {
+  limparHistoricoMonitoramento();
   res.json({ ok: true });
 });
 

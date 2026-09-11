@@ -18,6 +18,7 @@ const VERIFICACAO_TIMEOUT_MS = 30 * 1000;
 const VERIFICACAO_SESSOES_MS = 15 * 60 * 1000;
 const VERIFICACAO_RETENCAO_MS = 6 * 60 * 60 * 1000;
 const VERIFICACAO_MONITORAMENTO_MS = 5 * 60 * 1000;
+const AMOSTRA_MONITORAMENTO_MS = monitoramentoService.AMOSTRAGEM_SEGUNDOS * 1000;
 
 const BACKUP_AUTOMATICO = String(
   process.env.BACKUP_AUTOMATICO ?? (process.env.NODE_ENV === "production" ? "true" : "false")
@@ -83,6 +84,7 @@ function iniciarScheduler() {
   agendarPeriodico(otaService.verificarTimeouts, VERIFICACAO_TIMEOUT_MS, "timeouts-ota");
   agendarPeriodico(otaRolloutService.tick, VERIFICACAO_TIMEOUT_MS, "rollout-ota");
   agendarPeriodico(monitoramentoService.avaliar, VERIFICACAO_MONITORAMENTO_MS, "monitoramento");
+  agendarPeriodico(monitoramentoService.amostrar, AMOSTRA_MONITORAMENTO_MS, "monitoramento-amostra");
   agendarPeriodico(encerrarSessoesAbandonadas, VERIFICACAO_SESSOES_MS, "sessoes-abandonadas");
   agendarPeriodico(executarLimpezaRetencao, VERIFICACAO_RETENCAO_MS, "retencao");
   executarProtegido(encerrarSessoesAbandonadas, "sessoes-abandonadas-inicial");
@@ -91,6 +93,11 @@ function iniciarScheduler() {
   }, 10000);
   if (typeof timerRetencaoInicial.unref === "function") timerRetencaoInicial.unref();
   timers.push(timerRetencaoInicial);
+  const timerAmostraInicial = setTimeout(() => {
+    executarProtegido(monitoramentoService.amostrar, "monitoramento-amostra-inicial");
+  }, 15000);
+  if (typeof timerAmostraInicial.unref === "function") timerAmostraInicial.unref();
+  timers.push(timerAmostraInicial);
   if (BACKUP_AUTOMATICO) {
     agendarPeriodico(executarBackupAutomatico, BACKUP_INTERVALO_MS, "backup");
     const timerBackupInicial = setTimeout(() => {
@@ -102,7 +109,7 @@ function iniciarScheduler() {
   const infoBackup = BACKUP_AUTOMATICO
     ? `, backup automático a cada ${BACKUP_INTERVALO_MS / (60 * 60 * 1000)}h`
     : "";
-  console.log(`Agendador iniciado (agendamentos a cada minuto, checagem de ESPs offline a cada 30s, sessões abandonadas a cada 15min, monitoramento a cada 5min, retenção do banco a cada 6h${infoBackup}).`);
+  console.log(`Agendador iniciado (agendamentos a cada minuto, checagem de ESPs offline a cada 30s, sessões abandonadas a cada 15min, monitoramento a cada 5min com amostra de histórico a cada ${AMOSTRA_MONITORAMENTO_MS / 1000}s, retenção do banco a cada 6h${infoBackup}).`);
 }
 
 function pararScheduler() {

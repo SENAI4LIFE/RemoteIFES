@@ -26,6 +26,8 @@ const LIMITES_LINHAS = {
   notificacoes: 20000,
   sessoes: 50000,
   agendamentos_execucoes: 50000,
+  monitoramento_amostras: 6000,
+  monitoramento_horas: 1000,
 };
 let cacheEstatisticas = null;
 let cacheEstatisticasEm = 0;
@@ -37,6 +39,7 @@ function diasAuditoria() {
 
 function alvosTemporais() {
   const diasHistorico = diasAuditoria();
+  const monitoramento = require("./monitoramentoService");
   const alvos = [
     { nome: "auditoria_eventos", sql: "DELETE FROM auditoria_eventos WHERE criadoEm < datetime('now', ?)", dias: diasHistorico },
     { nome: "esp_indisponibilidades", sql: "DELETE FROM esp_indisponibilidades WHERE offlineEm < datetime('now', ?)", dias: diasHistorico },
@@ -50,6 +53,8 @@ function alvosTemporais() {
     { nome: "agendamentos_passados", sql: "DELETE FROM agendamentos WHERE data < date('now', ?)", dias: DIAS_AGENDAMENTOS },
     { nome: "sessoes", sql: "DELETE FROM sessoes WHERE logout IS NOT NULL AND logout < datetime('now', ?)", dias: DIAS_SESSOES },
     { nome: "esp_detectados", sql: "DELETE FROM esp_detectados WHERE ultimaDeteccao < datetime('now', ?) AND mac NOT IN (SELECT mac FROM salas WHERE mac IS NOT NULL)", dias: DIAS_DETECCOES },
+    { nome: "monitoramento_amostras", sql: "DELETE FROM monitoramento_amostras WHERE criadoEm < datetime('now', ?)", horas: monitoramento.RETENCAO_AMOSTRAS_HORAS },
+    { nome: "monitoramento_horas", sql: "DELETE FROM monitoramento_horas WHERE hora < datetime('now', ?)", dias: monitoramento.RETENCAO_HORAS_DIAS },
   ];
   if (DIAS_RELATOS_RESOLVIDOS > 0) {
     alvos.push({ nome: "relatos_resolvidos", sql: "DELETE FROM relatos WHERE status = 'resolvido' AND atualizadoEm < datetime('now', ?)", dias: DIAS_RELATOS_RESOLVIDOS });
@@ -61,6 +66,11 @@ function aplicarLimite(tabela, limite) {
   if (tabela === "sessoes") {
     return db.prepare(`DELETE FROM sessoes WHERE id IN (
       SELECT id FROM sessoes WHERE logout IS NOT NULL ORDER BY COALESCE(logout, login) DESC LIMIT -1 OFFSET ?
+    )`).run(limite).changes;
+  }
+  if (tabela === "monitoramento_horas") {
+    return db.prepare(`DELETE FROM monitoramento_horas WHERE hora IN (
+      SELECT hora FROM monitoramento_horas ORDER BY hora DESC LIMIT -1 OFFSET ?
     )`).run(limite).changes;
   }
   const coluna = tabela === "esp_indisponibilidades" ? "offlineEm" : tabela === "agendamentos_execucoes" ? "executadoEm" : "criadoEm";
@@ -83,9 +93,15 @@ function manutencaoLeve(algoRemovido) {
 function executarLimpezaRetencao() {
   const resumo = {};
   let algoRemovido = false;
+  try {
+    require("./monitoramentoService").consolidarHoras();
+  } catch (erro) {
+    logger.warn("retencao-consolidacao-monitoramento-falhou", { mensagem: erro.message });
+  }
   for (const alvo of alvosTemporais()) {
     try {
-      const argumentos = alvo.dataLocal ? [dataAtualBrasiliaISO(), `-${alvo.dias} days`] : [`-${alvo.dias} days`];
+      const prazo = alvo.horas ? `-${alvo.horas} hours` : `-${alvo.dias} days`;
+      const argumentos = alvo.dataLocal ? [dataAtualBrasiliaISO(), prazo] : [prazo];
       const removidos = Number(db.prepare(alvo.sql).run(...argumentos).changes);
       if (removidos > 0) { resumo[alvo.nome] = removidos; algoRemovido = true; }
     } catch (erro) {
