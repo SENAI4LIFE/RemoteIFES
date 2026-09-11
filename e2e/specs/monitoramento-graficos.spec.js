@@ -240,14 +240,14 @@ test("layouts: coluna única no celular, grade equilibrada no desktop, sem rolag
 });
 
 test("com a fonte máxima de acessibilidade os gráficos continuam legíveis, sem corte nem rolagem horizontal", async ({ page, context }) => {
-  for (const nome of ["mobile-compact", "mobile-landscape", "notebook"]) {
-    await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome], A11Y_MAXIMA);
+  for (const [nome, tipoFonte] of [["mobile-compact", "default"], ["mobile-compact", "dyslexic"], ["mobile-landscape", "serif"], ["notebook", "sans"]]) {
+    await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome], { ...A11Y_MAXIMA, remoteifes_font_type: tipoFonte });
     await esperarGraficos(page);
     const medidas = await medirFiguras(page);
     expect(await semRolagemHorizontal(page), `rolagem horizontal em ${nome}`).toBe(true);
     for (const f of medidas.figuras) {
       expect(f.right, `${f.id} dentro do bloco em ${nome}`).toBeLessThanOrEqual(medidas.blocoRight + 2);
-      expect(f.cortados, `texto cortado em ${f.id} (${nome})`).toBe(0);
+      expect(f.cortados, `texto cortado em ${f.id} (${nome}, fonte ${tipoFonte})`).toBe(0);
       expect(f.fonteTick, `rótulos de eixo ampliados em ${f.id}`).toBeGreaterThanOrEqual(20);
       expect(f.legendaDentro, `legenda de ${f.id} dentro da figura em ${nome}`).toBe(true);
     }

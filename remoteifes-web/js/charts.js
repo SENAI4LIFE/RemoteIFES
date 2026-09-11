@@ -19,11 +19,6 @@ const Graficos = (() => {
     return Number.isFinite(bruto) && bruto > 0 ? bruto : 1;
   }
 
-  function espacamentoLetrasEm() {
-    const bruto = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--a11y-letter-spacing"));
-    return Number.isFinite(bruto) && bruto > 0 ? bruto : 0;
-  }
-
   function deslocamentoFusoMs(ms) {
     const partes = {};
     fmtPartes.formatToParts(new Date(ms)).forEach((p) => { partes[p.type] = p.value; });
@@ -216,16 +211,37 @@ const Graficos = (() => {
     return `<svg viewBox="0 0 ${largura} ${altura}" width="${largura}" height="${altura}" aria-hidden="true" focusable="false">`;
   }
 
+  let contextoMedida;
+  let familiaAtual = "sans-serif";
+  let espacamentoPx = 0;
+
+  function prepararMedicao(el) {
+    const estilo = getComputedStyle(el);
+    familiaAtual = estilo.fontFamily || "sans-serif";
+    const bruto = parseFloat(estilo.letterSpacing);
+    espacamentoPx = Number.isFinite(bruto) && bruto > 0 ? bruto : 0;
+    if (contextoMedida === undefined) {
+      try {
+        contextoMedida = document.createElement("canvas").getContext("2d") || null;
+      } catch (erro) {
+        contextoMedida = null;
+      }
+    }
+  }
+
   function larguraTexto(texto, fonte) {
-    return String(texto).length * fonte * (0.58 + espacamentoLetrasEm());
+    const bruto = String(texto);
+    const espacamento = bruto.length * espacamentoPx;
+    if (!contextoMedida) return bruto.length * fonte * 0.62 + espacamento;
+    contextoMedida.font = `${fonte}px ${familiaAtual}`;
+    return contextoMedida.measureText(bruto).width + espacamento;
   }
 
   function truncarTexto(texto, fonte, larguraMaxima) {
-    const bruto = String(texto);
+    let bruto = String(texto);
     if (larguraTexto(bruto, fonte) <= larguraMaxima) return bruto;
-    const porChar = fonte * (0.58 + espacamentoLetrasEm());
-    const cabem = Math.max(1, Math.floor(larguraMaxima / porChar) - 2);
-    return `${bruto.slice(0, cabem)}…`;
+    while (bruto.length > 1 && larguraTexto(`${bruto}…`, fonte) > larguraMaxima) bruto = bruto.slice(0, -1);
+    return `${bruto}…`;
   }
 
   function serieTemporal(container, spec) {
@@ -237,6 +253,7 @@ const Graficos = (() => {
     const total = t.length;
 
     const desenhar = () => {
+      prepararMedicao(refs.plot);
       const escala = escalaFonte();
       const fonte = 11 * escala;
       const largura = Math.max(200, Math.floor(refs.plot.getBoundingClientRect().width || container.getBoundingClientRect().width));
@@ -246,7 +263,7 @@ const Graficos = (() => {
       const ticksY = ticksBonitos(spec.maximo !== undefined ? Math.max(spec.maximo, maximoBruto) : maximoBruto, 4, spec.unidade === "inteiro");
       const maximo = ticksY[ticksY.length - 1] || 1;
       const rotulosY = ticksY.map(fmt);
-      const margemEsq = Math.ceil(Math.max(...rotulosY.map((r) => larguraTexto(r, fonte))) + 8);
+      const margemEsq = Math.ceil(Math.max(...rotulosY.map((r) => larguraTexto(r, fonte))) + 10);
       const margemDir = 10;
       const margemTopo = 8;
       const margemBase = Math.ceil(fonte + 12);
@@ -415,6 +432,7 @@ const Graficos = (() => {
     const bucketBase = (spec.bucketSegundos || 0) * 1000;
 
     const desenhar = () => {
+      prepararMedicao(refs.plot);
       const escala = escalaFonte();
       const fonte = 11 * escala;
       const largura = Math.max(200, Math.floor(refs.plot.getBoundingClientRect().width || container.getBoundingClientRect().width));
@@ -432,7 +450,7 @@ const Graficos = (() => {
       const ticksY = ticksBonitos(maximoBruto, 3, true);
       const maximo = ticksY[ticksY.length - 1] || 1;
       const rotulosY = ticksY.map(fmt);
-      const margemEsq = Math.ceil(Math.max(...rotulosY.map((r) => larguraTexto(r, fonte))) + 8);
+      const margemEsq = Math.ceil(Math.max(...rotulosY.map((r) => larguraTexto(r, fonte))) + 10);
       const x0 = margemEsq;
       const x1 = largura - margemDir;
       const y0 = margemTopo;
@@ -529,6 +547,7 @@ const Graficos = (() => {
     const maximo = spec.maximo || Math.max(1, ...itens.map((it) => it.valor || 0));
 
     const desenhar = () => {
+      prepararMedicao(refs.plot);
       const escala = escalaFonte();
       const fonte = 11 * escala;
       const largura = Math.max(200, Math.floor(refs.plot.getBoundingClientRect().width || container.getBoundingClientRect().width));
@@ -594,6 +613,7 @@ const Graficos = (() => {
     const percentual = (v) => (soma > 0 ? `${fmtNumero((v / soma) * 100, 0)}%` : "—");
 
     const desenhar = () => {
+      prepararMedicao(refs.plot);
       const escala = escalaFonte();
       const fonte = 11 * escala;
       const largura = Math.max(160, Math.floor(refs.plot.getBoundingClientRect().width || container.getBoundingClientRect().width));
