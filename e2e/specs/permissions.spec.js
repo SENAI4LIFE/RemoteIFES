@@ -23,15 +23,17 @@ test("administrador vê Admin, Agenda, Grade e o sino, mas não as sub-abas de s
   await expect(page.locator('.admin-subtab-btn[data-sub="config"]')).toBeHidden();
   await expect(page.locator('.admin-subtab-btn[data-sub="macs"]')).toBeHidden();
   await expect(page.locator('.admin-subtab-btn[data-sub="esp32"]')).toBeHidden();
+  await expect(page.locator('.admin-subtab-btn[data-sub="protocolos"]')).toBeHidden();
 });
 
-test("superadministrador vê as sub-abas exclusivas (Configurações, Cadastro, Firmware / OTA)", async ({ page, sessaoComo }) => {
+test("superadministrador vê as sub-abas exclusivas (Configurações, Cadastro, Firmware / OTA, Protocolos IR)", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
   await expect(page.locator("#screen-admin")).toBeVisible();
   await expect(page.locator('.admin-subtab-btn[data-sub="config"]')).toBeVisible();
   await expect(page.locator('.admin-subtab-btn[data-sub="macs"]')).toBeVisible();
   await expect(page.locator('.admin-subtab-btn[data-sub="esp32"]')).toBeVisible();
+  await expect(page.locator('.admin-subtab-btn[data-sub="protocolos"]')).toBeVisible();
 });
 
 test("o Monitoramento é exclusivo do superadministrador (interface e API)", async ({ page, sessaoComo, request, tokens }) => {

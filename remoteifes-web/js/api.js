@@ -307,10 +307,6 @@ const Api = {
     });
   },
 
-  async acessarEsp32(sala) {
-    return chamar(`/admin/salas/${encodeURIComponent(sala)}/acessar-esp32`, { headers: headersComToken() });
-  },
-
   async listarDetectados() {
     return chamar("/admin/esp32/detectados", { headers: headersComToken() });
   },
@@ -449,35 +445,75 @@ const Api = {
     return chamar("/admin/esp32/dispositivos", { headers: headersComToken() });
   },
 
-  async estadoDispositivoEsp32(sala) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/estado`, { headers: headersComToken() });
+  async listarProtocolosIr() {
+    return chamar("/admin/protocolos-ir", { headers: headersComToken() });
   },
 
-  async entrarConfigEsp32(sala) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/entrar-config`, {
+  async definirClonadorIr(sala) {
+    return chamar("/admin/protocolos-ir/clonador", {
+      method: "PUT",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ sala: sala || null }),
+    });
+  },
+
+  async definirModoCloneIr(ativo) {
+    return chamar("/admin/protocolos-ir/clonador/modo-clone", {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ ativo: !!ativo }),
+    });
+  },
+
+  async salvarProtocoloIr(label, capturaId) {
+    return chamar("/admin/protocolos-ir", {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ label, capturaId }),
+    });
+  },
+
+  async definirFailsafeProtocoloIr(id, capturaId) {
+    return chamar(`/admin/protocolos-ir/${encodeURIComponent(id)}/failsafe`, {
+      method: "PUT",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ capturaId }),
+    });
+  },
+
+  async removerFailsafeProtocoloIr(id) {
+    return chamar(`/admin/protocolos-ir/${encodeURIComponent(id)}/failsafe`, { method: "DELETE", headers: headersComToken() });
+  },
+
+  async renomearProtocoloIr(id, label) {
+    return chamar(`/admin/protocolos-ir/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ label }),
+    });
+  },
+
+  async excluirProtocoloIr(id) {
+    return chamar(`/admin/protocolos-ir/${encodeURIComponent(id)}`, { method: "DELETE", headers: headersComToken() });
+  },
+
+  async transmitirProtocoloIr(id, sala) {
+    return chamar(`/admin/protocolos-ir/${encodeURIComponent(id)}/transmitir`, {
+      method: "POST",
+      headers: headersComToken({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ sala }),
+    });
+  },
+
+  async aplicarProtocoloIr(id, sala) {
+    return chamar(`/admin/protocolos-ir/${encodeURIComponent(id)}/aplicar/${encodeURIComponent(sala)}`, {
       method: "POST",
       headers: headersComToken(),
     });
   },
 
-  async sairOperacaoEsp32(sala) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/sair-operacao`, { method: "POST", headers: headersComToken() });
-  },
-
-  async definirModoEsp32(sala, modo) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/modo`, {
-      method: "POST",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ modo }),
-    });
-  },
-
-  async iniciarCapturaEsp32(sala) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/captura/iniciar`, { method: "POST", headers: headersComToken() });
-  },
-
-  async pararCapturaEsp32(sala) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/captura/parar`, { method: "POST", headers: headersComToken() });
+  async estadoDispositivoEsp32(sala) {
+    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/estado`, { headers: headersComToken() });
   },
 
   async testarRawEsp32(sala, raw, carrierHz) {
@@ -493,14 +529,6 @@ const Api = {
       method: "POST",
       headers: headersComToken({ "Content-Type": "application/json" }),
       body: JSON.stringify(dados),
-    });
-  },
-
-  async definirProtocoloIrEsp32(sala, protocolo) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/protocolo-ir`, {
-      method: "POST",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ protocolo }),
     });
   },
 

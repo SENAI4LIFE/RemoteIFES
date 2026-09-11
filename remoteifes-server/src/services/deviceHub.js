@@ -11,9 +11,19 @@ const JANELA_MENSAGENS_MS = 10 * 1000;
 const MODOS_VALIDOS = new Set(["operation", "config_idle", "config_clone"]);
 
 const conexoes = new Map();
+const capturasPorSala = new Map();
 const eventos = new EventEmitter();
 let wss = null;
 let intervaloPing = null;
+let proximoIdCaptura = 1;
+
+function protocolosIr() {
+  return require("./protocolosIrService");
+}
+
+function papelDaEntrada(sala, entrada, salaRow = null) {
+  return entrada ? protocolosIr().papelDaConexao(sala, entrada, salaRow) : protocolosIr().papelDaSala(sala, salaRow);
+}
 
 function autenticar(req) {
   const credenciaisService = require("./esp32CredenciaisService");
@@ -62,7 +72,8 @@ function autenticar(req) {
 function estadoPublico(sala) {
   const entrada = conexoes.get(sala);
   const ota = require("./otaService").estadoDaSala(sala);
-  if (!entrada) return { conectado: false, ota };
+  const role = papelDaEntrada(sala, entrada);
+  if (!entrada) return { conectado: false, role, ota };
   return {
     conectado: true,
     mac: entrada.mac,
@@ -72,11 +83,34 @@ function estadoPublico(sala) {
     wifiRssi: entrada.wifiRssi,
     modo: entrada.modo,
     fwVersao: entrada.fwVersao,
+    role,
     ultimaTelemetria: entrada.ultimaTelemetria,
     ultimoComando: entrada.ultimoComando,
-    capturasRecentes: entrada.capturas,
+    failsafe: entrada.failsafe,
+    capturasRecentes: capturasRecentes(sala),
     ota,
   };
+}
+
+function capturasRecentes(sala) {
+  return capturasPorSala.get(sala) || [];
+}
+
+function capturaRecente(sala, id) {
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return capturasRecentes(sala).find((c) => c.id === n) || null;
+}
+
+function limparCapturas(sala) {
+  if (sala === undefined) capturasPorSala.clear();
+  else capturasPorSala.delete(sala);
+}
+
+function sincronizarPapel(sala) {
+  const entrada = conexoes.get(sala);
+  if (!entrada) return false;
+  return enviarComando(sala, { tipo: "device_role", role: papelDaEntrada(sala, entrada) });
 }
 
 function listarEstados() {
@@ -164,6 +198,22 @@ function registrarVersaoFirmware(sala, entrada, fw) {
   }
 }
 
+function atualizarFailsafeReportado(entrada, msg) {
+  if (typeof msg?.failsafeConfigurado !== "boolean") return false;
+  const pulsos = Number(msg.failsafePulsos);
+  const carrierHz = Number(msg.failsafeCarrierHz);
+  const protocolRecordId = Number(msg.failsafeProtocolRecordId);
+  const configurado = msg.failsafeConfigurado;
+  entrada.failsafe = {
+    configurado,
+    pulsos: configurado && Number.isInteger(pulsos) && pulsos > 0 && pulsos <= 1024 ? pulsos : 0,
+    carrierHz: configurado && Number.isInteger(carrierHz) && carrierHz >= 20000 && carrierHz <= 60000 ? carrierHz : null,
+    protocolRecordId: configurado && Number.isInteger(protocolRecordId) && protocolRecordId > 0 ? protocolRecordId : null,
+    atualizadoEm: new Date().toISOString(),
+  };
+  return true;
+}
+
 function registrarTelemetria(sala, entrada, msg) {
   const agora = new Date().toISOString();
   const tempValida = numeroNaFaixa(msg.temp, -40, 85);
@@ -171,6 +221,7 @@ function registrarTelemetria(sala, entrada, msg) {
   entrada.wifiRssi = numeroNaFaixa(msg.rssi, -120, 0) ? msg.rssi : entrada.wifiRssi;
   entrada.modo = MODOS_VALIDOS.has(msg.modo) ? msg.modo : entrada.modo;
   registrarVersaoFirmware(sala, entrada, msg.fw);
+  atualizarFailsafeReportado(entrada, msg);
   entrada.ultimaTelemetria = {
     temp: tempValida ? msg.temp : null,
     hum: humValida ? msg.hum : null,
@@ -196,17 +247,37 @@ function registrarTelemetria(sala, entrada, msg) {
   eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
 }
 
-function registrarCaptura(sala, entrada, msg) {
+function registrarCaptura(sala, entrada, msg, salaRow) {
+  if (papelDaEntrada(sala, entrada, salaRow) !== "cloner") {
+    logger.warn("device-captura-rejeitada", { sala, mac: entrada.mac, motivo: "nao-e-o-clonador" });
+    return;
+  }
+  if (entrada.modo !== "config_clone") {
+    logger.warn("device-captura-rejeitada", { sala, mac: entrada.mac, modo: entrada.modo, motivo: "fora-do-modo-clone" });
+    return;
+  }
+  const raw = Array.isArray(msg.raw)
+    ? msg.raw.slice(0, 1024).filter((n) => Number.isInteger(n) && n >= 0 && n <= 65535)
+    : [];
+  if (!raw.length) {
+    logger.warn("device-captura-rejeitada", { sala, mac: entrada.mac, motivo: "raw-invalido" });
+    return;
+  }
   const captura = {
+    id: proximoIdCaptura++,
+    sala,
     isKnown: !!msg.isKnown,
-    protocolId: typeof msg.protocolId === "number" ? msg.protocolId : null,
-    protocol: typeof msg.protocol === "string" ? msg.protocol : null,
-    hex: typeof msg.hex === "string" ? msg.hex : null,
-    raw: Array.isArray(msg.raw) ? msg.raw.slice(0, 1024) : [],
+    protocolId: Number.isInteger(msg.protocolId) && msg.protocolId >= 0 ? msg.protocolId : null,
+    protocol: typeof msg.protocol === "string" ? msg.protocol.slice(0, 80) : null,
+    hex: typeof msg.hex === "string" ? msg.hex.slice(0, 4096) : null,
+    raw,
+    carrierHz: Number.isInteger(msg.carrierHz) && msg.carrierHz >= 20000 && msg.carrierHz <= 60000 ? msg.carrierHz : 38000,
     recebidoEm: new Date().toISOString(),
   };
-  entrada.capturas.unshift(captura);
-  if (entrada.capturas.length > MAX_CAPTURAS_ARMAZENADAS) entrada.capturas.length = MAX_CAPTURAS_ARMAZENADAS;
+  const historico = capturasPorSala.get(sala) || [];
+  historico.unshift(captura);
+  if (historico.length > MAX_CAPTURAS_ARMAZENADAS) historico.length = MAX_CAPTURAS_ARMAZENADAS;
+  capturasPorSala.set(sala, historico);
   eventos.emit("captura", { sala, captura });
 }
 
@@ -264,7 +335,7 @@ function iniciar(server) {
       fwVersao: null,
       ultimaTelemetria: null,
       ultimoComando: null,
-      capturas: [],
+      failsafe: null,
     };
     conexoes.set(sala, entrada);
     ws.isAlive = true;
@@ -282,7 +353,14 @@ function iniciar(server) {
     logger.info("device-ws-conectado", { sala, mac, ip });
     monitoramentoService.registrarConexaoDispositivo(sala);
     eventos.emit("conexao", { sala, conectado: true });
-    const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
+    const salaInicial = salasService.buscar(sala);
+    try {
+      ws.send(JSON.stringify({ tipo: "device_role", role: papelDaEntrada(sala, entrada, salaInicial) }));
+      ws.send(JSON.stringify(salasService.comandoFailsafeIR(salaInicial)));
+    } catch (erro) {
+      logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
+    }
+    const comandoInicial = salasService.comandoEstadoIR(salaInicial);
     if (comandoInicial) ws.send(JSON.stringify(comandoInicial));
     try {
       ws.send(JSON.stringify(require("./configuracoesService").politicaApDispositivo()));
@@ -320,12 +398,15 @@ function iniciar(server) {
         registrarTelemetria(sala, entrada, msg);
       } else if (msg.tipo === "info") {
         registrarVersaoFirmware(sala, entrada, msg.fw);
+        atualizarFailsafeReportado(entrada, msg);
+      } else if (msg.tipo === "failsafe_status") {
+        if (atualizarFailsafeReportado(entrada, msg)) eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
       } else if (msg.tipo === "ota_progresso") {
         require("./otaService").registrarProgresso(sala, msg);
       } else if (msg.tipo === "ota_resultado") {
         require("./otaService").registrarResultado(sala, msg);
       } else if (msg.tipo === "captura") {
-        registrarCaptura(sala, entrada, msg);
+        registrarCaptura(sala, entrada, msg, salaAtual);
       } else if (msg.tipo === "acesso") {
         salasService.registrarAcessoEsp(sala, {
           ip: typeof msg.ip === "string" ? msg.ip : entrada.ip,
@@ -387,6 +468,7 @@ function encerrar() {
     } catch (erro) {}
   });
   conexoes.clear();
+  capturasPorSala.clear();
   if (wss) {
     try {
       wss.close();
@@ -401,6 +483,10 @@ module.exports = {
   estadoPublico,
   listarEstados,
   enviarComando,
+  sincronizarPapel,
+  capturasRecentes,
+  capturaRecente,
+  limparCapturas,
   enviarAtualizacaoCredencial,
   difundirPoliticaAp,
   dispositivoConectado,

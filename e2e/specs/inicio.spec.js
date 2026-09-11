@@ -41,7 +41,7 @@ test("hub do administrador: agenda/grade/notificações e atalhos de administra�
 test("hub do superadministrador: atalhos completos e faixa de saúde do sistema", async ({ page, context }) => {
   await abrir(page, context, "superadmin");
   const adm = await chaves(page, "#hubGridAdmin");
-  expect(adm).toEqual(expect.arrayContaining(["adm-macs", "adm-config", "adm-status", "adm-relatos"]));
+  expect(adm).toEqual(expect.arrayContaining(["adm-macs", "adm-esp32", "adm-protocolos", "adm-config", "adm-status", "adm-relatos"]));
   await expect(page.locator("#hubResumo")).toBeVisible();
   await expect(page.locator("#hubResumo .status-chip").first()).toBeVisible();
   await page.locator("#hubResumo .hub-resumo-link").click();

@@ -81,20 +81,60 @@ test("comandos críticos duplicados continuam iguais ao README", () => {
   }
 });
 
-test("o manual não descreve mais o AP como temporário nem a estimativa de energia", () => {
+test("o manual descreve o AP apenas como portal de provisionamento, sem AP permanente nem estimativa de energia", () => {
   const manual = carregarManualPublico();
   const tudo = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
-  for (const obsoleto of [/rede aberta/i, /ponto de acesso aberto/i, /AP de recuperação/i, /portal de recuperação/i, /energia estimada/i, /kWh/i, /BTU/i]) {
+  for (const obsoleto of [/rede aberta/i, /ponto de acesso aberto/i, /AP de recuperação/i, /portal de recuperação/i, /AP permanente/i, /fica no ar o tempo todo/i, /energia estimada/i, /kWh/i, /BTU/i]) {
     assert.ok(!obsoleto.test(tudo), `texto obsoleto ainda presente no manual: ${obsoleto}`);
   }
-  for (const obsoleto of [/## Energia Estimada/, /energia_resumos_diarios/, /rede aberta `RemoteIFES-Setup`/, /ponto de acesso aberto `RemoteIFES-Setup`/]) {
+  for (const obsoleto of [/## Energia Estimada/, /energia_resumos_diarios/, /rede aberta `RemoteIFES-Setup`/, /ponto de acesso aberto `RemoteIFES-Setup`/, /permanentemente no ar/, /permanentemente ativa/, /acessar interface do ESP32" continua/, /status\.html/]) {
     assert.ok(!obsoleto.test(README), `texto obsoleto ainda presente no README: ${obsoleto}`);
   }
-  assert.ok(/permanentemente no ar/.test(README), "o README precisa dizer que o RemoteIFES-Setup fica ativo na operação normal");
-  assert.ok(/Exigir senha na rede de configuração dos ESP32/.test(README), "o README precisa documentar a nova opção global");
+  assert.ok(/criada apenas no modo AP de provisionamento/.test(README), "o README precisa dizer que o RemoteIFES-Setup só existe durante o provisionamento");
+  assert.ok(/encerra o AP e não serve frontend local durante a operação normal/.test(README), "o README precisa deixar claro que o frontend local é desligado após o setup");
+  assert.ok(/clique curto no switch físico/.test(README), "o README precisa documentar o clique no switch para reabrir o portal");
+  assert.ok(/Exigir senha na rede de configuração dos ESP32/.test(README), "o README precisa documentar a opção global");
   const superadmin = JSON.stringify(service._superSections);
   assert.ok(/RemoteIFES-Setup/.test(superadmin) && /Exigir senha na rede de configuração dos ESP32/.test(superadmin));
   assert.ok(/credencial do dispositivo no servidor/.test(superadmin), "a autenticação no servidor continua documentada à parte");
+});
+
+test("manual e README documentam Protocolos IR, o clonador vinculado à placa, o switch físico e o Auto-ON", () => {
+  const manual = carregarManualPublico();
+  const publico = JSON.stringify(manual.secoes);
+  const superadmin = JSON.stringify(service._superSections);
+  const admin = JSON.stringify(service._adminSections);
+
+  assert.ok(service._superSections.some((secao) => secao.id === "protocolos-ir" && secao.verNoApp === "/admin/protocolos"));
+  assert.ok(!admin.includes("\"id\":\"protocolos-ir\""), "a seção de Protocolos IR é exclusiva do Superadministrador");
+  for (const trecho of ["Administração &gt; Dispositivos &gt; Protocolos IR", "clonador", "failsafe OFF", "GPIO 26", "GPIO 27", "5 s", "40 ms", "pull-up interno"]) {
+    assert.ok(superadmin.toLowerCase().includes(trecho.toLowerCase()), `manual do Superadministrador sem: ${trecho}`);
+  }
+  assert.match(superadmin, /MAC e a credencial/);
+  assert.match(superadmin, /Auto-ON/);
+  assert.match(publico, /Auto-ON/);
+  for (const antigo of ["Com o aparelho ligado, use <strong>Turbo</strong>", "<strong>Turbo</strong>: só pode ser alterado com o aparelho ligado."]) {
+    assert.ok(!publico.includes(antigo), `o manual público ainda descreve o Turbo sem Auto-ON: ${antigo}`);
+  }
+
+  for (const trecho of [
+    "Administração > Dispositivos > Protocolos IR",
+    "### Administração > Dispositivos > Protocolos IR",
+    "### Switch físico e buzzer",
+    "| Auto-ON | **ativado** |",
+    "`protocolos_ir`",
+    "GPIO 26",
+    "GPIO 27",
+    "`failsafe_raw_set`",
+    "`failsafe_raw_clear`",
+    "um clonador oficial ativo por vez",
+    "protocolos-ir.spec.js",
+    "auto-on.spec.js",
+    "firmware-contrato.test.js",
+  ]) {
+    assert.ok(README.includes(trecho), `README sem: ${trecho}`);
+  }
+  assert.match(README, /atualmente `4\.1\.0`/);
 });
 
 test("procedimentos de host aparecem só no conjunto Superadministrador", () => {

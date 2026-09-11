@@ -28,6 +28,7 @@ function montarLinhaDispositivo(salaRow) {
     ipEsp32: salaRow.ipEsp32,
     online: !!salaRow.online,
     irProtocolo: Number.isInteger(salaRow.irProtocolo) ? salaRow.irProtocolo : null,
+    irProtocoloRegistroId: Number.isInteger(salaRow.irProtocoloRegistroId) ? salaRow.irProtocoloRegistroId : null,
     fwVersao: salaRow.fwVersao || null,
     credencial: credenciaisService.estado(salaRow.sala),
     dispositivo: deviceHub.estadoPublico(salaRow.sala),
@@ -44,6 +45,13 @@ function exigirSalaCadastrada(req, res, next) {
 function exigirDispositivoConectado(req, res, next) {
   if (!deviceHub.dispositivoConectado(req.params.sala)) {
     return res.status(409).json({ ok: false, erro: "dispositivo não está conectado no momento" });
+  }
+  next();
+}
+
+function exigirClonadorAutorizado(req, res, next) {
+  if (deviceHub.estadoPublico(req.params.sala).role !== "cloner") {
+    return res.status(403).json({ ok: false, erro: "somente o ESP32 definido como clonador em Dispositivos > Protocolos IR pode capturar sinais" });
   }
   next();
 }
@@ -173,15 +181,18 @@ router.post("/admin/esp32/:sala/sair-operacao", exigirSalaCadastrada, exigirDisp
   enviarOuFalhar(res, req.params.sala, { tipo: "exit_operation" });
 });
 
-router.post("/admin/esp32/:sala/modo", exigirSalaCadastrada, exigirDispositivoConectado, (req, res) => {
+router.post("/admin/esp32/:sala/modo", exigirSalaCadastrada, exigirDispositivoConectado, (req, res, next) => {
   const { modo } = req.body || {};
   if (!MODOS_VALIDOS.includes(modo)) {
     return res.status(400).json({ ok: false, erro: `modo deve ser um de: ${MODOS_VALIDOS.join(", ")}` });
   }
+  if (modo === "clone") return exigirClonadorAutorizado(req, res, next);
   enviarOuFalhar(res, req.params.sala, { tipo: "set_mode", modo });
+}, (req, res) => {
+  enviarOuFalhar(res, req.params.sala, { tipo: "set_mode", modo: "clone" });
 });
 
-router.post("/admin/esp32/:sala/captura/iniciar", exigirSalaCadastrada, exigirDispositivoConectado, (req, res) => {
+router.post("/admin/esp32/:sala/captura/iniciar", exigirSalaCadastrada, exigirDispositivoConectado, exigirClonadorAutorizado, (req, res) => {
   enviarOuFalhar(res, req.params.sala, { tipo: "start_capture" });
 });
 

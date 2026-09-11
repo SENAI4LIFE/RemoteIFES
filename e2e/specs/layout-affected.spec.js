@@ -94,7 +94,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
       expect(workspaceUsuarios.proporcao).toBeGreaterThan(0.9);
     }
 
-    for (const rota of ["usuarios", "usuarios/proprietarios", "notificacoes", "logs", "logs/acesso", "logs/dispositivos", "logs/sessoes", "logs/auditoria", "status", "status/mapa", "status/sistema", "macs", "config", "esp32", "relatos"]) {
+    for (const rota of ["usuarios", "usuarios/proprietarios", "notificacoes", "logs", "logs/acesso", "logs/dispositivos", "logs/sessoes", "logs/auditoria", "status", "status/mapa", "status/sistema", "macs", "config", "esp32", "protocolos", "relatos"]) {
       const [sub, aba] = rota.split("/");
       await page.locator(`.admin-subtab-btn[data-sub="${sub}"]`).click();
       await expect(page.locator(`#adminSub-${sub}`)).toBeVisible();

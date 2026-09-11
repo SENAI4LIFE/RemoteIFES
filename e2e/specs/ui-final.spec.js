@@ -265,7 +265,7 @@ test("os glifos dos controles fixos não crescem com a ampliação do texto", as
   expect(ampliado.alvoAjuda).toBeGreaterThanOrEqual(44);
 });
 
-const SUBABAS = ["usuarios", "usuarios/proprietarios", "notificacoes", "status/sistema", "config", "esp32", "macs", "logs/auditoria"];
+const SUBABAS = ["usuarios", "usuarios/proprietarios", "notificacoes", "status/sistema", "config", "esp32", "protocolos", "macs", "logs/auditoria"];
 
 for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
   test(`Administração continua utilizável na fonte máxima em ${tamanhoNome}`, async ({ page, context }) => {

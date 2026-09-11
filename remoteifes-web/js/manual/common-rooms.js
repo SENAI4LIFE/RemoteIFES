@@ -61,8 +61,8 @@ ManualContent.registrar([
       { t: "passos", itens: [
         "Confirme a sala e os indicadores <strong>online/offline</strong>, <strong>ligado/desligado</strong> e eventual aviso de reserva.",
         "Use <strong>Power</strong> para alternar entre ligado e desligado. O modo exibido passa entre <strong>Cool</strong> e <strong>Off</strong>.",
-        "Use <strong>Diminuir temperatura</strong> ou <strong>Aumentar temperatura</strong>; cada acionamento altera 1 °C e para nos limites efetivos da sala.",
-        "Com o aparelho ligado, use <strong>Turbo</strong> para ativar ou desativar o reforço configurado pelo Superadministrador.",
+        "Use <strong>Diminuir temperatura</strong> ou <strong>Aumentar temperatura</strong>; cada acionamento altera 1 °C e para nos limites efetivos da sala. Com a opção global <strong>Auto-ON</strong> ativa (padrão), ajustar a temperatura de um aparelho desligado também o liga com o novo alvo; com Auto-ON desativado, o alvo é guardado e o aparelho continua desligado.",
+        "Use <strong>Turbo</strong> para ativar ou desativar o reforço configurado pelo Superadministrador. Com Auto-ON, ativar o Turbo em um aparelho desligado também o liga; desativar o Turbo nunca liga o aparelho. Sem Auto-ON, o Turbo só pode ser alterado com o aparelho ligado.",
         "Aguarde a atualização do painel. O novo alvo e o estado dos controles são a confirmação de aceite pelo servidor.",
       ] },
       { t: "fluxo", titulo: "Estado e ação", itens: [
@@ -77,7 +77,7 @@ ManualContent.registrar([
         "<strong>Somente leitura</strong>: sua conta não possui controle para essa sala.",
         "<strong>Sala reservada por …</strong>: uma reserva ativa de outro usuário bloqueia usuários comuns até o fim indicado.",
         "<strong>Temperatura no limite</strong>: o botão correspondente fica desabilitado; isso é esperado.",
-        "<strong>Turbo</strong>: só pode ser alterado com o aparelho ligado.",
+        "<strong>Turbo</strong>: fica desabilitado com o aparelho desligado somente quando o Superadministrador desativa o Auto-ON global.",
       ] },
       { t: "nota", nivel: "atencao", texto: "Se o ESP32 estiver offline, o servidor pode aceitar e guardar o estado desejado. O painel avisa que ele será aplicado na reconexão; não interprete o aceite como confirmação física imediata." },
     ],

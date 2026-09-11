@@ -27,6 +27,7 @@ function criarSchema() {
       temperaturaMaxima REAL,
       turboAtivo INTEGER NOT NULL DEFAULT 0,
       irProtocolo INTEGER,
+      irProtocoloRegistroId INTEGER,
       ipEsp32 TEXT,
       mac TEXT,
       latitude REAL,
@@ -132,6 +133,24 @@ function criarSchema() {
     CREATE TABLE IF NOT EXISTS configuracoes (
       chave TEXT PRIMARY KEY,
       valor TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS protocolos_ir (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      label TEXT NOT NULL COLLATE NOCASE UNIQUE,
+      isKnown INTEGER NOT NULL DEFAULT 0,
+      protocolId INTEGER,
+      protocol TEXT,
+      hex TEXT,
+      rawJson TEXT NOT NULL,
+      carrierHz INTEGER NOT NULL DEFAULT 38000,
+      failsafeRawJson TEXT,
+      failsafeCarrierHz INTEGER,
+      failsafeAtualizadoEm TEXT,
+      origemSala TEXT REFERENCES salas(sala) ON DELETE SET NULL,
+      origemMac TEXT,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS notificacoes (
@@ -246,6 +265,7 @@ function criarSchema() {
     CREATE INDEX IF NOT EXISTS idx_esp_indisp_offline ON esp_indisponibilidades(offlineEm DESC);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_esp_indisp_aberta ON esp_indisponibilidades(sala) WHERE onlineEm IS NULL;
     CREATE INDEX IF NOT EXISTS idx_energia_resumos_data ON energia_resumos_diarios(data);
+    CREATE INDEX IF NOT EXISTS idx_protocolos_ir_criado ON protocolos_ir(criadoEm DESC);
 
   `);
 
@@ -253,6 +273,7 @@ function criarSchema() {
   migrarColunasAgendamentos();
   migrarColunasAgendamentosExecucoes();
   migrarColunasSalas();
+  migrarColunasProtocolosIr();
   removerTabelasObsoletas();
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL`);
 }
@@ -340,6 +361,9 @@ function migrarColunasSalas() {
   if (!colunas.includes("irProtocolo")) {
     db.exec(`ALTER TABLE salas ADD COLUMN irProtocolo INTEGER`);
   }
+  if (!colunas.includes("irProtocoloRegistroId")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN irProtocoloRegistroId INTEGER`);
+  }
   if (!colunas.includes("fwVersao")) {
     db.exec(`ALTER TABLE salas ADD COLUMN fwVersao TEXT`);
   }
@@ -367,6 +391,7 @@ function recriarTabelaSalas() {
         temperaturaMaxima REAL,
         turboAtivo INTEGER NOT NULL DEFAULT 0,
         irProtocolo INTEGER,
+        irProtocoloRegistroId INTEGER,
         fwVersao TEXT,
         ipEsp32 TEXT,
         mac TEXT,
@@ -378,12 +403,12 @@ function recriarTabelaSalas() {
       );
       INSERT INTO salas_nova (
         sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
-        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, ipEsp32,
+        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, irProtocoloRegistroId, ipEsp32,
         fwVersao, mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
       )
       SELECT
         sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
-        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, ipEsp32,
+        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, irProtocoloRegistroId, ipEsp32,
         fwVersao, mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
       FROM salas;
       DROP TABLE salas;
@@ -402,6 +427,18 @@ function recriarTabelaSalas() {
   const inconsistencias = db.prepare(`PRAGMA foreign_key_check`).all();
   if (inconsistencias.length > 0) {
     throw new Error("migração de salas deixou referências inválidas");
+  }
+}
+
+function migrarColunasProtocolosIr() {
+  const colunas = db.prepare(`PRAGMA table_info(protocolos_ir)`).all().map((c) => c.name);
+  for (const [coluna, tipo] of [
+    ["failsafeRawJson", "TEXT"],
+    ["failsafeCarrierHz", "INTEGER"],
+    ["failsafeAtualizadoEm", "TEXT"],
+    ["origemMac", "TEXT"],
+  ]) {
+    if (!colunas.includes(coluna)) db.exec(`ALTER TABLE protocolos_ir ADD COLUMN ${coluna} ${tipo}`);
   }
 }
 

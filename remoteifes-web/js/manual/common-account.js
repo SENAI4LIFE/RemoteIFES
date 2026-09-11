@@ -115,7 +115,7 @@ ManualContent.registrar([
         ["Sessão encerrada", "entre novamente; inatividade, troca de senha ou administração pode tê-la fechado"],
         ["Site sem servidor", "rede e origem; aguarde a reconexão automática"],
         ["Uma sala offline", "não repita comandos já aceitos; informe sala e horário à equipe"],
-        ["Controle desabilitado", "permissão geral, restrição da sala, reserva, limites e estado ligado para Turbo"],
+        ["Controle desabilitado", "permissão geral, restrição da sala, reserva, limites de temperatura e, sem Auto-ON, aparelho desligado para Turbo"],
         ["Comando aceito, sem efeito físico", "confira offline; o estado pode estar pendente para reconexão"],
         ["Tela antiga na PWA", "abra com rede e aguarde a atualização automática"],
         ["APK recusado", "build superior, mesma assinatura, origem publicável e permissão de instalação"],

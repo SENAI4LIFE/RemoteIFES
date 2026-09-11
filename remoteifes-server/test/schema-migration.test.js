@@ -42,6 +42,21 @@ legacy.exec(`
     18, 27, 1, 1, '192.0.2.10', 'AA:BB:CC:DD:EE:01', -20.1, -40.2, 1,
     '2026-08-29 12:00:00', 7, '{}'
   );
+  CREATE TABLE protocolos_ir (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    label TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    isKnown INTEGER NOT NULL DEFAULT 0,
+    protocolId INTEGER,
+    protocol TEXT,
+    hex TEXT,
+    rawJson TEXT NOT NULL,
+    carrierHz INTEGER NOT NULL DEFAULT 38000,
+    origemSala TEXT,
+    criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+    atualizadoEm TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  INSERT INTO protocolos_ir (label, isKnown, protocolId, protocol, rawJson, carrierHz, origemSala)
+  VALUES ('Legado IR', 1, 5, 'DAIKIN', '[9000,4500,560,560]', 38000, 'LEGACY-1');
 `);
 legacy.close();
 
@@ -61,6 +76,7 @@ test("migração da tabela legada de salas preserva dados e cria fwVersao", () =
 
   const colunas = db.prepare("PRAGMA table_info(salas)").all().map((c) => c.name);
   assert.ok(colunas.includes("fwVersao"));
+  assert.ok(colunas.includes("irProtocoloRegistroId"));
   assert.ok(!colunas.includes("presetId"));
   assert.ok(!colunas.includes("funcoesEstado"));
 
@@ -68,6 +84,7 @@ test("migração da tabela legada de salas preserva dados e cria fwVersao", () =
   assert.equal(sala.nome, "Sala legada");
   assert.equal(sala.mac, "AA:BB:CC:DD:EE:01");
   assert.equal(sala.irProtocolo, 1);
+  assert.equal(sala.irProtocoloRegistroId, null);
   assert.equal(sala.fwVersao, null);
 
   db.prepare("UPDATE salas SET fwVersao = ? WHERE sala = ?").run("4.0.0", "LEGACY-1");
@@ -80,6 +97,29 @@ test("migração da tabela legada de salas preserva dados e cria fwVersao", () =
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'energia_configuracoes'").get());
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'energia_estados'").get());
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'energia_resumos_diarios'").get());
+});
+
+test("a biblioteca de protocolos IR ganha as colunas de failsafe e origem sem perder registros anteriores", () => {
+  const colunas = db.prepare("PRAGMA table_info(protocolos_ir)").all().map((c) => c.name);
+  for (const coluna of ["failsafeRawJson", "failsafeCarrierHz", "failsafeAtualizadoEm", "origemMac"]) {
+    assert.ok(colunas.includes(coluna), `coluna ${coluna} ausente após a migração`);
+  }
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_protocolos_ir_criado'").get());
+  const legado = db.prepare("SELECT * FROM protocolos_ir WHERE label = 'Legado IR'").get();
+  assert.equal(legado.protocolId, 5);
+  assert.equal(legado.failsafeRawJson, null);
+  assert.equal(legado.origemMac, null);
+
+  const protocolos = require("../src/services/protocolosIrService");
+  const publico = protocolos.buscar(legado.id);
+  assert.deepEqual(publico.raw, [9000, 4500, 560, 560]);
+  assert.equal(publico.failsafe, null);
+  assert.deepEqual(publico.salas, []);
+
+  db.prepare("UPDATE salas SET irProtocoloRegistroId = ? WHERE sala = 'LEGACY-1'").run(legado.id);
+  assert.deepEqual(protocolos.salasAtribuidas(legado.id), ["LEGACY-1"]);
+  assert.throws(() => db.prepare("INSERT INTO protocolos_ir (label, rawJson) VALUES ('legado ir', '[1]')").run(), /UNIQUE/);
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 });
 
 test("a conta padrão 'admin' é migrada para 'superadmin' preservando id, nível e hash", () => {

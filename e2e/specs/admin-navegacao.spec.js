@@ -2,11 +2,11 @@ const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require
 
 const GRUPOS = {
   gestao: { rotulo: "Gestão", subs: ["usuarios", "relatos"] },
-  dispositivos: { rotulo: "Dispositivos", subs: ["macs", "esp32", "notificacoes"] },
+  dispositivos: { rotulo: "Dispositivos", subs: ["macs", "esp32", "protocolos", "notificacoes"] },
   sistema: { rotulo: "Sistema", subs: ["logs", "status", "config"] },
 };
 
-const SUPERADMIN_ONLY = ["relatos", "macs", "esp32", "config"];
+const SUPERADMIN_ONLY = ["relatos", "macs", "esp32", "protocolos", "config"];
 const TODAS_AS_FUNCOES = Object.values(GRUPOS).flatMap((g) => g.subs);
 
 const ABAS = {
@@ -74,11 +74,11 @@ test("Gestão reúne Usuários e Relatos de problemas", async ({ page, context }
   expect(gestao.itens.map((i) => i.sub)).toEqual(["usuarios", "relatos"]);
 });
 
-test("Dispositivos reúne Cadastro, Firmware / OTA e Alertas", async ({ page, context }) => {
+test("Dispositivos reúne Cadastro, Firmware / OTA, Protocolos IR e Alertas", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin");
   const dispositivos = (await estrutura(page)).find((g) => g.grupo === "dispositivos");
-  expect(dispositivos.itens.map((i) => i.rotulo)).toEqual(["Cadastro", "Firmware / OTA", "Alertas"]);
-  expect(dispositivos.itens.map((i) => i.sub)).toEqual(["macs", "esp32", "notificacoes"]);
+  expect(dispositivos.itens.map((i) => i.rotulo)).toEqual(["Cadastro", "Firmware / OTA", "Protocolos IR", "Alertas"]);
+  expect(dispositivos.itens.map((i) => i.sub)).toEqual(["macs", "esp32", "protocolos", "notificacoes"]);
 });
 
 test("Sistema reúne Logs, Status e Configurações", async ({ page, context }) => {
