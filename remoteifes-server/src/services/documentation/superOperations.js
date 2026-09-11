@@ -78,13 +78,13 @@ module.exports = [
     corpo: [
       { t: "p", texto: "<strong>Administração &gt; Sistema &gt; Status &gt; Sistema</strong> atualiza a cada 20 segundos enquanto está aberta. É diagnóstico detalhado; o <code>/health</code> continua sendo a checagem mínima de serviço e banco." },
       { t: "tabela", cabecalho: ["Cartão", "Como usar"], linhas: [
-        ["Serviço", "uptime, ambiente, memória RSS, carga, Node e PID; reinício zera contadores em memória"],
+        ["Serviço", "uptime, ambiente, memória RSS, carga, Node e PID (e nome, modo e reinícios quando roda sob PM2); reinício zera contadores em memória"],
         ["Banco de dados", "resposta, latência, arquivo, WAL e espaço reutilizável"],
         ["Armazenamento", "livre/total; alerta abaixo de 10% e criticidade abaixo de 5% ou 512 MiB"],
         ["Backups", "automático, quantidade, último e idade frente ao intervalo"],
         ["ESP32", "MACs, online, WebSocket, quedas, instabilidade e OTAs"],
         ["Credenciais", "provisionadas, Só MAC, revogadas e exigência global"],
-        ["Históricos com limite", "uso dos limites de retenção; ≥75% merece atenção e ≥90% alerta"],
+        ["Históricos com limite", "uso dos limites de retenção, inclusive das amostras e horas do histórico de monitoramento; ≥75% merece atenção e ≥90% alerta"],
         ["Falhas desde a inicialização", "comando, telemetria, OTA, credencial, reconexão e agendador"],
       ] },
       { t: "fluxo", titulo: "Triagem de alerta", itens: [
@@ -95,6 +95,7 @@ module.exports = [
         { tipo: "status", texto: "Atualizar e validar normalização" },
       ] },
       { t: "nota", texto: "Alertas recorrentes viram notificações com deduplicação aproximada de seis horas. Espaço crítico dispara limpeza de retenção, mas não substitui expansão do disco nem backup externo." },
+      { t: "links", itens: [{ id: "graficos", texto: "Histórico e gráficos" }, { id: "heatmap", texto: "Mapa de calor operacional" }] },
     ],
   },
   {
@@ -114,6 +115,36 @@ module.exports = [
         "Sem fonte confiável aparece <strong>Sem dados</strong>, nunca zero. Métricas de conectividade exigem MAC e dependem da retenção; a tela avisa quando o período a excede.",
       ] },
       { t: "nota", texto: "Use para comparar e priorizar, não para concluir causalidade." },
+    ],
+  },
+  {
+    id: "graficos",
+    titulo: "Histórico e gráficos do monitoramento",
+    papel: "superadmin",
+    categoria: "super_seguranca",
+    tags: ["gráficos", "histórico", "RSS", "CPU", "latência", "disco", "reconexões", "falhas", "comandos", "3 horas", "24 horas", "7 dias", "30 dias", "PM2"],
+    verNoApp: "/admin/status/sistema",
+    corpo: [
+      { t: "p", texto: "A seção <strong>Histórico e gráficos</strong>, em <strong>Administração &gt; Sistema &gt; Status &gt; Sistema</strong>, transforma os cartões em um painel de tendências. Os cartões continuam sendo a leitura exata e atualizada a cada 20 segundos; os gráficos mostram a evolução e só são consultados com a seção aberta (a preferência de recolher fica no navegador)." },
+      { t: "tabela", cabecalho: ["Gráfico", "Forma e leitura"], linhas: [
+        ["ESP32 conectados", "linhas: com MAC, online e conectados por WebSocket; a diferença entre elas é o offline inesperado"],
+        ["Reconexões e quedas", "colunas agrupadas por intervalo, a partir dos eventos online/offline já registrados em Logs &gt; Dispositivos"],
+        ["Falhas por período", "colunas empilhadas: telemetria, credencial, agendador e banco (deltas por intervalo) e OTA (notificações de falha)"],
+        ["Comandos por período", "colunas empilhadas por origem: manual, agendamento, ESP32 local e outros"],
+        ["Memória RSS · CPU · Latência do banco", "área da média com linha de pico por intervalo; CPU em percentual de um núcleo"],
+        ["Arquivo do banco e WAL · Disco livre", "linhas de tamanho; disco livre mostra o mínimo do intervalo"],
+        ["ESP32 online e offline · Credenciais · OTA por fase", "roscas com a composição atual, número central e legenda com quantidade e percentual"],
+        ["Uso dos históricos com limite", "barras horizontais com o uso de cada tabela limitada, incluindo as duas tabelas do próprio histórico"],
+      ] },
+      { t: "lista", itens: [
+        "Amostragem: o servidor grava uma amostra por minuto fora do caminho de comandos, telemetria e WebSocket (memória, CPU do processo, carga, latência e tamanho do banco/WAL, disco, contagens de ESP32 e deltas dos contadores de falha).",
+        "Retenção: amostras brutas por 48 horas e médias/picos por hora por 30 dias, consolidadas a cada minuto e limpas pela rotina de retenção (limites de 6 000 e 1 000 linhas); a tabela de uso mostra o próprio crescimento.",
+        "Faixas: 3 horas (3 min por ponto) e 24 horas (15 min) vêm das amostras; 7 dias (1 h) e 30 dias (6 h) vêm das horas consolidadas mais a hora corrente. Nada além de 168 pontos é enviado ao navegador.",
+        "Reinícios: cada início de processo aparece como marcador; nas faixas longas ele é aproximado à hora. Intervalos sem amostra ficam em branco, sem interpolação; contadores em memória nunca são exibidos como acumulado no gráfico.",
+        "Leitura sem cor: toda figura tem legenda, resumo em texto, leitura por teclado (setas, Home, End, Esc), toque ou passagem do ponteiro e <strong>Ver tabela de valores</strong>. O alto contraste troca a paleta.",
+        "PM2 (opcional): quando o servidor roda sob PM2, o cartão Serviço mostra nome, modo e reinícios informados pelo gerenciador; sem PM2 nada é inventado.",
+      ] },
+      { t: "nota", texto: "Cobertura parcial (instalação recente ou período maior que a retenção) é avisada acima dos gráficos. O histórico sobrevive a reinícios do servidor; apenas os contadores em memória recomeçam." },
     ],
   },
 ];

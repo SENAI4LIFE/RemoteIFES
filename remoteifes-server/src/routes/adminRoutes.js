@@ -165,6 +165,20 @@ router.get("/admin/monitoramento", exigirSuperAdmin, (req, res) => {
   res.json({ ok: true, monitoramento: monitoramentoService.coletar() });
 });
 
+router.get("/admin/monitoramento/historico", exigirSuperAdmin, (req, res) => {
+  const faixa = req.query.faixa === undefined ? "24h" : req.query.faixa;
+  if (!monitoramentoService.faixaValida(faixa)) {
+    return res.status(400).json({ ok: false, erro: "faixa inválida", faixas: monitoramentoService.faixasPublicas() });
+  }
+  try {
+    res.set("Cache-Control", "no-store");
+    res.json({ ok: true, ...monitoramentoService.historico(faixa) });
+  } catch (erro) {
+    logger.warn("monitoramento-historico-falhou", { mensagem: erro.message });
+    res.status(503).json({ ok: false, erro: "histórico de monitoramento temporariamente indisponível" });
+  }
+});
+
 router.get("/admin/heatmap", exigirSuperAdmin, (req, res) => {
   try {
     res.set("Cache-Control", "no-store");

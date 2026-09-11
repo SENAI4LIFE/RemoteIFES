@@ -276,7 +276,7 @@ O servidor roda uma rotina de retenção a cada 6 horas (e uma vez na inicializa
 | `auditoria_eventos`, `esp_indisponibilidades` | 7 dias | Administração, de 1 a 365 dias |
 | `relatos` **apenas com status `resolvido`** | desligado (`0`); defina para ativar | `RETENCAO_DIAS_RELATOS_RESOLVIDOS` |
 
-Usuários, salas, agendamentos do dia atual, configurações e **relatos de problema não resolvidos nunca são removidos** por essa rotina — a retenção de relatos resolvidos vem **desligada** e só apaga relatos já marcados como `resolvido` quando `RETENCAO_DIAS_RELATOS_RESOLVIDOS` recebe um número de dias. Notificações não lidas sobrevivem a `RETENCAO_DIAS_NOTIFICACOES` (365 dias por padrão) antes de serem descartadas, para uma caixa esquecida não crescer sem limite. As tabelas de histórico têm índices por data/hora para que a limpeza e as consultas de faixa de tempo (monitoramento, listas administrativas) continuem baratas mesmo com o banco cheio. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
+O histórico de monitoramento segue a mesma rotina: `monitoramento_amostras` guarda 48 horas (limite de 6 000 linhas) e `monitoramento_horas` 30 dias (limite de 1 000 linhas), sempre consolidando as horas fechadas antes de apagar amostras. Usuários, salas, agendamentos do dia atual, configurações e **relatos de problema não resolvidos nunca são removidos** por essa rotina — a retenção de relatos resolvidos vem **desligada** e só apaga relatos já marcados como `resolvido` quando `RETENCAO_DIAS_RELATOS_RESOLVIDOS` recebe um número de dias. Notificações não lidas sobrevivem a `RETENCAO_DIAS_NOTIFICACOES` (365 dias por padrão) antes de serem descartadas, para uma caixa esquecida não crescer sem limite. As tabelas de histórico têm índices por data/hora para que a limpeza e as consultas de faixa de tempo (monitoramento, listas administrativas) continuem baratas mesmo com o banco cheio. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco; após uma limpeza, o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
 
 ### Limites de crescimento e hardware mínimo
 
@@ -846,7 +846,30 @@ Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma 
 - **Credenciais:** provisionadas, ainda só por MAC, revogadas, e se a exigência global está ligada.
 - **Contadores de falha desde a inicialização** (em memória, zerados a cada reinício): persistência de telemetria, tarefas do agendador e execução de agendamentos, falhas de OTA, credenciais inválidas e reconexões anormais de dispositivo.
 
-A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição de alerta ativa, gera uma **notificação** (`tipo` `monitoramento`, no sino do administrador), sem repetir o mesmo alerta dentro de 6 horas. O endpoint bruto é `GET /admin/monitoramento`.
+A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição de alerta ativa, gera uma **notificação** (`tipo` `monitoramento`, no sino do administrador), sem repetir o mesmo alerta dentro de 6 horas. O endpoint bruto é `GET /admin/monitoramento`; o payload traz ainda `esp32.otaPorFase` (contagem por fase de OTA) e `servico.pm2`.
+
+Quando o servidor roda sob **PM2**, o cartão *Serviço* mostra nome, id, modo e contagem de reinícios informados pelo gerenciador — lidos das variáveis de ambiente que o próprio PM2 injeta ao iniciar o processo (`pm_id`, `name`, `exec_mode`, `restart_time`, `unstable_restarts`, `pm_uptime`), sem dependência nem chamada ao PM2. Fora do PM2 o campo é `null` e nada é exibido; os gráficos não dependem dele.
+
+### Histórico e gráficos
+
+Abaixo dos cartões, a seção recolhível **Histórico e gráficos** transforma o status em um painel operacional leve. Os cartões continuam sendo a leitura exata (atualizada a cada 20 s); os gráficos mostram a evolução e são desenhados em SVG pelo próprio frontend (`js/charts.js`, sem biblioteca externa nem CDN, incluído no shell da PWA e no Cordova). A preferência de manter a seção recolhida fica no navegador e, recolhida, nada é consultado nem desenhado.
+
+| Gráfico | Forma | Fonte |
+| --- | --- | --- |
+| ESP32 conectados (com MAC, online, WebSocket) | linhas/área | amostras |
+| Reconexões e quedas de ESP32 | colunas agrupadas por intervalo | `esp_eventos` (já persistido) |
+| Falhas por período (telemetria, credencial, agendador, banco, OTA) | colunas empilhadas | deltas amostrados por intervalo + notificações `esp32_ota_falha` |
+| Comandos por período (manual, agendamento, ESP32 local, outros) | colunas empilhadas | `comandos_log` (já persistido) |
+| Memória RSS, CPU do processo, latência do banco | área da média + linha de pico | amostras |
+| Arquivo do banco e WAL, disco livre | linhas/área | amostras |
+| ESP32 online × offline, credenciais de dispositivo, OTA por fase | roscas (composição atual) | payload corrente de `/admin/monitoramento` |
+| Uso dos históricos com limite | barras horizontais | payload corrente (`banco.tabelas`) |
+
+**Amostragem e retenção.** O agendador grava **uma amostra por minuto** (`monitoramento_amostras`: RSS, CPU do processo em % de um núcleo, carga, latência e tamanho do banco/WAL, disco livre/total, ESP32 com MAC/online/WebSocket e os **deltas** dos contadores de telemetria, credencial, agendador e banco no intervalo), sempre fora do caminho de comandos, telemetria e WebSocket e sem operações caras de integridade do SQLite. A cada minuto as horas fechadas são consolidadas em `monitoramento_horas` (média, pico/mínimo, somas e reinícios por hora). A retenção mantém **48 h de amostras brutas** e **30 dias de horas consolidadas** (limites de 6 000 e 1 000 linhas), integrada à rotina de retenção existente, que consolida antes de apagar; o crescimento das duas tabelas aparece no cartão *Históricos com limite* e no gráfico de uso. Em disco isso fica abaixo de 1 MB.
+
+**Faixas.** `GET /admin/monitoramento/historico?faixa=3h|24h|7d|30d` (superadministrador; `faixa` inválida responde 400) devolve séries já agregadas no servidor em uma grade completa: 3 h com 3 min por ponto e 24 h com 15 min vêm das amostras; 7 dias com 1 h e 30 dias com 6 h vêm das horas consolidadas mais a hora corrente crua. Nunca mais de 168 pontos por faixa, com cache de 30 s por faixa. Intervalos sem amostra chegam como `null` e ficam em branco no gráfico (sem interpolação); contagens de eventos persistidos chegam como zero. Cada início de processo dentro da janela vem em `reinicios` (instante exato nas faixas curtas, aproximado à hora nas longas) e vira um marcador; `cobertura` informa desde quando há histórico e se a janela está completa, e a tela avisa quando o período pedido começa antes da primeira amostra.
+
+**Leitura acessível.** Toda figura tem título, legenda para mais de uma série, resumo em texto (último, mínimo, máximo ou totais), leitura por teclado (setas, Home, End, Esc), por toque e por ponteiro (região `role="status"`), e uma tabela de valores sob demanda; o alto contraste troca a paleta das séries. Os gráficos são responsivos (coluna única no celular, duas colunas no desktop com os gráficos principais em largura total), respeitam a fonte máxima de acessibilidade, agrupam intervalos quando as colunas ficariam mais estreitas do que o legível e não redesenham no refresh de 20 s dos cartões: só quando a faixa muda, ao pedir *Atualizar* ou quando a composição atual realmente muda.
 
 ## Mapa de Calor Operacional
 
@@ -1081,7 +1104,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 
 | Alvo | Comando | Observações |
 |---|---|---|
-| Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`), o monitoramento operacional (`test/monitoramento.test.js`), a biblioteca de protocolos IR com clonador vinculado à identidade da placa, failsafe e reconexão (`test/protocolos-ir-service.test.js`, `test/protocolos-ir.test.js`), o Auto-ON global (`test/controle-auto-liga.test.js`), a migração do esquema (`test/schema-migration.test.js`) e o contrato do firmware — GPIOs, switch, buzzer, NVS, AP (`test/firmware-contrato.test.js`). |
+| Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credenciais.test.js`), o monitoramento operacional (`test/monitoramento.test.js`) e seu histórico de amostras, consolidação, retenção, faixas e reinícios (`test/monitoramento-historico.test.js`), a biblioteca de protocolos IR com clonador vinculado à identidade da placa, failsafe e reconexão (`test/protocolos-ir-service.test.js`, `test/protocolos-ir.test.js`), o Auto-ON global (`test/controle-auto-liga.test.js`), a migração do esquema (`test/schema-migration.test.js`) e o contrato do firmware — GPIOs, switch, buzzer, NVS, AP (`test/firmware-contrato.test.js`). |
 | Frontend end-to-end | `cd e2e && npm install && npx playwright install chromium && npx playwright test` | A instalação do pacote npm não baixa o navegador automaticamente; `npx playwright install chromium` instala a versão compatível. Em uma imagem Ubuntu mínima que ainda não tenha as bibliotecas do Chromium, use uma vez `sudo npx playwright install-deps chromium`. Para usar um canal do sistema, defina `E2E_BROWSER_CHANNEL` (por exemplo, `chrome` ou `msedge`). Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`inicio.spec.js`), o gate do Status por superadministrador, a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas, o clonador, a captura em tempo real, a biblioteca e o failsafe em `Protocolos IR` — inclusive em celular e com acessibilidade máxima (`protocolos-ir.spec.js`) — e o Auto-ON no painel de controle e nas Configurações (`auto-on.spec.js`). O ESP32 simulado responde a papel, modo clone, capturas, `send_raw` e failsafe. |
 | Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a coerência entre `config.xml` e `android-release.json`, a geração e a monotonia do `versionCode`, as recusas de publicação inconsistente, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
 | Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
@@ -1136,9 +1159,9 @@ remoteifes-server/
                         OTA de firmware (otaService) e sua distribuição em etapas (otaRolloutService),
                         biblioteca de protocolos IR, clonador oficial e failsafe (protocolosIrService),
                         credenciais de dispositivo (esp32CredenciaisService),
-                        monitoramento operacional (monitoramentoService),
+                        monitoramento operacional com amostragem e histórico consolidado por hora (monitoramentoService),
                         documentação administrativa por papel (documentationService))
-    scheduler/         verificação periódica de agendamentos, timeouts de ESP32 e de OTA, sessões abandonadas, monitoramento e backup
+    scheduler/         verificação periódica de agendamentos, timeouts de ESP32 e de OTA, sessões abandonadas, monitoramento, amostra de histórico a cada minuto e backup
     utils/             funções auxiliares (data/hora em fuso de Brasília, rate limiting, faixas de rede)
   test/               testes de regressão do servidor (node:test) — API, permissões, WebSocket, /health, backup, OTA, credenciais de dispositivo, monitoramento,
                         Protocolos IR e clonador (protocolos-ir*.test.js), Auto-ON (controle-auto-liga.test.js), contrato do firmware (firmware-contrato.test.js)
@@ -1164,6 +1187,7 @@ remoteifes-web/
     help.js            ajuda contextual dos modais (parte comum embutida; textos de administração vêm de /documentation após validar a sessão), com atalho para a seção do manual
     manual-content.js  seções comuns do manual (papel "todos") e diagramas SVG, carregadas sob demanda; as seções de administração e do superadministrador são entregues por /documentation e não ficam nos assets públicos
     tempo.js           formatação de datas/horas no fuso de Brasília
+    charts.js          gráficos SVG leves do monitoramento (linhas/área, colunas, barras horizontais e rosca) com leitura por teclado/toque, resumo e tabela
     rooms-data.js       utilitário auxiliar de composição de código de sala
     screens/           lógica de cada tela:
                         inicio.js (hub de início: cartões das ações principais adaptados ao papel, faixa de saúde do sistema para o superadministrador),
@@ -1179,7 +1203,7 @@ remoteifes-web/
                         em Dispositivos > Firmware / OTA, restrito ao superadministrador),
                         protocolos-ir-admin.js (clonador oficial, modo clone, capturas com nome, biblioteca e failsafe OFF —
                         em Dispositivos > Protocolos IR, restrito ao superadministrador),
-                        monitoramento.js (aba "Status" do painel administrativo, restrita ao superadministrador),
+                        monitoramento.js (aba "Status > Sistema" do painel administrativo, restrita ao superadministrador: cartões, histórico e gráficos),
                         manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
                         mobile-app.js (página #/aplicativo: estado da versão instalada, instalação guiada, atualização e download do APK verificado)
 

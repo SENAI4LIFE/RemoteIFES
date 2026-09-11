@@ -13,7 +13,7 @@ const MANUAL_SECAO_POR_AJUDA = {
   logs: "logs-dispositivos", dispositivos: "logs-dispositivos", acessos: "logs-dispositivos", proprietarios: "proprietarios-admin", propriedade: "controle-acesso-sala",
   mapa: "proprietarios-admin", macs: "esp32-cadastro", config: "configuracoes-globais", esp32: "esp32-avancado", protocolos: "protocolos-ir", monitoramento: "monitoramento",
   relatos: "relatos-gestao", notificacoes: "notificacoes", auditoria: "auditoria",
-  heatmap: "heatmap",
+  heatmap: "heatmap", graficos: "graficos",
 };
 
 const RoleDocumentation = (() => {
