@@ -237,6 +237,54 @@ function criarSchema() {
       PRIMARY KEY (sala, data)
     );
 
+    CREATE TABLE IF NOT EXISTS monitoramento_amostras (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      criadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      inicioProcesso TEXT NOT NULL,
+      rssMB REAL,
+      cpuPercent REAL,
+      carga1 REAL,
+      bancoMs REAL,
+      bancoBytes INTEGER,
+      walBytes INTEGER,
+      discoLivreBytes INTEGER,
+      discoTotalBytes INTEGER,
+      espComMac INTEGER,
+      espOnline INTEGER,
+      espWs INTEGER,
+      telemetriaFalhas INTEGER NOT NULL DEFAULT 0,
+      credencialFalhas INTEGER NOT NULL DEFAULT 0,
+      schedulerFalhas INTEGER NOT NULL DEFAULT 0,
+      bancoFalhas INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS monitoramento_horas (
+      hora TEXT PRIMARY KEY,
+      amostras INTEGER NOT NULL,
+      reinicios INTEGER NOT NULL DEFAULT 0,
+      rssMB REAL,
+      rssMBMax REAL,
+      cpuPercent REAL,
+      cpuPercentMax REAL,
+      carga1 REAL,
+      bancoMs REAL,
+      bancoMsMax REAL,
+      bancoBytes REAL,
+      walBytes REAL,
+      walBytesMax INTEGER,
+      discoLivreBytes REAL,
+      discoLivreBytesMin INTEGER,
+      discoTotalBytes REAL,
+      espComMac REAL,
+      espOnline REAL,
+      espOnlineMin INTEGER,
+      espWs REAL,
+      telemetriaFalhas INTEGER NOT NULL DEFAULT 0,
+      credencialFalhas INTEGER NOT NULL DEFAULT 0,
+      schedulerFalhas INTEGER NOT NULL DEFAULT 0,
+      bancoFalhas INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE INDEX IF NOT EXISTS idx_relatos_status ON relatos(status);
     CREATE INDEX IF NOT EXISTS idx_relatos_usuario ON relatos(usuarioId);
     CREATE INDEX IF NOT EXISTS idx_relatos_criado ON relatos(criadoEm);
@@ -266,6 +314,7 @@ function criarSchema() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_esp_indisp_aberta ON esp_indisponibilidades(sala) WHERE onlineEm IS NULL;
     CREATE INDEX IF NOT EXISTS idx_energia_resumos_data ON energia_resumos_diarios(data);
     CREATE INDEX IF NOT EXISTS idx_protocolos_ir_criado ON protocolos_ir(criadoEm DESC);
+    CREATE INDEX IF NOT EXISTS idx_mon_amostras_criado ON monitoramento_amostras(criadoEm);
 
   `);
 

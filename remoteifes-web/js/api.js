@@ -568,6 +568,11 @@ const Api = {
     return chamar("/admin/monitoramento", { headers: headersComToken() });
   },
 
+  async obterMonitoramentoHistorico(faixa) {
+    const q = new URLSearchParams({ faixa }).toString();
+    return chamar(`/admin/monitoramento/historico?${q}`, { headers: headersComToken() });
+  },
+
   async obterHeatmap(metrica, periodo) {
     const q = new URLSearchParams({ metrica, periodo }).toString();
     return chamar(`/admin/heatmap?${q}`, { headers: headersComToken() });

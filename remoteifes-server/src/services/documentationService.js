@@ -49,6 +49,11 @@ const superHelp = {
     { titulo: "Failsafe OFF", texto: "Opcional: capture só o botão de desligar no protocolo; ao aplicá-lo a uma sala, o RAW vai para a NVS do ESP32 e responde ao switch de 5 s." },
   ] },
   monitoramento: { titulo: "Como usar: Status > Sistema", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },
+  graficos: { titulo: "Como usar: Histórico e gráficos", itens: [
+    { titulo: "Faixa única", texto: "Escolha 3 h, 24 h, 7 dias ou 30 dias acima dos gráficos; todos passam a mostrar o mesmo período e nada é consultado com a seção recolhida." },
+    { titulo: "Leitura", texto: "Setas do teclado, toque ou ponteiro mostram o valor de cada intervalo; o resumo e a tabela de valores repetem os números sem depender de cor." },
+    { titulo: "Reinícios e lacunas", texto: "Marcadores indicam início do processo; intervalo em branco é ausência de amostra, não zero." },
+  ] },
   heatmap: { titulo: "Como usar: Mapa de calor operacional", itens: [
     { titulo: "Sob demanda", texto: "Expanda, escolha métrica/período e atualize; a consulta agrega históricos existentes." },
     { titulo: "Leitura", texto: "Frio é melhor e quente é pior; números, legenda e tabela sempre acompanham a cor." },
