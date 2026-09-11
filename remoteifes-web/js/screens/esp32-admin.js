@@ -21,7 +21,7 @@ const Esp32Admin = (() => {
   const MODO_ROTULOS = {
     operation: "operação",
     config_idle: "modo config",
-    config_clone: "modo clonagem",
+    config_clone: "modo clone",
   };
 
   const OTA_FASE_ROTULOS = {
@@ -145,6 +145,7 @@ const Esp32Admin = (() => {
   function renderUltimoComando(uc) {
     if (!uc) return "nenhum ainda";
     if (uc.tipo === "raw") return "sinal bruto (raw) reenviado";
+    if (uc.tipo === "failsafe") return "failsafe OFF pelo switch físico";
     if (uc.tipo === "known_state") {
       const partes = [`${formatarNumero(uc.temp, 0, "°C")}`, uc.power ? "ligado" : "desligado"];
       if (uc.turbo) partes.push("turbo");
@@ -154,42 +155,11 @@ const Esp32Admin = (() => {
     return uc.tipo;
   }
 
-  function renderCapturas(ul, capturas) {
-    ul.innerHTML = "";
-    (capturas || []).forEach((c) => {
-      const li = document.createElement("li");
-      li.className = "esp32-capture-item";
-      li.innerHTML = `
-        <div class="esp32-capture-info">
-          <div>${c.isKnown ? "protocolo conhecido" : "sinal genérico"}: <strong>${escapeHtml(c.protocol || "?")}</strong></div>
-          <div class="esp32-capture-hex">${escapeHtml(c.hex || "")} · ${(c.raw || []).length} pulsos</div>
-        </div>
-        <div class="esp32-capture-actions">
-          <button type="button" class="link-btn testar-captura-btn">testar</button>
-          ${c.isKnown && Number.isInteger(c.protocolId) ? `<button type="button" class="link-btn usar-protocolo-btn">usar protocolo</button>` : ""}
-        </div>
-      `;
-      li.querySelector(".testar-captura-btn").addEventListener("click", async () => {
-        const sala = ul.closest(".esp32-device-card").dataset.sala;
-        const resp = await Api.testarRawEsp32(sala, c.raw, 38000);
-        if (!resp.ok) Toast.erro(resp.erro || "não foi possível testar o sinal");
-        else Toast.aviso("sinal reenviado para teste");
-      });
-      const usarProtocoloBtn = li.querySelector(".usar-protocolo-btn");
-      if (usarProtocoloBtn) usarProtocoloBtn.addEventListener("click", async () => {
-        const sala = ul.closest(".esp32-device-card").dataset.sala;
-        const resp = await Api.definirProtocoloIrEsp32(sala, c.protocolId);
-        if (!resp.ok) {
-          Toast.erro(resp.erro || "não foi possível salvar o protocolo");
-          return;
-        }
-        const item = dispositivos.find((d) => d.sala === sala);
-        if (item) item.irProtocolo = c.protocolId;
-        Toast.aviso("protocolo do ar-condicionado salvo");
-        render();
-      });
-      ul.appendChild(li);
-    });
+  function renderFailsafe(dispositivo) {
+    const f = dispositivo.failsafe;
+    if (!f) return "sem informação";
+    if (!f.configurado) return "não gravado";
+    return `gravado · ${f.pulsos} pulsos${f.protocolRecordId ? ` · protocolo #${f.protocolRecordId}` : ""}`;
   }
 
   function renderDispositivo(d) {
@@ -197,7 +167,7 @@ const Esp32Admin = (() => {
     const conectado = !!dispositivo.conectado;
     const telemetria = dispositivo.ultimaTelemetria || {};
     const modo = dispositivo.modo || "operation";
-    const emConfig = conectado && modo !== "operation";
+    const clonador = dispositivo.role === "cloner";
 
     const li = document.createElement("li");
     li.className = "card esp32-device-card";
@@ -211,6 +181,7 @@ const Esp32Admin = (() => {
             <span class="esp32-conn-badge ${d.online ? "on" : "off"}">Wi-Fi ${d.online ? "conectado" : "desconectado"}</span>
             <span class="esp32-conn-badge ${conectado ? "on" : "off"}">Servidor ${conectado ? "conectado" : "desconectado"}</span>
             ${conectado ? `<span class="esp32-conn-badge modo">${modoRotulo(modo)}</span>` : ""}
+            <span class="esp32-conn-badge ${clonador ? "on" : "modo"}">${clonador ? "clonador IR" : "transmissor IR"}</span>
           </div>
         </div>
       </div>
@@ -219,7 +190,8 @@ const Esp32Admin = (() => {
         <div class="esp32-metric"><div class="esp32-metric-label">Temperatura</div><div class="esp32-metric-value">${formatarNumero(telemetria.temp, 1, "°C")}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Umidade</div><div class="esp32-metric-value">${formatarNumero(telemetria.hum, 0, "%")}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Sinal Wi-Fi</div><div class="esp32-metric-value">${dispositivo.wifiRssi != null ? `${dispositivo.wifiRssi} dBm` : "—"}</div></div>
-        <div class="esp32-metric"><div class="esp32-metric-label">Protocolo IR</div><div class="esp32-metric-value">${Number.isInteger(d.irProtocolo) ? d.irProtocolo : "não definido"}</div></div>
+        <div class="esp32-metric"><div class="esp32-metric-label">Protocolo IR</div><div class="esp32-metric-value">${Number.isInteger(d.irProtocolo) ? `${d.irProtocolo}${d.irProtocoloRegistroId ? ` · biblioteca #${d.irProtocoloRegistroId}` : ""}` : "não definido"}</div></div>
+        <div class="esp32-metric"><div class="esp32-metric-label">Failsafe OFF na NVS</div><div class="esp32-metric-value">${escapeHtml(renderFailsafe(dispositivo))}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Último comando IR</div><div class="esp32-metric-value">${escapeHtml(renderUltimoComando(dispositivo.ultimoComando))}</div></div>
       </div>
 
@@ -227,66 +199,12 @@ const Esp32Admin = (() => {
 
       ${renderCredencial(d)}
 
-      ${!emConfig ? `
-        <div class="esp32-config-form">
-          <button type="button" class="btn btn-on entrar-config-btn" ${conectado ? "" : "disabled"}>Entrar em modo de configuração</button>
-        </div>
-      ` : `
-        <div class="esp32-actions">
-          <button type="button" class="btn btn-off modo-clone-btn" ${modo === "config_clone" ? "disabled" : ""}>Ativar modo clonagem</button>
-          <button type="button" class="btn btn-off modo-idle-btn" ${modo === "config_idle" ? "disabled" : ""}>Voltar ao modo config</button>
-          <button type="button" class="btn btn-off iniciar-captura-btn" ${modo === "config_clone" ? "" : "disabled"}>Iniciar captura IR</button>
-          <button type="button" class="btn btn-off parar-captura-btn">Parar captura IR</button>
-          <button type="button" class="btn btn-off sair-config-btn">Sair do modo de configuração</button>
-        </div>
-        <p class="hint">Sinais capturados aparecem abaixo em tempo real. Use "testar" para reenviar um sinal capturado e confirmar que ele controla o aparelho.</p>
-        <ul class="esp32-capture-list"></ul>
-      `}
+      ${clonador ? `<p class="hint">Esta placa é o clonador oficial: o modo clone e a captura de sinais são controlados em Dispositivos &gt; Protocolos IR.</p>` : ""}
 
       <div class="esp32-actions">
         <button type="button" class="link-btn danger reset-wifi-btn" ${conectado ? "" : "disabled"}>Resetar Wi-Fi do dispositivo</button>
       </div>
     `;
-
-    const entrarBtn = li.querySelector(".entrar-config-btn");
-    if (entrarBtn) {
-      entrarBtn.addEventListener("click", async () => {
-        entrarBtn.disabled = true;
-        const resp = await Api.entrarConfigEsp32(d.sala);
-        entrarBtn.disabled = false;
-        if (!resp.ok) Toast.erro(resp.erro || "não foi possível entrar em modo de configuração");
-      });
-    }
-
-    const modoCloneBtn = li.querySelector(".modo-clone-btn");
-    if (modoCloneBtn) modoCloneBtn.addEventListener("click", async () => {
-      const resp = await Api.definirModoEsp32(d.sala, "clone");
-      if (!resp.ok) Toast.erro(resp.erro || "não foi possível mudar o modo");
-    });
-
-    const modoIdleBtn = li.querySelector(".modo-idle-btn");
-    if (modoIdleBtn) modoIdleBtn.addEventListener("click", async () => {
-      const resp = await Api.definirModoEsp32(d.sala, "idle");
-      if (!resp.ok) Toast.erro(resp.erro || "não foi possível mudar o modo");
-    });
-
-    const iniciarCapturaBtn = li.querySelector(".iniciar-captura-btn");
-    if (iniciarCapturaBtn) iniciarCapturaBtn.addEventListener("click", async () => {
-      const resp = await Api.iniciarCapturaEsp32(d.sala);
-      if (!resp.ok) Toast.erro(resp.erro || "não foi possível iniciar a captura");
-    });
-
-    const pararCapturaBtn = li.querySelector(".parar-captura-btn");
-    if (pararCapturaBtn) pararCapturaBtn.addEventListener("click", async () => {
-      const resp = await Api.pararCapturaEsp32(d.sala);
-      if (!resp.ok) Toast.erro(resp.erro || "não foi possível parar a captura");
-    });
-
-    const sairConfigBtn = li.querySelector(".sair-config-btn");
-    if (sairConfigBtn) sairConfigBtn.addEventListener("click", async () => {
-      const resp = await Api.sairOperacaoEsp32(d.sala);
-      if (!resp.ok) Toast.erro(resp.erro || "não foi possível sair do modo de configuração");
-    });
 
     const otaBtn = li.querySelector(".ota-btn");
     if (otaBtn && !otaBtn.disabled) {
@@ -371,7 +289,7 @@ const Esp32Admin = (() => {
     resetWifiBtn.addEventListener("click", async () => {
       const ok = await Dialog.confirmar({
         titulo: "Resetar Wi-Fi do dispositivo",
-        mensagem: `Resetar o Wi-Fi do ESP32 da sala ${d.sala}? O dispositivo vai apagar a rede e o endereço do servidor, preservar sua credencial exclusiva e reiniciar em modo de configuração (ponto de acesso).`,
+        mensagem: `Resetar o Wi-Fi do ESP32 da sala ${d.sala}? O dispositivo vai apagar a rede e o endereço do servidor, preservar sua credencial exclusiva e o failsafe OFF gravado, e reiniciar no ponto de acesso RemoteIFES-Setup para ser reprovisionado no local.`,
         confirmarTexto: "Resetar Wi-Fi",
         perigo: true,
       });
@@ -380,9 +298,6 @@ const Esp32Admin = (() => {
       if (!resp.ok) Toast.erro(resp.erro || "não foi possível resetar o Wi-Fi do dispositivo");
       else Toast.aviso("comando de reset enviado ao dispositivo");
     });
-
-    const capturaList = li.querySelector(".esp32-capture-list");
-    if (capturaList) renderCapturas(capturaList, dispositivo.capturasRecentes);
 
     return li;
   }
@@ -663,16 +578,6 @@ const Esp32Admin = (() => {
     render();
   }
 
-  function aplicarCapturaDispositivo(sala, captura) {
-    const item = dispositivos.find((d) => d.sala === sala);
-    if (!item) return;
-    if (!item.dispositivo) item.dispositivo = {};
-    if (!Array.isArray(item.dispositivo.capturasRecentes)) item.dispositivo.capturasRecentes = [];
-    item.dispositivo.capturasRecentes.unshift(captura);
-    item.dispositivo.capturasRecentes.length = Math.min(item.dispositivo.capturasRecentes.length, 20);
-    render();
-  }
-
   function aplicarOtaDispositivo(sala, ota) {
     const item = dispositivos.find((d) => d.sala === sala);
     if (!item) return;
@@ -686,8 +591,6 @@ const Esp32Admin = (() => {
   function aoMensagemWs(msg) {
     if (msg.tipo === "dispositivo_status") {
       aplicarEstadoDispositivo(msg.sala, msg.estado);
-    } else if (msg.tipo === "dispositivo_captura") {
-      aplicarCapturaDispositivo(msg.sala, msg.captura);
     } else if (msg.tipo === "dispositivo_ota") {
       aplicarOtaDispositivo(msg.sala, msg.ota);
     } else if (msg.tipo === "dispositivo_rollout") {

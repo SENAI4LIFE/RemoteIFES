@@ -72,6 +72,7 @@ const Inicio = (() => {
     { sub: "relatos", icon: "relato", titulo: "Relatos", grupo: "Gestão", exigeSuper: true },
     { sub: "macs", icon: "cadastro", titulo: "Cadastro", grupo: "Dispositivos", exigeSuper: true },
     { sub: "esp32", icon: "firmware", titulo: "Firmware / OTA", grupo: "Dispositivos", exigeSuper: true },
+    { sub: "protocolos", icon: "infravermelho", titulo: "Protocolos IR", grupo: "Dispositivos", exigeSuper: true },
     { sub: "notificacoes", icon: "sino", titulo: "Alertas", grupo: "Dispositivos" },
     { sub: "logs", icon: "logs", titulo: "Logs", grupo: "Sistema" },
     { sub: "status", icon: "status", titulo: "Status", grupo: "Sistema" },

@@ -18,6 +18,10 @@ const Manual = (() => {
     credenciais: "ota-credenciais",
     credencial: "ota-credenciais",
     esp32: "esp32-cadastro",
+    protocolos: "protocolos-ir",
+    clonador: "protocolos-ir",
+    failsafe: "protocolos-ir",
+    ir: "protocolos-ir",
     agenda: "agenda-grade",
     agendamentos: "agenda-grade",
     grade: "agenda-grade",
@@ -77,7 +81,7 @@ const Manual = (() => {
     if (typeof state === "undefined" || !state.usuario) return false;
     if (rota.startsWith("/admin/")) {
       const sub = rota.slice(7);
-      if (["macs", "config", "esp32", "logs/auditoria", "status/sistema"].includes(sub)) return !!state.isSuperAdmin;
+      if (["macs", "config", "esp32", "protocolos", "logs/auditoria", "status/sistema"].includes(sub)) return !!state.isSuperAdmin;
       return !!state.isAdmin;
     }
     if (rota === "/agenda" || rota === "/grade") return !!state.isAdmin;
@@ -335,7 +339,7 @@ const Manual = (() => {
           "logs:auditoria": "auditoria", "status:ativos": "ativos-sessoes",
           "status:mapa": "proprietarios-admin", "status:sistema": "monitoramento",
           notificacoes: "notificacoes", macs: "esp32-cadastro",
-          config: "configuracoes-globais", esp32: "esp32-avancado", relatos: "relatos-gestao",
+          config: "configuracoes-globais", esp32: "esp32-avancado", protocolos: "protocolos-ir", relatos: "relatos-gestao",
         })[aba ? `${sub}:${aba}` : sub] || "administracao";
       }
       return ({ "screen-panel": "controlador", "screen-agenda": "agenda-grade", "screen-grade": "agenda-grade", "screen-propriedade": "controle-acesso-sala", "screen-inicio": "inicio-acoes" })[id] || "selecao-sala";

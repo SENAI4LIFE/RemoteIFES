@@ -42,7 +42,7 @@ function aplicarBloqueio(dados) {
   document.getElementById("btnPower").disabled = bloqueado;
   document.getElementById("tempDown").disabled = bloqueado || dados.temperaturaAlvo <= dados.temperaturaMinima;
   document.getElementById("tempUp").disabled = bloqueado || dados.temperaturaAlvo >= dados.temperaturaMaxima;
-  document.getElementById("btnTurbo").disabled = bloqueado || !dados.ligado;
+  document.getElementById("btnTurbo").disabled = bloqueado || (!dados.ligado && dados.autoLigar === false);
 
   const avisoSomenteLeitura = document.getElementById("panelSomenteLeitura");
   avisoSomenteLeitura.classList.toggle("hidden", dados.podeControlarEsta !== false);

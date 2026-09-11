@@ -432,6 +432,7 @@ module.exports = {
   publicarFirmware,
   lerManifesto,
   caminhoBinPublicado,
+  compararVersoes,
   ofertar,
   vagasDisponiveis,
   avaliarElegibilidade,

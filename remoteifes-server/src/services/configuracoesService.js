@@ -13,6 +13,7 @@ const PADROES = {
   temperaturaMinima: 23,
   temperaturaMaxima: 25,
   turboFuncaoExtra: "nenhuma",
+  autoLigar: true,
   modoTeste: process.env.NODE_ENV !== "production",
   redesAutorizadas: [],
   modoManutencao: false,
@@ -25,7 +26,7 @@ const PADROES = {
 const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
 
 const CHAVES_NUMERICAS = ["timeoutInatividadeMinutos", "timeoutInatividadeAdminMinutos", "retencaoAuditoriaDias", "popupAvisoSegundos", "limiarOnlineMinutos"];
-const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias", "espApExigirCredencial"];
+const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias", "espApExigirCredencial", "autoLigar"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
 const CHAVES_TEXTO_CRITICAS = ["turboFuncaoExtra"];
@@ -69,8 +70,8 @@ function limitesTemperatura() {
   return { minima: cfg.temperaturaMinima, maxima: cfg.temperaturaMaxima };
 }
 
-function limitesEfetivosDaSala(salaRow) {
-  const { minima, maxima } = limitesTemperatura();
+function limitesEfetivosDaSala(salaRow, cfg = null) {
+  const { minima, maxima } = cfg ? { minima: cfg.temperaturaMinima, maxima: cfg.temperaturaMaxima } : limitesTemperatura();
   return {
     minima: Number.isFinite(salaRow?.temperaturaMinima) ? salaRow.temperaturaMinima : minima,
     maxima: Number.isFinite(salaRow?.temperaturaMaxima) ? salaRow.temperaturaMaxima : maxima,
@@ -79,6 +80,10 @@ function limitesEfetivosDaSala(salaRow) {
 
 function turboFuncaoExtra() {
   return obter().turboFuncaoExtra;
+}
+
+function autoLigarAtivo(cfg = null) {
+  return (cfg || obter()).autoLigar !== false;
 }
 
 function politicaApDispositivo() {
@@ -215,6 +220,8 @@ function validarEAtualizar(patch, requisitante) {
       const comando = salasService.comandoEstadoIR(sala);
       if (comando) deviceHub.enviarComando(sala.sala, comando);
     }
+  } else if (proximo.autoLigar !== atual.autoLigar) {
+    require("./salasService").eventos.emit("mudanca");
   }
   logger.info("configuracoes-alteradas", { chaves: Object.keys(patch), por: requisitante.id });
   return configuracoes;
@@ -227,6 +234,7 @@ module.exports = {
   limitesTemperatura,
   limitesEfetivosDaSala,
   turboFuncaoExtra,
+  autoLigarAtivo,
   politicaApDispositivo,
   acessoRestritoAtivo,
   modoManutencaoAtivo,

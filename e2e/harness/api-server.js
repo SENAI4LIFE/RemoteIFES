@@ -27,6 +27,8 @@ const salasService = require(path.join(RAIZ_SERVIDOR, "src", "services", "salasS
 const notificacoesService = require(path.join(RAIZ_SERVIDOR, "src", "services", "notificacoesService"));
 
 const otaService = require(path.join(RAIZ_SERVIDOR, "src", "services", "otaService"));
+const protocolosIrService = require(path.join(RAIZ_SERVIDOR, "src", "services", "protocolosIrService"));
+const configuracoesService = require(path.join(RAIZ_SERVIDOR, "src", "services", "configuracoesService"));
 
 const { iniciarFakeEsp32 } = require("./fake-esp32");
 
@@ -97,6 +99,35 @@ app.post("/__e2e/resetar-dispositivo", (req, res) => {
   db.prepare("UPDATE salas SET ligado = 0, turboAtivo = 0 WHERE sala = ?").run(SALA_COM_DISPOSITIVO);
   if (fake) fake.resetar();
   res.json({ ok: true });
+});
+
+app.post("/__e2e/resetar-protocolos", (req, res) => {
+  const anterior = protocolosIrService.obterClonador();
+  if (anterior && deviceHub.dispositivoConectado(anterior.sala)) deviceHub.enviarComando(anterior.sala, { tipo: "exit_operation" });
+  protocolosIrService.definirClonador(null);
+  db.prepare("UPDATE salas SET irProtocoloRegistroId = NULL").run();
+  db.prepare("DELETE FROM protocolos_ir").run();
+  deviceHub.limparCapturas();
+  if (deviceHub.dispositivoConectado(SALA_COM_DISPOSITIVO)) {
+    deviceHub.sincronizarPapel(SALA_COM_DISPOSITIVO);
+    deviceHub.enviarComando(SALA_COM_DISPOSITIVO, { tipo: "failsafe_raw_clear" });
+  }
+  if (fake) fake.resetarProtocolos();
+  res.json({ ok: true });
+});
+
+app.post("/__e2e/capturar-ir", (req, res) => {
+  if (!fake) return res.status(503).json({ ok: false, erro: "fake ESP32 indisponível" });
+  res.json({ ok: fake.capturar(req.body || {}) });
+});
+
+app.get("/__e2e/esp32", (req, res) => {
+  res.json({ ok: true, esp32: fake ? fake.estado() : null, servidor: deviceHub.estadoPublico(SALA_COM_DISPOSITIVO) });
+});
+
+app.post("/__e2e/auto-ligar/:valor", (req, res) => {
+  configuracoesService.validarEAtualizar({ autoLigar: req.params.valor === "on" }, { id: 1, nivel: 3 });
+  res.json({ ok: true, autoLigar: configuracoesService.obter().autoLigar });
 });
 
 function limparReleaseE2E() {

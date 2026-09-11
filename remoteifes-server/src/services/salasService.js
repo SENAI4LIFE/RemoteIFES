@@ -400,7 +400,8 @@ function statusCompleto(sala, requisitante) {
     && bloqueio.usuarioId !== requisitante.id
     && !requisitante.isAdmin;
 
-  const limites = configuracoesService.limitesEfetivosDaSala(salaRow);
+  const cfg = configuracoesService.obter();
+  const limites = configuracoesService.limitesEfetivosDaSala(salaRow, cfg);
 
   return {
     sala: salaRow.sala,
@@ -412,6 +413,7 @@ function statusCompleto(sala, requisitante) {
     temperaturaMinima: limites.minima,
     temperaturaMaxima: limites.maxima,
     turboAtivo: !!salaRow.turboAtivo,
+    autoLigar: configuracoesService.autoLigarAtivo(cfg),
     acessoRestrito: !!salaRow.acessoRestrito,
     podeControlarEsta: usuarioPodeControlarSala(requisitante, sala),
     bloqueio: bloqueio
@@ -454,6 +456,34 @@ function enviarEstadoIRParaDispositivo(salaAtualizada) {
   deviceHub.enviarComando(salaAtualizada.sala, comando);
 }
 
+function comandoFailsafeIR(salaAtualizada) {
+  const registroId = Number(salaAtualizada?.irProtocoloRegistroId);
+  if (!Number.isInteger(registroId) || registroId <= 0) return { tipo: "failsafe_raw_clear" };
+  const protocolo = require("./protocolosIrService").buscar(registroId);
+  if (!protocolo?.failsafe?.raw?.length) return { tipo: "failsafe_raw_clear", protocolRecordId: registroId };
+  return {
+    tipo: "failsafe_raw_set",
+    protocolRecordId: registroId,
+    raw: protocolo.failsafe.raw,
+    carrierHz: protocolo.failsafe.carrierHz,
+  };
+}
+
+function enviarFailsafeIRParaDispositivo(salaAtualizada) {
+  if (!salaAtualizada) return false;
+  return require("./deviceHub").enviarComando(salaAtualizada.sala, comandoFailsafeIR(salaAtualizada));
+}
+
+function sincronizarFailsafeIRPorProtocolo(protocoloRegistroId) {
+  const id = Number(protocoloRegistroId);
+  if (!Number.isInteger(id) || id <= 0) return 0;
+  let enviados = 0;
+  for (const salaRow of db.prepare("SELECT * FROM salas WHERE irProtocoloRegistroId = ?").all(id)) {
+    if (enviarFailsafeIRParaDispositivo(salaRow)) enviados += 1;
+  }
+  return enviados;
+}
+
 function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
@@ -473,22 +503,33 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
     }
   }
 
+  const cfg = configuracoesService.obter();
+  const autoLigar = configuracoesService.autoLigarAtivo(cfg);
+  let ligouAutomaticamente = false;
+
   if (cmd === "ligar") {
     db.prepare(`UPDATE salas SET ligado = 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
   } else if (cmd === "desligar") {
     db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
   } else if (cmd === "temperatura") {
     const temp = Number(valor);
-    const { minima, maxima } = configuracoesService.limitesEfetivosDaSala(salaRow);
+    const { minima, maxima } = configuracoesService.limitesEfetivosDaSala(salaRow, cfg);
     if (!Number.isFinite(temp) || temp < minima || temp > maxima) {
       throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
     }
-    db.prepare(`UPDATE salas SET temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
+    ligouAutomaticamente = autoLigar && !salaRow.ligado;
+    db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+      .run(autoLigar ? 1 : 0, temp, sala);
   } else if (cmd === "turbo") {
     if (typeof valor !== "boolean") throw new Error("turbo deve ser verdadeiro ou falso");
-    db.prepare(`UPDATE salas SET turboAtivo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(valor ? 1 : 0, sala);
+    ligouAutomaticamente = autoLigar && valor && !salaRow.ligado;
+    db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, turboAtivo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+      .run(autoLigar && valor ? 1 : 0, valor ? 1 : 0, sala);
   }
 
+  if (ligouAutomaticamente) {
+    registrarLog({ usuario: usuario ? usuario.usuario : null, sala, cmd: "ligar", valor: "automatico", origem });
+  }
   registrarLog({
     usuario: usuario ? usuario.usuario : null,
     sala,
@@ -560,7 +601,7 @@ function registrarComandoDispositivo(sala, cmd, valor) {
   });
 }
 
-function definirProtocoloIR(sala, protocolo) {
+function definirProtocoloIR(sala, protocolo, protocoloRegistroId = null) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
@@ -568,10 +609,16 @@ function definirProtocoloIR(sala, protocolo) {
   if (protocoloFinal !== null && (!Number.isInteger(protocoloFinal) || protocoloFinal < 0)) {
     throw new Error("protocolo de infravermelho inválido");
   }
+  const registroFinal = protocoloRegistroId === null || protocoloRegistroId === undefined ? null : Number(protocoloRegistroId);
+  if (registroFinal !== null && (!Number.isInteger(registroFinal) || registroFinal <= 0)) {
+    throw new Error("registro de protocolo infravermelho inválido");
+  }
 
-  db.prepare(`UPDATE salas SET irProtocolo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(protocoloFinal, sala);
+  db.prepare(`UPDATE salas SET irProtocolo = ?, irProtocoloRegistroId = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+    .run(protocoloFinal, registroFinal, sala);
   const atualizada = buscar(sala);
   enviarEstadoIRParaDispositivo(atualizada);
+  enviarFailsafeIRParaDispositivo(atualizada);
   return atualizada;
 }
 
@@ -660,6 +707,9 @@ module.exports = {
   buscarAdministrativo,
   identificarDispositivo,
   comandoEstadoIR,
+  comandoFailsafeIR,
+  enviarFailsafeIRParaDispositivo,
+  sincronizarFailsafeIRPorProtocolo,
   definirLimitesTemperatura,
   definirProtocoloIR,
   definirAcessoRestrito,

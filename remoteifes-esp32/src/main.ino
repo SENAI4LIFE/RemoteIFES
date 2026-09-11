@@ -28,6 +28,9 @@
 #define DHTTYPE DHT11
 #define IR_RECV_PIN 15
 #define IR_SEND_PIN 4
+#define BUZZER_PIN 27
+#define ACTION_SWITCH_PIN 26
+#define ACTION_SWITCH_ACTIVE_LEVEL LOW
 
 #define CAPTURE_BUFFER_SIZE 1024
 #define IR_CAPTURE_TIMEOUT_MS 50
@@ -48,6 +51,15 @@ const char SERVER_IDENTIFICACAO_PATH[] = "/dispositivo/identificar";
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
 const char DEVICE_WS_PATH[] = "/ws/dispositivo";
 const char AP_PASSWORD_PADRAO[] = "remoteifes";
+
+const unsigned long ACTION_SWITCH_DEBOUNCE_MS = 40;
+const unsigned long FAILSAFE_SWITCH_HOLD_MS = 5000;
+const unsigned long AP_TEMPORARIO_TIMEOUT_MS = 600000;
+const unsigned long BUZZER_MIN_MS = 60;
+const uint32_t FAILSAFE_CARRIER_MIN_HZ = 20000;
+const uint32_t FAILSAFE_CARRIER_MAX_HZ = 60000;
+const char DEVICE_ROLE_TRANSMITTER[] = "transmitter";
+const char DEVICE_ROLE_CLONER[] = "cloner";
 
 const unsigned long OTA_SELFTEST_TIMEOUT_MS = 90000;
 const unsigned long OTA_HTTP_TIMEOUT_MS = 20000;
@@ -97,7 +109,16 @@ bool isCapturing = false;
 bool apModeActive = false;
 bool apIniciado = false;
 bool apExigirCredencial = false;
+bool portalRegistrado = false;
+unsigned long apTemporarioAte = 0;
 String apPasswordAtiva;
+String deviceRole = DEVICE_ROLE_TRANSMITTER;
+bool actionSwitchRawActive = false;
+bool actionSwitchStableActive = false;
+bool actionSwitchLongPressConsumed = false;
+unsigned long actionSwitchLastChangeMs = 0;
+unsigned long actionSwitchPressedSinceMs = 0;
+unsigned long buzzerDesligarEm = 0;
 RuntimeMode runtimeMode = RUNTIME_OPERATION;
 WifiState estadoWifi = WIFI_ESTADO_DESCONECTADO;
 ServerWsState estadoWsServidor = WS_ESTADO_DESCONECTADO;
@@ -117,7 +138,6 @@ unsigned long ultimaTentativaReconexao = 0;
 unsigned long wifiDesconectadoDesde = 0;
 unsigned long ultimaIdentificacao = 0;
 unsigned long reinicioAgendadoEm = 0;
-bool servicosOperacaoIniciados = false;
 bool wsConfigurado = false;
 String salaWsConfigurada;
 bool littleFsOk = false;
@@ -138,11 +158,11 @@ unsigned long lastComandoAceito = 0;
 const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
 void startAPMode();
-void aplicarPontoDeAcesso();
+void aplicarPontoDeAcesso(bool manterSta);
 void aplicarPoliticaApDoServidor(JsonDocument& doc);
-void iniciarServicosOperacao();
-void handleRoot();
-void handleInfo();
+void registrarPortal();
+void abrirApTemporario();
+void encerrarApTemporario();
 void handleSetup();
 void handleSaveSetup();
 bool requisicaoPortalPermitida();
@@ -155,7 +175,6 @@ String urlServidor(const char* path);
 int executarHttpPost(const String& url, const String& payload, String& resposta);
 bool sendHttpPost(const String& url, const String& payload);
 void sendHeartbeat();
-void reportAccess(const String& ip, const String& userAgent);
 void reportComando(const String& cmd, const String& valor);
 void gerenciarConexaoWifi();
 bool configuracaoValida();
@@ -175,6 +194,25 @@ void iniciarOtaOferta(JsonDocument& doc);
 void reportarOtaResultado(bool ok, const String& erro);
 void reportarOtaProgresso(size_t recebido, size_t total);
 bool versaoSemanticaMenor(const String& candidata, const String& atual);
+bool moduloClonador();
+void aplicarPapelDoServidor(JsonDocument& doc);
+void entrarModoClone();
+void sairModoClone();
+void iniciarAvisoBuzzer();
+void atualizarBuzzer();
+bool failsafeConfigurado();
+uint16_t failsafePulsosSalvos();
+uint32_t failsafeCarrierHzSalvo();
+int failsafeProtocolRecordIdSalvo();
+bool failsafeIgualAoSalvo(const uint16_t* rawData, uint16_t length, uint32_t carrierHz, int protocolRecordId);
+bool salvarFailsafeRaw(const uint16_t* rawData, uint16_t length, uint32_t carrierHz, int protocolRecordId);
+void limparFailsafeRaw();
+bool transmitirFailsafeSalvo();
+void enviarStatusFailsafe();
+void preencherStatusFailsafe(JsonDocument& doc);
+void aplicarFailsafeDoServidor(JsonDocument& doc);
+void configurarSwitchAcao();
+void processarSwitchAcao();
 
 void setup() {
   Serial.begin(115200);
@@ -197,6 +235,9 @@ void setup() {
 
   dht.begin();
   irsend.begin();
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+  configurarSwitchAcao();
 
   preferences.begin("remoteifes", false);
   apPassword = preferences.isKey("apPass") ? preferences.getString("apPass", AP_PASSWORD_PADRAO) : String(AP_PASSWORD_PADRAO);
@@ -213,34 +254,46 @@ void setup() {
   if (tlsModo != "ca") Serial.println("AVISO DE SEGURANCA: transporte sem validacao de certificado foi selecionado explicitamente.");
   deviceId = preferences.isKey("devId") ? preferences.getString("devId", "") : "";
   deviceSecret = preferences.isKey("devSec") ? preferences.getString("devSec", "") : "";
+  if (preferences.isKey("role")) preferences.remove("role");
 
-  // O ponto de acesso de configuracao fica no ar tambem durante a operacao normal: AP e STA
-  // coexistem, entao provisionar ou reconfigurar no local nao depende de perder a rede antes.
-  aplicarPontoDeAcesso();
+  if (failsafeConfigurado()) {
+    Serial.printf("Failsafe OFF persistido na NVS: %u pulsos a %u Hz (protocolo #%d).\n",
+                  (unsigned)failsafePulsosSalvos(), (unsigned)failsafeCarrierHzSalvo(), failsafeProtocolRecordIdSalvo());
+  } else {
+    Serial.println("Failsafe OFF nao configurado: o servidor envia o RAW ao atribuir um protocolo com failsafe.");
+  }
 
   if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
+    apModeActive = false;
+    WiFi.mode(WIFI_STA);
+    WiFi.softAPdisconnect(true);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(false);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
-    apModeActive = false;
-    iniciarServicosOperacao();
+    Serial.println("Modo operacional: ponto de acesso e portal local desligados (clique no switch para abrir o RemoteIFES-Setup).");
   } else {
     startAPMode();
   }
 }
 
 void loop() {
-  dnsServer.processNextRequest();
+  processarSwitchAcao();
+  atualizarBuzzer();
+
+  if (apIniciado) {
+    dnsServer.processNextRequest();
+    server.handleClient();
+  }
 
   if (apModeActive) {
-    server.handleClient();
     if (reinicioAgendadoEm != 0 && (long)(millis() - reinicioAgendadoEm) >= 0) ESP.restart();
     return;
   }
 
+  if (apTemporarioAte != 0 && (long)(millis() - apTemporarioAte) >= 0) encerrarApTemporario();
+
   gerenciarConexaoWifi();
-  server.handleClient();
   wsCliente.loop();
 
   if (otaPendenteValidacao) verificarValidacaoOta();
@@ -342,8 +395,9 @@ void handleSetup() {
     server.send(500, "text/plain", "setup.html ausente no sistema de arquivos");
     return;
   }
-  server.streamFile(f, "text/html");
+  String html = f.readString();
   f.close();
+  server.send(200, "text/html", html);
 }
 
 void handleSaveSetup() {
@@ -407,13 +461,11 @@ String escaparHtml(const String& valor) {
   return saida;
 }
 
-// Sobe (ou reconfigura) o ponto de acesso. Sai sem tocar no radio quando a configuracao
-// desejada ja e a que esta no ar, para nao reiniciar o AP nem derrubar clientes a toa.
-void aplicarPontoDeAcesso() {
+void aplicarPontoDeAcesso(bool manterSta) {
   String senhaAlvo = apExigirCredencial ? apPassword : String("");
   if (apIniciado && senhaAlvo == apPasswordAtiva) return;
 
-  WiFi.mode(WIFI_AP_STA);
+  WiFi.mode(manterSta ? WIFI_AP_STA : WIFI_AP);
   IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   if (!WiFi.softAP("RemoteIFES-Setup", senhaAlvo.length() > 0 ? senhaAlvo.c_str() : NULL)) {
@@ -429,7 +481,7 @@ void aplicarPontoDeAcesso() {
   } else {
     Serial.println("Ponto de acesso 'RemoteIFES-Setup' ativo sem senha (politica do servidor).");
   }
-  Serial.println("Portal de configuracao permanente em 192.168.4.1.");
+  Serial.println("Portal de configuracao em 192.168.4.1 (somente enquanto o ponto de acesso estiver ativo).");
 }
 
 void aplicarPoliticaApDoServidor(JsonDocument& doc) {
@@ -450,34 +502,54 @@ void aplicarPoliticaApDoServidor(JsonDocument& doc) {
   if (!mudou) return;
 
   reportComando("config_ap", apExigirCredencial ? "com_credencial" : "aberto");
-  aplicarPontoDeAcesso();
+  if (apIniciado) aplicarPontoDeAcesso(!apModeActive);
+}
+
+void registrarPortal() {
+  if (portalRegistrado) return;
+  portalRegistrado = true;
+  server.on("/", handleSetup);
+  server.on("/save", HTTP_POST, handleSaveSetup);
+  server.onNotFound([]() {
+    handleSetup();
+  });
 }
 
 void startAPMode() {
   apModeActive = true;
-  aplicarPontoDeAcesso();
-
-  server.on("/", handleSetup);
-  server.on("/save", HTTP_POST, handleSaveSetup);
-
-  server.onNotFound([]() {
-    handleSetup();
-  });
-
+  apTemporarioAte = 0;
+  aplicarPontoDeAcesso(false);
+  registrarPortal();
   server.begin();
   Serial.println("Ponto de Acesso 'RemoteIFES-Setup' ativo no IP: 192.168.4.1");
 }
 
-void iniciarServicosOperacao() {
-  if (servicosOperacaoIniciados) return;
-  servicosOperacaoIniciados = true;
-  const char* headerKeys[] = { "User-Agent" };
-  server.collectHeaders(headerKeys, 1);
-  server.on("/", handleRoot);
-  server.on("/setup", handleSetup);
-  server.on("/save", HTTP_POST, handleSaveSetup);
-  server.on("/info", handleInfo);
+void abrirApTemporario() {
+  if (apModeActive) return;
+  bool jaAberto = apIniciado;
+  apTemporarioAte = millis() + AP_TEMPORARIO_TIMEOUT_MS;
+  if (jaAberto) {
+    Serial.println("Switch: janela do RemoteIFES-Setup prorrogada.");
+    return;
+  }
+  aplicarPontoDeAcesso(true);
+  registrarPortal();
   server.begin();
+  reportComando("setup_ap", "aberto_pelo_switch");
+  Serial.println("Switch: RemoteIFES-Setup aberto temporariamente em 192.168.4.1; a operacao continua pela rede.");
+}
+
+void encerrarApTemporario() {
+  apTemporarioAte = 0;
+  if (!apIniciado || apModeActive) return;
+  server.stop();
+  dnsServer.stop();
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_STA);
+  apIniciado = false;
+  apPasswordAtiva = "";
+  reportComando("setup_ap", "encerrado");
+  Serial.println("RemoteIFES-Setup encerrado; operacao normal sem ponto de acesso.");
 }
 
 void conectarWsServidor() {
@@ -530,7 +602,15 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
 
   const char* tipo = doc["tipo"] | "";
 
-  if (strcmp(tipo, "enter_config") == 0) {
+  if (strcmp(tipo, "device_role") == 0) {
+    aplicarPapelDoServidor(doc);
+  } else if (strcmp(tipo, "enter_clone") == 0) {
+    if (!moduloClonador()) {
+      Serial.println("enter_clone ignorado: o servidor nao definiu esta ESP32 como clonadora.");
+      return;
+    }
+    entrarModoClone();
+  } else if (strcmp(tipo, "enter_config") == 0) {
     runtimeMode = RUNTIME_CONFIG_IDLE;
     enviarModoAlterado();
     reportComando("entrar_config", "");
@@ -547,7 +627,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
   } else if (strcmp(tipo, "set_mode") == 0) {
     String modo = doc["modo"] | "";
     if (runtimeMode != RUNTIME_OPERATION) {
-      if (modo == "clone") {
+      if (modo == "clone" && moduloClonador()) {
         runtimeMode = RUNTIME_CONFIG_CLONE;
       } else if (modo == "idle") {
         runtimeMode = RUNTIME_CONFIG_IDLE;
@@ -560,13 +640,13 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       reportComando("modo", modo);
     }
   } else if (strcmp(tipo, "start_capture") == 0) {
-    if (runtimeMode == RUNTIME_CONFIG_CLONE) {
+    if (moduloClonador() && runtimeMode == RUNTIME_CONFIG_CLONE) {
       irrecv.enableIRIn();
       isCapturing = true;
       reportComando("captura_ir", "iniciada");
       Serial.println("Receptor IR ativo.");
     } else {
-      Serial.println("start_capture ignorado: dispositivo fora do modo clone.");
+      Serial.println("start_capture ignorado: somente a clonadora em modo clone recebe IR.");
     }
   } else if (strcmp(tipo, "stop_capture") == 0) {
     irrecv.disableIRIn();
@@ -623,6 +703,14 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       reportComando("controle_nativo", "protocolo=" + String(protocolo) + ";temp=" + String(temp, 1) + ";power=" + String(power ? "on" : "off") + ";turbo=" + String(turbo ? "on" : "off") + (fan.length() ? (";fan=" + fan) : ""));
       if (isCapturing) irrecv.enableIRIn();
     }
+  } else if (strcmp(tipo, "failsafe_raw_set") == 0) {
+    aplicarFailsafeDoServidor(doc);
+  } else if (strcmp(tipo, "failsafe_raw_clear") == 0) {
+    if (failsafeConfigurado()) {
+      limparFailsafeRaw();
+      reportComando("failsafe_off", "removido");
+    }
+    enviarStatusFailsafe();
   } else if (strcmp(tipo, "reset_wifi") == 0) {
     reportComando("reset_wifi", "");
     preferences.remove("ssid");
@@ -669,6 +757,7 @@ void enviarInfoDispositivo() {
   JsonDocument doc;
   doc["tipo"] = "info";
   doc["fw"] = FW_VERSAO;
+  preencherStatusFailsafe(doc);
   String saida;
   serializeJson(doc, saida);
   wsCliente.sendTXT(saida);
@@ -680,6 +769,7 @@ void enviarTelemetriaWs() {
   doc["rssi"] = WiFi.RSSI();
   doc["modo"] = modoAtualTexto();
   doc["fw"] = FW_VERSAO;
+  preencherStatusFailsafe(doc);
   if (powerConhecido) doc["ligado"] = lastKnownPower;
 
   if (!isnan(ultimaLeituraTemp)) doc["temp"] = ultimaLeituraTemp;
@@ -704,55 +794,13 @@ void enviarTelemetriaWs() {
   wsCliente.sendTXT(saida);
 }
 
-void handleRoot() {
-  if (requisicaoPortalPermitida()) {
-    handleSetup();
-    return;
-  }
-  File f = LittleFS.open("/status.html", "r");
-  if (!f) {
-    server.send(500, "text/plain", "status.html ausente no sistema de arquivos");
-    return;
-  }
-  String html = f.readString();
-  f.close();
-  html.replace("{{sala}}", escaparHtml(salaId.length() > 0 ? salaId : String("Aguardando vinculo por MAC")));
-  html.replace("{{mac}}", escaparHtml(WiFi.macAddress()));
-  html.replace("{{ip}}", escaparHtml(WiFi.localIP().toString()));
-  html.replace("{{servidor}}", escaparHtml(serverHost + ":" + String(serverPort)));
-  html.replace("{{fw}}", escaparHtml(String(FW_VERSAO)));
-  server.send(200, "text/html", html);
-  reportAccess(server.client().remoteIP().toString(), server.header("User-Agent"));
-}
-
-void handleInfo() {
-  JsonDocument doc;
-  doc["sala"] = salaId;
-  doc["mac"] = WiFi.macAddress();
-  doc["ip"] = WiFi.localIP().toString();
-  doc["servidor"] = serverHost + ":" + String(serverPort);
-  doc["modo"] = modoAtualTexto();
-  doc["fw"] = FW_VERSAO;
-  doc["wifiRssi"] = WiFi.RSSI();
-  doc["wsServidorConectado"] = estadoWsServidor == WS_ESTADO_CONECTADO;
-
-  String json;
-  serializeJson(doc, json);
-  server.send(200, "application/json", json);
-}
-
 void handleIRCapture() {
+  if (!moduloClonador()) return;
   if (!irrecv.decode(&results)) return;
 
   String protocolName = typeToString(results.decode_type);
   String hexValue = resultToHexidecimal(&results);
   bool isKnownAC = universalAC.isProtocolSupported(results.decode_type);
-
-  if (isKnownAC) {
-    irrecv.disableIRIn();
-    isCapturing = false;
-    Serial.println("Protocolo nativo de ar-condicionado identificado. Leitura pausada.");
-  }
 
   uint16_t* rawArray = resultToRawArray(&results);
   uint16_t length = getCorrectedRawLength(&results);
@@ -763,6 +811,7 @@ void handleIRCapture() {
   doc["protocolId"] = (int)results.decode_type;
   doc["protocol"] = protocolName;
   doc["hex"] = hexValue;
+  doc["carrierHz"] = 38000;
   JsonArray raw = doc["raw"].to<JsonArray>();
   for (uint16_t i = 0; i < length; i++) raw.add(rawArray[i]);
 
@@ -773,11 +822,230 @@ void handleIRCapture() {
   reportComando("sinal_capturado", "protocolo=" + protocolName + ";nativo=" + String(isKnownAC ? "sim" : "nao") + ";hex=" + hexValue);
   delete[] rawArray;
 
-  if (!isKnownAC) irrecv.resume();
+  if (isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE) irrecv.resume();
+}
+
+bool moduloClonador() {
+  return deviceRole == DEVICE_ROLE_CLONER;
+}
+
+void aplicarPapelDoServidor(JsonDocument& doc) {
+  String novoPapel = doc["role"] | DEVICE_ROLE_TRANSMITTER;
+  deviceRole = novoPapel == DEVICE_ROLE_CLONER ? DEVICE_ROLE_CLONER : DEVICE_ROLE_TRANSMITTER;
+  if (!moduloClonador() && runtimeMode == RUNTIME_CONFIG_CLONE) sairModoClone();
+  Serial.println("Papel definido pelo servidor: " + deviceRole);
+}
+
+void entrarModoClone() {
+  runtimeMode = RUNTIME_CONFIG_CLONE;
+  irrecv.enableIRIn();
+  isCapturing = true;
+  enviarModoAlterado();
+  reportComando("modo_clone", "ativo");
+  Serial.println("Modo clone ativado: receptor IR em captura continua.");
+}
+
+void sairModoClone() {
+  if (isCapturing) {
+    irrecv.disableIRIn();
+    isCapturing = false;
+  }
+  runtimeMode = RUNTIME_OPERATION;
+  enviarModoAlterado();
+  reportComando("modo_clone", "encerrado");
+  Serial.println("Modo clone encerrado: operacao normal restaurada.");
+}
+
+void iniciarAvisoBuzzer() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  buzzerDesligarEm = millis() + BUZZER_MIN_MS;
+}
+
+void atualizarBuzzer() {
+  if (buzzerDesligarEm == 0) return;
+  if ((long)(millis() - buzzerDesligarEm) >= 0) {
+    digitalWrite(BUZZER_PIN, LOW);
+    buzzerDesligarEm = 0;
+  }
+}
+
+bool failsafeConfigurado() {
+  if (!preferences.isKey("fsLen") || !preferences.isKey("fsRaw")) return false;
+  uint16_t length = preferences.getUShort("fsLen", 0);
+  if (length < 1 || length > MAX_RAW_IR_ENTRIES) return false;
+  return preferences.getBytesLength("fsRaw") == (size_t)length * sizeof(uint16_t);
+}
+
+uint16_t failsafePulsosSalvos() {
+  return failsafeConfigurado() ? preferences.getUShort("fsLen", 0) : 0;
+}
+
+uint32_t failsafeCarrierHzSalvo() {
+  if (!failsafeConfigurado()) return 0;
+  uint32_t hz = preferences.getUInt("fsHz", 38000);
+  return (hz >= FAILSAFE_CARRIER_MIN_HZ && hz <= FAILSAFE_CARRIER_MAX_HZ) ? hz : 38000;
+}
+
+int failsafeProtocolRecordIdSalvo() {
+  return failsafeConfigurado() ? preferences.getInt("fsProto", -1) : -1;
+}
+
+bool failsafeIgualAoSalvo(const uint16_t* rawData, uint16_t length, uint32_t carrierHz, int protocolRecordId) {
+  if (!failsafeConfigurado()) return false;
+  if (failsafePulsosSalvos() != length || failsafeCarrierHzSalvo() != carrierHz || failsafeProtocolRecordIdSalvo() != protocolRecordId) return false;
+  size_t bytes = (size_t)length * sizeof(uint16_t);
+  uint16_t* salvo = new uint16_t[length];
+  if (!salvo) return false;
+  bool igual = preferences.getBytes("fsRaw", salvo, bytes) == bytes && memcmp(salvo, rawData, bytes) == 0;
+  delete[] salvo;
+  return igual;
+}
+
+bool salvarFailsafeRaw(const uint16_t* rawData, uint16_t length, uint32_t carrierHz, int protocolRecordId) {
+  if (!rawData || length < 1 || length > MAX_RAW_IR_ENTRIES || carrierHz < FAILSAFE_CARRIER_MIN_HZ || carrierHz > FAILSAFE_CARRIER_MAX_HZ) return false;
+  size_t bytes = (size_t)length * sizeof(uint16_t);
+  if (preferences.putBytes("fsRaw", rawData, bytes) != bytes) return false;
+  preferences.putUShort("fsLen", length);
+  preferences.putUInt("fsHz", carrierHz);
+  preferences.putInt("fsProto", protocolRecordId);
+  Serial.printf("Failsafe OFF salvo na NVS: %u pulsos, %u Hz, protocolo #%d.\n", (unsigned)length, (unsigned)carrierHz, protocolRecordId);
+  return true;
+}
+
+void limparFailsafeRaw() {
+  preferences.remove("fsRaw");
+  preferences.remove("fsLen");
+  preferences.remove("fsHz");
+  preferences.remove("fsProto");
+  Serial.println("Failsafe OFF removido da NVS.");
+}
+
+void aplicarFailsafeDoServidor(JsonDocument& doc) {
+  JsonArray rawArr = doc["raw"].as<JsonArray>();
+  uint32_t carrierHz = doc["carrierHz"] | 38000;
+  int protocolRecordId = doc["protocolRecordId"] | -1;
+  if (rawArr.isNull() || rawArr.size() < 1 || rawArr.size() > MAX_RAW_IR_ENTRIES
+      || carrierHz < FAILSAFE_CARRIER_MIN_HZ || carrierHz > FAILSAFE_CARRIER_MAX_HZ) {
+    Serial.println("Failsafe rejeitado: RAW ou frequencia invalidos.");
+    reportComando("failsafe_off", "rejeitado");
+    enviarStatusFailsafe();
+    return;
+  }
+  uint16_t count = (uint16_t)rawArr.size();
+  uint16_t* rawData = new uint16_t[count];
+  if (!rawData) {
+    Serial.println("Failsafe rejeitado: sem memoria temporaria.");
+    return;
+  }
+  uint16_t i = 0;
+  for (JsonVariant v : rawArr) {
+    if (i >= count) break;
+    rawData[i++] = v.as<uint16_t>();
+  }
+  if (failsafeIgualAoSalvo(rawData, i, carrierHz, protocolRecordId)) {
+    delete[] rawData;
+    enviarStatusFailsafe();
+    return;
+  }
+  bool salvo = salvarFailsafeRaw(rawData, i, carrierHz, protocolRecordId);
+  delete[] rawData;
+  reportComando("failsafe_off", salvo ? "salvo" : "falha");
+  enviarStatusFailsafe();
+}
+
+bool transmitirFailsafeSalvo() {
+  if (!failsafeConfigurado()) {
+    Serial.println("Failsafe ignorado: nenhum RAW OFF salvo na NVS.");
+    reportComando("failsafe_off_local", "sem_raw");
+    return false;
+  }
+  uint16_t length = failsafePulsosSalvos();
+  uint16_t* rawData = new uint16_t[length];
+  if (!rawData) return false;
+  size_t esperado = (size_t)length * sizeof(uint16_t);
+  if (preferences.getBytes("fsRaw", rawData, esperado) != esperado) {
+    delete[] rawData;
+    return false;
+  }
+  bool retomarCaptura = isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE;
+  if (retomarCaptura) irrecv.disableIRIn();
+  sendRawIR(rawData, length, failsafeCarrierHzSalvo() / 1000);
+  if (retomarCaptura) irrecv.enableIRIn();
+  delete[] rawData;
+  lastKnownPower = false;
+  powerConhecido = true;
+  ultimoComando = UltimoComandoIR();
+  ultimoComando.valido = true;
+  ultimoComando.tipo = "failsafe";
+  ultimoComando.timestampMs = millis();
+  reportComando("failsafe_off_local", "transmitido");
+  Serial.println("Failsafe OFF transmitido localmente pelo switch, sem depender do servidor.");
+  return true;
+}
+
+void preencherStatusFailsafe(JsonDocument& doc) {
+  doc["failsafeConfigurado"] = failsafeConfigurado();
+  doc["failsafePulsos"] = failsafePulsosSalvos();
+  doc["failsafeCarrierHz"] = failsafeCarrierHzSalvo();
+  doc["failsafeProtocolRecordId"] = failsafeProtocolRecordIdSalvo();
+}
+
+void enviarStatusFailsafe() {
+  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  JsonDocument doc;
+  doc["tipo"] = "failsafe_status";
+  preencherStatusFailsafe(doc);
+  String saida;
+  serializeJson(doc, saida);
+  wsCliente.sendTXT(saida);
+}
+
+void configurarSwitchAcao() {
+  pinMode(ACTION_SWITCH_PIN, INPUT_PULLUP);
+  bool ativo = digitalRead(ACTION_SWITCH_PIN) == ACTION_SWITCH_ACTIVE_LEVEL;
+  actionSwitchRawActive = ativo;
+  actionSwitchStableActive = ativo;
+  actionSwitchLongPressConsumed = ativo;
+  actionSwitchLastChangeMs = millis();
+  actionSwitchPressedSinceMs = ativo ? millis() : 0;
+}
+
+void processarSwitchAcao() {
+  const unsigned long agora = millis();
+  const bool leituraAtiva = digitalRead(ACTION_SWITCH_PIN) == ACTION_SWITCH_ACTIVE_LEVEL;
+
+  if (leituraAtiva != actionSwitchRawActive) {
+    actionSwitchRawActive = leituraAtiva;
+    actionSwitchLastChangeMs = agora;
+    return;
+  }
+  if (agora - actionSwitchLastChangeMs < ACTION_SWITCH_DEBOUNCE_MS) return;
+
+  if (leituraAtiva != actionSwitchStableActive) {
+    actionSwitchStableActive = leituraAtiva;
+    if (actionSwitchStableActive) {
+      actionSwitchPressedSinceMs = agora;
+      actionSwitchLongPressConsumed = false;
+      return;
+    }
+    const bool foiPressaoLonga = actionSwitchLongPressConsumed;
+    actionSwitchPressedSinceMs = 0;
+    actionSwitchLongPressConsumed = false;
+    if (!foiPressaoLonga) abrirApTemporario();
+    return;
+  }
+
+  if (!actionSwitchStableActive || actionSwitchLongPressConsumed || actionSwitchPressedSinceMs == 0) return;
+  if (agora - actionSwitchPressedSinceMs >= FAILSAFE_SWITCH_HOLD_MS) {
+    actionSwitchLongPressConsumed = true;
+    transmitirFailsafeSalvo();
+  }
 }
 
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency) {
+  iniciarAvisoBuzzer();
   irsend.sendRaw(rawData, length, frequency);
+  atualizarBuzzer();
 }
 
 void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing) {
@@ -798,7 +1066,9 @@ void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo
 
   universalAC.next.swingv = swing ? stdAc::swingv_t::kAuto : stdAc::swingv_t::kOff;
 
+  iniciarAvisoBuzzer();
   universalAC.sendAc();
+  atualizarBuzzer();
 }
 
 void atualizarLeituraSensores() {
@@ -915,20 +1185,6 @@ void sendHeartbeat() {
 
   String url = urlServidor(SERVER_HEARTBEAT_PATH);
   sendHttpPost(url, payload);
-}
-
-void reportAccess(const String& ip, const String& userAgent) {
-  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
-
-  JsonDocument doc;
-  doc["tipo"] = "acesso";
-  doc["ip"] = ip;
-  doc["userAgent"] = userAgent;
-
-  String payload;
-  serializeJson(doc, payload);
-
-  wsCliente.sendTXT(payload);
 }
 
 void reportComando(const String& cmd, const String& valor) {

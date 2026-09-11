@@ -353,15 +353,6 @@ router.patch("/admin/salas/:sala/limites-temperatura", exigirSuperAdmin, (req, r
   }
 });
 
-router.get("/admin/salas/:sala/acessar-esp32", exigirSuperAdmin, (req, res) => {
-  const sala = salasService.buscar(req.params.sala);
-  if (!sala) return res.status(404).json({ ok: false, erro: "sala não encontrada" });
-  if (!sala.ipEsp32) {
-    return res.status(404).json({ ok: false, erro: "esta sala ainda não reportou um IP de ESP32" });
-  }
-  res.json({ ok: true, sala: sala.sala, ip: sala.ipEsp32, url: `http://${sala.ipEsp32}/` });
-});
-
 router.get("/admin/notificacoes", (req, res) => {
   res.json(notificacoesService.listar());
 });
