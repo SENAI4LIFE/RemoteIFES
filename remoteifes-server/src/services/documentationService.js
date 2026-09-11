@@ -39,9 +39,14 @@ const superHelp = {
   ] },
   config: { titulo: "Como usar: Configurações", itens: [{ titulo: "Impacto global", texto: "Registre valores anteriores; salve só a mudança planejada e valide sessões, rede e dispositivos." }] },
   esp32: { titulo: "Como usar: Dispositivos > Firmware / OTA", itens: [
-    { titulo: "Manutenção", texto: "Use configuração/IR em uma sala por vez e retorne a placa ao modo de operação." },
+    { titulo: "Manutenção", texto: "Consulte estado, papel (transmissor ou clonador), failsafe gravado e versão; a captura de sinais fica em Protocolos IR." },
     { titulo: "Distribuição em etapas", texto: "Atualize vários ESP32 com canário e lotes; ela para sozinha na primeira falha real e só conta como validado quem reconecta na versão nova." },
     { titulo: "Segurança", texto: "OTA, credenciais e Resetar Wi-Fi exigem plano de validação ou acesso físico." },
+  ] },
+  protocolos: { titulo: "Como usar: Dispositivos > Protocolos IR", itens: [
+    { titulo: "Clonador único", texto: "Defina como clonadora oficial somente a ESP32 com receptor IR; o papel fica vinculado ao MAC e à credencial da placa." },
+    { titulo: "Biblioteca", texto: "Entre no modo clone, capture, dê um nome e salve; depois transmita ou aplique o protocolo pela ESP32 de destino." },
+    { titulo: "Failsafe OFF", texto: "Opcional: capture só o botão de desligar no protocolo; ao aplicá-lo a uma sala, o RAW vai para a NVS do ESP32 e responde ao switch de 5 s." },
   ] },
   monitoramento: { titulo: "Como usar: Status > Sistema", itens: [{ titulo: "Triagem", texto: "Identifique o cartão em alerta, correlacione o horário e valide a normalização após corrigir uma causa." }] },
   heatmap: { titulo: "Como usar: Mapa de calor operacional", itens: [

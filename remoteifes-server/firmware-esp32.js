@@ -7,7 +7,7 @@ function uso() {
   console.log("  node firmware-esp32.js <arquivo.bin> <versao> [nota]  publica um firmware para OTA");
   console.log("");
   console.log("Exemplo:");
-  console.log("  node firmware-esp32.js ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.0.0 \"correção do watchdog\"");
+  console.log("  node firmware-esp32.js ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.1.0 \"clonador IR central, failsafe OFF e switch fisico\"");
 }
 
 const args = process.argv.slice(2);

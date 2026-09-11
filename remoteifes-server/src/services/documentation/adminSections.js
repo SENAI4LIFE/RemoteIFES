@@ -10,7 +10,7 @@ const adminSections = [
       { t: "p", texto: "A seção <strong>Admin</strong> reúne a operação administrativa em três grupos — <strong>Gestão</strong>, <strong>Dispositivos</strong> e <strong>Sistema</strong> —, sempre em dois níveis: <strong>Administração &gt; Grupo &gt; Função</strong>. O admin herda o uso comum e enxerga apenas as funções que seu nível autoriza; funções de infraestrutura permanecem exclusivas do Superadministrador e nem sequer aparecem no grupo." },
       { t: "tabela", cabecalho: ["Grupo", "Conceito", "Funções"], linhas: [
         ["Gestão", "contas e responsabilidade sobre salas", "Usuários e (Superadministrador) Relatos de problemas"],
-        ["Dispositivos", "administração dos ESP32 e avisos operacionais", "Cadastro, Firmware / OTA e Alertas"],
+        ["Dispositivos", "administração dos ESP32 e avisos operacionais", "Cadastro, Firmware / OTA, (Superadministrador) Protocolos IR e Alertas"],
         ["Sistema", "informação corrente, histórico e configuração", "Logs, Status e (Superadministrador) Configurações"],
       ] },
       { t: "p", texto: "Dentro de <strong>Sistema</strong>, a divisão é temporal: <strong>Status</strong> guarda o que está acontecendo agora e <strong>Logs</strong> guarda o que já aconteceu e ficou persistido. <strong>Configurações</strong> é a configuração do sistema." },
@@ -23,9 +23,10 @@ const adminSections = [
       { t: "fluxo", titulo: "Grupo Dispositivos", itens: [
         { tipo: "screen", texto: "Cadastro: vincular o ESP32 à sala" },
         { tipo: "device", texto: "Firmware / OTA: atualizar e manter a placa" },
+        { tipo: "action", texto: "Protocolos IR: clonar e aplicar sinais (Superadministrador)" },
         { tipo: "status", texto: "Alertas: avisos compartilhados da fila do sino" },
       ] },
-      { t: "nota", texto: "A permissão vale por aba interna, não pela tela que a contém: <strong>Status</strong> abre para qualquer admin por causa de Usuários ativos e Mapa, mas a aba <strong>Sistema</strong> continua exclusiva do Superadministrador; o mesmo vale para <strong>Auditoria</strong> dentro de Logs. Configurações globais, restrição da sala, Cadastro de ESP32, credenciais, IR, Firmware / OTA, Status &gt; Sistema, Logs &gt; Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou um atalho antigo tente abri-los." },
+      { t: "nota", texto: "A permissão vale por aba interna, não pela tela que a contém: <strong>Status</strong> abre para qualquer admin por causa de Usuários ativos e Mapa, mas a aba <strong>Sistema</strong> continua exclusiva do Superadministrador; o mesmo vale para <strong>Auditoria</strong> dentro de Logs. Configurações globais, restrição da sala, Cadastro de ESP32, credenciais, Protocolos IR, Firmware / OTA, Status &gt; Sistema, Logs &gt; Auditoria e gestão de relatos exigem Superadministrador, mesmo que uma URL ou um atalho antigo tente abri-los." },
     ],
   },
   {

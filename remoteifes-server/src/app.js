@@ -130,6 +130,7 @@ app.use(require("./routes/comandoRoutes"));
 app.use(require("./routes/agendamentoRoutes"));
 app.use(require("./routes/adminRoutes"));
 app.use(require("./routes/esp32AdminRoutes"));
+app.use(require("./routes/protocolosIrRoutes"));
 app.use(require("./routes/relatoRoutes"));
 
 if (!frontendDisponivel) {

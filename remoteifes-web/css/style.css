@@ -2977,48 +2977,7 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
 }
 .mon-alertas ul { margin: 6px 0 0; padding-left: 18px; overflow-wrap: break-word; }
 
-.esp32-config-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-  align-items: center;
-}
-.esp32-config-form input {
-  width: auto;
-  flex: 1 1 180px;
-  margin-top: 0;
-}
-.esp32-config-form .btn {
-  width: auto;
-  margin-top: 0;
-  padding: 8px 14px;
-}
-
-.esp32-capture-list {
-  list-style: none;
-  padding: 0;
-  margin: 10px 0 0;
-  max-height: 220px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.esp32-capture-item {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: calc(12px * var(--a11y-font-scale));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.esp32-capture-info { min-width: 0; }
 .esp32-capture-hex { font-family: monospace; color: var(--text-muted); }
-.esp32-capture-item .link-btn { flex: 0 0 auto; }
 
 .ota-rollout {
   margin-bottom: var(--space-4);
@@ -4444,3 +4403,28 @@ body.a11y-high-contrast .heatmap-floorplan .room.heatmap-f2 { background: #ffe00
 body.a11y-high-contrast .heatmap-floorplan .room.heatmap-f3 { background: #ff8800; color: #000000; border: 2px solid #000000; }
 body.a11y-high-contrast .heatmap-floorplan .room.heatmap-f4 { background: #cc0000; color: #ffffff; border: 2px solid #ffffff; }
 body.a11y-high-contrast .heatmap-floorplan .room.heatmap-sem-dados { background: #444444; color: #ffffff; border: 2px dashed #ffffff; }
+
+.protocolos-ir-lista {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.protocolos-ir-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: calc(13px * var(--a11y-font-scale));
+  overflow-wrap: anywhere;
+}
+.protocolos-ir-cabecalho { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.protocolos-ir-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.protocolos-ir-failsafe.ok { color: var(--ifes-green-dark); font-weight: 600; }
+.protocolos-ir-item .esp32-capture-actions { margin-top: 4px; }
+#protocolosIrClonadorAviso, #protocolosIrFailsafeAviso { margin-top: 10px; }
+body.a11y-high-contrast .protocolos-ir-failsafe.ok { color: inherit; text-decoration: underline; }

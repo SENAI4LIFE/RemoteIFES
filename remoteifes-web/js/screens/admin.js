@@ -428,6 +428,7 @@ const Admin = {
     document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
     document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
     document.getElementById("cfgTurboFuncaoExtra").value = cfg.turboFuncaoExtra || "nenhuma";
+    document.getElementById("cfgAutoLigar").checked = cfg.autoLigar !== false;
     document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
     document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
     document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
@@ -565,7 +566,6 @@ const Admin = {
           <div class="two-col mac-actions">
             <button type="button" class="link-btn salvar-mac">salvar MAC</button>
             <button type="button" class="link-btn salvar-limites">salvar limites</button>
-            ${s.ipEsp32 ? `<button type="button" class="link-btn acessar-esp32">acessar interface do ESP32</button>` : `<span class="hint">IP ainda não reportado</span>`}
           </div>
           <p class="error hidden mac-error"></p>
 
@@ -613,18 +613,6 @@ const Admin = {
         }
         Toast.aviso("limites da sala salvos");
       });
-
-      const acessarBtn = li.querySelector(".acessar-esp32");
-      if (acessarBtn) {
-        acessarBtn.addEventListener("click", async () => {
-          const resp = await Api.acessarEsp32(s.sala);
-          if (!resp.ok) {
-            Toast.erro(resp.erro || "não foi possível obter o endereço do ESP32");
-            return;
-          }
-          window.open(resp.url, "_blank", "noopener");
-        });
-      }
 
       const acessoArea = li.querySelector(".acesso-usuarios-area");
       const acessoLista = li.querySelector(".acesso-usuarios-list");
@@ -1039,6 +1027,7 @@ const ADMIN_CARGA = {
   relatos: () => Admin.carregarRelatos(),
   macs: () => Admin.aoAbrirMacs(),
   esp32: () => Esp32Admin.aoAbrir(),
+  protocolos: () => ProtocolosIrAdmin.aoAbrir(),
   notificacoes: () => Notificacoes.carregarAdmin(),
   config: () => Admin.carregarConfiguracoes(),
 };
@@ -1105,6 +1094,7 @@ function encerrarAdminAtivo(chave) {
   }
   if (chave !== "macs") Admin.aoFecharMacs();
   if (chave !== "esp32") Esp32Admin.aoFechar();
+  if (chave !== "protocolos") ProtocolosIrAdmin.aoFechar();
 }
 
 async function abrirAdminSub(sub, aba) {
@@ -1158,6 +1148,7 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     temperaturaMinima: Number(document.getElementById("cfgTemperaturaMinima").value),
     temperaturaMaxima: Number(document.getElementById("cfgTemperaturaMaxima").value),
     turboFuncaoExtra: document.getElementById("cfgTurboFuncaoExtra").value,
+    autoLigar: document.getElementById("cfgAutoLigar").checked,
     modoTeste: document.getElementById("cfgModoTeste").checked,
     redesAutorizadas: document.getElementById("cfgRedesAutorizadas").value
       .split("\n")
