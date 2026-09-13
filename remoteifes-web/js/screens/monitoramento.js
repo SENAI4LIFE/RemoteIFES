@@ -1,5 +1,6 @@
 const Monitoramento = (() => {
   let intervalo = null;
+  let aberto = false;
   let carregado = false;
   const CHAVE_GRAFICOS = "remoteifes_mon_graficos";
   let faixaAtual = "24h";
@@ -45,10 +46,22 @@ const Monitoramento = (() => {
   }
 
   function estadoArmazenamento(arm) {
-    if (arm.erro) return "falha";
-    if (arm.critico) return "falha";
-    if (arm.alerta) return "temporariamente-indisponivel";
+    const volumes = [arm, arm.backups].filter(Boolean);
+    if (volumes.some((v) => v.erro || v.critico)) return "falha";
+    if (volumes.some((v) => v.alerta)) return "temporariamente-indisponivel";
     return "disponivel";
+  }
+
+  function linhasArmazenamento(arm) {
+    const linhasDe = (v, prefixo) => (v.erro
+      ? [[`${prefixo}Erro`, v.erro, "alerta"]]
+      : [
+          [`${prefixo}Livre`, `${fmtBytes(v.livreBytes)} (${v.livrePercent}%)`, v.alerta ? "alerta" : ""],
+          [`${prefixo}Total`, fmtBytes(v.totalBytes)],
+          [`${prefixo}Local`, v.caminho, "caminho"],
+        ]);
+    if (!arm.backups) return linhasDe(arm, "");
+    return [...linhasDe(arm, "Banco · "), ...linhasDe(arm.backups, "Backups · ")];
   }
 
   function estadoBackup(bk) {
@@ -129,13 +142,7 @@ const Monitoramento = (() => {
         ["WAL", fmtBytes(b.walBytes)],
         ["Espaço reutilizável", fmtBytes(b.reutilizavelBytes)],
       ]),
-      card("Armazenamento", estadoArmazenamento(arm), arm.erro
-        ? [["Erro", arm.erro, "alerta"]]
-        : [
-            ["Livre", `${fmtBytes(arm.livreBytes)} (${arm.livrePercent}%)`, arm.alerta ? "alerta" : ""],
-            ["Total", fmtBytes(arm.totalBytes)],
-            ["Local", arm.caminho, "caminho"],
-          ]),
+      card("Armazenamento", estadoArmazenamento(arm), linhasArmazenamento(arm)),
       card("Backups", estadoBackup(bk), [
         ["Automático", bk.automatico ? "ligado" : "desligado"],
         ["Quantidade", bk.quantidade],
@@ -501,13 +508,16 @@ const Monitoramento = (() => {
 
   async function aoAbrir() {
     if (typeof state !== "undefined" && !state.isSuperAdmin) return;
+    aberto = true;
     if (!carregado) skeleton();
     await carregar();
+    if (!aberto) return;
     if (!intervalo) intervalo = setInterval(carregar, 20000);
     carregarHistorico();
   }
 
   function aoFechar() {
+    aberto = false;
     if (intervalo) {
       clearInterval(intervalo);
       intervalo = null;

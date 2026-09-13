@@ -75,7 +75,6 @@ function buscarPorId(id) {
 
 function senhaPadraoAtiva(usuario) {
   return !!usuario
-    && usuario.usuario === "superadmin"
     && usuario.nivel === NIVEL_SUPERADMIN
     && bcrypt.compareSync("admin", usuario.senhaHash);
 }

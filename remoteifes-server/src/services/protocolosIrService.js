@@ -9,6 +9,15 @@ const CARRIER_MIN = 20000;
 const CARRIER_MAX = 60000;
 const LABEL_MIN = 2;
 const LABEL_MAX = 80;
+const PROTOCOLOS_NATIVOS_SUPORTADOS = new Set([
+  10, 15, 16, 18, 20, 24, 27, 28, 32, 33, 34, 38, 40, 41, 44, 45, 46, 48, 49, 51, 53, 54, 55, 57, 59, 60, 61, 62, 63,
+  65, 66, 67, 68, 69, 70, 71, 72, 73, 78, 79, 80, 84, 85, 86, 89, 90, 92, 93, 94, 96, 98, 100, 101, 102, 103, 104, 105,
+  108, 109, 111, 113, 115, 120, 126, 128,
+]);
+
+function protocoloNativoSuportado(id) {
+  return Number.isInteger(id) && PROTOCOLOS_NATIVOS_SUPORTADOS.has(id);
+}
 
 let clonadorCache;
 
@@ -201,6 +210,9 @@ function criar({ label, captura }) {
   const isKnown = captura.isKnown === true;
   const protocolId = isKnown && Number.isInteger(captura.protocolId) && captura.protocolId >= 0 ? captura.protocolId : null;
   if (isKnown && protocolId === null) throw new Error("protocolo reconhecido precisa de protocolId válido");
+  if (isKnown && !protocoloNativoSuportado(protocolId)) {
+    throw new Error(`protocolId ${protocolId} não é suportado pelo firmware ESP32 desta versão`);
+  }
   const protocol = typeof captura.protocol === "string" ? captura.protocol.slice(0, 80) : null;
   const hex = typeof captura.hex === "string" ? captura.hex.slice(0, 4096) : null;
 
@@ -288,6 +300,8 @@ module.exports = {
   excluir,
   validarRaw,
   validarCarrierHz,
+  protocoloNativoSuportado,
+  PROTOCOLOS_NATIVOS_SUPORTADOS,
   normalizarLabel,
   MAX_RAW,
   CARRIER_PADRAO,

@@ -23,7 +23,7 @@ const captura = (extra = {}) => ({
   id: 1,
   sala: "CLONE-1",
   isKnown: true,
-  protocolId: 5,
+  protocolId: 16,
   protocol: "DAIKIN",
   hex: "0x1234",
   raw: [9000, 4500, 560, 560],
@@ -90,7 +90,7 @@ test("labels são normalizados, limitados a 2–80 caracteres e únicos sem dife
   const salvo = protocolos.criar({ label: "  Ar   laboratório  -  ligar\t", captura: captura() });
   assert.equal(salvo.label, "Ar laboratório - ligar");
   assert.equal(salvo.isKnown, true);
-  assert.equal(salvo.protocolId, 5);
+  assert.equal(salvo.protocolId, 16);
   assert.equal(salvo.origemSala, "CLONE-1");
   assert.equal(salvo.origemMac, "AA:BB:CC:DD:EE:C1");
   assert.equal(salvo.carrierHz, 38000);
@@ -143,13 +143,13 @@ test("renomear respeita unicidade e excluir desfaz o vínculo das salas com o re
   salasService.definirProtocoloIR("TX-2", ar.protocolId, ar.id);
   assert.deepEqual(protocolos.salasAtribuidas(ar.id), ["TX-1", "TX-2"]);
   assert.deepEqual(protocolos.buscar(ar.id).salas, ["TX-1", "TX-2"]);
-  assert.throws(() => salasService.definirProtocoloIR("TX-1", 5, 0), /registro de protocolo/);
+  assert.throws(() => salasService.definirProtocoloIR("TX-1", 16, 0), /registro de protocolo/);
 
   const excluido = protocolos.excluir(ar.id);
   assert.equal(excluido.id, ar.id);
   assert.equal(protocolos.buscar(ar.id), null);
   assert.equal(db.prepare("SELECT irProtocoloRegistroId FROM salas WHERE sala = 'TX-1'").get().irProtocoloRegistroId, null);
-  assert.equal(db.prepare("SELECT irProtocolo FROM salas WHERE sala = 'TX-1'").get().irProtocolo, 5);
+  assert.equal(db.prepare("SELECT irProtocolo FROM salas WHERE sala = 'TX-1'").get().irProtocolo, 16);
   assert.throws(() => protocolos.excluir(ar.id), /não encontrado/);
   assert.equal(protocolos.listar().length, 1);
   assert.equal(protocolos.listar()[0].id, projetor.id);

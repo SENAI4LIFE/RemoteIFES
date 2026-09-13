@@ -349,7 +349,7 @@ function migrarColunasUsuarios() {
 }
 
 function renomearContaPadraoSuperadmin() {
-  const antiga = db.prepare("SELECT id, nome FROM usuarios WHERE usuario = 'admin'").get();
+  const antiga = db.prepare("SELECT id, nome FROM usuarios WHERE usuario = 'admin' AND nivel = 3").get();
   if (!antiga) return;
   const conflito = db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get();
   if (conflito) return;

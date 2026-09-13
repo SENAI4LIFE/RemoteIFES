@@ -1,6 +1,8 @@
 const Router = (() => {
   let restaurando = false;
   let salasCache = null;
+  let geracaoNavegacao = 0;
+  const TENTATIVAS_SELECT = 25;
 
   const ADMIN_ALIAS = {
     proprietarios: ["usuarios", "proprietarios"],
@@ -257,12 +259,14 @@ const Router = (() => {
     el.dispatchEvent(new Event("change"));
   }
 
-  function definirSelect(id, valor) {
+  function definirSelect(id, valor, geracao = geracaoNavegacao, tentativa = 0) {
+    if (geracao !== geracaoNavegacao) return;
     const el = document.getElementById(id);
     if (!el) return;
     const tem = Array.from(el.options).some((o) => o.value === valor);
     if (!tem) {
-      setTimeout(() => definirSelect(id, valor), 120);
+      if (tentativa >= TENTATIVAS_SELECT) return;
+      setTimeout(() => definirSelect(id, valor, geracao, tentativa + 1), 120);
       return;
     }
     el.value = valor;
@@ -282,6 +286,7 @@ const Router = (() => {
 
   async function restaurar() {
     if (restaurando) return;
+    geracaoNavegacao += 1;
     const segs = segmentos();
     if (segs.length === 0) {
       if (logado()) irParaAba("inicio");

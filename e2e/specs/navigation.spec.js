@@ -248,3 +248,34 @@ test("uma rota protegida no endereço não concede acesso: usuário comum em /ad
   ).toBeVisible();
   await expect(page.locator("#adminSub-config")).toBeHidden();
 });
+
+test("uma rota com sala inexistente não deixa uma repetição infinita rodando depois de navegar para outra tela", async ({ page, context }) => {
+  await injetarSessao(context, "admin");
+  await context.addInitScript(() => {
+    window.__retentativas = 0;
+    const original = window.setTimeout;
+    window.setTimeout = function (fn, atraso, ...resto) {
+      if (atraso === 120) window.__retentativas += 1;
+      return original.call(window, fn, atraso, ...resto);
+    };
+  });
+  await page.goto("/#/agenda/SALA-QUE-NAO-EXISTE");
+  await expect(page.locator("#screen-agenda")).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => window.__retentativas)).toBeGreaterThan(0);
+
+  await page.evaluate(() => Router.ir("/inicio"));
+  await expect(page.locator("#screen-inicio")).toBeVisible();
+  await page.waitForTimeout(300);
+  const aoSair = await page.evaluate(() => window.__retentativas);
+  await page.waitForTimeout(2000);
+  expect(await page.evaluate(() => window.__retentativas), "nenhuma nova tentativa após a navegação").toBe(aoSair);
+
+  await page.evaluate(() => Router.ir("/agenda/OUTRA-INEXISTENTE"));
+  await expect(page.locator("#screen-agenda")).toBeVisible();
+  await page.waitForTimeout(4500);
+  const limitadas = await page.evaluate(() => window.__retentativas);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => window.__retentativas), "a repetição é limitada mesmo permanecendo na rota inválida").toBe(limitadas);
+  expect(limitadas - aoSair).toBeLessThanOrEqual(26);
+});

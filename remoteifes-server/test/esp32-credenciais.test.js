@@ -63,16 +63,20 @@ function assentar(ws, ms = 200) {
     let aberto = false;
     let fechado = false;
     let codigo = null;
+    let timer = null;
     ws.once("open", () => {
       aberto = true;
+      if (!timer) timer = setTimeout(() => resolve({ aberto, fechado, codigo }), ms);
     });
     ws.once("close", (code) => {
       fechado = true;
       codigo = code;
+      if (timer) clearTimeout(timer);
       resolve({ aberto, fechado, codigo });
     });
     ws.once("error", () => {});
-    setTimeout(() => resolve({ aberto, fechado, codigo }), ms);
+    const limite = setTimeout(() => { if (!aberto) resolve({ aberto, fechado, codigo }); }, 5000);
+    limite.unref();
   });
 }
 
@@ -82,7 +86,7 @@ async function esperaAceita(ws) {
 }
 
 async function esperaRecusada(ws) {
-  const r = await assentar(ws);
+  const r = await assentar(ws, 5000);
   assert.ok(r.fechado, `esperava conexão recusada, obtive ${JSON.stringify(r)}`);
 }
 
