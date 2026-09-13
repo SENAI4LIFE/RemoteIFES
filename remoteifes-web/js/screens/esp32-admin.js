@@ -30,6 +30,7 @@ const Esp32Admin = (() => {
     baixando: "baixando firmware…",
     gravado: "firmware gravado, reiniciando…",
     reiniciando: "reiniciando para validar…",
+    validando: "validando o novo firmware no dispositivo…",
     concluido: "atualização concluída",
     falhou: "falha na atualização",
   };
@@ -40,7 +41,7 @@ const Esp32Admin = (() => {
     const ota = dispositivo.ota || { fase: "ocioso" };
     const versaoDispositivo = dispositivo.fwVersao || d.fwVersao || null;
     const versaoPublicada = manifestoFirmware ? manifestoFirmware.versao : null;
-    const emAndamento = ["ofertado", "baixando", "gravado", "reiniciando"].includes(ota.fase);
+    const emAndamento = ["ofertado", "baixando", "gravado", "reiniciando", "validando"].includes(ota.fase);
     const atualizado = versaoPublicada && versaoDispositivo === versaoPublicada;
 
     let statusLinha = "";
@@ -318,6 +319,7 @@ const Esp32Admin = (() => {
     pendente: "na fila",
     atualizando: "atualizando",
     reiniciando: "reiniciando para validar",
+    validando: "validando o boot",
     validado: "validado",
     falhou: "falhou",
     revertido: "revertido",
@@ -333,6 +335,7 @@ const Esp32Admin = (() => {
     indeterminado: "erro",
     atualizando: "andamento",
     reiniciando: "andamento",
+    validando: "andamento",
   };
 
   function rolloutAtivo() {
@@ -560,7 +563,7 @@ const Esp32Admin = (() => {
   function salaNoRolloutAtivo(sala) {
     if (!rolloutAtivo()) return false;
     const item = rollout.dispositivos.find((d) => d.sala === sala);
-    return !!item && ["pendente", "atualizando", "reiniciando"].includes(item.estado);
+    return !!item && ["pendente", "atualizando", "reiniciando", "validando"].includes(item.estado);
   }
 
   function render() {

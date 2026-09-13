@@ -322,7 +322,7 @@ test("GET /admin/monitoramento continua compatível e ganha composição de OTA 
   assert.equal(typeof m.servico.cargaMedia1min, "number");
   assert.ok(m.servico.nucleos >= 1);
   assert.equal(m.servico.pm2, null, "sem PM2 o campo é nulo, nunca inventado");
-  assert.deepEqual(Object.keys(m.esp32.otaPorFase), ["ofertado", "baixando", "gravado", "reiniciando", "concluido", "falhou"]);
+  assert.deepEqual(Object.keys(m.esp32.otaPorFase), ["ofertado", "baixando", "gravado", "reiniciando", "validando", "concluido", "falhou"]);
   assert.equal(typeof m.esp32.otaComFalha, "number");
   assert.ok(m.banco.tabelas.monitoramento_amostras);
   assert.ok(m.banco.tabelas.monitoramento_horas);

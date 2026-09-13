@@ -267,8 +267,8 @@ const Monitoramento = (() => {
       vazio: "Nenhuma credencial ou dispositivo cadastrado.",
     });
 
-    const rotuloFase = { ofertado: "Ofertado", baixando: "Baixando", gravado: "Gravado", reiniciando: "Reiniciando", concluido: "Concluído", falhou: "Falhou" };
-    const corFase = { ofertado: "gr-cor-1", baixando: "gr-cor-3", gravado: "gr-cor-6", reiniciando: "gr-cor-4", concluido: "gr-ok", falhou: "gr-alerta" };
+    const rotuloFase = { ofertado: "Ofertado", baixando: "Baixando", gravado: "Gravado", reiniciando: "Reiniciando", validando: "Validando", concluido: "Concluído", falhou: "Falhou" };
+    const corFase = { ofertado: "gr-cor-1", baixando: "gr-cor-3", gravado: "gr-cor-6", reiniciando: "gr-cor-4", validando: "gr-cor-5", concluido: "gr-ok", falhou: "gr-alerta" };
     const itensOta = Object.keys(rotuloFase).map((fase) => ({ nome: rotuloFase[fase], valor: Number(fases[fase]) || 0, cor: corFase[fase] }));
     const totalOta = itensOta.reduce((acc, it) => acc + it.valor, 0);
     Graficos.rosca(el("grOtaAtual"), {

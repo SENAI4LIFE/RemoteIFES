@@ -16,11 +16,12 @@ const TAMANHO_MIN_BIN = 64 * 1024;
 const TAMANHO_MAX_BIN = 3 * 1024 * 1024;
 const MAGIC_IMAGEM_ESP = 0xe9;
 
-const FASES_ATIVAS = new Set(["ofertado", "baixando", "gravado", "reiniciando"]);
+const FASES_ATIVAS = new Set(["ofertado", "baixando", "gravado", "reiniciando", "validando"]);
 const FASES_TERMINAIS = new Set(["concluido", "falhou", "ocioso"]);
 const OTA_MAX_SIMULTANEOS = 2;
 const OTA_TIMEOUT_TRANSFERENCIA_MS = 4 * 60 * 1000;
 const OTA_TIMEOUT_REINICIO_MS = 3 * 60 * 1000;
+const OTA_TIMEOUT_VALIDACAO_MS = 4 * 60 * 1000;
 const OTA_ESTADO_TERMINAL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CAMINHO_DOWNLOAD = "/dispositivo/firmware";
 
@@ -63,10 +64,11 @@ function carregarEstados() {
     return;
   }
   if (!bruto || typeof bruto !== "object" || Array.isArray(bruto)) return;
+  const agora = new Date().toISOString();
   for (const [sala, estado] of Object.entries(bruto)) {
     if (typeof sala !== "string" || !sala || sala.length > 100 || !estado || typeof estado !== "object") continue;
     if (typeof estado.fase !== "string" || !Number.isFinite(new Date(estado.atualizadoEm).getTime())) continue;
-    estados.set(sala, { ...estado });
+    estados.set(sala, estado.fase === "validando" ? { ...estado, atualizadoEm: agora } : { ...estado });
   }
 }
 
@@ -331,6 +333,7 @@ function ofertar(sala, { rolloutId, tentativa, sha256 } = {}) {
     tamanho: manifesto.tamanho,
     sha256: manifesto.sha256,
     caminho: CAMINHO_DOWNLOAD,
+    tentativa: estados.get(sala).tentativa,
   });
   if (!enviado) {
     estados.delete(sala);
@@ -383,21 +386,74 @@ function aoDesconectarDispositivo(sala) {
   }
 }
 
-function aoReconectarDispositivo(sala, fwVersao) {
+function concluir(sala, estado, evidencia) {
+  definirEstado(sala, { fase: "concluido", recebido: estado.total, erro: null, causa: null, evidencia });
+  logger.info("ota-concluida", { sala, versao: estado.versao, evidencia });
+  notificarConcluido(sala, true, `A sala ${sala} foi atualizada para o firmware ${estado.versao}.`);
+}
+
+function reverter(sala, estado, fwVersao, erro, mensagem) {
+  definirEstado(sala, { fase: "falhou", erro, causa: "rollback", versaoReportada: fwVersao || null });
+  logger.warn("ota-revertida", { sala, versaoAlvo: estado.versao, versaoAtual: fwVersao || null });
+  notificarConcluido(sala, false, mensagem);
+}
+
+function aoReconectarDispositivo(sala, fwVersao, capacidades = {}) {
   const estado = estados.get(sala);
-  if (!estado || estado.fase === "concluido" || estado.fase === "ocioso") return;
+  if (!estado || estado.fase === "ocioso") return;
   if (estado.identidade && estado.identidade !== identidadeDaSala(sala)) return;
-  if (fwVersao && estado.versao && fwVersao === estado.versao) {
-    definirEstado(sala, { fase: "concluido", recebido: estado.total, erro: null, causa: null });
-    logger.info("ota-concluida", { sala, versao: estado.versao });
-    notificarConcluido(sala, true, `A sala ${sala} foi atualizada para o firmware ${estado.versao}.`);
+  const voltouAoAnterior = !!fwVersao && !!estado.versaoAnterior && fwVersao === estado.versaoAnterior && fwVersao !== estado.versao;
+  if (estado.fase === "concluido") {
+    if (voltouAoAnterior && estado.evidencia === "boot") {
+      reverter(sala, estado, fwVersao, "o dispositivo voltou à versão anterior depois de a atualização ter sido validada",
+        `A sala ${sala} voltou ao firmware ${fwVersao} depois de a atualização para ${estado.versao} ter sido validada.`);
+    }
     return;
   }
-  if (estado.fase !== "gravado" && estado.fase !== "reiniciando") return;
+  if (estado.fase === "falhou") return;
+  if (fwVersao && estado.versao && fwVersao === estado.versao) {
+    if (capacidades && capacidades.validacaoOta) {
+      if (estado.fase !== "validando") {
+        definirEstado(sala, { fase: "validando", recebido: estado.total, validandoDesde: new Date().toISOString() });
+        logger.info("ota-validando", { sala, versao: estado.versao });
+      }
+      return;
+    }
+    concluir(sala, estado, "versao");
+    return;
+  }
+  if (estado.fase !== "gravado" && estado.fase !== "reiniciando" && estado.fase !== "validando") return;
+  if (voltouAoAnterior && (estado.fase === "validando" || (capacidades && capacidades.validacaoOta))) {
+    reverter(sala, estado, fwVersao, "o dispositivo reverteu para a versão anterior sem validar o novo firmware",
+      `A atualização da sala ${sala} foi revertida pelo próprio dispositivo: o firmware ${estado.versao} não passou na validação de boot.`);
+    return;
+  }
   const erro = "o dispositivo reportou uma versão inesperada após a gravação; rollback não comprovado";
   definirEstado(sala, { fase: "falhou", erro, causa: "indeterminado" });
   logger.warn("ota-versao-inesperada", { sala, versaoAlvo: estado.versao, versaoAtual: fwVersao || null });
   notificarConcluido(sala, false, `A atualização da sala ${sala} não foi confirmada: versão inesperada após a gravação.`);
+}
+
+function registrarValidacao(sala, msg) {
+  const estado = estados.get(sala);
+  if (!estado || !msg || typeof msg.tentativa !== "string" || !msg.tentativa) return false;
+  if (estado.tentativa !== msg.tentativa) {
+    logger.warn("ota-validacao-tentativa-divergente", { sala, esperada: estado.tentativa || null, recebida: msg.tentativa.slice(0, 64) });
+    return false;
+  }
+  if (typeof msg.sha256 === "string" && msg.sha256.toLowerCase() !== estado.sha256) {
+    logger.warn("ota-validacao-hash-divergente", { sala });
+    return false;
+  }
+  if (typeof msg.versao === "string" && msg.versao !== estado.versao) {
+    logger.warn("ota-validacao-versao-divergente", { sala, esperada: estado.versao, recebida: msg.versao.slice(0, 32) });
+    return false;
+  }
+  if (estado.fase === "concluido") return true;
+  if (estado.fase !== "validando" && estado.fase !== "gravado" && estado.fase !== "reiniciando") return false;
+  if (estado.identidade && estado.identidade !== identidadeDaSala(sala)) return false;
+  concluir(sala, estado, "boot");
+  return true;
 }
 
 function notificarConcluido(sala, sucesso, mensagem) {
@@ -426,6 +482,10 @@ function verificarTimeouts() {
       definirEstado(sala, { fase: "falhou", erro: "o dispositivo não voltou a se conectar após gravar o firmware", causa: "reinicio" });
       logger.warn("ota-timeout-reinicio", { sala, versao: estado.versao });
       notificarConcluido(sala, false, `A sala ${sala} não voltou a se conectar após gravar o firmware.`);
+    } else if (estado.fase === "validando" && idadeMs > OTA_TIMEOUT_VALIDACAO_MS) {
+      definirEstado(sala, { fase: "falhou", erro: "o dispositivo não confirmou a validação de boot do novo firmware", causa: "validacao" });
+      logger.warn("ota-timeout-validacao", { sala, versao: estado.versao });
+      notificarConcluido(sala, false, `A sala ${sala} reiniciou com o firmware ${estado.versao}, mas não confirmou a validação de boot.`);
     }
   });
   if (removeuTerminal) persistirEstados();
@@ -458,6 +518,7 @@ module.exports = {
   registrarResultado,
   aoDesconectarDispositivo,
   aoReconectarDispositivo,
+  registrarValidacao,
   verificarTimeouts,
   estadoDaSala,
   listarEstados,
