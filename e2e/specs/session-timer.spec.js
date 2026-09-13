@@ -63,20 +63,43 @@ test("atividade e logout são sincronizados entre abas", async ({ appPage, login
   const segunda = await context.newPage();
   await segunda.goto("/");
   await expect(segunda.locator("#mainApp")).toBeVisible();
-  await appPage.evaluate(() => {
-    IdleTimer.prazoServidorMs = IdleTimer._agoraServidor() + 30000;
-    IdleTimer.ultimoPingMs = 0;
-  });
-  await segunda.evaluate(() => {
-    IdleTimer.prazoServidorMs = IdleTimer._agoraServidor() + 30000;
-    IdleTimer._checar();
-  });
-  await appPage.mouse.move(20, 20);
   await expect(segunda.locator("#accountSessionTimer")).toHaveText(/^11h \d+m$/);
+  for (const pagina of [appPage, segunda]) {
+    await pagina.evaluate(() => {
+      if (IdleTimer.pingPendente) {
+        clearTimeout(IdleTimer.pingPendente);
+        IdleTimer.pingPendente = null;
+      }
+      IdleTimer.prazoServidorMs = IdleTimer._agoraServidor() + 120000;
+      IdleTimer.ultimoPingMs = 0;
+      IdleTimer._checar();
+    });
+    await expect(pagina.locator("#accountSessionTimer")).toHaveText(/^0[12]:\d{2}$/);
+    await expect(pagina.locator("#idleModal")).toBeHidden();
+  }
+  const recebidoNaSegunda = segunda.evaluate(() => new Promise((resolve) => {
+    IdleTimer._canal.addEventListener("message", (evento) => { if (evento.data && evento.data.tipo === "prazo") resolve(evento.data); }, { once: true });
+  }));
+  const ping = appPage.waitForResponse((r) => r.url().endsWith("/ping") && r.ok());
+  await appPage.mouse.move(20, 20);
+  await ping;
+  await expect(appPage.locator("#accountSessionTimer")).toHaveText(/^11h \d+m$/);
+  const prazo = await recebidoNaSegunda;
+  expect(typeof prazo.sessaoExpiraEm).toBe("string");
+  await expect(segunda.locator("#accountSessionTimer")).toHaveText(/^11h \d+m$/);
+  await expect(segunda.locator("#idleModal")).toBeHidden();
+
+  const tokenApagadoNaSegunda = segunda.evaluate(() => new Promise((resolve) => {
+    window.addEventListener("storage", (evento) => { if (evento.key === "remoteifes_token" && !evento.newValue) resolve(true); }, { once: true });
+  }));
+  const logout = appPage.waitForResponse((r) => r.url().endsWith("/logout"));
   await appPage.locator("#accountMenuBtn").click();
   await appPage.locator('[data-account-action="logout"]').click();
+  await logout;
+  expect(await tokenApagadoNaSegunda).toBe(true);
   await expect(segunda.locator("#screen-login")).toBeVisible();
   await expect(segunda.locator("#mainApp")).toBeHidden();
+  expect(await segunda.evaluate(() => Api.temTokenSalvo())).toBe(false);
 });
 
 test("timer e aviso não criam rolagem horizontal no celular", async ({ appPage, loginComo }) => {

@@ -481,9 +481,16 @@ function comandoEstadoIR(salaAtualizada) {
 
 function enviarEstadoIRParaDispositivo(salaAtualizada) {
   const comando = comandoEstadoIR(salaAtualizada);
-  if (!comando) return;
+  if (!comando) return false;
   const deviceHub = require("./deviceHub");
-  deviceHub.enviarComando(salaAtualizada.sala, comando);
+  const entregue = deviceHub.enviarComando(salaAtualizada.sala, comando);
+  if (!entregue) {
+    require("./monitoramentoService").registrar("comandoNaoEntregue", {
+      sala: salaAtualizada.sala,
+      motivo: deviceHub.dispositivoConectado(salaAtualizada.sala) ? "envio-falhou" : "dispositivo-desconectado",
+    });
+  }
+  return entregue;
 }
 
 function comandoFailsafeIR(salaAtualizada) {
