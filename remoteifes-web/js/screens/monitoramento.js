@@ -172,12 +172,13 @@ const Monitoramento = (() => {
           info.usoPercentual >= 90 ? "alerta" : info.usoPercentual >= 75 ? "aviso" : "",
         ])),
       card("Falhas desde a inicialização", estadoFalhas(fc), [
-        ["Comandos", fc.comandoFalha || 0, (fc.comandoFalha || 0) > 0 ? "aviso" : ""],
+        ["Comandos não entregues ao ESP32", fc.comandoNaoEntregue || 0, (fc.comandoNaoEntregue || 0) > 0 ? "aviso" : ""],
         ["Telemetria", fc.telemetriaFalha || 0, (fc.telemetriaFalha || 0) > 0 ? "aviso" : ""],
         ["OTA", fc.otaFalha || 0, (fc.otaFalha || 0) > 0 ? "aviso" : ""],
         ["Credencial", fc.credencialFalha || 0],
         ["Reconexão anormal", fc.reconexaoAnormal || 0],
         ["Agendador/serviço", fc.schedulerFalha || 0, (fc.schedulerFalha || 0) > 0 ? "alerta" : ""],
+        ["Nota", "entregue ao ESP32 não significa executado no ar-condicionado", "caminho"],
       ]),
     ];
 

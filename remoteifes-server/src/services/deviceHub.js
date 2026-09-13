@@ -154,7 +154,12 @@ function enviarComando(sala, payload) {
     entrada.ws.close(4001, "vínculo do dispositivo alterado");
     return false;
   }
-  entrada.ws.send(JSON.stringify(payload));
+  try {
+    entrada.ws.send(JSON.stringify(payload));
+  } catch (erro) {
+    logger.warn("device-ws-envio-falhou", { sala, tipo: payload && payload.tipo, mensagem: erro.message });
+    return false;
+  }
   return true;
 }
 
