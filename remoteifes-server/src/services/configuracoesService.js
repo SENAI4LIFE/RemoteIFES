@@ -60,9 +60,9 @@ function obter() {
   return configuracoes;
 }
 
-function timeoutEfetivoParaUsuario(isAdmin) {
-  const cfg = obter();
-  return isAdmin ? cfg.timeoutInatividadeAdminMinutos : cfg.timeoutInatividadeMinutos;
+function timeoutEfetivoParaUsuario(isAdmin, cfg = null) {
+  const atual = cfg || obter();
+  return isAdmin ? atual.timeoutInatividadeAdminMinutos : atual.timeoutInatividadeMinutos;
 }
 
 function limitesTemperatura() {
@@ -95,8 +95,8 @@ function acessoRestritoAtivo() {
   return { modoTeste: !!cfg.modoTeste, redesAutorizadas: cfg.redesAutorizadas || [] };
 }
 
-function modoManutencaoAtivo() {
-  return !!obter().modoManutencao;
+function modoManutencaoAtivo(cfg = null) {
+  return !!(cfg || obter()).modoManutencao;
 }
 
 function validarEAtualizar(patch, requisitante) {

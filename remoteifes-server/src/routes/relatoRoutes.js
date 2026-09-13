@@ -7,7 +7,7 @@ const logger = require("../utils/logger");
 
 const router = express.Router();
 
-const limitarCriacao = criarLimitador({ janelaMs: 10 * 60 * 1000, maxTentativas: 15 });
+const limitarCriacao = criarLimitador({ janelaMs: 10 * 60 * 1000, maxTentativas: 15, chave: (req) => (req.usuario ? req.usuario.id : null) });
 
 function auditar(dados) {
   try { auditoriaService.registrar(dados); } catch (erro) { logger.warn("auditoria-registro-falhou", { tipo: dados.tipo, mensagem: erro.message }); }
