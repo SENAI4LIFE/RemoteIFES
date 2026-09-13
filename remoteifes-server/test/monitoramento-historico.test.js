@@ -31,6 +31,10 @@ function minutosAtras(min) {
   return db.prepare("SELECT datetime('now', ?) d").get(`-${min} minutes`).d;
 }
 
+function horaCorrenteMais(min) {
+  return db.prepare("SELECT datetime(strftime('%Y-%m-%d %H:00:00', 'now'), ?) d").get(`+${min} minutes`).d;
+}
+
 function limparHistorico() {
   db.prepare("DELETE FROM monitoramento_amostras").run();
   db.prepare("DELETE FROM monitoramento_horas").run();
@@ -218,11 +222,11 @@ test("historico() agrega em grade completa, deixa nulos onde não há amostra e 
 
 test("as faixas longas combinam horas consolidadas com a hora corrente crua e nunca mandam milhares de pontos", () => {
   limparHistorico();
-  const boot = minutosAtras(15);
+  const boot = horaCorrenteMais(0);
   const inserir = db.prepare(`INSERT INTO monitoramento_horas (hora, amostras, reinicios, rssMB, rssMBMax, cpuPercent, cpuPercentMax, bancoMs, bancoMsMax, espComMac, espOnline, espOnlineMin, espWs, telemetriaFalhas)
     VALUES (strftime('%Y-%m-%d %H:00:00', 'now', ?), 60, ?, 80, 90, 5, 12, 1, 3, 6, 5, 4, 5, ?)`);
   for (let i = 1; i <= 24 * 29; i += 1) inserir.run(`-${i} hours`, i === 48 ? 1 : 0, i % 24 === 0 ? 1 : 0);
-  for (let i = 0; i < 20; i += 1) monitoramentoService.gravarAmostra({ inicioProcesso: boot, rssMB: 100, cpuPercent: 30, bancoMs: 2, espComMac: 6, espOnline: 6, espWs: 6, telemetriaFalhas: i === 0 ? 3 : 0 }, minutosAtras(20 - i));
+  for (let i = 0; i < 20; i += 1) monitoramentoService.gravarAmostra({ inicioProcesso: boot, rssMB: 100, cpuPercent: 30, bancoMs: 2, espComMac: 6, espOnline: 6, espWs: 6, telemetriaFalhas: i === 0 ? 3 : 0 }, horaCorrenteMais(i));
 
   const h7 = monitoramentoService.historico("7d");
   assert.equal(h7.fonte, "horas");

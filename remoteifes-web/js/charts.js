@@ -262,6 +262,15 @@ const Graficos = (() => {
     return contextoMedida.measureText(bruto).width + espacamento;
   }
 
+  function rotuloEixoX(x, texto, fonte, largura, y) {
+    const metade = larguraTexto(texto, fonte) / 2;
+    let anchor = "middle";
+    let px = x;
+    if (x + metade > largura - 1) { anchor = "end"; px = Math.min(x + metade, largura - 1); }
+    else if (x - metade < 1) { anchor = "start"; px = Math.max(x - metade, 1); }
+    return `<text class="gr-eixo" x="${px.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}">${esc(texto)}</text>`;
+  }
+
   function truncarTexto(texto, fonte, larguraMaxima) {
     let bruto = String(texto);
     if (larguraTexto(bruto, fonte) <= larguraMaxima) return bruto;
@@ -313,7 +322,7 @@ const Graficos = (() => {
         const x = x0 + ((tk.x - t[0]) / (bucketMs || 1)) * passoX;
         if (x < x0 - 1 || x > x1 + 1) return;
         svg += `<line class="gr-grade gr-grade-x" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${y0}" y2="${y1}"/>`;
-        svg += `<text class="gr-eixo" x="${x.toFixed(1)}" y="${(y1 + fonte + 4).toFixed(1)}" text-anchor="middle">${esc(tk.rotulo)}</text>`;
+        svg += rotuloEixoX(x, tk.rotulo, fonte, largura, y1 + fonte + 4);
       });
       (spec.reinicios || []).forEach((r) => {
         const em = new Date(r.em).getTime();
@@ -496,7 +505,7 @@ const Graficos = (() => {
       ticksX.forEach((tk) => {
         const x = x0 + ((tk.x - t[0]) / (bucketMs || 1)) * passoX;
         if (x < x0 - 1 || x > x1 + 1) return;
-        svg += `<text class="gr-eixo" x="${x.toFixed(1)}" y="${(y1 + fonte + 4).toFixed(1)}" text-anchor="middle">${esc(tk.rotulo)}</text>`;
+        svg += rotuloEixoX(x, tk.rotulo, fonte, largura, y1 + fonte + 4);
       });
       for (let i = 0; i < total; i += 1) {
         const xSlot = x0 + i * passoX;

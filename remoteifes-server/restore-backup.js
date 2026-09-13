@@ -6,6 +6,7 @@ const { CAMINHO_DB } = require("./src/config/paths");
 
 const args = process.argv.slice(2);
 const semConfirmar = args.includes("--sim") || args.includes("-y");
+const recuperarCorrompido = args.includes("--recuperar-corrompido");
 const alvo = args.find((a) => !a.startsWith("-"));
 
 function listarEDesistir() {
@@ -18,7 +19,8 @@ function listarEDesistir() {
   for (const b of lista) {
     console.log(`  ${b.nome}   ${(b.bytes / 1024).toFixed(1)} KiB   ${b.modificadoEm}`);
   }
-  console.log(`\nUso: npm run restore -- <arquivo|caminho> [--sim]`);
+  console.log(`\nUso: npm run restore -- <arquivo|caminho> [--sim] [--recuperar-corrompido]`);
+  console.log("  --recuperar-corrompido  se o banco atual estiver corrompido, move-o para quarentena (nunca apaga) e instala o backup");
   process.exit(0);
 }
 
@@ -40,14 +42,27 @@ try {
 
 console.log(`\nO banco atual (${CAMINHO_DB}) será SOBRESCRITO por este backup.`);
 console.log("O servidor RemoteIFES precisa estar PARADO antes de continuar.");
-console.log("Uma cópia de segurança do banco atual será criada automaticamente antes da troca.\n");
+if (recuperarCorrompido) {
+  const diagnostico = fs.existsSync(CAMINHO_DB) ? backupService.diagnosticarBancoAtual(CAMINHO_DB) : null;
+  if (diagnostico && !diagnostico.integro) {
+    console.log(`Diagnóstico do banco atual: ${diagnostico.mensagem}`);
+    console.log("Como ele está danificado, será movido para quarentena (renomeado com sufixo .corrompido-<data>) junto dos arquivos -wal/-shm; nada é apagado.\n");
+  } else {
+    console.log("O banco atual passou na verificação de integridade: a quarentena não será usada e uma cópia de segurança verificada será criada normalmente.\n");
+  }
+} else {
+  console.log("Uma cópia de segurança do banco atual será criada automaticamente antes da troca.\n");
+}
 
 function prosseguir() {
   try {
-    const resultado = backupService.restaurarBackup(arquivo);
+    const resultado = backupService.restaurarBackup(arquivo, { quarentenarDanificado: recuperarCorrompido });
     console.log(`Banco restaurado em ${resultado.destino}`);
     if (resultado.copiaSeguranca) {
       console.log(`Cópia de segurança do banco anterior: ${resultado.copiaSeguranca}`);
+    }
+    if (resultado.quarentena) {
+      console.log(`Arquivos danificados preservados para análise: ${Object.values(resultado.quarentena).join(", ")}`);
     }
     console.log("Verificação pós-restauração: ok. Reinicie o servidor RemoteIFES.");
     process.exit(0);

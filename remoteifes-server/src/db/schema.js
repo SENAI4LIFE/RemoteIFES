@@ -284,7 +284,33 @@ function criarSchema() {
       schedulerFalhas INTEGER NOT NULL DEFAULT 0,
       bancoFalhas INTEGER NOT NULL DEFAULT 0
     );
+  `);
 
+  migrarColunasUsuarios();
+  migrarColunasAgendamentos();
+  migrarColunasAgendamentosExecucoes();
+  migrarColunasSalas();
+  migrarColunasProtocolosIr();
+  migrarColunasMonitoramentoHoras();
+  removerTabelasObsoletas();
+  criarIndices();
+}
+
+const MEDIDAS_MONITORAMENTO = [
+  "rssMB", "cpuPercent", "carga1", "bancoMs", "bancoBytes", "walBytes",
+  "discoLivreBytes", "discoTotalBytes", "espComMac", "espOnline", "espWs",
+];
+
+function migrarColunasMonitoramentoHoras() {
+  const colunas = db.prepare(`PRAGMA table_info(monitoramento_horas)`).all().map((c) => c.name);
+  for (const medida of MEDIDAS_MONITORAMENTO) {
+    const coluna = `${medida}Amostras`;
+    if (!colunas.includes(coluna)) db.exec(`ALTER TABLE monitoramento_horas ADD COLUMN ${coluna} INTEGER`);
+  }
+}
+
+function criarIndices() {
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_relatos_status ON relatos(status);
     CREATE INDEX IF NOT EXISTS idx_relatos_usuario ON relatos(usuarioId);
     CREATE INDEX IF NOT EXISTS idx_relatos_criado ON relatos(criadoEm);
@@ -315,16 +341,8 @@ function criarSchema() {
     CREATE INDEX IF NOT EXISTS idx_energia_resumos_data ON energia_resumos_diarios(data);
     CREATE INDEX IF NOT EXISTS idx_protocolos_ir_criado ON protocolos_ir(criadoEm DESC);
     CREATE INDEX IF NOT EXISTS idx_mon_amostras_criado ON monitoramento_amostras(criadoEm);
-
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL;
   `);
-
-  migrarColunasUsuarios();
-  migrarColunasAgendamentos();
-  migrarColunasAgendamentosExecucoes();
-  migrarColunasSalas();
-  migrarColunasProtocolosIr();
-  removerTabelasObsoletas();
-  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL`);
 }
 
 function migrarColunasUsuarios() {
@@ -332,6 +350,7 @@ function migrarColunasUsuarios() {
   if (!colunas.includes("nivel")) {
     db.exec(`ALTER TABLE usuarios ADD COLUMN nivel INTEGER NOT NULL DEFAULT 1`);
     db.exec(`UPDATE usuarios SET nivel = 2 WHERE isAdmin = 1`);
+    db.exec(`UPDATE usuarios SET nivel = 3 WHERE usuario = 'admin' AND isAdmin = 1`);
   }
   renomearContaPadraoSuperadmin();
   if (colunas.includes("senha")) {
@@ -366,6 +385,7 @@ function migrarColunasAgendamentos() {
     if (colunas.includes("dataUnica")) {
       db.exec(`UPDATE agendamentos SET data = dataUnica WHERE dataUnica IS NOT NULL`);
     }
+    db.exec(`DELETE FROM agendamentos_execucoes WHERE agendamentoId IN (SELECT id FROM agendamentos WHERE data IS NULL)`);
     db.exec(`DELETE FROM agendamentos WHERE data IS NULL`);
   }
   for (const antiga of ["diasSemana", "repeticao", "dataUnica"]) {
