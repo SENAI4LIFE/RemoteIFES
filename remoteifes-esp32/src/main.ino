@@ -90,6 +90,10 @@ const uint32_t FAILSAFE_REC_MAGIC = 0x53464952UL;
 const uint16_t FAILSAFE_REC_VERSAO = 1;
 const char FAILSAFE_REC_KEY[] = "fsRec";
 const char FAILSAFE_LATCH_KEY[] = "fsLatch";
+const char OTA_TENTATIVA_KEY[] = "otaTent";
+const char OTA_SHA_KEY[] = "otaSha";
+const uint8_t OTA_VALIDADO_MAX_ENVIOS = 10;
+uint8_t otaValidadoEnvios = 0;
 
 struct __attribute__((packed)) FailsafeRecordHeader {
   uint32_t magic;
@@ -221,6 +225,8 @@ void aplicarCredencial(JsonDocument& doc);
 void iniciarOtaOferta(JsonDocument& doc);
 void reportarOtaResultado(bool ok, const String& erro);
 void reportarOtaProgresso(size_t recebido, size_t total);
+void reportarOtaValidado();
+void concluirEvidenciaOta(JsonDocument& doc);
 bool versaoSemanticaMenor(const String& candidata, const String& atual);
 bool moduloClonador();
 void aplicarPapelDoServidor(JsonDocument& doc);
@@ -778,6 +784,8 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     agendarReinicio(500);
   } else if (strcmp(tipo, "ota_oferta") == 0) {
     iniciarOtaOferta(doc);
+  } else if (strcmp(tipo, "ota_validacao_ok") == 0) {
+    concluirEvidenciaOta(doc);
   } else if (strcmp(tipo, "credencial_provisionar") == 0 || strcmp(tipo, "credencial_rotacionar") == 0) {
     aplicarCredencial(doc);
   } else if (strcmp(tipo, "config_ap") == 0) {
@@ -814,11 +822,37 @@ void enviarInfoDispositivo() {
   JsonDocument doc;
   doc["tipo"] = "info";
   doc["fw"] = FW_VERSAO;
+  doc["otaValidacao"] = true;
   preencherStatusFailsafe(doc);
   if (powerConhecido) doc["ligado"] = lastKnownPower;
   String saida;
   serializeJson(doc, saida);
   wsCliente.sendTXT(saida);
+  if (!otaPendenteValidacao) reportarOtaValidado();
+}
+
+void reportarOtaValidado() {
+  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  if (!preferences.isKey(OTA_TENTATIVA_KEY)) return;
+  if (otaValidadoEnvios >= OTA_VALIDADO_MAX_ENVIOS) return;
+  otaValidadoEnvios++;
+  JsonDocument doc;
+  doc["tipo"] = "ota_validado";
+  doc["tentativa"] = preferences.getString(OTA_TENTATIVA_KEY, "");
+  doc["sha256"] = preferences.getString(OTA_SHA_KEY, "");
+  doc["versao"] = FW_VERSAO;
+  String payload;
+  serializeJson(doc, payload);
+  wsCliente.sendTXT(payload);
+}
+
+void concluirEvidenciaOta(JsonDocument& doc) {
+  String tentativa = doc["tentativa"] | "";
+  if (!preferences.isKey(OTA_TENTATIVA_KEY)) return;
+  if (tentativa.length() > 0 && tentativa != preferences.getString(OTA_TENTATIVA_KEY, "")) return;
+  preferences.remove(OTA_TENTATIVA_KEY);
+  if (preferences.isKey(OTA_SHA_KEY)) preferences.remove(OTA_SHA_KEY);
+  Serial.println("OTA: validacao de boot confirmada pelo servidor.");
 }
 
 void enviarTelemetriaWs() {
@@ -1383,6 +1417,7 @@ void verificarValidacaoOta() {
       Serial.println("Autovalidacao OK: novo firmware confirmado.");
     }
     otaPendenteValidacao = false;
+    reportarOtaValidado();
     return;
   }
   if ((long)(millis() - otaValidacaoLimite) >= 0) {
@@ -1444,7 +1479,9 @@ void iniciarOtaOferta(JsonDocument& doc) {
   String shaEsperado = doc["sha256"] | "";
   size_t tamanho = doc["tamanho"] | 0;
   String caminho = doc["caminho"] | "/dispositivo/firmware";
+  String tentativa = doc["tentativa"] | "";
   shaEsperado.toLowerCase();
+  if (tentativa.length() > 64) tentativa = "";
 
   if (tamanho < 65536 || shaEsperado.length() != 64) {
     reportarOtaResultado(false, "oferta de firmware invalida");
@@ -1604,6 +1641,13 @@ void iniciarOtaOferta(JsonDocument& doc) {
     return;
   }
 
+  if (tentativa.length() > 0) {
+    preferences.putString(OTA_TENTATIVA_KEY, tentativa);
+    preferences.putString(OTA_SHA_KEY, shaEsperado);
+  } else {
+    if (preferences.isKey(OTA_TENTATIVA_KEY)) preferences.remove(OTA_TENTATIVA_KEY);
+    if (preferences.isKey(OTA_SHA_KEY)) preferences.remove(OTA_SHA_KEY);
+  }
   Serial.println("OTA: firmware gravado e verificado. Reiniciando para validacao.");
   reportarOtaResultado(true, "");
   reportComando("ota", "gravado versao=" + versao);

@@ -193,10 +193,14 @@ function registrarVersaoFirmware(sala, entrada, fw) {
     logger.warn("device-ws-fw-registrar-falhou", { sala, mensagem: err.message });
   }
   try {
-    require("./otaService").aoReconectarDispositivo(sala, fw);
+    require("./otaService").aoReconectarDispositivo(sala, fw, entrada.capacidades);
   } catch (err) {
     logger.warn("device-ws-ota-reconectar-falhou", { sala, mensagem: err.message });
   }
+}
+
+function registrarCapacidades(entrada, msg) {
+  if (msg.otaValidacao === true) entrada.capacidades = { ...entrada.capacidades, validacaoOta: true };
 }
 
 function atualizarFailsafeReportado(entrada, msg) {
@@ -365,6 +369,7 @@ function iniciar(server) {
       ultimaTelemetria: null,
       ultimoComando: null,
       failsafe: null,
+      capacidades: {},
       sincronizacaoInicial: null,
       estadoInicialSincronizado: false,
     };
@@ -428,9 +433,19 @@ function iniciar(server) {
       if (msg.tipo === "telemetria") {
         registrarTelemetria(sala, entrada, msg);
       } else if (msg.tipo === "info") {
+        registrarCapacidades(entrada, msg);
         registrarVersaoFirmware(sala, entrada, msg.fw);
         atualizarFailsafeReportado(entrada, msg);
         sincronizarEstadoInicial(sala, entrada, msg);
+      } else if (msg.tipo === "ota_validado") {
+        registrarCapacidades(entrada, { otaValidacao: true });
+        if (require("./otaService").registrarValidacao(sala, msg)) {
+          try {
+            ws.send(JSON.stringify({ tipo: "ota_validacao_ok", tentativa: msg.tentativa }));
+          } catch (erro) {
+            logger.warn("device-ws-ota-validacao-ack-falhou", { sala, mensagem: erro.message });
+          }
+        }
       } else if (msg.tipo === "failsafe_status") {
         if (atualizarFailsafeReportado(entrada, msg)) eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
       } else if (msg.tipo === "ota_progresso") {
