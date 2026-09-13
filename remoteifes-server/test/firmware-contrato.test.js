@@ -65,11 +65,24 @@ test("o switch usa pull-up interno, nível baixo, debounce de 40 ms e 5 s para o
 test("o failsafe OFF é persistido na NVS, comparado antes de regravar e transmitido sem servidor", () => {
   assert.match(ino, /strcmp\(tipo, "failsafe_raw_set"\) == 0/);
   assert.match(ino, /strcmp\(tipo, "failsafe_raw_clear"\) == 0/);
-  assert.match(ino, /preferences\.putBytes\("fsRaw", rawData, bytes\)/);
-  assert.match(ino, /preferences\.putUShort\("fsLen", length\)/);
-  assert.match(ino, /preferences\.putUInt\("fsHz", carrierHz\)/);
-  assert.match(ino, /preferences\.putInt\("fsProto", protocolRecordId\)/);
+  const salvar = bloco("bool salvarFailsafeRaw");
+  assert.equal((salvar.match(/preferences\.put/g) || []).length, 1, "o failsafe é gravado como um único registro lógico, em uma só escrita na NVS");
+  assert.match(salvar, /preferences\.putBytes\(FAILSAFE_REC_KEY, bruto, total\) == total/);
+  assert.match(salvar, /cabecalho\.crc32 = crcRegistroFailsafe\(cabecalho, rawData\)/);
+  assert.match(salvar, /if \(!duracaoRawAceitavel\(rawData, length\)\) return false;/);
+  assert.match(ino, /const uint32_t FAILSAFE_REC_MAGIC = 0x53464952UL;/);
+  assert.match(ino, /const uint16_t FAILSAFE_REC_VERSAO = 1;/);
+  const ler = bloco("bool lerRegistroFailsafe");
+  assert.match(ler, /cabecalho\.magic == FAILSAFE_REC_MAGIC && cabecalho\.versao == FAILSAFE_REC_VERSAO/);
+  assert.match(ler, /crcRegistroFailsafe\(cabecalho, dados\) == cabecalho\.crc32/);
+  assert.match(ler, /esperado == total/, "comprimento do cabeçalho e do blob precisam bater");
+  const migrar = bloco("void migrarFailsafeLegado");
+  assert.match(migrar, /preferences\.getBytesLength\("fsRaw"\) == bytes/, "as quatro chaves antigas são migradas uma vez para o registro único");
   for (const chave of ["fsRaw", "fsLen", "fsHz", "fsProto"]) assert.match(ino, new RegExp(`preferences\\.remove\\("${chave}"\\)`));
+  assert.match(bloco("void setup"), /migrarFailsafeLegado\(\);\s*carregarFailsafeCache\(\);/);
+  assert.doesNotMatch(ino, /new uint16_t\[/, "toda alocação dinâmica de RAW usa std::nothrow e é verificada");
+  assert.match(ino, /#define MAX_RAW_IR_DURACAO_US 2000000UL/);
+  assert.match(bloco("bool duracaoRawAceitavel"), /if \(total > MAX_RAW_IR_DURACAO_US\) return false;/);
   assert.match(ino, /if \(failsafeIgualAoSalvo\(rawData, i, carrierHz, protocolRecordId\)\)/, "sincronização repetida não desgasta a NVS");
   assert.match(ino, /rawArr\.size\(\) > MAX_RAW_IR_ENTRIES\s*\|\| carrierHz < FAILSAFE_CARRIER_MIN_HZ \|\| carrierHz > FAILSAFE_CARRIER_MAX_HZ/);
   assert.match(ino, /const uint32_t FAILSAFE_CARRIER_MIN_HZ = 20000;/);
@@ -78,10 +91,40 @@ test("o failsafe OFF é persistido na NVS, comparado antes de regravar e transmi
   assert.match(ino, /#define CAPTURE_BUFFER_SIZE 1024/);
   const transmitir = bloco("bool transmitirFailsafeSalvo");
   assert.match(transmitir, /sendRawIR\(rawData, length, failsafeCarrierHzSalvo\(\) \/ 1000\)/);
+  assert.match(transmitir, /lerRegistroFailsafe\(cabecalho, rawData, length\)/, "o RAW transmitido sai do registro validado por CRC");
   assert.doesNotMatch(transmitir, /WiFi\.status|estadoWsServidor == WS_ESTADO_CONECTADO \|\|/, "o failsafe local não depende de rede");
+  assert.match(transmitir, /definirFailsafeLatch\(true\)/, "o OFF local fica travado até um comando explícito");
   assert.match(ino, /doc\["tipo"\] = "failsafe_status"/);
   assert.match(bloco("void enviarInfoDispositivo"), /preencherStatusFailsafe\(doc\)/);
   assert.match(bloco("void enviarTelemetriaWs"), /preencherStatusFailsafe\(doc\)/);
+  assert.match(bloco("void preencherStatusFailsafe"), /doc\["failsafeLatched"\] = failsafeLatched;/);
+});
+
+test("o OFF local persistido só é desfeito por um comando explícito do servidor e nunca deixa a placa presa", () => {
+  const setup = bloco("void setup");
+  assert.match(setup, /failsafeLatched = preferences\.isKey\(FAILSAFE_LATCH_KEY\)/);
+  assert.match(setup, /if \(failsafeLatched\) \{\s*lastKnownPower = false;\s*powerConhecido = true;/);
+  const processar = bloco("void processarComandoServidor");
+  const conhecido = processar.slice(processar.indexOf('"send_known_state"'));
+  assert.match(conhecido, /powerConhecido = true;\s*definirFailsafeLatch\(false\);/, "send_known_state limpa o latch");
+  const raw = processar.slice(processar.indexOf('"send_raw"'), processar.indexOf('"send_known_state"'));
+  assert.match(raw, /definirFailsafeLatch\(false\);/, "send_raw limpa o latch");
+  assert.match(raw, /new \(std::nothrow\) uint16_t\[count\]/);
+  assert.match(raw, /rejeitado_memoria/);
+  assert.match(raw, /rejeitado_duracao/);
+  const claro = processar.slice(processar.indexOf('"failsafe_raw_clear"'), processar.indexOf('"reset_wifi"'));
+  assert.doesNotMatch(claro, /definirFailsafeLatch/, "apagar o RAW de failsafe não é um comando de controle");
+  const latch = bloco("void definirFailsafeLatch");
+  assert.match(latch, /if \(failsafeLatched == ativo\) return;/, "sem regravação quando nada muda");
+  assert.match(bloco("void enviarInfoDispositivo"), /if \(powerConhecido\) doc\["ligado"\] = lastKnownPower;/);
+});
+
+test("durante a OTA o switch físico e o buzzer continuam sendo atendidos e o download tem prazo total", () => {
+  const ota = bloco("void iniciarOtaOferta");
+  const laco = ota.slice(ota.indexOf("while (recebido < tamanho)"));
+  assert.match(laco, /^\s*while \(recebido < tamanho\) \{\s*processarSwitchAcao\(\);\s*atualizarBuzzer\(\);/);
+  assert.match(laco, /OTA_TOTAL_TIMEOUT_MS/);
+  assert.match(ino, /const unsigned long OTA_TOTAL_TIMEOUT_MS = 600000;/);
 });
 
 test("o papel vem do servidor: só a clonadora entra em modo clone ou captura e o papel não é persistido", () => {

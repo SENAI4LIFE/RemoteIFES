@@ -16,7 +16,9 @@
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include <mbedtls/md.h>
+#include <esp32/rom/crc.h>
 #include <string.h>
+#include <new>
 
 #include "root_ca.h"
 
@@ -36,6 +38,7 @@
 #define IR_CAPTURE_TIMEOUT_MS 50
 #define HTTP_CLIENT_TIMEOUT_MS 2500
 #define MAX_RAW_IR_ENTRIES CAPTURE_BUFFER_SIZE
+#define MAX_RAW_IR_DURACAO_US 2000000UL
 
 const float AC_TEMP_MIN = 16.0;
 const float AC_TEMP_MAX = 30.0;
@@ -63,6 +66,7 @@ const char DEVICE_ROLE_CLONER[] = "cloner";
 
 const unsigned long OTA_SELFTEST_TIMEOUT_MS = 90000;
 const unsigned long OTA_HTTP_TIMEOUT_MS = 20000;
+const unsigned long OTA_TOTAL_TIMEOUT_MS = 600000;
 const size_t OTA_BUFFER_BYTES = 1024;
 const unsigned long OTA_PROGRESSO_INTERVALO_BYTES = 65536;
 
@@ -81,6 +85,30 @@ enum ServerWsState {
   WS_ESTADO_DESCONECTADO = 0,
   WS_ESTADO_CONECTADO = 1
 };
+
+const uint32_t FAILSAFE_REC_MAGIC = 0x53464952UL;
+const uint16_t FAILSAFE_REC_VERSAO = 1;
+const char FAILSAFE_REC_KEY[] = "fsRec";
+const char FAILSAFE_LATCH_KEY[] = "fsLatch";
+
+struct __attribute__((packed)) FailsafeRecordHeader {
+  uint32_t magic;
+  uint16_t versao;
+  uint16_t length;
+  uint32_t carrierHz;
+  int32_t protocolRecordId;
+  uint32_t crc32;
+};
+
+struct FailsafeCache {
+  bool valido = false;
+  uint16_t length = 0;
+  uint32_t carrierHz = 0;
+  int protocolRecordId = -1;
+};
+
+FailsafeCache failsafeCache;
+bool failsafeLatched = false;
 
 struct UltimoComandoIR {
   bool valido = false;
@@ -208,6 +236,12 @@ bool failsafeIgualAoSalvo(const uint16_t* rawData, uint16_t length, uint32_t car
 bool salvarFailsafeRaw(const uint16_t* rawData, uint16_t length, uint32_t carrierHz, int protocolRecordId);
 void limparFailsafeRaw();
 bool transmitirFailsafeSalvo();
+uint32_t crcRegistroFailsafe(const FailsafeRecordHeader& cabecalho, const uint16_t* rawData);
+bool lerRegistroFailsafe(FailsafeRecordHeader& cabecalho, uint16_t* rawData, uint16_t capacidade);
+void carregarFailsafeCache();
+void migrarFailsafeLegado();
+bool duracaoRawAceitavel(const uint16_t* rawData, uint16_t length);
+void definirFailsafeLatch(bool ativo);
 void enviarStatusFailsafe();
 void preencherStatusFailsafe(JsonDocument& doc);
 void aplicarFailsafeDoServidor(JsonDocument& doc);
@@ -255,6 +289,15 @@ void setup() {
   deviceId = preferences.isKey("devId") ? preferences.getString("devId", "") : "";
   deviceSecret = preferences.isKey("devSec") ? preferences.getString("devSec", "") : "";
   if (preferences.isKey("role")) preferences.remove("role");
+
+  migrarFailsafeLegado();
+  carregarFailsafeCache();
+  failsafeLatched = preferences.isKey(FAILSAFE_LATCH_KEY) && preferences.getUChar(FAILSAFE_LATCH_KEY, 0) == 1;
+  if (failsafeLatched) {
+    lastKnownPower = false;
+    powerConhecido = true;
+    Serial.println("Failsafe OFF local continua em vigor desde o ultimo acionamento (ate um comando explicito do servidor).");
+  }
 
   if (failsafeConfigurado()) {
     Serial.printf("Failsafe OFF persistido na NVS: %u pulsos a %u Hz (protocolo #%d).\n",
@@ -656,26 +699,39 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     JsonArray rawArr = doc["raw"].as<JsonArray>();
     uint16_t carrierHz = doc["carrierHz"] | 38000;
 
-    if (!rawArr.isNull() && rawArr.size() > 0 && comandoPermitidoAgora()) {
-      uint16_t count = (uint16_t)min((size_t)MAX_RAW_IR_ENTRIES, rawArr.size());
-      uint16_t* rawData = new uint16_t[count];
-      uint16_t i = 0;
-      for (JsonVariant v : rawArr) {
-        if (i >= count) break;
-        rawData[i++] = v.as<uint16_t>();
-      }
-
-      sendRawIR(rawData, count, carrierHz / 1000);
-      delete[] rawData;
-
-      ultimoComando = UltimoComandoIR();
-      ultimoComando.valido = true;
-      ultimoComando.tipo = "raw";
-      ultimoComando.timestampMs = millis();
-
-      reportComando("controle_raw", "carrier_hz=" + String(carrierHz));
-      if (isCapturing) irrecv.enableIRIn();
+    if (rawArr.isNull() || rawArr.size() < 1 || rawArr.size() > MAX_RAW_IR_ENTRIES) {
+      reportComando("controle_raw", "rejeitado_tamanho");
+      return;
     }
+    if (!comandoPermitidoAgora()) return;
+    uint16_t count = (uint16_t)rawArr.size();
+    uint16_t* rawData = new (std::nothrow) uint16_t[count];
+    if (!rawData) {
+      reportComando("controle_raw", "rejeitado_memoria");
+      return;
+    }
+    uint16_t i = 0;
+    for (JsonVariant v : rawArr) {
+      if (i >= count) break;
+      rawData[i++] = v.as<uint16_t>();
+    }
+    if (!duracaoRawAceitavel(rawData, i)) {
+      delete[] rawData;
+      reportComando("controle_raw", "rejeitado_duracao");
+      return;
+    }
+
+    sendRawIR(rawData, i, carrierHz / 1000);
+    delete[] rawData;
+    definirFailsafeLatch(false);
+
+    ultimoComando = UltimoComandoIR();
+    ultimoComando.valido = true;
+    ultimoComando.tipo = "raw";
+    ultimoComando.timestampMs = millis();
+
+    reportComando("controle_raw", "carrier_hz=" + String(carrierHz));
+    if (isCapturing) irrecv.enableIRIn();
   } else if (strcmp(tipo, "send_known_state") == 0) {
     int protocolo = doc["protocol"] | -1;
     float temp = doc["temp"] | 24.0;
@@ -688,6 +744,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       sendKnownACState((decode_type_t)protocolo, temp, power, turbo, fan, swing);
       lastKnownPower = power;
       powerConhecido = true;
+      definirFailsafeLatch(false);
 
       ultimoComando = UltimoComandoIR();
       ultimoComando.valido = true;
@@ -758,6 +815,7 @@ void enviarInfoDispositivo() {
   doc["tipo"] = "info";
   doc["fw"] = FW_VERSAO;
   preencherStatusFailsafe(doc);
+  if (powerConhecido) doc["ligado"] = lastKnownPower;
   String saida;
   serializeJson(doc, saida);
   wsCliente.sendTXT(saida);
@@ -870,53 +928,154 @@ void atualizarBuzzer() {
 }
 
 bool failsafeConfigurado() {
-  if (!preferences.isKey("fsLen") || !preferences.isKey("fsRaw")) return false;
-  uint16_t length = preferences.getUShort("fsLen", 0);
-  if (length < 1 || length > MAX_RAW_IR_ENTRIES) return false;
-  return preferences.getBytesLength("fsRaw") == (size_t)length * sizeof(uint16_t);
+  return failsafeCache.valido;
 }
 
 uint16_t failsafePulsosSalvos() {
-  return failsafeConfigurado() ? preferences.getUShort("fsLen", 0) : 0;
+  return failsafeCache.valido ? failsafeCache.length : 0;
 }
 
 uint32_t failsafeCarrierHzSalvo() {
-  if (!failsafeConfigurado()) return 0;
-  uint32_t hz = preferences.getUInt("fsHz", 38000);
-  return (hz >= FAILSAFE_CARRIER_MIN_HZ && hz <= FAILSAFE_CARRIER_MAX_HZ) ? hz : 38000;
+  return failsafeCache.valido ? failsafeCache.carrierHz : 0;
 }
 
 int failsafeProtocolRecordIdSalvo() {
-  return failsafeConfigurado() ? preferences.getInt("fsProto", -1) : -1;
+  return failsafeCache.valido ? failsafeCache.protocolRecordId : -1;
+}
+
+uint32_t crcRegistroFailsafe(const FailsafeRecordHeader& cabecalho, const uint16_t* rawData) {
+  FailsafeRecordHeader semCrc = cabecalho;
+  semCrc.crc32 = 0;
+  uint32_t crc = crc32_le(0, (const uint8_t*)&semCrc, sizeof(semCrc));
+  return crc32_le(crc, (const uint8_t*)rawData, (size_t)cabecalho.length * sizeof(uint16_t));
+}
+
+bool lerRegistroFailsafe(FailsafeRecordHeader& cabecalho, uint16_t* rawData, uint16_t capacidade) {
+  if (!preferences.isKey(FAILSAFE_REC_KEY)) return false;
+  size_t total = preferences.getBytesLength(FAILSAFE_REC_KEY);
+  if (total < sizeof(FailsafeRecordHeader) || total > sizeof(FailsafeRecordHeader) + (size_t)MAX_RAW_IR_ENTRIES * sizeof(uint16_t)) return false;
+  uint8_t* bruto = (uint8_t*)malloc(total);
+  if (!bruto) return false;
+  bool ok = false;
+  if (preferences.getBytes(FAILSAFE_REC_KEY, bruto, total) == total) {
+    memcpy(&cabecalho, bruto, sizeof(FailsafeRecordHeader));
+    size_t esperado = sizeof(FailsafeRecordHeader) + (size_t)cabecalho.length * sizeof(uint16_t);
+    if (cabecalho.magic == FAILSAFE_REC_MAGIC && cabecalho.versao == FAILSAFE_REC_VERSAO
+        && cabecalho.length >= 1 && cabecalho.length <= MAX_RAW_IR_ENTRIES && esperado == total
+        && cabecalho.carrierHz >= FAILSAFE_CARRIER_MIN_HZ && cabecalho.carrierHz <= FAILSAFE_CARRIER_MAX_HZ) {
+      const uint16_t* dados = (const uint16_t*)(bruto + sizeof(FailsafeRecordHeader));
+      if (crcRegistroFailsafe(cabecalho, dados) == cabecalho.crc32) {
+        ok = true;
+        if (rawData && capacidade >= cabecalho.length) memcpy(rawData, dados, (size_t)cabecalho.length * sizeof(uint16_t));
+      }
+    }
+  }
+  free(bruto);
+  return ok;
+}
+
+void carregarFailsafeCache() {
+  FailsafeRecordHeader cabecalho;
+  failsafeCache = FailsafeCache();
+  if (!lerRegistroFailsafe(cabecalho, NULL, 0)) {
+    if (preferences.isKey(FAILSAFE_REC_KEY)) {
+      Serial.println("Registro de failsafe invalido na NVS (CRC/formato); ignorado ate o servidor reenviar.");
+    }
+    return;
+  }
+  failsafeCache.valido = true;
+  failsafeCache.length = cabecalho.length;
+  failsafeCache.carrierHz = cabecalho.carrierHz;
+  failsafeCache.protocolRecordId = cabecalho.protocolRecordId;
+}
+
+void migrarFailsafeLegado() {
+  bool temLegado = preferences.isKey("fsLen") || preferences.isKey("fsRaw") || preferences.isKey("fsHz") || preferences.isKey("fsProto");
+  if (!temLegado) return;
+  if (!preferences.isKey(FAILSAFE_REC_KEY) && preferences.isKey("fsLen") && preferences.isKey("fsRaw")) {
+    uint16_t length = preferences.getUShort("fsLen", 0);
+    size_t bytes = (size_t)length * sizeof(uint16_t);
+    if (length >= 1 && length <= MAX_RAW_IR_ENTRIES && preferences.getBytesLength("fsRaw") == bytes) {
+      uint16_t* rawData = new (std::nothrow) uint16_t[length];
+      if (rawData && preferences.getBytes("fsRaw", rawData, bytes) == bytes) {
+        uint32_t hz = preferences.getUInt("fsHz", 38000);
+        if (hz < FAILSAFE_CARRIER_MIN_HZ || hz > FAILSAFE_CARRIER_MAX_HZ) hz = 38000;
+        if (salvarFailsafeRaw(rawData, length, hz, preferences.getInt("fsProto", -1))) {
+          Serial.println("Failsafe OFF legado migrado para o registro unico da NVS.");
+        }
+      }
+      delete[] rawData;
+    }
+  }
+  if (preferences.isKey(FAILSAFE_REC_KEY)) {
+    preferences.remove("fsRaw");
+    preferences.remove("fsLen");
+    preferences.remove("fsHz");
+    preferences.remove("fsProto");
+  }
+}
+
+bool duracaoRawAceitavel(const uint16_t* rawData, uint16_t length) {
+  uint32_t total = 0;
+  for (uint16_t i = 0; i < length; i++) {
+    total += rawData[i];
+    if (total > MAX_RAW_IR_DURACAO_US) return false;
+  }
+  return true;
+}
+
+void definirFailsafeLatch(bool ativo) {
+  if (failsafeLatched == ativo) return;
+  failsafeLatched = ativo;
+  if (ativo) preferences.putUChar(FAILSAFE_LATCH_KEY, 1);
+  else if (preferences.isKey(FAILSAFE_LATCH_KEY)) preferences.remove(FAILSAFE_LATCH_KEY);
 }
 
 bool failsafeIgualAoSalvo(const uint16_t* rawData, uint16_t length, uint32_t carrierHz, int protocolRecordId) {
   if (!failsafeConfigurado()) return false;
   if (failsafePulsosSalvos() != length || failsafeCarrierHzSalvo() != carrierHz || failsafeProtocolRecordIdSalvo() != protocolRecordId) return false;
-  size_t bytes = (size_t)length * sizeof(uint16_t);
-  uint16_t* salvo = new uint16_t[length];
+  uint16_t* salvo = new (std::nothrow) uint16_t[length];
   if (!salvo) return false;
-  bool igual = preferences.getBytes("fsRaw", salvo, bytes) == bytes && memcmp(salvo, rawData, bytes) == 0;
+  FailsafeRecordHeader cabecalho;
+  bool igual = lerRegistroFailsafe(cabecalho, salvo, length) && cabecalho.length == length
+    && memcmp(salvo, rawData, (size_t)length * sizeof(uint16_t)) == 0;
   delete[] salvo;
   return igual;
 }
 
 bool salvarFailsafeRaw(const uint16_t* rawData, uint16_t length, uint32_t carrierHz, int protocolRecordId) {
   if (!rawData || length < 1 || length > MAX_RAW_IR_ENTRIES || carrierHz < FAILSAFE_CARRIER_MIN_HZ || carrierHz > FAILSAFE_CARRIER_MAX_HZ) return false;
-  size_t bytes = (size_t)length * sizeof(uint16_t);
-  if (preferences.putBytes("fsRaw", rawData, bytes) != bytes) return false;
-  preferences.putUShort("fsLen", length);
-  preferences.putUInt("fsHz", carrierHz);
-  preferences.putInt("fsProto", protocolRecordId);
+  if (!duracaoRawAceitavel(rawData, length)) return false;
+  size_t bytesRaw = (size_t)length * sizeof(uint16_t);
+  size_t total = sizeof(FailsafeRecordHeader) + bytesRaw;
+  uint8_t* bruto = (uint8_t*)malloc(total);
+  if (!bruto) return false;
+  FailsafeRecordHeader cabecalho;
+  cabecalho.magic = FAILSAFE_REC_MAGIC;
+  cabecalho.versao = FAILSAFE_REC_VERSAO;
+  cabecalho.length = length;
+  cabecalho.carrierHz = carrierHz;
+  cabecalho.protocolRecordId = protocolRecordId;
+  cabecalho.crc32 = 0;
+  cabecalho.crc32 = crcRegistroFailsafe(cabecalho, rawData);
+  memcpy(bruto, &cabecalho, sizeof(cabecalho));
+  memcpy(bruto + sizeof(cabecalho), rawData, bytesRaw);
+  bool gravou = preferences.putBytes(FAILSAFE_REC_KEY, bruto, total) == total;
+  free(bruto);
+  if (!gravou) return false;
+  carregarFailsafeCache();
+  if (!failsafeCache.valido) return false;
   Serial.printf("Failsafe OFF salvo na NVS: %u pulsos, %u Hz, protocolo #%d.\n", (unsigned)length, (unsigned)carrierHz, protocolRecordId);
   return true;
 }
 
 void limparFailsafeRaw() {
+  if (preferences.isKey(FAILSAFE_REC_KEY)) preferences.remove(FAILSAFE_REC_KEY);
   preferences.remove("fsRaw");
   preferences.remove("fsLen");
   preferences.remove("fsHz");
   preferences.remove("fsProto");
+  failsafeCache = FailsafeCache();
   Serial.println("Failsafe OFF removido da NVS.");
 }
 
@@ -932,15 +1091,24 @@ void aplicarFailsafeDoServidor(JsonDocument& doc) {
     return;
   }
   uint16_t count = (uint16_t)rawArr.size();
-  uint16_t* rawData = new uint16_t[count];
+  uint16_t* rawData = new (std::nothrow) uint16_t[count];
   if (!rawData) {
     Serial.println("Failsafe rejeitado: sem memoria temporaria.");
+    reportComando("failsafe_off", "falha");
+    enviarStatusFailsafe();
     return;
   }
   uint16_t i = 0;
   for (JsonVariant v : rawArr) {
     if (i >= count) break;
     rawData[i++] = v.as<uint16_t>();
+  }
+  if (!duracaoRawAceitavel(rawData, i)) {
+    delete[] rawData;
+    Serial.println("Failsafe rejeitado: duracao total do RAW acima do limite.");
+    reportComando("failsafe_off", "rejeitado");
+    enviarStatusFailsafe();
+    return;
   }
   if (failsafeIgualAoSalvo(rawData, i, carrierHz, protocolRecordId)) {
     delete[] rawData;
@@ -960,11 +1128,16 @@ bool transmitirFailsafeSalvo() {
     return false;
   }
   uint16_t length = failsafePulsosSalvos();
-  uint16_t* rawData = new uint16_t[length];
-  if (!rawData) return false;
-  size_t esperado = (size_t)length * sizeof(uint16_t);
-  if (preferences.getBytes("fsRaw", rawData, esperado) != esperado) {
+  uint16_t* rawData = new (std::nothrow) uint16_t[length];
+  if (!rawData) {
+    reportComando("failsafe_off_local", "sem_memoria");
+    return false;
+  }
+  FailsafeRecordHeader cabecalho;
+  if (!lerRegistroFailsafe(cabecalho, rawData, length) || cabecalho.length != length) {
     delete[] rawData;
+    carregarFailsafeCache();
+    reportComando("failsafe_off_local", "registro_invalido");
     return false;
   }
   bool retomarCaptura = isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE;
@@ -974,6 +1147,7 @@ bool transmitirFailsafeSalvo() {
   delete[] rawData;
   lastKnownPower = false;
   powerConhecido = true;
+  definirFailsafeLatch(true);
   ultimoComando = UltimoComandoIR();
   ultimoComando.valido = true;
   ultimoComando.tipo = "failsafe";
@@ -988,6 +1162,7 @@ void preencherStatusFailsafe(JsonDocument& doc) {
   doc["failsafePulsos"] = failsafePulsosSalvos();
   doc["failsafeCarrierHz"] = failsafeCarrierHzSalvo();
   doc["failsafeProtocolRecordId"] = failsafeProtocolRecordIdSalvo();
+  doc["failsafeLatched"] = failsafeLatched;
 }
 
 void enviarStatusFailsafe() {
@@ -1352,10 +1527,18 @@ void iniciarOtaOferta(JsonDocument& doc) {
   size_t recebido = 0;
   size_t ultimoProgresso = 0;
   unsigned long ultimaAtividade = millis();
+  const unsigned long inicioDownload = millis();
   bool falhou = false;
   String erro;
 
   while (recebido < tamanho) {
+    processarSwitchAcao();
+    atualizarBuzzer();
+    if ((long)(millis() - inicioDownload) > (long)OTA_TOTAL_TIMEOUT_MS) {
+      falhou = true;
+      erro = "download excedeu o tempo maximo total";
+      break;
+    }
     int disponivel = stream->available();
     if (disponivel > 0) {
       size_t aLer = (size_t)disponivel < OTA_BUFFER_BYTES ? (size_t)disponivel : OTA_BUFFER_BYTES;

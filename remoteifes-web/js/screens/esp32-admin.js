@@ -159,8 +159,9 @@ const Esp32Admin = (() => {
   function renderFailsafe(dispositivo) {
     const f = dispositivo.failsafe;
     if (!f) return "sem informação";
-    if (!f.configurado) return "não gravado";
-    return `gravado · ${f.pulsos} pulsos${f.protocolRecordId ? ` · protocolo #${f.protocolRecordId}` : ""}`;
+    const travado = f.latched ? " · OFF local em vigor até o próximo comando" : "";
+    if (!f.configurado) return `não gravado${travado}`;
+    return `gravado · ${f.pulsos} pulsos${f.protocolRecordId ? ` · protocolo #${f.protocolRecordId}` : ""}${travado}`;
   }
 
   function renderDispositivo(d) {
