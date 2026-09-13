@@ -131,8 +131,13 @@ test("mudar Auto-ON avisa os painéis abertos para refletirem a opção sem reca
   const recebidas = [];
   ws.on("message", (dados) => recebidas.push(JSON.parse(dados.toString())));
   await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
+  const ate = async (condicao, limiteMs = 3000) => {
+    const inicio = Date.now();
+    while (!condicao() && Date.now() - inicio < limiteMs) await new Promise((r) => setTimeout(r, 10));
+    return condicao();
+  };
   ws.send(JSON.stringify({ tipo: "observar", sala: "AUTO-1" }));
-  await new Promise((r) => setTimeout(r, 60));
+  assert.ok(await ate(() => recebidas.some((m) => m.tipo === "status")), "o painel recebe o status inicial da sala observada");
   assert.equal(recebidas.filter((m) => m.tipo === "status").at(-1).status.autoLigar, true);
 
   recebidas.length = 0;
@@ -143,7 +148,7 @@ test("mudar Auto-ON avisa os painéis abertos para refletirem a opção sem reca
   });
   assert.equal(resp.status, 200);
   assert.equal((await resp.json()).configuracoes.autoLigar, false);
-  await new Promise((r) => setTimeout(r, 80));
+  assert.ok(await ate(() => recebidas.some((m) => m.tipo === "status" && m.status.autoLigar === false)), "o painel observando a sala recebe um novo status");
   const status = recebidas.filter((m) => m.tipo === "status").at(-1);
   assert.ok(status, "o painel observando a sala recebe um novo status");
   assert.equal(status.status.autoLigar, false);
