@@ -10,7 +10,7 @@ const logger = require("../utils/logger");
 
 const router = express.Router();
 
-const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 20 });
+const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 20, contarApenasFalhas: true });
 const HASH_COMPARACAO_INVALIDA = bcrypt.hashSync("credencial-invalida-para-comparacao", 10);
 
 router.post("/login", limitarLogin, (req, res) => {

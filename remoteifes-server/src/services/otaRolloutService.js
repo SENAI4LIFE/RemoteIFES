@@ -34,12 +34,17 @@ function agora() {
   return new Date().toISOString();
 }
 
+let ultimoPersistido = null;
+
 function persistir() {
   try {
+    const conteudo = JSON.stringify(rollout, null, 2);
+    if (conteudo === ultimoPersistido) return true;
     fs.mkdirSync(otaService.DIR_FIRMWARE, { recursive: true, mode: 0o700 });
     const temporario = `${ARQUIVO_ROLLOUT}.tmp`;
-    fs.writeFileSync(temporario, JSON.stringify(rollout, null, 2), { mode: 0o600 });
+    fs.writeFileSync(temporario, conteudo, { mode: 0o600 });
     fs.renameSync(temporario, ARQUIVO_ROLLOUT);
+    ultimoPersistido = conteudo;
     return true;
   } catch (erro) {
     logger.warn("ota-rollout-persistir-falhou", { mensagem: erro.message });

@@ -1,8 +1,7 @@
 const salasService = require("./salasService");
-const agendamentosService = require("./agendamentosService");
 const configuracoesService = require("./configuracoesService");
 const deviceHub = require("./deviceHub");
-const { validarToken } = require("./tokenService");
+const { validarToken, validarTokens } = require("./tokenService");
 const { ipAutorizado, resolverIpCliente } = require("../utils/rede");
 
 const REBROADCAST_MS = 30 * 1000;
@@ -69,9 +68,11 @@ function redeAutorizada(req) {
   return ipAutorizado(ipDoRequest(req), redesAutorizadas);
 }
 
-function montarSalas(usuario) {
-  const salas = salasService.listar({});
-  const agendadas = agendamentosService.salasComAgendamentoAtivo();
+function montarSalas(usuario, contexto) {
+  const { salas, agendadas } = contexto;
+  const controlaTodas = !!usuario.isAdmin;
+  const controlaLivres = !controlaTodas && !!usuario.podeControlar;
+  const acessos = controlaLivres && salas.some((s) => s.acessoRestrito) ? contexto.acessosDe(usuario.id) : null;
   return salas.map((s) => ({
     sala: s.sala,
     nome: s.nome,
@@ -83,7 +84,7 @@ function montarSalas(usuario) {
     latitude: s.latitude,
     longitude: s.longitude,
     acessoRestrito: !!s.acessoRestrito,
-    podeControlarEsta: salasService.usuarioPodeControlarSala(usuario, s.sala),
+    podeControlarEsta: controlaTodas || (controlaLivres && (!s.acessoRestrito || acessos.has(s.sala))),
   }));
 }
 
@@ -92,19 +93,19 @@ function enviar(ws, payload) {
   ws.send(JSON.stringify(payload));
 }
 
-function statusServidorPayload(usuario) {
-  const manutencaoAtiva = configuracoesService.modoManutencaoAtivo();
+function statusServidorPayload(usuario, cfg = null) {
+  const manutencaoAtiva = configuracoesService.modoManutencaoAtivo(cfg);
   const isAdmin = !!(usuario && usuario.nivel >= NIVEL_ADMIN);
   return { tipo: "servidor", online: true, manutencao: manutencaoAtiva && !isAdmin };
 }
 
-function enviarStatusServidor(ws) {
-  enviar(ws, statusServidorPayload(ws.usuario));
+function enviarStatusServidor(ws, cfg = null) {
+  enviar(ws, statusServidorPayload(ws.usuario, cfg));
 }
 
-function revalidarCliente(ws, atualizarUso = false) {
+function revalidarCliente(ws, atualizarUso = false, cfg = null, validadas = null) {
   if (!ws.token) return true;
-  const usuario = validarToken(ws.token, { atualizarUso });
+  const usuario = validadas && validadas.has(ws.token) ? validadas.get(ws.token) : validarToken(ws.token, { atualizarUso, cfg });
   if (!usuario) {
     ws.usuario = null;
     salaObservadaPorCliente.delete(ws);
@@ -116,31 +117,40 @@ function revalidarCliente(ws, atualizarUso = false) {
   return true;
 }
 
-function notificarCliente(ws) {
-  if (!revalidarCliente(ws)) return;
-  enviarStatusServidor(ws);
+function notificarCliente(ws, contexto = null, validadas = null) {
+  const ctx = contexto || salasService.contextoBroadcast();
+  if (!revalidarCliente(ws, false, ctx.cfg, validadas)) return;
+  enviarStatusServidor(ws, ctx.cfg);
   if (!ws.usuario) return;
-  enviar(ws, { tipo: "salas", salas: montarSalas(ws.usuario) });
+  enviar(ws, { tipo: "salas", salas: montarSalas(ws.usuario, ctx) });
   const sala = salaObservadaPorCliente.get(ws);
   if (sala) {
-    const status = salasService.statusCompleto(sala, ws.usuario);
+    const status = salasService.statusCompleto(sala, ws.usuario, ctx);
     if (status) enviar(ws, { tipo: "status", status });
   }
 }
 
 function notificarTodos() {
   if (!wss) return;
-  wss.clients.forEach((ws) => {
-    if (ws.usuario) notificarCliente(ws);
-  });
+  const destinatarios = [...wss.clients].filter((ws) => ws.usuario);
+  if (!destinatarios.length) return;
+  const contexto = salasService.contextoBroadcast();
+  const validadas = validarTokens(destinatarios.map((ws) => ws.token), { cfg: contexto.cfg });
+  contexto.precarregarAcessos(
+    [...validadas.values()].filter((u) => u && !u.isAdmin && u.podeControlar).map((u) => u.id)
+  );
+  destinatarios.forEach((ws) => notificarCliente(ws, contexto, validadas));
 }
 
 function notificarObservadoresDaSala({ sala }) {
   if (!wss) return;
-  wss.clients.forEach((ws) => {
-    if (!ws.usuario || salaObservadaPorCliente.get(ws) !== sala) return;
-    if (!revalidarCliente(ws) || !ws.usuario) return;
-    const status = salasService.statusCompleto(sala, ws.usuario);
+  const observadores = [...wss.clients].filter((ws) => ws.usuario && salaObservadaPorCliente.get(ws) === sala);
+  if (!observadores.length) return;
+  const contexto = salasService.contextoBroadcast();
+  const validadas = validarTokens(observadores.map((ws) => ws.token), { cfg: contexto.cfg });
+  observadores.forEach((ws) => {
+    if (!revalidarCliente(ws, false, contexto.cfg, validadas) || !ws.usuario) return;
+    const status = salasService.statusCompleto(sala, ws.usuario, contexto);
     if (status) enviar(ws, { tipo: "status", status });
   });
 }

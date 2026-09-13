@@ -7,7 +7,11 @@ const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
 
-const limitarDispositivo = criarLimitador({ janelaMs: 60 * 1000, maxTentativas: 120 });
+const limitarDispositivo = criarLimitador({
+  janelaMs: 60 * 1000,
+  maxTentativas: 120,
+  chave: (req) => req.headers["x-device-id"] || req.headers["x-device-mac"] || req.headers["x-device-sala"] || null,
+});
 router.use("/dispositivo", limitarDispositivo);
 
 function autenticarDispositivo(req, res, next) {
