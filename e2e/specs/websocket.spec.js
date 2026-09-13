@@ -216,3 +216,31 @@ test("socket que ficou meio-aberto é detectado ao retomar e reconectado", async
   await expect(page.locator("#mainApp")).toBeVisible();
   await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 20_000 });
 });
+
+test("no aplicativo empacotado (Cordova) o service worker da PWA não é registrado; no site continua sendo", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    window.__swRegistros = [];
+    if (navigator.serviceWorker) {
+      const registrar = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+      navigator.serviceWorker.register = (url, opcoes) => {
+        window.__swRegistros.push(String(url));
+        return registrar(url, opcoes);
+      };
+    }
+  });
+  await page.goto("/");
+  await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => page.evaluate(() => window.__swRegistros.length), { timeout: 10_000 }).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.__swRegistros[0])).toContain("sw.js");
+
+  await context.addInitScript(() => {
+    window.cordova = {};
+  });
+  const empacotada = await context.newPage();
+  await empacotada.goto("/");
+  await expect(empacotada.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
+  expect(await empacotada.evaluate(() => window.RemoteIFESConfig.empacotado)).toBe(true);
+  await empacotada.waitForTimeout(1500);
+  expect(await empacotada.evaluate(() => window.__swRegistros), "nenhum registro de sw.js no contexto empacotado").toEqual([]);
+  await empacotada.close();
+});

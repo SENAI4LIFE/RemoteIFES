@@ -3,7 +3,7 @@ const path = require("path");
 const os = require("os");
 const db = require("../config/database");
 const logger = require("../utils/logger");
-const { CAMINHO_DB, DIR_DADOS } = require("../config/paths");
+const { CAMINHO_DB, DIR_BACKUPS } = require("../config/paths");
 const notificacoesService = require("./notificacoesService");
 
 const INICIO_PROCESSO = Date.now();
@@ -127,22 +127,42 @@ function coletarBanco() {
   };
 }
 
-function coletarArmazenamento() {
-  const alvo = CAMINHO_DB === ":memory:" ? os.tmpdir() : DIR_DADOS;
+function medirSistemaDeArquivos(alvo, rotulo) {
   try {
     const st = fs.statfsSync(alvo);
     const totalBytes = st.blocks * st.bsize;
     const livreBytes = st.bavail * st.bsize;
-    const avaliacao = avaliarEspaco(totalBytes, livreBytes);
-    return {
-      caminho: alvo,
-      totalBytes,
-      livreBytes,
-      ...avaliacao,
-    };
+    return { caminho: alvo, rotulo, totalBytes, livreBytes, ...avaliarEspaco(totalBytes, livreBytes) };
   } catch (erro) {
-    return { caminho: alvo, erro: erro.message };
+    return { caminho: alvo, rotulo, erro: erro.message };
   }
+}
+
+function dispositivoDe(caminho) {
+  let atual = caminho;
+  for (let i = 0; i < 64; i += 1) {
+    try {
+      return fs.statSync(atual).dev;
+    } catch (erro) {
+      const pai = path.dirname(atual);
+      if (pai === atual) return null;
+      atual = pai;
+    }
+  }
+  return null;
+}
+
+function coletarArmazenamento() {
+  const emMemoria = CAMINHO_DB === ":memory:";
+  const dirBanco = emMemoria ? os.tmpdir() : path.dirname(CAMINHO_DB);
+  const principal = medirSistemaDeArquivos(dirBanco, "banco de dados");
+  if (emMemoria) return principal;
+  const devBanco = dispositivoDe(dirBanco);
+  const devBackups = dispositivoDe(DIR_BACKUPS);
+  if (devBanco !== null && devBackups !== null && devBanco !== devBackups) {
+    principal.backups = medirSistemaDeArquivos(DIR_BACKUPS, "backups");
+  }
+  return principal;
 }
 
 function avaliarEspaco(totalBytes, livreBytes) {
@@ -264,6 +284,9 @@ function coletar() {
   const alertas = [];
   if (!banco.ok) alertas.push("banco de dados não respondeu");
   if (armazenamento.alerta) alertas.push(`disco com apenas ${armazenamento.livrePercent}% livres em ${armazenamento.caminho}`);
+  if (armazenamento.backups && armazenamento.backups.alerta) {
+    alertas.push(`disco com apenas ${armazenamento.backups.livrePercent}% livres em ${armazenamento.backups.caminho}`);
+  }
   if (backup.alerta) {
     alertas.push(backup.idadeHoras === null
       ? "backup automático ligado, mas nenhum backup foi encontrado"
@@ -674,6 +697,7 @@ module.exports = {
   coletar,
   avaliar,
   avaliarEspaco,
+  coletarArmazenamento,
   amostrar,
   gravarAmostra,
   consolidarHoras,

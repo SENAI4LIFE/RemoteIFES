@@ -32,8 +32,7 @@ else
   echo 'NODE_ENV=production' >> .env
 fi
 
-DATA_DIR=$(grep -E '^REMOTEIFES_DATA_DIR=' .env | head -n1 | cut -d= -f2- | tr -d '[:space:]')
-[ -z "$DATA_DIR" ] && DATA_DIR="$APP_DIR/data"
+DATA_DIR=$("$NODE_BIN" --env-file-if-exists=.env -e 'process.stdout.write(require("./src/config/paths").DIR_DADOS)')
 mkdir -p "$DATA_DIR"
 chown -R "$RUN_USER" "$DATA_DIR" 2>/dev/null || true
 

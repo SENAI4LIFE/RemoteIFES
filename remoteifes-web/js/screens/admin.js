@@ -12,7 +12,14 @@ const Admin = {
 
   async aoAbrir() {
     document.getElementById("novoUsuarioAdminLabel").classList.toggle("hidden", !state.isSuperAdmin);
-    await this.carregarUsuarios();
+    const ativa = document.querySelector(".admin-subtab-btn.active:not(.hidden)");
+    const sub = ativa ? ativa.dataset.sub : "usuarios";
+    const aba = document.querySelector(`#adminSub-${sub} .admin-inner-tab-btn.active`);
+    await abrirAdminSub(sub, aba ? aba.dataset.aba : undefined);
+  },
+
+  aoFechar() {
+    encerrarAdminAtivo(null);
   },
 
   async carregarUsuarios() {

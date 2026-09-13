@@ -37,10 +37,9 @@ if [ "$RESTART" -eq 1 ] && ! $SYSTEMCTL cat remoteifes.service >/dev/null 2>&1; 
   exit 1
 fi
 
-DATA_DIR=$(grep -E '^REMOTEIFES_DATA_DIR=' .env | head -n1 | cut -d= -f2- | tr -d '[:space:]')
-[ -z "$DATA_DIR" ] && DATA_DIR="$APP_DIR/data"
+DATA_DIR=$(node --env-file-if-exists=.env -e 'process.stdout.write(require("./src/config/paths").DIR_DADOS)') || { echo "não foi possível resolver o diretório de dados (src/config/paths.js)."; exit 1; }
+DB_PATH=$(node --env-file-if-exists=.env -e 'process.stdout.write(require("./src/config/paths").CAMINHO_DB)') || { echo "não foi possível resolver o caminho do banco (src/config/paths.js)."; exit 1; }
 mkdir -p "$DATA_DIR"
-DB_PATH=$(node --env-file-if-exists=.env -e 'process.stdout.write(require("./src/config/paths").CAMINHO_DB)')
 
 LOCK="$DATA_DIR/.deploy-lock"
 if [ -f "$LOCK" ] && [ "$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || echo 0) ))" -ge 1800 ]; then
@@ -108,13 +107,7 @@ instalar_deps() {
     echo "Dependências mudaram; rodando npm ci..."
     local flags=(--omit=dev --no-audit --no-fund)
     [ "$OFFLINE" -eq 1 ] && flags+=(--offline)
-    if ! npm ci "${flags[@]}"; then
-      if [ -d node_modules ]; then
-        echo "npm ci falhou; mantendo node_modules atual."
-      else
-        return 1
-      fi
-    fi
+    npm ci "${flags[@]}" || return 1
   else
     echo "Dependências inalteradas; pulando npm ci."
   fi
@@ -152,7 +145,7 @@ aguardar_saude() {
 }
 
 if ! instalar_deps "$ANTES" "$DEPOIS"; then
-  echo "npm ci falhou e não há node_modules. Abortando e revertendo."
+  echo "npm ci falhou; as dependências da nova versão não foram instaladas de forma íntegra. Abortando e revertendo."
   reverter
   exit 1
 fi

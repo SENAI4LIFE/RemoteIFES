@@ -3,8 +3,14 @@ const { exigirLogin } = require("../middlewares/auth");
 const salasService = require("../services/salasService");
 const agendamentosService = require("../services/agendamentosService");
 const usuariosService = require("../services/usuariosService");
+const auditoriaService = require("../services/auditoriaService");
+const logger = require("../utils/logger");
 
 const router = express.Router();
+
+function auditar(dados) {
+  try { auditoriaService.registrar(dados); } catch (erro) { logger.warn("auditoria-registro-falhou", { tipo: dados.tipo, mensagem: erro.message }); }
+}
 
 function exigirDonoDaSala(req, res, next) {
   if (req.usuario.isAdmin) return next();
@@ -85,6 +91,7 @@ router.post("/salas/:sala/proprietario/acesso/:usuarioId", exigirLogin, exigirDo
       return res.status(400).json({ ok: false, erro: "usuário está desativado" });
     }
     const usuarios = salasService.concederAcesso(req.params.sala, usuarioId);
+    auditar({ tipo: "sala_usuario_autorizado", ator: req.usuario, alvoTipo: "usuario", alvoId: usuarioId, alvoRotulo: alvo.usuario, descricao: `Acesso a sala ${req.params.sala} concedido a ${alvo.usuario} pelo proprietario` });
     res.json({ ok: true, usuarios });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });
@@ -96,7 +103,9 @@ router.delete("/salas/:sala/proprietario/acesso/:usuarioId", exigirLogin, exigir
   if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
     return res.status(400).json({ ok: false, erro: "id inválido" });
   }
+  const alvo = usuariosService.buscarPorId(usuarioId);
   const usuarios = salasService.revogarAcesso(req.params.sala, usuarioId);
+  auditar({ tipo: "sala_usuario_revogado", ator: req.usuario, alvoTipo: "usuario", alvoId: usuarioId, alvoRotulo: alvo?.usuario || String(usuarioId), descricao: `Acesso a sala ${req.params.sala} revogado de ${alvo?.usuario || usuarioId} pelo proprietario` });
   res.json({ ok: true, usuarios });
 });
 

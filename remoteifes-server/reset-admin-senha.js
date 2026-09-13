@@ -13,6 +13,7 @@ if ((senhaFornecida && novaSenha.length < 8) || novaSenha.length > 128) {
 const senhaHash = bcrypt.hashSync(novaSenha, 10);
 
 const conta =
+  db.prepare("SELECT id, usuario FROM usuarios WHERE nivel = 3 ORDER BY id LIMIT 1").get() ||
   db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'superadmin'").get() ||
   db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'admin'").get();
 

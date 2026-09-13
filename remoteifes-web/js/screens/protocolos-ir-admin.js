@@ -27,6 +27,7 @@ const ProtocolosIrAdmin = (() => {
   const capturasConsumidas = new Set();
   let failsafePendenteId = null;
   let pararMensagens = null;
+  let aberto = false;
   let pararConexao = null;
   let ocupado = false;
 
@@ -415,12 +416,15 @@ const ProtocolosIrAdmin = (() => {
 
   async function aoAbrir() {
     if (!state.isSuperAdmin) return;
+    aberto = true;
     if (!pararMensagens) pararMensagens = ServerStatus.aoMensagem(aoMensagem);
     if (!pararConexao) pararConexao = ServerStatus.aoConectar(observarClonador);
     await carregar();
+    if (!aberto) ServerStatus.enviar({ tipo: "observar_dispositivos", salas: [] });
   }
 
   function aoFechar() {
+    aberto = false;
     if (!pararMensagens && !pararConexao) return;
     ServerStatus.enviar({ tipo: "observar_dispositivos", salas: [] });
     failsafePendenteId = null;

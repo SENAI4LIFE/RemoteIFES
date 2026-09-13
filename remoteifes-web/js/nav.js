@@ -26,6 +26,9 @@ function showScreen(name) {
   if (screens.simple && !screens.simple.classList.contains("hidden") && name !== "simple") {
     if (typeof SimpleWizard !== "undefined") SimpleWizard.pararAutoRefresh();
   }
+  if (screens.admin && !screens.admin.classList.contains("hidden") && name !== "admin") {
+    if (typeof Admin !== "undefined" && typeof Admin.aoFechar === "function") Admin.aoFechar();
+  }
   Object.values(screens).forEach((el) => el.classList.add("hidden"));
   screens[name].classList.remove("hidden");
   if (!["inicio", "agenda", "admin", "grade", "panel", "propriedade"].includes(name)) salasSubScreenAtual = name;
