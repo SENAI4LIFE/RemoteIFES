@@ -134,7 +134,9 @@ test("manual e README documentam Protocolos IR, o clonador vinculado à placa, o
   ]) {
     assert.ok(README.includes(trecho), `README sem: ${trecho}`);
   }
-  assert.match(README, /atualmente `4\.1\.0`/);
+  const platformio = fs.readFileSync(path.join(__dirname, "..", "..", "remoteifes-esp32", "platformio.ini"), "utf8");
+  const versaoFirmware = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/)[1];
+  assert.ok(README.includes(`atualmente \`${versaoFirmware}\``), `README precisa citar a versão do firmware compilada (${versaoFirmware})`);
 });
 
 test("procedimentos de host aparecem só no conjunto Superadministrador", () => {

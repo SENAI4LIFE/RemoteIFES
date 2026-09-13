@@ -11,7 +11,7 @@ function uso() {
   console.log("Uso:");
   console.log("  node credencial-esp32.js <sala>                estado da credencial da sala");
   console.log("  node credencial-esp32.js <sala> --provisionar  cria a credencial (mostra o segredo uma vez)");
-  console.log("  node credencial-esp32.js <sala> --rotacionar   gera um novo segredo (o antigo vale por 24h)");
+  console.log("  node credencial-esp32.js <sala> --rotacionar   gera um segredo pendente; o atual vale até a placa provar o novo, e então o anterior vale por 24h");
   console.log("  node credencial-esp32.js <sala> --substituir   novo deviceId + segredo (troca de hardware)");
   console.log("  node credencial-esp32.js <sala> --revogar      invalida a credencial e derruba a conexão");
 }
@@ -43,6 +43,7 @@ try {
       console.log(`  último uso:   ${estado.ultimoUsoEm || "nunca"}`);
       console.log(`  revogada:     ${estado.revogado ? estado.revogadoEm : "não"}`);
       console.log(`  grace ativo:  ${estado.graceRotacaoAtivo ? "sim (segredo anterior ainda aceito)" : "não"}`);
+      console.log(`  pendente:     ${estado.rotacaoPendente ? `desde ${estado.pendenteDesde}${estado.pendenteEntregueEm ? ", entregue à placa, aguardando prova" : estado.pendenteReentregavel ? ", será entregue quando a placa conectar" : ", não entregue (rotacione de novo com a placa conectada)"}` : "não"}`);
     }
   } else if (acao === "--provisionar") {
     const r = credenciaisService.provisionar(sala);
@@ -50,6 +51,9 @@ try {
   } else if (acao === "--rotacionar") {
     const r = credenciaisService.rotacionar(sala);
     imprimirSegredo(r);
+    console.log(r.enviadoAoDispositivo
+      ? "Segredo entregue à placa conectada; a credencial atual continua válida até ela provar o novo."
+      : "Placa offline: o segredo fica pendente e será entregue quando ela reconectar (até o servidor reiniciar). A credencial atual continua válida.");
   } else if (acao === "--substituir") {
     const r = credenciaisService.substituir(sala);
     imprimirSegredo(r);
