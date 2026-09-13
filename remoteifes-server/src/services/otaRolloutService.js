@@ -14,7 +14,7 @@ const LOTE_PADRAO = Math.min(otaService.MAX_SIMULTANEOS, LOTE_MAX);
 const GRACA_ESPERA_MS = 2 * 60 * 1000;
 
 const ESTADOS_ATIVOS = new Set(["preflight", "canario", "lotes", "pausado"]);
-const EM_VOO = new Set(["atualizando", "reiniciando"]);
+const EM_VOO = new Set(["atualizando", "reiniciando", "validando"]);
 const FALHAS = new Set(["falhou", "revertido", "indeterminado"]);
 const TERMINAIS = new Set(["validado", "falhou", "revertido", "indeterminado", "ignorado", "cancelado"]);
 const CODIGOS_TEMPORARIOS = new Set(["desconectado", "ota-em-andamento", "modo-config"]);
@@ -209,6 +209,9 @@ function passo() {
     }
 
     const falhas = lote.filter((d) => FALHAS.has(d.estado));
+    for (const d of rollout.dispositivos) {
+      if (d.estado === "revertido" && d.comprovado === true && !falhas.includes(d)) falhas.push(d);
+    }
     if (falhas.length) {
       if (emVoo > 0) return;
       encerrar("interrompido", motivoDoLote(falhas));
@@ -277,27 +280,49 @@ function estadoDeDispositivo(ota) {
   if (!ota) return null;
   if (ota.fase === "ofertado" || ota.fase === "baixando") return { estado: "atualizando", motivo: null };
   if (ota.fase === "gravado" || ota.fase === "reiniciando") return { estado: "reiniciando", motivo: null };
+  if (ota.fase === "validando") return { estado: "validando", motivo: null };
   if (ota.fase === "concluido") return { estado: "validado", motivo: null };
   if (ota.fase !== "falhou") return null;
-  if (ota.causa === "rollback" || ota.causa === "indeterminado") return { estado: "indeterminado", motivo: ota.erro || null };
-  if (ota.causa === "reinicio") return { estado: "indeterminado", motivo: ota.erro || null };
+  if (ota.causa === "rollback") return { estado: "revertido", motivo: ota.erro || null, comprovado: true };
+  if (ota.causa === "indeterminado" || ota.causa === "reinicio" || ota.causa === "validacao") return { estado: "indeterminado", motivo: ota.erro || null };
   return { estado: "falhou", motivo: ota.erro || null };
 }
 
 function aplicarOta(dispositivo, ota) {
-  if (TERMINAIS.has(dispositivo.estado) || dispositivo.estado === "pendente") return;
+  if (dispositivo.estado === "pendente") return;
+  if (TERMINAIS.has(dispositivo.estado)) {
+    if (dispositivo.estado !== "validado" || !corresponde(dispositivo, ota) || !ota || ota.fase !== "falhou" || ota.causa !== "rollback") return;
+    dispositivo.comprovado = true;
+    dispositivo.revertidoTardeEm = agora();
+    marcar(dispositivo, "revertido", ota.erro || "reverteu para a versão anterior depois de validado");
+    return;
+  }
   if (!corresponde(dispositivo, ota) || (dispositivo.identidade && dispositivo.identidade !== otaService.identidadeDaSala(dispositivo.sala))) {
     marcar(dispositivo, "indeterminado", "registro da tentativa ou vínculo do dispositivo indisponível ou alterado");
     return;
   }
   const proximo = estadoDeDispositivo(ota);
   if (!proximo || proximo.estado === dispositivo.estado) return;
+  if (proximo.comprovado) dispositivo.comprovado = true;
   marcar(dispositivo, proximo.estado, proximo.motivo);
 }
 
 function aoEventoOta({ sala, estado }) {
-  if (!ativo()) return;
+  if (!rollout) return;
   const dispositivo = rollout.dispositivos.find((d) => d.sala === sala);
+  if (!ativo()) {
+    if (dispositivo && dispositivo.estado === "validado" && estado && estado.fase === "falhou" && estado.causa === "rollback" && corresponde(dispositivo, estado)) {
+      dispositivo.comprovado = true;
+      dispositivo.revertidoTardeEm = agora();
+      dispositivo.estado = "revertido";
+      dispositivo.motivo = estado.erro || null;
+      rollout.reversoesTardias = (rollout.reversoesTardias || 0) + 1;
+      if (rollout.estado === "concluido") rollout.motivoParada = `${rollout.reversoesTardias} dispositivo(s) reverteram para a versão anterior depois da conclusão`;
+      registrar();
+      logger.warn("ota-rollout-reversao-tardia", { rollout: rollout.id, sala });
+    }
+    return;
+  }
   if (dispositivo) aplicarOta(dispositivo, estado);
   avancar();
 }
@@ -329,7 +354,7 @@ function carregar() {
   if (!bruto.dispositivos.every((d) => d && typeof d.sala === "string" && d.sala && Number.isInteger(d.lote) && d.lote >= 0 && (d.estado === "pendente" || EM_VOO.has(d.estado) || TERMINAIS.has(d.estado)))) return;
   if (new Set(bruto.dispositivos.map((d) => d.sala)).size !== bruto.dispositivos.length || !bruto.dispositivos.some((d) => d.lote === bruto.loteAtual)) return;
   for (const d of bruto.dispositivos) {
-    if (d.estado === "revertido") {
+    if (d.estado === "revertido" && d.comprovado !== true) {
       d.estado = "indeterminado";
       d.motivo = "registro antigo de versão inesperada; rollback não comprovado";
     }

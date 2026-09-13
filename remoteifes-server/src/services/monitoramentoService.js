@@ -45,7 +45,7 @@ const FAIXAS = {
   "7d": { rotulo: "7 dias", segundos: 7 * 86400, bucket: 3600, fonte: "horas" },
   "30d": { rotulo: "30 dias", segundos: 30 * 86400, bucket: 6 * 3600, fonte: "horas" },
 };
-const FASES_OTA = ["ofertado", "baixando", "gravado", "reiniciando", "concluido", "falhou"];
+const FASES_OTA = ["ofertado", "baixando", "gravado", "reiniciando", "validando", "concluido", "falhou"];
 
 const contadores = {
   comandoFalha: 0,
