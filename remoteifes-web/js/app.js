@@ -2,7 +2,7 @@ const _tabInicial = document.querySelector('.tab-btn[data-tab="inicio"]');
 _tabInicial.classList.add("active");
 _tabInicial.setAttribute("aria-current", "page");
 
-if ("serviceWorker" in navigator) {
+if ("serviceWorker" in navigator && !(window.RemoteIFESConfig && window.RemoteIFESConfig.empacotado)) {
   window.addEventListener("load", () => {
     const versao = window.REMOTEIFES_FRONTEND_VERSION || "unknown";
     // A recarga da aba após uma atualização é feita pelo próprio worker (clients.navigate),

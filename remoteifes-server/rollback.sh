@@ -31,9 +31,8 @@ if [ "$RESTART" -eq 1 ] && ! $SYSTEMCTL cat remoteifes.service >/dev/null 2>&1; 
   exit 1
 fi
 
-DATA_DIR=$(grep -E '^REMOTEIFES_DATA_DIR=' .env 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '[:space:]')
-[ -z "$DATA_DIR" ] && DATA_DIR="$APP_DIR/data"
-DB_PATH=$(node --env-file-if-exists=.env -e 'process.stdout.write(require("./src/config/paths").CAMINHO_DB)')
+DATA_DIR=$(node --env-file-if-exists=.env -e 'process.stdout.write(require("./src/config/paths").DIR_DADOS)') || { echo "não foi possível resolver o diretório de dados (src/config/paths.js)."; exit 1; }
+DB_PATH=$(node --env-file-if-exists=.env -e 'process.stdout.write(require("./src/config/paths").CAMINHO_DB)') || { echo "não foi possível resolver o caminho do banco (src/config/paths.js)."; exit 1; }
 
 if [ -z "$REF" ]; then
   [ -f "$DATA_DIR/previous-version" ] || { echo "nenhum $DATA_DIR/previous-version gravado; informe o ref explicitamente."; exit 1; }
@@ -78,7 +77,11 @@ if git diff --name-only "$ANTES" "$ALVO" -- package.json package-lock.json | gre
   echo "Dependências mudaram; rodando npm ci..."
   flags=(--omit=dev --no-audit --no-fund)
   [ "$OFFLINE" -eq 1 ] && flags+=(--offline)
-  npm ci "${flags[@]}" || echo "npm ci falhou; mantendo node_modules atual."
+  if ! npm ci "${flags[@]}"; then
+    echo "npm ci falhou: as dependências de $ALVO não foram instaladas de forma íntegra."
+    echo "O código já está em $ALVO, mas o serviço NÃO foi reiniciado. Corrija o npm ci (rede, espaço em disco) e rode 'npm ci --omit=dev' seguido de 'sudo systemctl restart remoteifes.service'."
+    exit 1
+  fi
 else
   echo "Dependências inalteradas; pulando npm ci."
 fi

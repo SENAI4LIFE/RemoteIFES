@@ -82,7 +82,7 @@ function fecharEEsperar(ws) {
   });
 }
 
-const CAPTURA_LIGAR = { tipo: "captura", isKnown: true, protocolId: 5, protocol: "DAIKIN", hex: "0x1234", raw: [9000, 4500, 560, 560], carrierHz: 38000 };
+const CAPTURA_LIGAR = { tipo: "captura", isKnown: true, protocolId: 16, protocol: "DAIKIN", hex: "0x1234", raw: [9000, 4500, 560, 560], carrierHz: 38000 };
 const CAPTURA_OFF = { tipo: "captura", isKnown: false, protocolId: -1, protocol: "UNKNOWN", hex: "0x0", raw: [9100, 4450, 570, 550, 570, 1650], carrierHz: 38000 };
 
 test.before(async () => {
@@ -194,7 +194,7 @@ test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clo
   const capturaLigar = recentes[0];
   assert.ok(Number.isInteger(capturaLigar.id));
   assert.equal(capturaLigar.sala, "CLONE-1");
-  assert.equal(capturaLigar.protocolId, 5);
+  assert.equal(capturaLigar.protocolId, 16);
   assert.equal(capturaLigar.carrierHz, 38000);
 
   resp = await auth("/admin/protocolos-ir", token, { method: "POST", body: JSON.stringify({ label: "Ar lab", capturaId: 999 }) });
@@ -225,10 +225,10 @@ test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clo
   resp = await auth(`/admin/protocolos-ir/${salvo.id}/aplicar/TX-1`, token, { method: "POST" });
   assert.equal(resp.status, 200);
   corpo = await resp.json();
-  assert.equal(corpo.sala.irProtocolo, 5);
+  assert.equal(corpo.sala.irProtocolo, 16);
   assert.equal(corpo.sala.irProtocoloRegistroId, salvo.id);
   assert.equal(corpo.failsafeSincronizado, true);
-  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.protocol === 5)));
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.protocol === 16)));
   const limpezaInicial = tx.mensagens.find((m) => m.tipo === "failsafe_raw_clear");
   assert.ok(limpezaInicial && limpezaInicial.protocolRecordId === salvo.id, "aplicar protocolo sem failsafe manda apagar um RAW antigo");
 
@@ -291,7 +291,7 @@ test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clo
   resp = await auth(`/admin/protocolos-ir/${salvo.id}/failsafe`, token, { method: "PUT", body: JSON.stringify({ capturaId: capturaOff.id }) });
   assert.equal(resp.status, 200);
   txReconectado.mensagens.length = 0;
-  resp = await auth(`/admin/esp32/TX-1/protocolo-ir`, token, { method: "POST", body: JSON.stringify({ protocolo: 5 }) });
+  resp = await auth(`/admin/esp32/TX-1/protocolo-ir`, token, { method: "POST", body: JSON.stringify({ protocolo: 16 }) });
   assert.equal(resp.status, 200);
   assert.ok(await ate(() => txReconectado.mensagens.some((m) => m.tipo === "failsafe_raw_clear")), "trocar o protocolo da sala sem registro apaga o failsafe da placa");
   assert.equal(db.prepare("SELECT irProtocoloRegistroId FROM salas WHERE sala = 'TX-1'").get().irProtocoloRegistroId, null);
@@ -306,7 +306,7 @@ test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clo
   assert.equal(resp.status, 200);
   assert.deepEqual((await resp.json()).salasAfetadas, ["TX-1"]);
   assert.ok(await ate(() => txReconectado.mensagens.some((m) => m.tipo === "failsafe_raw_clear")), "excluir o protocolo apaga o failsafe das salas que o usavam");
-  assert.equal(db.prepare("SELECT irProtocolo, irProtocoloRegistroId FROM salas WHERE sala = 'TX-1'").get().irProtocolo, 5);
+  assert.equal(db.prepare("SELECT irProtocolo, irProtocoloRegistroId FROM salas WHERE sala = 'TX-1'").get().irProtocolo, 16);
   resp = await auth(`/admin/protocolos-ir/${salvo.id}`, token, { method: "DELETE" });
   assert.equal(resp.status, 404);
 
@@ -492,4 +492,90 @@ test("trocar a clonadora devolve a antiga à operação e limpa o histórico de 
   assert.ok(db.prepare("SELECT 1 FROM auditoria_eventos WHERE tipo = 'esp32_clonador_removido'").get());
   await fecharEEsperar(antiga.ws);
   await fecharEEsperar(nova.ws);
+});
+
+test("capturas RAW malformadas ou grandes demais são rejeitadas por inteiro, sem filtrar nem truncar", async () => {
+  const token = await tokenSuperAdmin();
+  const resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });
+  assert.equal(resp.status, 200);
+  const clonador = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C9", { headers: { "x-device-id": credencialClonadora.deviceId, "x-device-secret": credencialClonadora.segredo } });
+  assert.equal(deviceHub.estadoPublico("CLONE-1").role, "cloner");
+  clonador.ws.send(JSON.stringify({ tipo: "modo_alterado", modo: "config_clone" }));
+  await esperar();
+  deviceHub.limparCapturas("CLONE-1");
+
+  const grande = Array.from({ length: 1025 }, (_, i) => 500 + (i % 7));
+  const comPulsoInvalido = [9000, 4500, 70000, 560];
+  const comValorNaoInteiro = [9000, 4500, "560", 560];
+  const comNegativo = [9000, -1, 560];
+  for (const raw of [grande, comPulsoInvalido, comValorNaoInteiro, comNegativo, [], "9000,4500"]) {
+    clonador.ws.send(JSON.stringify({ ...CAPTURA_LIGAR, raw }));
+  }
+  clonador.ws.send(JSON.stringify({ ...CAPTURA_LIGAR, raw: [9000, 4500, 560, 560], hex: "0xVALIDA" }));
+  assert.ok(await ate(() => deviceHub.capturasRecentes("CLONE-1").some((c) => c.hex === "0xVALIDA")));
+  const capturas = deviceHub.capturasRecentes("CLONE-1");
+  assert.equal(capturas.length, 1, "nenhuma versão filtrada ou truncada das capturas inválidas pode ter sido aceita");
+  assert.deepEqual(capturas[0].raw, [9000, 4500, 560, 560]);
+
+  const exato = Array.from({ length: 1024 }, () => 560);
+  clonador.ws.send(JSON.stringify({ ...CAPTURA_LIGAR, raw: exato, hex: "0xLIMITE" }));
+  assert.ok(await ate(() => deviceHub.capturasRecentes("CLONE-1").some((c) => c.hex === "0xLIMITE")));
+  assert.equal(deviceHub.capturasRecentes("CLONE-1").find((c) => c.hex === "0xLIMITE").raw.length, 1024);
+  await fecharEEsperar(clonador.ws);
+});
+
+test("identificadores numéricos de protocolo fora do suporte do firmware são recusados antes de alterar o estado", async () => {
+  const token = await tokenSuperAdmin();
+  const tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2");
+  const antes = salasService.buscar("TX-2");
+  for (const protocolo of [5, 1, 0, 129, 999]) {
+    const resp = await auth("/admin/esp32/TX-2/protocolo-ir", token, { method: "POST", body: JSON.stringify({ protocolo }) });
+    assert.equal(resp.status, 400, `protocolo ${protocolo}`);
+    assert.match((await resp.json()).erro, /não é suportado/);
+  }
+  assert.equal(salasService.buscar("TX-2").irProtocolo, antes.irProtocolo);
+  assert.ok(!tx.mensagens.some((m) => m.tipo === "send_known_state"), "nenhum estado foi enviado à placa");
+
+  const teste = await auth("/admin/esp32/TX-2/teste/estado", token, { method: "POST", body: JSON.stringify({ protocol: 5, temp: 23, power: true }) });
+  assert.equal(teste.status, 400);
+  assert.ok(!tx.mensagens.some((m) => m.tipo === "send_known_state"));
+
+  const valido = await auth("/admin/esp32/TX-2/protocolo-ir", token, { method: "POST", body: JSON.stringify({ protocolo: 15 }) });
+  assert.equal(valido.status, 200);
+  assert.equal(salasService.buscar("TX-2").irProtocolo, 15);
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.protocol === 15)));
+  const limpar = await auth("/admin/esp32/TX-2/protocolo-ir", token, { method: "POST", body: JSON.stringify({ protocolo: null }) });
+  assert.equal(limpar.status, 200);
+  assert.equal(salasService.buscar("TX-2").irProtocolo, null);
+  await fecharEEsperar(tx.ws);
+});
+
+test("um protocolo já gravado com identificador antigo continua sendo transmitido como antes", () => {
+  db.prepare("UPDATE salas SET irProtocolo = 5, irProtocoloRegistroId = NULL WHERE sala = 'TX-2'").run();
+  const comando = salasService.comandoEstadoIR(salasService.buscar("TX-2"));
+  assert.equal(comando.tipo, "send_known_state");
+  assert.equal(comando.protocol, 5);
+  db.prepare("UPDATE salas SET irProtocolo = NULL WHERE sala = 'TX-2'").run();
+});
+
+test("uma captura reconhecida pela placa com identificador desconhecido do servidor vira sinal RAW genérico, ainda salvável", async () => {
+  const token = await tokenSuperAdmin();
+  const resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });
+  assert.equal(resp.status, 200);
+  const clonador = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C9", { headers: { "x-device-id": credencialClonadora.deviceId, "x-device-secret": credencialClonadora.segredo } });
+  clonador.ws.send(JSON.stringify({ tipo: "modo_alterado", modo: "config_clone" }));
+  await esperar();
+  deviceHub.limparCapturas("CLONE-1");
+  clonador.ws.send(JSON.stringify({ ...CAPTURA_LIGAR, protocolId: 7, protocol: "SAMSUNG", hex: "0xDESCONHECIDO" }));
+  assert.ok(await ate(() => deviceHub.capturasRecentes("CLONE-1").some((c) => c.hex === "0xDESCONHECIDO")));
+  const captura = deviceHub.capturasRecentes("CLONE-1").find((c) => c.hex === "0xDESCONHECIDO");
+  assert.equal(captura.isKnown, false);
+  assert.equal(captura.protocolId, 7);
+  const salvo = await auth("/admin/protocolos-ir", token, { method: "POST", body: JSON.stringify({ label: "Sinal de protocolo desconhecido", capturaId: captura.id }) });
+  assert.equal(salvo.status, 201);
+  const { protocolo } = await salvo.json();
+  assert.equal(protocolo.isKnown, false);
+  assert.equal(protocolo.protocolId, null);
+  assert.deepEqual(protocolo.raw, CAPTURA_LIGAR.raw);
+  await fecharEEsperar(clonador.ws);
 });

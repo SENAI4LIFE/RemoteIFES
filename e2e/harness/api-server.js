@@ -78,7 +78,7 @@ function prepararSalaComDispositivo() {
   } catch (erro) {
     if (!/não corresponde|já está cadastrado/.test(erro.message)) throw erro;
   }
-  salasService.definirProtocoloIR(SALA_COM_DISPOSITIVO, 1);
+  salasService.definirProtocoloIR(SALA_COM_DISPOSITIVO, 15);
 }
 
 popularUsuariosDeTeste();

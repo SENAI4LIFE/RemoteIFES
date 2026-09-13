@@ -609,6 +609,9 @@ function definirProtocoloIR(sala, protocolo, protocoloRegistroId = null) {
   if (protocoloFinal !== null && (!Number.isInteger(protocoloFinal) || protocoloFinal < 0)) {
     throw new Error("protocolo de infravermelho inválido");
   }
+  if (protocoloFinal !== null && !require("./protocolosIrService").protocoloNativoSuportado(protocoloFinal)) {
+    throw new Error(`protocolo de infravermelho ${protocoloFinal} não é suportado pelo firmware ESP32`);
+  }
   const registroFinal = protocoloRegistroId === null || protocoloRegistroId === undefined ? null : Number(protocoloRegistroId);
   if (registroFinal !== null && (!Number.isInteger(registroFinal) || registroFinal <= 0)) {
     throw new Error("registro de protocolo infravermelho inválido");

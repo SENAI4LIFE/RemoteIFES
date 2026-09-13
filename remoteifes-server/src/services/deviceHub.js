@@ -256,18 +256,19 @@ function registrarCaptura(sala, entrada, msg, salaRow) {
     logger.warn("device-captura-rejeitada", { sala, mac: entrada.mac, modo: entrada.modo, motivo: "fora-do-modo-clone" });
     return;
   }
-  const raw = Array.isArray(msg.raw)
-    ? msg.raw.slice(0, 1024).filter((n) => Number.isInteger(n) && n >= 0 && n <= 65535)
-    : [];
-  if (!raw.length) {
-    logger.warn("device-captura-rejeitada", { sala, mac: entrada.mac, motivo: "raw-invalido" });
+  let raw;
+  try {
+    raw = protocolosIr().validarRaw(msg.raw);
+  } catch (erro) {
+    logger.warn("device-captura-rejeitada", { sala, mac: entrada.mac, motivo: "raw-invalido", detalhe: erro.message });
     return;
   }
+  const protocolId = Number.isInteger(msg.protocolId) && msg.protocolId >= 0 ? msg.protocolId : null;
   const captura = {
     id: proximoIdCaptura++,
     sala,
-    isKnown: !!msg.isKnown,
-    protocolId: Number.isInteger(msg.protocolId) && msg.protocolId >= 0 ? msg.protocolId : null,
+    isKnown: !!msg.isKnown && protocolosIr().protocoloNativoSuportado(protocolId),
+    protocolId,
     protocol: typeof msg.protocol === "string" ? msg.protocol.slice(0, 80) : null,
     hex: typeof msg.hex === "string" ? msg.hex.slice(0, 4096) : null,
     raw,

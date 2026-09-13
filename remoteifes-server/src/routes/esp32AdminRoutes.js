@@ -220,6 +220,9 @@ router.post("/admin/esp32/:sala/teste/estado", exigirSalaCadastrada, exigirDispo
   if (!Number.isInteger(protocol)) {
     return res.status(400).json({ ok: false, erro: "protocol inválido" });
   }
+  if (!require("../services/protocolosIrService").protocoloNativoSuportado(protocol)) {
+    return res.status(400).json({ ok: false, erro: `protocol ${protocol} não é suportado pelo firmware ESP32` });
+  }
   const limites = require("../services/configuracoesService").limitesEfetivosDaSala(req.salaRow);
   if (typeof temp !== "number" || !Number.isFinite(temp) || temp < limites.minima || temp > limites.maxima) {
     return res.status(400).json({ ok: false, erro: `temp deve estar entre ${limites.minima} e ${limites.maxima}` });

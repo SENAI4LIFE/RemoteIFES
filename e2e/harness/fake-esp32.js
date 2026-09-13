@@ -148,7 +148,7 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5, firmware = "4.0.
       return enviar({
         tipo: "captura",
         isKnown: captura.isKnown !== false,
-        protocolId: Number.isInteger(captura.protocolId) ? captura.protocolId : 1,
+        protocolId: Number.isInteger(captura.protocolId) ? captura.protocolId : 15,
         protocol: captura.protocol || "COOLIX",
         hex: captura.hex || "0xB2BF40",
         raw: captura.raw || [4400, 4400, 550, 1600, 550, 550, 550, 1600, 550, 550],

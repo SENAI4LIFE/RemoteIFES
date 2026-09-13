@@ -94,14 +94,29 @@ const Graficos = (() => {
     return [];
   }
 
+  function assinaturaTipografia(el) {
+    const estilo = getComputedStyle(el);
+    return `${escalaFonte()}|${estilo.fontFamily}|${estilo.fontSize}|${estilo.letterSpacing}|${estilo.fontWeight}`;
+  }
+
+  function redesenharTodos() {
+    registro.forEach((item, el) => redesenharSeMudou(el, item));
+  }
+
   function garantirObservador() {
-    if (observador || typeof ResizeObserver === "undefined") {
-      if (!observador && !janelaOuvida) {
-        janelaOuvida = true;
-        window.addEventListener("resize", () => registro.forEach((item, el) => redesenharSeMudou(el, item)));
+    if (!janelaOuvida) {
+      janelaOuvida = true;
+      if (typeof ResizeObserver === "undefined") window.addEventListener("resize", redesenharTodos);
+      if (typeof MutationObserver !== "undefined") {
+        const tipografia = new MutationObserver(redesenharTodos);
+        tipografia.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
+        if (document.body) tipografia.observe(document.body, { attributes: true, attributeFilter: ["style", "class"] });
       }
-      return;
+      if (document.fonts && typeof document.fonts.addEventListener === "function") {
+        document.fonts.addEventListener("loadingdone", redesenharTodos);
+      }
     }
+    if (observador || typeof ResizeObserver === "undefined") return;
     observador = new ResizeObserver((entradas) => {
       entradas.forEach((entrada) => {
         const item = registro.get(entrada.target);
@@ -112,8 +127,11 @@ const Graficos = (() => {
 
   function redesenharSeMudou(el, item) {
     const largura = el.getBoundingClientRect().width;
-    if (largura <= 0 || Math.abs(largura - item.largura) < 2) return;
+    if (largura <= 0) return;
+    const tipografia = assinaturaTipografia(el);
+    if (Math.abs(largura - item.largura) < 2 && tipografia === item.tipografia) return;
     item.largura = largura;
+    item.tipografia = tipografia;
     if (item.agendado) return;
     item.agendado = true;
     requestAnimationFrame(() => {
@@ -128,9 +146,10 @@ const Graficos = (() => {
     if (existente) {
       existente.desenhar = desenhar;
       existente.largura = container.getBoundingClientRect().width;
+      existente.tipografia = assinaturaTipografia(container);
       return;
     }
-    registro.set(container, { desenhar, largura: container.getBoundingClientRect().width, agendado: false });
+    registro.set(container, { desenhar, largura: container.getBoundingClientRect().width, tipografia: assinaturaTipografia(container), agendado: false });
     if (observador) observador.observe(container);
   }
 
@@ -189,10 +208,12 @@ const Graficos = (() => {
     const plot = refs.plot;
     plot.setAttribute("aria-label", `${refs.container.querySelector(".gr-titulo").textContent}: use as setas do teclado para percorrer os valores`);
     let atual = -1;
+    const guardar = () => { plot.dataset.grIndice = String(atual); };
     const aplicar = (i) => {
       if (total <= 0) return;
       atual = Math.max(0, Math.min(total - 1, i));
       selecionar(atual);
+      guardar();
     };
     plot.onkeydown = (ev) => {
       const avancar = eixo === "y" ? ["ArrowDown"] : ["ArrowRight", "ArrowUp"];
@@ -201,10 +222,14 @@ const Graficos = (() => {
       else if (recuar.includes(ev.key)) { aplicar(atual < 0 ? total - 1 : atual - 1); ev.preventDefault(); }
       else if (ev.key === "Home") { aplicar(0); ev.preventDefault(); }
       else if (ev.key === "End") { aplicar(total - 1); ev.preventDefault(); }
-      else if (ev.key === "Escape") { atual = -1; selecionar(-1); }
+      else if (ev.key === "Escape") { atual = -1; selecionar(-1); guardar(); }
     };
     plot.onfocus = () => { if (atual < 0 && total > 0) aplicar(total - 1); };
-    return { definir: (i) => { atual = i; } };
+    const anterior = Number(plot.dataset.grIndice);
+    if (document.activeElement === plot && Number.isInteger(anterior) && anterior >= 0 && total > 0) {
+      Promise.resolve().then(() => { if (document.activeElement === plot) aplicar(anterior); });
+    }
+    return { definir: (i) => { atual = i; guardar(); } };
   }
 
   function baseSvg(largura, altura) {

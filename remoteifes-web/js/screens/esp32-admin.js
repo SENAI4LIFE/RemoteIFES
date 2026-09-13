@@ -15,6 +15,7 @@ const Esp32Admin = (() => {
   let pararOuvirMensagens = null;
   let pararOuvirConexao = null;
   let intervaloAtualizacao = null;
+  let aberto = false;
   let carregando = false;
   let manifestoFirmware = null;
 
@@ -632,13 +633,16 @@ const Esp32Admin = (() => {
 
   async function aoAbrir() {
     if (!state.isSuperAdmin) return;
+    aberto = true;
     if (!pararOuvirMensagens) pararOuvirMensagens = ServerStatus.aoMensagem(aoMensagemWs);
     if (!pararOuvirConexao) pararOuvirConexao = ServerStatus.aoConectar(observarTodasAsSalas);
     await carregar();
+    if (!aberto) return;
     if (!intervaloAtualizacao) intervaloAtualizacao = setInterval(carregar, 20000);
   }
 
   function aoFechar() {
+    aberto = false;
     ServerStatus.enviar({ tipo: "observar_dispositivos", salas: [] });
     if (intervaloAtualizacao) {
       clearInterval(intervaloAtualizacao);
