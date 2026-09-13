@@ -44,6 +44,7 @@ function autenticar(req) {
     }
     sala = resultado.sala;
     viaCredencial = true;
+    req.credencialGrace = resultado.grace ? resultado.expiraEm : null;
   } else if (typeof salaHeader === "string" && salaHeader) {
     sala = salaHeader;
   }
@@ -370,6 +371,7 @@ function iniciar(server) {
       ultimoComando: null,
       failsafe: null,
       capacidades: {},
+      credencialExpiraEm: req.credencialGrace || null,
       sincronizacaoInicial: null,
       estadoInicialSincronizado: false,
     };
@@ -398,6 +400,13 @@ function iniciar(server) {
     }
     entrada.sincronizacaoInicial = setTimeout(() => sincronizarEstadoInicial(sala, entrada, null), ESPERA_INFO_INICIAL_MS);
     entrada.sincronizacaoInicial.unref();
+    if (viaCredencial && !entrada.credencialExpiraEm) {
+      try {
+        require("./esp32CredenciaisService").entregarPendente(sala);
+      } catch (erro) {
+        logger.warn("device-ws-credencial-pendente-falhou", { sala, mensagem: erro.message });
+      }
+    }
     try {
       ws.send(JSON.stringify(require("./configuracoesService").politicaApDispositivo()));
     } catch (erro) {
@@ -496,7 +505,8 @@ function iniciar(server) {
   });
 
   intervaloPing = setInterval(() => {
-    conexoes.forEach((entrada) => {
+    conexoes.forEach((entrada, sala) => {
+      if (encerrarSeCredencialExpirou(sala, entrada)) return;
       if (!entrada.ws.isAlive) {
         entrada.ws.terminate();
         return;
@@ -506,6 +516,25 @@ function iniciar(server) {
     });
   }, PING_MS);
   intervaloPing.unref();
+}
+
+function encerrarSeCredencialExpirou(sala, entrada) {
+  if (!entrada.credencialExpiraEm) return false;
+  const expiraMs = new Date(entrada.credencialExpiraEm).getTime();
+  if (!Number.isFinite(expiraMs) || expiraMs > Date.now()) return false;
+  logger.info("device-ws-credencial-anterior-expirou", { sala });
+  try {
+    entrada.ws.close(4001, "credencial anterior expirou; reconecte com a credencial atual");
+  } catch (erro) {}
+  return true;
+}
+
+function encerrarCredenciaisExpiradas() {
+  let encerradas = 0;
+  conexoes.forEach((entrada, sala) => {
+    if (encerrarSeCredencialExpirou(sala, entrada)) encerradas += 1;
+  });
+  return encerradas;
 }
 
 function encerrar() {
@@ -539,6 +568,7 @@ module.exports = {
   capturaRecente,
   limparCapturas,
   enviarAtualizacaoCredencial,
+  encerrarCredenciaisExpiradas,
   difundirPoliticaAp,
   dispositivoConectado,
   desconectarSala,

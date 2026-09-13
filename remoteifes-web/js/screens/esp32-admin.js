@@ -74,6 +74,7 @@ const Esp32Admin = (() => {
     let badge;
     if (!c.provisionado) badge = `<span class="esp32-conn-badge off">sem credencial (só MAC)</span>`;
     else if (c.revogado) badge = `<span class="esp32-conn-badge off">credencial revogada</span>`;
+    else if (c.rotacaoPendente) badge = `<span class="esp32-conn-badge modo">${c.pendenteEntregueEm ? "rotação entregue, aguardando a placa confirmar" : c.pendenteReentregavel ? "rotação pendente: será entregue quando a placa conectar" : "rotação pendente não entregue: rotacione de novo com a placa conectada"}</span>`;
     else if (c.graceRotacaoAtivo) badge = `<span class="esp32-conn-badge modo">rotação: tolerância ativa</span>`;
     else badge = `<span class="esp32-conn-badge on">credencial ativa</span>`;
 
@@ -248,7 +249,7 @@ const Esp32Admin = (() => {
     if (credRotBtn) credRotBtn.addEventListener("click", async () => {
       const ok = await Dialog.confirmar({
         titulo: "Rotacionar credencial",
-        mensagem: `Gerar um novo segredo para a sala ${d.sala}? O segredo anterior continua válido por 24 h para dar tempo do dispositivo migrar.`,
+        mensagem: `Gerar um novo segredo para a sala ${d.sala}? O segredo atual continua valendo até o dispositivo se conectar com o novo; só então o anterior entra em tolerância de 24 h. Se a placa estiver offline agora, o novo segredo é entregue quando ela reconectar (enquanto o servidor não reiniciar).`,
         confirmarTexto: "Rotacionar",
       });
       if (!ok) return;

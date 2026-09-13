@@ -292,6 +292,7 @@ function criarSchema() {
   migrarColunasSalas();
   migrarColunasProtocolosIr();
   migrarColunasMonitoramentoHoras();
+  migrarColunasEspCredenciais();
   removerTabelasObsoletas();
   criarIndices();
 }
@@ -300,6 +301,13 @@ const MEDIDAS_MONITORAMENTO = [
   "rssMB", "cpuPercent", "carga1", "bancoMs", "bancoBytes", "walBytes",
   "discoLivreBytes", "discoTotalBytes", "espComMac", "espOnline", "espWs",
 ];
+
+function migrarColunasEspCredenciais() {
+  const colunas = db.prepare(`PRAGMA table_info(esp_credenciais)`).all().map((c) => c.name);
+  for (const [coluna, tipo] of [["segredoHashPendente", "TEXT"], ["pendenteCriadoEm", "TEXT"], ["pendenteEntregueEm", "TEXT"]]) {
+    if (!colunas.includes(coluna)) db.exec(`ALTER TABLE esp_credenciais ADD COLUMN ${coluna} ${tipo}`);
+  }
+}
 
 function migrarColunasMonitoramentoHoras() {
   const colunas = db.prepare(`PRAGMA table_info(monitoramento_horas)`).all().map((c) => c.name);
