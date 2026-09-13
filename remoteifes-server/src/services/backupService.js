@@ -202,7 +202,39 @@ function removerLaterais(destinoBanco) {
   }
 }
 
-function restaurarBackup(arquivo, { destino = CAMINHO_DB, dirSeguranca = DIR_BACKUPS } = {}) {
+function diagnosticarBancoAtual(destino) {
+  let conexao;
+  try {
+    conexao = new DatabaseSync(destino, { readOnly: true });
+  } catch (erro) {
+    return { abre: false, integro: false, mensagem: erro.message };
+  }
+  try {
+    const linhas = conexao.prepare("PRAGMA integrity_check").all();
+    const integro = linhas.length === 1 && linhas[0].integrity_check === "ok";
+    return { abre: true, integro, mensagem: integro ? "ok" : linhas.map((l) => l.integrity_check).join("; ") };
+  } catch (erro) {
+    return { abre: true, integro: false, mensagem: erro.message };
+  } finally {
+    conexao.close();
+  }
+}
+
+function quarentenarBancoDanificado(destino) {
+  const sufixo = `.corrompido-${carimboDeData()}-${tokenUnico()}`;
+  const movidos = {};
+  for (const [chave, lateral] of [["banco", ""], ["wal", "-wal"], ["shm", "-shm"]]) {
+    const origem = `${destino}${lateral}`;
+    if (!fs.existsSync(origem)) continue;
+    const alvo = `${destino}${sufixo}${lateral}`;
+    fs.renameSync(origem, alvo);
+    movidos[chave] = alvo;
+  }
+  fsyncCaminho(path.dirname(destino));
+  return movidos;
+}
+
+function restaurarBackup(arquivo, { destino = CAMINHO_DB, dirSeguranca = DIR_BACKUPS, quarentenarDanificado = false } = {}) {
   if (destino === ":memory:") {
     throw new Error("não é possível restaurar sobre um banco em memória");
   }
@@ -214,17 +246,30 @@ function restaurarBackup(arquivo, { destino = CAMINHO_DB, dirSeguranca = DIR_BAC
   limparTemporariosOrfaos(dirSeguranca);
 
   let copiaSeguranca = null;
+  let quarentena = null;
   if (fs.existsSync(destino) && fs.statSync(destino).size > 0) {
-    copiaSeguranca = path.join(dirSeguranca, `pre-restauracao-${carimboDeData()}-${tokenUnico()}${SUFIXO}`);
-    try {
-      snapshotDoBancoAtual(destino, copiaSeguranca);
-      fs.chmodSync(copiaSeguranca, 0o600);
-    } catch (erro) {
-      fs.rmSync(copiaSeguranca, { force: true });
-      throw new Error(
-        `não foi possível criar uma cópia de segurança verificada do banco atual (${erro.message}); ` +
-          "restauração abortada. Confirme que o servidor está parado e tente novamente."
-      );
+    const diagnostico = diagnosticarBancoAtual(destino);
+    if (!diagnostico.integro) {
+      if (!quarentenarDanificado) {
+        throw new Error(
+          `o banco atual não passou na verificação de integridade (${diagnostico.mensagem}); restauração abortada. ` +
+            "Os arquivos atuais não foram tocados. Para movê-los para quarentena e instalar o backup, use a recuperação com quarentena (--recuperar-corrompido)."
+        );
+      }
+      quarentena = quarentenarBancoDanificado(destino);
+      logger.warn("banco-corrompido-quarentenado", { diagnostico: diagnostico.mensagem, arquivos: Object.values(quarentena).map((a) => path.basename(a)) });
+    } else {
+      copiaSeguranca = path.join(dirSeguranca, `pre-restauracao-${carimboDeData()}-${tokenUnico()}${SUFIXO}`);
+      try {
+        snapshotDoBancoAtual(destino, copiaSeguranca);
+        fs.chmodSync(copiaSeguranca, 0o600);
+      } catch (erro) {
+        fs.rmSync(copiaSeguranca, { force: true });
+        throw new Error(
+          `não foi possível criar uma cópia de segurança verificada do banco atual (${erro.message}); ` +
+            "restauração abortada. Confirme que o servidor está parado e tente novamente."
+        );
+      }
     }
   }
 
@@ -274,8 +319,9 @@ function restaurarBackup(arquivo, { destino = CAMINHO_DB, dirSeguranca = DIR_BAC
   logger.info("backup-restaurado", {
     origem: path.basename(origem),
     copiaSeguranca: copiaSeguranca ? path.basename(copiaSeguranca) : null,
+    quarentena: quarentena ? Object.values(quarentena).map((a) => path.basename(a)) : null,
   });
-  return { destino, copiaSeguranca };
+  return { destino, copiaSeguranca, quarentena };
 }
 
 function podarPreRestauracao(dir = DIR_BACKUPS) {
@@ -288,6 +334,7 @@ module.exports = {
   criarBackup,
   restaurarBackup,
   verificarArquivoBackup,
+  diagnosticarBancoAtual,
   listarBackups,
   rotacionar,
   normalizarInteiro,

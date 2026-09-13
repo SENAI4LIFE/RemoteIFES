@@ -232,24 +232,32 @@ function calcular(metricaPedida, periodoPedido) {
   const { metrica, periodo } = normalizar(metricaPedida, periodoPedido);
   const definicao = METRICAS[metrica];
   const horas = PERIODOS[periodo].horas;
-  const janelaSegundos = horas * 3600;
 
   const { inicio, fim } = db
     .prepare("SELECT datetime('now', ?) inicio, datetime('now') fim")
     .get(`-${horas} hours`);
 
+  const retencaoDias = diasRetencaoConectividade();
+  const excedeRetencao = definicao.fonte.includes("esp_indisponibilidades") && horas / 24 > retencaoDias;
+  const proporcional = metrica === "disponibilidade" || metrica === "indisponibilidade";
+  const horasEfetivas = excedeRetencao && proporcional ? retencaoDias * 24 : horas;
+  const inicioConectividade = horasEfetivas === horas
+    ? inicio
+    : db.prepare("SELECT datetime('now', ?) inicio").get(`-${horasEfetivas} hours`).inicio;
+  const janelaConectividadeSegundos = horasEfetivas * 3600;
+
   const salas = salasBase();
   // As duas consultas de conectividade servem tanto ao valor quanto ao detalhe do tooltip.
   const precisaConectividade = definicao.exigeDispositivo;
-  const offlinePorSala = precisaConectividade ? segundosOfflinePorSala(inicio, fim) : new Map();
+  const offlinePorSala = precisaConectividade ? segundosOfflinePorSala(inicioConectividade, fim) : new Map();
   const quedasPorSala = precisaConectividade
     ? contagemPorSala(
         "SELECT sala, COUNT(*) n FROM esp_indisponibilidades WHERE offlineEm >= ? AND offlineEm < ? GROUP BY sala",
-        inicio,
+        inicioConectividade,
         fim
       )
     : new Map();
-  const valorDe = agregar(metrica, inicio, fim, janelaSegundos, offlinePorSala, quedasPorSala);
+  const valorDe = agregar(metrica, inicioConectividade, fim, janelaConectividadeSegundos, offlinePorSala, quedasPorSala);
 
   let minimo = null;
   let maximo = null;
@@ -267,13 +275,10 @@ function calcular(metricaPedida, periodoPedido) {
     if (precisaConectividade && !semDispositivo) {
       const offline = offlinePorSala.get(s.sala);
       item.quedas = quedasPorSala.get(s.sala) || 0;
-      item.minutosOffline = Math.round(Math.min(offline ? offline.segundos : 0, janelaSegundos) / 60);
+      item.minutosOffline = Math.round(Math.min(offline ? offline.segundos : 0, janelaConectividadeSegundos) / 60);
     }
     return item;
   });
-
-  const retencaoDias = diasRetencaoConectividade();
-  const excedeRetencao = definicao.fonte.includes("esp_indisponibilidades") && horas / 24 > retencaoDias;
 
   return {
     metrica,
@@ -284,13 +289,15 @@ function calcular(metricaPedida, periodoPedido) {
     unidade: definicao.unidade,
     casas: definicao.casas,
     maiorEhPior: definicao.maiorEhPior,
-    janela: { inicio, fim, horas },
+    janela: { inicio, fim, horas, horasEfetivas, inicioEfetivo: inicioConectividade },
     minimo,
     maximo,
     comDados,
     total: lista.length,
     avisoRetencao: excedeRetencao
-      ? `O histórico de conectividade é mantido por ${retencaoDias} dia(s); o período selecionado cobre apenas esse trecho.`
+      ? (proporcional
+        ? `O histórico de conectividade é mantido por ${retencaoDias} dia(s); os valores cobrem apenas as últimas ${horasEfetivas} h, não o período inteiro.`
+        : `O histórico de conectividade é mantido por ${retencaoDias} dia(s); o período selecionado cobre apenas esse trecho.`)
       : null,
     salas: lista,
   };

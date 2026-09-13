@@ -428,20 +428,26 @@ function capitalizar(texto) {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+function colunaContagem(coluna) {
+  return `${coluna}Amostras`;
+}
+
 function colunasHora() {
   const colunas = [];
   for (const m of MEDIDAS) {
     colunas.push(m.coluna);
     for (const extra of m.extras) colunas.push(`${m.coluna}${capitalizar(extra)}`);
+    colunas.push(colunaContagem(m.coluna));
   }
   return [...colunas, ...Object.keys(CONTADORES_AMOSTRADOS)];
 }
 
-function agregacoesAmostras() {
+function agregacoesAmostras(comContagens = false) {
   const partes = [];
   for (const m of MEDIDAS) {
     partes.push(`AVG(${m.coluna}) ${m.coluna}`);
     for (const extra of m.extras) partes.push(`${extra.toUpperCase()}(${m.coluna}) ${m.coluna}${capitalizar(extra)}`);
+    if (comContagens) partes.push(`COUNT(${m.coluna}) ${colunaContagem(m.coluna)}`);
   }
   for (const coluna of Object.keys(CONTADORES_AMOSTRADOS)) partes.push(`SUM(${coluna}) ${coluna}`);
   return partes.join(", ");
@@ -450,7 +456,8 @@ function agregacoesAmostras() {
 function agregacoesHoras() {
   const partes = [];
   for (const m of MEDIDAS) {
-    partes.push(`SUM(${m.coluna} * amostras) / SUM(CASE WHEN ${m.coluna} IS NULL THEN 0 ELSE amostras END) ${m.coluna}`);
+    const peso = `COALESCE(${colunaContagem(m.coluna)}, amostras)`;
+    partes.push(`SUM(${m.coluna} * ${peso}) / SUM(CASE WHEN ${m.coluna} IS NULL THEN 0 ELSE ${peso} END) ${m.coluna}`);
     for (const extra of m.extras) {
       const nome = `${m.coluna}${capitalizar(extra)}`;
       partes.push(`${extra.toUpperCase()}(${nome}) ${nome}`);
@@ -472,7 +479,7 @@ function consolidarHoras() {
   const colunas = colunasHora();
   const inserir = db.prepare(`
     INSERT OR REPLACE INTO monitoramento_horas (hora, amostras, reinicios, ${colunas.join(", ")})
-    SELECT ?, COUNT(*), ?, ${agregacoesAmostras()}
+    SELECT ?, COUNT(*), ?, ${agregacoesAmostras(true)}
     FROM monitoramento_amostras WHERE criadoEm >= ? AND criadoEm < datetime(?, '+1 hour')
   `);
   for (const { hora } of pendentes) {

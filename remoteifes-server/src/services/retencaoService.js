@@ -42,7 +42,7 @@ function alvosTemporais() {
   const monitoramento = require("./monitoramentoService");
   const alvos = [
     { nome: "auditoria_eventos", sql: "DELETE FROM auditoria_eventos WHERE criadoEm < datetime('now', ?)", dias: diasHistorico },
-    { nome: "esp_indisponibilidades", sql: "DELETE FROM esp_indisponibilidades WHERE offlineEm < datetime('now', ?)", dias: diasHistorico },
+    { nome: "esp_indisponibilidades", sql: "DELETE FROM esp_indisponibilidades WHERE onlineEm IS NOT NULL AND offlineEm < datetime('now', ?)", dias: diasHistorico },
     { nome: "comandos_log", sql: "DELETE FROM comandos_log WHERE criadoEm < datetime('now', ?)", dias: DIAS_LOGS },
     { nome: "esp_eventos", sql: "DELETE FROM esp_eventos WHERE criadoEm < datetime('now', ?)", dias: DIAS_LOGS },
     { nome: "esp_acessos", sql: "DELETE FROM esp_acessos WHERE criadoEm < datetime('now', ?)", dias: DIAS_LOGS },
@@ -73,7 +73,12 @@ function aplicarLimite(tabela, limite) {
       SELECT hora FROM monitoramento_horas ORDER BY hora DESC LIMIT -1 OFFSET ?
     )`).run(limite).changes;
   }
-  const coluna = tabela === "esp_indisponibilidades" ? "offlineEm" : tabela === "agendamentos_execucoes" ? "executadoEm" : "criadoEm";
+  if (tabela === "esp_indisponibilidades") {
+    return db.prepare(`DELETE FROM esp_indisponibilidades WHERE id IN (
+      SELECT id FROM esp_indisponibilidades WHERE onlineEm IS NOT NULL ORDER BY offlineEm DESC, id DESC LIMIT -1 OFFSET ?
+    )`).run(limite).changes;
+  }
+  const coluna = tabela === "agendamentos_execucoes" ? "executadoEm" : "criadoEm";
   return db.prepare(`DELETE FROM ${tabela} WHERE id IN (
     SELECT id FROM ${tabela} ORDER BY ${coluna} DESC, id DESC LIMIT -1 OFFSET ?
   )`).run(limite).changes;
@@ -134,4 +139,4 @@ function estatisticasTabelas() {
   return cacheEstatisticas;
 }
 
-module.exports = { executarLimpezaRetencao, normalizarDiasRetencao, estatisticasTabelas, LIMITES_LINHAS, diasAuditoria };
+module.exports = { executarLimpezaRetencao, aplicarLimite, normalizarDiasRetencao, estatisticasTabelas, LIMITES_LINHAS, diasAuditoria };

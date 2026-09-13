@@ -159,7 +159,8 @@ const Heatmap = (() => {
 
   function render() {
     preencherSeletores();
-    el("heatmapDescricao").textContent = `${dados.descricao} Janela: últimas ${dados.janela.horas} h.`;
+    const horasJanela = Number.isFinite(dados.janela.horasEfetivas) ? dados.janela.horasEfetivas : dados.janela.horas;
+    el("heatmapDescricao").textContent = `${dados.descricao} Janela: últimas ${horasJanela} h.`;
     const aviso = el("heatmapAviso");
     aviso.classList.toggle("hidden", !dados.avisoRetencao);
     aviso.textContent = dados.avisoRetencao || "";

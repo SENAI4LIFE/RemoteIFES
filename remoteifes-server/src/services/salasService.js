@@ -506,37 +506,51 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   const cfg = configuracoesService.obter();
   const autoLigar = configuracoesService.autoLigarAtivo(cfg);
   let ligouAutomaticamente = false;
+  let temp = null;
 
-  if (cmd === "ligar") {
-    db.prepare(`UPDATE salas SET ligado = 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
-  } else if (cmd === "desligar") {
-    db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
-  } else if (cmd === "temperatura") {
-    const temp = Number(valor);
+  if (cmd === "temperatura") {
+    temp = Number(valor);
     const { minima, maxima } = configuracoesService.limitesEfetivosDaSala(salaRow, cfg);
     if (!Number.isFinite(temp) || temp < minima || temp > maxima) {
       throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
     }
-    ligouAutomaticamente = autoLigar && !salaRow.ligado;
-    db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
-      .run(autoLigar ? 1 : 0, temp, sala);
-  } else if (cmd === "turbo") {
-    if (typeof valor !== "boolean") throw new Error("turbo deve ser verdadeiro ou falso");
-    ligouAutomaticamente = autoLigar && valor && !salaRow.ligado;
-    db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, turboAtivo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
-      .run(autoLigar && valor ? 1 : 0, valor ? 1 : 0, sala);
+  } else if (cmd === "turbo" && typeof valor !== "boolean") {
+    throw new Error("turbo deve ser verdadeiro ou falso");
   }
 
-  if (ligouAutomaticamente) {
-    registrarLog({ usuario: usuario ? usuario.usuario : null, sala, cmd: "ligar", valor: "automatico", origem });
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    if (cmd === "ligar") {
+      db.prepare(`UPDATE salas SET ligado = 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+    } else if (cmd === "desligar") {
+      db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+    } else if (cmd === "temperatura") {
+      ligouAutomaticamente = autoLigar && !salaRow.ligado;
+      db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+        .run(autoLigar ? 1 : 0, temp, sala);
+    } else if (cmd === "turbo") {
+      ligouAutomaticamente = autoLigar && valor && !salaRow.ligado;
+      db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, turboAtivo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+        .run(autoLigar && valor ? 1 : 0, valor ? 1 : 0, sala);
+    }
+
+    if (ligouAutomaticamente) {
+      registrarLog({ usuario: usuario ? usuario.usuario : null, sala, cmd: "ligar", valor: "automatico", origem });
+    }
+    registrarLog({
+      usuario: usuario ? usuario.usuario : null,
+      sala,
+      cmd,
+      valor,
+      origem,
+    });
+    db.exec("COMMIT");
+  } catch (erro) {
+    try {
+      db.exec("ROLLBACK");
+    } catch (rollbackErro) {}
+    throw erro;
   }
-  registrarLog({
-    usuario: usuario ? usuario.usuario : null,
-    sala,
-    cmd,
-    valor,
-    origem,
-  });
 
   eventos.emit("mudanca");
   const salaAtualizada = buscar(sala);
@@ -634,7 +648,7 @@ function aplicarInicioAgendamento(sala, temperatura) {
     throw new Error(`temperatura deve estar entre ${minima} e ${maxima}`);
   }
 
-  db.exec("BEGIN");
+  db.exec("BEGIN IMMEDIATE");
   try {
     db.prepare(`UPDATE salas SET ligado = 1, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
     registrarLog({ usuario: null, sala, cmd: "ligar", valor: undefined, origem: "agendamento" });
