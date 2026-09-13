@@ -11,13 +11,14 @@ function extrairToken(req) {
 
 function exigirLogin(req, res, next) {
   const token = extrairToken(req);
-  const usuario = token ? validarToken(token) : null;
+  const cfg = token ? configuracoesService.obter() : null;
+  const usuario = token ? validarToken(token, { cfg }) : null;
 
   if (!usuario) {
     return res.status(401).json({ ok: false, erro: "não autenticado" });
   }
 
-  if (usuario.nivel < NIVEL_ADMIN && configuracoesService.modoManutencaoAtivo()) {
+  if (usuario.nivel < NIVEL_ADMIN && configuracoesService.modoManutencaoAtivo(cfg)) {
     return res.status(503).json({ ok: false, erro: "sistema em manutenção", manutencao: true });
   }
 

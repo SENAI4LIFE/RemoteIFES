@@ -5,7 +5,7 @@ const { criarLimitador } = require("../utils/rateLimiter");
 
 const router = express.Router();
 
-const limitarComando = criarLimitador({ janelaMs: 60 * 1000, maxTentativas: 60 });
+const limitarComando = criarLimitador({ janelaMs: 60 * 1000, maxTentativas: 60, chave: (req) => (req.usuario ? req.usuario.id : null) });
 
 router.post("/comando", exigirLogin, exigirPermissao("podeControlar"), limitarComando, (req, res) => {
   const { sala, cmd, valor } = req.body || {};

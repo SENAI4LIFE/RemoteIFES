@@ -5,6 +5,7 @@ const { paraEpochMs } = require("../utils/tempo");
 
 const NIVEL_ADMIN = 2;
 const SESSAO_MAX_HORAS_PADRAO = 12;
+const INTERVALO_MIN_GRAVACAO_USO_MS = 30 * 1000;
 
 function sessaoMaxHoras() {
   const valor = Number(process.env.SESSAO_MAX_HORAS || SESSAO_MAX_HORAS_PADRAO);
@@ -21,8 +22,8 @@ function gerarToken(usuarioId) {
   return token;
 }
 
-function detalhesSessao(sessao, baseInatividadeMs = Date.now()) {
-  const timeoutInatividadeMinutos = configuracoesService.timeoutEfetivoParaUsuario(sessao.nivel >= NIVEL_ADMIN);
+function detalhesSessao(sessao, baseInatividadeMs = Date.now(), cfg = null) {
+  const timeoutInatividadeMinutos = configuracoesService.timeoutEfetivoParaUsuario(sessao.nivel >= NIVEL_ADMIN, cfg);
   const expiraAbsoluta = paraEpochMs(sessao.login) + sessaoMaxHoras() * 3600000;
   const expiraInatividade = baseInatividadeMs + timeoutInatividadeMinutos * 60000;
   return {
@@ -32,42 +33,70 @@ function detalhesSessao(sessao, baseInatividadeMs = Date.now()) {
   };
 }
 
-function validarToken(token, { atualizarUso = true } = {}) {
-  const tokenHash = hashToken(token);
-  const sessao = db.prepare(`
-    SELECT s.token, s.login, s.ultimoUso, u.*
-    FROM sessoes s
-    JOIN usuarios u ON u.id = s.usuarioId
-    WHERE s.token = ? AND s.logout IS NULL AND u.ativo = 1
-  `).get(tokenHash);
+const SELECT_SESSAO = `
+  SELECT s.token AS tokenHash, s.login, s.ultimoUso, u.*
+  FROM sessoes s
+  JOIN usuarios u ON u.id = s.usuarioId
+  WHERE s.logout IS NULL AND u.ativo = 1`;
 
+function avaliarSessao(sessao, { atualizarUso, cfg }) {
   if (!sessao) return null;
+  const tokenHash = sessao.tokenHash;
+  delete sessao.tokenHash;
+  sessao.token = tokenHash;
 
   const idadeHoras = (Date.now() - paraEpochMs(sessao.login)) / 3600000;
   if (idadeHoras > sessaoMaxHoras()) {
-    removerToken(token);
+    removerTokenPorHash(tokenHash);
     return null;
   }
 
-  const timeoutMinutos = configuracoesService.timeoutEfetivoParaUsuario(sessao.nivel >= NIVEL_ADMIN);
+  const configuracoes = cfg || configuracoesService.obter();
+  const timeoutMinutos = configuracoesService.timeoutEfetivoParaUsuario(sessao.nivel >= NIVEL_ADMIN, configuracoes);
+  const ultimoUsoMs = paraEpochMs(sessao.ultimoUso);
   if (timeoutMinutos) {
-    const minutosInativo = (Date.now() - paraEpochMs(sessao.ultimoUso)) / 60000;
+    const minutosInativo = (Date.now() - ultimoUsoMs) / 60000;
     if (minutosInativo > timeoutMinutos) {
-      removerToken(token);
+      removerTokenPorHash(tokenHash);
       return null;
     }
   }
 
   const agora = Date.now();
-  if (atualizarUso) {
+  const gravarUso = atualizarUso && !(Number.isFinite(ultimoUsoMs) && agora - ultimoUsoMs < INTERVALO_MIN_GRAVACAO_USO_MS);
+  if (gravarUso) {
     db.prepare(`UPDATE sessoes SET ultimoUso = datetime('now') WHERE token = ?`).run(tokenHash);
   }
-  Object.assign(sessao, detalhesSessao(sessao, atualizarUso ? agora : paraEpochMs(sessao.ultimoUso)));
+  Object.assign(sessao, detalhesSessao(sessao, gravarUso ? agora : ultimoUsoMs, configuracoes));
   return sessao;
 }
 
+function validarToken(token, { atualizarUso = true, cfg = null } = {}) {
+  const sessao = db.prepare(`${SELECT_SESSAO} AND s.token = ?`).get(hashToken(token));
+  return avaliarSessao(sessao, { atualizarUso, cfg });
+}
+
+function validarTokens(tokens, { atualizarUso = false, cfg = null } = {}) {
+  const resultado = new Map();
+  const unicos = [...new Set(tokens.filter((t) => typeof t === "string" && t))];
+  if (!unicos.length) return resultado;
+  const configuracoes = cfg || configuracoesService.obter();
+  const porHash = new Map(unicos.map((t) => [hashToken(t), t]));
+  const hashes = [...porHash.keys()];
+  const linhas = db.prepare(`${SELECT_SESSAO} AND s.token IN (${hashes.map(() => "?").join(", ")})`).all(...hashes);
+  const encontradas = new Map(linhas.map((l) => [l.tokenHash, l]));
+  for (const [hash, token] of porHash) {
+    resultado.set(token, avaliarSessao(encontradas.get(hash) || null, { atualizarUso, cfg: configuracoes }));
+  }
+  return resultado;
+}
+
+function removerTokenPorHash(tokenHash) {
+  db.prepare(`UPDATE sessoes SET logout = datetime('now') WHERE token = ? AND logout IS NULL`).run(tokenHash);
+}
+
 function removerToken(token) {
-  db.prepare(`UPDATE sessoes SET logout = datetime('now') WHERE token = ? AND logout IS NULL`).run(hashToken(token));
+  removerTokenPorHash(hashToken(token));
 }
 
 function removerSessoesDoUsuario(usuarioId) {
@@ -158,6 +187,7 @@ function apagarHistoricoSessoes({ data } = {}) {
 module.exports = {
   gerarToken,
   validarToken,
+  validarTokens,
   removerToken,
   removerSessoesDoUsuario,
   encerrarSessoesAtivasNoInicio,

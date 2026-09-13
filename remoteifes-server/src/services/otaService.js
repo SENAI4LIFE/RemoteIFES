@@ -120,7 +120,7 @@ function lerManifesto() {
   } finally {
     fs.closeSync(fd);
   }
-  const hashReal = sha256Arquivo(arquivoBin);
+  const hashReal = sha256ArquivoMemorizado(arquivoBin, stat);
   if (!crypto.timingSafeEqual(Buffer.from(hashReal, "hex"), Buffer.from(manifesto.sha256, "hex"))) {
     logger.warn("ota-manifesto-hash-divergente", { arquivo: manifesto.arquivo });
     return null;
@@ -134,10 +134,25 @@ function caminhoBinPublicado() {
   return path.join(DIR_FIRMWARE, manifesto.arquivo);
 }
 
+const hashesMemorizados = new Map();
+
 function sha256Arquivo(arquivo) {
   const hash = crypto.createHash("sha256");
   hash.update(fs.readFileSync(arquivo));
   return hash.digest("hex");
+}
+
+function sha256ArquivoMemorizado(arquivo, stat) {
+  const identidade = `${stat.size}:${stat.mtimeMs}:${stat.ino}`;
+  const guardado = hashesMemorizados.get(arquivo);
+  if (guardado && guardado.identidade === identidade) return guardado.sha256;
+  const sha256 = sha256Arquivo(arquivo);
+  hashesMemorizados.set(arquivo, { identidade, sha256 });
+  return sha256;
+}
+
+function esquecerHashes() {
+  hashesMemorizados.clear();
 }
 
 function publicarFirmware({ origem, versao, notas } = {}) {
@@ -182,6 +197,7 @@ function publicarFirmware({ origem, versao, notas } = {}) {
   const manifestoTmp = `${ARQUIVO_MANIFESTO}.tmp`;
   fs.writeFileSync(manifestoTmp, JSON.stringify(manifesto, null, 2), { mode: 0o600 });
   fs.renameSync(manifestoTmp, ARQUIVO_MANIFESTO);
+  esquecerHashes();
 
   for (const nome of fs.readdirSync(dir)) {
     if (nome.startsWith("firmware-") && nome.endsWith(".bin") && nome !== nomeBin) {
@@ -431,6 +447,7 @@ module.exports = {
   MAX_SIMULTANEOS: OTA_MAX_SIMULTANEOS,
   publicarFirmware,
   lerManifesto,
+  esquecerHashes,
   caminhoBinPublicado,
   compararVersoes,
   ofertar,

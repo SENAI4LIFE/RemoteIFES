@@ -222,6 +222,36 @@ function usuarioTemAcessoSala(usuarioId, sala) {
   return !!registro;
 }
 
+function salasComAcessoDoUsuario(usuarioId) {
+  return new Set(db.prepare(`SELECT sala FROM sala_acessos WHERE usuarioId = ?`).all(usuarioId).map((r) => r.sala));
+}
+
+function contextoBroadcast() {
+  const cfg = configuracoesService.obter();
+  const salas = listar({});
+  const porSala = new Map(salas.map((s) => [s.sala, s]));
+  const agendadas = require("./agendamentosService").salasComAgendamentoAtivo();
+  const acessos = new Map();
+  return {
+    cfg,
+    salas,
+    agendadas,
+    sala: (codigo) => porSala.get(codigo) || null,
+    bloqueio: (codigo) => agendadas[codigo] || null,
+    acessosDe(usuarioId) {
+      if (!acessos.has(usuarioId)) acessos.set(usuarioId, salasComAcessoDoUsuario(usuarioId));
+      return acessos.get(usuarioId);
+    },
+    precarregarAcessos(usuarioIds) {
+      const pendentes = [...new Set(usuarioIds.filter((id) => Number.isInteger(id) && !acessos.has(id)))];
+      if (!pendentes.length) return;
+      for (const id of pendentes) acessos.set(id, new Set());
+      const linhas = db.prepare(`SELECT usuarioId, sala FROM sala_acessos WHERE usuarioId IN (${pendentes.map(() => "?").join(", ")})`).all(...pendentes);
+      for (const linha of linhas) acessos.get(linha.usuarioId).add(linha.sala);
+    },
+  };
+}
+
 function listarDonos(sala) {
   return db.prepare(`
     SELECT u.id, u.usuario, u.nome
@@ -267,16 +297,16 @@ function listarSalasDeDono(usuarioId) {
   return linhas.map((s) => ({ ...s, acessoRestrito: !!s.acessoRestrito }));
 }
 
-function usuarioPodeControlarSala(usuario, sala) {
+function usuarioPodeControlarSala(usuario, sala, contexto = null) {
   if (!usuario) return false;
   if (usuario.isAdmin) return true;
   if (!usuario.podeControlar) return false;
 
-  const salaRow = buscar(sala);
+  const salaRow = contexto ? contexto.sala(sala) : buscar(sala);
   if (!salaRow) return false;
   if (!salaRow.acessoRestrito) return true;
 
-  return usuarioTemAcessoSala(usuario.id, sala);
+  return contexto ? contexto.acessosDe(usuario.id).has(sala) : usuarioTemAcessoSala(usuario.id, sala);
 }
 
 function definirLimitesTemperatura(sala, { minima, maxima }) {
@@ -391,16 +421,16 @@ function bloqueioAtivo(sala) {
   return null;
 }
 
-function statusCompleto(sala, requisitante) {
-  const salaRow = buscar(sala);
+function statusCompleto(sala, requisitante, contexto = null) {
+  const salaRow = contexto ? contexto.sala(sala) : buscar(sala);
   if (!salaRow) return null;
 
-  const bloqueio = bloqueioAtivo(sala);
+  const bloqueio = contexto ? contexto.bloqueio(sala) : bloqueioAtivo(sala);
   const travadaParaMim = !!bloqueio
     && bloqueio.usuarioId !== requisitante.id
     && !requisitante.isAdmin;
 
-  const cfg = configuracoesService.obter();
+  const cfg = contexto ? contexto.cfg : configuracoesService.obter();
   const limites = configuracoesService.limitesEfetivosDaSala(salaRow, cfg);
 
   return {
@@ -415,7 +445,7 @@ function statusCompleto(sala, requisitante) {
     turboAtivo: !!salaRow.turboAtivo,
     autoLigar: configuracoesService.autoLigarAtivo(cfg),
     acessoRestrito: !!salaRow.acessoRestrito,
-    podeControlarEsta: usuarioPodeControlarSala(requisitante, sala),
+    podeControlarEsta: usuarioPodeControlarSala(requisitante, sala, contexto),
     bloqueio: bloqueio
       ? {
           usuarioNome: bloqueio.usuarioNome,
@@ -552,9 +582,9 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
     throw erro;
   }
 
-  eventos.emit("mudanca");
   const salaAtualizada = buscar(sala);
   enviarEstadoIRParaDispositivo(salaAtualizada);
+  eventos.emit("mudanca");
 
   return {
     ...salaAtualizada,
@@ -735,6 +765,8 @@ module.exports = {
   revogarAcesso,
   usuarioTemAcessoSala,
   usuarioPodeControlarSala,
+  salasComAcessoDoUsuario,
+  contextoBroadcast,
   listarDonos,
   concederDono,
   revogarDono,
