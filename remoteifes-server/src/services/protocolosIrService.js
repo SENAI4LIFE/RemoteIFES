@@ -4,6 +4,7 @@ const logger = require("../utils/logger");
 const CHAVE_CLONADOR = "espClonador";
 const MAX_RAW = 1024;
 const MAX_PULSO = 65535;
+const MAX_RAW_DURACAO_US = 2000000;
 const CARRIER_PADRAO = 38000;
 const CARRIER_MIN = 20000;
 const CARRIER_MAX = 60000;
@@ -47,6 +48,9 @@ function validarRaw(raw) {
   }
   if (!raw.every((n) => Number.isInteger(n) && n >= 0 && n <= MAX_PULSO)) {
     throw new Error(`raw deve conter apenas inteiros entre 0 e ${MAX_PULSO}`);
+  }
+  if (raw.reduce((soma, n) => soma + n, 0) > MAX_RAW_DURACAO_US) {
+    throw new Error(`raw excede a duração máxima de ${MAX_RAW_DURACAO_US / 1000} ms`);
   }
   return raw;
 }
@@ -304,5 +308,6 @@ module.exports = {
   PROTOCOLOS_NATIVOS_SUPORTADOS,
   normalizarLabel,
   MAX_RAW,
+  MAX_RAW_DURACAO_US,
   CARRIER_PADRAO,
 };

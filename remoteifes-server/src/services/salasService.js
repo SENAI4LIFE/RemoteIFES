@@ -620,6 +620,24 @@ function apagarLogs({ data } = {}) {
   }
 }
 
+function adotarDesligamentoLocal(sala) {
+  const salaRow = buscar(sala);
+  if (!salaRow) throw new Error("sala não encontrada");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+    registrarLog({ usuario: null, sala, cmd: "failsafe_off_local", valor: "mantido_na_reconexao", origem: "esp32_local" });
+    db.exec("COMMIT");
+  } catch (erro) {
+    try {
+      db.exec("ROLLBACK");
+    } catch (rollbackErro) {}
+    throw erro;
+  }
+  if (salaRow.ligado || salaRow.turboAtivo) eventos.emit("mudanca");
+  return buscar(sala);
+}
+
 function registrarVersaoFirmware(sala, fw) {
   if (typeof fw !== "string" || !fw || fw.length > 32) return;
   db.prepare(`UPDATE salas SET fwVersao = ?, atualizadoEm = datetime('now') WHERE sala = ? AND (fwVersao IS NULL OR fwVersao != ?)`).run(fw, sala, fw);
@@ -746,6 +764,7 @@ module.exports = {
   listarEventosEsp,
   registrarComandoDispositivo,
   registrarVersaoFirmware,
+  adotarDesligamentoLocal,
   registrarAcessoEsp,
   listarAcessosEsp,
   apagarAcessosEsp,

@@ -6,6 +6,7 @@ const monitoramentoService = require("./monitoramentoService");
 const PING_MS = 15 * 1000;
 const MAX_CAPTURAS_ARMAZENADAS = 20;
 const MAX_PAYLOAD_BYTES = 256 * 1024;
+const ESPERA_INFO_INICIAL_MS = 3000;
 const MAX_MENSAGENS_JANELA = 120;
 const JANELA_MENSAGENS_MS = 10 * 1000;
 const MODOS_VALIDOS = new Set(["operation", "config_idle", "config_clone"]);
@@ -209,9 +210,36 @@ function atualizarFailsafeReportado(entrada, msg) {
     pulsos: configurado && Number.isInteger(pulsos) && pulsos > 0 && pulsos <= 1024 ? pulsos : 0,
     carrierHz: configurado && Number.isInteger(carrierHz) && carrierHz >= 20000 && carrierHz <= 60000 ? carrierHz : null,
     protocolRecordId: configurado && Number.isInteger(protocolRecordId) && protocolRecordId > 0 ? protocolRecordId : null,
+    latched: msg.failsafeLatched === true,
     atualizadoEm: new Date().toISOString(),
   };
   return true;
+}
+
+function sincronizarEstadoInicial(sala, entrada, info) {
+  if (entrada.sincronizacaoInicial) {
+    clearTimeout(entrada.sincronizacaoInicial);
+    entrada.sincronizacaoInicial = null;
+  }
+  if (entrada.estadoInicialSincronizado || conexoes.get(sala) !== entrada || entrada.ws.readyState !== entrada.ws.OPEN) return;
+  entrada.estadoInicialSincronizado = true;
+  if (info && info.failsafeLatched === true) {
+    try {
+      salasService.adotarDesligamentoLocal(sala);
+    } catch (erro) {
+      logger.warn("device-ws-failsafe-latch-adotar-falhou", { sala, mensagem: erro.message });
+    }
+    logger.info("device-ws-failsafe-latch", { sala });
+    return;
+  }
+  const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
+  if (comandoInicial) {
+    try {
+      entrada.ws.send(JSON.stringify(comandoInicial));
+    } catch (erro) {
+      logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
+    }
+  }
 }
 
 function registrarTelemetria(sala, entrada, msg) {
@@ -337,6 +365,8 @@ function iniciar(server) {
       ultimaTelemetria: null,
       ultimoComando: null,
       failsafe: null,
+      sincronizacaoInicial: null,
+      estadoInicialSincronizado: false,
     };
     conexoes.set(sala, entrada);
     ws.isAlive = true;
@@ -361,8 +391,8 @@ function iniciar(server) {
     } catch (erro) {
       logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
     }
-    const comandoInicial = salasService.comandoEstadoIR(salaInicial);
-    if (comandoInicial) ws.send(JSON.stringify(comandoInicial));
+    entrada.sincronizacaoInicial = setTimeout(() => sincronizarEstadoInicial(sala, entrada, null), ESPERA_INFO_INICIAL_MS);
+    entrada.sincronizacaoInicial.unref();
     try {
       ws.send(JSON.stringify(require("./configuracoesService").politicaApDispositivo()));
     } catch (erro) {
@@ -400,6 +430,7 @@ function iniciar(server) {
       } else if (msg.tipo === "info") {
         registrarVersaoFirmware(sala, entrada, msg.fw);
         atualizarFailsafeReportado(entrada, msg);
+        sincronizarEstadoInicial(sala, entrada, msg);
       } else if (msg.tipo === "failsafe_status") {
         if (atualizarFailsafeReportado(entrada, msg)) eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
       } else if (msg.tipo === "ota_progresso") {
@@ -427,6 +458,10 @@ function iniciar(server) {
     });
 
     ws.on("close", (code, motivo) => {
+      if (entrada.sincronizacaoInicial) {
+        clearTimeout(entrada.sincronizacaoInicial);
+        entrada.sincronizacaoInicial = null;
+      }
       if (conexoes.get(sala) === entrada) {
         conexoes.delete(sala);
         logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString() });

@@ -208,6 +208,11 @@ router.post("/admin/esp32/:sala/teste/raw", exigirSalaCadastrada, exigirDisposit
   if (!raw.every((n) => Number.isInteger(n) && n >= 0 && n <= 65535)) {
     return res.status(400).json({ ok: false, erro: "raw deve conter apenas inteiros entre 0 e 65535" });
   }
+  try {
+    require("../services/protocolosIrService").validarRaw(raw);
+  } catch (err) {
+    return res.status(400).json({ ok: false, erro: err.message });
+  }
   const hz = carrierHz === undefined ? 38000 : Number(carrierHz);
   if (!Number.isFinite(hz) || hz < 20000 || hz > 60000) {
     return res.status(400).json({ ok: false, erro: "carrierHz inválido" });
