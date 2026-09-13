@@ -119,3 +119,25 @@ test("avaliar() cria uma notificação de monitoramento para um alerta e não du
   const depois = notificacoesService.listar().filter((n) => n.tipo === "monitoramento").length;
   assert.equal(depois, meio.length, "mudança no contador não deve duplicar o mesmo alerta");
 });
+
+test("comandoNaoEntregue conta apenas o que o servidor não conseguiu entregar ao socket do ESP32", () => {
+  const salasService = require("../src/services/salasService");
+  db.prepare("INSERT OR IGNORE INTO salas (sala, nome, bloco, andar, irProtocolo, temperaturaAlvo) VALUES ('MON-CMD', 'Mon', 'A', 1, 16, 23)").run();
+  const contador = () => monitoramentoService.coletar().falhas.contadores.comandoNaoEntregue;
+  assert.equal(typeof contador(), "number");
+  assert.equal("comandoFalha" in monitoramentoService.coletar().falhas.contadores, false, "a métrica antiga, nunca incrementada, deixou de existir");
+  const antes = contador();
+  salasService.aplicarComando("MON-CMD", "ligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true }, origem: "manual" });
+  assert.equal(contador(), antes + 1, "sem dispositivo conectado o comando não foi entregue");
+  const deviceHub = require("../src/services/deviceHub");
+  const original = deviceHub.enviarComando;
+  deviceHub.enviarComando = () => true;
+  try {
+    salasService.aplicarComando("MON-CMD", "desligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true }, origem: "manual" });
+  } finally {
+    deviceHub.enviarComando = original;
+  }
+  assert.equal(contador(), antes + 1, "entrega bem-sucedida não conta, mesmo sem confirmação física");
+  const alertas = monitoramentoService.coletar().alertas;
+  assert.ok(alertas.some((a) => a.startsWith("comandoNaoEntregue:")));
+});

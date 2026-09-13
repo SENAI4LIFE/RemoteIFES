@@ -48,7 +48,7 @@ const FAIXAS = {
 const FASES_OTA = ["ofertado", "baixando", "gravado", "reiniciando", "validando", "concluido", "falhou"];
 
 const contadores = {
-  comandoFalha: 0,
+  comandoNaoEntregue: 0,
   telemetriaFalha: 0,
   otaFalha: 0,
   credencialFalha: 0,
@@ -297,7 +297,7 @@ function coletar() {
   }
   if (esp32.otaComFalha > 0) alertas.push(`${esp32.otaComFalha} atualização(ões) de firmware com falha pendente(s) de revisão`);
   for (const [evento, total] of Object.entries(contadores)) {
-    if (total > 0 && ["schedulerFalha", "telemetriaFalha", "comandoFalha"].includes(evento)) {
+    if (total > 0 && ["schedulerFalha", "telemetriaFalha", "comandoNaoEntregue"].includes(evento)) {
       alertas.push(`${evento}: ${total} desde a inicialização (último em ${ultimaOcorrencia[evento]})`);
     }
   }
@@ -342,7 +342,7 @@ function chaveAlerta(mensagem) {
   const sala = mensagem.match(/^sala ([^:]+): .* reconexões/);
   if (sala) return `reconexoes:${sala[1]}`;
   if (/atualização\(ões\) de firmware com falha/.test(mensagem)) return "ota-falha";
-  const falha = mensagem.match(/^(schedulerFalha|telemetriaFalha|comandoFalha):/);
+  const falha = mensagem.match(/^(schedulerFalha|telemetriaFalha|comandoNaoEntregue):/);
   if (falha) return `falha:${falha[1]}`;
   return mensagem;
 }
