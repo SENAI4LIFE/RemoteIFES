@@ -46,9 +46,10 @@ checar(releaseScript.includes("REMOTEIFES_ANDROID_KEYSTORE") && releaseScript.in
 checar(releaseScript.includes("fixarServidorNoBundle") && releaseScript.includes("REMOTEIFES_SERVER_URL"), "build de release fixa a origem de produção no bundle");
 checar(releaseScript.includes("fs.mkdtempSync") && releaseScript.includes("fs.rmSync(temporario"), "configuração temporária de assinatura é removida após o build");
 const publishScript = fs.readFileSync(path.join(RAIZ, "publish-android-release.js"), "utf8");
-checar(publishScript.includes('"verify", "--verbose"') && publishScript.includes('"manifest", "debuggable"'), "publicação verifica assinatura e rejeita APK depurável");
-checar(publishScript.includes('"manifest", "version-name"') && publishScript.includes('"manifest", "version-code"'), "publicação confere versão e build no manifesto do APK");
-checar(publishScript.includes('"manifest", "min-sdk"') && publishScript.includes('"manifest", "target-sdk"'), "publicação confere minSdk e targetSdk no manifesto do APK");
+const inspectionScript = fs.readFileSync(path.join(RAIZ, "inspect-apk.js"), "utf8");
+checar(inspectionScript.includes("'verify', '--verbose'") && inspectionScript.includes("value('debuggable')"), "publicação verifica assinatura e rejeita APK depurável");
+checar(inspectionScript.includes("value('versionName')") && inspectionScript.includes("value('versionCode')"), "publicação confere versão e build no manifesto do APK");
+checar(inspectionScript.includes("value('minSdkVersion')") && inspectionScript.includes("value('targetSdkVersion')"), "publicação confere minSdk e targetSdk no manifesto do APK");
 checar(publishScript.includes('localhost') && releaseScript.includes('localhost'), "build e publicação recusam origem loopback para APK de produção");
 checar(publishScript.includes("conferirAvanco"), "publicação recusa um build que não avança sobre o já publicado");
 checar(releaseScript.includes("fixarVersaoNoBundle"), "build de release grava a versão Android no bundle para o app saber a própria versão");
