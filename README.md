@@ -1008,20 +1008,40 @@ Os executáveis são encontrados a partir de `ANDROID_HOME`. Para instalações 
 
 O build HTTPS usa `https://localhost` e bloqueia cleartext. HTTP usa `http://localhost` e permite cleartext para compatibilidade com a implantação local existente. A permissão Android de cleartext é global ao aplicativo; não é uma regra de domínio de `network_security_config`. A configuração Cordova restringe navegação/rede à origem informada. Nenhum bypass de certificado TLS é adicionado.
 
+Para inspecionar a configuração manualmente (o release automatiza isso), use `npm run harden-config -- https://remoteifes.ifes.edu.br` ou `npm run harden-config -- http://192.168.1.50:8080`; depois restaure com `npm run dev-config`.
+
 Servidor indisponível deve levar à recuperação de conexão, sem reconfiguração da infraestrutura pelo usuário normal. Mudanças HTTP ↔ HTTPS alteram a origem da WebView e podem separar o armazenamento/sessão anterior; trate isso como migração e teste antes de distribuir. Confira CORS para a origem efetiva da WebView e o handshake WebSocket no servidor.
 
 #### Versão e publicação
 
 - Pacote: `widget id` de `config.xml`.
-- Versão/build: `android-release.json`, propagado por `npm run android-version -- <versão>` ou `npm run android-version -- --rebuild`.
+- Versão/build: `android-release.json`, propagado para `config.xml` pelo comando abaixo.
 - Origem: `REMOTEIFES_SERVER_URL`, usada no build e conferida contra os bytes na publicação.
 - Assinatura: keystore/alias existentes; a publicação compara o certificado com `release.json` anterior.
 
 O Android admite reinstalação da mesma versão com `adb install -r`; a política do RemoteIFES exige versionCode crescente para **um novo artefato publicado**. Republicar exatamente o mesmo SHA-256 é idempotente. O versionName pode permanecer igual quando `--rebuild` aumenta versionCode. Não edite manualmente os dois arquivos de versão.
 
+```sh
+npm run android-version                     # consultar
+npm run android-version -- 1.1.0             # nova versão
+npm run android-version -- --rebuild         # mesmo nome, novo versionCode
+npm run android-version -- --verificar       # conferir consistência
+```
+
 Após validar o runtime, defina `REMOTEIFES_ANDROID_APK` e `REMOTEIFES_MOBILE_RELEASE_DIR`, mantenha a mesma origem do build e execute `npm run publish-android-release`. O script recusa inconsistências antes de copiar o APK. A publicação não executa automaticamente os testes de runtime. A primeira publicação requer conferência humana da identidade correta; assinatura criptograficamente válida não identifica, sozinha, a chave de produção.
 
 O destino padrão do servidor é `remoteifes-server/data/releases/mobile/` (`MOBILE_APP_RELEASE_DIR`). O servidor só anuncia o APK quando `release.json.serverOrigin` corresponde à origem da requisição. Para outra implantação, gere outro APK com a origem correspondente. A versão Android é independente de `remoteifes-web/version.json`.
+
+Exemplo Bash de publicação, com overrides opcionais de ferramentas:
+
+```sh
+REMOTEIFES_ANDROID_APK=platforms/android/app/build/outputs/apk/release/app-release.apk \
+REMOTEIFES_MOBILE_RELEASE_DIR=../remoteifes-server/data/releases/mobile \
+REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br \
+ANDROID_APKSIGNER=$ANDROID_HOME/build-tools/36.0.0/apksigner \
+ANDROID_APKANALYZER=$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer \
+npm run publish-android-release
+```
 
 #### Smoke e repetição
 
