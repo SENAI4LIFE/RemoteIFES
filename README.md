@@ -949,150 +949,141 @@ Sempre que algum arquivo estático de `remoteifes-web` for alterado, avance a ve
 
 ### Cordova (Android/iOS)
 
-O projeto `remoteifes-cordova/` empacota `remoteifes-web` como app nativo. A pasta `remoteifes-cordova/www/` nunca deve ser editada diretamente: ela é gerada a partir de `remoteifes-web` pelo script `sync-www.js`, chamado automaticamente pelos scripts de preparo, build, execução e validação.
+O fonte é `remoteifes-web/`. `sync-www.js` recria `remoteifes-cordova/www/`, exclui `sw.js`, `manifest.webmanifest` e `.nojekyll`, e insere `cordova.js`. Cordova prepara a plataforma a partir de `config.xml`; Gradle compila o manifesto, os recursos, o plugin StatusBar e os assets dentro do APK. A WebView instalada carrega esses assets e usa API e WebSocket do servidor configurado no build.
 
-#### Instalação do Cordova
+`www/`, `platforms/`, `plugins/`, `build/`, APKs, keystores e `.signing/` são locais e ignorados pelo Git. Não edite a plataforma gerada nem copie um frontend antigo para ela.
 
-```bash
-cd remoteifes-cordova
+#### Pré-requisitos
+
+- Node compatível com o Cordova travado em `package-lock.json` (CI: Node 22).
+- JDK 17, com `JAVA_HOME` ou `CORDOVA_JAVA_HOME` apontando para ele.
+- Android SDK: Platform 36, Build Tools 36.0.0, Platform Tools/ADB, Command-line Tools (`apkanalyzer`) e Emulator.
+- Gradle 8.14.2 no `PATH` para inicializar o wrapper gerado pelo Cordova.
+- `ANDROID_HOME` apontando para o SDK. Não grave caminhos da máquina no repositório.
+- Emuladores/dispositivos de teste preparados separadamente. O doctor não instala componentes, aceita licenças nem modifica o sistema.
+
+Referência: [guia oficial Cordova Android](https://cordova.apache.org/docs/en/latest/guide/platforms/android/). A plataforma Cordova Android 15 declara Android 7.0/API 24 a Android 16/API 36. Isso é o intervalo de SDK suportado; não significa que toda a matriz de execução já foi aprovada.
+
+#### Fluxo curto
+
+Execute em `remoteifes-cordova/` (Cordova e plataformas são instalados localmente pelo lockfile):
+
+```sh
 npm ci
-```
-
-Isso instala as versões registradas em `package-lock.json` do Cordova CLI, das plataformas Android/iOS e do `cordova-plugin-statusbar`, sem instalação global. O splash screen é fornecido pelas próprias plataformas Cordova atuais; os antigos plugins `cordova-plugin-whitelist` e `cordova-plugin-splashscreen` não são usados.
-
-#### Requisitos por plataforma
-
-| Plataforma | Requisitos |
-|---|---|
-| Android | JDK 17; Android SDK Platform 36, Build Tools 36 e Platform Tools; Android Studio ou SDK Command-line Tools; `ANDROID_HOME` apontando para o SDK; Gradle 8.14.2 no `PATH` para criar o wrapper na primeira compilação |
-| iOS | macOS com Xcode e Xcode Command Line Tools, CocoaPods (`sudo gem install cocoapods`) |
-
-#### Adicionar as plataformas
-
-```bash
-cd remoteifes-cordova
+npm run doctor
 npm run prepare-android
-```
-
-```bash
-cd remoteifes-cordova
-npm run prepare-ios
-```
-
-Cada comando sincroniza `www/` a partir de `remoteifes-web`, roda `cordova platform add` e `cordova prepare` para a plataforma correspondente.
-
-#### Build e execução
-
-```bash
 npm run build-android
+npm run inspect-apk -- platforms/android/app/build/outputs/apk/debug/app-debug.apk debug
 ```
 
-```bash
+`prepare-android` adiciona Android somente quando ausente e propaga qualquer erro, inclusive no Windows. Para desenvolvimento sem origem embutida, o aplicativo mostra a configuração inicial do servidor. `http://localhost` dentro da WebView é a origem dos assets, não o servidor central. No emulador padrão, `10.0.2.2` acessa o host.
+
+Para release, carregue no ambiente, a partir do mecanismo seguro da equipe:
+
+| Variável | Uso |
+|---|---|
+| `REMOTEIFES_SERVER_URL` | Somente a origem HTTP/HTTPS da implantação, sem caminho, usuário ou senha |
+| `REMOTEIFES_ANDROID_KEYSTORE` | Keystore de produção existente |
+| `REMOTEIFES_ANDROID_KEYSTORE_TYPE` | `jks` (padrão) ou `pkcs12` |
+| `REMOTEIFES_ANDROID_KEY_ALIAS` | Alias da identidade de assinatura |
+| `REMOTEIFES_ANDROID_STORE_PASSWORD` | Senha do keystore |
+| `REMOTEIFES_ANDROID_KEY_PASSWORD` | Senha da chave |
+
+Não coloque valores secretos na linha de comando, no Git ou em logs. Não use a chave temporária de validação para distribuição. Preserve e faça backup seguro da identidade de produção: mudar a assinatura impede a atualização normal.
+
+```sh
+npm run doctor -- --release
 npm run build-android-release
 ```
 
-```bash
-npm run run-android
+Esse comando prepara a plataforma, sincroniza o frontend, injeta origem e versão somente no bundle, restringe a configuração nativa, faz um clean/build, verifica o APK e restaura o `config.xml` original e o bundle neutro. A configuração temporária de assinatura é removida no `finally`. Em encerramento forçado da máquina/processo, revise e remova sobras temporárias de assinatura antes de retomar.
+
+Sem credenciais, `npm run build-android-release -- --unsigned` exercita o mesmo build de produção e a inspeção estática, mas gera um APK **não instalável/publicável** até ser assinado. A origem continua obrigatória. O CI usa uma origem de exemplo, nunca uma implantação real.
+
+O verificador inspeciona manifesto e recursos do APK com `apkanalyzer`/`aapt2` e a assinatura com `apksigner`: pacote, versão, versionCode, SDKs, permissões, depuração, cleartext, origem embutida, versão no JavaScript e configuração de navegação. Ele resolve os nomes de recursos otimizados do release. Registra tamanho, SHA-256 e certificado. Não é um scanner completo de segredos nem uma prova de funcionamento em runtime.
+
+Os executáveis são encontrados a partir de `ANDROID_HOME`. Para instalações diferentes, há overrides `ANDROID_APKANALYZER`, `ANDROID_APKSIGNER`, `ANDROID_AAPT2`, `ANDROID_ADB` e `ANDROID_EMULATOR`.
+
+#### Origem e segurança
+
+O build HTTPS usa `https://localhost` e bloqueia cleartext. HTTP usa `http://localhost` e permite cleartext para compatibilidade com a implantação local existente. A permissão Android de cleartext é global ao aplicativo; não é uma regra de domínio de `network_security_config`. A configuração Cordova restringe navegação/rede à origem informada. Nenhum bypass de certificado TLS é adicionado.
+
+Servidor indisponível deve levar à recuperação de conexão, sem reconfiguração da infraestrutura pelo usuário normal. Mudanças HTTP ↔ HTTPS alteram a origem da WebView e podem separar o armazenamento/sessão anterior; trate isso como migração e teste antes de distribuir. Confira CORS para a origem efetiva da WebView e o handshake WebSocket no servidor.
+
+#### Versão e publicação
+
+- Pacote: `widget id` de `config.xml`.
+- Versão/build: `android-release.json`, propagado por `npm run android-version -- <versão>` ou `npm run android-version -- --rebuild`.
+- Origem: `REMOTEIFES_SERVER_URL`, usada no build e conferida contra os bytes na publicação.
+- Assinatura: keystore/alias existentes; a publicação compara o certificado com `release.json` anterior.
+
+O Android admite reinstalação da mesma versão com `adb install -r`; a política do RemoteIFES exige versionCode crescente para **um novo artefato publicado**. Republicar exatamente o mesmo SHA-256 é idempotente. O versionName pode permanecer igual quando `--rebuild` aumenta versionCode. Não edite manualmente os dois arquivos de versão.
+
+Após validar o runtime, defina `REMOTEIFES_ANDROID_APK` e `REMOTEIFES_MOBILE_RELEASE_DIR`, mantenha a mesma origem do build e execute `npm run publish-android-release`. O script recusa inconsistências antes de copiar o APK. A publicação não executa automaticamente os testes de runtime. A primeira publicação requer conferência humana da identidade correta; assinatura criptograficamente válida não identifica, sozinha, a chave de produção.
+
+O destino padrão do servidor é `remoteifes-server/data/releases/mobile/` (`MOBILE_APP_RELEASE_DIR`). O servidor só anuncia o APK quando `release.json.serverOrigin` corresponde à origem da requisição. Para outra implantação, gere outro APK com a origem correspondente. A versão Android é independente de `remoteifes-web/version.json`.
+
+#### Smoke e repetição
+
+Use um dispositivo dedicado. `test-android` exige `ANDROID_SERIAL`, instala com `-r`, faz cold start, rotações, background/resume e force-stop/restart. Não desinstala nem limpa dados automaticamente. Restaura as configurações de rotação; grava relatório JSON, meminfo por ciclo, logcat, hierarquia UI e screenshot em `build/android-test-*/`. Logs/screenshots podem conter dados da conta de teste; revise antes de compartilhar.
+
+```sh
+adb devices -l
+# Bash; PowerShell: $env:ANDROID_SERIAL='emulator-5554'
+export ANDROID_SERIAL=emulator-5554
+export ANDROID_TEST_CYCLES=10
+npm run test-android -- <caminho-do-apk-assinado>
 ```
 
-```bash
-npm run build-ios
+Sem `--webview`, o teste comprova somente instalação/processo/lifecycle. Processo vivo não prova que a tela ou a rede estejam corretas.
+
+No modo `--webview`, `ANDROID_TEST_SCREENS=0` permite repetir somente os ciclos; por padrão também são capturadas as telas em seis tamanhos e combinações de fontes/contraste. Alterações de densidade reiniciam a Activity nesse diagnóstico: as capturas não comprovam continuidade de estado durante a mudança.
+
+Para diagnosticar o **debug APK realmente instalado**, instale também as dependências existentes de `e2e/` e `remoteifes-server/` com `npm ci`, inicie `node e2e/harness/api-server.js` na raiz em outro terminal e execute:
+
+```sh
+npm run test-android -- <apk-debug> --webview
 ```
 
-```bash
-npm run run-ios
-```
+Usa Playwright Android contra a WebView, sem navegador desktop. O harness tem banco temporário e dispositivo simulado; não opera o ESP32 real. Origem padrão: `http://10.0.2.2:8791`, conta de teste do harness. Overrides: `ANDROID_TEST_ORIGIN`, `ANDROID_TEST_USER`, `ANDROID_TEST_PASSWORD`. Não aponte esse modo para produção. Exercita login/logout, sala A-108, Admin/Status, Firmware, rotação, background/resume e interrupção/latência emulada por CDP. Registra requests cumulativos, sockets observados, heap JS, nós e listeners. Esses contadores não constituem, isoladamente, prova de vazamento. A instrumentação exige debug; não habilite depuração no release para fazê-la passar.
 
-`build-android-release` gera um APK de produção já assinado. O comando falha se a origem do servidor, o keystore, o alias ou qualquer senha de assinatura estiver ausente; os segredos entram num `build.json` temporário fora do repositório (modo `0600`) e são removidos ao final. Para iOS, `run-ios` abre o simulador; para dispositivo físico ou publicação na App Store, abra `platforms/ios/RemoteIFES.xcworkspace` no Xcode.
+#### Matriz de aceitação manual
 
-**Material de assinatura — nunca versionado.** O `.gitignore` bloqueia `remoteifes-cordova/.signing/`, `*.keystore`, `*.jks` e `build.json`. A convenção local é manter o keystore e um arquivo `signing.env` (com as variáveis abaixo, `chmod 600`) em `remoteifes-cordova/.signing/`, carregado com `set -a && . ./.signing/signing.env && set +a` antes do build. Como esse diretório fica fora do Git, **ele não é coberto por nenhum backup do repositório**: guarde uma cópia do keystore e das senhas num cofre de segredos da instituição ou em mídia offline cifrada. Se o keystore original for perdido, o Android recusa qualquer atualização assinada por outra chave — os aparelhos já instalados só conseguem migrar desinstalando e reinstalando (perdendo o endereço do servidor salvo e a sessão), e a rotação de chave do esquema de assinatura v3 ainda exige a chave antiga para autorizar a nova. Trate o backup do keystore como requisito de operação, não como opcional.
+Registre APK/SHA-256, API, versão Android, ABI, WebView, resolução/densidade, escala de fonte, conta/servidor e duração em cada execução. Mínimo: APIs 24, 29, 34 e 36; aparelho real quando disponível.
 
-#### Ícone e splash screen
+| Grupo | Procedimento e critério |
+|---|---|
+| Instalação | Instalação limpa; `adb install -r` do mesmo artefato; upgrade com sessão ativa; reiniciar; assinatura diferente deve falhar; versão inferior deve ser rejeitada sem `-d`; desinstalar/reinstalar e `pm clear` somente no aparelho de teste |
+| Estado | Upgrade com mesma assinatura/origem preserva configuração e sessão esperadas; force-stop/restart e morte do processo não exigem reinstalação |
+| Fluxos | Login/logout, sala e controles, Admin, Firmware/OTA, Protocolos IR e monitoramento; Android Back retorna corretamente |
+| Telas | 320/360, ~400, telefone grande, tablet e paisagem; sem overflow horizontal/controles cortados; barras do sistema não encobrem o conteúdo |
+| Gráficos | Linhas/áreas, colunas/barras, pizza/donut, legendas e tabelas com dados representativos; rótulos legíveis e redraw após rotação/escala |
+| Acessibilidade | Font scale e display scale Android, fonte máxima 2× no app, default/serif/sans/dislexia; temas/contraste disponíveis, diálogos e alvos de toque. TalkBack somente se efetivamente disponível e utilizado |
+| Rede | Servidor ausente no startup e perdido durante uso; reinício do servidor; WebSocket interrompido; Wi-Fi off/on; latência e intermitência; HTTP, HTTPS válido e TLS inválido rejeitado |
+| Lifecycle | Bloquear/desbloquear tela, repetir home/retorno, rotacionar, matar processo, sessão expirada; recuperação sem reset de dados |
+| Soak | Repetir fluxo por duração suficiente; observar crashes/ANRs/renderer, sockets simultâneos, requests por ciclo, listeners/timers e memória após aquecimento |
 
-As imagens-fonte ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732, geradas a partir de `remoteifes-web/assets/remoteifes-logo.png`). O Android usa `icon.png` também no splash screen nativo da plataforma; o iOS usa `splash.png`. As plataformas atuais geram os recursos necessários durante o preparo. Para gerar variantes personalizadas com `cordova-res`, instale essa ferramenta separadamente e execute:
+`adb install -r` preserva dados conforme a [documentação Android](https://developer.android.com/tools/adb). Teste cada migração real; não assuma preservação se mudar pacote, assinatura ou origem WebView.
 
-```bash
-cd remoteifes-cordova
-npx cordova-res android --skip-config --copy
-npx cordova-res ios --skip-config --copy
-```
+#### CI e regeneração
 
-#### Apontando o app para o servidor
+`ci.yml` mantém validação Cordova e testes existentes. `android.yml` faz builds limpos e inspeção de APK quando frontend/Android/workflow mudam, mais smoke nativo API 36. `workflow_dispatch` com `broad_matrix=true` amplia para 24/29/34/36. Runners descartáveis provisionam o SDK; o doctor local não instala nada. Os artefatos do CI são de validação, não releases de produção. A matriz manual de UI/rede/acessibilidade continua necessária.
 
-O app empacotado é carregado de `file://` (ou `https://localhost`), então não existe uma "origem" que sirva de endereço do servidor — diferente do site/PWA, que usa automaticamente o mesmo domínio de onde foi baixado. Há duas formas de definir o endereço no Cordova:
+Para regeneração limpa, com o aplicativo de teste parado, remova **somente** `remoteifes-cordova/platforms/`, `plugins/` e `www/` após conferir os caminhos absolutos. Execute `npm ci`, `npm run prepare-android` e o build. Nunca remova `.signing/` junto com os gerados. Não versione APKs ou caminhos de SDK.
 
-- **Configuração inicial de desenvolvimento:** somente um Cordova sem origem predefinida abre a tela dedicada **Conectar este aplicativo** antes do login e guarda o endereço no armazenamento local do app. Essa tela não aparece no site/PWA nem em uma perda temporária de conexão.
-- **Fixo no build:** `build-android-release` grava `REMOTEIFES_SERVER_URL` somente na cópia gerada em `remoteifes-cordova/www/` (o fonte web em `remoteifes-web/` continua neutro, com `serverUrl` vazio no contexto empacotado). Esse é o fluxo obrigatório para um APK de produção.
+#### Diagnóstico
 
-Depois que existe uma origem, quedas HTTP ou WebSocket mostram apenas **Sem conexão com o servidor** e **Reconectando automaticamente…**. A tela de indisponibilidade não expõe contadores técnicos nem oferece edição de infraestrutura a usuários, administradores ou superadministradores; diagnósticos detalhados ficam no monitoramento do superadministrador. Overrides de `localStorage` continuam disponíveis para o harness e ferramentas de desenvolvimento, mas não são graváveis pela interface web/PWA.
+- Doctor falha: corrija o componente ou `PATH` indicado; ele não deve mascarar erro com `|| true`.
+- `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: certificado diferente. Use a identidade correta; desinstalar perde dados e não é solução para upgrade de produção.
+- `INSTALL_FAILED_VERSION_DOWNGRADE`: use versionCode maior. Não use `-d` para validar o fluxo normal.
+- Tela sem servidor: confirme a origem **dentro do APK**, CORS/WebSocket e alcance de rede do Android; localhost do aparelho não alcança o servidor do host.
+- TLS inválido: corrija certificado/cadeia/hostname no servidor; não desabilite validação.
+- ANR de System UI ou timeout ADB: preserve logs e diferencie infraestrutura de falha do pacote. Não marque um teste interrompido como aprovado.
+- Execução interrompida: confira `config.xml`, sincronize `www/`, remova arquivos temporários de assinatura e restaure eventuais overrides de `wm size/density` e `settings` no dispositivo de teste.
 
-O APK servido é **específico daquela instalação**: `harden-config.js` trava rede e navegação na origem do build e o servidor só anuncia o APK quando `release.json.serverOrigin` bate com a origem da requisição. Para outra implantação (outro IP de rede local, um domínio HTTPS), gere e publique um APK novo com o `REMOTEIFES_SERVER_URL` daquela implantação. Builds e publicações de produção recusam `localhost`, `127.0.0.1` e `::1`, pois esses endereços apontam para o próprio aparelho Android. O artefato local não versionado em `data/releases/mobile/` usa `http://localhost:8080` apenas como amostra validável pelo harness e não é anunciado pelo servidor fora de `NODE_ENV=test`.
+#### iOS e recursos visuais
 
-#### Ajustando as permissões de rede
-
-`remoteifes-cordova/config.xml` vem, por padrão, no modo de desenvolvimento: `<access origin="*" />`, `<allow-navigation href="*" />`, `<allow-intent>` para HTTP/HTTPS e tráfego HTTP local liberado no Android e iOS, para simplificar os testes contra qualquer `serverUrl`.
-
-Para o build de produção, o script `harden-config.js` reescreve o `config.xml` restringindo rede e navegação a uma **única origem**:
-
-```bash
-cd remoteifes-cordova
-npm run harden-config -- https://remoteifes.ifes.edu.br   # origem HTTPS: remove exceções de HTTP
-npm run harden-config -- http://192.168.1.50:8080         # origem HTTP em rede local: mantém a exceção local (com aviso)
-```
-
-Ao usar os comandos manualmente, `npm run dev-config` devolve o arquivo ao modo de desenvolvimento depois do build. A operação é reversível e idempotente. O script `build-android-release` faz essa restauração automaticamente, inclusive se a compilação falhar.
-
-O app suporta **retrato e paisagem** (`Orientation` = `default`); a interface acompanha a rotação sem recarregar nem perder o estado atual. Para evitar gerar um APK com permissões de rede curinga, `npm run build-android-release` exige `REMOTEIFES_SERVER_URL` e endurece o `config.xml` automaticamente antes do build:
-
-```bash
-REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br \
-REMOTEIFES_ANDROID_KEYSTORE=/caminho/.signing/remoteifes-release.keystore \
-REMOTEIFES_ANDROID_KEYSTORE_TYPE=pkcs12 \
-REMOTEIFES_ANDROID_STORE_PASSWORD='...' \
-REMOTEIFES_ANDROID_KEY_ALIAS=remoteifes \
-REMOTEIFES_ANDROID_KEY_PASSWORD='...' \
-npm run build-android-release
-```
-
-Variáveis de assinatura exigidas: `REMOTEIFES_ANDROID_KEYSTORE` (caminho do keystore), `REMOTEIFES_ANDROID_KEYSTORE_TYPE` (`pkcs12` ou `jks`; padrão `jks`), `REMOTEIFES_ANDROID_KEY_ALIAS`, `REMOTEIFES_ANDROID_STORE_PASSWORD` e `REMOTEIFES_ANDROID_KEY_PASSWORD`, além de `REMOTEIFES_SERVER_URL`. Mantenha-as em `remoteifes-cordova/.signing/signing.env` (fora do Git) e carregue-as no ambiente antes do build. O build precisa de JDK 17, do Android SDK (build-tools e plataforma da API 36) e de um `gradle` do sistema (a cordova-android 15 não usa o wrapper).
-
-#### Versão do aplicativo Android
-
-A versão publicável do Android tem **uma única fonte**: `remoteifes-cordova/android-release.json`, com `versionName`, `versionCode`, `releaseDate` e as notas de versão. O script `android-version.js` é quem escreve esse arquivo e propaga `version` e `android-versionCode` para o `config.xml`; ninguém digita a mesma versão em dois lugares. Essa versão é independente da versão do frontend web/PWA (`remoteifes-web/version.json`), que existe para invalidar o cache do service worker e continua com o seu próprio ciclo.
-
-```bash
-cd remoteifes-cordova
-npm run android-version                    # mostra a versão publicável atual
-npm run android-version -- 1.1.0           # define a versão e avança o versionCode
-npm run android-version -- --rebuild       # mantém a versão e só avança o versionCode
-npm run android-version -- --verificar     # confere config.xml contra android-release.json
-```
-
-O `versionCode` nasce da própria versão (`1.2.3` → `10203`), o que o mantém previsível e legível, e **nunca deixa de crescer**: recompilar a mesma versão avança em um, porque o Android recusa instalar por cima um pacote cujo `versionCode` não aumentou. Depois de definir a versão, revise as notas em `android-release.json` — elas aparecem como "Novidades desta versão" na página do aplicativo.
-
-#### Fluxo de release
-
-```bash
-cd remoteifes-cordova
-npm run android-version -- 1.1.0     # 1. versão e versionCode na fonte única
-npm run validate                     # 2. valida config.xml, scripts e coerência da versão
-set -a && . ./.signing/signing.env && set +a
-REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br npm run build-android-release   # 3. build assinado
-REMOTEIFES_ANDROID_APK=platforms/android/app/build/outputs/apk/release/app-release.apk \
-REMOTEIFES_MOBILE_RELEASE_DIR=../remoteifes-server/data/releases/mobile \
-REMOTEIFES_SERVER_URL=https://remoteifes.ifes.edu.br \
-ANDROID_APKSIGNER=$ANDROID_HOME/build-tools/36.0.0/apksigner \
-ANDROID_APKANALYZER=$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer \
-npm run publish-android-release      # 4. verifica o artefato e publica
-```
-
-O build recusa começar se `config.xml` e `android-release.json` discordarem, grava a versão no bundle gerado (é assim que o aplicativo instalado sabe a própria versão) e, ao terminar, imprime o caminho do APK assinado pronto para a etapa de publicação.
-
-A publicação (`npm run publish-android-release`) lê versão e build da fonte única — não há `REMOTEIFES_ANDROID_VERSION` nem `REMOTEIFES_ANDROID_BUILD` para digitar de novo — e exige `REMOTEIFES_ANDROID_APK`, `REMOTEIFES_MOBILE_RELEASE_DIR` (aponta para o `MOBILE_APP_RELEASE_DIR` lido pelo servidor — por padrão `remoteifes-server/data/releases/mobile/`), `REMOTEIFES_SERVER_URL`, `ANDROID_APKSIGNER` e `ANDROID_APKANALYZER`. Ela recusa nomes `debug`/`unsigned` e origens loopback, valida a assinatura, confirma `debuggable=false`, versão, build, `minSdk=24` e `targetSdk` atual (35 ou posterior), **recusa um build que não avança sobre o já publicado** (o mesmo build só é aceito se for exatamente o mesmo arquivo), registra o SHA-256 do arquivo e do certificado, grava `serverOrigin`, data e notas, escreve `release.json` de forma atômica e só então remove os APKs superados. O arquivo entra inteiro antes dos metadados: até a troca atômica do `release.json` o servidor continua anunciando a publicação anterior, nunca uma release pela metade. Sem todos esses dados coerentes — ou se a origem da requisição não for igual ao `serverOrigin` —, `/mobile-app/android` responde 404 e a interface não oferece download. No Windows, o script chama `apksigner.bat`/`apkanalyzer.bat` via `cmd.exe /c`.
-
-Para um servidor HTTP em rede local, informe a origem `http://192.168.1.50:8080`; o Android e o iOS manterão somente a exceção necessária para rede local.
-
-**Verificação obrigatória em aparelho para servidor HTTP.** O WebView da cordova-android 15 carrega o app de `https://localhost`, um contexto seguro, enquanto o servidor de rede local usa `http://`/`ws://`. Instale o APK em um Android real e confirme que a lista de salas carrega e que o painel de uma sala atualiza em tempo real; se o app ficar preso em **Sem conexão com o servidor** e o `logcat` acusar bloqueio de conteúdo misto, acrescente `<preference name="scheme" value="http" />` à plataforma Android em `config.xml` (o app passa a carregar de `http://localhost`, que continua sendo contexto seguro) e gere o APK de novo. Um servidor HTTPS não precisa dessa verificação. Trocar o `scheme` muda a origem do WebView: instalações anteriores perdem o endereço do servidor e a sessão salvos, e precisam ser reconfiguradas.
+No macOS, instale Xcode/Command Line Tools e CocoaPods. Execute `npm run prepare-ios`, `npm run build-ios` e `npm run run-ios`; para distribuição, abra `platforms/ios/RemoteIFES.xcworkspace` no Xcode. Os fontes de ícone/splash ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732); o preparo gera os recursos nativos. Variantes personalizadas podem ser copiadas com `cordova-res`, instalado separadamente.
 
 ## Scripts Auxiliares
 
