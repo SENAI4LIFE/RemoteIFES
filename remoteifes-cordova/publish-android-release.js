@@ -1,20 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 const { verificar: verificarVersao } = require("./android-version");
-
-function executar(comando, argumentos) {
-  const ehBat = process.platform === "win32" && /\.(bat|cmd)$/i.test(comando);
-  const resultado = ehBat
-    ? spawnSync("cmd.exe", ["/c", comando, ...argumentos], { encoding: "utf8" })
-    : spawnSync(comando, argumentos, { encoding: "utf8" });
-  if (resultado.error || resultado.status !== 0) {
-    const detalhe = resultado.stderr || resultado.stdout || (resultado.error && resultado.error.message) || `${comando} terminou com código ${resultado.status}`;
-    throw new Error(String(detalhe).trim());
-  }
-  return resultado.stdout.trim();
-}
 
 function exigir(nome) {
   const valor = String(process.env[nome] || "").trim();
@@ -22,9 +9,8 @@ function exigir(nome) {
   return valor;
 }
 
-// A publicação anterior é a única referência de que o versionCode cresceu: o Android
-// recusa instalar por cima um pacote que não avançou, e um servidor anunciando um build
-// mais antigo deixaria os aparelhos sem caminho de atualização.
+// Cada novo artefato publicado deve avançar o versionCode. A reinstalação Android
+// da mesma versão é permitida, mas não identifica uma release nova para os clientes.
 function conferirAvanco(destino, build, sha256) {
   const metadados = path.join(destino, "release.json");
   if (!fs.existsSync(metadados)) return;
@@ -67,19 +53,18 @@ function main() {
   if (!fs.existsSync(apk) || !fs.statSync(apk).isFile() || !apk.toLowerCase().endsWith(".apk")) throw new Error("APK ausente ou inválido.");
   if (/debug|unsigned/i.test(path.basename(apk))) throw new Error("Artefatos debug ou unsigned não podem ser publicados.");
 
-  const apksigner = exigir("ANDROID_APKSIGNER");
-  const apkanalyzer = exigir("ANDROID_APKANALYZER");
-  executar(apksigner, ["verify", "--verbose", apk]);
-  const certificados = executar(apksigner, ["verify", "--print-certs", apk]);
-  const cert = certificados.match(/certificate SHA-256 digest:\s*([a-f0-9]+)/i);
-  if (!cert || cert[1].length !== 64) throw new Error("Não foi possível confirmar o certificado de assinatura do APK.");
-  if (executar(apkanalyzer, ["manifest", "debuggable", apk]).toLowerCase() !== "false") throw new Error("O APK está marcado como depurável.");
-  if (executar(apkanalyzer, ["manifest", "version-name", apk]) !== version) throw new Error(`O APK não foi gerado nesta versão: android-release.json declara ${version}.`);
-  if (executar(apkanalyzer, ["manifest", "version-code", apk]) !== build) throw new Error(`O APK não foi gerado neste build: android-release.json declara ${build}.`);
-  const minSdk = executar(apkanalyzer, ["manifest", "min-sdk", apk]);
-  const targetSdk = executar(apkanalyzer, ["manifest", "target-sdk", apk]);
-  if (minSdk !== "24") throw new Error("O APK deve declarar minSdk 24.");
-  if (!/^\d+$/.test(targetSdk) || Number(targetSdk) < 35) throw new Error("O APK deve declarar targetSdk 35 ou posterior.");
+  // Verify the bytes being published, including the embedded origin and package ID.
+  const inspected = require('./inspect-apk').inspect(apk, { origin: serverOrigin });
+  const previousMetadata = path.join(destino, 'release.json');
+  if (fs.existsSync(previousMetadata)) {
+    const previous = JSON.parse(fs.readFileSync(previousMetadata, 'utf8'));
+    if (!previous.certificateSha256 || previous.certificateSha256.toLowerCase() !== inspected.certificateSha256.toLowerCase()) {
+      throw new Error('O certificado difere da assinatura publicada; a atualização não preservaria a identidade do aplicativo.');
+    }
+  }
+
+  const minSdk = inspected.minSdk;
+  const targetSdk = inspected.targetSdk;
 
   const bytes = fs.readFileSync(apk);
   const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
@@ -98,7 +83,7 @@ function main() {
     version,
     build,
     sha256,
-    certificateSha256: cert[1].toLowerCase(),
+    certificateSha256: inspected.certificateSha256.toLowerCase(),
     serverOrigin,
     releaseDate: dados.releaseDate,
     notes: dados.notes,

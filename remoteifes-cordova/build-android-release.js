@@ -65,45 +65,58 @@ function fixarVersaoNoBundle({ versionName, versionCode }) {
 function main() {
   let temporario = null;
   let endurecido = false;
+  const configOriginal = fs.readFileSync(path.join(__dirname, 'config.xml'));
+  const signingProperties = path.join(__dirname, 'platforms', 'android', 'release-signing.properties');
+  const signingOriginal = fs.existsSync(signingProperties) ? fs.readFileSync(signingProperties) : null;
+  const unsigned = process.argv.includes('--unsigned');
   try {
     const origem = exigirOrigemPublicavel(exigirAmbiente("REMOTEIFES_SERVER_URL"));
-    const keystore = path.resolve(exigirAmbiente("REMOTEIFES_ANDROID_KEYSTORE"));
-    if (!fs.existsSync(keystore) || !fs.statSync(keystore).isFile()) throw new Error("O keystore de produção informado não existe.");
-    const release = {
-      keystore,
-      storePassword: exigirAmbiente("REMOTEIFES_ANDROID_STORE_PASSWORD"),
-      alias: exigirAmbiente("REMOTEIFES_ANDROID_KEY_ALIAS"),
-      password: exigirAmbiente("REMOTEIFES_ANDROID_KEY_PASSWORD"),
-      keystoreType: process.env.REMOTEIFES_ANDROID_KEYSTORE_TYPE || "jks",
-      packageType: "apk",
-    };
-    temporario = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-android-release-"));
-    const buildConfig = path.join(temporario, "build.json");
-    fs.writeFileSync(buildConfig, JSON.stringify({ android: { release } }), { mode: 0o600 });
+    if (!unsigned) {
+      const keystore = path.resolve(exigirAmbiente("REMOTEIFES_ANDROID_KEYSTORE"));
+      if (!fs.existsSync(keystore) || !fs.statSync(keystore).isFile()) throw new Error("O keystore de produção informado não existe.");
+      const release = {
+        keystore,
+        storePassword: exigirAmbiente("REMOTEIFES_ANDROID_STORE_PASSWORD"),
+        alias: exigirAmbiente("REMOTEIFES_ANDROID_KEY_ALIAS"),
+        password: exigirAmbiente("REMOTEIFES_ANDROID_KEY_PASSWORD"),
+        keystoreType: process.env.REMOTEIFES_ANDROID_KEYSTORE_TYPE || "jks",
+        packageType: "apk",
+      };
+      temporario = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-android-release-"));
+      const buildConfig = path.join(temporario, "build.json");
+      fs.writeFileSync(buildConfig, JSON.stringify({ android: { release } }), { mode: 0o600 });
+    }
     const { problemas, dados } = verificarVersao();
     if (problemas.length) throw new Error(`${problemas.join("; ")}. Rode \`npm run android-version -- --verificar\`.`);
-    executar(process.execPath, [path.join(__dirname, "sync-www.js")]);
+    endurecido = true;
+    executar(process.execPath, [path.join(__dirname, "prepare-android.js")]);
     fixarServidorNoBundle(origem);
     fixarVersaoNoBundle(dados);
     console.log(`Versão Android do build: ${dados.versionName} (versionCode ${dados.versionCode}).`);
     executar(process.execPath, [path.join(__dirname, "harden-config.js"), origem]);
-    endurecido = true;
-    executar(process.execPath, [caminhoCordova(), "build", "android", "--release", `--buildConfig=${buildConfig}`]);
-    const artefato = path.join(__dirname, "platforms", "android", "app", "build", "outputs", "apk", "release", "app-release.apk");
+    executar(process.execPath, [caminhoCordova(), "clean", "android"]);
+    executar(process.execPath, [caminhoCordova(), "build", "android", "--release", ...(unsigned ? ['--', '--packageType=apk'] : [`--buildConfig=${path.join(temporario, 'build.json')}`])]);
+    const artefato = path.join(__dirname, "platforms", "android", "app", "build", "outputs", "apk", "release", unsigned ? "app-release-unsigned.apk" : "app-release.apk");
     if (!fs.existsSync(artefato)) throw new Error(`o build terminou mas o APK assinado não apareceu em ${artefato}.`);
-    console.log(`APK assinado: ${artefato}`);
-    console.log(`Para publicar: REMOTEIFES_ANDROID_APK=${artefato} npm run publish-android-release`);
+    console.log(JSON.stringify(require('./inspect-apk').inspect(artefato, { mode: unsigned ? 'unsigned' : 'release', origin: origem }), null, 2));
+    console.log(`APK ${unsigned ? 'sem assinatura (somente validacao)' : 'assinado e verificado'}: ${artefato}`);
+    if (!unsigned) console.log(`Para publicar: REMOTEIFES_ANDROID_APK=${artefato} npm run publish-android-release`);
   } catch (erro) {
     console.error(erro.message);
     process.exitCode = erro.exitCode || 1;
   } finally {
     if (temporario) fs.rmSync(temporario, { recursive: true, force: true });
     if (endurecido) {
-      try { executar(process.execPath, [path.join(__dirname, "harden-config.js"), "--dev"]); }
+      try {
+        if (signingOriginal) fs.writeFileSync(signingProperties, signingOriginal);
+        else fs.rmSync(signingProperties, { force: true });
+        fs.writeFileSync(path.join(__dirname, 'config.xml'), configOriginal);
+        executar(process.execPath, [path.join(__dirname, 'sync-www.js')]);
+      }
       catch (erro) { console.error(`Falha ao restaurar config.xml: ${erro.message}`); process.exitCode = erro.exitCode || 1; }
     }
   }
 }
 
+module.exports = { caminhoCordova, exigirOrigemPublicavel };
 if (require.main === module) main();
-module.exports = { caminhoCordova };
