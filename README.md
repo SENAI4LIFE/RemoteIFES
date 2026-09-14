@@ -964,6 +964,8 @@ O fonte é `remoteifes-web/`. `sync-www.js` recria `remoteifes-cordova/www/`, ex
 
 Referência: [guia oficial Cordova Android](https://cordova.apache.org/docs/en/latest/guide/platforms/android/). A plataforma Cordova Android 15 declara Android 7.0/API 24 a Android 16/API 36. Isso é o intervalo de SDK suportado; não significa que toda a matriz de execução já foi aprovada.
 
+O WebView também precisa ser compatível com o JavaScript atual. A validação de setembro/2026 encontrou erros de sintaxe no WebView antigo da imagem API 24; portanto, essa combinação não está aprovada. API 34/WebView 113 passou no smoke nativo e API 36/WebView 133 passou nos testes locais de interface. Atualize o WebView pelos canais oficiais e valide o aparelho: `minSdk=24` sozinho não garante compatibilidade do runtime.
+
 #### Fluxo curto
 
 Execute em `remoteifes-cordova/` (Cordova e plataformas são instalados localmente pelo lockfile):

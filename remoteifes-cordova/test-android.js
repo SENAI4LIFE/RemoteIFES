@@ -37,6 +37,14 @@ async function main() {
     report.api = await shell('getprop', 'ro.build.version.sdk');
     report.android = await shell('getprop', 'ro.build.version.release');
     report.webview = await shell('dumpsys', 'webviewupdate');
+    // Android 7 images may not implement dumpsys webviewupdate.
+    if (!report.webview.trim()) {
+      report.webviewPackages = {};
+      for (const candidate of ['com.google.android.webview', 'com.android.webview', 'com.android.chrome']) {
+        const details = await shell('dumpsys', 'package', candidate);
+        report.webviewPackages[candidate] = details.match(/versionName=([^\s]+)/)?.[1] || null;
+      }
+    }
     report.size = await shell('wm', 'size'); report.density = await shell('wm', 'density');
     report.install = await adb('install', '-r', path.resolve(apk));
     await adb('logcat', '-c');
@@ -74,8 +82,12 @@ async function main() {
     if (scenario) await bounded(scenario.close(), 10000, 'WebView disconnect');
     browser = null;
     await shell('am', 'force-stop', pkg); report.processRestart = await launch();
-    await sleep(1500);
-    if (!(await shell('pidof', pkg))) throw new Error('No process after restart');
+    let restarted = false;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await sleep(1000);
+      try { if (await shell('pidof', pkg)) { restarted = true; break; } } catch (_) {}
+    }
+    if (!restarted) throw new Error('No process within 15 seconds after restart');
     for (let attempt = 0; attempt < 8; attempt++) {
       const dumped = await shell('uiautomator', 'dump', '/sdcard/remoteifes-smoke.xml');
       if (/dumped to:/.test(dumped)) {
@@ -94,9 +106,12 @@ async function main() {
   } catch (e) { report.errors.push(e.message); process.exitCode = 1; }
   finally {
     try { if (browser) await bounded(browser.close(), 10000, 'WebView disconnect'); } catch (_) {}
+    for (const [key, value] of [['user_rotation', previous.rotation], ['accelerometer_rotation', previous.auto]]) {
+      try {
+        await shell('settings', ...(value === 'null' ? ['delete', 'system', key] : ['put', 'system', key, value]));
+      } catch (e) { report.errors.push(e.message); process.exitCode = 1; }
+    }
     try {
-      await shell('settings', 'put', 'system', 'user_rotation', previous.rotation);
-      await shell('settings', 'put', 'system', 'accelerometer_rotation', previous.auto);
       const logs = await adb('logcat', '-d', '-v', 'threadtime');
       fs.writeFileSync(path.join(dir, 'logcat.txt'), logs);
       report.fatalLogLines = logs.split('\n').filter(l => /FATAL EXCEPTION|ANR in |am_anr|Render process.*crash|Fatal signal/.test(l));
