@@ -48,7 +48,8 @@ test("a conexão WebSocket entrega a lista de salas em tempo real após a sessã
   await expect.poll(() => framesSalas.length, { timeout: 15_000 }).toBeGreaterThan(0);
 });
 
-test("queda de rede mostra o aviso de conexão e o app se recupera ao voltar", async ({ page, sessaoComo, context, request }) => {
+test("queda de rede mostra o aviso de conexão e o app se recupera ao voltar", async ({ page, sessaoComo, context, request, browserName }) => {
+  test.skip(browserName === "webkit", "a emulação offline do Playwright não interrompe WebSockets no WebKit, então a queda de rede não é reproduzível nesse motor");
   await sessaoComo("user");
   await expect(page.locator("#screen-server-status")).toBeHidden();
 
@@ -89,7 +90,8 @@ test("sessão invalidada durante reconexão volta ao login sem loop", async ({ p
 });
 
 for (const papel of ["admin", "superadmin"]) {
-  test(`queda temporária para ${papel} mantém somente a reconexão automática`, async ({ page, sessaoComo, context, request }) => {
+  test(`queda temporária para ${papel} mantém somente a reconexão automática`, async ({ page, sessaoComo, context, request, browserName }) => {
+    test.skip(browserName === "webkit", "a emulação offline do Playwright não interrompe WebSockets no WebKit, então a queda de rede não é reproduzível nesse motor");
     await sessaoComo(papel);
     await context.setOffline(true);
     const fechado = await request.post(`${API_URL}/__e2e/fechar-status`);
@@ -100,6 +102,81 @@ for (const papel of ["admin", "superadmin"]) {
     await expect(page.getByText("Configurar endereço do servidor", { exact: true })).toHaveCount(0);
     await context.setOffline(false);
     await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 25_000 });
+  });
+}
+
+async function tokenInvalidado(request) {
+  const login = await request.post(`${API_URL}/login`, { data: { usuario: "e2e_user", senha: "e2e-user-pass-123" } });
+  expect(login.ok()).toBe(true);
+  const token = (await login.json()).token;
+  const logout = await request.post(`${API_URL}/logout`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(logout.ok()).toBe(true);
+  return token;
+}
+
+test("token salvo que o servidor já não aceita leva ao portal com a conexão ativa, sem ficar preso no aviso", async ({ page, context, request }) => {
+  const token = await tokenInvalidado(request);
+  await context.addInitScript((t) => {
+    try {
+      window.localStorage.setItem("remoteifes_token", t);
+    } catch (e) {}
+  }, token);
+
+  await page.goto("/");
+  await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 10_000 });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("remoteifes_token"))).toBeNull();
+  await expect.poll(() => page.evaluate(() => ServerStatus.estaConectado()), { timeout: 10_000 }).toBe(true);
+
+  await page.waitForTimeout(1500);
+  await expect(page.locator("#screen-server-status")).toBeHidden();
+  await page.locator('.portal-option[data-tipo="normal"]').click();
+  await expect(page.locator("#screen-login")).toBeVisible();
+  await expect(page.locator("#username")).toBeEditable();
+});
+
+const FALHAS_TRANSITORIAS_ME = {
+  "queda de rede": (route) => route.abort("failed"),
+  "resposta truncada": (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":tr' }),
+  "erro 502 do proxy": (route) => route.fulfill({ status: 502, contentType: "text/html", body: "<h1>Bad Gateway</h1>" }),
+};
+
+for (const [falha, responder] of Object.entries(FALHAS_TRANSITORIAS_ME)) {
+  test(`${falha} ao restaurar a sessão não encerra a sessão no servidor nem descarta o token`, async ({ page, context, request }) => {
+    const login = await request.post(`${API_URL}/login`, { data: { usuario: "e2e_user", senha: "e2e-user-pass-123" } });
+    expect(login.ok()).toBe(true);
+    const token = (await login.json()).token;
+    await context.addInitScript((t) => {
+      try {
+        window.localStorage.setItem("remoteifes_token", t);
+      } catch (e) {}
+    }, token);
+
+    const chamadasLogout = [];
+    await page.route(`${API_URL}/logout`, (route) => {
+      chamadasLogout.push(route.request().url());
+      return route.continue();
+    });
+    let primeiraChamada = true;
+    await page.route(`${API_URL}/me`, (route) => {
+      if (!primeiraChamada) return route.continue();
+      primeiraChamada = false;
+      return responder(route);
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 10_000 });
+    await page.waitForTimeout(1000);
+    expect(chamadasLogout, "nenhum logout é enviado por uma falha transitória").toEqual([]);
+    expect(await page.evaluate(() => localStorage.getItem("remoteifes_token"))).toBe(token);
+
+    const me = await request.get(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } });
+    expect(me.ok(), "a sessão continua válida no servidor").toBe(true);
+
+    await page.reload();
+    await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("#userTag")).toContainText("Usuário E2E");
   });
 }
 

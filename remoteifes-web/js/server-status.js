@@ -250,9 +250,10 @@ const ServerStatus = (() => {
         if (typeof Api !== "undefined") Api.limparSessaoLocal();
         if (typeof state !== "undefined" && state.usuario) {
           window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
-        } else if (typeof mostrarPortal === "function") {
-          mostrarPortal();
+          return;
         }
+        if (typeof mostrarPortal === "function") mostrarPortal();
+        reconectarComTokenAtual();
         return;
       }
       agendarReconexao();
@@ -260,12 +261,14 @@ const ServerStatus = (() => {
 
     socket.addEventListener("error", () => {
       if (idConexao !== conexaoId || ws !== socket) return;
-      if (socket.readyState === WebSocket.CLOSED) {
-        ws = null;
-        agendarReconexao();
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
         return;
       }
-      socket.close();
+      if (socket.readyState !== WebSocket.CLOSED) socket.close();
+      ws = null;
+      limparSonda();
+      agendarReconexao();
     });
   }
 

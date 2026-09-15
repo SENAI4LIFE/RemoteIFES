@@ -59,7 +59,8 @@ test.afterAll(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("PWA instalada atualiza A para B, remove cache obsoleto e continua offline", async ({ page, context }) => {
+test("PWA instalada atualiza A para B, remove cache obsoleto e continua offline", async ({ page, context, browserName }) => {
+  test.skip(browserName === "webkit", "no projeto WebKit o service worker fica bloqueado para que page.route intercepte a API; a emulação offline do Playwright tampouco alcança navegações servidas pelo worker nesse motor");
   await page.goto(origin);
   await expect.poll(() => page.locator('meta[name="remoteifes-version"]').getAttribute("content")).toBe("pwa-a");
   await page.evaluate(() => navigator.serviceWorker.ready);

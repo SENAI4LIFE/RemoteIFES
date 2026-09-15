@@ -397,6 +397,7 @@ test("mudar espaçamento de letras ou família da fonte redesenha a geometria do
   await expect.poll(() => page.locator("#monGraficosSeries svg").count(), { timeout: 20_000 }).toBe(FIGURAS_HISTORICO.length);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
+  await page.mouse.move(0, 0);
   const plot = page.locator("#grRss .gr-plot");
   await plot.focus();
   await page.keyboard.press("Home");
@@ -430,13 +431,19 @@ test("mudar espaçamento de letras ou família da fonte redesenha a geometria do
   expect(await page.locator("#grRss .gr-cursor").getAttribute("visibility")).toBe("visible");
 
   await marcar("espacado");
+  const familiaAntes = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
   await page.locator("#a11yToggleBtn").click();
   await expect(page.locator("#a11yPanel")).toBeVisible();
   await page.locator("#a11yFontTypeDyslexicBtn").click();
   await expect.poll(async () => (await geometria()).marca, { timeout: 5_000 }).toBe("");
   const comFonte = await geometria();
   expect(comFonte.largura).toBe(antes.largura);
-  expect(comFonte.margemEsquerda).not.toBe(comEspacamento.margemEsquerda);
+  const fontesDiferem = await page.evaluate((antes) => {
+    const contexto = document.createElement("canvas").getContext("2d");
+    const medir = (familia) => { contexto.font = `12px ${familia}`; return contexto.measureText("0123456789 MB").width; };
+    return medir(antes) !== medir(getComputedStyle(document.body).fontFamily);
+  }, familiaAntes);
+  if (fontesDiferem) expect(comFonte.margemEsquerda).not.toBe(comEspacamento.margemEsquerda);
   await page.locator("#a11yCloseBtn").click();
 
   await expect(page.locator("#monGraficosBloco .gr-faixa[data-faixa='24h']")).toHaveAttribute("aria-pressed", "true");
