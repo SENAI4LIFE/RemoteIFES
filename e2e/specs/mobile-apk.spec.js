@@ -153,6 +153,46 @@ test("baixar o aplicativo publicado confirma a integridade pelo SHA-256 anunciad
   expect(baixado, "arquivo salvo é exatamente o artefato anunciado").toBe(meta.sha256);
 });
 
+async function semCryptoSubtle(context) {
+  await context.addInitScript(() => {
+    Object.defineProperty(window.crypto, "subtle", { configurable: true, get: () => undefined });
+  });
+}
+
+test("em origem HTTP sem crypto.subtle (rede local sem HTTPS) o download ainda confere o SHA-256", async ({ page, context, request }) => {
+  const meta = await publicarApkFixture(request);
+  await semCryptoSubtle(context);
+  await abrirAplicativo(page, context);
+  expect(await page.evaluate(() => typeof crypto.subtle)).toBe("undefined");
+  const baixar = page.locator(".mobile-app-download-btn");
+  await expect(baixar).toBeVisible();
+
+  const [download] = await Promise.all([page.waitForEvent("download"), baixar.click()]);
+
+  await expect(page.locator(".mobile-app-verify")).toContainText("Integridade confirmada");
+  await expect(page.locator(".mobile-app-verify")).not.toHaveClass(/mobile-app-verify-erro/);
+  const baixado = crypto.createHash("sha256").update(fs.readFileSync(await download.path())).digest("hex");
+  expect(baixado).toBe(meta.sha256);
+});
+
+test("em origem HTTP sem crypto.subtle um APK adulterado continua sendo recusado", async ({ page, context, request }) => {
+  await publicarApkFixture(request);
+  await semCryptoSubtle(context);
+  await abrirAplicativo(page, context);
+  const baixar = page.locator(".mobile-app-download-btn");
+  await expect(baixar).toBeVisible();
+  await page.route("**/mobile-app/android", (route) =>
+    route.fulfill({ status: 200, headers: { "content-type": "application/vnd.android.package-archive" }, body: Buffer.from("conteudo-adulterado-em-transito") })
+  );
+  let baixou = false;
+  page.on("download", () => {
+    baixou = true;
+  });
+  await baixar.click();
+  await expect(page.locator(".mobile-app-verify-erro")).toContainText("verificação de integridade");
+  expect(baixou).toBe(false);
+});
+
 test("um APK adulterado em trânsito é recusado pela verificação de integridade no cliente", async ({ page, context, request }) => {
   await publicarApkFixture(request);
   await abrirAplicativo(page, context);

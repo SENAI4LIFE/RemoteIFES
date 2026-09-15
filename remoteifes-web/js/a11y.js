@@ -212,6 +212,11 @@
       });
     }
 
+    function confirmarAoSoltar(slider, confirmar) {
+      slider.addEventListener("change", confirmar);
+      slider.addEventListener("touchend", confirmar, { passive: true });
+    }
+
     function atualizarPreenchimentoSlider(input) {
       if (!input) return;
       const min = parseFloat(input.min) || 0;
@@ -312,7 +317,7 @@
         atualizarPreenchimentoSlider(fontSlider);
         if (fontValue) fontValue.textContent = `${Math.round(parseFloat(fontSlider.value) * 100)}%`;
       });
-      fontSlider.addEventListener("change", () => definirFonte(parseFloat(fontSlider.value)));
+      confirmarAoSoltar(fontSlider, () => definirFonte(parseFloat(fontSlider.value)));
     }
     if (fontDecreaseBtn) fontDecreaseBtn.addEventListener("click", () => definirFonte(escalaFonte - FONTE_PASSO));
     if (fontIncreaseBtn) fontIncreaseBtn.addEventListener("click", () => definirFonte(escalaFonte + FONTE_PASSO));
@@ -329,7 +334,7 @@
         atualizarPreenchimentoSlider(spacingSlider);
         if (spacingValue) spacingValue.textContent = parseFloat(spacingSlider.value).toFixed(2).replace(/\.?0+$/, "") || "0";
       });
-      spacingSlider.addEventListener("change", () => definirEspacamento(parseFloat(spacingSlider.value)));
+      confirmarAoSoltar(spacingSlider, () => definirEspacamento(parseFloat(spacingSlider.value)));
     }
     if (spacingDecreaseBtn) spacingDecreaseBtn.addEventListener("click", () => definirEspacamento(espacamento - ESPACAMENTO_PASSO));
     if (spacingIncreaseBtn) spacingIncreaseBtn.addEventListener("click", () => definirEspacamento(espacamento + ESPACAMENTO_PASSO));
@@ -346,7 +351,7 @@
         atualizarPreenchimentoSlider(lineSlider);
         if (lineValue) lineValue.textContent = parseFloat(lineSlider.value).toFixed(1);
       });
-      lineSlider.addEventListener("change", () => definirAltura(parseFloat(lineSlider.value)));
+      confirmarAoSoltar(lineSlider, () => definirAltura(parseFloat(lineSlider.value)));
     }
     if (lineDecreaseBtn) lineDecreaseBtn.addEventListener("click", () => definirAltura(altura - ALTURA_PASSO));
     if (lineIncreaseBtn) lineIncreaseBtn.addEventListener("click", () => definirAltura(altura + ALTURA_PASSO));
@@ -372,7 +377,7 @@
         atualizarPreenchimentoSlider(paragraphSlider);
         if (paragraphValue) paragraphValue.textContent = LARGURA_PARAGRAFO_ROTULOS[parseInt(paragraphSlider.value, 10)] || "Padrão";
       });
-      paragraphSlider.addEventListener("change", () => definirLarguraParagrafo(parseInt(paragraphSlider.value, 10)));
+      confirmarAoSoltar(paragraphSlider, () => definirLarguraParagrafo(parseInt(paragraphSlider.value, 10)));
     }
     if (paragraphDecreaseBtn) paragraphDecreaseBtn.addEventListener("click", () => definirLarguraParagrafo(larguraParagrafo - 1));
     if (paragraphIncreaseBtn) paragraphIncreaseBtn.addEventListener("click", () => definirLarguraParagrafo(larguraParagrafo + 1));

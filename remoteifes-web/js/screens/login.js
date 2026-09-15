@@ -118,7 +118,7 @@ async function restaurarSessaoSalva() {
   }
   const resp = await Api.me();
   if (!resp.ok) {
-    await Api.logout();
+    if (resp.manutencao) await Api.logout();
     abrirAjudaSemSessao();
     return false;
   }

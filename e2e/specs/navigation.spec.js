@@ -220,7 +220,8 @@ test("deep link em caminho com /index.html é restaurado após refresh (estilo C
   expect(await page.evaluate(() => location.pathname)).toMatch(/\/index\.html$/);
 });
 
-test("o manual abre por link direto mesmo offline, servido pelo cache do PWA", async ({ page, context }) => {
+test("o manual abre por link direto mesmo offline, servido pelo cache do PWA", async ({ page, context, browserName }) => {
+  test.skip(browserName === "webkit", "no projeto WebKit o service worker fica bloqueado para que page.route intercepte a API; a emulação offline do Playwright tampouco alcança navegações servidas pelo worker nesse motor");
   await page.goto("/");
   await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
   await page.evaluate(() => navigator.serviceWorker.ready);
