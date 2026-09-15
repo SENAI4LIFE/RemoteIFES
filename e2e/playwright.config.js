@@ -11,6 +11,21 @@ process.env.E2E_WEB_PORT = String(WEB_PORT);
 process.env.E2E_API_URL = API_URL;
 process.env.E2E_WEB_URL = WEB_URL;
 
+const NAVEGADORES = {
+  chromium: { name: "chrome-desktop", use: { ...devices["Desktop Chrome"], channel: process.env.E2E_BROWSER_CHANNEL || undefined } },
+  firefox: { name: "firefox-desktop", use: { ...devices["Desktop Firefox"] } },
+  webkit: { name: "webkit-desktop", use: { ...devices["Desktop Safari"], serviceWorkers: "block" } },
+};
+
+const projects = (process.env.E2E_BROWSERS || "chromium")
+  .split(",")
+  .map((nome) => nome.trim())
+  .filter(Boolean)
+  .map((nome) => {
+    if (!NAVEGADORES[nome]) throw new Error(`E2E_BROWSERS: navegador desconhecido "${nome}" (use chromium, firefox ou webkit)`);
+    return NAVEGADORES[nome];
+  });
+
 module.exports = defineConfig({
   testDir: "./specs",
   timeout: 45_000,
@@ -21,7 +36,6 @@ module.exports = defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL: WEB_URL,
-    channel: process.env.E2E_BROWSER_CHANNEL || undefined,
     headless: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
@@ -30,7 +44,7 @@ module.exports = defineConfig({
   },
   globalSetup: require.resolve("./harness/global-setup.js"),
   globalTeardown: require.resolve("./harness/global-teardown.js"),
-  projects: [{ name: "chrome-desktop", use: { ...devices["Desktop Chrome"] } }],
+  projects,
   webServer: [
     {
       command: `node ${path.join(__dirname, "harness", "api-server.js")}`,
