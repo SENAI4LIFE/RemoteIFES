@@ -274,9 +274,13 @@ test("uma rota com sala inexistente não deixa uma repetição infinita rodando 
 
   await page.evaluate(() => Router.ir("/agenda/OUTRA-INEXISTENTE"));
   await expect(page.locator("#screen-agenda")).toBeVisible();
-  await page.waitForTimeout(4500);
+  await expect
+    .poll(async () => {
+      const antes = await page.evaluate(() => window.__retentativas);
+      await page.waitForTimeout(1500);
+      return (await page.evaluate(() => window.__retentativas)) - antes;
+    }, { message: "a repetição é limitada mesmo permanecendo na rota inválida", timeout: 20_000 })
+    .toBe(0);
   const limitadas = await page.evaluate(() => window.__retentativas);
-  await page.waitForTimeout(1500);
-  expect(await page.evaluate(() => window.__retentativas), "a repetição é limitada mesmo permanecendo na rota inválida").toBe(limitadas);
   expect(limitadas - aoSair).toBeLessThanOrEqual(26);
 });

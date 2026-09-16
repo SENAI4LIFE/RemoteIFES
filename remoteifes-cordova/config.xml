@@ -31,7 +31,7 @@
                 <true />
             </dict>
         </edit-config>
-        <preference name="deployment-target" value="13.0" />
+        <preference name="deployment-target" value="15.4" />
         <icon src="resources/icon.png" />
         <splash src="resources/splash.png" />
     </platform>

@@ -233,8 +233,25 @@ function limparHistoricoMonitoramento() {
   monitoramentoService.limparCacheHistorico();
 }
 
-function semearHistoricoMonitoramento({ horas = 26, lacunaMinutos = 40, reinicioMinutos = 300 } = {}) {
+function semearHistoricoMonitoramento(opcoes) {
   limparHistoricoMonitoramento();
+  db.exec("BEGIN");
+  try {
+    inserirHistoricoMonitoramento(opcoes);
+    db.exec("COMMIT");
+  } catch (erro) {
+    db.exec("ROLLBACK");
+    throw erro;
+  }
+  monitoramentoService.consolidarHoras();
+  monitoramentoService.limparCacheHistorico();
+  return {
+    amostras: db.prepare("SELECT COUNT(*) n FROM monitoramento_amostras").get().n,
+    horas: db.prepare("SELECT COUNT(*) n FROM monitoramento_horas").get().n,
+  };
+}
+
+function inserirHistoricoMonitoramento({ horas = 26, lacunaMinutos = 40, reinicioMinutos = 300 } = {}) {
   const minutosAtras = (min) => db.prepare("SELECT datetime('now', ?) d").get(`-${min} minutes`).d;
   const totalMinutos = Math.round(horas * 60);
   const bootA = minutosAtras(totalMinutos + 30);
@@ -276,12 +293,6 @@ function semearHistoricoMonitoramento({ horas = 26, lacunaMinutos = 40, reinicio
   const notificacao = db.prepare("INSERT INTO notificacoes (tipo, sala, mensagem, lida, criadoEm) VALUES (?, ?, ?, 1, ?)");
   notificacao.run("esp32_ota_falha", sala, "e2e-historico falha", minutosAtras(650));
   notificacao.run("esp32_ota_ok", sala, "e2e-historico ok", minutosAtras(600));
-  monitoramentoService.consolidarHoras();
-  monitoramentoService.limparCacheHistorico();
-  return {
-    amostras: db.prepare("SELECT COUNT(*) n FROM monitoramento_amostras").get().n,
-    horas: db.prepare("SELECT COUNT(*) n FROM monitoramento_horas").get().n,
-  };
 }
 
 app.post("/__e2e/monitoramento-historico", (req, res) => {
