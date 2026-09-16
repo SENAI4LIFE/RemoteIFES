@@ -20,6 +20,7 @@ test("liga e desliga o ar-condicionado de uma sala com ESP32 conectado", async (
 test("ajuste de temperatura respeita os limites e atualiza o alvo exibido", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
+  await expect(page.locator("#btnPower")).toBeEnabled({ timeout: 15_000 });
 
   const alvo = page.locator("#tempTarget");
   const lerAlvo = async () => parseInt((await alvo.textContent()).replace(/\D/g, ""), 10);
