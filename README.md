@@ -1139,6 +1139,8 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 
 `.github/workflows/ci.yml` roda em cada push e pull request para `main` (e sob demanda em **Actions > CI > Run workflow**) quatro jobs independentes: servidor (`npm test` + health check), frontend end-to-end (Playwright, em matriz com Chromium, Firefox e WebKit), validação de configuração Cordova e build do firmware ESP32. Nenhum token adicional é necessário.
 
+Todas as actions dos workflows são referenciadas pelo SHA completo do commit (a versão correspondente fica em comentário ao lado), de modo que uma tag movida ou comprometida no repositório da action não altera o que o CI executa. O `.github/dependabot.yml` abre mensalmente um único pull request agrupado com as atualizações dessas actions; ao aceitá-lo, o SHA e o comentário de versão avançam juntos.
+
 ## Uso da API do GitHub
 
 Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita à hospedagem do código-fonte, ao workflow opcional `.github/workflows/pages.yml` que publica `remoteifes-web` no GitHub Pages e ao workflow de CI descrito em [Testes e Integração Contínua](#testes-e-integração-contínua). A publicação usa apenas o `GITHUB_TOKEN` efêmero fornecido automaticamente ao workflow, com a permissão mínima `pages: write`/`id-token: write`.
