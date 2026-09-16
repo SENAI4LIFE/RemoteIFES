@@ -4,17 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>RemoteIFES</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2026.09.15.1" />
+  <script>
+    (function () {
+      var suportado = false;
+      try {
+        new Function("a", "return a?.b ?? 0");
+        suportado = typeof Element.prototype.replaceChildren === "function"
+          && typeof CSS !== "undefined" && CSS.supports("selector(:has(*))") && CSS.supports("height", "1dvh");
+      } catch (erro) {}
+      if (suportado) return;
+      document.write('<div id="navegador-incompativel" role="alert" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;overflow:auto;padding:32px 20px;background:#f4f6f4;color:#1f2b23;font:16px/1.5 system-ui,-apple-system,\'Segoe UI\',Roboto,Arial,sans-serif;text-align:center">'
+        + '<div style="max-width:440px;margin:0 auto">'
+        + '<h1 style="font-size:22px;margin:0 0 12px;color:#1c6b3c">Navegador desatualizado</h1>'
+        + '<p style="margin:0 0 12px">Este navegador não tem os recursos que o RemoteIFES usa, e a aplicação não foi carregada para não funcionar pela metade.</p>'
+        + '<p style="margin:0 0 12px">No Android, atualize o <strong>Android System WebView</strong> e o Chrome pela Play Store; em outros aparelhos, atualize o navegador. Depois, abra o RemoteIFES novamente.</p>'
+        + '<p style="margin:0;font-size:14px;color:#5c6b60">Versões mínimas: Chrome ou WebView 108, Safari 15.4, Firefox 121.</p>'
+        + '</div></div><!--');
+    })();
+  </script>
+  <link rel="manifest" href="manifest.webmanifest?v=2026.09.16.1" />
   <meta name="theme-color" content="#1c6b3c" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemoteIFES" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.15.1" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.15.1" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.15.1" />
-  <meta name="remoteifes-version" content="2026.09.15.1" />
-  <link rel="stylesheet" href="css/style.css?v=2026.09.15.1" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.16.1" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.16.1" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.16.1" />
+  <meta name="remoteifes-version" content="2026.09.16.1" />
+  <link rel="stylesheet" href="css/style.css?v=2026.09.16.1" />
 </head>
 <body>
 
@@ -87,7 +105,7 @@
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
-      <img src="assets/remoteifes-logo.png?v=2026.09.15.1" alt="RemoteIFES" />
+      <img src="assets/remoteifes-logo.png?v=2026.09.16.1" alt="RemoteIFES" />
       <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
@@ -153,7 +171,7 @@
             </div>
           </div>
           <div class="portal-footer">
-            <img src="assets/ifes-logo.png?v=2026.09.15.1" alt="Instituto Federal do Espírito Santo" />
+            <img src="assets/ifes-logo.png?v=2026.09.16.1" alt="Instituto Federal do Espírito Santo" />
             <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
@@ -1582,46 +1600,46 @@
     </div>
   </div>
 
-  <script src="js/version.js?v=2026.09.15.1"></script>
-  <script src="js/icons.js?v=2026.09.15.1"></script>
-  <script src="js/state.js?v=2026.09.15.1"></script>
-  <script src="js/config.js?v=2026.09.15.1"></script>
-  <script src="js/toast.js?v=2026.09.15.1"></script>
-  <script src="js/server-status.js?v=2026.09.15.1"></script>
-  <script src="js/tempo.js?v=2026.09.15.1"></script>
-  <script src="js/rooms-data.js?v=2026.09.15.1"></script>
-  <script src="js/api.js?v=2026.09.15.1"></script>
-  <script src="js/rtstatus.js?v=2026.09.15.1"></script>
-  <script src="js/nav.js?v=2026.09.15.1"></script>
-  <script src="js/idle-timer.js?v=2026.09.15.1"></script>
-  <script src="js/a11y.js?v=2026.09.15.1"></script>
-  <script src="js/ui-dialog.js?v=2026.09.15.1"></script>
-  <script src="js/ui-status.js?v=2026.09.15.1"></script>
-  <script src="js/help.js?v=2026.09.15.1"></script>
-  <script src="js/screens/notifications.js?v=2026.09.15.1"></script>
-  <script src="js/screens/relatos.js?v=2026.09.15.1"></script>
-  <script src="js/screens/login.js?v=2026.09.15.1"></script>
-  <script src="js/screens/portal-funcoes.js?v=2026.09.15.1"></script>
-  <script src="js/screens/location.js?v=2026.09.15.1"></script>
-  <script src="js/screens/simple.js?v=2026.09.15.1"></script>
-  <script src="js/floorplan.js?v=2026.09.15.1"></script>
-  <script src="js/screens/floorplan.js?v=2026.09.15.1"></script>
-  <script src="js/screens/rooms.js?v=2026.09.15.1"></script>
-  <script src="js/screens/panel.js?v=2026.09.15.1"></script>
-  <script src="js/screens/schedule.js?v=2026.09.15.1"></script>
-  <script src="js/screens/grade.js?v=2026.09.15.1"></script>
-  <script src="js/screens/propriedade.js?v=2026.09.15.1"></script>
-  <script src="js/charts.js?v=2026.09.15.1"></script>
-  <script src="js/screens/monitoramento.js?v=2026.09.15.1"></script>
-  <script src="js/screens/heatmap.js?v=2026.09.15.1"></script>
-  <script src="js/screens/inicio.js?v=2026.09.15.1"></script>
-  <script src="js/screens/admin.js?v=2026.09.15.1"></script>
-  <script src="js/screens/esp32-admin.js?v=2026.09.15.1"></script>
-  <script src="js/screens/protocolos-ir-admin.js?v=2026.09.15.1"></script>
-  <script src="js/screens/manual.js?v=2026.09.15.1"></script>
-  <script src="js/screens/mobile-app.js?v=2026.09.15.1"></script>
-  <script src="js/account-menu.js?v=2026.09.15.1"></script>
-  <script src="js/router.js?v=2026.09.15.1"></script>
-  <script src="js/app.js?v=2026.09.15.1"></script>
+  <script src="js/version.js?v=2026.09.16.1"></script>
+  <script src="js/icons.js?v=2026.09.16.1"></script>
+  <script src="js/state.js?v=2026.09.16.1"></script>
+  <script src="js/config.js?v=2026.09.16.1"></script>
+  <script src="js/toast.js?v=2026.09.16.1"></script>
+  <script src="js/server-status.js?v=2026.09.16.1"></script>
+  <script src="js/tempo.js?v=2026.09.16.1"></script>
+  <script src="js/rooms-data.js?v=2026.09.16.1"></script>
+  <script src="js/api.js?v=2026.09.16.1"></script>
+  <script src="js/rtstatus.js?v=2026.09.16.1"></script>
+  <script src="js/nav.js?v=2026.09.16.1"></script>
+  <script src="js/idle-timer.js?v=2026.09.16.1"></script>
+  <script src="js/a11y.js?v=2026.09.16.1"></script>
+  <script src="js/ui-dialog.js?v=2026.09.16.1"></script>
+  <script src="js/ui-status.js?v=2026.09.16.1"></script>
+  <script src="js/help.js?v=2026.09.16.1"></script>
+  <script src="js/screens/notifications.js?v=2026.09.16.1"></script>
+  <script src="js/screens/relatos.js?v=2026.09.16.1"></script>
+  <script src="js/screens/login.js?v=2026.09.16.1"></script>
+  <script src="js/screens/portal-funcoes.js?v=2026.09.16.1"></script>
+  <script src="js/screens/location.js?v=2026.09.16.1"></script>
+  <script src="js/screens/simple.js?v=2026.09.16.1"></script>
+  <script src="js/floorplan.js?v=2026.09.16.1"></script>
+  <script src="js/screens/floorplan.js?v=2026.09.16.1"></script>
+  <script src="js/screens/rooms.js?v=2026.09.16.1"></script>
+  <script src="js/screens/panel.js?v=2026.09.16.1"></script>
+  <script src="js/screens/schedule.js?v=2026.09.16.1"></script>
+  <script src="js/screens/grade.js?v=2026.09.16.1"></script>
+  <script src="js/screens/propriedade.js?v=2026.09.16.1"></script>
+  <script src="js/charts.js?v=2026.09.16.1"></script>
+  <script src="js/screens/monitoramento.js?v=2026.09.16.1"></script>
+  <script src="js/screens/heatmap.js?v=2026.09.16.1"></script>
+  <script src="js/screens/inicio.js?v=2026.09.16.1"></script>
+  <script src="js/screens/admin.js?v=2026.09.16.1"></script>
+  <script src="js/screens/esp32-admin.js?v=2026.09.16.1"></script>
+  <script src="js/screens/protocolos-ir-admin.js?v=2026.09.16.1"></script>
+  <script src="js/screens/manual.js?v=2026.09.16.1"></script>
+  <script src="js/screens/mobile-app.js?v=2026.09.16.1"></script>
+  <script src="js/account-menu.js?v=2026.09.16.1"></script>
+  <script src="js/router.js?v=2026.09.16.1"></script>
+  <script src="js/app.js?v=2026.09.16.1"></script>
 </body>
 </html>
