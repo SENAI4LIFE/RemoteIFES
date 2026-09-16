@@ -1124,7 +1124,7 @@ Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (ex
 |---|---|
 | `python3 export.py` | Adiciona todas as alterações (`git add -A`), pede uma mensagem de commit (ou usa `update` como padrão) e envia (`git push origin main`) |
 | `python3 import.py` | Atualiza a cópia local a partir do remoto (`git pull origin main`) |
-| `python3 clear.py` | Recria o histórico do repositório do zero em um único commit (`checkout --orphan`) e, mediante confirmação explícita, sobrescreve o histórico remoto (`push -f`) — apaga permanentemente todo o histórico de commits anterior; use apenas se isso for intencional |
+| `python3 clear.py` | Recria o histórico do repositório do zero em um único commit (`checkout --orphan`) e, mediante confirmação explícita, sobrescreve o histórico remoto (`push -f`) — apaga permanentemente todo o histórico de commits anterior; use apenas se isso for intencional. O ruleset de `main` no GitHub bloqueia push forçado, então esse `push -f` só passa se um administrador desativar temporariamente a regra em **Settings > Rules > Rulesets** |
 
 O repositório inclui um `.gitignore` na raiz que já ignora `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas). Se você clonou uma cópia antiga do repositório em que esse arquivo não existia e chegou a commitar `.env` ou o banco, rode `git rm --cached` nesses arquivos antes de publicar o repositório.
 
@@ -1157,6 +1157,8 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 - build do firmware ESP32.
 
 `.github/workflows/ios.yml` (macOS) prepara a plataforma iOS com o `cordova-ios` travado no lockfile, compila o app para o iOS Simulator com o Xcode do runner e executa `npm run test-ios`; veja [iOS e recursos visuais](#ios-e-recursos-visuais) para o que essa execução comprova. Nenhum token adicional é necessário.
+
+A branch `main` é protegida por um ruleset do GitHub (**Settings > Rules > Rulesets**, regra `main`) que bloqueia a exclusão da branch e qualquer push que não seja fast-forward (`push -f`, rebase publicado), sem exceção para administradores. Pushes normais, `export.py` e `import.py` continuam iguais; um erro do tipo `non-fast-forward` ou `deletion` vindo do GitHub indica a regra, não um problema local. Como o fluxo do projeto é de push direto em `main`, a regra não exige pull request nem status checks — exigir checks bloquearia todo push direto.
 
 Todas as actions dos workflows são referenciadas pelo SHA completo do commit (a versão correspondente fica em comentário ao lado), de modo que uma tag movida ou comprometida no repositório da action não altera o que o CI executa. O `.github/dependabot.yml` abre mensalmente um único pull request agrupado com as atualizações dessas actions dentro da mesma versão maior (o que as tags `@vN` anteriores já acompanhavam); ao aceitá-lo, o SHA e o comentário de versão avançam juntos. A troca de versão maior de uma action continua sendo uma decisão manual.
 
