@@ -72,9 +72,9 @@ const ServerStatus = (() => {
     return (typeof Api !== "undefined" && Api.obterToken()) || "";
   }
 
-  function mostrarIcone(nome) {
+  function mostrarIcone(nome, tom) {
     spinner.classList.add("hidden");
-    Icones.aplicar(icone, nome);
+    Icones.aplicar(icone, nome, tom);
     icone.classList.remove("hidden");
   }
 
@@ -137,7 +137,7 @@ const ServerStatus = (() => {
       return;
     }
     tela.classList.remove("hidden");
-    mostrarIcone("ferramenta");
+    mostrarIcone("ferramenta", "tom-atencao");
     aplicarChip("manutencao", "Em manutenção");
     titulo.textContent = "Sistema em manutenção";
     desc.textContent = "O RemoteIFES está passando por uma manutenção programada. Tente novamente em alguns instantes.";

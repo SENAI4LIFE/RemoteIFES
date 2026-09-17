@@ -471,7 +471,7 @@ const Admin = {
       const bloco = document.createElement("div");
       const titulo = document.createElement("div");
       titulo.className = "room-name";
-      titulo.innerHTML = `${Icones.markup("auditoria", "icone-inline")} ${escapeHtml(evento.descricao)}`;
+      titulo.innerHTML = `${Icones.markup("auditoria", "icone-inline tom-admin")} ${escapeHtml(evento.descricao)}`;
       const meta = document.createElement("div");
       meta.className = "room-sub";
       const ator = evento.atorLogin ? `@${evento.atorLogin}` : "sistema";
@@ -516,7 +516,7 @@ const Admin = {
       const bloco = document.createElement("div");
       const titulo = document.createElement("div");
       titulo.className = "room-name";
-      titulo.innerHTML = `${Icones.markup("dispositivo", "icone-inline")} ${escapeHtml(RoomsData.rotulo(periodo.sala))}`;
+      titulo.innerHTML = `${Icones.markup("dispositivo", "icone-inline tom-dispositivo")} ${escapeHtml(RoomsData.rotulo(periodo.sala))}`;
       const meta = document.createElement("div");
       meta.className = "room-sub";
       if (periodo.onlineEm) {
