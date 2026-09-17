@@ -54,11 +54,64 @@ trap 'rm -f "$LOCK"' EXIT
 
 [ "$OFFLINE" -eq 1 ] || git fetch --tags --prune origin >/dev/null 2>&1 || true
 
+# shellcheck source=verificar-versao.sh
+. ./verificar-versao.sh
+ROTULO_VERSAO="a reversão"
+
 ALVO=$(git rev-parse --verify --quiet "${REF}^{commit}") || { echo "não foi possível resolver o ref '${REF}'."; exit 1; }
 ANTES=$(git rev-parse HEAD)
+
+registrar_rollback_ok() {
+  mkdir -p "$DATA_DIR"
+  echo "$(date -Iseconds) rollback ${1} -> ${ALVO} ok (${VERSAO_CONFIRMACAO})" >> "$DATA_DIR/deploy.log"
+  [ -n "$1" ] && [ "$1" != "$ALVO" ] && echo "$1" > "$DATA_DIR/previous-version"
+  echo "$ALVO" > "$DATA_DIR/current-version"
+  bash healthcheck.sh
+  echo ""
+  echo "Rollback concluído: $ALVO (${VERSAO_RESUMO})"
+  echo "Se a versão revertida usa um esquema de banco mais antigo e incompatível, restaure também o backup pré-atualização: npm run restore"
+}
+
+# HEAD já é o alvo (rollback interrompido, reversão anterior que não confirmou o reinício, ou
+# --no-restart): só é "nada a fazer" quando o processo em execução confirma a versão.
 if [ "$ALVO" = "$ANTES" ]; then
-  echo "Já está em $ALVO. Nada a fazer."
-  exit 0
+  if [ "$RESTART" -eq 0 ]; then
+    echo "Já está em $ALVO. Serviço não reiniciado nem verificado (--no-restart)."
+    exit 0
+  fi
+  if ler_saude && [ "$VERSAO_EM_EXECUCAO" = "$ALVO" ]; then
+    echo "Já está em $ALVO e o processo em execução a confirma. Nada a fazer."
+    exit 0
+  fi
+  echo "O código já está em $ALVO, mas o processo em execução $(descrever_em_execucao); reiniciando para aplicá-la."
+  EM_EXECUCAO_ANTES="$VERSAO_EM_EXECUCAO"
+  if [ -f "$DB_PATH" ]; then
+    echo "Backup do banco antes do rollback..."
+    node --env-file-if-exists=.env backup-db.js pre-rollback || { echo "backup falhou; abortando."; exit 1; }
+  fi
+  PRECISA_NPM=0
+  if [ -z "$EM_EXECUCAO_ANTES" ] || ! git cat-file -e "${EM_EXECUCAO_ANTES}^{commit}" 2>/dev/null; then
+    echo "Versão em execução desconhecida; rodando npm ci para garantir as dependências de $ALVO..."
+    PRECISA_NPM=1
+  elif git diff --name-only "$EM_EXECUCAO_ANTES" "$ALVO" -- package.json package-lock.json | grep -q .; then
+    echo "Dependências mudaram em relação à versão em execução; rodando npm ci..."
+    PRECISA_NPM=1
+  fi
+  if [ "$PRECISA_NPM" -eq 1 ]; then
+    flags=(--omit=dev --no-audit --no-fund)
+    [ "$OFFLINE" -eq 1 ] && flags+=(--offline)
+    npm ci "${flags[@]}" || { echo "npm ci falhou; o serviço não foi reiniciado."; exit 1; }
+  fi
+  reiniciar_servico
+  if aguardar_versao "$ALVO"; then
+    registrar_rollback_ok "$EM_EXECUCAO_ANTES"
+    exit 0
+  fi
+  echo "ATENÇÃO: o código está em $ALVO, mas ${VERSAO_MOTIVO}."
+  mkdir -p "$DATA_DIR"
+  echo "$(date -Iseconds) rollback ${EM_EXECUCAO_ANTES:-?} -> ${ALVO} FALHOU: ${VERSAO_MOTIVO}" >> "$DATA_DIR/deploy.log"
+  echo "Verifique 'journalctl -u remoteifes.service -e'. Se necessário, restaure o banco: npm run restore"
+  exit 1
 fi
 
 if [ -f "$DB_PATH" ]; then
@@ -93,43 +146,15 @@ if [ "$RESTART" -eq 0 ]; then
   exit 0
 fi
 
-echo "Reiniciando remoteifes.service..."
-$SYSTEMCTL restart remoteifes.service || echo "aviso: 'systemctl restart' retornou erro; verificando qual versão está em execução mesmo assim."
+reiniciar_servico
 
-# Commit reportado pelo /health do processo em execução (vazio se ele não informa). Falha se o /health não responde.
-versao_em_execucao() {
-  local corpo
-  corpo=$(bash healthcheck.sh 2>/dev/null) || return 1
-  printf '%s' "$corpo" | sed -n 's/.*"commit":"\([0-9a-f]\{40\}\)".*/\1/p'
-}
-
-# Só é rollback concluído quando o processo em execução informa o commit alvo; um processo antigo que
-# sobreviveu a um 'restart' que falhou responde saudável e não conta. Uma versão alvo anterior ao campo
-# de commit no /health (que não o informa) é aceita pelo /health saudável, com aviso.
-VERSAO_EM_EXECUCAO=""
-for _ in $(seq 1 "$ESPERA_SAUDE_TENTATIVAS"); do
-  if VERSAO_EM_EXECUCAO=$(versao_em_execucao); then
-    if [ "$VERSAO_EM_EXECUCAO" = "$ALVO" ] || [ -z "$VERSAO_EM_EXECUCAO" ]; then
-      [ -z "$VERSAO_EM_EXECUCAO" ] && echo "aviso: o processo em execução não informa o commit no /health (versão anterior a esse campo); aceitando pelo /health saudável."
-      mkdir -p "$DATA_DIR"
-      echo "$(date -Iseconds) rollback ${ANTES} -> ${ALVO} ok (processo em execução: ${VERSAO_EM_EXECUCAO:-sem commit informado})" >> "$DATA_DIR/deploy.log"
-      echo "$ANTES" > "$DATA_DIR/previous-version"
-      echo "$ALVO" > "$DATA_DIR/current-version"
-      bash healthcheck.sh
-      echo ""
-      echo "Rollback concluído: $ALVO"
-      echo "Se a versão revertida usa um esquema de banco mais antigo e incompatível, restaure também o backup pré-atualização: npm run restore"
-      exit 0
-    fi
-  fi
-  sleep "$ESPERA_SAUDE_INTERVALO"
-done
-
-if [ -z "$VERSAO_EM_EXECUCAO" ]; then
-  echo "ATENÇÃO: código revertido para $ALVO, mas o /health não respondeu saudável."
-else
-  echo "ATENÇÃO: código revertido para $ALVO, mas o processo em execução continua em ${VERSAO_EM_EXECUCAO} (o reinício não aplicou a reversão)."
+if aguardar_versao "$ALVO"; then
+  registrar_rollback_ok "$ANTES"
+  exit 0
 fi
-echo "$(date -Iseconds) rollback ${ANTES} -> ${ALVO} FALHOU: processo em execução ${VERSAO_EM_EXECUCAO:-sem resposta do /health}" >> "$DATA_DIR/deploy.log"
+
+echo "ATENÇÃO: código revertido para $ALVO, mas ${VERSAO_MOTIVO}."
+mkdir -p "$DATA_DIR"
+echo "$(date -Iseconds) rollback ${ANTES} -> ${ALVO} FALHOU: ${VERSAO_MOTIVO}" >> "$DATA_DIR/deploy.log"
 echo "Verifique 'journalctl -u remoteifes.service -e'. Se necessário, restaure o banco: npm run restore"
 exit 1
