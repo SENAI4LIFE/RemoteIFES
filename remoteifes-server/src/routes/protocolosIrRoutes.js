@@ -179,7 +179,7 @@ router.post("/admin/protocolos-ir/:id/transmitir", (req, res) => {
   const sala = req.body?.sala;
   if (typeof sala !== "string" || !salasService.buscar(sala)) return res.status(400).json({ ok: false, erro: "sala de destino inválida" });
   if (!deviceHub.dispositivoConectado(sala)) return res.status(409).json({ ok: false, erro: "o ESP32 de destino não está conectado" });
-  if (!deviceHub.enviarComando(sala, { tipo: "send_raw", raw: protocolo.raw, carrierHz: protocolo.carrierHz })) {
+  if (!deviceHub.enviarTesteIR(sala, { tipo: "send_raw", raw: protocolo.raw, carrierHz: protocolo.carrierHz })) {
     return res.status(409).json({ ok: false, erro: "não foi possível enviar ao dispositivo" });
   }
   auditar({ tipo: "protocolo_ir_transmitido", ator: req.usuario, alvoTipo: "esp32", alvoId: sala, alvoRotulo: sala, descricao: `Protocolo IR "${protocolo.label}" transmitido por ${sala}` });

@@ -201,6 +201,27 @@ function jaExecutadoHoje(agendamentoId, tipo, dataISO) {
   return !!linha;
 }
 
+// Agendamentos do dia anterior que ligaram o ar-condicionado e cujo desligamento nunca foi executado
+// (o servidor parou antes do fim do intervalo e só voltou depois da virada do dia).
+function listarDesligamentosPendentesDeOntem(dataISO = dataAtualBrasiliaISO()) {
+  return db.prepare(`
+    SELECT a.*
+    FROM agendamentos a
+    WHERE a.ativo = 1 AND a.modo != 'reserva' AND a.data = date(?, '-1 day')
+      AND EXISTS (
+        SELECT 1 FROM agendamentos_execucoes e
+        WHERE e.agendamentoId = a.id AND e.tipo = 'ligar'
+          AND (e.dataExecucao = a.data OR (e.dataExecucao IS NULL AND date(e.executadoEm, '-3 hours') = a.data))
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM agendamentos_execucoes e
+        WHERE e.agendamentoId = a.id AND e.tipo = 'desligar'
+          AND (e.dataExecucao = a.data OR (e.dataExecucao IS NULL AND date(e.executadoEm, '-3 hours') = a.data))
+      )
+    ORDER BY a.horaInicio, a.id
+  `).all(dataISO);
+}
+
 function listarAtivosParaAgendador(dataISO = dataAtualBrasiliaISO()) {
   return db.prepare(`
     SELECT a.*, u.usuario AS usuarioLogin
@@ -221,4 +242,5 @@ module.exports = {
   registrarExecucao,
   jaExecutadoHoje,
   listarAtivosParaAgendador,
+  listarDesligamentosPendentesDeOntem,
 };

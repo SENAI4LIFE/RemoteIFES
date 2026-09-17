@@ -330,14 +330,23 @@ function definirLimitesTemperatura(sala, { minima, maxima }) {
   }
 
   const alvoAjustado = Math.max(efetivaMin, Math.min(efetivaMax, salaRow.temperaturaAlvo));
-  db.prepare(`
-    UPDATE salas
-    SET temperaturaMinima = ?, temperaturaMaxima = ?, temperaturaAlvo = ?, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now')
-    WHERE sala = ?
-  `).run(minimaFinal, maximaFinal, alvoAjustado, sala);
-  db.prepare(`
-    UPDATE agendamentos SET temperatura = MAX(?, MIN(?, temperatura)) WHERE sala = ?
-  `).run(efetivaMin, efetivaMax, sala);
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare(`
+      UPDATE salas
+      SET temperaturaMinima = ?, temperaturaMaxima = ?, temperaturaAlvo = ?, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now')
+      WHERE sala = ?
+    `).run(minimaFinal, maximaFinal, alvoAjustado, sala);
+    db.prepare(`
+      UPDATE agendamentos SET temperatura = MAX(?, MIN(?, temperatura)) WHERE sala = ?
+    `).run(efetivaMin, efetivaMax, sala);
+    db.exec("COMMIT");
+  } catch (erro) {
+    try {
+      db.exec("ROLLBACK");
+    } catch (rollbackErro) {}
+    throw erro;
+  }
   eventos.emit("mudanca");
   const atualizada = buscar(sala);
   enviarEstadoIRParaDispositivo(atualizada);
@@ -480,8 +489,9 @@ function comandoEstadoIR(salaAtualizada) {
   };
 }
 
+// Reenvia o estado desejado vigente a todas as placas; a versão já foi avançada na transação que
+// alterou a intenção (ver configuracoesService.validarEAtualizar).
 function reenviarEstadoIRParaTodas() {
-  db.prepare(`UPDATE salas SET estadoVersao = estadoVersao + 1 WHERE irProtocolo IS NOT NULL`).run();
   const deviceHub = require("./deviceHub");
   for (const salaRow of listar()) {
     const comando = comandoEstadoIR(salaRow);
@@ -531,7 +541,7 @@ function sincronizarFailsafeIRPorProtocolo(protocoloRegistroId) {
   return enviados;
 }
 
-function aplicarComando(sala, cmd, valor, { usuario, origem, registrarNaTransacao = null }) {
+function aplicarComando(sala, cmd, valor, { usuario, origem, registrarNaTransacao = null, enviarAoDispositivo = true }) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
@@ -601,7 +611,7 @@ function aplicarComando(sala, cmd, valor, { usuario, origem, registrarNaTransaca
   }
 
   const salaAtualizada = buscar(sala);
-  const enviadoAoDispositivo = enviarEstadoIRParaDispositivo(salaAtualizada);
+  const enviadoAoDispositivo = enviarAoDispositivo ? enviarEstadoIRParaDispositivo(salaAtualizada) : false;
   eventos.emit("mudanca");
 
   return {
@@ -715,7 +725,7 @@ function definirProtocoloIR(sala, protocolo, protocoloRegistroId = null) {
   return atualizada;
 }
 
-function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = null } = {}) {
+function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = null, enviarAoDispositivo = true } = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
   const temp = Number(temperatura);
@@ -738,8 +748,18 @@ function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = nu
 
   const atualizada = buscar(sala);
   eventos.emit("mudanca");
-  enviarEstadoIRParaDispositivo(atualizada);
+  if (enviarAoDispositivo) enviarEstadoIRParaDispositivo(atualizada);
   return atualizada;
+}
+
+// Houve alguma mudança de intenção na sala (comando manual ou de agendamento, OFF local adotado)
+// depois do instante dado (UTC no formato do datetime('now') do SQLite)?
+function intencaoAlteradaDesde(sala, instanteUtcSqlite) {
+  return !!db.prepare(`
+    SELECT 1 FROM comandos_log
+    WHERE sala = ? AND criadoEm > ? AND (origem IN ('manual', 'agendamento') OR cmd = 'failsafe_off_local')
+    LIMIT 1
+  `).get(sala, instanteUtcSqlite);
 }
 
 function registrarAcessoEsp(sala, { ip, userAgent } = {}) {
@@ -785,6 +805,7 @@ module.exports = {
   agendamentoOcorreHoje,
   aplicarComando,
   aplicarInicioAgendamento,
+  intencaoAlteradaDesde,
   listarLogs,
   apagarLogs,
   marcarOnline,
