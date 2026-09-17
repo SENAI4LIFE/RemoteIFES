@@ -32,6 +32,8 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "não é um reposi
 
 SYSTEMCTL="systemctl"
 [ "$(id -u)" -ne 0 ] && SYSTEMCTL="sudo systemctl"
+ESPERA_SAUDE_TENTATIVAS="${ESPERA_SAUDE_TENTATIVAS:-20}"
+ESPERA_SAUDE_INTERVALO="${ESPERA_SAUDE_INTERVALO:-2}"
 if [ "$RESTART" -eq 1 ] && ! $SYSTEMCTL cat remoteifes.service >/dev/null 2>&1; then
   echo "serviço remoteifes.service não encontrado. Rode 'sudo bash install-service.sh' ou use --no-restart."
   exit 1
@@ -126,20 +128,38 @@ reverter() {
   instalar_deps "$DEPOIS" "$ANTES" || echo "aviso: não foi possível reinstalar as dependências da versão anterior."
   if [ "$RESTART" -eq 1 ]; then
     $SYSTEMCTL restart remoteifes.service || true
-    if aguardar_saude; then
-      echo "Revertido para $ANTES e o servidor está saudável."
+    if aguardar_versao "$ANTES" legado; then
+      echo "Revertido para $ANTES e o servidor em execução está saudável nessa versão."
     else
-      echo "ATENÇÃO: reversão feita mas o /health ainda falha. Verifique 'journalctl -u remoteifes.service -e' e, se necessário, restaure o banco com: npm run restore"
+      echo "ATENÇÃO: código revertido para $ANTES, mas o processo em execução não confirma essa versão (${VERSAO_EM_EXECUCAO:-sem resposta do /health}). Verifique 'journalctl -u remoteifes.service -e' e, se necessário, restaure o banco com: npm run restore"
     fi
   fi
 }
 
-aguardar_saude() {
-  for _ in $(seq 1 20); do
-    if bash healthcheck.sh >/dev/null 2>&1; then
-      return 0
+# Commit reportado pelo /health do processo em execução (vazio se ele não informa). Falha se o /health não responde.
+versao_em_execucao() {
+  local corpo
+  corpo=$(bash healthcheck.sh 2>/dev/null) || return 1
+  printf '%s' "$corpo" | sed -n 's/.*"commit":"\([0-9a-f]\{40\}\)".*/\1/p'
+}
+
+# Um /health saudável não basta: um processo antigo que sobreviveu a um 'restart' que falhou responde
+# igual. Só é sucesso quando o processo em execução informa exatamente o commit esperado. Com "legado",
+# um processo que não informa commit (versão anterior a esse campo) é aceito, com aviso.
+aguardar_versao() {
+  local esperado="$1" modo="${2:-estrito}"
+  VERSAO_EM_EXECUCAO=""
+  for _ in $(seq 1 "$ESPERA_SAUDE_TENTATIVAS"); do
+    if VERSAO_EM_EXECUCAO=$(versao_em_execucao); then
+      if [ "$VERSAO_EM_EXECUCAO" = "$esperado" ]; then
+        return 0
+      fi
+      if [ -z "$VERSAO_EM_EXECUCAO" ] && [ "$modo" = "legado" ]; then
+        echo "aviso: o processo em execução não informa o commit no /health (versão anterior a esse campo); aceitando pelo /health saudável."
+        return 0
+      fi
     fi
-    sleep 2
+    sleep "$ESPERA_SAUDE_INTERVALO"
   done
   return 1
 }
@@ -156,19 +176,24 @@ if [ "$RESTART" -eq 0 ]; then
 fi
 
 echo "Reiniciando remoteifes.service..."
-$SYSTEMCTL restart remoteifes.service || echo "aviso: 'systemctl restart' retornou erro; verificando o /health mesmo assim."
+$SYSTEMCTL restart remoteifes.service || echo "aviso: 'systemctl restart' retornou erro; verificando qual versão está em execução mesmo assim."
 
-if aguardar_saude; then
-  echo "$(date -Iseconds) deploy ${ANTES} -> ${DEPOIS} (${ALVO_REF}) ok" >> "$DATA_DIR/deploy.log"
+if aguardar_versao "$DEPOIS"; then
+  echo "$(date -Iseconds) deploy ${ANTES} -> ${DEPOIS} (${ALVO_REF}) ok (processo em execução confirmou ${DEPOIS})" >> "$DATA_DIR/deploy.log"
   echo "$ANTES" > "$DATA_DIR/previous-version"
   echo "$DEPOIS" > "$DATA_DIR/current-version"
   bash healthcheck.sh
   echo ""
-  echo "Deploy concluído: $DEPOIS"
+  echo "Deploy concluído: $DEPOIS (confirmado pelo processo em execução)"
   echo "Se algo estiver errado agora, volte com: bash rollback.sh"
 else
-  echo "$(date -Iseconds) deploy ${ANTES} -> ${DEPOIS} (${ALVO_REF}) FALHOU no health; revertido" >> "$DATA_DIR/deploy.log"
-  echo "O /health não ficou saudável após a atualização."
+  if [ -z "$VERSAO_EM_EXECUCAO" ]; then
+    MOTIVO="o /health não respondeu saudável ou não informou o commit em execução"
+  else
+    MOTIVO="o processo em execução continua em ${VERSAO_EM_EXECUCAO}, não em ${DEPOIS} (o reinício não aplicou a nova versão)"
+  fi
+  echo "$(date -Iseconds) deploy ${ANTES} -> ${DEPOIS} (${ALVO_REF}) FALHOU: ${MOTIVO}; revertido" >> "$DATA_DIR/deploy.log"
+  echo "A atualização não foi confirmada: ${MOTIVO}."
   reverter
   exit 1
 fi
