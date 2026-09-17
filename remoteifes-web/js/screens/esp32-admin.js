@@ -158,6 +158,11 @@ const Esp32Admin = (() => {
     return uc.tipo;
   }
 
+  function renderConfirmacao(dispositivo) {
+    if (!dispositivo.conectado || typeof dispositivo.estadoConfirmado !== "boolean") return "—";
+    return dispositivo.estadoConfirmado ? "confirmado pela placa" : "ainda não confirmado pela placa";
+  }
+
   function renderFailsafe(dispositivo) {
     const f = dispositivo.failsafe;
     if (!f) return "sem informação";
@@ -197,6 +202,7 @@ const Esp32Admin = (() => {
         <div class="esp32-metric"><div class="esp32-metric-label">Protocolo IR</div><div class="esp32-metric-value">${Number.isInteger(d.irProtocolo) ? `${d.irProtocolo}${d.irProtocoloRegistroId ? ` · biblioteca #${d.irProtocoloRegistroId}` : ""}` : "não definido"}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Failsafe OFF na NVS</div><div class="esp32-metric-value">${escapeHtml(renderFailsafe(dispositivo))}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Último comando IR</div><div class="esp32-metric-value">${escapeHtml(renderUltimoComando(dispositivo.ultimoComando))}</div></div>
+        <div class="esp32-metric"><div class="esp32-metric-label">Estado desejado</div><div class="esp32-metric-value">${escapeHtml(renderConfirmacao(dispositivo))}</div></div>
       </div>
 
       ${renderOta(d)}

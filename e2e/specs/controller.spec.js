@@ -11,10 +11,33 @@ test("liga e desliga o ar-condicionado de uma sala com ESP32 conectado", async (
   await expect(page.locator("#modoValue")).toHaveText("Cool");
   await expect(page.locator("#statusValue")).toHaveText("ligado");
   await expect(page.locator("#btnPower")).toHaveClass(/is-on/);
+  await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
 
   await page.locator("#btnPower").click();
   await expect(page.locator("#modoValue")).toHaveText("Off");
   await expect(page.locator("#statusValue")).toHaveText("desligado");
+  await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
+});
+
+test("o estado desejado fica marcado como não confirmado enquanto o ESP32 não o ecoa", async ({ page, sessaoComo, request }) => {
+  await sessaoComo("user");
+  await irParaSala(page, "A-108");
+  await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
+  await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
+
+  await request.post(`${process.env.E2E_API_URL}/__e2e/silenciar-dispositivo/on`);
+  await page.locator("#btnPower").click();
+  await expect(page.locator("#statusValue")).toHaveText("ligado");
+  await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "false");
+  await expect(page.locator("#statusValue")).toHaveAttribute("title", /aguardando o ESP32/);
+
+  await request.post(`${process.env.E2E_API_URL}/__e2e/silenciar-dispositivo/off`);
+  await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
+  await expect(page.locator("#statusValue")).toHaveAttribute("title", "Estado do ar-condicionado");
+
+  await page.locator("#btnPower").click();
+  await expect(page.locator("#statusValue")).toHaveText("desligado");
+  await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
 });
 
 test("ajuste de temperatura respeita os limites e atualiza o alvo exibido", async ({ page, sessaoComo }) => {

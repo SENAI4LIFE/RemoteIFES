@@ -7,6 +7,35 @@ const _panelAplicarAvisoOfflineToast = Toast.criarAvisoDeEstado(
   "panelAvisoOffline",
   "O dispositivo está offline: o estado foi salvo e será aplicado quando o ESP32 reconectar."
 );
+// O servidor guarda o estado desejado; o ESP32 confirma quando o aplica (imediatamente no firmware
+// atual, em até um ciclo de telemetria no anterior). Só avisamos se a confirmação demorar demais.
+const _panelAplicarAvisoSemConfirmacaoToast = Toast.criarAvisoDeEstado(
+  "panelAvisoSemConfirmacao",
+  "O ESP32 ainda não confirmou o último comando: o estado foi salvo e continua valendo até a placa aplicá-lo."
+);
+const PANEL_ESPERA_CONFIRMACAO_MS = 12000;
+let _panelTimerConfirmacao = null;
+let _panelUltimoStatus = null;
+
+function acompanharConfirmacao(status) {
+  _panelUltimoStatus = status;
+  const badge = document.getElementById("statusValue");
+  const pendente = !!status.online && status.dispositivoConfirmou === false;
+  badge.dataset.confirmado = typeof status.dispositivoConfirmou === "boolean" ? String(status.dispositivoConfirmou) : "";
+  badge.title = pendente ? "Estado salvo no servidor; aguardando o ESP32 confirmar" : "Estado do ar-condicionado";
+  if (!pendente) {
+    clearTimeout(_panelTimerConfirmacao);
+    _panelTimerConfirmacao = null;
+    _panelAplicarAvisoSemConfirmacaoToast(false);
+    return;
+  }
+  if (_panelTimerConfirmacao) return;
+  _panelTimerConfirmacao = setTimeout(() => {
+    _panelTimerConfirmacao = null;
+    const ultimo = _panelUltimoStatus;
+    if (_panelPararStatus && ultimo && ultimo.online && ultimo.dispositivoConfirmou === false) _panelAplicarAvisoSemConfirmacaoToast(true);
+  }, PANEL_ESPERA_CONFIRMACAO_MS);
+}
 
 async function openRoom(sala, nome) {
   state.salaAtual = sala;
@@ -32,6 +61,9 @@ function pararAutoRefreshPanel() {
     _panelPararStatus();
     _panelPararStatus = null;
   }
+  clearTimeout(_panelTimerConfirmacao);
+  _panelTimerConfirmacao = null;
+  _panelUltimoStatus = null;
   RTStatus.pararObservarSala();
 }
 
@@ -93,6 +125,7 @@ function aplicarStatusNoPainel(status) {
   document.getElementById("tempTarget").textContent = `${status.temperaturaAlvo}°C`;
 
   _panelAplicarAvisoOfflineToast(!status.online && status.ligado);
+  acompanharConfirmacao(status);
   aplicarBloqueio(status);
 }
 

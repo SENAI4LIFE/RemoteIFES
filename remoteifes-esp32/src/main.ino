@@ -160,6 +160,8 @@ unsigned long lastHeartbeat = 0;
 unsigned long lastTelemetryWs = 0;
 bool lastKnownPower = false;
 bool powerConhecido = false;
+uint32_t ultimaVersaoEstado = 0;
+bool versaoEstadoConhecida = false;
 UltimoComandoIR ultimoComando;
 
 float ultimaLeituraTemp = NAN;
@@ -217,6 +219,7 @@ void processarComandoServidor(uint8_t* payload, size_t length);
 void enviarTelemetriaWs();
 void enviarModoAlterado();
 void enviarInfoDispositivo();
+void preencherVersaoEstado(JsonDocument& doc);
 const char* modoAtualTexto();
 void identificarSalaNoServidor();
 void agendarReinicio(unsigned long esperaMs);
@@ -744,9 +747,19 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     bool power = doc["power"] | false;
     bool turbo = doc["turbo"] | false;
     bool swing = doc["swing"] | false;
+    bool restauracao = doc["restauracao"] | false;
     String fan = doc["fan"] | "";
 
     if (protocolo >= 0) {
+      if (doc["versao"].is<uint32_t>()) {
+        ultimaVersaoEstado = doc["versao"].as<uint32_t>();
+        versaoEstadoConhecida = true;
+      }
+      if (restauracao && failsafeLatched) {
+        reportComando("controle_nativo", "ignorado_failsafe_latch");
+        enviarStatusFailsafe();
+        return;
+      }
       sendKnownACState((decode_type_t)protocolo, temp, power, turbo, fan, swing);
       lastKnownPower = power;
       powerConhecido = true;
@@ -764,6 +777,8 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       ultimoComando.timestampMs = millis();
 
       reportComando("controle_nativo", "protocolo=" + String(protocolo) + ";temp=" + String(temp, 1) + ";power=" + String(power ? "on" : "off") + ";turbo=" + String(turbo ? "on" : "off") + (fan.length() ? (";fan=" + fan) : ""));
+      lastTelemetryWs = millis();
+      enviarTelemetriaWs();
       if (isCapturing) irrecv.enableIRIn();
     }
   } else if (strcmp(tipo, "failsafe_raw_set") == 0) {
@@ -824,11 +839,16 @@ void enviarInfoDispositivo() {
   doc["fw"] = FW_VERSAO;
   doc["otaValidacao"] = true;
   preencherStatusFailsafe(doc);
+  preencherVersaoEstado(doc);
   if (powerConhecido) doc["ligado"] = lastKnownPower;
   String saida;
   serializeJson(doc, saida);
   wsCliente.sendTXT(saida);
   if (!otaPendenteValidacao) reportarOtaValidado();
+}
+
+void preencherVersaoEstado(JsonDocument& doc) {
+  if (versaoEstadoConhecida) doc["versao"] = ultimaVersaoEstado;
 }
 
 void reportarOtaValidado() {
@@ -862,6 +882,7 @@ void enviarTelemetriaWs() {
   doc["modo"] = modoAtualTexto();
   doc["fw"] = FW_VERSAO;
   preencherStatusFailsafe(doc);
+  preencherVersaoEstado(doc);
   if (powerConhecido) doc["ligado"] = lastKnownPower;
 
   if (!isnan(ultimaLeituraTemp)) doc["temp"] = ultimaLeituraTemp;
@@ -1204,6 +1225,7 @@ void enviarStatusFailsafe() {
   JsonDocument doc;
   doc["tipo"] = "failsafe_status";
   preencherStatusFailsafe(doc);
+  preencherVersaoEstado(doc);
   String saida;
   serializeJson(doc, saida);
   wsCliente.sendTXT(saida);
