@@ -79,36 +79,37 @@ const SimpleWizard = {
     }
     empty.classList.add("hidden");
 
-    // Os botões das salas ficam no lugar entre atualizações: só classes e textos mudam, então o
-    // foco do teclado e a interação em curso sobrevivem a cada mensagem do servidor.
-    UISync.sincronizarLista(grid, salas, {
-      seletor: ".simple-tile-sala[data-sala]",
-      chave: (s) => s.sala,
-      criar: () => {
-        const tile = document.createElement("button");
+    const existentes = new Map();
+    grid.querySelectorAll(".simple-tile-sala[data-sala]").forEach((tile) => {
+      existentes.set(tile.dataset.sala, tile);
+    });
+
+    const fragment = document.createDocumentFragment();
+    salas.forEach((s) => {
+      let tile = existentes.get(s.sala);
+      if (!tile) {
+        tile = document.createElement("button");
         tile.type = "button";
-        tile.className = "simple-tile simple-tile-sala";
+        tile.dataset.sala = s.sala;
         tile.innerHTML = `
           <span class="simple-tile-icon" aria-hidden="true">${Icones.markup("neve")}</span>
           <span class="simple-tile-label"></span>
           <span class="simple-tile-sub"></span>
         `;
         tile.addEventListener("click", () => openRoom(tile.dataset.sala, tile.dataset.nome));
-        return tile;
-      },
-      atualizar: (tile, s) => {
-        tile.dataset.nome = s.nome;
-        const estado = s.online ? (s.ligado ? "is-ligado" : "is-desligado") : "is-offline";
-        const classe = `simple-tile simple-tile-sala ${estado}${s.agendadaAgora ? " is-reservada" : ""}`;
-        if (tile.className !== classe) tile.className = classe;
-        const rotulo = rotulosPlanta.get(s.sala) || RoomsData.rotulo(s.sala);
-        const label = tile.querySelector(".simple-tile-label");
-        if (label.textContent !== rotulo) label.textContent = rotulo;
-        const sub = tile.querySelector(".simple-tile-sub");
-        const textoSub = `${s.nome}${s.podeControlarEsta === false ? " · visualização" : ""}`;
-        if (sub.textContent !== textoSub) sub.textContent = textoSub;
-      },
+      }
+
+      tile.dataset.nome = s.nome;
+      const estado = s.online ? (s.ligado ? "is-ligado" : "is-desligado") : "is-offline";
+      tile.className = `simple-tile simple-tile-sala ${estado}${s.agendadaAgora ? " is-reservada" : ""}`;
+      const rotuloPlanta = rotulosPlanta.get(s.sala);
+      tile.querySelector(".simple-tile-label").textContent = rotuloPlanta || RoomsData.rotulo(s.sala);
+      tile.querySelector(".simple-tile-sub").textContent = `${s.nome}${s.podeControlarEsta === false ? " · visualização" : ""}`;
+      fragment.appendChild(tile);
+      existentes.delete(s.sala);
     });
+
+    grid.replaceChildren(fragment);
   }
 };
 

@@ -105,7 +105,7 @@ const Monitoramento = (() => {
     const alertasEl = el("monAlertas");
     if (m.alertas && m.alertas.length) {
       alertasEl.classList.remove("hidden");
-      UISync.aplicarHtml(alertasEl, `<strong>Atenção</strong><ul>${m.alertas.map((a) => `<li>${escapeHtml(a)}</li>`).join("")}</ul>`);
+      alertasEl.innerHTML = `<strong>Atenção</strong><ul>${m.alertas.map((a) => `<li>${escapeHtml(a)}</li>`).join("")}</ul>`;
     } else {
       alertasEl.classList.add("hidden");
       alertasEl.innerHTML = "";
@@ -182,9 +182,8 @@ const Monitoramento = (() => {
       ]),
     ];
 
-    // Os cartões são sempre os mesmos: a cada consulta só os valores que mudaram são reescritos.
     const gridEl = el("monGrid");
-    UISync.aplicarHtml(gridEl, grid.join(""));
+    gridEl.innerHTML = grid.join("");
     gridEl.setAttribute("aria-busy", "false");
     ultimoEstado = m;
     if (blocoGraficosAberto()) renderComposicao(m);
