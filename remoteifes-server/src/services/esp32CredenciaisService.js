@@ -6,6 +6,10 @@ const configuracoesService = require("./configuracoesService");
 const RE_DEVICE_ID = /^esp_[0-9a-f]{16}$/;
 const GRACE_ROTACAO_MS = 24 * 60 * 60 * 1000;
 const segredosPendentesEmMemoria = new Map();
+// Segredo já ativado por rotação, guardado só em memória enquanto a geração anterior está na
+// tolerância: uma placa que reconecta com a anterior (a gravação na NVS não durou um reinício)
+// recebe o segredo atual de novo, em vez de ficar inacessível ao fim da tolerância.
+const segredosAtivadosEmMemoria = new Map();
 
 function gerarDeviceId() {
   return `esp_${crypto.randomBytes(8).toString("hex")}`;
@@ -79,6 +83,29 @@ function limparPendente(sala) {
   segredosPendentesEmMemoria.delete(sala);
 }
 
+function limparAtivado(sala) {
+  segredosAtivadosEmMemoria.delete(sala);
+}
+
+function ativadoReentregavel(sala, linha = buscarLinha(sala)) {
+  const guardado = segredosAtivadosEmMemoria.get(sala);
+  if (!guardado || !linha || linha.revogadoEm || linha.deviceId !== guardado.deviceId
+      || !linha.segredoHashAnterior || !linha.anteriorExpiraEm
+      || new Date(linha.anteriorExpiraEm.replace(" ", "T") + "Z").getTime() <= Date.now()
+      || !iguaisConstante(hash(guardado.segredo), linha.segredoHash)) {
+    segredosAtivadosEmMemoria.delete(sala);
+    return null;
+  }
+  return guardado;
+}
+
+function reentregarAtual(sala) {
+  const guardado = ativadoReentregavel(sala);
+  if (!guardado) return false;
+  logger.info("credencial-reentrega-apos-reconexao-com-anterior", { sala, deviceId: guardado.deviceId });
+  return notificarDispositivo(sala, "credencial_rotacionar", guardado.deviceId, guardado.segredo);
+}
+
 function deviceIdAtivoPara(sala, deviceId) {
   if (typeof deviceId !== "string") return false;
   const linha = db.prepare(`
@@ -113,6 +140,7 @@ function provisionar(sala) {
       revogadoEm = NULL
   `).run(sala, deviceId, hash(segredo));
   limparPendente(sala);
+  limparAtivado(sala);
   logger.info("credencial-provisionada", { sala, deviceId });
   const enviadoAoDispositivo = notificarDispositivo(sala, "credencial_provisionar", deviceId, segredo);
   return { deviceId, segredo, enviadoAoDispositivo };
@@ -150,7 +178,10 @@ function ativarPendente(linha) {
       rotacionadoEm = datetime('now')
     WHERE deviceId = ? AND segredoHashPendente IS NOT NULL
   `).run(expira, linha.deviceId);
+  const guardado = segredosPendentesEmMemoria.get(linha.sala);
   limparPendente(linha.sala);
+  if (guardado && guardado.deviceId === linha.deviceId) segredosAtivadosEmMemoria.set(linha.sala, guardado);
+  else limparAtivado(linha.sala);
   logger.info("credencial-rotacionada", { sala: linha.sala, deviceId: linha.deviceId });
 }
 
@@ -177,6 +208,7 @@ function substituir(sala) {
     WHERE sala = ?
   `).run(deviceId, hash(segredo), sala);
   limparPendente(sala);
+  limparAtivado(sala);
   logger.info("credencial-substituida", { sala, deviceId });
   try {
     require("./deviceHub").desconectarSala(sala);
@@ -195,6 +227,7 @@ function revogar(sala) {
     WHERE sala = ?
   `).run(sala);
   limparPendente(sala);
+  limparAtivado(sala);
   logger.info("credencial-revogada", { sala, deviceId: linha.deviceId });
   try {
     require("./deviceHub").desconectarSala(sala);
@@ -245,6 +278,7 @@ function estado(sala) {
     revogado: !!linha.revogadoEm,
     revogadoEm: linha.revogadoEm || null,
     graceRotacaoAtivo: graceAtivo,
+    atualReentregavel: graceAtivo && !!ativadoReentregavel(sala, linha),
     rotacaoPendente: !!linha.segredoHashPendente,
     pendenteDesde: linha.segredoHashPendente ? linha.pendenteCriadoEm : null,
     pendenteEntregueEm: linha.segredoHashPendente ? linha.pendenteEntregueEm || null : null,
@@ -283,6 +317,7 @@ module.exports = {
   provisionar,
   rotacionar,
   entregarPendente,
+  reentregarAtual,
   substituir,
   revogar,
   verificar,
