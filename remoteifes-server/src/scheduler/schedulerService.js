@@ -37,13 +37,17 @@ function verificarAgendamentos() {
       const inicioLigar = ag.modo === "ligar_intervalo" ? ag.ligarInicio : ag.horaInicio;
       const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
 
+      // O registro da execução entra na mesma transação da mudança de estado: ou os dois persistem
+      // ou nenhum, para que uma falha (ou queda do servidor) entre eles não repita o comando no tick seguinte.
       if (estaNaJanelaDeLigar(hora, inicioLigar, fimLigar) && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
-        aplicarInicioAgendamento(ag.sala, ag.temperatura);
-        registrarExecucao(ag.id, "ligar", dataISO);
+        aplicarInicioAgendamento(ag.sala, ag.temperatura, { registrarNaTransacao: () => registrarExecucao(ag.id, "ligar", dataISO) });
       }
       if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO)) {
-        aplicarComando(ag.sala, "desligar", undefined, { usuario: null, origem: "agendamento" });
-        registrarExecucao(ag.id, "desligar", dataISO);
+        aplicarComando(ag.sala, "desligar", undefined, {
+          usuario: null,
+          origem: "agendamento",
+          registrarNaTransacao: () => registrarExecucao(ag.id, "desligar", dataISO),
+        });
       }
     } catch (erro) {
       logger.error("agendamento-falhou", { agendamentoId: ag.id, sala: ag.sala, mensagem: erro.message });

@@ -163,6 +163,27 @@ test("o buzzer acompanha cada transmissão IR sem atraso bloqueante", () => {
   assert.match(ino, /const unsigned long BUZZER_MIN_MS = 60;/);
 });
 
+test("a placa ecoa a versão do estado desejado e não trata a restauração automática como comando explícito", () => {
+  const versao = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/);
+  assert.ok(compararVersoes(versao[1], "4.3.0") >= 0, "o eco de versão e a recusa da restauração existem a partir de 4.3.0");
+  assert.match(ino, /uint32_t ultimaVersaoEstado = 0;/);
+  assert.match(ino, /bool versaoEstadoConhecida = false;/);
+  assert.match(bloco("void preencherVersaoEstado"), /if \(versaoEstadoConhecida\) doc\["versao"\] = ultimaVersaoEstado;/);
+  for (const fn of ["void enviarInfoDispositivo", "void enviarTelemetriaWs", "void enviarStatusFailsafe"]) {
+    assert.match(bloco(fn), /preencherVersaoEstado\(doc\);/, `${fn} precisa ecoar a versão`);
+  }
+  const processar = bloco("void processarComandoServidor");
+  const conhecido = processar.slice(processar.indexOf('"send_known_state"'), processar.indexOf('"failsafe_raw_set"'));
+  assert.match(conhecido, /bool restauracao = doc\["restauracao"\] \| false;/);
+  assert.match(conhecido, /if \(doc\["versao"\]\.is<uint32_t>\(\)\) \{\s*ultimaVersaoEstado = doc\["versao"\]\.as<uint32_t>\(\);\s*versaoEstadoConhecida = true;\s*\}/, "a versão é registrada mesmo quando a restauração é recusada");
+  assert.match(conhecido, /if \(restauracao && failsafeLatched\) \{\s*reportComando\("controle_nativo", "ignorado_failsafe_latch"\);\s*enviarStatusFailsafe\(\);\s*return;\s*\}/, "uma placa travada em OFF local ignora a restauração e responde com failsafe_status");
+  assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("sendKnownACState("), "a recusa vem antes de qualquer transmissão IR");
+  assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("definirFailsafeLatch(false)"), "a recusa vem antes de limpar a trava");
+  assert.match(conhecido, /lastTelemetryWs = millis\(\);\s*enviarTelemetriaWs\(\);/, "o estado aplicado é confirmado na hora");
+  const raw = processar.slice(processar.indexOf('"send_raw"'), processar.indexOf('"send_known_state"'));
+  assert.doesNotMatch(raw, /restauracao/, "send_raw continua sendo sempre explícito");
+});
+
 test("o firmware não carrega comentários de código", () => {
   assert.doesNotMatch(ino, /^\s*\/\//m);
   assert.doesNotMatch(ino, /\/\*/);

@@ -11,6 +11,9 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5, firmware = "4.0.
   let role = "transmitter";
   let modo = "operation";
   let failsafe = null;
+  let failsafeLatched = false;
+  let versaoEstado = null;
+  let silenciado = false;
   let ultimoRaw = null;
   const recebidas = [];
 
@@ -20,6 +23,8 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5, firmware = "4.0.
       failsafePulsos: failsafe ? failsafe.raw.length : 0,
       failsafeCarrierHz: failsafe ? failsafe.carrierHz : 0,
       failsafeProtocolRecordId: failsafe ? failsafe.protocolRecordId : -1,
+      failsafeLatched,
+      ...(versaoEstado === null ? {} : { versao: versaoEstado }),
     };
   }
 
@@ -30,7 +35,7 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5, firmware = "4.0.
   }
 
   function enviarTelemetria() {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN || silenciado) return;
     const quadro = {
       tipo: "telemetria",
       temp: temperatura,
@@ -73,8 +78,14 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5, firmware = "4.0.
       recebidas.push(msg);
       if (recebidas.length > 50) recebidas.shift();
       if (msg.tipo === "send_known_state" && typeof msg.protocol === "number" && msg.protocol >= 0) {
+        if (Number.isInteger(msg.versao)) versaoEstado = msg.versao;
+        if (msg.restauracao === true && failsafeLatched) {
+          enviar({ tipo: "failsafe_status", ...camposFailsafe() });
+          return;
+        }
         ligado = msg.power === true;
         powerConhecido = true;
+        failsafeLatched = false;
         setTimeout(enviarTelemetria, 40);
       } else if (msg.tipo === "ota_oferta") {
         responderOta(msg);
@@ -139,6 +150,10 @@ function iniciarFakeEsp32({ url, sala, mac, temperatura = 23.5, firmware = "4.0.
     definirFirmware(fw) {
       versao = fw;
       enviarTelemetria();
+    },
+    silenciar(ativo) {
+      silenciado = !!ativo;
+      if (!silenciado) enviarTelemetria();
     },
     firmware: () => versao,
     estado() {

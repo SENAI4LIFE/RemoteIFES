@@ -113,8 +113,8 @@ router.post("/dispositivo/heartbeat", autenticarDispositivo, (req, res) => {
   }
 
   try {
+    // "ligado" é aceito por compatibilidade, mas é só o eco do último comando: não altera a intenção.
     const estadoReportado = {};
-    if (ligado !== undefined) estadoReportado.ligado = ligado;
     if (temperatura !== undefined) estadoReportado.temperatura = temperatura;
 
     const ipReportado = typeof ip === "string" && ip ? ip : req.ip;

@@ -26,6 +26,7 @@ function criarSchema() {
       temperaturaMinima REAL,
       temperaturaMaxima REAL,
       turboAtivo INTEGER NOT NULL DEFAULT 0,
+      estadoVersao INTEGER NOT NULL DEFAULT 0,
       irProtocolo INTEGER,
       irProtocoloRegistroId INTEGER,
       ipEsp32 TEXT,
@@ -444,6 +445,9 @@ function migrarColunasSalas() {
   if (!colunas.includes("fwVersao")) {
     db.exec(`ALTER TABLE salas ADD COLUMN fwVersao TEXT`);
   }
+  if (!colunas.includes("estadoVersao")) {
+    db.exec(`ALTER TABLE salas ADD COLUMN estadoVersao INTEGER NOT NULL DEFAULT 0`);
+  }
   colunas = db.prepare(`PRAGMA table_info(salas)`).all().map((c) => c.name);
   if (colunas.includes("presetId") || colunas.includes("funcoesEstado")) {
     recriarTabelaSalas();
@@ -467,6 +471,7 @@ function recriarTabelaSalas() {
         temperaturaMinima REAL,
         temperaturaMaxima REAL,
         turboAtivo INTEGER NOT NULL DEFAULT 0,
+        estadoVersao INTEGER NOT NULL DEFAULT 0,
         irProtocolo INTEGER,
         irProtocoloRegistroId INTEGER,
         fwVersao TEXT,
@@ -480,12 +485,12 @@ function recriarTabelaSalas() {
       );
       INSERT INTO salas_nova (
         sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
-        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, irProtocoloRegistroId, ipEsp32,
+        temperaturaMinima, temperaturaMaxima, turboAtivo, estadoVersao, irProtocolo, irProtocoloRegistroId, ipEsp32,
         fwVersao, mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
       )
       SELECT
         sala, nome, bloco, andar, online, ligado, temperatura, temperaturaAlvo,
-        temperaturaMinima, temperaturaMaxima, turboAtivo, irProtocolo, irProtocoloRegistroId, ipEsp32,
+        temperaturaMinima, temperaturaMaxima, turboAtivo, estadoVersao, irProtocolo, irProtocoloRegistroId, ipEsp32,
         fwVersao, mac, latitude, longitude, acessoRestrito, ultimoHeartbeat, atualizadoEm
       FROM salas;
       DROP TABLE salas;
