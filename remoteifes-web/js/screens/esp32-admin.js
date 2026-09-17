@@ -61,7 +61,7 @@ const Esp32Admin = (() => {
           <span>Firmware: <strong>${escapeHtml(versaoDispositivo || "desconhecido")}</strong>${
             versaoPublicada ? ` · publicado: <strong>${escapeHtml(versaoPublicada)}</strong>` : ""
           }${atualizado ? ` <span class="esp32-conn-badge on">atualizado</span>` : ""}</span>
-          <button type="button" class="btn btn-off ota-btn" ${podeAtualizar ? "" : "disabled"}>Atualizar firmware (OTA)</button>
+          <button type="button" class="btn btn-off ota-btn" data-acao="ota" ${podeAtualizar ? "" : "disabled"}>Atualizar firmware (OTA)</button>
         </div>
         ${statusLinha ? `<div class="esp32-ota-status ${ota.fase}">${escapeHtml(statusLinha)}</div>` : ""}
         ${emRollout ? `<div class="esp32-ota-status">esta sala faz parte da distribuição em etapas em andamento</div>` : ""}
@@ -86,12 +86,12 @@ const Esp32Admin = (() => {
 
     let botoes;
     if (!c.provisionado || c.revogado) {
-      botoes = `<button type="button" class="btn btn-on cred-provisionar-btn">Provisionar credencial</button>`;
+      botoes = `<button type="button" class="btn btn-on cred-provisionar-btn" data-acao="cred-provisionar">Provisionar credencial</button>`;
     } else {
       botoes = `
-        <button type="button" class="btn btn-off cred-rotacionar-btn">Rotacionar</button>
-        <button type="button" class="btn btn-off cred-substituir-btn">Substituir (troca de hardware)</button>
-        <button type="button" class="link-btn danger cred-revogar-btn">Revogar</button>
+        <button type="button" class="btn btn-off cred-rotacionar-btn" data-acao="cred-rotacionar">Rotacionar</button>
+        <button type="button" class="btn btn-off cred-substituir-btn" data-acao="cred-substituir">Substituir (troca de hardware)</button>
+        <button type="button" class="link-btn danger cred-revogar-btn" data-acao="cred-revogar">Revogar</button>
       `;
     }
 
@@ -171,6 +171,8 @@ const Esp32Admin = (() => {
     return `gravado · ${f.pulsos} pulsos${f.protocolRecordId ? ` · protocolo #${f.protocolRecordId}` : ""}${travado}`;
   }
 
+  // Conteúdo do cartão de um dispositivo. É aplicado no <li> já existente pelo UISync, que só toca
+  // os textos, classes e atributos que mudaram: uma telemetria não reconstrói o cartão.
   function renderDispositivo(d) {
     const dispositivo = d.dispositivo || {};
     const conectado = !!dispositivo.conectado;
@@ -178,11 +180,7 @@ const Esp32Admin = (() => {
     const modo = dispositivo.modo || "operation";
     const clonador = dispositivo.role === "cloner";
 
-    const li = document.createElement("li");
-    li.className = "card esp32-device-card";
-    li.dataset.sala = d.sala;
-
-    li.innerHTML = `
+    return `
       <div class="esp32-device-head">
         <div>
           <div class="room-name">${escapeHtml(d.nome)} <span class="room-sub">(${escapeHtml(d.sala)})</span></div>
@@ -212,105 +210,107 @@ const Esp32Admin = (() => {
       ${clonador ? `<p class="hint">Esta placa é o clonador oficial: o modo clone e a captura de sinais são controlados em Dispositivos &gt; Protocolos IR.</p>` : ""}
 
       <div class="esp32-actions">
-        <button type="button" class="link-btn danger reset-wifi-btn" ${conectado ? "" : "disabled"}>Resetar Wi-Fi do dispositivo</button>
+        <button type="button" class="link-btn danger reset-wifi-btn" data-acao="reset-wifi" ${conectado ? "" : "disabled"}>Resetar Wi-Fi do dispositivo</button>
       </div>
     `;
+  }
 
-    const otaBtn = li.querySelector(".ota-btn");
-    if (otaBtn && !otaBtn.disabled) {
-      otaBtn.addEventListener("click", async () => {
-        const versaoPublicada = manifestoFirmware ? manifestoFirmware.versao : "";
-        const ok = await Dialog.confirmar({
-          titulo: "Atualizar firmware por OTA",
-          mensagem: `Enviar o firmware ${versaoPublicada} para o ESP32 da sala ${d.sala}? O dispositivo baixa a imagem, verifica o hash, grava e reinicia. Se a nova versão não validar, ele reverte sozinho para a atual.`,
-          confirmarTexto: "Enviar atualização",
-        });
-        if (!ok) return;
-        otaBtn.disabled = true;
-        const resp = await Api.atualizarFirmwareEsp32(d.sala);
-        if (!resp.ok) {
-          otaBtn.disabled = false;
-          Toast.erro(resp.erro || "não foi possível iniciar a atualização");
-        } else {
-          Toast.aviso("atualização enviada ao dispositivo");
-        }
+  const ACOES_DISPOSITIVO = {
+    async ota(sala, botao) {
+      const versaoPublicada = manifestoFirmware ? manifestoFirmware.versao : "";
+      const ok = await Dialog.confirmar({
+        titulo: "Atualizar firmware por OTA",
+        mensagem: `Enviar o firmware ${versaoPublicada} para o ESP32 da sala ${sala}? O dispositivo baixa a imagem, verifica o hash, grava e reinicia. Se a nova versão não validar, ele reverte sozinho para a atual.`,
+        confirmarTexto: "Enviar atualização",
       });
-    }
+      if (!ok) return;
+      botao.disabled = true;
+      const resp = await Api.atualizarFirmwareEsp32(sala);
+      if (!resp.ok) {
+        botao.disabled = false;
+        Toast.erro(resp.erro || "não foi possível iniciar a atualização");
+      } else {
+        Toast.aviso("atualização enviada ao dispositivo");
+      }
+    },
 
-    const credProvBtn = li.querySelector(".cred-provisionar-btn");
-    if (credProvBtn) credProvBtn.addEventListener("click", async () => {
+    async "cred-provisionar"(sala) {
       const ok = await Dialog.confirmar({
         titulo: "Provisionar credencial",
-        mensagem: `Gerar uma credencial exclusiva para o ESP32 da sala ${d.sala}? A partir daí a sala passa a exigir essa credencial (o MAC sozinho deixa de ser aceito). Se o dispositivo estiver conectado agora, ele recebe a credencial automaticamente.`,
+        mensagem: `Gerar uma credencial exclusiva para o ESP32 da sala ${sala}? A partir daí a sala passa a exigir essa credencial (o MAC sozinho deixa de ser aceito). Se o dispositivo estiver conectado agora, ele recebe a credencial automaticamente.`,
         confirmarTexto: "Provisionar",
       });
       if (!ok) return;
-      const resp = await Api.provisionarCredencialEsp32(d.sala);
+      const resp = await Api.provisionarCredencialEsp32(sala);
       if (!resp.ok) return Toast.erro(resp.erro || "não foi possível provisionar");
       await mostrarSegredo("Credencial provisionada", resp);
       carregar();
-    });
+    },
 
-    const credRotBtn = li.querySelector(".cred-rotacionar-btn");
-    if (credRotBtn) credRotBtn.addEventListener("click", async () => {
+    async "cred-rotacionar"(sala) {
       const ok = await Dialog.confirmar({
         titulo: "Rotacionar credencial",
-        mensagem: `Gerar um novo segredo para a sala ${d.sala}? O segredo atual continua valendo até o dispositivo se conectar com o novo; só então o anterior entra em tolerância de 24 h. Se a placa estiver offline agora, o novo segredo é entregue quando ela reconectar (enquanto o servidor não reiniciar).`,
+        mensagem: `Gerar um novo segredo para a sala ${sala}? O segredo atual continua valendo até o dispositivo se conectar com o novo; só então o anterior entra em tolerância de 24 h. Se a placa estiver offline agora, o novo segredo é entregue quando ela reconectar (enquanto o servidor não reiniciar).`,
         confirmarTexto: "Rotacionar",
       });
       if (!ok) return;
-      const resp = await Api.rotacionarCredencialEsp32(d.sala);
+      const resp = await Api.rotacionarCredencialEsp32(sala);
       if (!resp.ok) return Toast.erro(resp.erro || "não foi possível rotacionar");
       await mostrarSegredo("Credencial rotacionada", resp);
       carregar();
-    });
+    },
 
-    const credSubBtn = li.querySelector(".cred-substituir-btn");
-    if (credSubBtn) credSubBtn.addEventListener("click", async () => {
+    async "cred-substituir"(sala) {
       const ok = await Dialog.confirmar({
         titulo: "Substituir credencial",
-        mensagem: `Emitir um novo deviceId e segredo para a sala ${d.sala} (troca de placa)? O segredo anterior deixa de valer imediatamente. A associação da sala é preservada.`,
+        mensagem: `Emitir um novo deviceId e segredo para a sala ${sala} (troca de placa)? O segredo anterior deixa de valer imediatamente. A associação da sala é preservada.`,
         confirmarTexto: "Substituir",
         perigo: true,
       });
       if (!ok) return;
-      const resp = await Api.substituirCredencialEsp32(d.sala);
+      const resp = await Api.substituirCredencialEsp32(sala);
       if (!resp.ok) return Toast.erro(resp.erro || "não foi possível substituir");
       await mostrarSegredo("Nova credencial", resp);
       carregar();
-    });
+    },
 
-    const credRevBtn = li.querySelector(".cred-revogar-btn");
-    if (credRevBtn) credRevBtn.addEventListener("click", async () => {
+    async "cred-revogar"(sala) {
       const ok = await Dialog.confirmar({
         titulo: "Revogar credencial",
-        mensagem: `Revogar a credencial da sala ${d.sala}? A conexão atual do dispositivo é encerrada e ele não volta a autenticar até ser reprovisionado.`,
+        mensagem: `Revogar a credencial da sala ${sala}? A conexão atual do dispositivo é encerrada e ele não volta a autenticar até ser reprovisionado.`,
         confirmarTexto: "Revogar",
         perigo: true,
       });
       if (!ok) return;
-      const resp = await Api.revogarCredencialEsp32(d.sala);
+      const resp = await Api.revogarCredencialEsp32(sala);
       if (!resp.ok) return Toast.erro(resp.erro || "não foi possível revogar");
       Toast.aviso("credencial revogada");
       carregar();
-    });
+    },
 
-    const resetWifiBtn = li.querySelector(".reset-wifi-btn");
-    resetWifiBtn.addEventListener("click", async () => {
+    async "reset-wifi"(sala) {
       const ok = await Dialog.confirmar({
         titulo: "Resetar Wi-Fi do dispositivo",
-        mensagem: `Resetar o Wi-Fi do ESP32 da sala ${d.sala}? O dispositivo vai apagar a rede e o endereço do servidor, preservar sua credencial exclusiva e o failsafe OFF gravado, e reiniciar no ponto de acesso RemoteIFES-Setup para ser reprovisionado no local.`,
+        mensagem: `Resetar o Wi-Fi do ESP32 da sala ${sala}? O dispositivo vai apagar a rede e o endereço do servidor, preservar sua credencial exclusiva e o failsafe OFF gravado, e reiniciar no ponto de acesso RemoteIFES-Setup para ser reprovisionado no local.`,
         confirmarTexto: "Resetar Wi-Fi",
         perigo: true,
       });
       if (!ok) return;
-      const resp = await Api.resetarWifiEsp32(d.sala);
+      const resp = await Api.resetarWifiEsp32(sala);
       if (!resp.ok) Toast.erro(resp.erro || "não foi possível resetar o Wi-Fi do dispositivo");
       else Toast.aviso("comando de reset enviado ao dispositivo");
-    });
+    },
+  };
 
-    return li;
-  }
+  // Um único listener na lista: os botões dos cartões podem aparecer, sumir ou ser atualizados no
+  // lugar sem precisar religar handlers.
+  if (listEl) listEl.addEventListener("click", (event) => {
+    const botao = event.target.closest("button[data-acao]");
+    if (!botao || botao.disabled || !listEl.contains(botao)) return;
+    const cartao = botao.closest("li[data-sala]");
+    const acao = ACOES_DISPOSITIVO[botao.dataset.acao];
+    if (cartao && acao) acao(cartao.dataset.sala, botao);
+  });
 
   const ROLLOUT_ESTADO_ROTULOS = {
     preflight: "verificando compatibilidade",
@@ -574,13 +574,22 @@ const Esp32Admin = (() => {
   }
 
   function render() {
-    listEl.innerHTML = "";
     if (dispositivos.length === 0) {
+      listEl.innerHTML = "";
       emptyEl.classList.remove("hidden");
       return;
     }
     emptyEl.classList.add("hidden");
-    dispositivos.forEach((d) => listEl.appendChild(renderDispositivo(d)));
+    UISync.sincronizarLista(listEl, dispositivos, {
+      seletor: "li[data-sala]",
+      chave: (d) => d.sala,
+      criar: () => {
+        const li = document.createElement("li");
+        li.className = "card esp32-device-card";
+        return li;
+      },
+      atualizar: (li, d) => UISync.aplicarHtml(li, renderDispositivo(d)),
+    });
   }
 
   function aplicarEstadoDispositivo(sala, estado) {
