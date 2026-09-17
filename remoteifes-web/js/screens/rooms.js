@@ -38,14 +38,13 @@ function renderRooms(salasTodas) {
   }
   empty.classList.add("hidden");
 
-  const existentes = new Map();
-  list.querySelectorAll("li[data-sala]").forEach((li) => existentes.set(li.dataset.sala, li));
-
-  salas.forEach((s, index) => {
-    let li = existentes.get(s.sala);
-    if (!li) {
-      li = document.createElement("li");
-      li.dataset.sala = s.sala;
+  // Cada sala é um <li> estável: as atualizações em tempo real só trocam textos e classes, sem
+  // recriar nem reposicionar o elemento (a ordem recebida não reordena a lista já exibida).
+  UISync.sincronizarLista(list, salas, {
+    seletor: "li[data-sala]",
+    chave: (s) => s.sala,
+    criar: () => {
+      const li = document.createElement("li");
       li.tabIndex = 0;
       li.setAttribute("role", "button");
       li.innerHTML = `
@@ -61,26 +60,25 @@ function renderRooms(salasTodas) {
         event.preventDefault();
         openRoom(li.dataset.sala, li.dataset.nome);
       });
-    } else {
-      existentes.delete(s.sala);
-    }
-    li.dataset.nome = s.nome;
-
-    li.querySelector(".room-name").innerHTML = `
-      ${escapeHtml(rotulosPlanta.get(s.sala) || RoomsData.rotulo(s.sala))}
-      ${s.agendadaAgora ? '<span class="schedule-badge" title="Agendamento ativo agora">agendada</span>' : ""}
-      ${s.podeControlarEsta === false ? '<span class="schedule-badge readonly-badge" title="Apenas visualização">visualização</span>' : ""}
-    `;
-    li.querySelector(".room-sub").textContent = `${s.nome}${s.online && s.ligado ? " · ligado" : ""}`;
-    const badge = li.querySelector(".status-badge");
-    badge.textContent = s.online ? "online" : "offline";
-    badge.className = `status-badge ${s.online ? "on" : "off"}`;
-
-    const referencia = list.children[index];
-    if (referencia !== li) list.insertBefore(li, referencia || null);
+      return li;
+    },
+    atualizar: (li, s) => {
+      li.dataset.nome = s.nome;
+      UISync.aplicarHtml(li.querySelector(".room-name"), `
+        ${escapeHtml(rotulosPlanta.get(s.sala) || RoomsData.rotulo(s.sala))}
+        ${s.agendadaAgora ? '<span class="schedule-badge" title="Agendamento ativo agora">agendada</span>' : ""}
+        ${s.podeControlarEsta === false ? '<span class="schedule-badge readonly-badge" title="Apenas visualização">visualização</span>' : ""}
+      `);
+      const sub = li.querySelector(".room-sub");
+      const textoSub = `${s.nome}${s.online && s.ligado ? " · ligado" : ""}`;
+      if (sub.textContent !== textoSub) sub.textContent = textoSub;
+      const badge = li.querySelector(".status-badge");
+      const textoBadge = s.online ? "online" : "offline";
+      if (badge.textContent !== textoBadge) badge.textContent = textoBadge;
+      const classeBadge = `status-badge ${s.online ? "on" : "off"}`;
+      if (badge.className !== classeBadge) badge.className = classeBadge;
+    },
   });
-
-  existentes.forEach((li) => li.remove());
 }
 
 function iniciarAutoRefreshRooms(somenteSeJaCarregado) {
