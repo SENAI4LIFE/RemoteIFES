@@ -1,6 +1,7 @@
-const { aplicarComando, aplicarInicioAgendamento, verificarTimeouts, agendamentoOcorreHoje } = require("../services/salasService");
+const { aplicarComando, aplicarInicioAgendamento, verificarTimeouts, agendamentoOcorreHoje, intencaoAlteradaDesde } = require("../services/salasService");
 const {
   listarAtivosParaAgendador,
+  listarDesligamentosPendentesDeOntem,
   registrarExecucao,
   jaExecutadoHoje,
 } = require("../services/agendamentosService");
@@ -10,7 +11,7 @@ const { criarBackup, normalizarInteiro } = require("../services/backupService");
 const otaService = require("../services/otaService");
 const otaRolloutService = require("../services/otaRolloutService");
 const monitoramentoService = require("../services/monitoramentoService");
-const { horaAtualBrasilia, dataAtualBrasiliaISO } = require("../utils/tempo");
+const { horaAtualBrasilia, dataAtualBrasiliaISO, brasiliaParaUtcSqlite } = require("../utils/tempo");
 const logger = require("../utils/logger");
 
 const VERIFICACAO_MS = 60 * 1000;
@@ -25,9 +26,32 @@ const BACKUP_AUTOMATICO = String(
 ).toLowerCase() === "true";
 const BACKUP_INTERVALO_MS = normalizarInteiro(process.env.BACKUP_INTERVALO_HORAS, 24, 1, 8760) * 60 * 60 * 1000;
 
-function verificarAgendamentos() {
+// aoIniciar: primeira passagem, feita antes de qualquer placa reconectar — o estado desejado é só
+// persistido (a reconexão o entrega), para que um OFF agendado pendente vença a restauração.
+function verificarAgendamentos({ aoIniciar = false } = {}) {
   const hora = horaAtualBrasilia();
   const dataISO = dataAtualBrasiliaISO();
+  const enviarAoDispositivo = !aoIniciar;
+
+  // Um desligamento agendado que ficou pendente na virada do dia é aplicado uma única vez, a menos
+  // que uma intenção mais nova (comando manual, outro agendamento, OFF local) tenha surgido depois
+  // da hora em que ele era devido; sem isso o ar-condicionado ficaria ligado até alguém notar.
+  for (const ag of listarDesligamentosPendentesDeOntem(dataISO)) {
+    try {
+      const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
+      if (intencaoAlteradaDesde(ag.sala, brasiliaParaUtcSqlite(ag.data, fimLigar))) continue;
+      aplicarComando(ag.sala, "desligar", undefined, {
+        usuario: null,
+        origem: "agendamento",
+        registrarNaTransacao: () => registrarExecucao(ag.id, "desligar", ag.data),
+        enviarAoDispositivo,
+      });
+      logger.warn("agendamento-desligamento-recuperado", { agendamentoId: ag.id, sala: ag.sala, data: ag.data, devidoAs: fimLigar });
+    } catch (erro) {
+      logger.error("agendamento-falhou", { agendamentoId: ag.id, sala: ag.sala, mensagem: erro.message });
+      monitoramentoService.registrar("schedulerFalha", { tarefa: "agendamento", agendamentoId: ag.id });
+    }
+  }
 
   for (const ag of listarAtivosParaAgendador()) {
     try {
@@ -40,13 +64,14 @@ function verificarAgendamentos() {
       // O registro da execução entra na mesma transação da mudança de estado: ou os dois persistem
       // ou nenhum, para que uma falha (ou queda do servidor) entre eles não repita o comando no tick seguinte.
       if (estaNaJanelaDeLigar(hora, inicioLigar, fimLigar) && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
-        aplicarInicioAgendamento(ag.sala, ag.temperatura, { registrarNaTransacao: () => registrarExecucao(ag.id, "ligar", dataISO) });
+        aplicarInicioAgendamento(ag.sala, ag.temperatura, { registrarNaTransacao: () => registrarExecucao(ag.id, "ligar", dataISO), enviarAoDispositivo });
       }
       if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO)) {
         aplicarComando(ag.sala, "desligar", undefined, {
           usuario: null,
           origem: "agendamento",
           registrarNaTransacao: () => registrarExecucao(ag.id, "desligar", dataISO),
+          enviarAoDispositivo,
         });
       }
     } catch (erro) {
@@ -91,6 +116,7 @@ function iniciarScheduler() {
   agendarPeriodico(monitoramentoService.amostrar, AMOSTRA_MONITORAMENTO_MS, "monitoramento-amostra");
   agendarPeriodico(encerrarSessoesAbandonadas, VERIFICACAO_SESSOES_MS, "sessoes-abandonadas");
   agendarPeriodico(executarLimpezaRetencao, VERIFICACAO_RETENCAO_MS, "retencao");
+  executarProtegido(() => verificarAgendamentos({ aoIniciar: true }), "agendamentos-inicial");
   executarProtegido(encerrarSessoesAbandonadas, "sessoes-abandonadas-inicial");
   const timerRetencaoInicial = setTimeout(() => {
     executarProtegido(executarLimpezaRetencao, "retencao-inicial");

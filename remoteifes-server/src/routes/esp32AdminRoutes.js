@@ -56,8 +56,8 @@ function exigirClonadorAutorizado(req, res, next) {
   next();
 }
 
-function enviarOuFalhar(res, sala, payload) {
-  const enviado = deviceHub.enviarComando(sala, payload);
+function enviarOuFalhar(res, sala, payload, enviar = deviceHub.enviarComando) {
+  const enviado = enviar(sala, payload);
   if (!enviado) {
     return res.status(409).json({ ok: false, erro: "dispositivo não está conectado no momento" });
   }
@@ -217,7 +217,7 @@ router.post("/admin/esp32/:sala/teste/raw", exigirSalaCadastrada, exigirDisposit
   if (!Number.isFinite(hz) || hz < 20000 || hz > 60000) {
     return res.status(400).json({ ok: false, erro: "carrierHz inválido" });
   }
-  enviarOuFalhar(res, req.params.sala, { tipo: "send_raw", raw, carrierHz: hz });
+  enviarOuFalhar(res, req.params.sala, { tipo: "send_raw", raw, carrierHz: hz }, deviceHub.enviarTesteIR);
 });
 
 router.post("/admin/esp32/:sala/teste/estado", exigirSalaCadastrada, exigirDispositivoConectado, (req, res) => {
@@ -243,7 +243,7 @@ router.post("/admin/esp32/:sala/teste/estado", exigirSalaCadastrada, exigirDispo
     turbo: !!turbo,
     fan: fan || "",
     swing: !!swing,
-  });
+  }, deviceHub.enviarTesteIR);
 });
 
 router.post("/admin/esp32/:sala/protocolo-ir", exigirSalaCadastrada, (req, res) => {

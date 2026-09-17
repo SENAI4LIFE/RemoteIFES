@@ -257,11 +257,14 @@ test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clo
   assert.equal(linhaTx.dispositivo.failsafe.configurado, true);
   assert.equal(dispositivos.find((d) => d.sala === "CLONE-1").dispositivo.role, "cloner");
 
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.1.0", modo: "operation", ligado: false, versao: salasService.buscar("TX-1").estadoVersao }));
+  assert.ok(await ate(() => deviceHub.estadoPublico("TX-1").estadoConfirmado === true));
   tx.mensagens.length = 0;
   resp = await auth(`/admin/protocolos-ir/${salvo.id}/transmitir`, token, { method: "POST", body: JSON.stringify({ sala: "TX-1" }) });
   assert.equal(resp.status, 200);
   assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_raw")));
   assert.deepEqual(tx.mensagens.find((m) => m.tipo === "send_raw").raw, CAPTURA_LIGAR.raw);
+  assert.equal(deviceHub.estadoPublico("TX-1").estadoConfirmado, false, "transmitir um RAW tira a placa do estado desejado confirmado");
   resp = await auth(`/admin/protocolos-ir/${salvo.id}/transmitir`, token, { method: "POST", body: JSON.stringify({ sala: "TX-2" }) });
   assert.equal(resp.status, 409, "destino desconectado");
 
@@ -548,6 +551,44 @@ test("identificadores numéricos de protocolo fora do suporte do firmware são r
   assert.equal(limpar.status, 200);
   assert.equal(salasService.buscar("TX-2").irProtocolo, null);
   await fecharEEsperar(tx.ws);
+});
+
+test("os testes IR administrativos de uma sala não confirmam a intenção guardada: a confirmação só volta com uma intenção nova", async () => {
+  const token = await tokenSuperAdmin();
+  db.prepare("UPDATE salas SET irProtocolo = 16, ligado = 1, temperaturaAlvo = 23 WHERE sala = 'TX-2'").run();
+  const tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2");
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.restauracao === true)));
+  const versao = tx.mensagens.find((m) => m.tipo === "send_known_state").versao;
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.1.0", modo: "operation", ligado: true, versao }));
+  assert.ok(await ate(() => deviceHub.estadoPublico("TX-2").estadoConfirmado === true));
+
+  tx.mensagens.length = 0;
+  let resp = await auth("/admin/esp32/TX-2/teste/estado", token, { method: "POST", body: JSON.stringify({ protocol: 16, temp: 24, power: false }) });
+  assert.equal(resp.status, 200);
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state")));
+  assert.equal(tx.mensagens.find((m) => m.tipo === "send_known_state").versao, undefined, "o teste não carrega versão de intenção");
+  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false);
+  assert.equal(salasService.buscar("TX-2").ligado, 1, "o teste não altera a intenção");
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.1.0", modo: "operation", ligado: false, versao, ultimoComando: { tipo: "known_state", protocol: 16, temp: 24, power: false, turbo: false } }));
+  await esperar(80);
+  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "o eco da versão anterior ao teste não confirma a intenção");
+
+  salasService.aplicarComando("TX-2", "ligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true, nivel: 3 }, origem: "manual" });
+  assert.ok(await ate(() => tx.mensagens.filter((m) => m.tipo === "send_known_state").length === 2));
+  const nova = tx.mensagens.filter((m) => m.tipo === "send_known_state")[1].versao;
+  assert.ok(nova > versao);
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.1.0", modo: "operation", ligado: true, versao: nova }));
+  assert.ok(await ate(() => deviceHub.estadoPublico("TX-2").estadoConfirmado === true));
+
+  resp = await auth("/admin/esp32/TX-2/teste/raw", token, { method: "POST", body: JSON.stringify({ raw: [9000, 4500, 560, 560], carrierHz: 38000 }) });
+  assert.equal(resp.status, 200);
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_raw")));
+  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "um RAW de teste também invalida a confirmação");
+
+  resp = await auth("/admin/esp32/dispositivos", token);
+  assert.equal((await resp.json()).find((d) => d.sala === "TX-2").dispositivo.estadoConfirmado, false);
+  await fecharEEsperar(tx.ws);
+  db.prepare("UPDATE salas SET irProtocolo = NULL, ligado = 0 WHERE sala = 'TX-2'").run();
 });
 
 test("um protocolo já gravado com identificador antigo continua sendo transmitido como antes", () => {
