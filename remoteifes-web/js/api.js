@@ -27,23 +27,61 @@ function headersComToken(extra = {}) {
   return authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
 }
 
+// Prazo de cada chamada, do envio até o corpo da resposta lido. Sem ele, uma conexão que emudece
+// (rede móvel que cai, servidor travado) deixa a tela presa para sempre no estado "enviando".
+const TEMPO_LIMITE_MS = 15000;
+const TEMPO_LIMITE_DOWNLOAD_MS = 120000;
+
+function ehMutacao(options) {
+  return !!options.method && options.method.toUpperCase() !== "GET";
+}
+
+// Uma mutação sem resposta tem desfecho desconhecido: o servidor pode ter aplicado o pedido. O
+// chamador deve conferir o estado (o painel refaz a consulta) em vez de repetir ou dar como não feito.
+function semResposta(options, tempoEsgotado) {
+  const mutacao = ehMutacao(options);
+  let erro;
+  if (tempoEsgotado) {
+    erro = mutacao
+      ? `o servidor não respondeu em ${TEMPO_LIMITE_MS / 1000} s; o pedido pode ter sido aplicado — confira o estado antes de repetir`
+      : `o servidor não respondeu em ${TEMPO_LIMITE_MS / 1000} s`;
+  } else {
+    erro = mutacao
+      ? `a conexão com o servidor em ${SERVER_URL} falhou antes da resposta; o pedido pode ter sido aplicado — confira o estado antes de repetir`
+      : `não foi possível conectar ao servidor em ${SERVER_URL} (verifique se ele está rodando e acessível)`;
+  }
+  return { ok: false, erro, semResposta: true, tempoEsgotado: !!tempoEsgotado, desfechoDesconhecido: mutacao };
+}
+
 async function chamar(path, options = {}) {
+  const { tempoLimiteMs = TEMPO_LIMITE_MS, ...opcoesFetch } = options;
+  const controle = new AbortController();
+  let tempoEsgotado = false;
+  const prazo = setTimeout(() => {
+    tempoEsgotado = true;
+    controle.abort();
+  }, tempoLimiteMs);
   let res;
-  try {
-    res = await fetch(`${SERVER_URL}${path}`, options);
-  } catch (err) {
-    return { ok: false, erro: `não foi possível conectar ao servidor em ${SERVER_URL} (verifique se ele está rodando e acessível)` };
-  }
-  if (res.status === 401 && authToken) {
-    authToken = null;
-    gravarTokenArmazenado(null);
-    window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
-  }
   let data;
   try {
-    data = await res.json();
-  } catch (err) {
-    return { ok: false, erro: `resposta inválida do servidor (status ${res.status})` };
+    try {
+      res = await fetch(`${SERVER_URL}${path}`, { ...opcoesFetch, signal: controle.signal });
+    } catch (err) {
+      return semResposta(opcoesFetch, tempoEsgotado);
+    }
+    if (res.status === 401 && authToken) {
+      authToken = null;
+      gravarTokenArmazenado(null);
+      window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
+    }
+    try {
+      data = await res.json();
+    } catch (err) {
+      if (tempoEsgotado || (err && err.name === "AbortError")) return semResposta(opcoesFetch, tempoEsgotado);
+      return { ok: false, erro: `resposta inválida do servidor (status ${res.status})` };
+    }
+  } finally {
+    clearTimeout(prazo);
   }
   if (res.status === 503 && data && data.manutencao) {
     window.dispatchEvent(new CustomEvent("app:manutencao-ativa"));
@@ -78,18 +116,34 @@ const Api = {
   },
 
   async baixarMobileApk() {
-    let res;
+    const controle = new AbortController();
+    let tempoEsgotado = false;
+    const prazo = setTimeout(() => {
+      tempoEsgotado = true;
+      controle.abort();
+    }, TEMPO_LIMITE_DOWNLOAD_MS);
     try {
-      res = await fetch(`${SERVER_URL}/mobile-app/android`, { headers: headersComToken() });
-    } catch (err) {
-      return { ok: false, erro: `não foi possível conectar ao servidor em ${SERVER_URL} (verifique se ele está rodando e acessível)` };
+      let res;
+      try {
+        res = await fetch(`${SERVER_URL}/mobile-app/android`, { headers: headersComToken(), signal: controle.signal });
+      } catch (err) {
+        return semResposta({}, tempoEsgotado);
+      }
+      if (!res.ok) {
+        let erro = "APK indisponível";
+        try { erro = (await res.json()).erro || erro; } catch (err) {}
+        return { ok: false, erro };
+      }
+      try {
+        return { ok: true, blob: await res.blob(), nome: "RemoteIFES.apk" };
+      } catch (err) {
+        return tempoEsgotado
+          ? { ok: false, erro: `o download não terminou em ${TEMPO_LIMITE_DOWNLOAD_MS / 1000} s`, semResposta: true, tempoEsgotado: true }
+          : semResposta({}, false);
+      }
+    } finally {
+      clearTimeout(prazo);
     }
-    if (!res.ok) {
-      let erro = "APK indisponível";
-      try { erro = (await res.json()).erro || erro; } catch (err) {}
-      return { ok: false, erro };
-    }
-    return { ok: true, blob: await res.blob(), nome: "RemoteIFES.apk" };
   },
 
   async login(usuario, senha) {

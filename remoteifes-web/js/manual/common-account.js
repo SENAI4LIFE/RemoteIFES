@@ -117,6 +117,7 @@ ManualContent.registrar([
         ["Uma sala offline", "não repita comandos já aceitos; informe sala e horário à equipe"],
         ["Controle desabilitado", "permissão geral, restrição da sala, reserva, limites de temperatura e, sem Auto-ON, aparelho desligado para Turbo"],
         ["Comando aceito, sem efeito físico", "confira offline; o estado pode estar pendente para reconexão"],
+        ["Servidor sem resposta ao enviar", "cada pedido espera até 15 s; o comando pode ter sido aplicado — o painel refaz a consulta do estado; confira antes de repetir"],
         ["Tela antiga na PWA", "abra com rede e aguarde a atualização automática"],
         ["APK recusado", "build superior, mesma assinatura, origem publicável e permissão de instalação"],
         ["Manual sem tópico administrativo", "entre com o papel correto; conteúdo privilegiado vem do servidor"],
