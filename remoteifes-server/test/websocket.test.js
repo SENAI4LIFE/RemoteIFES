@@ -222,17 +222,19 @@ test("heartbeat que muda so a temperatura avisa apenas quem observa a sala", asy
   alheio.ws.close();
 });
 
-test("heartbeat que muda ligado retransmite a lista de salas", async () => {
+test("o ligado reportado no heartbeat não altera o estado desejado nem retransmite a lista de salas", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salasService.listar()[3].sala;
   salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
+  assert.equal(salasService.buscar(sala).ligado, 0);
 
   const cliente = await clienteObservando("ligado", sala);
   const coleta = coletarPor(cliente, 500);
   salasService.marcarOnline(sala, { ligado: true, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
   const tipos = (await coleta).map((m) => m.tipo);
-  assert.ok(tipos.includes("salas"), `esperava uma retransmissao de salas, veio ${JSON.stringify(tipos)}`);
   cliente.ws.close();
+  assert.equal(salasService.buscar(sala).ligado, 0, "o eco da placa não vira intenção");
+  assert.deepEqual(tipos, [], `um relato que não muda nada exibido nao deveria gerar trafego, veio ${JSON.stringify(tipos)}`);
 });
 
 async function clienteAutenticado(sufixo, nivel) {

@@ -119,11 +119,12 @@ test("dispositivo conecta via WS, envia telemetria, e recebe comandos retransmit
   const sala = db.prepare(`SELECT * FROM salas WHERE sala = ?`).get("teste-esp32-online");
   assert.equal(sala.online, 1);
   assert.equal(sala.temperatura, 23.5);
-  assert.equal(sala.ligado, 1);
+  assert.equal(sala.ligado, 0, "o ligado reportado é o eco da placa, não altera o estado desejado");
 
   const estado = deviceHub.estadoPublico("teste-esp32-online");
   assert.equal(estado.conectado, true);
   assert.equal(estado.ultimaTelemetria.temp, 23.5);
+  assert.equal(estado.ultimaTelemetria.ligado, true);
   assert.equal(estado.ultimoComando.protocol, 5);
 
   const token = await tokenSuperAdmin();

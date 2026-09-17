@@ -96,6 +96,12 @@ app.post("/__e2e/fechar-status", (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/__e2e/silenciar-dispositivo/:valor", (req, res) => {
+  if (!fake) return res.status(503).json({ ok: false, erro: "fake ESP32 indisponível" });
+  fake.silenciar(req.params.valor === "on");
+  res.json({ ok: true });
+});
+
 app.post("/__e2e/resetar-dispositivo", (req, res) => {
   db.prepare("UPDATE salas SET ligado = 0, turboAtivo = 0 WHERE sala = ?").run(SALA_COM_DISPOSITIVO);
   if (fake) fake.resetar();

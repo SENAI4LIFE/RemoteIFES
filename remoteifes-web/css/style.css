@@ -3223,6 +3223,9 @@ textarea {
   color: #7cffb2;
 }
 
+.ac-remote-display #statusValue[data-confirmado="false"] { opacity: 0.75; }
+.ac-remote-display #statusValue[data-confirmado="false"]::after { content: " …"; }
+
 .ac-remote-display-bottom {
   margin-top: calc(8px * var(--rs));
 }

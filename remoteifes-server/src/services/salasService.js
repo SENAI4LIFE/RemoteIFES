@@ -109,7 +109,9 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null, opcoes 
     logger.warn("esp32-indisponibilidade-fechamento-falhou", { sala, mensagem: erro.message });
   }
 
-  const temLigado = Object.prototype.hasOwnProperty.call(estadoReportado, "ligado");
+  // "ligado" reportado pela placa é o eco do último comando que ela processou, nunca a intenção:
+  // um relato atrasado não pode desfazer um comando já persistido (a trava do OFF local é adotada
+  // explicitamente em adotarDesligamentoLocal, só a partir de relatos comprovadamente atuais).
   const temTemperatura = Object.prototype.hasOwnProperty.call(estadoReportado, "temperatura");
 
   db.prepare(`
@@ -117,20 +119,17 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null, opcoes 
       online = 1,
       ultimoHeartbeat = datetime('now'),
       atualizadoEm = datetime('now'),
-      ligado = COALESCE(?, ligado),
       temperatura = COALESCE(?, temperatura),
       ipEsp32 = COALESCE(?, ipEsp32)
     WHERE sala = ?
   `).run(
-    temLigado ? (estadoReportado.ligado ? 1 : 0) : null,
     temTemperatura ? Number(estadoReportado.temperatura) : null,
     ip || null,
     sala
   );
 
   const atualizada = buscar(sala);
-  const mudouNaListagem = !salaRow.online !== !atualizada.online || !salaRow.ligado !== !atualizada.ligado;
-  if (mudouNaListagem) eventos.emit("mudanca");
+  if (!salaRow.online !== !atualizada.online) eventos.emit("mudanca");
   else if (salaRow.temperatura !== atualizada.temperatura) eventos.emit("mudanca-sala", { sala });
   return atualizada;
 }
@@ -333,7 +332,7 @@ function definirLimitesTemperatura(sala, { minima, maxima }) {
   const alvoAjustado = Math.max(efetivaMin, Math.min(efetivaMax, salaRow.temperaturaAlvo));
   db.prepare(`
     UPDATE salas
-    SET temperaturaMinima = ?, temperaturaMaxima = ?, temperaturaAlvo = ?, atualizadoEm = datetime('now')
+    SET temperaturaMinima = ?, temperaturaMaxima = ?, temperaturaAlvo = ?, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now')
     WHERE sala = ?
   `).run(minimaFinal, maximaFinal, alvoAjustado, sala);
   db.prepare(`
@@ -446,6 +445,7 @@ function statusCompleto(sala, requisitante, contexto = null) {
     autoLigar: configuracoesService.autoLigarAtivo(cfg),
     acessoRestrito: !!salaRow.acessoRestrito,
     podeControlarEsta: usuarioPodeControlarSala(requisitante, sala, contexto),
+    dispositivoConfirmou: require("./deviceHub").estadoConfirmado(salaRow),
     bloqueio: bloqueio
       ? {
           usuarioNome: bloqueio.usuarioNome,
@@ -470,6 +470,7 @@ function comandoEstadoIR(salaAtualizada) {
   const swing = configuracoesService.turboFuncaoExtra() === "swing" && !!salaAtualizada.turboAtivo;
   return {
     tipo: "send_known_state",
+    versao: salaAtualizada.estadoVersao,
     protocol: salaAtualizada.irProtocolo,
     temp: salaAtualizada.temperaturaAlvo,
     power: !!salaAtualizada.ligado,
@@ -477,6 +478,15 @@ function comandoEstadoIR(salaAtualizada) {
     fan: "",
     swing,
   };
+}
+
+function reenviarEstadoIRParaTodas() {
+  db.prepare(`UPDATE salas SET estadoVersao = estadoVersao + 1 WHERE irProtocolo IS NOT NULL`).run();
+  const deviceHub = require("./deviceHub");
+  for (const salaRow of listar()) {
+    const comando = comandoEstadoIR(salaRow);
+    if (comando) deviceHub.enviarComando(salaRow.sala, comando);
+  }
 }
 
 function enviarEstadoIRParaDispositivo(salaAtualizada) {
@@ -521,7 +531,7 @@ function sincronizarFailsafeIRPorProtocolo(protocoloRegistroId) {
   return enviados;
 }
 
-function aplicarComando(sala, cmd, valor, { usuario, origem }) {
+function aplicarComando(sala, cmd, valor, { usuario, origem, registrarNaTransacao = null }) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
@@ -558,16 +568,16 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   db.exec("BEGIN IMMEDIATE");
   try {
     if (cmd === "ligar") {
-      db.prepare(`UPDATE salas SET ligado = 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+      db.prepare(`UPDATE salas SET ligado = 1, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
     } else if (cmd === "desligar") {
-      db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
+      db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
     } else if (cmd === "temperatura") {
       ligouAutomaticamente = autoLigar && !salaRow.ligado;
-      db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+      db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, temperaturaAlvo = ?, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now') WHERE sala = ?`)
         .run(autoLigar ? 1 : 0, temp, sala);
     } else if (cmd === "turbo") {
       ligouAutomaticamente = autoLigar && valor && !salaRow.ligado;
-      db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, turboAtivo = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+      db.prepare(`UPDATE salas SET ligado = CASE WHEN ? THEN 1 ELSE ligado END, turboAtivo = ?, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now') WHERE sala = ?`)
         .run(autoLigar && valor ? 1 : 0, valor ? 1 : 0, sala);
     }
 
@@ -581,6 +591,7 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
       valor,
       origem,
     });
+    if (registrarNaTransacao) registrarNaTransacao();
     db.exec("COMMIT");
   } catch (erro) {
     try {
@@ -590,11 +601,12 @@ function aplicarComando(sala, cmd, valor, { usuario, origem }) {
   }
 
   const salaAtualizada = buscar(sala);
-  enviarEstadoIRParaDispositivo(salaAtualizada);
+  const enviadoAoDispositivo = enviarEstadoIRParaDispositivo(salaAtualizada);
   eventos.emit("mudanca");
 
   return {
     ...salaAtualizada,
+    enviadoAoDispositivo,
     avisoDispositivoOffline: !salaAtualizada.online,
   };
 }
@@ -627,13 +639,22 @@ function apagarLogs({ data } = {}) {
   }
 }
 
-function adotarDesligamentoLocal(sala) {
+// O OFF local travado na placa passa a ser a intenção do servidor. A versão do estado não avança:
+// a placa já está no estado adotado, e só um comando explícito (que avança a versão) limpa a trava.
+function adotarDesligamentoLocal(sala, { naReconexao = true } = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
+  if (!salaRow.ligado && !salaRow.turboAtivo) return salaRow;
   db.exec("BEGIN IMMEDIATE");
   try {
     db.prepare(`UPDATE salas SET ligado = 0, turboAtivo = 0, atualizadoEm = datetime('now') WHERE sala = ?`).run(sala);
-    registrarLog({ usuario: null, sala, cmd: "failsafe_off_local", valor: "mantido_na_reconexao", origem: "esp32_local" });
+    registrarLog({
+      usuario: null,
+      sala,
+      cmd: "failsafe_off_local",
+      valor: naReconexao ? "mantido_na_reconexao" : "adotado_em_operacao",
+      origem: "esp32_local",
+    });
     db.exec("COMMIT");
   } catch (erro) {
     try {
@@ -641,7 +662,7 @@ function adotarDesligamentoLocal(sala) {
     } catch (rollbackErro) {}
     throw erro;
   }
-  if (salaRow.ligado || salaRow.turboAtivo) eventos.emit("mudanca");
+  eventos.emit("mudanca");
   return buscar(sala);
 }
 
@@ -686,7 +707,7 @@ function definirProtocoloIR(sala, protocolo, protocoloRegistroId = null) {
     throw new Error("registro de protocolo infravermelho inválido");
   }
 
-  db.prepare(`UPDATE salas SET irProtocolo = ?, irProtocoloRegistroId = ?, atualizadoEm = datetime('now') WHERE sala = ?`)
+  db.prepare(`UPDATE salas SET irProtocolo = ?, irProtocoloRegistroId = ?, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now') WHERE sala = ?`)
     .run(protocoloFinal, registroFinal, sala);
   const atualizada = buscar(sala);
   enviarEstadoIRParaDispositivo(atualizada);
@@ -694,7 +715,7 @@ function definirProtocoloIR(sala, protocolo, protocoloRegistroId = null) {
   return atualizada;
 }
 
-function aplicarInicioAgendamento(sala, temperatura) {
+function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = null } = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
   const temp = Number(temperatura);
@@ -705,9 +726,10 @@ function aplicarInicioAgendamento(sala, temperatura) {
 
   db.exec("BEGIN IMMEDIATE");
   try {
-    db.prepare(`UPDATE salas SET ligado = 1, temperaturaAlvo = ?, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
+    db.prepare(`UPDATE salas SET ligado = 1, temperaturaAlvo = ?, estadoVersao = estadoVersao + 1, atualizadoEm = datetime('now') WHERE sala = ?`).run(temp, sala);
     registrarLog({ usuario: null, sala, cmd: "ligar", valor: undefined, origem: "agendamento" });
     registrarLog({ usuario: null, sala, cmd: "temperatura", valor: temp, origem: "agendamento" });
+    if (registrarNaTransacao) registrarNaTransacao();
     db.exec("COMMIT");
   } catch (erro) {
     db.exec("ROLLBACK");
@@ -780,6 +802,7 @@ module.exports = {
   buscarAdministrativo,
   identificarDispositivo,
   comandoEstadoIR,
+  reenviarEstadoIRParaTodas,
   comandoFailsafeIR,
   enviarFailsafeIRParaDispositivo,
   sincronizarFailsafeIRPorProtocolo,

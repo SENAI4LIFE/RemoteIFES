@@ -89,9 +89,17 @@ function estadoPublico(sala) {
     ultimaTelemetria: entrada.ultimaTelemetria,
     ultimoComando: entrada.ultimoComando,
     failsafe: entrada.failsafe,
+    estadoConfirmado: estadoConfirmado(salasService.buscar(sala), entrada),
+    versaoEstadoReportada: entrada.versaoEstadoReportada,
     capturasRecentes: capturasRecentes(sala),
     ota,
   };
+}
+
+// true/false: a placa conectada já reportou (ou não) o estado desejado vigente; null: sem placa ou sem IR.
+function estadoConfirmado(salaRow, entrada = conexoes.get(salaRow?.sala)) {
+  if (!salaRow || !entrada || !Number.isInteger(salaRow.irProtocolo)) return null;
+  return entrada.versaoConfirmada === salaRow.estadoVersao;
 }
 
 function capturasRecentes(sala) {
@@ -226,6 +234,45 @@ function atualizarFailsafeReportado(entrada, msg) {
   return true;
 }
 
+// Firmware sem eco de versão (≤ 4.2.0): o último comando IR relatado bate com a intenção vigente.
+function relatoCondizComIntencao(salaRow, ultimoComando) {
+  if (!ultimoComando || typeof ultimoComando !== "object" || ultimoComando.tipo !== "known_state") return false;
+  return ultimoComando.protocol === salaRow.irProtocolo
+    && !!ultimoComando.power === !!salaRow.ligado
+    && Number(ultimoComando.temp) === Number(salaRow.temperaturaAlvo)
+    && !!ultimoComando.turbo === !!salaRow.turboAtivo;
+}
+
+// Reconcilia um relato da placa (info, telemetria ou failsafe_status) com a intenção persistida.
+// Um relato só influencia a intenção quando comprovadamente reflete a versão vigente dela: pela
+// versão ecoada (firmware ≥ 4.3.0) ou, sem eco, quando esta conexão já confirmou a versão vigente
+// (a ordem das mensagens no socket garante que o relato é posterior). A trava do OFF local reportada
+// no info da conexão é adotada sempre, como antes. Devolve true quando a confirmação mudou.
+function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
+  let salaRow = salasService.buscar(sala);
+  if (!salaRow) return false;
+  const versaoAtual = salaRow.estadoVersao;
+  const versaoReportada = Number.isInteger(msg.versao) && msg.versao >= 0 ? msg.versao : null;
+  entrada.versaoEstadoReportada = versaoReportada;
+  const reflete = versaoReportada !== null
+    ? versaoReportada === versaoAtual
+    : entrada.versaoConfirmada === versaoAtual || relatoCondizComIntencao(salaRow, msg.ultimoComando);
+  const latched = msg.failsafeLatched === true;
+  if (latched && (inicial || reflete) && (salaRow.ligado || salaRow.turboAtivo)) {
+    try {
+      salaRow = salasService.adotarDesligamentoLocal(sala, { naReconexao: inicial });
+      logger.info("device-ws-failsafe-latch", { sala, naReconexao: inicial });
+    } catch (erro) {
+      logger.warn("device-ws-failsafe-latch-adotar-falhou", { sala, mensagem: erro.message });
+    }
+  }
+  const confirmado = reflete || (latched && !salaRow.ligado && !salaRow.turboAtivo);
+  const antes = entrada.versaoConfirmada === versaoAtual;
+  if (confirmado) entrada.versaoConfirmada = versaoAtual;
+  else if (versaoReportada !== null && entrada.versaoConfirmada === versaoAtual) entrada.versaoConfirmada = null;
+  return antes !== confirmado;
+}
+
 function sincronizarEstadoInicial(sala, entrada, info) {
   if (entrada.sincronizacaoInicial) {
     clearTimeout(entrada.sincronizacaoInicial);
@@ -233,19 +280,16 @@ function sincronizarEstadoInicial(sala, entrada, info) {
   }
   if (entrada.estadoInicialSincronizado || conexoes.get(sala) !== entrada || entrada.ws.readyState !== entrada.ws.OPEN) return;
   entrada.estadoInicialSincronizado = true;
-  if (info && info.failsafeLatched === true) {
-    try {
-      salasService.adotarDesligamentoLocal(sala);
-    } catch (erro) {
-      logger.warn("device-ws-failsafe-latch-adotar-falhou", { sala, mensagem: erro.message });
-    }
-    logger.info("device-ws-failsafe-latch", { sala });
-    return;
+  if (info) {
+    reconciliarRelato(sala, entrada, info, { inicial: true });
+    if (info.failsafeLatched === true) return;
   }
+  // A restauração automática é marcada para que o firmware não a trate como comando explícito
+  // (uma placa travada em OFF local a ignora e responde com failsafe_status).
   const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
   if (comandoInicial) {
     try {
-      entrada.ws.send(JSON.stringify(comandoInicial));
+      entrada.ws.send(JSON.stringify({ ...comandoInicial, restauracao: true }));
     } catch (erro) {
       logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
     }
@@ -275,12 +319,12 @@ function registrarTelemetria(sala, entrada, msg) {
   try {
     const estadoReportado = {};
     if (tempValida) estadoReportado.temperatura = msg.temp;
-    if (typeof msg.ligado === "boolean") estadoReportado.ligado = msg.ligado;
     salasService.marcarOnline(sala, estadoReportado, entrada.mac, entrada.ip, { viaCredencial: entrada.viaCredencial });
   } catch (err) {
     logger.warn("device-ws-telemetria-marcar-online-falhou", { sala, mensagem: err.message });
     monitoramentoService.registrar("telemetriaFalha", { sala });
   }
+  if (reconciliarRelato(sala, entrada, msg)) salasService.eventos.emit("mudanca-sala", { sala });
 
   eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
 }
@@ -379,6 +423,8 @@ function iniciar(server) {
       credencialExpiraEm: req.credencialGrace || null,
       sincronizacaoInicial: null,
       estadoInicialSincronizado: false,
+      versaoConfirmada: null,
+      versaoEstadoReportada: null,
     };
     conexoes.set(sala, entrada);
     ws.isAlive = true;
@@ -403,7 +449,9 @@ function iniciar(server) {
     } catch (erro) {
       logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
     }
-    entrada.sincronizacaoInicial = setTimeout(() => sincronizarEstadoInicial(sala, entrada, null), ESPERA_INFO_INICIAL_MS);
+    // setImmediate: depois de uma pausa longa do event loop, um info já recebido no socket é
+    // processado (fase de I/O) antes desta sincronização por tempo esgotado.
+    entrada.sincronizacaoInicial = setTimeout(() => setImmediate(() => sincronizarEstadoInicial(sala, entrada, null)), ESPERA_INFO_INICIAL_MS);
     entrada.sincronizacaoInicial.unref();
     if (viaCredencial && !entrada.credencialExpiraEm) {
       try {
@@ -450,7 +498,8 @@ function iniciar(server) {
         registrarCapacidades(entrada, msg);
         registrarVersaoFirmware(sala, entrada, msg.fw);
         atualizarFailsafeReportado(entrada, msg);
-        sincronizarEstadoInicial(sala, entrada, msg);
+        if (!entrada.estadoInicialSincronizado) sincronizarEstadoInicial(sala, entrada, msg);
+        else if (reconciliarRelato(sala, entrada, msg)) salasService.eventos.emit("mudanca-sala", { sala });
       } else if (msg.tipo === "ota_validado") {
         registrarCapacidades(entrada, { otaValidacao: true });
         if (require("./otaService").registrarValidacao(sala, msg)) {
@@ -461,7 +510,10 @@ function iniciar(server) {
           }
         }
       } else if (msg.tipo === "failsafe_status") {
-        if (atualizarFailsafeReportado(entrada, msg)) eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
+        if (atualizarFailsafeReportado(entrada, msg)) {
+          if (reconciliarRelato(sala, entrada, msg)) salasService.eventos.emit("mudanca-sala", { sala });
+          eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
+        }
       } else if (msg.tipo === "ota_progresso") {
         require("./otaService").registrarProgresso(sala, msg);
       } else if (msg.tipo === "ota_resultado") {
@@ -566,6 +618,7 @@ module.exports = {
   encerrar,
   eventos,
   estadoPublico,
+  estadoConfirmado,
   listarEstados,
   enviarComando,
   sincronizarPapel,

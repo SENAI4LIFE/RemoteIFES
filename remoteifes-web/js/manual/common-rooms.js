@@ -79,7 +79,7 @@ ManualContent.registrar([
         "<strong>Temperatura no limite</strong>: o botão correspondente fica desabilitado; isso é esperado.",
         "<strong>Turbo</strong>: fica desabilitado com o aparelho desligado somente quando o Superadministrador desativa o Auto-ON global.",
       ] },
-      { t: "nota", nivel: "atencao", texto: "Se o ESP32 estiver offline, o servidor pode aceitar e guardar o estado desejado. O painel avisa que ele será aplicado na reconexão; não interprete o aceite como confirmação física imediata." },
+      { t: "nota", nivel: "atencao", texto: "O aceite de um comando significa que o servidor guardou o estado desejado. Se o ESP32 estiver offline, o painel avisa que ele será aplicado na reconexão. Com o ESP32 online, o estado fica com reticências até a placa confirmar que o aplicou; se a confirmação demorar, o painel avisa. Nem a confirmação da placa garante que o ar-condicionado recebeu o sinal infravermelho: em dúvida, confira o aparelho." },
     ],
   },
   {

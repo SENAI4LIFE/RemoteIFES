@@ -214,12 +214,8 @@ function validarEAtualizar(patch, requisitante) {
     || proximo.turboFuncaoExtra !== atual.turboFuncaoExtra;
   if (estadoIRAlterado) {
     const salasService = require("./salasService");
-    const deviceHub = require("./deviceHub");
     salasService.eventos.emit("mudanca");
-    for (const sala of salasService.listar()) {
-      const comando = salasService.comandoEstadoIR(sala);
-      if (comando) deviceHub.enviarComando(sala.sala, comando);
-    }
+    salasService.reenviarEstadoIRParaTodas();
   } else if (proximo.autoLigar !== atual.autoLigar) {
     require("./salasService").eventos.emit("mudanca");
   }
