@@ -5,6 +5,7 @@ const express = require("express");
 const cors = require("cors");
 
 const db = require("./config/database");
+const { COMMIT_EM_EXECUCAO } = require("./config/release");
 const { criarSchema } = require("./db/schema");
 const { popularBanco } = require("./db/seed");
 const { restringirRedeIFES } = require("./middlewares/rede");
@@ -97,6 +98,7 @@ app.get("/health", (req, res) => {
     servico: "RemoteIFES API",
     banco,
     ambiente: NODE_ENV,
+    commit: COMMIT_EM_EXECUCAO,
     uptimeSegundos: Math.round((Date.now() - INICIO_PROCESSO) / 1000),
   });
 });
