@@ -23,7 +23,7 @@ function git(cwd, ...args) {
 function prepararRepo(env = "PORTA=8080\n") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-deploy-"));
   fs.mkdirSync(path.join(dir, "src", "config"), { recursive: true });
-  for (const arquivo of ["deploy.sh", "rollback.sh", "healthcheck.sh"]) {
+  for (const arquivo of ["deploy.sh", "rollback.sh", "healthcheck.sh", "verificar-versao.sh"]) {
     fs.copyFileSync(path.join(RAIZ, arquivo), path.join(dir, arquivo));
   }
   fs.copyFileSync(path.join(RAIZ, "src", "config", "paths.js"), path.join(dir, "src", "config", "paths.js"));
@@ -123,24 +123,30 @@ test("deploy.sh com dependências inalteradas não roda npm ci e aplica a nova v
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-// Serviço simulado: um "processo em execução" que responde ao /health com o commit que carregou, e um
-// systemctl falso cujo "restart" pode aplicar a nova versão, falhar deixando o processo antigo no ar,
-// ou subir um processo de outra versão. sudo falso só repassa o comando.
+// Serviço simulado: um "processo em execução" que responde ao /health com o commit que carregou (ou
+// sem commit, como as versões anteriores a esse campo) e o tempo de vida do processo, e um systemctl
+// falso cujo "restart" pode aplicar a nova versão, falhar deixando o processo antigo no ar (que
+// continua com o tempo de vida antigo), ou subir um processo de outra versão. sudo falso só repassa.
 const { spawn } = require("child_process");
 
-async function servicoFalso(dir, { commitInicial, semCommit = false }) {
+async function servicoFalso(dir, { commitInicial, semCommit = false, semUptime = false }) {
   const bin = path.join(dir, "bin-servico");
   fs.mkdirSync(bin, { recursive: true });
   const arquivoCommit = path.join(dir, "commit-em-execucao");
   fs.writeFileSync(arquivoCommit, `${commitInicial}\n`);
+  const arquivoInicio = path.join(dir, "inicio-em-execucao");
+  fs.writeFileSync(arquivoInicio, `${Math.floor(Date.now() / 1000) - 3600}\n`);
   const healthJs = path.join(dir, "health-falso.js");
   fs.writeFileSync(healthJs, `
     const http = require("http");
     const fs = require("fs");
-    const [porta, arquivo, semCommit] = process.argv.slice(2);
+    const [porta, arquivo, arquivoInicio, semCommit, semUptime] = process.argv.slice(2);
     http.createServer((req, res) => {
       const commit = fs.readFileSync(arquivo, "utf8").trim();
-      const corpo = semCommit === "1" ? { ok: true, banco: "ok" } : { ok: true, banco: "ok", commit };
+      const uptimeSegundos = Math.floor(Date.now() / 1000) - Number(fs.readFileSync(arquivoInicio, "utf8").trim());
+      const corpo = { ok: true, banco: "ok" };
+      if (semCommit !== "1") corpo.commit = commit;
+      if (semUptime !== "1") corpo.uptimeSegundos = uptimeSegundos;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify(corpo));
     }).listen(Number(porta), "127.0.0.1", () => process.stdout.write("pronto\\n"));
@@ -153,9 +159,9 @@ async function servicoFalso(dir, { commitInicial, semCommit = false }) {
     "  cat) exit 0 ;;",
     "  restart)",
     '    case "$FAKE_RESTART_MODE" in',
-    '      ok) git -C "$FAKE_REPO_DIR" rev-parse HEAD > "$FAKE_COMMIT_FILE"; exit 0 ;;',
+    '      ok) git -C "$FAKE_REPO_DIR" rev-parse HEAD > "$FAKE_COMMIT_FILE"; date +%s > "$FAKE_INICIO_FILE"; exit 0 ;;',
     "      falha) exit 1 ;;",
-    '      divergente) echo "1111111111111111111111111111111111111111" > "$FAKE_COMMIT_FILE"; exit 0 ;;',
+    '      divergente) echo "1111111111111111111111111111111111111111" > "$FAKE_COMMIT_FILE"; date +%s > "$FAKE_INICIO_FILE"; exit 0 ;;',
     "    esac ;;",
     "esac",
     "exit 0",
@@ -168,7 +174,7 @@ async function servicoFalso(dir, { commitInicial, semCommit = false }) {
     const s = require("net").createServer();
     s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => resolve(p)); });
   });
-  const processo = spawn(process.execPath, [healthJs, String(porta), arquivoCommit, semCommit ? "1" : "0"], { stdio: ["ignore", "pipe", "ignore"] });
+  const processo = spawn(process.execPath, [healthJs, String(porta), arquivoCommit, arquivoInicio, semCommit ? "1" : "0", semUptime ? "1" : "0"], { stdio: ["ignore", "pipe", "ignore"] });
   await new Promise((resolve) => processo.stdout.once("data", resolve));
   return {
     porta,
@@ -180,6 +186,7 @@ async function servicoFalso(dir, { commitInicial, semCommit = false }) {
       FAKE_RESTART_MODE: modoRestart,
       FAKE_REPO_DIR: dir,
       FAKE_COMMIT_FILE: arquivoCommit,
+      FAKE_INICIO_FILE: arquivoInicio,
       ESPERA_SAUDE_TENTATIVAS: "3",
       ESPERA_SAUDE_INTERVALO: "0.2",
     }),
@@ -273,10 +280,10 @@ test("rollback.sh não conclui quando o restart falha e o processo da versão at
     const r = sh(dir, `bash rollback.sh ${shaA} --offline`, servico.ambiente("falha"));
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.doesNotMatch(r.stdout, /Rollback concluído/);
-    assert.match(r.stdout, new RegExp(`o processo em execução continua em ${shaC} \\(o reinício não aplicou a reversão\\)`));
+    assert.match(r.stdout, new RegExp(`o processo em execução continua em ${shaC}, não em ${shaA} \\(o reinício não aplicou a reversão\\)`));
     assert.equal(git(dir, "rev-parse", "HEAD"), shaA, "o código fica na versão pedida para o operador agir");
     assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")));
-    assert.match(lerDeployLog(dir), /rollback .* FALHOU: processo em execução/);
+    assert.match(lerDeployLog(dir), /rollback .* FALHOU: o processo em execução continua em/);
   } finally {
     servico.parar();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -306,10 +313,158 @@ test("rollback.sh conclui quando o processo confirma a versão alvo, e aceita co
   try {
     const r = sh(dir, `bash rollback.sh ${shaA} --offline`, legado.ambiente("ok"));
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /não informa o commit no \/health/);
-    assert.match(r.stdout, new RegExp(`Rollback concluído: ${shaA}`));
+    assert.match(r.stdout, /identidade do processo não pôde ser confirmada; aceito porque um processo saudável subiu \d+s atrás, depois do reinício/);
+    assert.match(r.stdout, new RegExp(`Rollback concluído: ${shaA} \\(identidade não confirmada`));
+    assert.match(lerDeployLog(dir), /rollback .* ok \(identidade não confirmada: .* não informa commit; processo saudável reiniciado há \d+s\)/);
   } finally {
     legado.parar();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("rollback.sh para uma versão sem identidade não conclui quando o processo antigo (também sem identidade) sobreviveu ao restart", { skip: !disponivel }, async () => {
+  const { dir, shaA } = prepararRepo();
+  const shaC = commitC(dir, shaA);
+  git(dir, "reset", "-q", "--hard", shaC);
+  const legado = await servicoFalso(dir, { commitInicial: shaC, semCommit: true });
+  fs.writeFileSync(path.join(dir, ".env"), `PORTA=${legado.porta}\n`);
+  try {
+    const r = sh(dir, `bash rollback.sh ${shaA} --offline`, legado.ambiente("falha"));
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /Rollback concluído/);
+    assert.match(r.stdout, /não informa o commit e está no ar há \d+s, ou seja, sobreviveu ao reinício/);
+    assert.match(lerDeployLog(dir), /rollback .* FALHOU: o processo em execução não informa o commit e está no ar há/);
+    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")), "um /health saudável sem identidade não vira registro de sucesso");
+  } finally {
+    legado.parar();
+  }
+
+  // Sem commit nem tempo de vida no /health não há como verificar: também não é sucesso.
+  fs.rmSync(path.join(dir, "data"), { recursive: true, force: true });
+  git(dir, "reset", "-q", "--hard", shaC);
+  const opaco = await servicoFalso(dir, { commitInicial: shaC, semCommit: true, semUptime: true });
+  fs.writeFileSync(path.join(dir, ".env"), `PORTA=${opaco.porta}\n`);
+  try {
+    const r = sh(dir, `bash rollback.sh ${shaA} --offline`, opaco.ambiente("ok"));
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /não informa commit nem tempo de vida: não é possível verificar/);
+    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")));
+  } finally {
+    opaco.parar();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("um processo sem identidade não é aceito como uma versão alvo que informaria o commit", { skip: !disponivel }, async () => {
+  const { dir, shaA } = prepararRepo();
+  // A versão D traz o módulo que põe o commit no /health: um processo que não o informa não pode ser ela.
+  fs.writeFileSync(path.join(dir, "src", "config", "release.js"), "module.exports = { COMMIT_EM_EXECUCAO: null };\n");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "D");
+  const shaD = git(dir, "rev-parse", "HEAD");
+  fs.writeFileSync(path.join(dir, "README.txt"), "versão E");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "E");
+  const shaE = git(dir, "rev-parse", "HEAD");
+  const legado = await servicoFalso(dir, { commitInicial: shaE, semCommit: true });
+  fs.writeFileSync(path.join(dir, ".env"), `PORTA=${legado.porta}\n`);
+  try {
+    const r = sh(dir, `bash rollback.sh ${shaD} --offline`, legado.ambiente("falha"));
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, new RegExp(`não informa o commit, mas ${shaD} informaria: é outra versão`));
+    assert.doesNotMatch(r.stdout, /Rollback concluído/);
+    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")));
+  } finally {
+    legado.parar();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("deploy.sh com o código já na versão alvo não a dá por concluída: reinicia e confirma o processo, ou não faz nada quando ele já a confirma", { skip: !disponivel }, async () => {
+  const { dir, shaA } = prepararRepo();
+  const shaC = commitC(dir, shaA);
+  // Atualização interrompida (ou 'deploy --no-restart'): o código já está em C, o serviço ainda roda A.
+  git(dir, "reset", "-q", "--hard", shaC);
+  const servico = await servicoFalso(dir, { commitInicial: shaA });
+  fs.writeFileSync(path.join(dir, ".env"), `PORTA=${servico.porta}\n`);
+  try {
+    let r = sh(dir, `bash deploy.sh ${shaC} --offline --no-restart`, servico.ambiente("ok"));
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /Já está na versão alvo .* Serviço não reiniciado nem verificado \(--no-restart\)/);
+    assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 0);
+    assert.equal(servico.commitEmExecucao(), shaA);
+
+    r = sh(dir, `bash deploy.sh ${shaC} --offline`, servico.ambiente("ok"));
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /Nada a fazer/);
+    assert.match(r.stdout, new RegExp(`O código já está em ${shaC}, mas o processo em execução está em ${shaA}; reiniciando`));
+    assert.match(r.stdout, new RegExp(`Deploy concluído: ${shaC} \\(confirmado pelo processo em execução\\)`));
+    assert.equal(servico.commitEmExecucao(), shaC);
+    assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 1);
+    assert.equal(fs.readFileSync(path.join(dir, "data", "current-version"), "utf8").trim(), shaC);
+    assert.equal(fs.readFileSync(path.join(dir, "data", "previous-version"), "utf8").trim(), shaA, "a versão que estava rodando é a de retorno");
+    assert.match(lerDeployLog(dir), new RegExp(`deploy ${shaA} -> ${shaC} .* ok \\(código já estava em ${shaC}; processo em execução confirmou`));
+
+    r = sh(dir, `bash deploy.sh ${shaC} --offline`, servico.ambiente("falha"));
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /Já está na versão alvo .* e o processo em execução a confirma\. Nada a fazer\./);
+    assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 1, "nada é reiniciado quando o processo já confirma a versão");
+  } finally {
+    servico.parar();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("deploy.sh com o código já na versão alvo e o restart falhando não registra sucesso", { skip: !disponivel }, async () => {
+  const { dir, shaA } = prepararRepo();
+  const shaC = commitC(dir, shaA);
+  git(dir, "reset", "-q", "--hard", shaC);
+  const servico = await servicoFalso(dir, { commitInicial: shaA });
+  fs.writeFileSync(path.join(dir, ".env"), `PORTA=${servico.porta}\n`);
+  try {
+    const r = sh(dir, `bash deploy.sh ${shaC} --offline`, servico.ambiente("falha"));
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /Deploy concluído|Nada a fazer/);
+    assert.match(r.stdout, new RegExp(`ATENÇÃO: o código está em ${shaC}, mas o processo em execução continua em ${shaA}`));
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaC, "sem versão anterior conhecida do checkout, o código fica para o operador agir");
+    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")));
+    assert.match(lerDeployLog(dir), /FALHOU: o processo em execução continua em/);
+  } finally {
+    servico.parar();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("rollback.sh com o código já na versão alvo reinicia e confirma em vez de dar o rollback por feito", { skip: !disponivel }, async () => {
+  const { dir, shaA } = prepararRepo();
+  const shaC = commitC(dir, shaA);
+  // Rollback anterior que reverteu o código mas cujo restart não confirmou: HEAD em A, processo em C.
+  const servico = await servicoFalso(dir, { commitInicial: shaC });
+  fs.writeFileSync(path.join(dir, ".env"), `PORTA=${servico.porta}\n`);
+  try {
+    let r = sh(dir, `bash rollback.sh ${shaA} --offline --no-restart`, servico.ambiente("ok"));
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /Já está em .* Serviço não reiniciado nem verificado \(--no-restart\)/);
+    assert.equal(servico.commitEmExecucao(), shaC);
+
+    r = sh(dir, `bash rollback.sh ${shaA} --offline`, servico.ambiente("falha"));
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, new RegExp(`O código já está em ${shaA}, mas o processo em execução está em ${shaC}; reiniciando`));
+    assert.doesNotMatch(r.stdout, /Rollback concluído/);
+    assert.match(lerDeployLog(dir), /rollback .* FALHOU: o processo em execução continua em/);
+
+    r = sh(dir, `bash rollback.sh ${shaA} --offline`, servico.ambiente("ok"));
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, new RegExp(`Rollback concluído: ${shaA} \\(confirmado pelo processo em execução\\)`));
+    assert.equal(servico.commitEmExecucao(), shaA);
+    assert.equal(fs.readFileSync(path.join(dir, "data", "current-version"), "utf8").trim(), shaA);
+    assert.equal(fs.readFileSync(path.join(dir, "data", "previous-version"), "utf8").trim(), shaC);
+
+    r = sh(dir, `bash rollback.sh ${shaA} --offline`, servico.ambiente("falha"));
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /Já está em .* e o processo em execução a confirma\. Nada a fazer\./);
+  } finally {
+    servico.parar();
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
