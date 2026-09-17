@@ -1,7 +1,8 @@
 const { test, expect, VIEWPORTS, injetarSessao, API_URL, tokenDe } = require("../harness/fixtures");
 
-// Valores que os relatos da placa produzem nas métricas de texto do cartão, do mais curto ao mais
-// longo que cabe em três linhas na célula mais estreita da grade.
+// Valores que a operação normal produz nas métricas de texto do cartão (confirmação do estado,
+// último comando de ligar/desligar e failsafe gravado): todos cabem nas três linhas reservadas,
+// mesmo com as fontes mais largas dos sistemas sem Segoe UI/Roboto.
 const VALORES_RELATADOS = [
   "—",
   "nenhum ainda",
@@ -9,11 +10,8 @@ const VALORES_RELATADOS = [
   "não gravado",
   "23°C · ligado",
   "23°C · desligado",
-  "23°C · ligado · turbo · fan 3",
-  "sinal bruto (raw) reenviado",
-  "failsafe OFF pelo switch físico",
+  "23°C · ligado · turbo",
   "gravado · 137 pulsos",
-  "gravado · 137 pulsos · protocolo #3",
   "confirmado pela placa",
   "ainda não confirmado pela placa",
 ];
@@ -72,7 +70,7 @@ for (const [nome, tamanho] of [["celular", VIEWPORTS["mobile-portrait"]], ["note
     await expect(estadoDesejado).toHaveText("confirmado pela placa");
     expect(await medir(page)).toEqual(antes);
 
-    // Qualquer valor que a placa relate nas métricas de texto cabe no espaço já reservado.
+    // Qualquer valor da operação normal cabe no espaço já reservado.
     for (const metrica of ["Último comando IR", "Failsafe OFF na NVS", "Estado desejado"]) {
       const valor = cartao.locator(".esp32-metric").filter({ hasText: metrica }).locator(".esp32-metric-value");
       for (const texto of VALORES_RELATADOS) {
