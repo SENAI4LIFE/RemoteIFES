@@ -129,6 +129,7 @@ function aplicarStatusNoPainel(status) {
   aplicarBloqueio(status);
 }
 
+// Devolve true quando o painel foi atualizado com o estado autoritativo do servidor.
 async function refreshStatus() {
   const sala = state.salaAtual;
   const geracao = _panelGeracao;
@@ -138,11 +139,13 @@ async function refreshStatus() {
     && geracao === _panelGeracao && revisao === _panelRevisao && consulta === _panelConsulta;
   try {
     const status = await Api.statusSala(sala);
-    if (!vigente()) return;
+    if (!vigente()) return revisao !== _panelRevisao;
     if (status.erro) throw new Error(status.erro);
     aplicarStatusNoPainel(status);
+    return true;
   } catch (erro) {
     if (vigente()) Toast.erro("não foi possível falar com o servidor");
+    return false;
   }
 }
 
@@ -151,7 +154,10 @@ async function enviarComandoPainel(botao, cmd, valor) {
   botao.disabled = true;
   const resp = await Api.enviarComando(state.salaAtual, cmd, valor);
   if (!resp.ok) Toast.erro(resp.erro || "não foi possível enviar o comando");
-  await refreshStatus();
+  // Sem resposta (prazo esgotado ou conexão perdida) o desfecho é desconhecido: só o estado que o
+  // servidor devolver diz se o comando valeu. Se nem isso chegar, o botão volta a ficar utilizável.
+  const atualizado = await refreshStatus();
+  if (!atualizado && state.salaAtual && botao.isConnected) botao.disabled = false;
 }
 
 document.getElementById("btnPower").addEventListener("click", (event) => {
