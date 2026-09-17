@@ -53,6 +53,21 @@ function semResposta(options, tempoEsgotado) {
   return { ok: false, erro, semResposta: true, tempoEsgotado: !!tempoEsgotado, desfechoDesconhecido: mutacao };
 }
 
+// Os cabeçalhos chegaram, mas o corpo se perdeu (conexão caiu no meio) ou não é JSON. Uma mutação
+// aceita pelo servidor (2xx) ou barrada por um intermediário (5xx) pode ter sido aplicada: o
+// desfecho continua desconhecido e não vira "não feito"; um 4xx é uma recusa do próprio servidor.
+function respostaInutilizavel(options, status) {
+  const desconhecido = ehMutacao(options) && !(status >= 400 && status < 500);
+  return {
+    ok: false,
+    erro: desconhecido
+      ? `a resposta do servidor chegou incompleta (status ${status}); o pedido pode ter sido aplicado — confira o estado antes de repetir`
+      : `resposta inválida do servidor (status ${status})`,
+    respostaIncompleta: true,
+    desfechoDesconhecido: desconhecido,
+  };
+}
+
 async function chamar(path, options = {}) {
   const { tempoLimiteMs = TEMPO_LIMITE_MS, ...opcoesFetch } = options;
   const controle = new AbortController();
@@ -78,7 +93,7 @@ async function chamar(path, options = {}) {
       data = await res.json();
     } catch (err) {
       if (tempoEsgotado || (err && err.name === "AbortError")) return semResposta(opcoesFetch, tempoEsgotado);
-      return { ok: false, erro: `resposta inválida do servidor (status ${res.status})` };
+      return respostaInutilizavel(opcoesFetch, res.status);
     }
   } finally {
     clearTimeout(prazo);
