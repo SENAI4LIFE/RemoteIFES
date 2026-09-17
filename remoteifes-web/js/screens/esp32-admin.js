@@ -200,9 +200,9 @@ const Esp32Admin = (() => {
         <div class="esp32-metric"><div class="esp32-metric-label">Umidade</div><div class="esp32-metric-value">${formatarNumero(telemetria.hum, 0, "%")}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Sinal Wi-Fi</div><div class="esp32-metric-value">${dispositivo.wifiRssi != null ? `${dispositivo.wifiRssi} dBm` : "—"}</div></div>
         <div class="esp32-metric"><div class="esp32-metric-label">Protocolo IR</div><div class="esp32-metric-value">${Number.isInteger(d.irProtocolo) ? `${d.irProtocolo}${d.irProtocoloRegistroId ? ` · biblioteca #${d.irProtocoloRegistroId}` : ""}` : "não definido"}</div></div>
-        <div class="esp32-metric"><div class="esp32-metric-label">Failsafe OFF na NVS</div><div class="esp32-metric-value">${escapeHtml(renderFailsafe(dispositivo))}</div></div>
-        <div class="esp32-metric"><div class="esp32-metric-label">Último comando IR</div><div class="esp32-metric-value">${escapeHtml(renderUltimoComando(dispositivo.ultimoComando))}</div></div>
-        <div class="esp32-metric"><div class="esp32-metric-label">Estado desejado</div><div class="esp32-metric-value">${escapeHtml(renderConfirmacao(dispositivo))}</div></div>
+        <div class="esp32-metric esp32-metric-texto"><div class="esp32-metric-label">Failsafe OFF na NVS</div><div class="esp32-metric-value">${escapeHtml(renderFailsafe(dispositivo))}</div></div>
+        <div class="esp32-metric esp32-metric-texto"><div class="esp32-metric-label">Último comando IR</div><div class="esp32-metric-value">${escapeHtml(renderUltimoComando(dispositivo.ultimoComando))}</div></div>
+        <div class="esp32-metric esp32-metric-texto"><div class="esp32-metric-label">Estado desejado</div><div class="esp32-metric-value">${escapeHtml(renderConfirmacao(dispositivo))}</div></div>
       </div>
 
       ${renderOta(d)}
