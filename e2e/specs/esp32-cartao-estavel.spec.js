@@ -55,11 +55,12 @@ for (const [nome, tamanho] of [["celular", VIEWPORTS["mobile-portrait"]], ["note
     await page.waitForTimeout(400);
     const antes = await medir(page);
 
-    // Comando sem resposta da placa: o texto fica mais longo (consulta periódica e WebSocket).
+    // Comando sem resposta da placa: o texto fica mais longo (consulta periódica e WebSocket). Se a
+    // consulta periódica de 20 s estiver em andamento, a chamada direta é ignorada e vale a próxima.
     await request.post(`${API_URL}/__e2e/silenciar-dispositivo/on`);
     await comando(request, "A-108", "ligar");
     await page.evaluate(() => Esp32Admin.aoAbrir());
-    await expect(estadoDesejado).toHaveText("ainda não confirmado pela placa");
+    await expect(estadoDesejado).toHaveText("ainda não confirmado pela placa", { timeout: 25_000 });
     expect(await medir(page)).toEqual(antes);
 
     await request.post(`${API_URL}/__e2e/silenciar-dispositivo/off`);
