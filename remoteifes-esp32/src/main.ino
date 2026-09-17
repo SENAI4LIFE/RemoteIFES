@@ -194,6 +194,8 @@ const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 void startAPMode();
 void aplicarPontoDeAcesso(bool manterSta);
 void aplicarPoliticaApDoServidor(JsonDocument& doc);
+bool gravarChaveNvsVerificada(const char* chave, const String& valor);
+void restaurarChaveNvs(const char* chave, const String& valor);
 void registrarPortal();
 void abrirApTemporario();
 void encerrarApTemporario();
@@ -808,19 +810,37 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
   }
 }
 
+bool gravarChaveNvsVerificada(const char* chave, const String& valor) {
+  if (preferences.putString(chave, valor) != valor.length()) return false;
+  return preferences.getString(chave, "") == valor;
+}
+
+void restaurarChaveNvs(const char* chave, const String& valor) {
+  if (valor.length() > 0) preferences.putString(chave, valor);
+  else if (preferences.isKey(chave)) preferences.remove(chave);
+}
+
 void aplicarCredencial(JsonDocument& doc) {
   String novoId = doc["deviceId"] | "";
   String novoSegredo = doc["segredo"] | "";
   if (novoId.length() < 4 || novoSegredo.length() < 20) return;
   if (novoId == deviceId && novoSegredo == deviceSecret) return;
 
-  preferences.putString("devId", novoId);
-  preferences.putString("devSec", novoSegredo);
+  String idAnterior = preferences.getString("devId", "");
+  String segredoAnterior = preferences.getString("devSec", "");
+  bool gravado = gravarChaveNvsVerificada("devId", novoId) && gravarChaveNvsVerificada("devSec", novoSegredo);
+  if (!gravado) {
+    restaurarChaveNvs("devId", idAnterior);
+    restaurarChaveNvs("devSec", segredoAnterior);
+    reportComando("credencial", "falha_nvs");
+    Serial.println("Credencial de dispositivo NAO gravada na NVS; a credencial atual continua em uso.");
+    return;
+  }
   deviceId = novoId;
   deviceSecret = novoSegredo;
   credencialAlterada = true;
   reportComando("credencial", "aplicada");
-  Serial.println("Credencial de dispositivo atualizada; reconectando ao servidor.");
+  Serial.println("Credencial de dispositivo gravada e verificada na NVS; reconectando ao servidor.");
   conectarWsServidor();
 }
 

@@ -453,9 +453,11 @@ function iniciar(server) {
     // processado (fase de I/O) antes desta sincronização por tempo esgotado.
     entrada.sincronizacaoInicial = setTimeout(() => setImmediate(() => sincronizarEstadoInicial(sala, entrada, null)), ESPERA_INFO_INICIAL_MS);
     entrada.sincronizacaoInicial.unref();
-    if (viaCredencial && !entrada.credencialExpiraEm) {
+    if (viaCredencial) {
       try {
-        require("./esp32CredenciaisService").entregarPendente(sala);
+        const credenciaisService = require("./esp32CredenciaisService");
+        if (entrada.credencialExpiraEm) credenciaisService.reentregarAtual(sala);
+        else credenciaisService.entregarPendente(sala);
       } catch (erro) {
         logger.warn("device-ws-credencial-pendente-falhou", { sala, mensagem: erro.message });
       }
