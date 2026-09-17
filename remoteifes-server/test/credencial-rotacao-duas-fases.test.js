@@ -205,3 +205,50 @@ test("substituir e revogar descartam a geração pendente", async () => {
   assert.equal(credenciais.verificar(pendente2.deviceId, pendente2.segredo), null);
   assert.equal(linha("ROT-6").segredoHashPendente, null);
 });
+
+test("uma placa que volta com a geração anterior depois da ativação (gravação na NVS não durou) recebe o segredo atual de novo, enquanto a tolerância vale", async () => {
+  sala("ROT-7", "AA:CC:11:00:00:07");
+  const antiga = credenciais.provisionar("ROT-7");
+  const nova = credenciais.rotacionar("ROT-7");
+  assert.equal(credenciais.estado("ROT-7").atualReentregavel, false, "antes da ativação não há segredo ativado para reentregar");
+  assert.ok(credenciais.verificar(nova.deviceId, nova.segredo), "a placa prova o novo segredo (só em RAM, no cenário)");
+  assert.equal(credenciais.estado("ROT-7").rotacaoPendente, false);
+  assert.equal(credenciais.estado("ROT-7").atualReentregavel, true);
+
+  const reiniciada = await conectar(antiga.deviceId, antiga.segredo);
+  assert.equal(reiniciada.aberto, true, "após reiniciar com a NVS antiga, a placa ainda conecta pela tolerância");
+  assert.ok(await ate(() => reiniciada.pushes().length === 1), "o servidor reentrega o segredo atual à conexão em tolerância");
+  assert.equal(reiniciada.pushes()[0].deviceId, nova.deviceId);
+  assert.equal(reiniciada.pushes()[0].segredo, nova.segredo);
+  assert.equal(linha("ROT-7").segredoHashPendente, null, "a reentrega não cria uma geração pendente");
+
+  const atualizada = await conectar(nova.deviceId, nova.segredo);
+  assert.equal(atualizada.aberto, true);
+  assert.ok(await ate(() => atualizada.pushes().length === 0 && reiniciada.fechamento() === 4002));
+  await esperar(150);
+  assert.equal(atualizada.pushes().length, 0, "quem conecta com o segredo atual não recebe reentrega");
+  atualizada.ws.close();
+
+  db.prepare("UPDATE esp_credenciais SET anteriorExpiraEm = datetime('now', '-1 minute') WHERE sala = 'ROT-7'").run();
+  assert.equal(credenciais.estado("ROT-7").atualReentregavel, false, "fora da tolerância o segredo ativado não fica mais em memória");
+  assert.equal(credenciais.reentregarAtual("ROT-7"), false);
+});
+
+test("substituir, revogar e uma nova rotação ativada descartam o segredo ativado guardado para reentrega", () => {
+  sala("ROT-8", "AA:CC:11:00:00:08");
+  credenciais.provisionar("ROT-8");
+  const primeira = credenciais.rotacionar("ROT-8");
+  credenciais.verificar(primeira.deviceId, primeira.segredo);
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true);
+  const segunda = credenciais.rotacionar("ROT-8");
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true, "a pendente nova não invalida a reentrega da atual");
+  credenciais.verificar(segunda.deviceId, segunda.segredo);
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true, "agora é a segunda geração que fica reentregável");
+  credenciais.substituir("ROT-8");
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, false);
+  const terceira = credenciais.rotacionar("ROT-8");
+  credenciais.verificar(terceira.deviceId, terceira.segredo);
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true);
+  credenciais.revogar("ROT-8");
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, false);
+});

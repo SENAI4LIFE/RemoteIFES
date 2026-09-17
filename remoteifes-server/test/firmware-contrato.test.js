@@ -184,6 +184,20 @@ test("a placa ecoa a versão do estado desejado e não trata a restauração aut
   assert.doesNotMatch(raw, /restauracao/, "send_raw continua sendo sempre explícito");
 });
 
+test("a credencial só troca em RAM e só reconecta depois de gravada e relida na NVS; falha mantém a atual", () => {
+  const aplicar = bloco("void aplicarCredencial");
+  assert.match(aplicar, /bool gravado = gravarChaveNvsVerificada\("devId", novoId\) && gravarChaveNvsVerificada\("devSec", novoSegredo\);/);
+  assert.match(aplicar, /if \(!gravado\) \{\s*restaurarChaveNvs\("devId", idAnterior\);\s*restaurarChaveNvs\("devSec", segredoAnterior\);\s*reportComando\("credencial", "falha_nvs"\);/, "gravação parcial é desfeita e reportada");
+  assert.ok(aplicar.indexOf("if (!gravado)") < aplicar.indexOf("deviceId = novoId;"), "a RAM só muda depois da gravação verificada");
+  assert.ok(aplicar.indexOf("deviceId = novoId;") < aplicar.indexOf("conectarWsServidor();"), "a reconexão com o segredo novo vem depois");
+  assert.doesNotMatch(aplicar.slice(0, aplicar.indexOf("bool gravado")), /deviceId = novoId|deviceSecret = novoSegredo/);
+  const gravar = bloco("bool gravarChaveNvsVerificada");
+  assert.match(gravar, /preferences\.putString\(chave, valor\) != valor\.length\(\)\) return false;/);
+  assert.match(gravar, /return preferences\.getString\(chave, ""\) == valor;/, "a gravação é relida da NVS");
+  const restaurar = bloco("void restaurarChaveNvs");
+  assert.match(restaurar, /else if \(preferences\.isKey\(chave\)\) preferences\.remove\(chave\);/, "sem valor anterior, a chave é removida em vez de ficar vazia");
+});
+
 test("o firmware não carrega comentários de código", () => {
   assert.doesNotMatch(ino, /^\s*\/\//m);
   assert.doesNotMatch(ino, /\/\*/);
