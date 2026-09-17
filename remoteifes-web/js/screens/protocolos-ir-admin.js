@@ -65,14 +65,10 @@ const ProtocolosIrAdmin = (() => {
       const online = d.dispositivo?.conectado ? "conectado" : "desconectado";
       return `<option value="${escape(d.sala)}">${escape(d.sala)} · ${escape(d.nome)} · ${papel} · ${online}</option>`;
     }).join("");
-    // As opções recebem telemetria (conectado/desconectado) a cada poucos segundos: só o texto que
-    // mudou é reescrito, e um select aberto ou focado não é reconstruído por baixo do usuário.
-    UISync.aplicarHtml(clonadorSelect, `<option value="">Nenhum</option>${opcoes}`);
-    UISync.aplicarHtml(destinoSelect, `<option value="">Selecione uma ESP32</option>${opcoes}`);
-    const clonadorValor = dispositivos.some((d) => d.sala === clonadorAtual) ? clonadorAtual : "";
-    if (clonadorSelect.value !== clonadorValor) clonadorSelect.value = clonadorValor;
-    const destinoValor = dispositivos.some((d) => d.sala === destinoAtual) ? destinoAtual : "";
-    if (destinoSelect.value !== destinoValor) destinoSelect.value = destinoValor;
+    clonadorSelect.innerHTML = `<option value="">Nenhum</option>${opcoes}`;
+    destinoSelect.innerHTML = `<option value="">Selecione uma ESP32</option>${opcoes}`;
+    clonadorSelect.value = dispositivos.some((d) => d.sala === clonadorAtual) ? clonadorAtual : "";
+    destinoSelect.value = dispositivos.some((d) => d.sala === destinoAtual) ? destinoAtual : "";
   }
 
   function atualizarStatusClonador() {
