@@ -271,11 +271,131 @@ test("cada mudança de intenção avança a versão do estado e a reenvia com o 
   assert.equal(linha("REL-10").estadoVersao, v0 + 5);
   salasService.definirLimitesTemperatura("REL-10", { minima: 23, maxima: 25 });
   assert.equal(linha("REL-10").estadoVersao, v0 + 6);
-  salasService.reenviarEstadoIRParaTodas();
-  assert.equal(linha("REL-10").estadoVersao, v0 + 7);
+  const configuracoes = require("../src/services/configuracoesService");
+  const limitesAntes = configuracoes.limitesTemperatura();
+  configuracoes.validarEAtualizar({ turboFuncaoExtra: configuracoes.turboFuncaoExtra() === "swing" ? "nenhuma" : "swing" }, ADMIN.usuario);
+  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "uma configuração global que muda o estado IR avança a versão");
   assert.equal(salasService.comandoEstadoIR(salasService.buscar("REL-10")).versao, v0 + 7);
+  salasService.reenviarEstadoIRParaTodas();
+  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "reenviar o mesmo estado não é uma intenção nova");
+  configuracoes.validarEAtualizar({ modoManutencao: false }, ADMIN.usuario);
+  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "uma configuração que não toca o estado IR não avança a versão");
+  assert.deepEqual(configuracoes.limitesTemperatura(), limitesAntes);
   salasService.adotarDesligamentoLocal("REL-10");
   assert.equal(linha("REL-10").estadoVersao, v0 + 7, "adotar o OFF local não é uma intenção nova");
+});
+
+test("um comando explícito enviado antes do info inicial atrasado não é apagado pela trava antiga, e a placa o confirma", async () => {
+  sala("REL-12", "AA:BB:CC:E1:00:12", false);
+  const d = await conectar("REL-12", "AA:BB:CC:E1:00:12");
+  const resultado = salasService.aplicarComando("REL-12", "ligar", undefined, ADMIN);
+  assert.equal(resultado.enviadoAoDispositivo, true);
+  assert.ok(await ate(() => d.estados().length === 1));
+  const v = d.estados()[0].versao;
+  assert.equal(d.estados()[0].restauracao, undefined);
+
+  d.enviar({ tipo: "info", fw: "4.3.0", ...FAILSAFE, failsafeLatched: true, ligado: false, versao: v - 1 });
+  await esperar(150);
+  assert.equal(linha("REL-12").ligado, 1, "o info descreve a placa de antes do comando: a trava antiga não apaga a intenção nova");
+  assert.equal(d.estados().length, 1, "nada é restaurado por cima do comando explícito já enviado");
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM comandos_log WHERE sala = 'REL-12' AND cmd = 'failsafe_off_local'").get().n, 0);
+  assert.equal(status("REL-12").dispositivoConfirmou, false);
+
+  d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: true, versao: v, ...FAILSAFE, failsafeLatched: false });
+  assert.ok(await ate(() => status("REL-12").dispositivoConfirmou === true));
+  assert.equal(linha("REL-12").ligado, 1);
+
+  d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v, ...FAILSAFE, failsafeLatched: true });
+  assert.ok(await ate(() => linha("REL-12").ligado === 0), "uma trava posterior ao comando continua sendo adotada");
+  await d.fechar();
+
+  sala("REL-13", "AA:BB:CC:E1:00:13", false);
+  const e = await conectar("REL-13", "AA:BB:CC:E1:00:13");
+  salasService.aplicarComando("REL-13", "ligar", undefined, ADMIN);
+  assert.ok(await ate(() => e.estados().length === 1));
+  e.enviar({ tipo: "info", fw: "4.2.0", ...FAILSAFE, failsafeLatched: true, ligado: false });
+  await esperar(150);
+  assert.equal(linha("REL-13").ligado, 1, "sem eco de versão o info atrasado também não adota a trava anterior ao comando");
+  await esperar(3200);
+  assert.equal(e.estados().length, 1, "a sincronização por tempo esgotado não reenvia o estado já enviado");
+  await e.fechar();
+});
+
+test("um teste IR administrativo invalida a confirmação até uma intenção mais nova ser enviada", async (t) => {
+  sala("REL-14", "AA:BB:CC:E1:00:14", true);
+  const d = await conectar("REL-14", "AA:BB:CC:E1:00:14");
+  d.enviar({ tipo: "info", fw: "4.3.0", ...FAILSAFE, failsafeLatched: false });
+  assert.ok(await ate(() => d.estados().length === 1));
+  const v = d.estados()[0].versao;
+  d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: true, versao: v, ...FAILSAFE, failsafeLatched: false });
+  assert.ok(await ate(() => status("REL-14").dispositivoConfirmou === true));
+
+  const mudancas = ouvirMudancasDeSala(t, "REL-14");
+  assert.equal(deviceHub.enviarTesteIR("REL-14", { tipo: "send_known_state", protocol: 16, temp: 30, power: false, turbo: false, fan: "", swing: false }), true);
+  assert.equal(status("REL-14").dispositivoConfirmou, false, "o aparelho foi posto num estado que não é a intenção");
+  assert.equal(linha("REL-14").ligado, 1, "o teste não muda a intenção nem a versão");
+  assert.equal(linha("REL-14").estadoVersao, v);
+  assert.equal(mudancas.valor, 1, "o painel é avisado da perda de confirmação");
+  assert.ok(await ate(() => d.estados().length === 2));
+  assert.equal(d.estados()[1].versao, undefined, "o teste sai sem versão");
+
+  d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v, ...FAILSAFE, failsafeLatched: false, ultimoComando: { tipo: "known_state", protocol: 16, temp: 30, power: false, turbo: false } });
+  await esperar(150);
+  assert.equal(status("REL-14").dispositivoConfirmou, false, "o eco da versão anterior ao teste não volta a confirmar");
+  assert.equal(linha("REL-14").ligado, 1);
+
+  salasService.aplicarComando("REL-14", "ligar", undefined, ADMIN);
+  assert.ok(await ate(() => d.estados().length === 3));
+  const v2 = d.estados()[2].versao;
+  assert.ok(v2 > v);
+  d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: true, versao: v2, ...FAILSAFE, failsafeLatched: false });
+  assert.ok(await ate(() => status("REL-14").dispositivoConfirmou === true), "a intenção nova volta a ser confirmável");
+
+  assert.equal(deviceHub.enviarTesteIR("REL-14", { tipo: "send_raw", raw: [9000, 4500, 560, 560], carrierHz: 38000 }), true);
+  assert.equal(status("REL-14").dispositivoConfirmou, false, "um RAW também tira a placa do estado desejado");
+  d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v2, ...FAILSAFE, failsafeLatched: true });
+  assert.ok(await ate(() => linha("REL-14").ligado === 0), "a trava depois do teste ainda é adotada: o eco prova que ela é posterior à intenção");
+  assert.equal(status("REL-14").dispositivoConfirmou, true, "placa e intenção desligadas estão reconciliadas");
+  await d.fechar();
+});
+
+test("uma falha ao gravar limites globais não deixa intenção nem versão pela metade e não envia nada à placa", (t) => {
+  sala("REL-15", "AA:BB:CC:E1:00:15", true);
+  const configuracoes = require("../src/services/configuracoesService");
+  const antesCfg = configuracoes.limitesTemperatura();
+  db.prepare("UPDATE salas SET temperaturaAlvo = 18 WHERE sala = 'REL-15'").run();
+  const antes = linha("REL-15");
+  const enviados = [];
+  t.mock.method(deviceHub, "enviarComando", (s, payload) => { enviados.push({ sala: s, payload }); return true; });
+  const preparar = db.prepare.bind(db);
+  t.mock.method(db, "prepare", (sql, ...resto) => {
+    if (/UPDATE salas SET estadoVersao = estadoVersao \+ 1 WHERE irProtocolo IS NOT NULL/.test(sql)) {
+      return { run: () => { throw new Error("SQLITE_FULL simulado"); } };
+    }
+    return preparar(sql, ...resto);
+  });
+  assert.throws(() => configuracoes.validarEAtualizar({ temperaturaMinima: 20, temperaturaMaxima: 28 }, ADMIN.usuario), /SQLITE_FULL/);
+  assert.deepEqual(configuracoes.limitesTemperatura(), antesCfg, "a configuração não foi gravada");
+  assert.deepEqual(linha("REL-15"), antes, "o alvo não foi ajustado sem a versão avançar junto");
+  assert.equal(enviados.length, 0, "nada é submetido à placa sem commit");
+
+  db.prepare.mock.restore();
+  configuracoes.validarEAtualizar({ temperaturaMinima: 20, temperaturaMaxima: 28 }, ADMIN.usuario);
+  const depois = linha("REL-15");
+  assert.equal(depois.temperaturaAlvo, 20, "o alvo é ajustado ao novo limite");
+  assert.equal(depois.estadoVersao, antes.estadoVersao + 1);
+  assert.equal(enviados.find((e) => e.sala === "REL-15").payload.versao, depois.estadoVersao, "o reenvio sai com a versão gravada");
+  configuracoes.validarEAtualizar({ temperaturaMinima: antesCfg.minima, temperaturaMaxima: antesCfg.maxima }, ADMIN.usuario);
+
+  t.mock.method(db, "prepare", (sql, ...resto) => {
+    if (/UPDATE agendamentos SET temperatura = MAX/.test(sql)) return { run: () => { throw new Error("SQLITE_FULL simulado"); } };
+    return preparar(sql, ...resto);
+  });
+  const antesSala = linha("REL-15");
+  enviados.length = 0;
+  assert.throws(() => salasService.definirLimitesTemperatura("REL-15", { minima: 22, maxima: 26 }), /SQLITE_FULL/);
+  assert.deepEqual(linha("REL-15"), antesSala, "limites por sala: a sala não muda se a segunda escrita falha");
+  assert.equal(enviados.length, 0);
 });
 
 test("o agendador não repete um comando cujo registro de execução falhou: estado e registro persistem juntos", (t) => {

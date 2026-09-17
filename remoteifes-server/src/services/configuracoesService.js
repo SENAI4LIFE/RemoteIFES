@@ -174,6 +174,9 @@ function validarEAtualizar(patch, requisitante) {
     ...CHAVES_LISTA_CRITICAS,
     ...CHAVES_TEXTO_CRITICAS,
   ];
+  const estadoIRAlterado = proximo.temperaturaMinima !== atual.temperaturaMinima
+    || proximo.temperaturaMaxima !== atual.temperaturaMaxima
+    || proximo.turboFuncaoExtra !== atual.turboFuncaoExtra;
   db.exec("BEGIN");
   try {
     for (const chave of chavesArmazenaveis) {
@@ -196,6 +199,9 @@ function validarEAtualizar(patch, requisitante) {
         )
       )
     `).run(proximo.temperaturaMinima, proximo.temperaturaMaxima);
+    // O estado desejado das salas muda junto com estes limites/funções: a versão avança na mesma
+    // transação, para que um eco da versão anterior nunca passe por confirmação do novo estado.
+    if (estadoIRAlterado) db.prepare(`UPDATE salas SET estadoVersao = estadoVersao + 1 WHERE irProtocolo IS NOT NULL`).run();
     db.exec("COMMIT");
   } catch (erro) {
     db.exec("ROLLBACK");
@@ -209,9 +215,6 @@ function validarEAtualizar(patch, requisitante) {
   if (proximo.espApExigirCredencial !== atual.espApExigirCredencial) {
     require("./deviceHub").difundirPoliticaAp(!!configuracoes.espApExigirCredencial);
   }
-  const estadoIRAlterado = proximo.temperaturaMinima !== atual.temperaturaMinima
-    || proximo.temperaturaMaxima !== atual.temperaturaMaxima
-    || proximo.turboFuncaoExtra !== atual.turboFuncaoExtra;
   if (estadoIRAlterado) {
     const salasService = require("./salasService");
     salasService.eventos.emit("mudanca");

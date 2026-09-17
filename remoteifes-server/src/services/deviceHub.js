@@ -168,6 +168,23 @@ function enviarComando(sala, payload) {
     logger.warn("device-ws-envio-falhou", { sala, tipo: payload && payload.tipo, mensagem: erro.message });
     return false;
   }
+  if (payload && payload.tipo === "send_known_state" && Number.isInteger(payload.versao)) entrada.versaoEnviada = payload.versao;
+  return true;
+}
+
+// Um teste IR administrativo (send_raw, send_known_state sem versão) muda o estado do aparelho sem
+// passar pela intenção: a versão que a placa vier a ecoar deixa de provar que ela está no estado
+// desejado, até uma intenção mais nova ser enviada. O firmware ≤ 4.3.0 continua ecoando a última
+// versão recebida depois de um teste, por isso a invalidação fica no servidor.
+function enviarTesteIR(sala, payload) {
+  if (!enviarComando(sala, payload)) return false;
+  const entrada = conexoes.get(sala);
+  const salaRow = salasService.buscar(sala);
+  if (entrada && salaRow) {
+    entrada.versaoConfirmada = null;
+    entrada.versaoInvalidadaAte = salaRow.estadoVersao;
+    salasService.eventos.emit("mudanca-sala", { sala });
+  }
   return true;
 }
 
@@ -247,7 +264,8 @@ function relatoCondizComIntencao(salaRow, ultimoComando) {
 // Um relato só influencia a intenção quando comprovadamente reflete a versão vigente dela: pela
 // versão ecoada (firmware ≥ 4.3.0) ou, sem eco, quando esta conexão já confirmou a versão vigente
 // (a ordem das mensagens no socket garante que o relato é posterior). A trava do OFF local reportada
-// no info da conexão é adotada sempre, como antes. Devolve true quando a confirmação mudou.
+// no info da conexão é adotada sempre, como antes, salvo quando um comando explícito já saiu nesta
+// conexão antes dele (ver sincronizarEstadoInicial). Devolve true quando a confirmação mudou.
 function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
   let salaRow = salasService.buscar(sala);
   if (!salaRow) return false;
@@ -257,6 +275,7 @@ function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
   const reflete = versaoReportada !== null
     ? versaoReportada === versaoAtual
     : entrada.versaoConfirmada === versaoAtual || relatoCondizComIntencao(salaRow, msg.ultimoComando);
+  const ecoInvalidado = versaoReportada !== null && entrada.versaoInvalidadaAte !== null && versaoAtual <= entrada.versaoInvalidadaAte;
   const latched = msg.failsafeLatched === true;
   if (latched && (inicial || reflete) && (salaRow.ligado || salaRow.turboAtivo)) {
     try {
@@ -266,7 +285,7 @@ function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
       logger.warn("device-ws-failsafe-latch-adotar-falhou", { sala, mensagem: erro.message });
     }
   }
-  const confirmado = reflete || (latched && !salaRow.ligado && !salaRow.turboAtivo);
+  const confirmado = (reflete && !ecoInvalidado) || (latched && !salaRow.ligado && !salaRow.turboAtivo);
   const antes = entrada.versaoConfirmada === versaoAtual;
   if (confirmado) entrada.versaoConfirmada = versaoAtual;
   else if (versaoReportada !== null && entrada.versaoConfirmada === versaoAtual) entrada.versaoConfirmada = null;
@@ -280,6 +299,13 @@ function sincronizarEstadoInicial(sala, entrada, info) {
   }
   if (entrada.estadoInicialSincronizado || conexoes.get(sala) !== entrada || entrada.ws.readyState !== entrada.ws.OPEN) return;
   entrada.estadoInicialSincronizado = true;
+  // Um comando explícito já saiu nesta conexão antes do info (ou da espera): o info descreve a placa
+  // de antes desse comando, então não pode adotar uma trava nem apagar a intenção mais nova, e a
+  // restauração seria redundante — a intenção vigente já foi enviada com a sua versão.
+  if (entrada.versaoEnviada !== null) {
+    if (info && reconciliarRelato(sala, entrada, info)) salasService.eventos.emit("mudanca-sala", { sala });
+    return;
+  }
   if (info) {
     reconciliarRelato(sala, entrada, info, { inicial: true });
     if (info.failsafeLatched === true) return;
@@ -425,6 +451,8 @@ function iniciar(server) {
       estadoInicialSincronizado: false,
       versaoConfirmada: null,
       versaoEstadoReportada: null,
+      versaoEnviada: null,
+      versaoInvalidadaAte: null,
     };
     conexoes.set(sala, entrada);
     ws.isAlive = true;
@@ -623,6 +651,7 @@ module.exports = {
   estadoConfirmado,
   listarEstados,
   enviarComando,
+  enviarTesteIR,
   sincronizarPapel,
   capturasRecentes,
   capturaRecente,
