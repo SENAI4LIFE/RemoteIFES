@@ -48,6 +48,25 @@
   --a11y-font-scale: 1;
   --a11y-letter-spacing: 0em;
 
+  /* Tons semânticos dos ícones: a cor diz a função do ícone, não decora.
+     operação = verde (salas, controles, mapas, saúde); info = azul (ajuda, referência,
+     aplicativo); atenção = âmbar (agenda, alertas, manutenção); crítico = vermelho
+     (problemas, ações destrutivas); admin = roxo (gestão, sistema, configuração);
+     dispositivo = azul-petróleo (cadastro, firmware e IR dos ESP32). */
+  --icone-operacao-claro: #1c6b3c;
+  --icone-info-claro: #1a5fb4;
+  --icone-atencao-claro: #8a5a06;
+  --icone-critico-claro: #b3261e;
+  --icone-admin-claro: #6b3fa0;
+  --icone-dispositivo-claro: #0f6b70;
+
+  --icone-operacao: var(--icone-operacao-claro);
+  --icone-info: var(--icone-info-claro);
+  --icone-atencao: var(--icone-atencao-claro);
+  --icone-critico: var(--icone-critico-claro);
+  --icone-admin: var(--icone-admin-claro);
+  --icone-dispositivo: var(--icone-dispositivo-claro);
+
   --a11y-line-height: 1.5;
   --a11y-paragraph-width: none;
 }
@@ -82,6 +101,20 @@
 
 .icone-inline { vertical-align: -0.15em; }
 .icone-topbar { width: 20px; height: 20px; }
+
+/* Vai no próprio <svg class="icone ...">, porque o glifo usa fill: currentColor. */
+.tom-operacao { color: var(--icone-operacao); }
+.tom-info { color: var(--icone-info); }
+.tom-atencao { color: var(--icone-atencao); }
+.tom-critico { color: var(--icone-critico); }
+.tom-admin { color: var(--icone-admin); }
+.tom-dispositivo { color: var(--icone-dispositivo); }
+
+/* Quem escolheu uma cor de fonte na acessibilidade continua mandando no glifo. */
+body.a11y-font-color-on :is(.tom-operacao, .tom-info, .tom-atencao, .tom-critico, .tom-admin, .tom-dispositivo) {
+  color: inherit;
+}
+
 .ac-remote-power-glyph { width: 1.6em; height: 1.6em; }
 
 html { scroll-padding-top: 72px; scroll-padding-bottom: 88px; }
@@ -174,6 +207,26 @@ body.a11y-high-contrast {
   --ifes-green: #00d26a;
   --ifes-green-dark: #00b85e;
   --ifes-green-soft: #062a15;
+  --icone-operacao: #00d26a;
+  --icone-info: #8ecbff;
+  --icone-atencao: #ffe000;
+  --icone-critico: #ff9d9d;
+  --icone-admin: #d8b4fe;
+  --icone-dispositivo: #5ce1e6;
+}
+/* Estas superfícies seguem claras mesmo em alto contraste: mantêm os tons escuros. */
+body.a11y-high-contrast :is(.portal-options, .login-info-tips, .manutencao-acesso-card) {
+  --icone-operacao: var(--icone-operacao-claro);
+  --icone-info: var(--icone-info-claro);
+  --icone-atencao: var(--icone-atencao-claro);
+  --icone-critico: var(--icone-critico-claro);
+  --icone-admin: var(--icone-admin-claro);
+  --icone-dispositivo: var(--icone-dispositivo-claro);
+}
+/* No alto contraste, o badge claro deixaria glifo claro sobre fundo claro. */
+body.a11y-high-contrast .admin-subtab-btn.active .admin-subtab-icon,
+body.a11y-high-contrast .hub-card:hover .hub-card-icon {
+  background: var(--bg);
 }
 body.a11y-high-contrast .status-badge.on { background: #00d26a; color: #000; }
 body.a11y-high-contrast .status-badge.off { background: #333; color: #fff; }
@@ -1777,6 +1830,10 @@ button.btn:disabled {
   border-color: var(--ifes-green-dark);
 }
 .portal-funcao.is-active .portal-funcao-label { color: #fff; }
+.portal-funcao.is-active .portal-funcao-icon .icone { color: #fff; }
+/* No alto contraste o verde ativo é claro: o primeiro plano vira preto. */
+body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-label,
+body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-icon .icone { color: #000; }
 
 .portal-funcao-icon {
   font-size: calc(19px * var(--a11y-font-scale));
