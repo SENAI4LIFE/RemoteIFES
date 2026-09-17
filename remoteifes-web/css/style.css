@@ -2865,6 +2865,9 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
   font-weight: 600;
   margin-top: 2px;
 }
+.esp32-metric-texto .esp32-metric-value {
+  min-height: calc(3 * var(--a11y-line-height) * 1em);
+}
 
 .esp32-actions {
   display: flex;
