@@ -168,7 +168,7 @@ test("todo item do sumário da Ajuda aponta para uma seção existente", async (
   await expect(page.locator("#manualToc .manual-toc-category")).not.toHaveCount(0);
 });
 
-test("Notificações de dispositivos está na Ajuda do administrador e leva à aba correta", async ({ page, context }) => {
+test("Notificações do sistema está na Ajuda do administrador e leva à aba correta", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/ajuda/notificacoes");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -202,7 +202,7 @@ test("os ícones de ajuda das abas novas de Administração abrem a orientação
   await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 20_000 });
   await page.locator('#adminSub-notificacoes .help-icon-btn').click();
   await expect(page.locator("#helpModal")).toBeVisible();
-  await expect(page.locator("#helpModalTitle")).toContainText("Notificações de dispositivos");
+  await expect(page.locator("#helpModalTitle")).toContainText("Notificações do sistema");
   await page.locator("#helpModalManualBtn").click();
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/ajuda/notificacoes");
