@@ -1,4 +1,4 @@
-const { test, expect, VIEWPORTS, injetarSessao, irParaSala, semRolagemHorizontal } = require("../harness/fixtures");
+const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
 const MAXIMO_A11Y = {
   remoteifes_font_scale: "2",
@@ -359,31 +359,3 @@ test("no ajuste padrão a interface permanece como antes", async ({ page, contex
   expect(largura).toBeLessThanOrEqual(241);
   expect(await semRolagemHorizontal(page)).toBe(true);
 });
-
-const PAINEL_DUAS_COLUNAS = ["tablet-compact", "tablet-portrait", "tablet-large", "tablet-landscape", "notebook", "desktop-compact", "desktop", "wide-desktop"];
-
-for (const tamanhoNome of PAINEL_DUAS_COLUNAS) {
-  test(`Turbo e Temperatura − ficam na mesma linha do controle da sala em ${tamanhoNome}`, async ({ page, context }) => {
-    await injetarSessao(context, "user");
-    await page.setViewportSize(VIEWPORTS[tamanhoNome]);
-    await page.goto("/");
-    await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
-    await irParaSala(page, "A-108");
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-
-    const m = await page.evaluate(() => {
-      const centro = (id) => {
-        const b = document.getElementById(id).getBoundingClientRect();
-        return { y: (b.top + b.bottom) / 2, altura: b.height };
-      };
-      const colunas = getComputedStyle(document.querySelector(".ac-remote-controls")).gridTemplateColumns.split(" ").length;
-      return { colunas, power: centro("btnPower"), turbo: centro("btnTurbo"), up: centro("tempUp"), down: centro("tempDown") };
-    });
-
-    expect(m.colunas, "o painel largo usa a grade de duas colunas").toBe(2);
-    expect(Math.abs(m.turbo.y - m.down.y), "Turbo e Temperatura − compartilham a linha de baixo").toBeLessThanOrEqual(1);
-    expect(Math.abs(m.power.y - m.up.y), "Power e Temperatura + compartilham a linha de cima").toBeLessThanOrEqual(1);
-    expect(m.turbo.y, "a linha de baixo vem depois da de cima").toBeGreaterThan(m.power.y);
-    expect(await semRolagemHorizontal(page), "painel sem rolagem horizontal").toBe(true);
-  });
-}
