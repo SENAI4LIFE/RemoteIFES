@@ -155,7 +155,7 @@ const adminSections = [
   },
   {
     id: "notificacoes",
-    titulo: "Notificações de dispositivos",
+    titulo: "Notificações do sistema",
     papel: "admin",
     categoria: "admin_historicos",
     tags: ["sino", "lidas", "offline", "OTA", "monitoramento"],
