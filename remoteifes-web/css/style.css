@@ -3664,18 +3664,21 @@ textarea {
     gap: min(calc(11px * var(--rs)), 1.6vh) calc(18px * var(--rs));
   }
 
-  /* Power e Turbo entram direto nas linhas da grade: um item único abrangendo as
-     duas linhas posicionaria os dois pela própria altura, e não pela linha em que
-     Temperatura + e Temperatura − estão. */
-  .ac-remote-center-controls { display: contents; }
+  .ac-remote-center-controls {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: min(calc(12px * var(--rs)), 1.5vh);
+  }
 
   .ac-remote-power-btn {
     min-width: 0;
     gap: min(calc(6px * var(--rs)), 0.9vh);
   }
 
-  #btnPower { grid-column: 1; grid-row: 1; }
-  #btnTurbo { grid-column: 1; grid-row: 2; }
   #tempUp { grid-column: 2; grid-row: 1; }
   #tempDown { grid-column: 2; grid-row: 2; }
 
