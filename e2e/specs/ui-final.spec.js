@@ -1,4 +1,4 @@
-const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
+const { test, expect, VIEWPORTS, injetarSessao, irParaSala, semRolagemHorizontal } = require("../harness/fixtures");
 
 const MAXIMO_A11Y = {
   remoteifes_font_scale: "2",
@@ -359,3 +359,33 @@ test("no ajuste padrão a interface permanece como antes", async ({ page, contex
   expect(largura).toBeLessThanOrEqual(241);
   expect(await semRolagemHorizontal(page)).toBe(true);
 });
+
+const PAINEL_DUAS_COLUNAS = ["tablet-compact", "tablet-portrait", "tablet-large", "tablet-landscape", "notebook", "desktop-compact", "desktop", "wide-desktop"];
+
+for (const tamanhoNome of PAINEL_DUAS_COLUNAS) {
+  test(`Turbo e Temperatura − ficam na mesma linha do controle da sala em ${tamanhoNome}`, async ({ page, context }) => {
+    await injetarSessao(context, "user");
+    await page.setViewportSize(VIEWPORTS[tamanhoNome]);
+    await page.goto("/");
+    await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
+    await irParaSala(page, "A-108");
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+    const m = await page.evaluate(() => {
+      const centro = (id) => {
+        const b = document.getElementById(id).getBoundingClientRect();
+        return (b.top + b.bottom) / 2;
+      };
+      return {
+        largo: window.matchMedia("(min-width: 700px) and (min-height: 560px)").matches,
+        power: centro("btnPower"), turbo: centro("btnTurbo"), up: centro("tempUp"), down: centro("tempDown"),
+      };
+    });
+
+    expect(m.largo, "o painel largo usa a grade de duas colunas").toBe(true);
+    expect(Math.abs(m.turbo - m.down), "Turbo e Temperatura − compartilham a linha de baixo").toBeLessThanOrEqual(1);
+    expect(Math.abs(m.power - m.up), "Power e Temperatura + compartilham a linha de cima").toBeLessThanOrEqual(1);
+    expect(m.turbo, "a linha de baixo vem depois da de cima").toBeGreaterThan(m.power);
+    expect(await semRolagemHorizontal(page), "painel sem rolagem horizontal").toBe(true);
+  });
+}

@@ -26,7 +26,7 @@ const adminHelp = {
     { titulo: "Abas internas", texto: "A mesma tela reúne Acessos, Dispositivos, Sessões e, para o Superadministrador, Auditoria: todo histórico persistido fica aqui." },
   ] },
   dispositivos: { titulo: "Como usar: Logs > Dispositivos", itens: [{ titulo: "Eventos", texto: "Correlacione quedas e retornos do controlador com comandos e relatos." }] },
-  notificacoes: { titulo: "Como usar: Notificações de dispositivos", itens: [{ titulo: "Fila compartilhada", texto: "Dispositivos > Alertas e o sino mostram a mesma lista; marcar como lida vale para todos os administradores." }] },
+  notificacoes: { titulo: "Como usar: Notificações do sistema", itens: [{ titulo: "Fila compartilhada", texto: "Dispositivos > Alertas e o sino mostram a mesma lista; marcar como lida vale para todos os administradores." }] },
   acessos: { titulo: "Como usar: Logs > Acessos", itens: [{ titulo: "Evidência", texto: "Filtre por data as requisições registradas pelos controladores; elas não confirmam resposta física do ar-condicionado." }] },
   proprietarios: { titulo: "Como usar: Usuários > Proprietários de sala", itens: [{ titulo: "Delegação", texto: "Associe usuário comum à sala; ele passará a manter a lista de acesso em Config." }] },
   mapa: { titulo: "Como usar: Status > Mapa", itens: [{ titulo: "Triagem", texto: "Use conexão, energia e reserva como visão geral e abra a sala ou histórico para investigar." }] },

@@ -36,6 +36,6 @@ test("o sino e o ícone de inseto são indicadores distintos", async ({ page, se
   await sessaoComo("admin");
   await expect(page.locator("#notifBellBtn")).toBeVisible();
   await expect(page.locator("#bugReportBtn")).toBeVisible();
-  await expect(page.locator("#notifBellBtn")).toHaveAttribute("aria-label", /dispositivos/i);
+  await expect(page.locator("#notifBellBtn")).toHaveAttribute("aria-label", /notificações do sistema/i);
   await expect(page.locator("#bugReportBtn")).toHaveAttribute("aria-label", /problema/i);
 });
