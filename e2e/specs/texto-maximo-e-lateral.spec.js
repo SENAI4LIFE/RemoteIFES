@@ -3,7 +3,8 @@ const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require
 // Ajustes de texto no máximo (2×, entrelinha 3, espaçamento 0,25em): o Início não ganha
 // rolagem horizontal e o selo dos cartões fica dentro do cartão. A barra lateral da
 // Administração termina acima da barra inferior em qualquer posição de rolagem, com o
-// último item alcançável.
+// último item alcançável. Os botões da paginação da auditoria mantêm o rótulo inteiro
+// em vez de quebrá-lo letra a letra.
 
 const MAXIMO_A11Y = {
   remoteifes_font_scale: "2",
@@ -87,7 +88,9 @@ function medirLateral() {
     caixaBase: Math.round(caixa.bottom),
     topoDaBarra: Math.round(barra.top),
     alturaDaBarra: Math.round(barra.height),
-    piso: parseFloat(estilo.maxHeight) <= 140,
+    // Em repouso a caixa pode começar abaixo da barra inferior (texto máximo em celular
+    // deitado): aí o último item está fora da tela, não sob a barra, e só a rolagem conta.
+    comecaAbaixoDaBarra: caixa.top >= barra.top,
     ultimoAlcancavel: ultimo.contains(noFim),
     ultimoSobABarra: Math.round(Math.max(0, ru.bottom - barra.top)),
   };
@@ -98,8 +101,12 @@ const CENARIOS_LATERAL = [
   ["notebook", VIEWPORTS.notebook, {}],
   ["tablet", VIEWPORTS["tablet-compact"], {}],
   ["620 (início da barra lateral)", { width: 620, height: 900 }, {}],
+  ["celular deitado 844x390", VIEWPORTS["mobile-landscape"], {}],
+  ["celular deitado 740x360", { width: 740, height: 360 }, {}],
+  ["celular deitado 667x375", { width: 667, height: 375 }, {}],
   ["desktop curto 1024x600 com texto máximo", { width: 1024, height: 600 }, MAXIMO_A11Y],
   ["notebook com texto máximo", VIEWPORTS.notebook, MAXIMO_A11Y],
+  ["celular deitado 844x390 com texto máximo", VIEWPORTS["mobile-landscape"], MAXIMO_A11Y],
 ];
 
 for (const [nome, tamanho, ajustes] of CENARIOS_LATERAL) {
@@ -109,7 +116,7 @@ for (const [nome, tamanho, ajustes] of CENARIOS_LATERAL) {
 
     const parada = await page.evaluate(medirLateral);
     expect(parada.sticky, "a barra lateral é sticky neste tamanho").toBe(true);
-    if (!parada.piso) {
+    if (!parada.comecaAbaixoDaBarra) {
       expect(parada.caixaBase, "parada: a caixa termina acima da barra inferior").toBeLessThanOrEqual(parada.topoDaBarra);
       expect(parada.ultimoSobABarra, "parada: o último item não fica sob a barra").toBe(0);
       expect(parada.ultimoAlcancavel, "parada: o último item recebe o toque").toBe(true);
@@ -123,4 +130,66 @@ for (const [nome, tamanho, ajustes] of CENARIOS_LATERAL) {
     expect(rolada.ultimoSobABarra, "rolada: o último item não fica sob a barra").toBe(0);
     expect(rolada.ultimoAlcancavel, "rolada: o último item recebe o toque").toBe(true);
   });
+}
+
+// Paginação da auditoria: os botões «← Anterior» e «Próxima →» são itens de um flex; o
+// `overflow-wrap: anywhere` global dos botões deixava o mínimo deles em um caractere e, com
+// texto máximo, o contador ficava com a largura toda e cada botão virava uma coluna de letras.
+function medirPaginacao() {
+  const caixa = document.querySelector("#adminSub-logs .audit-pagination");
+  const rc = caixa.getBoundingClientRect();
+  const limite = document.documentElement.clientWidth;
+  // Geometria de todos na mesma posição de rolagem; o teste de toque rola cada botão depois.
+  const medir = (id) => {
+    const el = document.getElementById(id);
+    const faixa = document.createRange();
+    faixa.selectNodeContents(el);
+    const linhas = new Set(Array.from(faixa.getClientRects()).filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+    const r = el.getBoundingClientRect();
+    return { linhas, largura: Math.round(r.width), dentroDaCaixa: r.left >= rc.left - 0.5 && r.right <= rc.right + 0.5, topo: r.top, base: r.bottom };
+  };
+  const toque = (id) => {
+    const el = document.getElementById(id);
+    el.scrollIntoView({ block: "center" });
+    const r = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  };
+  const medida = { anterior: medir("auditPrevBtn"), proxima: medir("auditNextBtn"), contador: medir("auditPageInfo"), caixaDentroDaTela: rc.right <= limite + 0.5 };
+  medida.anterior.recebeOToque = toque("auditPrevBtn");
+  medida.proxima.recebeOToque = toque("auditNextBtn");
+  return medida;
+}
+
+const CENARIOS_PAGINACAO = [
+  ["celular deitado 844x390", VIEWPORTS["mobile-landscape"]],
+  ["celular deitado 740x360", { width: 740, height: 360 }],
+  ["celular 360x800", VIEWPORTS["mobile-compact"]],
+  ["desktop curto 1024x600", { width: 1024, height: 600 }],
+  ["notebook", VIEWPORTS.notebook],
+];
+
+for (const [nome, tamanho] of CENARIOS_PAGINACAO) {
+  for (const [modo, ajustes] of [["texto padrão", {}], ["texto máximo", MAXIMO_A11Y]]) {
+    test(`a paginação da auditoria mantém os rótulos inteiros e alcançáveis (${modo}, ${nome})`, async ({ page, context }) => {
+      await abrir(page, context, "superadmin", "/#/admin/logs/auditoria", tamanho, ajustes, "#adminSub-logs");
+      await expect(page.locator("#auditPageInfo")).not.toBeEmpty({ timeout: 15_000 });
+      if (ajustes.remoteifes_font_scale) {
+        await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--a11y-font-scale").trim())).toBe(ajustes.remoteifes_font_scale);
+      }
+
+      expect(await semRolagemHorizontal(page), "documento sem rolagem horizontal").toBe(true);
+      const medida = await page.evaluate(medirPaginacao);
+      expect(medida.caixaDentroDaTela, "a paginação cabe na tela").toBe(true);
+      for (const [rotulo, botao] of [["← Anterior", medida.anterior], ["Próxima →", medida.proxima]]) {
+        expect(botao.linhas, `«${rotulo}» fica em uma linha`).toBe(1);
+        expect(botao.dentroDaCaixa, `«${rotulo}» dentro da paginação`).toBe(true);
+        expect(botao.recebeOToque, `«${rotulo}» recebe o toque no centro`).toBe(true);
+      }
+      expect(medida.contador.dentroDaCaixa, "o contador fica dentro da paginação").toBe(true);
+      if (!ajustes.remoteifes_font_scale) {
+        // Com texto padrão os dois botões continuam na mesma linha (o contador quebra antes deles).
+        expect(medida.anterior.topo < medida.proxima.base && medida.proxima.topo < medida.anterior.base, "os botões dividem a linha").toBe(true);
+      }
+    });
+  }
 }
