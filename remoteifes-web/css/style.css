@@ -38,6 +38,8 @@
 
   --topbar-h: 72px;
   --aviso-seguranca-fim: 0px;
+  /* Altura da barra inferior sem a área segura. O valor inicial é o padrão; app.js mede a
+     barra real (ela cresce com a ampliação de texto) e atualiza a variável. */
   --tabbar-h: 54px;
 
   --fab-tamanho: 48px;
@@ -257,6 +259,12 @@ body {
   top: 0;
   z-index: 10;
 }
+/* A barra é um contexto de empilhamento próprio: com um painel aberto (menu da conta,
+   notificações, relatos) ela sobe acima da faixa de senha padrão (500) e dos botões
+   flutuantes (950), ficando ainda abaixo dos toasts (1000). */
+.topbar:has(.account-menu:not(.hidden)),
+.topbar:has(.notif-panel:not(.hidden)),
+.topbar:has(.relatos-panel:not(.hidden)) { z-index: 960; }
 
 @media (min-width: 700px) {
   .topbar { padding: calc(10px + var(--safe-top)) calc(20px + var(--safe-right)) 10px calc(20px + var(--safe-left)); }
@@ -2394,10 +2402,13 @@ body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-icon .icone { co
   right: calc(16px + var(--safe-right));
   top: auto;
   bottom: calc(var(--fab-base) + var(--fab-tamanho) + var(--fab-separacao));
-  z-index: 1000;
+  /* Acima do manual e da página do aplicativo (900), abaixo dos toasts (1000) e dos
+     painéis abertos na barra superior (960). */
+  z-index: 950;
 }
 
-body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
+/* Com a sessão aberta os botões flutuantes ficam logo acima da barra inferior real. */
+body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(--safe-bottom)); }
 .a11y-toggle-btn {
   width: var(--fab-tamanho);
   height: var(--fab-tamanho);
@@ -2663,8 +2674,11 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
 }
 
 @supports not selector(:has(*)) {
-  body { --fab-base: calc(66px + var(--safe-bottom)); }
+  body { --fab-base: calc(var(--tabbar-h) + 12px + var(--safe-bottom)); }
 }
+/* O painel de ajuda aberto passa por cima do botão de acessibilidade e da faixa de senha
+   padrão; fica na mesma camada que o botão de acessibilidade e vem depois dele no DOM. */
+.help-fab-widget:has(.help-fab-panel:not(.hidden)) { z-index: 950; }
 .help-fab-btn {
   width: var(--fab-tamanho);
   height: var(--fab-tamanho);
@@ -2690,6 +2704,10 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(66px + var(--safe-bottom)); }
   padding: 18px 20px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   width: min(340px, calc(100vw - 32px));
+  /* O painel abre para cima a partir do botão (base do botão + 58px); o que sobra até o
+     topo da tela, menos uma margem, é a altura máxima — o resto rola dentro dele. */
+  max-height: calc(100dvh - var(--safe-top) - var(--fab-base) - 58px - 16px);
+  overflow: auto;
 }
 .help-fab-panel.hidden { display: none; }
 .help-fab-panel .a11y-panel-header {
@@ -3576,7 +3594,7 @@ textarea {
   min-height: calc(50px * var(--a11y-font-scale));
 }
 
-.modal-card, .server-status-card, .help-fab-panel {
+.modal-card, .server-status-card {
   max-height: calc(100dvh - 32px);
   overflow: auto;
 }
@@ -3599,8 +3617,10 @@ textarea {
   .tab-btn { font-size: calc(12.5px * var(--a11y-font-scale)); padding: 13px 4px; }
 }
 
+/* O fim da página precisa passar da pilha de botões flutuantes (barra inferior, ajuda e
+   acessibilidade) para que o último controle não fique embaixo deles. */
 #app:has(#mainApp:not(.hidden)) {
-  padding-bottom: max(calc(150px + var(--safe-bottom)), calc(96px * var(--a11y-font-scale)));
+  padding-bottom: calc(var(--fab-base) + 2 * var(--fab-tamanho) + var(--fab-separacao) + 16px);
 }
 
 .esp32-capture-actions {
