@@ -11,6 +11,14 @@
   --danger-soft: #fbeceb;
   --warn: #7a5f16;
   --warn-soft: #fbf3d9;
+  --success: #15803d;
+  --warning: #b45309;
+  /* Superfície neutra discreta: selos apagados, código, botões secundários. */
+  --surface-muted: #f0f2f0;
+  /* Texto (e ícones em currentColor) sobre as superfícies de destaque — verde do
+     campus, vermelho e âmbar. No alto contraste essas cores ficam claras e o texto
+     sobre elas passa a preto. */
+  --texto-sobre-destaque: #ffffff;
   --radius: 10px;
   --radius-sm: 8px;
   --radius-pill: 999px;
@@ -203,12 +211,22 @@ body.a11y-link-highlight .link-btn {
 body.a11y-high-contrast {
   --bg: #000000;
   --surface: #000000;
+  --surface-muted: #262626;
   --text: #ffffff;
   --text-muted: #e6e6e6;
   --border: #ffffff;
   --ifes-green: #00d26a;
   --ifes-green-dark: #00b85e;
   --ifes-green-soft: #062a15;
+  /* Aviso e erro: texto claro (os mesmos tons dos ícones) sobre fundos escuros
+     tingidos, em vez dos tons pastel do tema claro, que ficavam sob texto branco. */
+  --danger: #ff9d9d;
+  --danger-soft: #2b0a08;
+  --warn: #ffe000;
+  --warn-soft: #2a2200;
+  --success: #00d26a;
+  --warning: #ffe000;
+  --texto-sobre-destaque: #000000;
   --icone-operacao: #00d26a;
   --icone-info: #8ecbff;
   --icone-atencao: #ffe000;
@@ -216,8 +234,9 @@ body.a11y-high-contrast {
   --icone-admin: #d8b4fe;
   --icone-dispositivo: #5ce1e6;
 }
-/* Estas superfícies seguem claras mesmo em alto contraste: mantêm os tons escuros. */
-body.a11y-high-contrast :is(.portal-options, .login-info-tips, .manutencao-acesso-card) {
+/* Estas superfícies seguem claras mesmo em alto contraste (as opções do portal e os
+   selos brancos das dicas do login): mantêm os tons escuros dos ícones. */
+body.a11y-high-contrast :is(.portal-options, .login-info-tips) {
   --icone-operacao: var(--icone-operacao-claro);
   --icone-info: var(--icone-info-claro);
   --icone-atencao: var(--icone-atencao-claro);
@@ -232,12 +251,18 @@ body.a11y-high-contrast .hub-card:hover .hub-card-icon {
 }
 body.a11y-high-contrast .status-badge.on { background: #00d26a; color: #000; }
 body.a11y-high-contrast .status-badge.off { background: #333; color: #fff; }
-body.a11y-high-contrast .mapa-offline { background: #444444; border: 2px dashed #ffffff; }
-body.a11y-high-contrast .mapa-online-desligado { background: #0057b8; border: 2px solid #ffffff; }
-body.a11y-high-contrast .mapa-online-ligado { background: #00d26a; border: 2px solid #000000; }
-body.a11y-high-contrast .floorplan-scope .room.fp-offline { background: #444444; border: 2px dashed #ffffff; }
-body.a11y-high-contrast .floorplan-scope .room.fp-online-desligado { background: #0057b8; border: 2px solid #ffffff; }
-body.a11y-high-contrast .floorplan-scope .room.fp-online-ligado { background: #00d26a; border: 2px solid #000000; }
+body.a11y-high-contrast .mapa-offline { background: #444444; border: 2px dashed #ffffff; color: #ffffff; }
+body.a11y-high-contrast .mapa-online-desligado { background: #0057b8; border: 2px solid #ffffff; color: #ffffff; }
+body.a11y-high-contrast .mapa-online-ligado { background: #00d26a; border: 2px solid #000000; color: #000000; }
+body.a11y-high-contrast .simple-tile-sala.is-offline { background: #444444; border: 2px dashed #ffffff; color: #ffffff; }
+body.a11y-high-contrast .simple-tile-sala.is-desligado { background: #0057b8; border: 2px solid #ffffff; color: #ffffff; }
+body.a11y-high-contrast .simple-tile-sala.is-ligado { background: #00d26a; border: 2px solid #000000; color: #000000; }
+body.a11y-high-contrast .floorplan-scope .room.fp-offline { background: #444444; border: 2px dashed #ffffff; color: #ffffff; }
+body.a11y-high-contrast .floorplan-scope .room.fp-online-desligado { background: #0057b8; border: 2px solid #ffffff; color: #ffffff; }
+body.a11y-high-contrast .floorplan-scope .room.fp-online-ligado { background: #00d26a; border: 2px solid #000000; color: #000000; }
+/* O avatar é um círculo branco no tema claro; no alto contraste vira preto com iniciais
+   brancas, em vez de verde-claro sobre branco. */
+body.a11y-high-contrast .account-avatar { background: var(--surface); color: var(--text); }
 body.a11y-high-contrast .floorplan-scope .room.fp-reservada { box-shadow: 0 0 0 3px #ffbe0b inset; }
 
 body {
@@ -249,7 +274,7 @@ body {
 
 .topbar {
   background: var(--ifes-green);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   padding: calc(14px + var(--safe-top)) calc(20px + var(--safe-right)) 14px calc(20px + var(--safe-left));
   display: flex;
   align-items: center;
@@ -277,11 +302,11 @@ body {
 }
 
 .topbar .link-btn {
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 
 .user-tag { font-size: calc(13px * var(--a11y-font-scale)); opacity: 0.9; }
-.account-wrap { position: relative; display: flex; align-items: center; gap: 5px; color: #fff; white-space: nowrap; }
+.account-wrap { position: relative; display: flex; align-items: center; gap: 5px; color: var(--texto-sobre-destaque); white-space: nowrap; }
 .account-timer-separator { opacity: .7; }
 .account-session-timer { min-width: 4.4em; font-size: calc(12px * var(--a11y-font-scale)); font-variant-numeric: tabular-nums; font-weight: 700; }
 .account-avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); background: #fff; color: var(--ifes-green-dark); font-weight: 800; letter-spacing: .02em; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.16); }
@@ -315,7 +340,7 @@ body {
   position: relative;
   background: none;
   border: none;
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -382,7 +407,7 @@ body {
   overflow: hidden;
 }
 .notif-item.nao-lida {
-  background: #fdecea;
+  background: var(--danger-soft);
   border-color: #f3b4ae;
 }
 .notif-item-msg { font-size: calc(13px * var(--a11y-font-scale)); }
@@ -561,7 +586,7 @@ button.btn:disabled {
   width: 100%;
   margin-top: 20px;
   background: var(--ifes-green);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 #loginForm button:hover { background: var(--ifes-green-dark); }
 
@@ -602,7 +627,7 @@ button.btn:disabled {
   color: var(--danger);
   font-size: calc(13.5px * var(--a11y-font-scale));
   font-weight: 500;
-  background: #fdecea;
+  background: var(--danger-soft);
   border: 1px solid #f3b4ae;
 }
 .toast-aviso {
@@ -677,7 +702,7 @@ button.btn:disabled {
   -webkit-mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6l1 2h5v2H3V5h5l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z'/%3E%3C/svg%3E");
   mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 3h6l1 2h5v2H3V5h5l1-2Zm-3 6h12l-1 12H7L6 9Zm4 2v8h2v-8h-2Zm4 0v8h2v-8h-2Z'/%3E%3C/svg%3E");
 }
-.admin-apagar-btn:hover { background: var(--danger); color: #fff; }
+.admin-apagar-btn:hover { background: var(--danger); color: var(--texto-sobre-destaque); }
 .admin-apagar-btn:focus-visible { outline-offset: 2px; }
 
 .card > .two-col:has(> .admin-apagar-btn) {
@@ -776,21 +801,22 @@ button.btn:disabled {
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #e9ece9;
+  background: var(--surface-muted);
   color: var(--text-muted);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 .status-badge.on { background: var(--ifes-green-soft); color: var(--ifes-green-dark); }
-.status-badge.off { background: #ededed; color: var(--text-muted); }
+.status-badge.off { background: var(--surface-muted); color: var(--text-muted); }
 .status-badge.inativo { background: #fbefc7; color: #6f560f; }
 
 .power-row { display: flex; gap: 12px; margin-bottom: 20px; }
 .power-row .btn { flex: 1; }
 
-.btn-on { background: var(--ifes-green); color: #fff; }
+.btn-on { background: var(--ifes-green); color: var(--texto-sobre-destaque); }
 .btn-on:hover { background: var(--ifes-green-dark); }
-.btn-off { background: #f1f1f1; color: var(--text); }
-.btn-off:hover { background: #e4e4e4; }
+.btn-off { background: var(--surface-muted); color: var(--text); }
+/* Escurece a superfície que estiver em uso (clara ou escura) em vez de fixar um cinza claro. */
+.btn-off:hover { filter: brightness(0.95); }
 .btn-block { width: 100%; margin-top: 18px; }
 
 #screen-panel.screen {
@@ -901,7 +927,7 @@ button.btn:disabled {
 .choice-btn.active {
   background: var(--ifes-green);
   border-color: var(--ifes-green);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 
 .two-col {
@@ -1074,7 +1100,7 @@ button.btn:disabled {
   padding: 18px 12px;
   text-align: center;
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.12);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   transition: background-color 0.25s ease;
 }
 .simple-tile:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15); }
@@ -1237,7 +1263,7 @@ button.btn:disabled {
 }
 .admin-subtab-group.is-active .admin-group-btn {
   background: var(--ifes-green-dark);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 
 @media (max-width: 619px) {
@@ -1324,7 +1350,7 @@ button.btn:disabled {
   padding: 0 0.4em;
   border-radius: 999px;
   background: var(--danger, #b91c1c);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   font-size: calc(10px * var(--a11y-font-scale));
   font-weight: 700;
   line-height: 1.6;
@@ -1535,7 +1561,7 @@ button.btn:disabled {
   vertical-align: middle;
   flex-shrink: 0;
 }
-.help-icon-btn:hover { background: var(--ifes-green); color: #fff; }
+.help-icon-btn:hover { background: var(--ifes-green); color: var(--texto-sobre-destaque); }
 
 .help-modal-card { max-width: 460px; text-align: left; }
 .help-list { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-direction: column; gap: 10px; }
@@ -1573,7 +1599,7 @@ button.btn:disabled {
 .floorplan-scope .red { color: #c0392b; font-weight: 700; }
 .floorplan-scope .blue { color: #1d4ed8; }
 .floorplan-scope .tiny { font-size: 6.5px !important; }
-.floorplan-scope .corridor { position: absolute; background: transparent; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #9aa5b1; letter-spacing: 2px; }
+.floorplan-scope .corridor { position: absolute; background: transparent; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #5f6b78; letter-spacing: 2px; }
 .floorplan-scope .ext { position: absolute; font-size: 10px; color: #333; white-space: nowrap; }
 .floorplan-scope .vert { writing-mode: vertical-rl; }
 .floorplan-scope .deco { position: absolute; border: 1px solid #000; background: #fff; }
@@ -1614,7 +1640,7 @@ button.btn:disabled {
 .home-btn-title {
   font-weight: bold;
   font-size: clamp(15px, 4vw, 19px);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 
 .portal-wrap, .login-wrap {
@@ -1697,7 +1723,7 @@ button.btn:disabled {
   font-weight: 500;
   padding: 12px;
   background: var(--warn);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 .manutencao-acesso-submit-btn:hover { filter: brightness(0.92); }
 #manutencaoAcessoCancelarBtn { margin-top: 10px; align-self: center; }
@@ -1836,11 +1862,8 @@ button.btn:disabled {
   background: var(--ifes-green);
   border-color: var(--ifes-green-dark);
 }
-.portal-funcao.is-active .portal-funcao-label { color: #fff; }
-.portal-funcao.is-active .portal-funcao-icon .icone { color: #fff; }
-/* No alto contraste o verde ativo é claro: o primeiro plano vira preto. */
-body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-label,
-body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-icon .icone { color: #000; }
+.portal-funcao.is-active .portal-funcao-label { color: var(--texto-sobre-destaque); }
+.portal-funcao.is-active .portal-funcao-icon .icone { color: var(--texto-sobre-destaque); }
 
 .portal-funcao-icon {
   font-size: calc(19px * var(--a11y-font-scale));
@@ -1900,11 +1923,11 @@ body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-icon .icone { co
   padding: clamp(18px, 4vw, 30px);
   border-radius: calc(var(--radius) * 1.4);
   background: linear-gradient(135deg, var(--ifes-green-dark), var(--ifes-green));
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 .hub-hero-texto h1 {
   margin: 0;
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   font-size: clamp(20px, 4.4vw, 30px);
   line-height: 1.12;
 }
@@ -2025,7 +2048,7 @@ body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-icon .icone { co
   text-align: center;
   white-space: nowrap;
 }
-.hub-card-badge.is-alerta { background: var(--danger); color: #fff; }
+.hub-card-badge.is-alerta { background: var(--danger); color: var(--texto-sobre-destaque); }
 .hub-card-badge.hidden { display: none; }
 .hub-card-compacto .hub-card-title { overflow-wrap: normal; word-break: normal; hyphens: none; }
 
@@ -2217,7 +2240,7 @@ body.a11y-high-contrast .portal-funcao.is-active .portal-funcao-icon .icone { co
 
 .fp-legenda { margin-bottom: 12px; }
 
-.readonly-badge { background: #e7e9ec; color: var(--text-muted); }
+.readonly-badge { background: var(--surface-muted); color: var(--text-muted); }
 
 #screen-floorplan.screen {
   max-width: 1320px;
@@ -2414,7 +2437,7 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(
   border-radius: 50%;
   border: none;
   background: var(--ifes-green);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2524,7 +2547,7 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(
 .a11y-toggle-option-btn.is-active {
   background: var(--ifes-green);
   border-color: var(--ifes-green);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 
 .a11y-reset-all-btn {
@@ -2684,7 +2707,7 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(
   border-radius: 50%;
   border: none;
   background: var(--ifes-green-dark);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   font-size: 20px;
   line-height: 1;
   font-weight: 700;
@@ -3046,7 +3069,7 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(
 .mon-row.aviso strong { color: var(--warning, #b45309); }
 .mon-row.alerta strong { color: var(--danger, #b91c1c); }
 .mon-alertas {
-  background: var(--danger-bg, #fef2f2);
+  background: var(--danger-soft);
   border: 1px solid var(--danger, #b91c1c);
   border-radius: 8px;
   padding: 10px 14px;
@@ -3561,7 +3584,7 @@ textarea {
 .ac-remote-turbo-btn.is-on {
   background: var(--warn);
   border-color: var(--warn);
-  color: #fff;
+  color: var(--texto-sobre-destaque);
 }
 
 .ac-remote-temp-btn:disabled, .ac-remote-turbo-btn:disabled, .ac-remote-power-btn:disabled {
@@ -3785,8 +3808,8 @@ textarea {
   flex: 1;
 }
 
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #8f1e17; }
+.btn-danger { background: var(--danger); color: var(--texto-sobre-destaque); }
+.btn-danger:hover { filter: brightness(0.8); }
 
 .pwd-field {
   position: relative;
@@ -3820,7 +3843,7 @@ textarea {
   position: relative;
   background: none;
   border: none;
-  color: #fff;
+  color: var(--texto-sobre-destaque);
   cursor: pointer;
   padding: 4px;
   min-width: var(--tap-min);
@@ -3876,7 +3899,10 @@ textarea {
   margin-bottom: 10px;
 }
 .relatos-panel-head h3 { margin: 0; font-size: calc(14px * var(--a11y-font-scale)); }
-.relatos-fechar-btn {
+/* O painel fica dentro da barra superior, onde `.topbar .link-btn` pinta os links com a
+   cor do texto sobre o verde; aqui a superfície é a do painel. */
+.relatos-panel .link-btn { color: var(--ifes-green); }
+.relatos-panel .relatos-fechar-btn {
   font-size: calc(18px * var(--a11y-font-scale));
   line-height: 1;
   padding: 4px 8px;
@@ -4123,7 +4149,7 @@ textarea {
 .status-chip.status-err { background: var(--danger-soft); color: var(--danger); border-color: #f0c4c1; }
 .status-chip.status-off,
 .status-chip.status-muted,
-.status-chip.status-loading { background: #eef0ee; color: var(--text-muted); border-color: var(--border); }
+.status-chip.status-loading { background: var(--surface-muted); color: var(--text-muted); border-color: var(--border); }
 .a11y-high-contrast .status-chip { border-color: currentColor; }
 
 .mon-card h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
@@ -4183,7 +4209,7 @@ body.mobile-app-open { overflow: hidden; }
 .mobile-app-card, .mobile-app-instructions, .mobile-app-security { border: 1px solid var(--border); border-radius: var(--radius); padding: clamp(16px, 3vw, 25px); background: var(--surface); }
 .mobile-app-card.is-recommended { border-color: var(--ifes-green); box-shadow: 0 0 0 2px var(--ifes-green-soft); }
 .mobile-app-card h3, .mobile-app-instructions h2, .mobile-app-security h2 { margin-top: 0; color: var(--ifes-green-dark); }
-.mobile-app-unavailable { border-left: 3px solid #b98000; padding: 10px 12px; background: #fff8df; }
+.mobile-app-unavailable { border-left: 3px solid #b98000; padding: 10px 12px; background: var(--warn-soft); }
 .mobile-app-integrity { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 14px; }
 .mobile-app-integrity dt { font-weight: 700; }
 .mobile-app-integrity dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -4308,7 +4334,7 @@ body.mobile-app-open { overflow: hidden; }
 .manual-secao li { margin-bottom: 6px; }
 .manual-secao p, .manual-secao li { text-align: left; }
 .manual-secao ul { list-style-position: outside; }
-.manual-secao code { background: #eef0ee; border-radius: 4px; padding: 1px 5px; font-size: 0.9em; }
+.manual-secao code { background: var(--surface-muted); border-radius: 4px; padding: 1px 5px; font-size: 0.9em; }
 .manual-nota {
   border-left: 3px solid var(--ifes-green);
   background: var(--ifes-green-soft);
@@ -4513,7 +4539,7 @@ body.a11y-high-contrast {
 .gr-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 6px 0 10px; }
 .gr-faixas { display: flex; flex-wrap: wrap; gap: 6px; }
 .gr-toolbar .btn { margin: 0; min-height: var(--tap-min); }
-.gr-faixa[aria-pressed="true"] { background: var(--ifes-green); color: #fff; }
+.gr-faixa[aria-pressed="true"] { background: var(--ifes-green); color: var(--texto-sobre-destaque); }
 .gr-meta { margin: 0 0 6px; font-size: calc(12.5px * var(--a11y-font-scale)); }
 .gr-vazio-msg { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); }
 .gr-secao-titulo { margin: 16px 0 8px; font-size: calc(14px * var(--a11y-font-scale)); }
@@ -4584,7 +4610,6 @@ body.a11y-high-contrast .gr-figura { border-color: #ffffff; }
 body.a11y-high-contrast .gr-cursor { stroke: #ffffff; opacity: .9; }
 body.a11y-high-contrast .gr-destaque, body.a11y-high-contrast .gr-destaque-linha { fill: #ffffff; opacity: .18; }
 body.a11y-high-contrast .gr-area { opacity: .3; }
-body.a11y-high-contrast .gr-faixa[aria-pressed="true"] { background: #00d26a; color: #000; }
 @media (prefers-reduced-motion: no-preference) {
   .gr-grid { transition: opacity .2s ease; }
 }
