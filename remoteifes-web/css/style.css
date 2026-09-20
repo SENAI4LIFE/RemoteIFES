@@ -1552,7 +1552,6 @@ button.btn:disabled {
 .floorplan-scope h2 { font-size: 15px; margin: 0 0 10px 2px; color: var(--text); }
 .floorplan-scope .plan-wrap { overflow: hidden; background: #fff; border: 3px solid #ccc; border-radius: var(--radius); padding: 10px; height: 500px; box-sizing: border-box; }
 .floorplan-scope .plan-wrap.fp-zoomed { overflow: auto; }
-#screen-floorplan .fp-scale-outer { width: calc(100% + 48px); }
 .floorplan-scope .plan { position: relative; }
 .floorplan-scope .room {
   position: absolute;
