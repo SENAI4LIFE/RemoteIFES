@@ -46,3 +46,23 @@ ServerStatus.conectar();
   new MutationObserver(medir).observe(aviso, { attributes: true, attributeFilter: ["class"] });
   window.addEventListener("resize", medir);
 })();
+
+// A barra inferior cresce com a ampliação de texto. Os botões flutuantes e a folga no fim
+// da página partem da altura real dela (sem a área segura, que o CSS soma por conta
+// própria), não de um valor fixo.
+(function () {
+  const barra = document.querySelector(".tabbar");
+  if (!barra) return;
+  const medir = () => {
+    const altura = barra.getBoundingClientRect().height;
+    if (!altura) {
+      document.documentElement.style.removeProperty("--tabbar-h");
+      return;
+    }
+    const areaSegura = parseFloat(getComputedStyle(barra).paddingBottom) || 0;
+    document.documentElement.style.setProperty("--tabbar-h", `${Math.round(altura - areaSegura)}px`);
+  };
+  medir();
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(medir).observe(barra);
+  window.addEventListener("resize", medir);
+})();
