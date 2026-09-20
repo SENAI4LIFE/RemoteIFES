@@ -66,3 +66,38 @@ ServerStatus.conectar();
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(medir).observe(barra);
   window.addEventListener("resize", medir);
 })();
+
+// A barra lateral da Administração é sticky: enquanto a página não rola, ela fica abaixo
+// do deslocamento sticky, e uma altura máxima calculada para a posição encostada passava
+// por baixo da barra inferior. A posição real no viewport vai para --admin-nav-atual.
+(function () {
+  const nav = document.querySelector(".admin-subtabs");
+  if (!nav) return;
+  let agendado = false;
+  const medir = () => {
+    agendado = false;
+    const estilo = getComputedStyle(nav);
+    const topo = parseFloat(estilo.top);
+    if (estilo.position !== "sticky" || Number.isNaN(topo) || !nav.offsetParent) {
+      document.documentElement.style.removeProperty("--admin-nav-atual");
+      return;
+    }
+    const atual = Math.max(topo, nav.getBoundingClientRect().top);
+    document.documentElement.style.setProperty("--admin-nav-atual", `${Math.round(atual)}px`);
+  };
+  const agendar = () => {
+    if (agendado) return;
+    agendado = true;
+    requestAnimationFrame(medir);
+  };
+  medir();
+  if (typeof ResizeObserver !== "undefined") {
+    // A posição da barra muda com o que fica acima dela: barra superior, faixa de senha
+    // padrão e o cabeçalho da tela, além da própria barra aparecer ou sumir.
+    const observador = new ResizeObserver(agendar);
+    const acima = document.querySelector("#screen-admin .screen-head");
+    [nav, document.querySelector(".topbar"), document.getElementById("defaultPasswordWarning"), acima].forEach((el) => { if (el) observador.observe(el); });
+  }
+  window.addEventListener("scroll", agendar, { passive: true });
+  window.addEventListener("resize", agendar);
+})();

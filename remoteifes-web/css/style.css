@@ -1192,7 +1192,8 @@ button.btn:disabled {
 }
 .admin-subtabs {
   --admin-nav-topo: max(74px, var(--aviso-seguranca-fim));
-  --admin-nav-rodape: max(calc(74px + var(--safe-bottom)), calc(58px * var(--a11y-font-scale)));
+  /* Folga até a barra inferior real (medida em --tabbar-h), não a um valor fixo. */
+  --admin-nav-rodape: calc(var(--tabbar-h) + 20px + var(--safe-bottom));
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
@@ -1204,7 +1205,9 @@ button.btn:disabled {
   overflow: hidden;
   position: sticky;
   top: var(--admin-nav-topo);
-  max-height: max(140px, calc(100dvh - var(--admin-nav-topo) - var(--admin-nav-rodape) - 8px));
+  /* A altura cabe entre a posição real da barra (antes de encostar ela fica abaixo do
+     deslocamento sticky; app.js mede em --admin-nav-atual) e a barra inferior. */
+  max-height: max(140px, calc(100dvh - var(--admin-nav-atual, var(--admin-nav-topo)) - var(--admin-nav-rodape) - 8px));
   overflow-y: auto;
 }
 .admin-subtab-btn {
@@ -1925,6 +1928,8 @@ button.btn:disabled {
   background: linear-gradient(135deg, var(--ifes-green-dark), var(--ifes-green));
   color: var(--texto-sobre-destaque);
 }
+/* Um nome longo com o texto ampliado não alarga o bloco além do herói: quebra dentro dele. */
+.hub-hero-texto { min-width: 0; max-width: 100%; }
 .hub-hero-texto h1 {
   margin: 0;
   color: var(--texto-sobre-destaque);
@@ -2050,7 +2055,9 @@ button.btn:disabled {
 }
 .hub-card-badge.is-alerta { background: var(--danger); color: var(--texto-sobre-destaque); }
 .hub-card-badge.hidden { display: none; }
-.hub-card-compacto .hub-card-title { overflow-wrap: normal; word-break: normal; hyphens: none; }
+/* Sem `anywhere` (herdado do botão) para a coluna não encolher a uma letra por linha; a
+   quebra dentro da palavra só acontece quando ela não cabe no cartão. */
+.hub-card-compacto .hub-card-title { overflow-wrap: break-word; word-break: normal; hyphens: none; }
 
 @media (max-width: 560px) {
   #screen-inicio { gap: 18px; }
@@ -2060,12 +2067,16 @@ button.btn:disabled {
   .hub-grid-compacto { grid-template-columns: 1fr; gap: 10px; }
   .hub-card {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     min-height: var(--tap-min);
     padding: 14px;
   }
   .hub-card-desc { display: none; }
-  .hub-card-badge { position: static; margin-left: auto; }
+  /* O selo não encolhe (o `min-width` explícito deixava o flex esmagá-lo e o texto, em
+     nowrap, vazava do cartão): quando não cabe ao lado do título, passa para a linha de
+     baixo, ainda encostado à direita. */
+  .hub-card-badge { position: static; margin-left: auto; flex-shrink: 0; }
   .hub-resumo { justify-content: flex-start; }
 }
 
