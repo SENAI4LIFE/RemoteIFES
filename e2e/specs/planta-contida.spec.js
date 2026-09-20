@@ -130,3 +130,41 @@ test("aproximar a planta rola dentro do invólucro e restaurar volta a caber, se
   expect(depois.escala).toBeCloseTo(antes.escala, 3);
   expect(depois.plantaDentroDoConteudo).toBe(true);
 });
+
+// O rótulo CORREDOR tem o tamanho dos códigos de sala e continua dentro da faixa do
+// corredor, sem encostar em sala ou legenda, em todas as plantas.
+for (const [nome, tamanho] of [["mobile-portrait", VIEWPORTS["mobile-portrait"]], ["mobile-landscape", VIEWPORTS["mobile-landscape"]], ["notebook", VIEWPORTS.notebook]]) {
+  test(`o rótulo CORREDOR é legível e fica dentro da faixa do corredor em ${nome}`, async ({ page, context }) => {
+    await abrirPlanta(page, context, tamanho);
+    for (const secao of ["a-terreo", "a-2pav", "a-3pav", "b-terreo", "b-2pav", "b-3pav"]) {
+      await page.goto(`/#/salas/planta/${secao}`);
+      await expect(page.locator(`#fp-${secao}`)).toBeVisible();
+      await page.waitForFunction((s) => {
+        const plan = document.querySelector(`#fp-${s} .plan`);
+        return !!(plan && plan.style.transform);
+      }, secao);
+      const medida = await page.evaluate((s) => {
+        const plan = document.querySelector(`#fp-${s} .plan`);
+        const corredor = Array.from(plan.querySelectorAll(".corridor")).find((el) => el.textContent.trim());
+        const faixa = document.createRange();
+        faixa.selectNodeContents(corredor);
+        const texto = faixa.getBoundingClientRect();
+        const caixa = corredor.getBoundingClientRect();
+        const encosta = Array.from(plan.querySelectorAll(".room, .lbl, .deco, .ext"))
+          .filter((el) => { const r = el.getBoundingClientRect(); return r.width && r.left < texto.right && r.right > texto.left && r.top < texto.bottom && r.bottom > texto.top; })
+          .map((el) => el.textContent.trim().slice(0, 24) || el.className);
+        const codigo = plan.querySelector(".room.code");
+        return {
+          fonte: parseFloat(getComputedStyle(corredor).fontSize),
+          fonteDoCodigo: codigo ? parseFloat(getComputedStyle(codigo).fontSize) : null,
+          textoDentroDaFaixa: texto.left >= caixa.left - 0.5 && texto.right <= caixa.right + 0.5 && texto.top >= caixa.top - 0.5 && texto.bottom <= caixa.bottom + 0.5,
+          encosta,
+        };
+      }, secao);
+      expect(medida.fonte, `${secao}: o rótulo não é menor que os códigos de sala`).toBeGreaterThanOrEqual(medida.fonteDoCodigo || 12);
+      expect(medida.textoDentroDaFaixa, `${secao}: o texto fica dentro da faixa do corredor`).toBe(true);
+      expect(medida.encosta, `${secao}: o texto não encosta em sala ou legenda`).toEqual([]);
+      expect(await semRolagemHorizontal(page), `${secao}: página sem rolagem horizontal`).toBe(true);
+    }
+  });
+}
