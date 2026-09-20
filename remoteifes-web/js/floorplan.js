@@ -41,9 +41,12 @@ const Floorplan = {
           return;
         }
 
-        const availableWidth = wrap.clientWidth;
-        const availableHeight = wrap.clientHeight;
-        if (!availableWidth || !availableHeight) return;
+        // A planta cabe na caixa de conteúdo do invólucro: clientWidth/Height incluem o
+        // padding, e uma planta ajustada a eles passava por cima dele e era cortada.
+        const estiloWrap = getComputedStyle(wrap);
+        const availableWidth = wrap.clientWidth - (parseFloat(estiloWrap.paddingLeft) || 0) - (parseFloat(estiloWrap.paddingRight) || 0);
+        const availableHeight = wrap.clientHeight - (parseFloat(estiloWrap.paddingTop) || 0) - (parseFloat(estiloWrap.paddingBottom) || 0);
+        if (availableWidth <= 0 || availableHeight <= 0) return;
 
         let fitScale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
         if (fitScale > 1) fitScale = 1;
