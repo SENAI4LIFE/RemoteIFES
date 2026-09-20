@@ -278,32 +278,52 @@
     if (fontColorInput) fontColorInput.value = corFonte || COR_PADRAO;
     if (textColorInput) textColorInput.value = corTexto || COR_PADRAO;
 
+    // Mesmo ciclo de foco dos outros painéis: ao abrir, o foco entra no painel (no botão
+    // de fechar); Esc fecha; ao fechar, o foco volta a quem abriu — e nunca fica em um
+    // controle que acabou de ser escondido.
+    let focoAnterior = null;
+
     function abrirPainel() {
+      focoAnterior = document.activeElement;
       panel.classList.remove("hidden");
       toggleBtn.setAttribute("aria-expanded", "true");
       const helpFabPanel = document.getElementById("helpFabPanel");
       if (helpFabPanel) helpFabPanel.classList.add("hidden");
       const helpFabToggleBtn = document.getElementById("helpFabToggleBtn");
       if (helpFabToggleBtn) helpFabToggleBtn.setAttribute("aria-expanded", "false");
+      if (closeBtn) closeBtn.focus();
     }
 
-    function fecharPainel() {
+    function fecharPainel({ restaurarFoco = false } = {}) {
+      if (panel.classList.contains("hidden")) return;
+      const focoNoPainel = panel.contains(document.activeElement);
       panel.classList.add("hidden");
       toggleBtn.setAttribute("aria-expanded", "false");
+      if (restaurarFoco || focoNoPainel) {
+        const alvo = focoAnterior && typeof focoAnterior.focus === "function" && focoAnterior.isConnected && focoAnterior.offsetParent !== null ? focoAnterior : toggleBtn;
+        alvo.focus();
+      }
+      focoAnterior = null;
     }
 
     toggleBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (panel.classList.contains("hidden")) abrirPainel();
-      else fecharPainel();
+      else fecharPainel({ restaurarFoco: true });
     });
 
-    if (closeBtn) closeBtn.addEventListener("click", fecharPainel);
+    if (closeBtn) closeBtn.addEventListener("click", () => fecharPainel({ restaurarFoco: true }));
 
     document.addEventListener("click", (e) => {
       if (!panel.contains(e.target) && e.target !== toggleBtn && !toggleBtn.contains(e.target)) {
         fecharPainel();
       }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || panel.classList.contains("hidden")) return;
+      e.preventDefault();
+      fecharPainel({ restaurarFoco: true });
     });
 
     function definirFonte(valor) {
