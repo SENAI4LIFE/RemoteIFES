@@ -66,7 +66,9 @@ function verificarAgendamentos({ aoIniciar = false } = {}) {
       if (estaNaJanelaDeLigar(hora, inicioLigar, fimLigar) && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
         aplicarInicioAgendamento(ag.sala, ag.temperatura, { registrarNaTransacao: () => registrarExecucao(ag.id, "ligar", dataISO), enviarAoDispositivo });
       }
-      if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO)) {
+      // O OFF só pertence a um agendamento que de fato ligou hoje: criado ou reativado depois da
+      // janela (ou perdido inteiro numa queda), ele não tem intenção própria a encerrar.
+      if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO) && jaExecutadoHoje(ag.id, "ligar", dataISO)) {
         aplicarComando(ag.sala, "desligar", undefined, {
           usuario: null,
           origem: "agendamento",

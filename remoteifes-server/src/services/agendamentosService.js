@@ -63,7 +63,7 @@ function salasComAgendamentoAtivo() {
     SELECT a.*, u.nome AS usuarioNome, u.usuario AS usuarioLogin
     FROM agendamentos a
     JOIN usuarios u ON u.id = a.usuarioId
-    WHERE a.ativo = 1 AND a.data = ? AND a.horaInicio <= ? AND a.horaFim >= ?
+    WHERE a.ativo = 1 AND a.data = ? AND a.horaInicio <= ? AND a.horaFim > ?
     ORDER BY a.id
   `).all(dataAtualBrasiliaISO(), hora, hora);
   const resultado = {};
