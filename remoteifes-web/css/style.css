@@ -4407,7 +4407,9 @@ body.mobile-app-open { overflow: hidden; }
 .manual-command h4 { margin: 0 0 8px; font-size: calc(14px * var(--a11y-font-scale)); }
 .manual-command pre { max-width: 100%; margin: 6px 0; padding: 10px; overflow-x: auto; border-radius: var(--radius-sm); background: #17221d; color: #f2f7f4; white-space: pre; }
 .manual-command pre code { padding: 0; background: none; color: inherit; font-size: calc(12px * var(--a11y-font-scale)); }
-.manual-command dl { display: grid; grid-template-columns: minmax(7rem, auto) minmax(0, 1fr); gap: 5px 10px; margin: 10px 0 0; }
+/* fit-content: com texto máximo e fonte larga, "Resultado esperado" em auto tomava o máximo
+   do conteúdo e deixava à coluna do valor menos que um glifo, que vazava do artigo. */
+.manual-command dl { display: grid; grid-template-columns: fit-content(35%) minmax(0, 1fr); gap: 5px 10px; margin: 10px 0 0; }
 .manual-command dt { font-weight: 700; }
 .manual-command dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .manual-tabela-wrap { overflow-x: auto; margin: 0 0 16px; }
