@@ -454,6 +454,7 @@ function statusCompleto(sala, requisitante, contexto = null) {
     autoLigar: configuracoesService.autoLigarAtivo(cfg),
     acessoRestrito: !!salaRow.acessoRestrito,
     podeControlarEsta: usuarioPodeControlarSala(requisitante, sala, contexto),
+    canalComandos: require("./deviceHub").canalDeComandos(salaRow.sala),
     dispositivoConfirmou: require("./deviceHub").estadoConfirmado(salaRow),
     bloqueio: bloqueio
       ? {
@@ -617,6 +618,7 @@ function aplicarComando(sala, cmd, valor, { usuario, origem, registrarNaTransaca
   return {
     ...salaAtualizada,
     enviadoAoDispositivo,
+    canalComandos: require("./deviceHub").canalDeComandos(sala),
     avisoDispositivoOffline: !salaAtualizada.online,
   };
 }
