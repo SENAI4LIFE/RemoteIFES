@@ -424,11 +424,14 @@ test("a documentação privilegiada não sobrevive ao logout, nem quando a respo
 
 // Acima de 760px o sumário fica ao lado e os passos dos fluxos ficam em linha: o texto de cada
 // passo quebra dentro da caixa (inclusive "Superadministrador:" e o texto máximo), sem rolagem
-// horizontal do artigo nem passo saindo da figura.
-for (const [nome, tamanho, ampliado] of [
-  ["761x900", { width: 761, height: 900 }, false],
-  ["notebook com texto máximo", { width: 1366, height: 768 }, true],
-  ["celular deitado com texto máximo", { width: 844, height: 390 }, true],
+// horizontal do artigo nem passo saindo da figura. A variante com fonte larga (Verdana, ou
+// DejaVu Sans no Linux) reproduz em qualquer plataforma o que só as fontes do Linux mostravam:
+// o rótulo dos comandos ("Resultado esperado") tomava a largura e o valor vazava do artigo.
+for (const [nome, tamanho, ampliado, fonteLarga] of [
+  ["761x900", { width: 761, height: 900 }, false, false],
+  ["notebook com texto máximo", { width: 1366, height: 768 }, true, false],
+  ["celular deitado com texto máximo", { width: 844, height: 390 }, true, false],
+  ["celular deitado com texto máximo e fonte larga", { width: 844, height: 390 }, true, true],
 ]) {
   test(`os passos dos fluxos ficam dentro da figura e o artigo não rola na horizontal em ${nome}`, async ({ page, context }) => {
     if (ampliado) {
@@ -442,6 +445,7 @@ for (const [nome, tamanho, ampliado] of [
     await injetarSessao(context, "superadmin");
     await page.goto("/#/ajuda/administracao");
     await expect(page.locator("#manual-sec-administracao .manual-flow")).toBeVisible({ timeout: 20_000 });
+    if (fonteLarga) await page.addStyleTag({ content: '#manualConteudo, #manualConteudo * { font-family: Verdana, "DejaVu Sans", sans-serif !important; }' });
     const medida = await page.evaluate(() => {
       const artigo = document.getElementById("manualConteudo");
       const fora = [];
