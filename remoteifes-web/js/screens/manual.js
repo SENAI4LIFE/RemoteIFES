@@ -37,6 +37,9 @@ const Manual = (() => {
     atalhos: "inicio-acoes",
     conta: "conta-sessao",
     sessao: "conta-sessao",
+    sessoes: "sessoes-historico",
+    mapa: "status-mapa",
+    ativos: "ativos-sessoes",
     offline: "pwa-mobile",
     historico: "auditoria",
     notificacao: "notificacoes",
@@ -65,6 +68,9 @@ const Manual = (() => {
   let hashAnterior = null;
   let elementoAnterior = null;
   let carregando = null;
+  // Módulos públicos cujo script chegou e executou; os demais são tentados de novo a cada abertura.
+  const modulosCarregados = new Set();
+  let modulosPendentes = [];
 
   function normalizar(t) {
     return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -141,11 +147,25 @@ const Manual = (() => {
     return `${!!s.usuario}|${!!s.isAdmin}|${!!s.isSuperAdmin}|${!!s.temSalaComoProprietario}`;
   }
 
+  function avisoDeCarga() {
+    if (!modulosPendentes.length) return "";
+    const parcial = typeof ManualContent !== "undefined" && ManualContent.secoes.length > 0;
+    const texto = parcial
+      ? "Parte do manual não pôde ser carregada — sem conexão com o servidor? As seções disponíveis estão abaixo."
+      : "O manual não pôde ser carregado — sem conexão com o servidor?";
+    return `<p class="manual-nota manual-nota-atencao manual-carga-falhou">${texto} <button type="button" class="link-btn manual-recarregar">Tentar de novo</button></p>`;
+  }
+
   function render() {
-    if (typeof ManualContent === "undefined") return;
     const assinatura = assinaturaPapel();
     if (renderRole === assinatura) return;
     renderRole = assinatura;
+    if (typeof ManualContent === "undefined") {
+      tocEl.innerHTML = "";
+      conteudoEl.innerHTML = avisoDeCarga();
+      ligarRecarga();
+      return;
+    }
     const privadas = typeof RoleDocumentation !== "undefined" ? RoleDocumentation.secoes() : [];
     const categorias = ManualContent.categorias || {};
     const secoes = [...ManualContent.secoes, ...privadas]
@@ -163,7 +183,7 @@ const Manual = (() => {
       return `${cabecalho}<li data-category="${escapeHtml(categoria)}"><button type="button" class="manual-toc-link" data-sec="${escapeHtml(s.id)}">${escapeHtml(s.titulo)}</button></li>`;
     }).join("");
 
-    conteudoEl.innerHTML = secoes
+    conteudoEl.innerHTML = avisoDeCarga() + secoes
       .map((s) => {
         const verNoApp =
           s.verNoApp && rotaPermitida(s.verNoApp)
@@ -196,6 +216,11 @@ const Manual = (() => {
         irParaSecao(btn.dataset.sec);
       });
     });
+    ligarRecarga();
+  }
+
+  function ligarRecarga() {
+    conteudoEl.querySelectorAll(".manual-recarregar").forEach((btn) => btn.addEventListener("click", () => abrir(secaoAtual)));
   }
 
   function irParaSecao(id) {
@@ -225,25 +250,37 @@ const Manual = (() => {
         .some((item) => !item.classList.contains("hidden"));
       cabecalho.classList.toggle("hidden", !algum);
     });
-    tocVazioEl.classList.toggle("hidden", visiveis !== 0);
+    // "Nenhuma seção corresponde" responde a uma busca; sem termo (manual que não carregou), não aparece.
+    tocVazioEl.classList.toggle("hidden", !termo || visiveis !== 0);
   }
 
+  function carregarScript(caminho) {
+    return new Promise((resolve) => {
+      const s = document.createElement("script");
+      s.src = `${caminho}?v=${encodeURIComponent(window.REMOTEIFES_FRONTEND_VERSION || "unknown")}`;
+      s.onload = () => resolve(true);
+      s.onerror = () => { s.remove(); resolve(false); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // Carrega os módulos públicos que ainda faltam, na ordem (o registro primeiro). Um script que
+  // não chega (rede) fica pendente e é tentado de novo na próxima abertura; um que executou não é
+  // reinserido, para não registrar seções duas vezes. Sem o registro, os demais nem são tentados.
   async function garantirConteudo() {
-    if (typeof ManualContent !== "undefined" && ManualContent.secoes.length) return;
     if (!carregando) {
       carregando = (async () => {
-        const versao = window.REMOTEIFES_FRONTEND_VERSION || "unknown";
         for (const caminho of MODULOS_PUBLICOS) {
-          if (caminho.endsWith("manual-content.js") && typeof ManualContent !== "undefined") continue;
-          await new Promise((resolve) => {
-            const s = document.createElement("script");
-            s.src = `${caminho}?v=${encodeURIComponent(versao)}`;
-            s.onload = resolve;
-            s.onerror = resolve;
-            document.head.appendChild(s);
-          });
+          if (modulosCarregados.has(caminho)) continue;
+          if (typeof ManualContent !== "undefined" && caminho.endsWith("manual-content.js")) {
+            modulosCarregados.add(caminho);
+            continue;
+          }
+          if (await carregarScript(caminho)) modulosCarregados.add(caminho);
+          if (typeof ManualContent === "undefined") break;
         }
-      })();
+        modulosPendentes = MODULOS_PUBLICOS.filter((caminho) => !modulosCarregados.has(caminho));
+      })().finally(() => { carregando = null; });
     }
     await carregando;
   }
@@ -277,6 +314,10 @@ const Manual = (() => {
     if (typeof RoleDocumentation !== "undefined") await RoleDocumentation.carregar();
     renderRole = null;
     render();
+    // Abrir (ou reabrir) parte sempre do sumário completo: uma busca anterior não fica
+    // retida com o seu "nenhuma seção" ao lado de seções visíveis.
+    buscaEl.value = "";
+    filtrar();
 
     if (!aberto) {
       const hashAtual = location.hash || "";
@@ -308,9 +349,13 @@ const Manual = (() => {
     overlay.classList.add("hidden");
     document.body.classList.remove("manual-open");
     document.removeEventListener("keydown", aoTeclar, true);
-    if (elementoAnterior && typeof elementoAnterior.focus === "function") {
+    // O foco volta a quem abriu; se esse controle já não está visível (o item do menu de ajuda,
+    // escondido ao abrir o manual), vai ao botão flutuante de ajuda, nunca fica solto no body.
+    const visivel = (el) => !!el && el !== document.body && el !== document.documentElement && el.isConnected && typeof el.focus === "function" && el.getClientRects().length > 0;
+    const alvoFoco = visivel(elementoAnterior) ? elementoAnterior : document.getElementById("helpFabToggleBtn");
+    if (visivel(alvoFoco)) {
       try {
-        elementoAnterior.focus();
+        alvoFoco.focus();
       } catch (erro) {}
     }
     if (semRestaurar) return;
@@ -326,7 +371,7 @@ const Manual = (() => {
   function montarAtalhos() {
     const cont = document.getElementById("helpFabLinks");
     const primarios = document.getElementById("helpFabPrimaryLinks");
-    if (!cont || typeof ManualContent === "undefined") return;
+    if (!cont) return;
     const contextual = (() => {
       const id = document.querySelector("#mainApp .screen.tab-content:not(.hidden)")?.id || "";
       if (id === "screen-admin") {
@@ -335,9 +380,9 @@ const Manual = (() => {
         return ({
           "usuarios:contas": "usuarios-admin", "usuarios:proprietarios": "proprietarios-admin",
           "logs:comandos": "logs-dispositivos", "logs:acesso": "logs-dispositivos",
-          "logs:dispositivos": "logs-dispositivos", "logs:sessoes": "ativos-sessoes",
+          "logs:dispositivos": "logs-dispositivos", "logs:sessoes": "sessoes-historico",
           "logs:auditoria": "auditoria", "status:ativos": "ativos-sessoes",
-          "status:mapa": "proprietarios-admin", "status:sistema": "monitoramento",
+          "status:mapa": "status-mapa", "status:sistema": "monitoramento",
           notificacoes: "notificacoes", macs: "esp32-cadastro",
           config: "configuracoes-globais", esp32: "esp32-avancado", protocolos: "protocolos-ir", relatos: "relatos-gestao",
         })[aba ? `${sub}:${aba}` : sub] || "administracao";
@@ -361,7 +406,9 @@ const Manual = (() => {
       });
     }
     const idsAtalho = [...ATALHOS, ...(state.isAdmin ? ["administracao"] : []), ...(state.isSuperAdmin ? ["monitoramento", "operacao-admin"] : [])];
-    const disponiveis = [...ManualContent.secoes, ...(typeof RoleDocumentation !== "undefined" ? RoleDocumentation.secoes() : [])];
+    // Sem o registro público carregado, os atalhos ficam vazios, mas "Manual completo" continua
+    // aqui: o manual abre com o aviso de carga e o "Tentar de novo".
+    const disponiveis = [...(typeof ManualContent !== "undefined" ? ManualContent.secoes : []), ...(typeof RoleDocumentation !== "undefined" ? RoleDocumentation.secoes() : [])];
     cont.innerHTML = idsAtalho.map((id) => {
       const s = disponiveis.find((x) => x.id === id && papelPermitido(x.papel));
       return s ? `<li><button type="button" class="link-btn" data-sec="${s.id}">${escapeHtml(s.titulo)}</button></li>` : "";
@@ -394,6 +441,7 @@ const Manual = (() => {
     fechar,
     estaAberto: () => aberto,
     secaoAtual: () => secaoAtual,
+    modulosPendentes: () => modulosPendentes.slice(),
   };
 })();
 

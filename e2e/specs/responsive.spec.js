@@ -52,21 +52,42 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
 
     expect(await semRolagemHorizontal(page), "página sem rolagem horizontal").toBe(true);
 
+    // Ao abrir a administração a coluna (#app) anima a largura; a planta acompanha o invólucro
+    // pelo ResizeObserver, entregue só no próximo quadro. Mede com a animação terminada e um
+    // quadro pintado, o estado que o usuário vê.
+    await page.evaluate(() => Promise.all(document.getElementById("app").getAnimations().map((a) => a.finished.catch(() => {}))));
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
     const medida = await page.evaluate(() => {
+      const outer = document.querySelector("#adminSub-macs .fp-scale-outer");
       const inner = document.getElementById("macsFpInner");
       const secao = inner && inner.querySelector(".fp-section:not(.hidden)");
       const plan = secao && secao.querySelector(".plan");
       const wrap = secao && secao.querySelector(".plan-wrap");
-      if (!plan || !wrap) return null;
+      if (!plan || !wrap || !outer) return null;
       const pr = plan.getBoundingClientRect();
       const wr = wrap.getBoundingClientRect();
+      const or = outer.getBoundingClientRect();
+      const rolavel = wrap.classList.contains("fp-zoomed");
+      let fimAlcancavel = true;
+      if (rolavel) {
+        wrap.scrollLeft = wrap.scrollWidth;
+        fimAlcancavel = plan.getBoundingClientRect().right <= wrap.getBoundingClientRect().right + 1;
+        wrap.scrollLeft = 0;
+      }
       return {
         vazaDireita: Math.round(pr.x + pr.width - (wr.x + wr.width)),
-        rolavel: wrap.classList.contains("fp-zoomed"),
+        rolavel,
+        fimAlcancavel,
+        involucroVazaDireita: Math.round(wr.right - or.right),
+        seletorEscondeConteudo: outer.scrollWidth > outer.clientWidth + 1,
       };
     });
     expect(medida, "planta baixa renderizada").not.toBeNull();
     expect(medida.vazaDireita <= 1 || medida.rolavel, `planta cabe ou rola (${JSON.stringify(medida)})`).toBe(true);
+    expect(medida.fimAlcancavel, `o fim da planta é alcançável rolando o invólucro (${JSON.stringify(medida)})`).toBe(true);
+    expect(medida.involucroVazaDireita, `o invólucro da planta cabe no seletor (${JSON.stringify(medida)})`).toBeLessThanOrEqual(1);
+    expect(medida.seletorEscondeConteudo, `nada fica escondido além da borda do seletor (${JSON.stringify(medida)})`).toBe(false);
   });
 }
 

@@ -113,7 +113,11 @@ test("abrir o painel de ajuda fecha o de acessibilidade e vice-versa, com foco c
   await page.locator("#helpFabToggleBtn").click();
   await expect(page.locator("#a11yPanel")).toBeHidden();
   await expect(page.locator("#helpFabPanel")).toBeVisible();
-  await expect.poll(async () => (await focoAtual(page)).escondido, "o foco não fica em controle escondido").toBe(false);
+  // O painel de ajuda leva o foco ao seu botão de fechar logo depois de abrir (mesmo ciclo do
+  // painel de acessibilidade): espera o foco entrar antes de teclar, para conferir a devolução
+  // do foco a partir do estado documentado. Um foco em controle escondido também é pego aqui.
+  await expect(page.locator("#helpFabCloseBtn"), "o foco entra no painel de ajuda").toBeFocused();
+  expect((await focoAtual(page)).escondido, "o foco não fica em controle escondido").toBe(false);
 
   // O painel de ajuda aberto cobre a coluna dos botões flutuantes; Esc o fecha e devolve o
   // foco ao seu botão, e daí o painel de acessibilidade abre normalmente.
@@ -123,4 +127,27 @@ test("abrir o painel de ajuda fecha o de acessibilidade e vice-versa, com foco c
   await page.locator("#a11yToggleBtn").click();
   await expect(page.locator("#a11yPanel")).toBeVisible();
   await expect(page.locator("#a11yCloseBtn")).toBeFocused();
+});
+
+// O foco pode voltar ao botão flutuante com o painel ainda aberto (Shift+Tab a partir do fechar;
+// no Firefox passando antes pelo próprio painel rolável). Esc precisa fechar também daí.
+test("com o painel de ajuda aberto, Esc fecha mesmo com o foco no botão flutuante", async ({ page, context }) => {
+  await injetarSessao(context, "user");
+  await page.setViewportSize(VIEWPORTS.notebook);
+  await page.goto("/#/inicio");
+  await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
+
+  await page.locator("#helpFabToggleBtn").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#helpFabPanel")).toBeVisible();
+  await expect(page.locator("#helpFabCloseBtn")).toBeFocused();
+
+  await page.locator("#helpFabToggleBtn").focus();
+  await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
+  await expect(page.locator("#helpFabPanel"), "voltar ao botão não fecha o painel").toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#helpFabPanel")).toBeHidden();
+  await expect(page.locator("#helpFabToggleBtn")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
 });

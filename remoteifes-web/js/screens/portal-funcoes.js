@@ -21,7 +21,7 @@ const PORTAL_FUNCOES = {
     icon: "grade",
     tom: "tom-operacao",
     titulo: "Grade",
-    texto: "Acompanhe em um painel único o status de todas as salas monitoradas ao mesmo tempo.",
+    texto: "Consulte, por sala e data, os períodos de aula livres, reservados e com o ar-condicionado ligado antes de agendar.",
   },
   admin: {
     icon: "ferramenta",
