@@ -9,6 +9,7 @@ const eventos = new EventEmitter();
 
 const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura", "turbo"];
 const TIMEOUT_OFFLINE_MS = 90 * 1000;
+const DETECTADOS_MAX = 100;
 
 function listar({ bloco, andar } = {}) {
   let query = "SELECT * FROM salas WHERE 1=1";
@@ -63,13 +64,16 @@ function identificarDispositivo(mac, ip) {
   return salaRow || null;
 }
 
+// Só os mais recentes: uma placa ainda sem sala se reapresenta a cada 15 s, então ela está sempre
+// entre os primeiros, e a lista não cresce com identidades espúrias acumuladas na retenção.
 function listarDetectados() {
   return db.prepare(`
     SELECT d.* FROM esp_detectados d
     LEFT JOIN salas s ON s.mac = d.mac
     WHERE s.mac IS NULL
     ORDER BY d.ultimaDeteccao DESC
-  `).all();
+    LIMIT ?
+  `).all(DETECTADOS_MAX);
 }
 
 function removerDetectado(mac) {
@@ -204,9 +208,14 @@ function listarUsuariosComAcesso(sala) {
   `).all(sala);
 }
 
+function exigirUsuario(usuarioId) {
+  if (!db.prepare(`SELECT 1 FROM usuarios WHERE id = ?`).get(usuarioId)) throw new Error("usuário não encontrado");
+}
+
 function concederAcesso(sala, usuarioId) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
+  exigirUsuario(usuarioId);
   db.prepare(`INSERT OR IGNORE INTO sala_acessos (sala, usuarioId) VALUES (?, ?)`).run(sala, usuarioId);
   return listarUsuariosComAcesso(sala);
 }
@@ -264,6 +273,7 @@ function listarDonos(sala) {
 function concederDono(sala, usuarioId) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
+  exigirUsuario(usuarioId);
   db.prepare(`INSERT OR IGNORE INTO sala_donos (sala, usuarioId) VALUES (?, ?)`).run(sala, usuarioId);
   return listarDonos(sala);
 }

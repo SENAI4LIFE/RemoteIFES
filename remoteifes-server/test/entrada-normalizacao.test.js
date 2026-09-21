@@ -140,3 +140,26 @@ test("a auditoria de permissões lista exatamente os campos que mudaram", async 
     ["podeControlar", "ativo", "podeControlar,ativo", "nivel", "nivel,podeControlar,ativo"]
   );
 });
+
+test("conceder acesso ou propriedade a um usuário inexistente responde com mensagem própria, não com o erro do SQLite", async () => {
+  for (const rota of ["/admin/salas/A-108/acesso/999999", "/admin/salas/A-108/donos/999999"]) {
+    const resp = await chamar(rota, { method: "POST", token: tokenSuper });
+    assert.equal(resp.status, 400, rota);
+    assert.equal(resp.corpo.erro, "usuário não encontrado", rota);
+    assert.ok(!JSON.stringify(resp.corpo).includes("constraint"), rota);
+  }
+});
+
+test("a lista de ESP32 detectados é limitada aos mais recentes, mantendo quem acabou de se apresentar", async () => {
+  const salasService = require("../src/services/salasService");
+  db.prepare("DELETE FROM esp_detectados").run();
+  for (let i = 0; i < 130; i += 1) {
+    const mac = `02:00:00:00:${String(Math.floor(i / 256)).padStart(2, "0")}:${String(i % 256).padStart(2, "0")}`.toUpperCase();
+    db.prepare("INSERT INTO esp_detectados (mac, ip, ultimaDeteccao) VALUES (?, '10.0.0.1', datetime('now', ?))").run(mac, `-${200 - i} minutes`);
+  }
+  salasService.identificarDispositivo("02:00:00:00:00:00", "10.0.0.2");
+  const lista = await chamar("/admin/esp32/detectados", { token: tokenSuper });
+  assert.equal(lista.status, 200);
+  assert.equal(lista.corpo.length, 100);
+  assert.equal(lista.corpo[0].mac, "02:00:00:00:00:00", "a identidade que acabou de se apresentar vem primeiro");
+});
