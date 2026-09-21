@@ -370,6 +370,7 @@ deviceHub.eventos.on("erro", ({ sala, mensagem }) => {
 
 deviceHub.eventos.on("conexao", ({ sala }) => {
   notificarObservadoresDeDispositivo(sala, { tipo: "dispositivo_status", sala, estado: deviceHub.estadoPublico(sala) });
+  notificarObservadoresDaSala({ sala });
 });
 
 module.exports = { iniciar, encerrar, fecharConexoes };

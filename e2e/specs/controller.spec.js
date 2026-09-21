@@ -77,3 +77,40 @@ test("usuário sem permissão de controle vê o painel em modo somente leitura",
   await expect(page.locator("#tempUp")).toBeDisabled();
   await expect(page.locator("#tempDown")).toBeDisabled();
 });
+
+// A placa vista só por heartbeat HTTP (o firmware usa esse caminho enquanto o WebSocket está caído)
+// conta como presente, mas o servidor não tem por onde entregar o comando.
+test.describe("presença sem canal de comandos", () => {
+  test.afterEach(async ({ request }) => {
+    await request.post(`${process.env.E2E_API_URL}/__e2e/so-heartbeat/off`);
+    await request.post(`${process.env.E2E_API_URL}/__e2e/resetar-dispositivo`);
+  });
+
+  test("online só por heartbeat: o painel mostra a falta do canal, avisa que o comando não foi entregue e volta ao normal na reconexão", async ({ page, sessaoComo, request }) => {
+    await sessaoComo("user");
+    await irParaSala(page, "A-108");
+    await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
+    await expect(page.locator("#statusValue")).toHaveText("desligado");
+
+    await request.post(`${process.env.E2E_API_URL}/__e2e/so-heartbeat/on`);
+    await expect(page.locator("#conexaoValue")).toHaveText("online, sem comandos", { timeout: 15_000 });
+    await expect(page.locator("#conexaoValue")).toHaveClass(/\boff\b/);
+
+    await page.locator("#btnPower").click();
+    await expect(page.locator(".toast-aviso").filter({ hasText: "não foi entregue ao ESP32" })).toBeVisible();
+    await expect(page.locator("#statusValue")).toHaveText("ligado");
+    await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "");
+    await expect(page.locator("#conexaoValue")).toHaveText("online, sem comandos");
+
+    await request.post(`${process.env.E2E_API_URL}/__e2e/so-heartbeat/off`);
+    await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
+    await expect(page.locator("#conexaoValue")).toHaveClass(/\bon\b/);
+    await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true", { timeout: 15_000 });
+
+    const avisos = await page.locator(".toast-aviso").count();
+    await page.locator("#btnPower").click();
+    await expect(page.locator("#statusValue")).toHaveText("desligado");
+    await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
+    expect(await page.locator(".toast-aviso").count()).toBe(avisos);
+  });
+});
