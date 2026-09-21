@@ -143,8 +143,16 @@ app.use((err, req, res, next) => {
   if (err && err.type === "entity.parse.failed") {
     return res.status(400).json({ ok: false, erro: "corpo da requisição inválido" });
   }
+  if (err && err.type === "entity.too.large") {
+    return res.status(413).json({ ok: false, erro: "corpo da requisição muito grande" });
+  }
   if (err && err.message === "origem não permitida pelo CORS") {
     return res.status(403).json({ ok: false, erro: "origem não permitida" });
+  }
+  // Demais erros do parser de corpo (charset/encoding não suportados, corpo abortado) já vêm com
+  // status 4xx: são erros do cliente e não merecem 500 nem log de erro interno.
+  if (err && typeof err.type === "string" && Number.isInteger(err.status) && err.status >= 400 && err.status < 500) {
+    return res.status(err.status).json({ ok: false, erro: "requisição inválida" });
   }
   logger.error("erro-nao-tratado", { requestId: req.id, metodo: req.method, rota: req.originalUrl, mensagem: err && err.message });
   return res.status(500).json({ ok: false, erro: "erro interno do servidor" });
