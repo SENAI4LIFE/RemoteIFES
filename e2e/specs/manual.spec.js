@@ -89,6 +89,8 @@ test("Esc fecha o manual e volta para a tela anterior", async ({ page, context }
   await page.keyboard.press("Escape");
   await expect(page.locator("#screen-manual")).toBeHidden();
   await expect(page.locator("#screen-grade")).toBeVisible();
+  // O item do menu de ajuda que abriu o manual já está escondido: o foco vai ao botão de ajuda.
+  await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
 });
 
 test("o manual não faz requisições externas e cabe no celular", async ({ page, context }) => {
@@ -214,6 +216,28 @@ test("os ícones de ajuda das abas novas de Administração abrem a orientação
   await expect(page.locator("#helpModalTitle")).toContainText("Auditoria");
 });
 
+// A ajuda de Status > Mapa e a de Logs > Sessões abrem tópicos cujo "Ver no app" volta à mesma
+// aba, e não a um tópico vizinho (proprietários, usuários ativos).
+test("a ajuda do Mapa e a do histórico de Sessões levam a tópicos próprios, que voltam à mesma aba", async ({ page, context }) => {
+  await injetarSessao(context, "admin");
+  for (const [rota, painel, titulo, secao] of [
+    ["/#/admin/status/mapa", "#statusAba-mapa", "Status > Mapa", "status-mapa"],
+    ["/#/admin/logs/sessoes", "#logsAba-sessoes", "Logs > Sessões", "sessoes-historico"],
+  ]) {
+    await page.goto(rota);
+    await expect(page.locator(painel)).toBeVisible({ timeout: 20_000 });
+    await page.locator(`${painel} .help-icon-btn`).click();
+    await expect(page.locator("#helpModalTitle")).toContainText(titulo);
+    await page.locator("#helpModalManualBtn").click();
+    await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe(`#/ajuda/${secao}`);
+    await expect(page.locator(`#manualToc .manual-toc-link[data-sec="${secao}"]`)).toHaveClass(/is-active/);
+    await page.locator(`#manual-sec-${secao} .manual-ver-app`).click();
+    await expect(page.locator(painel)).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe(rota.slice(1));
+  }
+});
+
 test("o manual do admin apresenta a Administração agrupada e o grupo Dispositivos", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/ajuda/administracao");
@@ -254,6 +278,8 @@ test("\"Ver no app\" das seções movidas abre a aba interna correspondente", as
   for (const [secao, painel, rota] of [
     ["proprietarios-admin", "#usuariosAba-proprietarios", "#/admin/usuarios/proprietarios"],
     ["ativos-sessoes", "#statusAba-ativos", "#/admin/status"],
+    ["status-mapa", "#statusAba-mapa", "#/admin/status/mapa"],
+    ["sessoes-historico", "#logsAba-sessoes", "#/admin/logs/sessoes"],
     ["logs-dispositivos", "#logsAba-comandos", "#/admin/logs"],
     ["auditoria", "#logsAba-auditoria", "#/admin/logs/auditoria"],
     ["monitoramento", "#statusAba-sistema", "#/admin/status/sistema"],
@@ -300,3 +326,137 @@ test("nenhum tópico visível do manual usa a navegação antiga de Administraç
   expect(texto).toContain("Administração > Sistema > Status > Mapa");
   expect(texto).toContain("Administração > Sistema > Status > Sistema");
 });
+
+test("reabrir o manual depois de uma busca sem resultado começa com o sumário completo e a busca limpa", async ({ page, context }) => {
+  await abrirApp(page, context, "user");
+  await abrirManualPeloFab(page);
+  await page.fill("#manualBusca", "zzzz-nada-disso");
+  await expect(page.locator("#manualTocVazio")).toBeVisible();
+  await expect(page.locator("#manualConteudo .manual-secao:not(.hidden)")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#screen-manual")).toBeHidden();
+
+  await abrirManualPeloFab(page);
+  await expect(page.locator("#manualBusca")).toHaveValue("");
+  await expect(page.locator("#manualTocVazio")).toBeHidden();
+  const total = await page.locator("#manualConteudo .manual-secao").count();
+  expect(total).toBeGreaterThan(0);
+  await expect(page.locator("#manualConteudo .manual-secao:not(.hidden)")).toHaveCount(total);
+  await expect(page.locator("#manualToc li:not(.hidden) .manual-toc-link")).toHaveCount(total);
+
+  // Abrir um tópico específico também parte limpo, e vai ao tópico.
+  await page.fill("#manualBusca", "zzzz-nada-disso");
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => Router.ir("/ajuda/conta-sessao"));
+  await expect(page.locator("#screen-manual")).toBeVisible();
+  await expect(page.locator("#manualBusca")).toHaveValue("");
+  await expect(page.locator('#manualToc .manual-toc-link[data-sec="conta-sessao"]')).toHaveClass(/is-active/);
+});
+
+// Sem service worker, para a rede de verdade decidir: um módulo público que não chega é avisado
+// (com as seções que chegaram) e volta na próxima abertura; o registro falhando, nada é
+// registrado duas vezes depois.
+test("um módulo público que não carrega é avisado e recarregado na próxima abertura, sem seções duplicadas", async ({ browser }) => {
+  const context = await browser.newContext({ serviceWorkers: "block", baseURL: process.env.E2E_WEB_URL });
+  await context.addInitScript((apiUrl) => { try { window.localStorage.setItem("remoteifes_server_url", apiUrl); } catch (e) {} }, API_URL);
+  await injetarSessao(context, "user");
+  const page = await context.newPage();
+  const bloqueados = { "manual-content.js": true, "common-rooms.js": true };
+  const interceptar = (route) => {
+    const nome = route.request().url().split("/").pop().split("?")[0];
+    if (bloqueados[nome]) return route.abort();
+    return route.continue();
+  };
+  await page.route("**/js/manual-content.js*", interceptar);
+  await page.route("**/js/manual/*", interceptar);
+  await page.goto("/");
+  await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
+
+  await abrirManualPeloFab(page);
+  await expect(page.locator("#manualConteudo .manual-carga-falhou")).toContainText("O manual não pôde ser carregado");
+  await expect(page.locator("#manualConteudo .manual-secao")).toHaveCount(0);
+  await expect(page.locator("#manualTocVazio"), "sem busca, o aviso de busca vazia não aparece").toBeHidden();
+
+  bloqueados["manual-content.js"] = false;
+  await page.locator("#manualConteudo .manual-recarregar").click();
+  await expect(page.locator("#manualConteudo .manual-carga-falhou")).toContainText("Parte do manual não pôde ser carregada");
+  const parcial = await page.locator("#manualConteudo .manual-secao").count();
+  expect(parcial).toBeGreaterThan(0);
+  await expect(page.locator("#manual-sec-controlador")).toHaveCount(0);
+
+  bloqueados["common-rooms.js"] = false;
+  await page.keyboard.press("Escape");
+  await abrirManualPeloFab(page);
+  await expect(page.locator("#manualConteudo .manual-carga-falhou")).toHaveCount(0);
+  await expect(page.locator("#manual-sec-controlador")).toHaveCount(1);
+  const total = await page.locator("#manualConteudo .manual-secao").count();
+  expect(total).toBeGreaterThan(parcial);
+  const ids = await page.evaluate(() => [...document.querySelectorAll("#manualConteudo .manual-secao")].map((s) => s.id));
+  expect(new Set(ids).size).toBe(ids.length);
+  await context.close();
+});
+
+test("a documentação privilegiada não sobrevive ao logout, nem quando a resposta chega depois de sair", async ({ page, context }) => {
+  await abrirApp(page, context, "superadmin");
+  // O token do superadmin é compartilhado pelos demais testes: a saída é feita só no cliente,
+  // que é onde o conteúdo privilegiado precisa ser descartado.
+  await page.route(`${API_URL}/logout`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
+  let liberar = null;
+  await page.route("**/documentation", async (route) => {
+    await new Promise((resolve) => { liberar = resolve; });
+    await route.continue();
+  });
+  const abrindo = page.locator("#helpFabToggleBtn").click();
+  await expect.poll(() => liberar !== null, "a requisição da documentação está em voo").toBe(true);
+  await page.locator("#accountMenuBtn").click();
+  await page.locator('#accountMenu [data-account-action="logout"]').click();
+  await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 10_000 });
+  liberar();
+  await abrindo;
+  await expect.poll(() => page.evaluate(() => RoleDocumentation.secoes().length), "a resposta tardia é descartada").toBe(0);
+
+  // Sem sessão, o manual mostra só o conteúdo público.
+  await page.evaluate(() => Router.ir("/ajuda"));
+  await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("#manual-sec-operacao-admin")).toHaveCount(0);
+  await expect(page.locator("#manual-sec-inicio")).toHaveCount(1);
+});
+
+// Acima de 760px o sumário fica ao lado e os passos dos fluxos ficam em linha: o texto de cada
+// passo quebra dentro da caixa (inclusive "Superadministrador:" e o texto máximo), sem rolagem
+// horizontal do artigo nem passo saindo da figura.
+for (const [nome, tamanho, ampliado] of [
+  ["761x900", { width: 761, height: 900 }, false],
+  ["notebook com texto máximo", { width: 1366, height: 768 }, true],
+  ["celular deitado com texto máximo", { width: 844, height: 390 }, true],
+]) {
+  test(`os passos dos fluxos ficam dentro da figura e o artigo não rola na horizontal em ${nome}`, async ({ page, context }) => {
+    if (ampliado) {
+      await context.addInitScript(() => {
+        localStorage.setItem("remoteifes_font_scale", "2");
+        localStorage.setItem("remoteifes_line_height", "3");
+        localStorage.setItem("remoteifes_letter_spacing", "0.25");
+      });
+    }
+    await page.setViewportSize(tamanho);
+    await injetarSessao(context, "superadmin");
+    await page.goto("/#/ajuda/administracao");
+    await expect(page.locator("#manual-sec-administracao .manual-flow")).toBeVisible({ timeout: 20_000 });
+    const medida = await page.evaluate(() => {
+      const artigo = document.getElementById("manualConteudo");
+      const fora = [];
+      for (const fluxo of artigo.querySelectorAll(".manual-flow")) {
+        const caixa = fluxo.getBoundingClientRect();
+        for (const item of fluxo.querySelectorAll(".manual-flow-item")) {
+          const r = item.getBoundingClientRect();
+          const texto = item.querySelector("span:last-child").getBoundingClientRect();
+          if (r.right > caixa.right + 1 || texto.right > r.right + 1) fora.push(item.textContent.trim().slice(0, 40));
+        }
+      }
+      return { fora, artigoRola: artigo.scrollWidth > artigo.clientWidth + 1 };
+    });
+    expect(medida.fora, "passos ou textos fora da própria caixa").toEqual([]);
+    expect(medida.artigoRola, "o artigo do manual não ganha rolagem horizontal").toBe(false);
+    expect(await semRolagemHorizontal(page)).toBe(true);
+  });
+}

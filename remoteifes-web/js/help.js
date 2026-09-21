@@ -9,9 +9,9 @@ const HelpContent = {
 
 const MANUAL_SECAO_POR_AJUDA = {
   cards: "selecao-sala", localizacao: "selecao-sala", planta: "selecao-sala", salas: "selecao-sala", painel: "controlador",
-  agenda: "agenda-grade", grade: "agenda-grade", usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "ativos-sessoes",
+  agenda: "agenda-grade", grade: "agenda-grade", usuarios: "usuarios-admin", ativos: "ativos-sessoes", sessoes: "sessoes-historico",
   logs: "logs-dispositivos", dispositivos: "logs-dispositivos", acessos: "logs-dispositivos", proprietarios: "proprietarios-admin", propriedade: "controle-acesso-sala",
-  mapa: "proprietarios-admin", macs: "esp32-cadastro", config: "configuracoes-globais", esp32: "esp32-avancado", protocolos: "protocolos-ir", monitoramento: "monitoramento",
+  mapa: "status-mapa", macs: "esp32-cadastro", config: "configuracoes-globais", esp32: "esp32-avancado", protocolos: "protocolos-ir", monitoramento: "monitoramento",
   relatos: "relatos-gestao", notificacoes: "notificacoes", auditoria: "auditoria",
   heatmap: "heatmap", graficos: "graficos",
 };
@@ -21,23 +21,29 @@ const RoleDocumentation = (() => {
   let secoesPrivadas = [];
   let ajudaPrivada = {};
   let carregando = null;
+  let geracao = 0;
   function assinaturaAtual() { return `${state.usuario || ""}|${state.nivel || 1}`; }
+  // O conteúdo em memória pertence a uma sessão (usuário + nível). Outra sessão, ou nenhuma,
+  // começa vazia: uma resposta que chegue depois de sair ou de trocar de conta é descartada.
   async function carregar() {
-    if (!state.usuario || !state.isAdmin) return;
+    if (!state.usuario || !state.isAdmin) { if (assinatura !== null) limpar(); return; }
     const atual = assinaturaAtual();
     if (assinatura === atual) return;
+    if (assinatura !== null) limpar();
     if (!carregando) {
+      const minhaGeracao = geracao;
       carregando = Api.documentacao().then((resp) => {
+        if (minhaGeracao !== geracao || assinaturaAtual() !== atual) return;
         if (resp && resp.ok) {
           secoesPrivadas = Array.isArray(resp.secoes) ? resp.secoes : [];
           ajudaPrivada = resp.ajuda && typeof resp.ajuda === "object" ? resp.ajuda : {};
           assinatura = atual;
         }
-      }).finally(() => { carregando = null; });
+      }).finally(() => { if (minhaGeracao === geracao) carregando = null; });
     }
     await carregando;
   }
-  function limpar() { assinatura = null; secoesPrivadas = []; ajudaPrivada = {}; carregando = null; }
+  function limpar() { geracao += 1; assinatura = null; secoesPrivadas = []; ajudaPrivada = {}; carregando = null; }
   return { carregar, limpar, secoes: () => secoesPrivadas, ajuda: (chave) => ajudaPrivada[chave] || null };
 })();
 

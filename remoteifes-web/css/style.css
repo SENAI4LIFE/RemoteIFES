@@ -4200,8 +4200,11 @@ textarea {
 .mon-skel-line:nth-child(3) { width: 60%; }
 @keyframes mon-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 
+/* max-width: sem ele, min-height atravessa o aspect-ratio e vira uma largura mínima (447px),
+   e o invólucro passa da coluna estreita do cadastro em vez de rolar a planta por dentro. */
 .admin-fp-picker .floorplan-scope .plan-wrap {
   height: auto;
+  max-width: 100%;
   aspect-ratio: 2.6 / 1;
   min-height: 172px;
   max-height: 68vh;
@@ -4383,6 +4386,9 @@ body.mobile-app-open { overflow: hidden; }
   background: var(--surface);
 }
 .manual-flow-item:not(:last-child)::after { content: "→"; position: absolute; right: -16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: 800; }
+/* O texto do passo quebra dentro da caixa em qualquer largura: sem isto, uma palavra longa
+   ("Superadministrador:") ou o texto máximo empurrava o passo para fora do artigo acima de 760px. */
+.manual-flow-item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .manual-flow-num { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: var(--ifes-green-soft); color: var(--ifes-green-dark); font-size: .78em; font-weight: 800; }
 .manual-flow-screen { border-top: 3px solid var(--ifes-green); }
 .manual-flow-action { border-top: 3px solid #3972b9; }
@@ -4432,7 +4438,6 @@ body.mobile-app-open { overflow: hidden; }
   }
   .manual-flow ol { flex-direction: column; gap: 18px; }
   .manual-flow-item { width: 100%; max-width: 100%; flex-basis: auto; }
-  .manual-flow-item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
   .manual-flow-item:not(:last-child)::after { content: "↓"; right: 50%; top: auto; bottom: -18px; transform: translateX(50%); }
   .manual-command dl { grid-template-columns: 1fr; gap: 2px; }
   .manual-command dd { margin-bottom: 6px; }
