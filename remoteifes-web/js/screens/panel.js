@@ -13,6 +13,9 @@ const _panelAplicarAvisoSemConfirmacaoToast = Toast.criarAvisoDeEstado(
   "panelAvisoSemConfirmacao",
   "O ESP32 ainda não confirmou o último comando: o estado foi salvo e continua valendo até a placa aplicá-lo."
 );
+// "online" é presença (a placa foi vista há pouco, mesmo só por heartbeat HTTP); comandos só são
+// entregues pelo socket de comandos, que o servidor informa em canalComandos.
+const PANEL_AVISO_SEM_CANAL = "O comando não foi entregue ao ESP32: a placa foi vista há pouco, mas está sem canal de comandos agora. O estado foi salvo e será aplicado quando ela reconectar.";
 const PANEL_ESPERA_CONFIRMACAO_MS = 12000;
 let _panelTimerConfirmacao = null;
 let _panelUltimoStatus = null;
@@ -101,8 +104,12 @@ function aplicarStatusNoPainel(status) {
     : "— °C";
 
   const conexao = document.getElementById("conexaoValue");
-  conexao.textContent = status.online ? "online" : "offline";
-  conexao.className = `status-badge ${status.online ? "on" : "off"}`;
+  const semCanal = !!status.online && status.canalComandos === false;
+  conexao.textContent = !status.online ? "offline" : semCanal ? "online, sem comandos" : "online";
+  conexao.className = `status-badge ${status.online && !semCanal ? "on" : "off"}`;
+  conexao.parentElement.title = semCanal
+    ? "O ESP32 foi visto há pouco, mas não tem canal de comandos agora: comandos ficam salvos até ele reconectar"
+    : "Conexão do dispositivo";
 
   const badge = document.getElementById("statusValue");
   badge.textContent = status.ligado ? "ligado" : "desligado";
@@ -154,6 +161,7 @@ async function enviarComandoPainel(botao, cmd, valor) {
   botao.disabled = true;
   const resp = await Api.enviarComando(state.salaAtual, cmd, valor);
   if (!resp.ok) Toast.erro(resp.erro || "não foi possível enviar o comando");
+  else if (resp.sala && resp.sala.online && resp.sala.canalComandos === false && resp.sala.enviadoAoDispositivo === false) Toast.aviso(PANEL_AVISO_SEM_CANAL);
   // Sem resposta (prazo esgotado ou conexão perdida) o desfecho é desconhecido: só o estado que o
   // servidor devolver diz se o comando valeu. Se nem isso chegar, o botão volta a ficar utilizável.
   const atualizado = await refreshStatus();

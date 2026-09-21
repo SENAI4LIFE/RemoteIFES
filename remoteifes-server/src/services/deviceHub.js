@@ -96,6 +96,13 @@ function estadoPublico(sala) {
   };
 }
 
+// Há um socket de comandos aberto para a sala (só o estado em memória: "online" por heartbeat HTTP
+// não basta para entregar um comando).
+function canalDeComandos(sala) {
+  const entrada = conexoes.get(sala);
+  return !!entrada && entrada.ws.readyState === entrada.ws.OPEN;
+}
+
 // true/false: a placa conectada já reportou (ou não) o estado desejado vigente; null: sem placa ou sem IR.
 function estadoConfirmado(salaRow, entrada = conexoes.get(salaRow?.sala)) {
   if (!salaRow || !entrada || !Number.isInteger(salaRow.irProtocolo)) return null;
@@ -649,6 +656,7 @@ module.exports = {
   eventos,
   estadoPublico,
   estadoConfirmado,
+  canalDeComandos,
   listarEstados,
   enviarComando,
   enviarTesteIR,

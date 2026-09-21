@@ -102,6 +102,21 @@ app.post("/__e2e/silenciar-dispositivo/:valor", (req, res) => {
   res.json({ ok: true });
 });
 
+// Placa vista só por heartbeat HTTP (o firmware usa esse caminho quando o WebSocket está caído):
+// "on" derruba o socket do ESP32 simulado sem reconectar e marca presença; "off" o reconecta.
+app.post("/__e2e/so-heartbeat/:valor", async (req, res) => {
+  if (req.params.valor === "on") {
+    if (fake) fake.parar();
+    fake = null;
+    for (let i = 0; i < 300 && deviceHub.estadoPublico(SALA_COM_DISPOSITIVO).conectado; i++) await new Promise((r) => setTimeout(r, 10));
+    salasService.heartbeatDispositivo(SALA_COM_DISPOSITIVO, { temperatura: 23.5 }, MAC_DISPOSITIVO, "127.0.0.1");
+  } else if (!fake) {
+    fake = iniciarFakeEsp32({ url: `ws://127.0.0.1:${PORT}`, sala: SALA_COM_DISPOSITIVO, mac: MAC_DISPOSITIVO });
+    for (let i = 0; i < 300 && !deviceHub.estadoPublico(SALA_COM_DISPOSITIVO).conectado; i++) await new Promise((r) => setTimeout(r, 10));
+  }
+  res.json({ ok: true, conectado: deviceHub.estadoPublico(SALA_COM_DISPOSITIVO).conectado });
+});
+
 app.post("/__e2e/resetar-dispositivo", (req, res) => {
   db.prepare("UPDATE salas SET ligado = 0, turboAtivo = 0 WHERE sala = ?").run(SALA_COM_DISPOSITIVO);
   if (fake) fake.resetar();
