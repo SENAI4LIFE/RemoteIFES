@@ -17,6 +17,9 @@ function rotuloAgendamento(ag) {
 
 router.get("/agendamentos", (req, res) => {
   const { sala } = req.query;
+  if (sala !== undefined && typeof sala !== "string") {
+    return res.status(400).json({ ok: false, erro: "sala inválida" });
+  }
   res.json(agendamentosService.listar({ sala }));
 });
 
@@ -42,8 +45,12 @@ function parseId(req, res) {
 router.patch("/agendamentos/:id", (req, res) => {
   const id = parseId(req, res);
   if (id === null) return;
+  const ativo = req.body ? req.body.ativo : undefined;
+  if (typeof ativo !== "boolean") {
+    return res.status(400).json({ ok: false, erro: "ativo deve ser verdadeiro ou falso" });
+  }
   try {
-    const ag = agendamentosService.alternar(id, !!req.body.ativo, req.usuario);
+    const ag = agendamentosService.alternar(id, ativo, req.usuario);
     auditar({ tipo: ag.ativo ? "agendamento_ativado" : "agendamento_desativado", ator: req.usuario, alvoTipo: "agendamento", alvoId: ag.id, alvoRotulo: ag.sala, descricao: `Agendamento ${ag.ativo ? "ativado" : "desativado"}: ${rotuloAgendamento(ag)}`, camposAlterados: ["ativo"] });
     res.json({ ok: true, agendamento: ag });
   } catch (err) {

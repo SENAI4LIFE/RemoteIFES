@@ -103,7 +103,16 @@ function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
   return paraSaida(buscarPorId(info.lastInsertRowid));
 }
 
-function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante) {
+function booleanoOpcional(valor, campo) {
+  if (valor === undefined) return undefined;
+  if (typeof valor !== "boolean") throw new Error(`${campo} deve ser verdadeiro ou falso`);
+  return valor;
+}
+
+function atualizarPermissoes(id, dados, requisitante) {
+  const podeControlar = booleanoOpcional(dados?.podeControlar, "podeControlar");
+  const ativo = booleanoOpcional(dados?.ativo, "ativo");
+  const isAdmin = booleanoOpcional(dados?.isAdmin, "isAdmin");
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   if (usuario.nivel === NIVEL_SUPERADMIN) {
@@ -140,8 +149,8 @@ function atualizarPermissoes(id, { podeControlar, ativo, isAdmin }, requisitante
         isAdmin = ?
     WHERE id = ?
   `).run(
-    podeControlar === undefined ? null : (podeControlar ? 1 : 0),
-    ativo === undefined ? null : (ativo ? 1 : 0),
+    podeControlar === undefined ? null : Number(podeControlar),
+    ativo === undefined ? null : Number(ativo),
     novoNivel,
     novoNivel >= NIVEL_ADMIN ? 1 : 0,
     id
