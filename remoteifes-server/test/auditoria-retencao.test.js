@@ -70,9 +70,9 @@ test("criação, renomeação, mudança de papel, senha e exclusão geram histó
   const criada = (await criadaResp.json()).usuario;
   assert.equal((await requisitar(`/admin/usuarios/${criada.id}/nome`, { token: tokenSuper, method: "PATCH", body: { novoNome: "Alvo Novo" } })).status, 200);
   assert.equal((await requisitar(`/admin/usuarios/${criada.id}/login`, { token: tokenSuper, method: "PATCH", body: { novoLogin: "audit-target-new" } })).status, 200);
-  assert.equal((await requisitar(`/admin/usuarios/${criada.id}`, { token: tokenSuper, method: "PATCH", body: { nivel: 2 } })).status, 200);
+  assert.equal((await requisitar(`/admin/usuarios/${criada.id}`, { token: tokenSuper, method: "PATCH", body: { isAdmin: true } })).status, 200);
   assert.equal((await requisitar(`/admin/usuarios/${criada.id}/senha`, { token: tokenSuper, method: "PATCH", body: { novaSenha: "OutroSegredo-654" } })).status, 200);
-  assert.equal((await requisitar(`/admin/usuarios/${criada.id}`, { token: tokenSuper, method: "PATCH", body: { nivel: 1 } })).status, 200);
+  assert.equal((await requisitar(`/admin/usuarios/${criada.id}`, { token: tokenSuper, method: "PATCH", body: { isAdmin: false } })).status, 200);
   assert.equal((await requisitar(`/admin/usuarios/${criada.id}`, { token: tokenSuper, method: "DELETE" })).status, 200);
 
   const eventos = db.prepare("SELECT * FROM auditoria_eventos WHERE alvoId = ? ORDER BY id").all(String(criada.id));
@@ -80,6 +80,7 @@ test("criação, renomeação, mudança de papel, senha e exclusão geram histó
   assert.ok(tipos.has("conta_criada"));
   assert.ok(tipos.has("conta_login_alterado"));
   assert.ok(tipos.has("conta_permissoes_alteradas"));
+  assert.deepEqual(eventos.filter((e) => e.tipo === "conta_permissoes_alteradas").map((e) => e.camposAlterados), ["nivel", "nivel"]);
   assert.ok(tipos.has("conta_senha_redefinida"));
   assert.ok(tipos.has("conta_excluida"));
   const bruto = JSON.stringify(auditoriaService.listar({ limite: 100 }));

@@ -50,7 +50,8 @@ router.patch("/admin/usuarios/:id", (req, res) => {
   try {
     const antes = usuariosService.buscarPorId(id);
     const atualizado = usuariosService.atualizarPermissoes(id, req.body, req.usuario);
-    const campos = ["nivel", "podeControlar", "ativo"].filter((campo) => antes && String(antes[campo]) !== String(atualizado[campo]));
+    const efetivo = { nivel: antes && antes.nivel, podeControlar: !!(antes && antes.podeControlar), ativo: !!(antes && antes.ativo) };
+    const campos = ["nivel", "podeControlar", "ativo"].filter((campo) => antes && efetivo[campo] !== atualizado[campo]);
     if (campos.length) auditar({ tipo: "conta_permissoes_alteradas", ator: req.usuario, alvoTipo: "usuario", alvoId: id, alvoRotulo: atualizado.usuario, descricao: `Permissoes de ${atualizado.usuario} alteradas`, camposAlterados: campos });
     res.json({ ok: true, usuario: atualizado });
   } catch (err) {
