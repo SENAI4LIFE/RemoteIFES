@@ -130,12 +130,6 @@ function lerManifesto() {
   return manifesto;
 }
 
-function caminhoBinPublicado() {
-  const manifesto = lerManifesto();
-  if (!manifesto) return null;
-  return path.join(DIR_FIRMWARE, manifesto.arquivo);
-}
-
 const hashesMemorizados = new Map();
 
 function sha256Arquivo(arquivo) {
@@ -186,6 +180,13 @@ function publicarFirmware({ origem, versao, notas } = {}) {
   fs.copyFileSync(origem, temporario);
   fs.chmodSync(temporario, 0o600);
   const sha256 = sha256Arquivo(temporario);
+  // Uma oferta em andamento tem de continuar baixando exatamente o que lhe foi ofertado: o mesmo
+  // nome de versão com outros bytes sobrescreveria o artefato dela.
+  const emVoo = artefatosReferenciados().get(nomeBin);
+  if (emVoo && emVoo !== sha256) {
+    fs.rmSync(temporario, { force: true });
+    throw new Error(`a versão ${versao} está em andamento em uma atualização com outro conteúdo; aguarde ela terminar ou publique com outro número de versão`);
+  }
   fs.renameSync(temporario, destino);
 
   const manifesto = {
@@ -200,15 +201,73 @@ function publicarFirmware({ origem, versao, notas } = {}) {
   fs.writeFileSync(manifestoTmp, JSON.stringify(manifesto, null, 2), { mode: 0o600 });
   fs.renameSync(manifestoTmp, ARQUIVO_MANIFESTO);
   esquecerHashes();
-
-  for (const nome of fs.readdirSync(dir)) {
-    if (nome.startsWith("firmware-") && nome.endsWith(".bin") && nome !== nomeBin) {
-      fs.rmSync(path.join(dir, nome), { force: true });
-    }
-  }
+  limparArtefatosObsoletos(nomeBin);
 
   logger.info("ota-firmware-publicado", { versao, tamanho: bytes, sha256 });
   return manifesto;
+}
+
+// Artefatos que ofertas ainda em transferência esperam encontrar no disco (nome → sha256).
+function artefatosReferenciados() {
+  const referencias = new Map();
+  estados.forEach((estado) => {
+    if ((estado.fase === "ofertado" || estado.fase === "baixando") && typeof estado.versao === "string" && typeof estado.sha256 === "string") {
+      referencias.set(`firmware-${estado.versao}.bin`, estado.sha256);
+    }
+  });
+  return referencias;
+}
+
+// Mantém no disco só o binário publicado e os que ainda estão sendo baixados por uma oferta ativa;
+// o conjunto é limitado pelo teto de atualizações simultâneas e pelo prazo de transferência.
+function limparArtefatosObsoletos(nomePublicado) {
+  let publicado = nomePublicado;
+  if (!publicado) {
+    const manifesto = lerManifesto();
+    if (!manifesto) return;
+    publicado = manifesto.arquivo;
+  }
+  const referenciados = artefatosReferenciados();
+  let nomes;
+  try {
+    nomes = fs.readdirSync(DIR_FIRMWARE);
+  } catch (erro) {
+    if (erro.code !== "ENOENT") logger.warn("ota-limpeza-artefatos-falhou", { mensagem: erro.message });
+    return;
+  }
+  for (const nome of nomes) {
+    if (!nome.startsWith("firmware-") || !nome.endsWith(".bin") || nome === publicado || referenciados.has(nome)) continue;
+    try {
+      fs.rmSync(path.join(DIR_FIRMWARE, nome), { force: true });
+      hashesMemorizados.delete(path.join(DIR_FIRMWARE, nome));
+    } catch (erro) {
+      logger.warn("ota-artefato-remover-falhou", { arquivo: nome, mensagem: erro.message });
+    }
+  }
+}
+
+// O que a sala deve baixar: o artefato da sua oferta em andamento (mesmo que outro firmware tenha
+// sido publicado depois) ou, sem oferta ativa, o firmware publicado. `indisponivel` sinaliza uma
+// oferta cujo artefato não está mais íntegro no disco.
+function artefatoParaDownload(sala) {
+  const estado = estados.get(sala);
+  if (estado && (estado.fase === "ofertado" || estado.fase === "baixando") && typeof estado.versao === "string" && typeof estado.sha256 === "string") {
+    const caminho = path.join(DIR_FIRMWARE, `firmware-${estado.versao}.bin`);
+    let stat = null;
+    try {
+      stat = fs.statSync(caminho);
+    } catch (erro) {
+      if (erro.code !== "ENOENT") throw erro;
+    }
+    if (stat && stat.isFile() && stat.size === estado.total && sha256ArquivoMemorizado(caminho, stat) === estado.sha256) {
+      return { caminho, versao: estado.versao, sha256: estado.sha256, tamanho: estado.total, indisponivel: false };
+    }
+    logger.warn("ota-artefato-ofertado-indisponivel", { sala, versao: estado.versao });
+    return { caminho: null, versao: estado.versao, sha256: estado.sha256, tamanho: estado.total, indisponivel: true };
+  }
+  const manifesto = lerManifesto();
+  if (!manifesto) return null;
+  return { caminho: path.join(DIR_FIRMWARE, manifesto.arquivo), versao: manifesto.versao, sha256: manifesto.sha256, tamanho: manifesto.tamanho, indisponivel: false };
 }
 
 function estadoDaSala(sala) {
@@ -489,6 +548,7 @@ function verificarTimeouts() {
     }
   });
   if (removeuTerminal) persistirEstados();
+  limparArtefatosObsoletos();
 }
 
 function limparEstado(sala) {
@@ -508,7 +568,7 @@ module.exports = {
   publicarFirmware,
   lerManifesto,
   esquecerHashes,
-  caminhoBinPublicado,
+  artefatoParaDownload,
   compararVersoes,
   ofertar,
   vagasDisponiveis,

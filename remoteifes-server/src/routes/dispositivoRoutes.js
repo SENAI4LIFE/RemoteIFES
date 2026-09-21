@@ -85,16 +85,18 @@ router.get("/dispositivo/firmware", (req, res, next) => {
   }
   next();
 }, autenticarDispositivo, (req, res) => {
-  const manifesto = otaService.lerManifesto();
-  const caminho = otaService.caminhoBinPublicado();
-  if (!manifesto || !caminho) {
+  const artefato = otaService.artefatoParaDownload(req.query.sala);
+  if (!artefato) {
     return res.status(404).json({ ok: false, erro: "nenhum firmware publicado" });
   }
+  if (artefato.indisponivel) {
+    return res.status(409).json({ ok: false, erro: "o firmware ofertado a esta sala não está mais disponível; oferte a atualização de novo" });
+  }
   res.set("Content-Type", "application/octet-stream");
-  res.set("Content-Length", String(manifesto.tamanho));
-  res.set("X-Firmware-Versao", manifesto.versao);
-  res.set("X-Firmware-Sha256", manifesto.sha256);
-  fs.createReadStream(caminho).pipe(res);
+  res.set("Content-Length", String(artefato.tamanho));
+  res.set("X-Firmware-Versao", artefato.versao);
+  res.set("X-Firmware-Sha256", artefato.sha256);
+  fs.createReadStream(artefato.caminho).pipe(res);
 });
 
 router.post("/dispositivo/heartbeat", autenticarDispositivo, (req, res) => {
