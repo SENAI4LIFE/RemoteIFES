@@ -276,7 +276,7 @@ test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clo
   assert.equal(resp.status, 400, "RAW genérico não vira protocolo operacional");
 
   await fecharEEsperar(tx.ws);
-  await ate(() => !deviceHub.dispositivoConectado("TX-1"));
+  await ate(() => !deviceHub.estadoPublico("TX-1").conectado);
   const txReconectado = await conectar("TX-1", "AA:BB:CC:DD:EE:D1");
   const reenviado = txReconectado.mensagens.find((m) => m.tipo === "failsafe_raw_set");
   assert.ok(reenviado, "ao reconectar o servidor sincroniza o failsafe persistido");
@@ -374,7 +374,7 @@ test("o histórico de capturas é limitado e sobrevive à reconexão da clonador
   assert.equal(deviceHub.capturasRecentes("CLONE-1")[0].hex, "0x24");
   const maisAntiga = deviceHub.capturasRecentes("CLONE-1")[19];
   await fecharEEsperar(clonador.ws);
-  await ate(() => !deviceHub.dispositivoConectado("CLONE-1"));
+  await ate(() => !deviceHub.estadoPublico("CLONE-1").conectado);
   assert.equal(deviceHub.capturasRecentes("CLONE-1").length, 20);
   const resp = await auth("/admin/protocolos-ir", token, { method: "POST", body: JSON.stringify({ label: "Após reconexão", capturaId: maisAntiga.id }) });
   assert.equal(resp.status, 201);
@@ -444,7 +444,7 @@ test("substituir a placa da sala clonadora derruba a autorização até nova con
 
   const { deviceId, segredo } = credenciais.provisionar("CLONE-1");
   await esperar(1200);
-  await ate(() => !deviceHub.dispositivoConectado("CLONE-1"), 2000);
+  await ate(() => !deviceHub.estadoPublico("CLONE-1").conectado, 2000);
   const comCredencial = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C9", { headers: { "x-device-id": deviceId, "x-device-secret": segredo } });
   assert.equal(deviceHub.estadoPublico("CLONE-1").role, "cloner", "provisionar credencial na mesma placa mantém o papel");
   resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });

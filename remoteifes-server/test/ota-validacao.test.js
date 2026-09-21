@@ -76,7 +76,7 @@ async function abrirDispositivo(sala, mac, fw, { capaz = true, headers = {} } = 
       const fechado = new Promise((r) => ws.once("close", r));
       ws.close();
       await fechado;
-      await ate(() => !deviceHub.dispositivoConectado(sala));
+      await ate(() => !deviceHub.estadoPublico(sala).conectado);
     },
   };
   return d;

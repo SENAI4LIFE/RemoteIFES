@@ -121,7 +121,7 @@ test("a desconexão durante a espera cancela a sincronização pendente", async 
   const d = await conectar("LATCH-4", "AA:BB:CC:F5:00:04");
   await ate(() => d.mensagens.some((m) => m.tipo === "device_role"));
   d.ws.close();
-  await ate(() => !deviceHub.dispositivoConectado("LATCH-4"));
+  await ate(() => !deviceHub.estadoPublico("LATCH-4").conectado);
   await esperar(3300);
   assert.equal(d.estados().length, 0);
 });
