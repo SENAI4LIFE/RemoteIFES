@@ -57,6 +57,7 @@ const adminSections = [
       { t: "lista", itens: [
         "Use o controle de ativo para suspender ou reativar um agendamento sem apagá-lo. A reativação é recusada se houver conflito com outra reserva ativa na mesma sala e data.",
         "Use <strong>remover</strong> no agendamento desejado para remoção definitiva; recrie se precisar alterar sala, horário, temperatura ou modo.",
+        "Desativar ou remover um agendamento em curso libera a reserva e cancela o desligamento previsto para o fim; o ar-condicionado que ele já ligou continua ligado até um comando manual. Um agendamento criado depois do seu horário de ligar não liga nem desliga nada.",
         "Sobreposição com outro agendamento ativo na mesma sala e data é recusada.",
         "Também são recusados horário invertido, intervalo de acionamento fora da reserva, temperatura fora dos limites, sala/data inválida e excesso do limite administrativo.",
       ] },

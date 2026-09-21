@@ -415,7 +415,7 @@ function bloqueioAtivo(sala) {
 
   for (const ag of agendamentos) {
     if (!agendamentoOcorreHoje(ag, dataISO)) continue;
-    if (hora >= ag.horaInicio && hora <= ag.horaFim) {
+    if (hora >= ag.horaInicio && hora < ag.horaFim) {
       return {
         agendamentoId: ag.id,
         usuarioId: ag.usuarioId,
