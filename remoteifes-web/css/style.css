@@ -163,6 +163,18 @@ body {
 body, p, li, label, .room-sub, .help-list li, .hint {
   letter-spacing: var(--a11y-letter-spacing);
 }
+/* O espaçamento acima, já resolvido em px na fonte do body e herdado como comprimento:
+   quem precisa compensar o espaço que o navegador põe depois do último glifo usa este
+   valor, o mesmo que herda em letter-spacing, e não um em relativo à própria fonte.
+   Fica em #app, que não define fonte própria, porque o Gecko resolve o em de uma
+   propriedade registrada na fonte do pai e Blink/WebKit na do próprio elemento — em
+   ambos dá a fonte do body. */
+@property --a11y-letter-spacing-resolvido {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+#app { --a11y-letter-spacing-resolvido: var(--a11y-letter-spacing); }
 p, li, label, .room-sub, .help-list li, .hint {
   line-height: var(--a11y-line-height);
 }
@@ -3557,6 +3569,11 @@ textarea {
   color: var(--text-muted);
   text-align: center;
 }
+
+/* O letter-spacing da acessibilidade também entra depois do último glifo, e o "Power"
+   centrado ficava meio espaço à esquerda do círculo; o recuo inicial de igual tamanho
+   devolve a simetria sem mexer no espaçamento em si. */
+.ac-remote-power-btn .ac-remote-control-label { text-indent: var(--a11y-letter-spacing-resolvido); }
 
 .ac-remote-temp-btn, .ac-remote-turbo-btn {
   border: 1px solid var(--border);

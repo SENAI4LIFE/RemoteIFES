@@ -389,3 +389,39 @@ for (const tamanhoNome of PAINEL_DUAS_COLUNAS) {
     expect(await semRolagemHorizontal(page), "painel sem rolagem horizontal").toBe(true);
   });
 }
+
+// O letter-spacing da acessibilidade também é aplicado depois do último glifo: um rótulo
+// centrado pela caixa de texto fica meio espaço à esquerda do que se vê. O centro dos glifos
+// de "Power" deve coincidir com o centro do círculo em qualquer layout e ajuste de texto.
+const LAYOUTS_POWER = ["mobile-portrait", "mobile-landscape", "tablet-compact", "notebook", "desktop"];
+
+for (const [ajusteNome, a11yMaximo] of [["ajuste padrão", false], ["texto máximo", true]]) {
+  for (const tamanhoNome of LAYOUTS_POWER) {
+    test(`o rótulo Power fica centrado sob o círculo (${ajusteNome}, ${tamanhoNome})`, async ({ page, context }) => {
+      await abrir(page, context, "user", "/", VIEWPORTS[tamanhoNome], a11yMaximo);
+      await irParaSala(page, "A-108");
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+      const m = await page.evaluate(() => {
+        const botao = document.getElementById("btnPower");
+        const circulo = botao.querySelector(".ac-remote-power-icon").getBoundingClientRect();
+        const rotulo = botao.querySelector(".ac-remote-control-label");
+        const faixa = document.createRange();
+        faixa.selectNodeContents(rotulo);
+        const texto = faixa.getBoundingClientRect();
+        // A caixa do texto inclui o espaço que o navegador põe depois do último glifo.
+        const espaco = parseFloat(getComputedStyle(rotulo).letterSpacing) || 0;
+        return {
+          circulo: (circulo.left + circulo.right) / 2,
+          glifos: (texto.left + texto.right - espaco) / 2,
+          espaco,
+          larguraCirculo: circulo.width,
+        };
+      });
+
+      expect(m.larguraCirculo, "o círculo do Power está visível").toBeGreaterThan(0);
+      if (a11yMaximo) expect(m.espaco, "o espaçamento de letras chegou ao rótulo").toBeGreaterThan(0);
+      expect(Math.abs(m.glifos - m.circulo), "centro do texto Power sob o centro do círculo").toBeLessThanOrEqual(1);
+    });
+  }
+}
