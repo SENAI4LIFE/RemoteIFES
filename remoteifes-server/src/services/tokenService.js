@@ -158,7 +158,7 @@ function listarHistoricoSessoes({ data, limite = 500 } = {}) {
   `;
   const params = [];
   if (data) {
-    query += " AND date(s.login) = ?";
+    query += " AND date(s.login, '-3 hours') = ?";
     params.push(data);
   }
   query += " ORDER BY s.login DESC LIMIT ?";
@@ -178,7 +178,7 @@ function listarHistoricoSessoes({ data, limite = 500 } = {}) {
 
 function apagarHistoricoSessoes({ data } = {}) {
   if (data) {
-    db.prepare(`DELETE FROM sessoes WHERE logout IS NOT NULL AND date(login) = ?`).run(data);
+    db.prepare(`DELETE FROM sessoes WHERE logout IS NOT NULL AND date(login, '-3 hours') = ?`).run(data);
   } else {
     db.prepare(`DELETE FROM sessoes WHERE logout IS NOT NULL`).run();
   }

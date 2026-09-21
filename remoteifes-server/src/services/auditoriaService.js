@@ -56,7 +56,7 @@ function listar(filtros = {}) {
   const onde = [];
   const params = [];
   const data = validarData(filtros.data);
-  if (data) { onde.push("date(criadoEm) = ?"); params.push(data); }
+  if (data) { onde.push("date(criadoEm, '-3 hours') = ?"); params.push(data); }
   for (const [campo, valor, max] of [["tipo", filtros.tipo, 80], ["atorLogin", filtros.ator, 60]]) {
     if (valor !== undefined && valor !== "") {
       const normalizado = texto(valor, max);
@@ -109,7 +109,7 @@ function listarConectividade(filtros = {}) {
   const onde = [];
   const params = [];
   const data = validarData(filtros.data);
-  if (data) { onde.push("date(offlineEm) = ?"); params.push(data); }
+  if (data) { onde.push("date(offlineEm, '-3 hours') = ?"); params.push(data); }
   if (filtros.sala !== undefined && filtros.sala !== "") {
     const sala = texto(filtros.sala, 100);
     if (!sala) throw new Error("sala invalida");
