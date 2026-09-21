@@ -391,7 +391,7 @@ function listarEventosEsp({ sala, data } = {}) {
     params.push(sala);
   }
   if (data) {
-    query += " AND date(criadoEm) = ?";
+    query += " AND date(criadoEm, '-3 hours') = ?";
     params.push(data);
   }
   query += " ORDER BY criadoEm DESC LIMIT 500";
@@ -627,7 +627,7 @@ function listarLogs({ data, sala, andar, limite = 300 } = {}) {
   let query = "SELECT comandos_log.* FROM comandos_log LEFT JOIN salas ON salas.sala = comandos_log.sala WHERE 1=1";
   const params = [];
   if (data) {
-    query += " AND date(comandos_log.criadoEm) = ?";
+    query += " AND date(comandos_log.criadoEm, '-3 hours') = ?";
     params.push(data);
   }
   if (sala) {
@@ -645,7 +645,7 @@ function listarLogs({ data, sala, andar, limite = 300 } = {}) {
 
 function apagarLogs({ data } = {}) {
   if (data) {
-    db.prepare("DELETE FROM comandos_log WHERE date(criadoEm) = ?").run(data);
+    db.prepare("DELETE FROM comandos_log WHERE date(criadoEm, '-3 hours') = ?").run(data);
   } else {
     db.prepare("DELETE FROM comandos_log").run();
   }
@@ -782,7 +782,7 @@ function listarAcessosEsp({ sala, data, limite = 300 } = {}) {
     params.push(sala);
   }
   if (data) {
-    query += " AND date(criadoEm) = ?";
+    query += " AND date(criadoEm, '-3 hours') = ?";
     params.push(data);
   }
   query += " ORDER BY criadoEm DESC LIMIT ?";
@@ -792,7 +792,7 @@ function listarAcessosEsp({ sala, data, limite = 300 } = {}) {
 
 function apagarAcessosEsp({ data } = {}) {
   if (data) {
-    db.prepare("DELETE FROM esp_acessos WHERE date(criadoEm) = ?").run(data);
+    db.prepare("DELETE FROM esp_acessos WHERE date(criadoEm, '-3 hours') = ?").run(data);
   } else {
     db.prepare("DELETE FROM esp_acessos").run();
   }
