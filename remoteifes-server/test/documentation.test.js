@@ -71,8 +71,9 @@ test("catálogo público cobre as funções comuns e não contém links quebrado
 
 test("comandos críticos duplicados continuam iguais ao README", () => {
   const grupos = [
-    "instalacao", "backup", "deploy", "firmwareOta", "credenciais",
-    "recuperacaoConta", "carga", "androidVersao", "androidRede", "androidPublicacao", "testes", "git",
+    "instalacao", "iniciar", "backupCriar", "backupRestaurar", "deployAtualizar", "deployReverter", "release", "firmwareOta",
+    "credenciaisConsultar", "credenciaisEmitir", "credenciaisDerrubar", "recuperacaoConta", "carga",
+    "androidVersao", "androidRede", "androidPublicacao", "testes", "gitSincronizar", "gitRecriar",
   ];
   for (const grupo of grupos) {
     for (const comando of commands[grupo]) {

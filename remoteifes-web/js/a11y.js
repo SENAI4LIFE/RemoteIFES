@@ -547,8 +547,13 @@
       document.addEventListener("focusin", (e) => {
         if (!helpFabPanel.classList.contains("hidden") && !helpFabPanel.contains(e.target) && e.target !== helpFabToggle) fecharAjuda();
       });
-      helpFabPanel.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") { e.preventDefault(); fecharAjuda(true); }
+      // Como no painel de acessibilidade: Esc fecha com o painel aberto onde quer que o foco
+      // esteja — inclusive no próprio botão flutuante (Shift+Tab a partir do fechar, ou antes
+      // de o foco adiado entrar no painel).
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape" || helpFabPanel.classList.contains("hidden")) return;
+        e.preventDefault();
+        fecharAjuda(true);
       });
     }
   });

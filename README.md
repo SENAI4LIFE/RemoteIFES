@@ -18,7 +18,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 [![Cordova](https://img.shields.io/badge/Apache%20Cordova-Android%20%2F%20iOS-E8E8E8?logo=apachecordova&logoColor=black)](#)
 [![Android](https://img.shields.io/badge/Android-App-3DDC84?logo=android&logoColor=white)](#)
 [![iOS](https://img.shields.io/badge/iOS-App-000000?logo=apple)](#)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Hosting-222222?logo=github)](#)
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Demo-222222?logo=github)](#)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](#)
 [![HTTP](https://img.shields.io/badge/API-HTTP-005571?logo=http)](#)
 [![REST](https://img.shields.io/badge/API-REST-0A66C2)](#)
@@ -30,6 +30,19 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 [![Windows](https://img.shields.io/badge/Server-Windows-0078D4?logo=windows)](#)
 [![macOS](https://img.shields.io/badge/Server-macOS-000000?logo=apple)](#)
 [![Git](https://img.shields.io/badge/Git-Version%20Control-F05032?logo=git)](#)
+
+## Acesso rápido
+
+| Preciso… | Vá para |
+|---|---|
+| instalar pela primeira vez | [Instalação Rápida](#instalação-rápida) e [Inicialização e implantação](#inicialização-e-implantação-referência-canônica) |
+| operar em produção (serviço, proxy, redes autorizadas) | [Deploy](#deploy) e [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) |
+| atualizar ou reverter uma versão | [Atualização, versões e reversão](#atualização-versões-e-reversão) |
+| fazer backup ou restaurar o banco | [Backup e restauração do banco](#backup-e-restauração-do-banco) |
+| gravar, atualizar (OTA) ou autenticar um ESP32 | [Firmware ESP32](#firmware-esp32), [OTA](#atualização-de-firmware-por-ota-esp32) e [Credenciais por Dispositivo](#credenciais-por-dispositivo-e-migração) |
+| diagnosticar um problema | [Solução de Problemas](#solução-de-problemas) e [Monitoramento Operacional](#monitoramento-operacional) |
+| recuperar a senha do superadministrador | [Solução de Problemas › contas](#contas-permissões-e-sessões) |
+| entender o que o usuário vê | [Ajuda e Manual no App](#ajuda-e-manual-no-app) (guia por papel, dentro do próprio app) |
 
 ## Sumário
 
@@ -73,8 +86,8 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 O projeto é dividido em quatro partes independentes:
 
 ```
-remoteifes-web/      Frontend estático (HTML/CSS/JS puro, sem build), publicado no GitHub Pages,
-                     também instalável como PWA
+remoteifes-web/      Frontend estático (HTML/CSS/JS puro, sem build), entregue pelo próprio servidor
+                     central na mesma origem da API; instalável como PWA (GitHub Pages só para demonstração)
 remoteifes-cordova/  Empacotamento do mesmo frontend como app nativo Android/iOS via Apache Cordova
 remoteifes-server/   API central (Node.js + Express + SQLite), roda em um servidor/host próprio
 remoteifes-esp32/    Firmware Arduino/ESP32 instalado em cada sala, ao lado do ar-condicionado
@@ -86,7 +99,7 @@ Fluxo geral:
 
 2. O **servidor central** (`remoteifes-server`) mantém o banco de dados (SQLite), a lógica de autenticação, permissões, agendamentos, limites de temperatura, notificações e configurações globais. Ele expõe uma API REST usada tanto pelo frontend web quanto pelos ESP32, além de canais WebSocket para atualização de status e comandos em tempo real.
 
-3. O **frontend** (`remoteifes-web`) é um site estático (sem framework de build) que fala com o servidor central via `fetch` e WebSocket. É hospedado no GitHub Pages e pode ser servido em um domínio próprio.
+3. O **frontend** (`remoteifes-web`) é um site estático (sem framework de build) que fala com o servidor central via `fetch` e WebSocket. Em produção ele é entregue pelo próprio Express, na mesma origem da API e do WebSocket (veja [Deploy](#deploy)); a publicação no GitHub Pages é opcional e serve só como demonstração pública (veja [Frontend no GitHub Pages](#frontend-no-github-pages-opcional-para-demonstração)).
 
 ## Papéis e Permissões
 
@@ -95,7 +108,7 @@ O sistema tem três níveis de usuário:
 | Nível | Papel | Pode |
 |---|---|---|
 | 1 | Usuário comum | Ligar/desligar e ajustar a temperatura das salas liberadas para controle; enviar relatos de problema pelo ícone de inseto no topo |
-| 2 | Administrador (`admin`) | Tudo do nível 1, além de gerenciar agendamentos, grade de horários, notificações de dispositivos, sessões, logs, dispositivos e usuários comuns |
+| 2 | Administrador (`admin`) | Tudo do nível 1, além de agendamentos e grade de horários, contas de usuários comuns e proprietários de sala, os alertas dos ESP32 (`Dispositivos > Alertas`), os históricos de comandos, acessos, conexão dos ESP32 e sessões (`Sistema > Logs`, sem Auditoria) e `Sistema > Status` (Usuários ativos e Mapa, sem a aba Sistema) |
 | 3 | Superadministrador (`superadmin`) | Tudo do nível 2, além de alterar configurações globais, limites globais e por sala, função extra do Turbo, Auto-ON, redes autorizadas, modo de teste, cadastro de ESP32 por MAC, o painel avançado de cada ESP32 (`Administração > Dispositivos > Firmware / OTA`), o clonador e a biblioteca de protocolos infravermelhos (`Administração > Dispositivos > Protocolos IR`) e a gestão dos relatos de problema enviados pelos usuários — inclusive a exclusão permanente de um relato — em `Administração > Gestão > Relatos de problemas` |
 
 A conta padrão do nível 3 usa o login `superadmin` (nome exibido "Superadministrador"). Instalações anteriores que usavam o login `admin` são migradas automaticamente para `superadmin` no primeiro boot após a atualização, preservando id, hash de senha, nível e permissões; o identificador interno do papel continua sendo `superadmin`. A conta inicial só é criada quando o banco não tem **nenhuma** conta de nível 3: renomear o login do superadministrador (ou personalizá-lo de qualquer forma) nunca faz o servidor recriar `superadmin` com a senha padrão em um reinício. Uma instalação já estabelecida que, por qualquer motivo, fique sem conta de nível 3 não recebe uma credencial padrão silenciosa — o log mostra `seed-superadmin-ausente` e a saída é `npm run reset-admin`, que localiza a conta pelo nível, não pelo login.
@@ -146,6 +159,8 @@ O sistema oferece três formas de chegar até uma sala, todas equivalentes em fu
   - azul: online, desligado
   - verde: online, ligado
   - contorno amarelo: com agendamento ativo no momento
+
+  "Online" é presença (a placa foi vista há pouco); "ligado/desligado" é o estado desejado guardado no servidor. A confirmação da placa aparece no painel da sala e em `Dispositivos > Firmware / OTA`; o efeito no aparelho não é medido (veja [Painel dos ESP32](#painel-dos-esp32-protocolos-ir-e-failsafe-administração--dispositivos)).
 - **Lista tradicional** (`Bloco → Andar → Sala`): navegação simples em lista, sem elementos gráficos.
 
 Qualquer usuário autenticado pode visualizar o estado de todas as salas — isso inclui salas às quais o usuário não tem permissão de controle, que aparecem marcadas como "visualização" e cujos controles ficam desabilitados no painel. Os três modos de navegação têm botões cruzados para alternar entre si a qualquer momento.
@@ -202,7 +217,7 @@ Cada agendamento reserva a sala durante um período (`horaInicio`–`horaFim`) e
 | `ligar_completo` | Reserva a sala e liga o ar-condicionado durante todo o horário definido (padrão) |
 | `ligar_intervalo` | Reserva a sala no período, mas o ar-condicionado só liga dentro de um intervalo menor, definido dentro do período reservado |
 
-O agendador do servidor verifica agendamentos ativos a cada minuto e não repete uma mesma ação (ligar/desligar) mais de uma vez no mesmo dia. O período é fechado no início e aberto no fim (`[horaInicio, horaFim)`): no minuto exato de `horaFim` a reserva já não vale e o desligamento agendado é aplicado — uma reserva seguinte que comece nesse minuto assume a sala sem intervalo. O desligamento só é executado por um agendamento que ligou o ar-condicionado naquele dia; um agendamento que não chegou a ligá-lo (criado depois do seu horário de ligar, ou perdido inteiro numa queda do servidor) não desliga nada — em particular, não desliga um aparelho ligado manualmente. Um agendamento desativado permanece salvo, mas não é executado; o autor do agendamento ou um administrador podem ativá-lo, desativá-lo ou removê-lo — outros usuários comuns só podem visualizar. Desativar ou remover um agendamento em curso libera a reserva e cancela o desligamento que ele faria no fim; o ar-condicionado que ele já ligou **continua ligado** até um comando manual ou outro agendamento. Se o servidor parar depois de ligar e só voltar no dia seguinte, o desligamento que ficou pendente é aplicado uma única vez na primeira passagem do agendador, feita ao iniciar e antes de qualquer ESP32 reconectar (a reconexão recebe o OFF, não o "ligado" expirado) — a menos que uma intenção mais nova (comando manual, outro agendamento ou OFF local) tenha surgido depois da hora em que ele era devido; agendamentos desativados não são recuperados e uma execução já registrada nunca se repete.
+O agendador do servidor verifica agendamentos ativos a cada minuto e não repete uma mesma ação (ligar/desligar) mais de uma vez no mesmo dia. O período é fechado no início e aberto no fim (`[horaInicio, horaFim)`): no minuto exato de `horaFim` a reserva já não vale e o desligamento agendado é aplicado — uma reserva seguinte que comece nesse minuto assume a sala sem intervalo. Criado ou reativado com o intervalo de ligar em andamento, o agendamento liga o ar-condicionado na próxima verificação (até 1 minuto) e o desliga no fim. O desligamento só é executado por um agendamento que ligou o ar-condicionado naquele dia; um agendamento que não chegou a ligá-lo (criado só depois de o intervalo de ligar terminar, ou perdido inteiro numa queda do servidor) não liga nem desliga nada — em particular, não desliga um aparelho ligado manualmente — e a reserva, enquanto vigente, continua bloqueando a sala. Um ajuste manual do autor (ou de um administrador) dentro do período não cancela o desligamento do fim. Um agendamento desativado permanece salvo, mas não é executado; o autor ou qualquer outro administrador pode ativá-lo, desativá-lo ou removê-lo. Usuários comuns não veem a Agenda nem a Grade: para eles a reserva aparece só como indicação na sala (contorno na lista e na planta, aviso no painel), e o servidor recusa seus comandos em uma sala reservada por outra pessoa. Desativar ou remover um agendamento em curso libera a reserva e cancela o desligamento que ele faria no fim; o ar-condicionado que ele já ligou **continua ligado** até um comando manual ou outro agendamento. Se o servidor parar depois de ligar e só voltar no dia seguinte, o desligamento que ficou pendente é aplicado uma única vez na primeira passagem do agendador, feita ao iniciar e antes de qualquer ESP32 reconectar (a reconexão recebe o OFF, não o "ligado" expirado) — a menos que uma intenção mais nova (comando manual, outro agendamento ou OFF local) tenha surgido depois da hora em que ele era devido; agendamentos desativados não são recuperados e uma execução já registrada nunca se repete.
 
 A reativação é recusada se houver conflito com outra reserva ativa na mesma sala e data; o agendamento permanece desativado até que o conflito seja resolvido.
 
@@ -254,7 +269,7 @@ O servidor encerra sessões sem atividade e continua sendo a autoridade sobre o 
 
 O histórico operacional do sistema fica reunido nas abas internas de **`Administração > Sistema > Logs`**, todas filtráveis por data; **Comandos**, **Acessos** e **Sessões** oferecem ainda a exclusão de registros (ação irreversível), enquanto **Dispositivos** é somente consulta. Os registros são gravados em UTC, mas exibidos, filtrados e excluídos pelo **dia de Brasília**: um registro mostrado às 22:30 de um dia pertence a esse dia no filtro e em "excluir data", não ao dia UTC seguinte (o mesmo vale para a auditoria e a conectividade em `Administração > Sistema > Status`):
 
-- **`Administração > Sistema > Logs > Comandos`**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando veio de um agendamento) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o registro parte do próprio dispositivo — por exemplo, o failsafe OFF disparado pelo switch físico ou a abertura do ponto de acesso pelo switch).
+- **`Administração > Sistema > Logs > Comandos`**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando não houve uma conta por trás: agendamento ou registro da própria placa) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o registro parte do próprio dispositivo — por exemplo, o failsafe OFF disparado pelo switch físico ou a abertura do ponto de acesso pelo switch).
 - **`Administração > Sistema > Logs > Dispositivos`**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
 - **`Administração > Sistema > Logs > Acessos`**: registros de acesso à antiga interface web local dos ESP32, com o IP de origem. O firmware atual não serve página local em operação, então a aba preserva apenas o histórico já gravado e continua aceitando registros de placas com firmware anterior.
 - **`Administração > Sistema > Logs > Sessões`**: o histórico de login/logout descrito em [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade).
@@ -422,7 +437,7 @@ Os ícones da interface vêm de um sprite SVG único (`index.html`) e são pinta
 
 ## Ajuda e Manual no App
 
-O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela página, com um atalho para a seção correspondente do manual. O botão **Precisa de ajuda?** (canto inferior) abre um menu rápido com a ajuda da página atual, o **manual completo do RemoteIFES**, a solução de problemas, o envio de relato e a página do aplicativo móvel. O menu da conta (avatar com iniciais) traz apenas ações de conta — **Aplicativo móvel** e **Sair**; ajuda e manual ficam exclusivamente na interface de ajuda dedicada. O manual é uma página de documentação dedicada, com sumário, busca, diagramas em SVG e links "Ver no app". A documentação comum fica no app-shell e funciona offline. Conteúdo administrativo é entregue por `/documentation` somente após validar a sessão no servidor: administrador recebe apenas operação administrativa e superadministrador recebe também ESP32, OTA, credenciais, monitoramento, backup, implantação e manutenção. A resposta usa `private, no-store`; esses textos não ficam nos assets públicos nem no cache compartilhado da PWA/Cordova.
+O ícone **?** ao lado do título de cada tela abre uma ajuda curta daquela página, com um atalho para a seção correspondente do manual. O botão **Precisa de ajuda?** (canto inferior) abre um menu rápido com a ajuda da página atual, o **manual completo do RemoteIFES**, a solução de problemas, o envio de relato e a página do aplicativo móvel. O menu da conta (avatar com iniciais) traz apenas ações de conta — **Aplicativo móvel** e **Sair**; ajuda e manual ficam exclusivamente na interface de ajuda dedicada. O manual é uma página de documentação dedicada, com sumário por assunto, busca, fluxos ilustrados e links "Ver no app"; reabrir o manual sempre parte do sumário completo com a busca limpa, e um tópico aberto por link ou ajuda contextual fica marcado no sumário. A documentação comum fica no app-shell e funciona offline. Conteúdo administrativo é entregue por `/documentation` somente após validar a sessão no servidor: administrador recebe apenas operação administrativa e superadministrador recebe também ESP32, OTA, credenciais, monitoramento, backup, implantação e manutenção. A resposta usa `private, no-store`; esses textos não ficam nos assets públicos nem no cache compartilhado da PWA/Cordova.
 
 A divisão entre os dois documentos é deliberada: este README é a referência de instalação, arquitetura, implantação e desenvolvimento; a **Ajuda no app** é o guia operacional de uso, escrito por papel e verificado contra a interface real. Procedimentos de terminal e infraestrutura aparecem na Ajuda apenas para o superadministrador, e sem repetir o conteúdo detalhado daqui.
 
@@ -497,7 +512,7 @@ npm start
 
 `npm run setup` só é necessário na primeira instalação ou quando as dependências mudam; não o rode antes de cada reinício. Com `SERVIR_FRONTEND=true` (padrão), abra `http://localhost:8080` ou `http://IP_DO_SERVIDOR:8080`. Express serve `remoteifes-web`, API e `/ws` na mesma origem. `npm run dev` oferece o mesmo conjunto integrado com reinício automático do processo ao alterar arquivos do servidor. O frontend não tem etapa de build.
 
-Em macOS/Linux, `npm run setup` instala as dependências e copia `.env.example` para `.env` somente se o arquivo ainda não existir. No Windows, use os passos manuais da [Instalação Rápida](#instalação-rápida). Banco e migrações são aplicados automaticamente no primeiro startup; não há comando separado de migração.
+O que `npm run setup` faz (e a alternativa manual no Windows) está em [Instalação Rápida](#instalação-rápida). Banco e migrações são aplicados automaticamente no primeiro startup; não há comando separado de migração. `npm start` e `npm run dev` são alternativas, não uma sequência: não deixe os dois rodando sobre o mesmo banco.
 
 ### Produção
 
@@ -540,11 +555,17 @@ bash flash.sh
 
 ```bash
 cd remoteifes-esp32
-pio run --target erase        # opcional: apaga completamente a flash e remove configurações anteriores
 pio run                       # compila o firmware
 pio run --target uploadfs     # grava data/ (LittleFS) no dispositivo
 pio run --target upload       # grava o firmware
 pio device monitor -b 115200  # acompanha os logs de série do ESP32 (Ctrl+C para sair)
+```
+
+Apagar toda a flash é uma operação **à parte e destrutiva** — remove Wi-Fi, servidor, credencial do dispositivo e failsafe gravados na NVS, e a placa volta ao `RemoteIFES-Setup`. Só a use de propósito, com os dados de reprovisionamento em mãos, antes da sequência acima:
+
+```bash
+cd remoteifes-esp32
+pio run --target erase        # apaga completamente a flash (NVS inclusive); depois grave firmware e data/ de novo
 ```
 
 Ou abra a pasta `remoteifes-esp32/` no VS Code com a extensão PlatformIO instalada e use os alvos equivalentes na barra de tarefas do PlatformIO (Build, Upload Filesystem Image, Upload, Monitor).
@@ -1223,7 +1244,7 @@ remoteifes-server/
   test/               testes de regressão do servidor (node:test) — API, permissões, WebSocket, /health, backup, OTA, credenciais de dispositivo, monitoramento,
                         Protocolos IR e clonador (protocolos-ir*.test.js), Auto-ON (controle-auto-liga.test.js), contrato do firmware (firmware-contrato.test.js)
 
-remoteifes-web/
+remoteifes-web/        frontend estático; em produção é servido pelo Express na mesma origem da API
   manifest.webmanifest  manifesto da PWA (nome, ícones, cor de tema)
   sw.js                 service worker: cache do app shell para instalação/uso offline parcial
   assets/icons/         ícones gerados para PWA, favicon e tela inicial (iOS/Android)
@@ -1295,33 +1316,54 @@ export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxil
 
 ## Solução de Problemas
 
+Cada item segue a mesma leitura: **sintoma** (o que se vê) → o que **verificar** → o que isso **significa** → o que **fazer**. No fim de cada grupo está a **escalação**: para onde ir quando o item não resolve. Ao relatar um problema, informe a ação tentada, a mensagem exibida, a sala e o horário — nunca senhas, tokens ou segredos de ESP32.
+
+### Servidor, rede e serviço
+
 - **`EADDRINUSE` / porta 8080 ocupada**: descubra o processo com `ss -ltnp 'sport = :8080'` (use `sudo ss -ltnp 'sport = :8080'` se o nome/PID não aparecer). Se já for uma instância do RemoteIFES, use-a ou pare-a pelo mesmo método com que foi iniciada; não abra uma segunda instância sobre o mesmo banco. Confirme depois com `curl -fsS http://localhost:8080/health` ou `npm run health`.
 - **Servidor parece iniciado, mas a tela não abre**: `curl -fsS http://localhost:8080/health` deve retornar JSON com `"ok":true`, e `curl -I http://localhost:8080/` deve indicar conteúdo HTML. Confira também `ss -ltnp 'sport = :8080'`. Se `/health` funciona mas `/` não é HTML, confirme `SERVIR_FRONTEND=true` e reinicie o processo.
-- **PWA mostra frontend antigo após uma alteração**: abra uma vez com a rede disponível e aguarde alguns segundos — o novo service worker instala o app-shell, assume o controle e recarrega a aba sozinho. Se a tela continuar antiga, a causa quase sempre é a versão não ter sido avançada na release: confirme que `remoteifes-web/version.json`, `index.html`, `js/version.js`, `manifest.webmanifest` e `sw.js` apontam para a mesma versão (`npm test` cobre isso) e que `/index.html`, `/sw.js` e `/version.json` são servidos com `Cache-Control: no-cache`. Desregistrar o worker ou limpar o armazenamento não faz parte do procedimento normal.
-- **Perda temporária ou endereço incorreto**: uma queda momentânea mostra “Reconectando automaticamente…” e a interface recupera sozinha quando HTTP/WebSocket voltam. Falha persistente desde a abertura, `/health` inacessível pelo mesmo dispositivo ou acesso por um IP antigo indica endereço, porta, firewall, proxy ou rede autorizada incorretos. No fluxo integrado, abra novamente `http://IP_DO_SERVIDOR:8080`; não troque a configuração por causa de uma interrupção breve.
-- **Live Server abre a interface, mas não representa a implantação**: ele é apenas o modo opcional de [frontend em origem separada](#frontend-em-origem-separada-desenvolvimento-opcional). Para teste integrado, pare-o e use `http://localhost:8080` ou `http://IP_DO_SERVIDOR:8080`.
 - **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
-- **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`). No Ubuntu 24.04, não contorne a proteção de Python gerenciado com `pip --break-system-packages`: instale `pipx` pelo gerenciador de pacotes e rode `flash.sh` novamente.
-- **ESP32 não aparece como online**: confirme que o dispositivo aparece em `Administração > Dispositivos > Cadastro`, vincule seu MAC a uma sala e verifique se ele alcança o endereço/porta do servidor pela rede local. `pio device monitor -b 115200 -p /dev/ttyUSB0` mostra o estado de Wi-Fi, identificação e WebSocket em tempo real.
-- **Não consigo capturar IR em `Administração > Dispositivos > Protocolos IR`**: confirme que a placa física com receptor foi salva como **clonador oficial** e está conectada; use **Entrar no modo clone** — esse único comando já ativa o receptor em captura contínua. O servidor descarta capturas de qualquer outra placa, de uma placa fora do modo clone ou de um ESP32 substituído: se a tela avisar que o vínculo mudou (MAC ou credencial), salve a clonadora novamente. O tipo do módulo não é escolhido no `RemoteIFES-Setup`.
-- **Failsafe OFF não aparece como gravado na ESP32**: o failsafe é opcional e vem do protocolo. Em `Protocolos IR`, configure o failsafe do protocolo transmitindo somente o botão de desligar do controle original e aplique esse protocolo à sala; o RAW é enviado e gravado na NVS, e o campo **Failsafe OFF na NVS** em `Firmware / OTA` passa a mostrar "gravado" quando a placa confirma. Se ela estava offline, a sincronização acontece na reconexão. Aplicar um protocolo sem failsafe apaga um RAW antigo de propósito.
-- **Switch físico**: um único botão no GPIO 26 (`INPUT_PULLUP`, ligado ao GND). Clique curto abre o `RemoteIFES-Setup` por dez minutos sem derrubar a operação; manter pressionado por 5 s transmite uma única vez o failsafe OFF gravado. Soltar depois dos 5 s não abre o AP, e sem failsafe gravado a pressão longa não transmite nada. O buzzer no GPIO 27 confirma cada transmissão IR.
-- **`Dispositivos > Firmware / OTA` ou `Protocolos IR` não aparece no painel administrativo**: essas funções são restritas ao superadministrador, assim como `Dispositivos > Cadastro` e `Sistema > Configurações`; um grupo cujas funções estejam todas fora do seu nível nem chega a ser exibido.
-- **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Administração > Dispositivos > Cadastro`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
-- **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: vincule o MAC detectado a uma sala existente em `Administração > Dispositivos > Cadastro`; o vínculo é recebido automaticamente na próxima consulta do dispositivo.
-- **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. Durante a operação normal o AP `RemoteIFES-Setup` fica desligado; para reconfigurar no local, dê um clique curto no switch físico (abre o portal por dez minutos) ou use **Resetar Wi-Fi** no painel central. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
-- **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Administração > Dispositivos > Cadastro` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala (diretamente pelo admin, ou por um proprietário da sala).
-- **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Administração > Sistema > Configurações`; a mesma restrição vale para a conexão WebSocket.
-- **Frontend não fala com o servidor depois do deploy**: na implantação same-origin, acesse a URL do próprio servidor/proxy e não configure `serverUrl` nem `CORS_ORIGIN`. Se o frontend estiver em outra origem (GitHub Pages ou Cordova), confirme `serverUrl` e inclua a origem dele em `CORS_ORIGIN`; isso também afeta a conexão WebSocket.
-- **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos. Depois de o celular voltar do segundo plano, a prova de vida da conexão pode levar alguns segundos até reconectar — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
-- **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
-- **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Administração > Gestão > Usuários > Proprietários de sala`.
-- **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend está em HTTPS e que o navegador atende aos demais critérios de instalação. O `serverUrl` também deve usar HTTPS para a API funcionar sem bloqueio de conteúdo misto, mas não é ele que determina se o navegador oferece a instalação.
-- **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_HOME` aponta para o Android SDK, que Platform 36/Build Tools 36 estão instalados, que o JDK 17 está em `JAVA_HOME`/`PATH` e que o Gradle 8.14.2 está no `PATH` para inicializar o wrapper; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
 - **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org`); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `npm run setup` novamente.
 - **`install-service.sh` falha com "systemd não encontrado"**: o script só funciona em Linux com `systemd` (padrão no Raspberry Pi OS); em outras distribuições, use um gerenciador de processo alternativo como `pm2`.
 - **Serviço `remoteifes.service` não inicia**: rode `sudo journalctl -u remoteifes.service -f` para ver o erro; confira se `remoteifes-server/.env` existe e está com as variáveis esperadas (veja [Configuração](#configuração)), e rode `sudo systemctl restart remoteifes.service` após qualquer correção.
-- **`flash.sh` não encontra a porta serial do ESP32**: confirme que o cabo USB usado transmite dados (não é só de carga) e que os drivers do conversor USB-serial (CP210x ou CH340, conforme a placa) estão instalados; informe a porta manualmente, ex.: `bash flash.sh /dev/ttyUSB0`.
+- **Perda temporária ou endereço incorreto**: uma queda momentânea mostra “Reconectando automaticamente…” e a interface recupera sozinha quando HTTP/WebSocket voltam. Falha persistente desde a abertura, `/health` inacessível pelo mesmo dispositivo ou acesso por um IP antigo indica endereço, porta, firewall, proxy ou rede autorizada incorretos. No fluxo integrado, abra novamente `http://IP_DO_SERVIDOR:8080`; não troque a configuração por causa de uma interrupção breve.
+- **Acesso bloqueado em produção mesmo dentro da rede do IFES**: confira as faixas CIDR em `redesAutorizadas` e, temporariamente, o `modoTeste` em `Administração > Sistema > Configurações`; a mesma restrição vale para a conexão WebSocket.
 - **Restrição de rede ou limite de tentativas de login parecem não fazer efeito**: confira `TRUST_PROXY` no `.env` — o valor precisa corresponder ao número real de proxies reversos na frente do servidor (`1` para o Nginx de `https-setup.sh`, `0` se o Node estiver exposto diretamente); um valor maior que o real permite que o IP de origem seja falsificado via `X-Forwarded-For`, contornando as duas proteções.
+- **Frontend não fala com o servidor depois do deploy**: na implantação same-origin, acesse a URL do próprio servidor/proxy e não configure `serverUrl` nem `CORS_ORIGIN`. Se o frontend estiver em outra origem (GitHub Pages ou Cordova), confirme `serverUrl` e inclua a origem dele em `CORS_ORIGIN`; isso também afeta a conexão WebSocket.
+- **Status das salas não atualiza sozinho**: o painel depende da conexão WebSocket (`/ws`); se ela cair, o frontend reconecta automaticamente com espera crescente, e há uma retransmissão de reforço a cada 30 segundos. Depois de o celular voltar do segundo plano, a prova de vida da conexão pode levar alguns segundos até reconectar — uma falha persistente costuma indicar bloqueio de rede/proxy para conexões WebSocket ou a mesma causa do item anterior (CORS/rede autorizada).
+- **Live Server abre a interface, mas não representa a implantação**: ele é apenas o modo opcional de [frontend em origem separada](#frontend-em-origem-separada-desenvolvimento-opcional). Para teste integrado, pare-o e use `http://localhost:8080` ou `http://IP_DO_SERVIDOR:8080`.
+
+Se persistir: `sudo journalctl -u remoteifes.service -f`, `npm run health`, `Administração > Sistema > Status > Sistema` (superadministrador) e, em último caso, [rollback](#atualização-versões-e-reversão) para a última versão boa.
+
+### Interface, PWA e aplicativo
+
+- **PWA mostra frontend antigo após uma alteração**: abra uma vez com a rede disponível e aguarde alguns segundos — o novo service worker instala o app-shell, assume o controle e recarrega a aba sozinho. Se a tela continuar antiga, a causa quase sempre é a versão não ter sido avançada na release: confirme que `remoteifes-web/version.json`, `index.html`, `js/version.js`, `manifest.webmanifest` e `sw.js` apontam para a mesma versão (`npm test` cobre isso) e que `/index.html`, `/sw.js` e `/version.json` são servidos com `Cache-Control: no-cache`. Desregistrar o worker ou limpar o armazenamento não faz parte do procedimento normal.
+- **Botão de instalar o PWA não aparece no navegador**: confirme que o frontend está em HTTPS e que o navegador atende aos demais critérios de instalação. O `serverUrl` também deve usar HTTPS para a API funcionar sem bloqueio de conteúdo misto, mas não é ele que determina se o navegador oferece a instalação.
+- **`cordova build android` falha por SDK não encontrado**: confirme que `ANDROID_HOME` aponta para o Android SDK, que Platform 36/Build Tools 36 estão instalados, que o JDK 17 está em `JAVA_HOME`/`PATH` e que o Gradle 8.14.2 está no `PATH` para inicializar o wrapper; rode `npx cordova requirements android` dentro de `remoteifes-cordova` para diagnosticar o que falta.
 - **App Cordova não fala com o servidor central**: em desenvolvimento, um app sem origem mostra **Conectar este aplicativo** na primeira abertura; limpe os dados/reinstale o app para refazer essa configuração inicial. Em produção, gere outro APK com o `REMOTEIFES_SERVER_URL` correto e confirme que a configuração endurecida libera exatamente essa origem — uma indisponibilidade temporária só tenta reconectar e não permite trocar a infraestrutura.
+
+Se persistir: confira a versão em `remoteifes-web/version.json` contra a que o navegador carregou (meta `remoteifes-version`) e a origem que o app usa; um relato pelo próprio app anexa página, navegador e viewport.
+
+### ESP32, firmware e infravermelho
+
+- **`pio run` falha ao baixar a plataforma `espressif32`**: o PlatformIO precisa de acesso à internet na primeira compilação (para baixar o toolchain do ESP32 e resolver as bibliotecas de `platformio.ini`); confirme a conexão e tente novamente — compilações seguintes reaproveitam o cache local (`~/.platformio`). No Ubuntu 24.04, não contorne a proteção de Python gerenciado com `pip --break-system-packages`: instale `pipx` pelo gerenciador de pacotes e rode `flash.sh` novamente.
+- **`flash.sh` não encontra a porta serial do ESP32**: confirme que o cabo USB usado transmite dados (não é só de carga) e que os drivers do conversor USB-serial (CP210x ou CH340, conforme a placa) estão instalados; informe a porta manualmente, ex.: `bash flash.sh /dev/ttyUSB0`.
+- **ESP32 não aparece como online**: confirme que o dispositivo aparece em `Administração > Dispositivos > Cadastro`, vincule seu MAC a uma sala e verifique se ele alcança o endereço/porta do servidor pela rede local. `pio device monitor -b 115200 -p /dev/ttyUSB0` mostra o estado de Wi-Fi, identificação e WebSocket em tempo real.
+- **ESP32 aparece em "ESP32 detectados na rede" mas nunca fica online**: vincule o MAC detectado a uma sala existente em `Administração > Dispositivos > Cadastro`; o vínculo é recebido automaticamente na próxima consulta do dispositivo.
+- **Heartbeat rejeitado com erro de MAC**: a sala já tem um MAC diferente cadastrado em `Administração > Dispositivos > Cadastro`; atualize o cadastro ou libere a sala novamente para o ESP32 correto.
+- **ESP32 perde conexão Wi-Fi e não volta sozinho**: o firmware tenta reconectar automaticamente a cada 30 segundos, sem reiniciar. Durante a operação normal o AP `RemoteIFES-Setup` fica desligado; para reconfigurar no local, dê um clique curto no switch físico (abre o portal por dez minutos) ou use **Resetar Wi-Fi** no painel central. Se a falha persistir, verifique o sinal e as credenciais; use o reset de Wi-Fi somente quando elas realmente mudarem.
+- **Não consigo capturar IR em `Administração > Dispositivos > Protocolos IR`**: confirme que a placa física com receptor foi salva como **clonador oficial** e está conectada; use **Entrar no modo clone** — esse único comando já ativa o receptor em captura contínua. O servidor descarta capturas de qualquer outra placa, de uma placa fora do modo clone ou de um ESP32 substituído: se a tela avisar que o vínculo mudou (MAC ou credencial), salve a clonadora novamente. O tipo do módulo não é escolhido no `RemoteIFES-Setup`.
+- **Failsafe OFF não aparece como gravado na ESP32**: o failsafe é opcional e vem do protocolo. Em `Protocolos IR`, configure o failsafe do protocolo transmitindo somente o botão de desligar do controle original e aplique esse protocolo à sala; o RAW é enviado e gravado na NVS, e o campo **Failsafe OFF na NVS** em `Firmware / OTA` passa a mostrar "gravado" quando a placa confirma. Se ela estava offline, a sincronização acontece na reconexão. Aplicar um protocolo sem failsafe apaga um RAW antigo de propósito.
+- **Switch físico**: um único botão no GPIO 26 (`INPUT_PULLUP`, ligado ao GND). Clique curto abre o `RemoteIFES-Setup` por dez minutos sem derrubar a operação; manter pressionado por 5 s transmite uma única vez o failsafe OFF gravado. Soltar depois dos 5 s não abre o AP, e sem failsafe gravado a pressão longa não transmite nada. O buzzer no GPIO 27 confirma cada transmissão IR.
+
+Se persistir: o monitor serial (`pio device monitor -b 115200`) é a evidência primária; `Administração > Sistema > Logs > Dispositivos` mostra as quedas e retornos, e a [gravação por USB](#firmware-esp32) é a recuperação de referência. Lembre que "online" é presença e a confirmação da placa não prova que o aparelho recebeu o infravermelho.
+
+### Contas, permissões e sessões
+
 - **Não sei a senha do `superadmin` (ou o login não funciona) após clonar**: em um banco novo sem `SENHA_ADMIN_INICIAL`, use `superadmin` / `admin`; o sistema mostra somente a essa conta um aviso persistente com acesso direto à troca. Rode `npm run reset-admin -- umaSenhaEscolhida` para usar uma senha definida por você, ou `npm run reset-admin` para restaurar `admin`. A senha não é impressa no terminal.
+- **Usuário com "pode controlar" ativo não consegue controlar uma sala específica**: verifique se a sala está marcada como "acesso restrito" em `Administração > Dispositivos > Cadastro` — nesse caso, o usuário precisa ser adicionado explicitamente à lista de acesso daquela sala (diretamente pelo admin, ou por um proprietário da sala).
+- **Aba "Grade" ou "Agenda" não aparece**: essas abas só ficam visíveis para administradores; usuários comuns não têm acesso a elas.
+- **Aba "Config." não aparece para um usuário comum**: ela só é exibida quando o usuário foi tornado proprietário de ao menos uma sala em `Administração > Gestão > Usuários > Proprietários de sala`.
+- **`Dispositivos > Firmware / OTA` ou `Protocolos IR` não aparece no painel administrativo**: essas funções são restritas ao superadministrador, assim como `Dispositivos > Cadastro` e `Sistema > Configurações`; um grupo cujas funções estejam todas fora do seu nível nem chega a ser exibido.
+
+Se persistir: um administrador confere a conta em `Administração > Gestão > Usuários` e a sala em `Dispositivos > Cadastro` (superadministrador); `Sistema > Logs > Sessões` e `Auditoria` mostram o que mudou e quando.

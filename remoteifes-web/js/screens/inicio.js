@@ -27,7 +27,7 @@ const Inicio = (() => {
     },
     {
       id: "grade", icon: "grade", tom: "tom-operacao", titulo: "Grade",
-      desc: "Acompanhe o status de todas as salas em um painel único.",
+      desc: "Veja, por sala e data, os períodos livres, reservados e com o ar ligado.",
       quando: () => !!state.isAdmin, acao: () => irRota("/grade"),
     },
     {
