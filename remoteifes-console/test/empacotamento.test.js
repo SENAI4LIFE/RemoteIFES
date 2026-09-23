@@ -140,6 +140,63 @@ test("o payload construído é exatamente o que o extrator do atualizador entend
   assert.ok(!fs.existsSync(path.join(destino, "empacotar")), "o empacotador não entra no payload");
 });
 
+test("o tar é bem formado para QUALQUER leitor, não só para o nosso extrator", (t) => {
+  // Regressão de um defeito que passou despercebido porque o único leitor era o extrator do
+  // próprio console, que cria diretórios sozinho. O campo typeflag do cabeçalho tem 1 byte e
+  // não é terminado por NUL; ele era escrito por um helper que reservava o último byte para o
+  // terminador, o que com tamanho 1 truncava o campo para vazio. Todo membro saía com \0
+  // (AREGTYPE), que leitores tratam como arquivo comum — então os arquivos funcionavam e um
+  // diretório virava um arquivo vazio de mesmo nome. O `dpkg`, que extrai membro a membro e
+  // não inventa caminho, recusava o pacote inteiro.
+  const saida = ajuda.dirTemporario("console-tar-");
+  t.after(() => fs.rmSync(saida, { recursive: true, force: true }));
+
+  construir(ajuda.RAIZ, saida, ["--alvo", "linux-arm64", "--formato", "payload"]);
+  const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
+  const bruto = require("zlib").gunzipSync(fs.readFileSync(path.join(saida, `remoteifes-console-${versao}-linux-arm64.tar.gz`)));
+
+  const membros = [];
+  let posicao = 0;
+  while (posicao + 512 <= bruto.length) {
+    const cabecalho = bruto.subarray(posicao, posicao + 512);
+    if (cabecalho.every((b) => b === 0)) break;
+    const texto = (i, n) => cabecalho.subarray(i, i + n).toString("utf8").replace(/\0.*$/, "").trim();
+    const nome = texto(0, 100);
+    const tamanho = parseInt(texto(124, 12) || "0", 8) || 0;
+    membros.push({ nome, tipo: String.fromCharCode(cabecalho[156]), modo: parseInt(texto(100, 8) || "0", 8), ustar: texto(257, 6) });
+    posicao += 512 + Math.ceil(tamanho / 512) * 512;
+  }
+
+  assert.ok(membros.length > 40, "o payload tem o programa inteiro");
+  for (const m of membros) {
+    assert.ok(m.tipo === "0" || m.tipo === "5", `${m.nome} tem typeflag ${JSON.stringify(m.tipo)}; só arquivo (0) e diretório (5) são emitidos`);
+    assert.equal(m.ustar, "ustar", `${m.nome} não declara o formato ustar`);
+  }
+
+  // Todo diretório aparece como membro próprio, ANTES de qualquer coisa que more nele.
+  const vistos = new Set();
+  for (const m of membros) {
+    if (m.tipo === "5") {
+      assert.match(m.nome, /\/$/, `entrada de diretório ${m.nome} precisa terminar em barra`);
+      vistos.add(m.nome);
+      continue;
+    }
+    const partes = m.nome.split("/").slice(0, -1);
+    let acumulado = "";
+    for (const parte of partes) {
+      acumulado += `${parte}/`;
+      assert.ok(vistos.has(acumulado), `${m.nome} aparece antes da entrada de diretório ${acumulado}`);
+    }
+  }
+  assert.ok(vistos.has("src/") && vistos.has("src/plataforma/"), "diretórios aninhados também têm entrada própria");
+
+  // O bit de execução vem do shebang; nada de setuid/setgid saindo daqui.
+  const runner = membros.find((m) => m.nome === "bin/backup.js");
+  assert.ok(runner, "os runners viajam no payload");
+  assert.equal(runner.modo, 0o755, "um runner com shebang precisa sair executável");
+  assert.ok(membros.every((m) => (m.modo & 0o6000) === 0), "nenhum membro pode carregar setuid/setgid");
+});
+
 test("cadeia completa: construir, assinar, publicar e atualizar de verdade", async (t) => {
   const NOVA = "99.9.0";
   const fonte = arvoreNaVersao(NOVA);

@@ -14,9 +14,17 @@ const processos = require("../processos");
 // verdade exigiria componente nativo compilado e validado, que não é entregue aqui; tudo que
 // dependeria dele está isolado neste arquivo.
 //
-// O serviço *da aplicação* RemoteIFES, quando existe no Windows, é controlado por `sc.exe`
-// consultado com `Get-Service`; quando não existe, o console diz "não instalado" em vez de
-// fingir que parou alguma coisa.
+// O serviço *da aplicação* RemoteIFES, quando existe no Windows, é consultado e controlado por
+// `sc.exe`; quando não existe, o console diz "não instalado" em vez de fingir que parou alguma
+// coisa.
+//
+// POR QUE `sc.exe` E NÃO `Get-Service`: cada chamada de PowerShell paga a partida de um
+// processo que carrega o motor .NET — algo entre 1 e 5 s numa máquina modesta. A avaliação de
+// prontidão consulta serviço e watchdog antes de **toda** operação, e com PowerShell isso
+// passou de 15 s num runner de dois núcleos: o operador esperaria esse tempo só para ver a tela
+// de confirmação. `sc.exe` é um binário nativo que responde em milissegundos. O PowerShell
+// continua onde não há equivalente nativo (log de eventos, disco, portas), e ali o custo é
+// pago uma vez, sob demanda.
 
 const { ESTADO, recurso } = base;
 
@@ -31,36 +39,60 @@ function powershell(script, { timeoutMs = 20_000 } = {}) {
   );
 }
 
-async function estadoDoServico() {
-  const r = await powershell(
-    `$ErrorActionPreference='SilentlyContinue';` +
-      `$s = Get-Service -Name '${SERVICO_APP}';` +
-      `if ($null -eq $s) { 'NAOINSTALADO' } else { ` +
-      `$p = Get-CimInstance Win32_Service -Filter "Name='${SERVICO_APP}'";` +
-      `"Status=$($s.Status)"; "StartType=$($s.StartType)"; "ProcessId=$($p.ProcessId)"; "State=$($p.State)" }`
+/** `sc.exe` com o nome do serviço passado como argumento, nunca interpolado num script. */
+function sc(args, { timeoutMs = 15_000 } = {}) {
+  return processos.executar("sc.exe", args, { timeoutMs });
+}
+
+// 1060 = ERROR_SERVICE_DOES_NOT_EXIST. É o código que distingue "não instalado" de "parado",
+// e a mensagem varia com o idioma do Windows — por isso a decisão é pelo código.
+const SERVICO_INEXISTENTE = /1060|does not exist as an installed service|não existe como serviço instalado/i;
+
+function servicoNaoInstalado() {
+  return recurso(
+    ESTADO.NAO_INSTALADO,
+    `o serviço "${SERVICO_APP}" não está registrado neste Windows. O RemoteIFES pode estar sendo executado ` +
+      "manualmente (npm start); nesse caso o console observa a saúde pelo /health, mas não controla o ciclo de vida."
   );
-  if (!r.ok) return recurso(ESTADO.INDISPONIVEL, r.erro || "não foi possível consultar o gerenciador de serviços");
-  if (r.saida.includes("NAOINSTALADO")) {
-    return recurso(
-      ESTADO.NAO_INSTALADO,
-      `o serviço "${SERVICO_APP}" não está registrado neste Windows. O RemoteIFES pode estar sendo executado ` +
-        "manualmente (npm start); nesse caso o console observa a saúde pelo /health, mas não controla o ciclo de vida."
-    );
-  }
+}
+
+/** Campos "CHAVE : valor" da saída de `sc query`/`sc qc`, tolerante a idioma e espaçamento. */
+function camposSc(texto) {
   const campos = {};
-  for (const linha of r.saida.split("\n")) {
-    const idx = linha.indexOf("=");
-    if (idx > 0) campos[linha.slice(0, idx).trim()] = linha.slice(idx + 1).trim();
+  for (const linha of String(texto).split(/\r?\n/)) {
+    const m = /^\s*([A-Z_]+)\s*:\s*(.+?)\s*$/.exec(linha);
+    if (m) campos[m[1]] = m[2];
   }
-  const ativo = campos.Status === "Running";
+  return campos;
+}
+
+async function estadoDoServico() {
+  const consulta = await sc(["query", SERVICO_APP]);
+  if (SERVICO_INEXISTENTE.test(consulta.saida || consulta.erro || "")) return servicoNaoInstalado();
+  if (!consulta.ok) {
+    return recurso(ESTADO.INDISPONIVEL, (consulta.saida || consulta.erro || "não foi possível consultar o gerenciador de serviços").slice(0, 300));
+  }
+
+  const campos = camposSc(consulta.saida);
+  // "STATE : 4  RUNNING" — o número é estável entre idiomas, o rótulo não.
+  const codigoEstado = config.inteiro((campos.STATE || "").trim().split(/\s+/)[0], null, 0, 10);
+  const ativo = codigoEstado === 4;
+
+  // Tipo de início e PID vêm de chamadas separadas e baratas; nenhuma é obrigatória para
+  // responder o essencial, então uma falha ali não derruba a consulta inteira.
+  const [configuracao, detalhe] = await Promise.all([sc(["qc", SERVICO_APP]), sc(["queryex", SERVICO_APP])]);
+  const camposConfig = configuracao.ok ? camposSc(configuracao.saida) : {};
+  const camposDetalhe = detalhe.ok ? camposSc(detalhe.saida) : {};
+  const inicio = camposConfig.START_TYPE || "";
+
   return {
     ...recurso(ESTADO.SUPORTADO),
     ativo,
-    habilitado: campos.StartType === "Automatic",
+    habilitado: /AUTO_START/i.test(inicio),
     estadoAtivo: ativo ? "active" : "inactive",
-    subEstado: (campos.Status || "").toLowerCase(),
-    arquivoUnidade: campos.StartType || null,
-    pid: config.inteiro(campos.ProcessId, null, 0, 1e9),
+    subEstado: (campos.STATE || "").replace(/^\d+\s+/, "").toLowerCase() || null,
+    arquivoUnidade: inicio.replace(/^\d+\s+/, "") || null,
+    pid: config.inteiro(camposDetalhe.PID, null, 1, 1e9),
     memoriaBytes: null,
     reinicios: null,
     desde: null,
@@ -69,23 +101,58 @@ async function estadoDoServico() {
 }
 
 async function controlarServico(acao) {
-  const comandos = {
-    iniciar: `Start-Service -Name '${SERVICO_APP}' -ErrorAction Stop`,
-    parar: `Stop-Service -Name '${SERVICO_APP}' -Force -ErrorAction Stop`,
-    reiniciar: `Restart-Service -Name '${SERVICO_APP}' -Force -ErrorAction Stop`,
-  };
-  if (!comandos[acao]) return recurso(ESTADO.NAO_SUPORTADO, `ação de serviço desconhecida: ${acao}`);
+  if (!["iniciar", "parar", "reiniciar"].includes(acao)) {
+    return recurso(ESTADO.NAO_SUPORTADO, `ação de serviço desconhecida: ${acao}`);
+  }
 
   const existe = await estadoDoServico();
   if (existe.estado === ESTADO.NAO_INSTALADO) return existe;
 
-  const r = await powershell(comandos[acao], { timeoutMs: 90_000 });
-  if (r.ok) return recurso(ESTADO.SUPORTADO);
-  // Acesso negado é diferente de falha: o operador precisa saber que falta elevação.
-  if (/Access is denied|Acesso negado|PermissionDenied/i.test(r.saida || "")) {
-    return recurso(ESTADO.SEM_PERMISSAO, "controlar este serviço exige executar o console como Administrador");
+  // `sc stop`/`sc start` retornam assim que o SCM aceita o pedido, não quando ele termina.
+  // Para reiniciar é preciso esperar a parada de fato, senão o start falha com "serviço já
+  // está sendo parado" — e o console teria relatado sucesso sobre um serviço que não subiu.
+  const negado = (r) => /Access is denied|Acesso negado|5:/i.test(r.saida || r.erro || "");
+
+  if (acao === "parar" || acao === "reiniciar") {
+    const parada = await sc(["stop", SERVICO_APP], { timeoutMs: 30_000 });
+    // 1062 = o serviço não foi iniciado; parar algo já parado não é falha.
+    const jaParado = /1062/.test(parada.saida || parada.erro || "");
+    if (!parada.ok && !jaParado) {
+      if (negado(parada)) return recurso(ESTADO.SEM_PERMISSAO, "controlar este serviço exige executar o console como Administrador");
+      return recurso(ESTADO.INDISPONIVEL, (parada.saida || parada.erro || "").slice(0, 400));
+    }
+    const parou = await esperarEstado(1, 60_000);
+    if (!parou) return recurso(ESTADO.INDISPONIVEL, `o serviço "${SERVICO_APP}" não chegou a parar dentro do prazo`);
   }
-  return recurso(ESTADO.INDISPONIVEL, (r.saida || r.erro || "").slice(0, 400));
+
+  if (acao === "iniciar" || acao === "reiniciar") {
+    const partida = await sc(["start", SERVICO_APP], { timeoutMs: 30_000 });
+    const jaRodando = /1056/.test(partida.saida || partida.erro || "");
+    if (!partida.ok && !jaRodando) {
+      if (negado(partida)) return recurso(ESTADO.SEM_PERMISSAO, "controlar este serviço exige executar o console como Administrador");
+      return recurso(ESTADO.INDISPONIVEL, (partida.saida || partida.erro || "").slice(0, 400));
+    }
+    const subiu = await esperarEstado(4, 60_000);
+    if (!subiu) return recurso(ESTADO.INDISPONIVEL, `o serviço "${SERVICO_APP}" não chegou a rodar dentro do prazo`);
+  }
+
+  return recurso(ESTADO.SUPORTADO);
+}
+
+/**
+ * Espera o SCM chegar a um estado. Não é retentativa cega para esconder instabilidade: `sc` é
+ * assíncrono por contrato, e confirmar a transição é o que separa "o pedido foi aceito" de "o
+ * serviço está no estado pedido" — a diferença entre relatar sucesso e ter sucesso.
+ */
+async function esperarEstado(codigoDesejado, prazoMs) {
+  const limite = Date.now() + prazoMs;
+  for (;;) {
+    const r = await sc(["query", SERVICO_APP]);
+    const codigo = config.inteiro((camposSc(r.saida).STATE || "").trim().split(/\s+/)[0], null, 0, 10);
+    if (codigo === codigoDesejado) return true;
+    if (Date.now() >= limite) return false;
+    await new Promise((resolver) => setTimeout(resolver, 500));
+  }
 }
 
 async function lerRegistros({ unidade = "aplicacao", linhas = 200 } = {}) {

@@ -106,7 +106,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          # O caminho do package.json vai por variável de ambiente, nunca interpolado dentro de
+          # um literal JavaScript: num runner Windows o bash entrega "D:\a\RemoteIFES\..." e o
+          # literal JS comeria as barras invertidas, deixando "D:aRemoteIFES...".
+          VERSAO=$(CONSOLE_PKG="$GITHUB_WORKSPACE/remoteifes-console/package.json" node -p "require(process.env.CONSOLE_PKG).version")
           case "$RUNNER_OS" in
             Linux) SO=linux ;;
             macOS) SO=macos ;;
@@ -126,7 +129,10 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $versao = node -p "require('$env:GITHUB_WORKSPACE/remoteifes-console/package.json').version"
+          # A versão é lida com ConvertFrom-Json, não com `node -p "require('<caminho>')"`: ao
+          # passar um caminho do Windows como argumento nativo, o PowerShell come as barras
+          # invertidas e o require recebe "D:aRemoteIFES...".
+          $versao = (Get-Content -Raw "$env:GITHUB_WORKSPACE\remoteifes-console\package.json" | ConvertFrom-Json).version
           $arco = node -p "process.arch"
           Expand-Archive -Path "$env:RUNNER_TEMP\dist\remoteifes-console-$versao-windows-$arco.zip" -DestinationPath "$env:RUNNER_TEMP\origem" -Force
           Push-Location "$env:RUNNER_TEMP\origem"
@@ -138,7 +144,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          VERSAO=$(CONSOLE_PKG="$GITHUB_WORKSPACE/remoteifes-console/package.json" node -p "require(process.env.CONSOLE_PKG).version")
           RAIZ="$RUNNER_TEMP/programa"
           for exigido in console-bootstrap.js launcher-bootstrap.js estado-instalacao.json \
                          "versoes/$VERSAO/console.js" "versoes/$VERSAO/launcher.js" \
@@ -212,7 +218,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          VERSAO=$(CONSOLE_PKG="$GITHUB_WORKSPACE/remoteifes-console/package.json" node -p "require(process.env.CONSOLE_PKG).version")
           sudo dpkg --force-depends -i "$RUNNER_TEMP/dist/remoteifes-console_${VERSAO}_all.deb"
           test -f /opt/remoteifes-console/console-bootstrap.js
           test -f /opt/remoteifes-console/launcher-bootstrap.js
@@ -227,7 +233,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          VERSAO=$(CONSOLE_PKG="$GITHUB_WORKSPACE/remoteifes-console/package.json" node -p "require(process.env.CONSOLE_PKG).version")
           node "$RUNNER_TEMP/programa/versoes/$VERSAO/instalacao/desinstalar.js" \
             --raiz "$RUNNER_TEMP/programa" --estado "$RUNNER_TEMP/estado" --sim
           test ! -e "$RUNNER_TEMP/programa/console-bootstrap.js"
