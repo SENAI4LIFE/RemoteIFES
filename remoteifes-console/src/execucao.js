@@ -10,14 +10,25 @@ const processos = require("./processos");
 
 // Motor de trabalhos longos (atualização, rollback, backup, restauração...).
 //
-// Propriedades que o desenho garante:
-//  - a operação não é abandonada quando o navegador fecha: ela roda em grupo de processos
-//    próprio e a saída vai para arquivo, não para um pipe preso à requisição HTTP;
-//  - a operação sobrevive à saída do console por ociosidade ou a um reinício do console:
-//    o registro fica em disco com PID e o arquivo de saída pode ser relido;
-//  - um processo filho não fica solto para sempre: há prazo máximo por ação e, na partida,
-//    o console reconcilia o que encontrou;
-//  - um desfecho que não pode ser comprovado é **desconhecido**, nunca "sucesso".
+// O que o desenho garante, com precisão — e o que ele **não** garante:
+//
+//  - **Fechar o navegador não interrompe nada.** A saída vai para arquivo e o trabalho não
+//    depende da requisição HTTP que o iniciou. Isto é garantido.
+//
+//  - **O console reiniciar não mata o trabalho em todos os casos, mas pode matar em um.**
+//    O filho roda em grupo de processos próprio (`detached`), o que o solta do terminal e do
+//    grupo do pai. Num serviço systemd, porém, o filho continua no **cgroup da unidade**: um
+//    `systemctl restart remoteifes-console.service` com `KillMode` padrão encerra o cgroup
+//    inteiro, filho incluído. Ou seja: sobrevive a uma saída por ociosidade e a uma queda do
+//    processo do console, mas não necessariamente a um restart da unidade.
+//
+//  - **Por isso o desfecho desconhecido existe.** Quando o console volta e encontra um
+//    trabalho "executando" cujo processo não está mais vivo, ele não presume nada: registra
+//    desfecho **desconhecido**. A reconciliação confere PID e, quando o sistema oferece,
+//    a identidade do processo (hora de início), porque PID é reaproveitado.
+//
+//  - **Nenhum filho fica solto para sempre:** há prazo máximo por ação, e o que passa dele é
+//    encerrado e marcado como desconhecido — nunca como sucesso.
 
 const ESTADOS = Object.freeze({
   EXECUTANDO: "executando",
@@ -77,6 +88,7 @@ function salvar(trabalho) {
     iniciadoEm: trabalho.iniciadoEm,
     terminadoEm: trabalho.terminadoEm || null,
     pid: trabalho.pid || null,
+    iniciadoProcessoEm: trabalho.iniciadoProcessoEm || null,
     codigo: trabalho.codigo === undefined ? null : trabalho.codigo,
     resumo: trabalho.resumo || null,
     erro: trabalho.erro || null,
@@ -134,14 +146,31 @@ function trabalhoAtivo() {
  * Reconciliação na partida. O console pode ter saído por ociosidade, caído ou sido reiniciado
  * por uma auto-atualização enquanto um trabalho corria.
  */
+/**
+ * O processo registrado é mesmo aquele, e não outro que herdou o PID? Em Linux, `/proc/<pid>`
+ * tem a hora de início; onde isso não existe, a checagem devolve `true` e a conferência fica
+ * limitada ao PID — o que é dito no registro em vez de presumido.
+ */
+function identidadeDeProcessoConfere(trabalho) {
+  if (!trabalho.iniciadoProcessoEm) return true;
+  try {
+    const stat = fs.statSync(`/proc/${trabalho.pid}`);
+    // O diretório do processo nasce com ele; uma diferença grande denuncia outro processo.
+    return Math.abs(stat.ctimeMs - Date.parse(trabalho.iniciadoProcessoEm)) < 60_000;
+  } catch {
+    return true;
+  }
+}
+
 function reconciliar() {
   const dados = lerRegistro();
   let mudou = false;
   for (const t of dados.trabalhos) {
     if (t.estado !== ESTADOS.EXECUTANDO) continue;
-    if (t.pid && trava.processoVivo(t.pid)) {
-      // Continua rodando: o processo sobreviveu ao console. A saída segue no arquivo e volta
-      // a ser acompanhada pela UI; o console não reata o pipe, lê o arquivo.
+    // PID vivo não basta: o número é reaproveitado, e um processo qualquer que tenha herdado
+    // o PID faria um trabalho morto parecer vivo. Quando o sistema permite, a identidade é
+    // confirmada pela hora de início registrada junto com o PID.
+    if (t.pid && trava.processoVivo(t.pid) && identidadeDeProcessoConfere(t)) {
       t.resumo = t.resumo || "operação iniciada antes deste processo do console ainda em andamento";
       mudou = true;
       continue;
@@ -216,9 +245,9 @@ function iniciar(spec) {
       }),
       stdio: [spec.entrada === undefined ? "ignore" : "pipe", "pipe", "pipe"],
       shell: false,
-      // Grupo de processos próprio: a operação não morre com o console e, ao cancelar,
-      // o sinal alcança a árvore inteira (bash + filhos) e não só o bash.
-      detached: process.platform !== "win32",
+      // Grupo próprio: solta o filho do terminal e do grupo do console, e faz o cancelamento
+      // alcançar a árvore inteira em vez de só o processo direto.
+      ...require("./plataforma").opcoesDeGrupo(),
       windowsHide: true,
     });
   } catch (erro) {
@@ -230,6 +259,13 @@ function iniciar(spec) {
   }
 
   trabalho.pid = filho.pid;
+  trabalho.iniciadoProcessoEm = (() => {
+    try {
+      return new Date(fs.statSync(`/proc/${filho.pid}`).ctimeMs).toISOString();
+    } catch {
+      return null;
+    }
+  })();
   salvar(trabalho);
   estado.auditar("trabalho-iniciado", {
     id,
@@ -335,7 +371,13 @@ async function finalizar(contexto, { estadoFinal, erro, codigo = null, sinal = n
         if (resultado.resumo) trabalho.resumo = resultado.resumo;
       }
     } catch (e) {
+      // Uma verificação que lança não pode virar "concluída": não saber se o efeito aconteceu
+      // é exatamente o desfecho desconhecido, e é assim que precisa ser registrado.
       trabalho.verificacao = { ok: false, resumo: `verificação falhou: ${e.message}` };
+      if (trabalho.estado === ESTADOS.CONCLUIDO) {
+        trabalho.estado = ESTADOS.DESCONHECIDO;
+        trabalho.erro = `a operação terminou sem erro, mas a verificação do efeito falhou (${e.message}); confira o estado atual.`;
+      }
     }
   }
 
@@ -358,16 +400,9 @@ async function finalizar(contexto, { estadoFinal, erro, codigo = null, sinal = n
 }
 
 function encerrarArvore(pid, sinal) {
-  if (!pid) return;
-  try {
-    // Negativo alcança o grupo inteiro, criado por detached.
-    if (process.platform !== "win32") process.kill(-pid, sinal);
-    else process.kill(pid, sinal);
-  } catch {
-    try {
-      process.kill(pid, sinal);
-    } catch {}
-  }
+  // Delegado ao adaptador: no POSIX é o grupo de processos; no Windows, `taskkill /T`, porque
+  // lá não existe grupo POSIX e matar só o pai deixaria netos vivos.
+  require("./plataforma").encerrarArvore(pid, sinal);
 }
 
 function cancelar(id, operador) {

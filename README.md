@@ -718,18 +718,67 @@ O **Console de Operações** (`remoteifes-console/`) é um serviço local, separ
 
 A aplicação encerra todas as sessões a cada reinício, a autenticação dela vive no SQLite e o banco pode ser justamente o que quebrou. Uma ferramenta de recuperação embutida na aplicação não estaria disponível quando fosse necessária. Além disso, administrar a aplicação **não pode** conceder acesso irrestrito ao host.
 
-O console é ativado por socket do systemd: enquanto ninguém o usa, **nenhum processo dele fica residente** — o systemd apenas mantém a porta. Na primeira conexão o serviço sobe e, depois de `CONSOLE_OCIOSIDADE_S` (padrão 900 s) sem uso, ele sai sozinho. Num Raspberry Pi 3 de 1 GiB, isso troca RAM ociosa permanente por uma partida de processo na primeira requisição.
+No Linux o console é ativado por socket do systemd: enquanto ninguém o usa, **nenhum processo dele fica residente** — o systemd apenas mantém a porta. Na primeira conexão o serviço sobe e, depois de `CONSOLE_OCIOSIDADE_S` (padrão 900 s) sem uso, ele sai sozinho. Num Raspberry Pi 3 de 1 GiB, isso troca RAM ociosa permanente por uma partida de processo na primeira requisição. No Windows e no macOS não há socket de sistema equivalente, e o modelo é o mesmo por outro caminho: o lançador sobe o console sob demanda e o processo sai sozinho ao ficar ocioso.
 
-O código instalado fica em `/opt/remoteifes-console/atual` e o estado em `/var/lib/remoteifes-console`, **fora do checkout**: `deploy.sh` e `rollback.sh` trocam o checkout inteiro, e um rollback para uma revisão anterior ao console apagaria o diretório de onde ele estaria rodando.
+### Sistemas e arquiteturas suportados
 
-### Instalar e acessar
+| Sistema | Arquitetura | Controle do serviço da aplicação | Partida em segundo plano | Registros do sistema |
+|---|---|---|---|---|
+| Linux com systemd (Raspberry Pi OS, Debian, Ubuntu) | arm64, armv7, x64 | `systemctl` pelo auxiliar privilegiado | socket do systemd | `journalctl` |
+| Linux sem systemd | arm64, armv7, x64 | **não aplicável**, com o motivo exibido | lançador sob demanda | não aplicável |
+| Windows 10/11, Server 2019+ | x64, arm64 | SCM, quando o serviço `RemoteIFES` existir | lançador sob demanda (+ tarefa `ONLOGON` opcional) | `Get-WinEvent` |
+| macOS 12+ | arm64, x64 | `launchctl`, quando o agente existir | `LaunchAgent` com `RunAtLoad=false` | `log show` |
+
+Onde uma capacidade não existe, o console diz **por quê** — "não instalado", "sem permissão", "indisponível", "não se aplica" e "não suportado aqui" são estados distintos, visíveis na aba **Programa**, e o servidor recusa a operação de verdade: botão desabilitado não é controle de acesso.
+
+A arquitetura não é decidida por `uname -m`. Um Raspberry Pi 3 pode ter hardware e kernel de 64 bits com **userland de 32 bits**; quem decide o artefato é `process.arch`, a arquitetura do runtime que de fato vai executar. O console classifica hardware, kernel, userland e runtime separadamente e mostra os quatro. Um Pi 3 com sistema de 32 bits (armv7/armhf) segue suportado enquanto o **Node 22** tiver suporte — fim em **2027-04-30**; depois disso a recomendação é migrar o Pi para um sistema de 64 bits, e o console exibe esse horizonte em vez de deixar a surpresa para a atualização que quebrar.
+
+O programa instalado fica **fora do checkout** — `deploy.sh` e `rollback.sh` trocam o checkout inteiro, e um rollback para uma revisão anterior ao console apagaria o diretório de onde ele estaria rodando. O layout é o mesmo nos três sistemas:
+
+```
+<raiz>/console-bootstrap.js      camada estável (o pacote é dono dela; nenhuma atualização a reescreve)
+<raiz>/estado-instalacao.json    ponteiro da versão ativa
+<raiz>/versoes/<versao>/         payload imutável
+```
+
+| Sistema | Programa | Estado |
+|---|---|---|
+| Linux (sistema) | `/opt/remoteifes-console` | `/var/lib/remoteifes-console` |
+| Linux (usuário) | `~/.local/share/remoteifes-console` | `~/.local/state/remoteifes-console` |
+| Windows (usuário) | `%LOCALAPPDATA%\Programs\RemoteIFES Console` | `%APPDATA%\RemoteIFES Console` |
+| macOS (usuário) | `~/Applications/RemoteIFES Console.app/Contents/Resources` | `~/Library/Application Support/RemoteIFES Console` |
+
+### Instalar
+
+O instalador é o mesmo nos três sistemas e **não** exige compilador, SDK nem pacote npm global — só o Node 22.13+ que o RemoteIFES já requer.
 
 ```bash
 cd remoteifes-console
-sudo bash install-console.sh
+sudo node instalacao/instalar.js --escopo sistema     # Linux com systemd
+node instalacao/instalar.js                           # macOS, ou Linux por usuário
 ```
 
-O instalador copia o console para `/opt`, instala o auxiliar privilegiado como `root:root`, grava uma regra de `sudo` restrita a ele (validada com `visudo`), instala o socket e o serviço systemd e exibe **uma única vez** um segredo de instalação para criar o primeiro operador.
+```powershell
+# Windows, na pasta descompactada do .zip
+.\instalar.ps1
+```
+
+No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket`/`.service`. Em qualquer sistema ele cria o atalho de aplicativo e exibe **uma única vez** um segredo de instalação para criar o primeiro operador — que também fica em `bootstrap-token`, no diretório de estado, legível só por quem administra o host. Isso faz a instalação funcionar igual com interface gráfica e por SSH sem terminal interativo.
+
+Para remover: `node instalacao/desinstalar.js --simular` mostra exatamente o que sairia; sem `--apagar-estado`, operadores, auditoria e histórico são preservados. A remoção recusa qualquer caminho que não prove ser uma instalação do console, e nunca toca no checkout do RemoteIFES.
+
+### Acessar
+
+Abra pelo atalho do sistema, ou pelo lançador:
+
+```bash
+node <raiz>/launcher-bootstrap.js            # abre o console no navegador padrão
+node <raiz>/launcher-bootstrap.js --status   # estado do console, da aplicação e da versão do programa
+```
+
+Antes de abrir o navegador, o lançador **confere a identidade** de quem responde na porta esperada: envia um desafio e exige a resposta HMAC derivada do segredo que só o console em execução conhece. Se outro processo tiver tomado a porta, o navegador não é aberto. Nenhuma credencial reutilizável viaja em URL, argumento de processo ou atalho.
+
+Num host **sem interface gráfica** — o caso normal de um Raspberry Pi — não há navegador para abrir, e nada disso é necessário: o socket do systemd já sobe o console na primeira conexão, então basta o túnel SSH acima. O segredo de instalação do primeiro operador é impresso pelo instalador **e** gravado em `bootstrap-token` no diretório de estado, justamente para que a instalação por SSH, sem terminal interativo, funcione igual à instalação com interface.
 
 O console escuta apenas em `127.0.0.1`. De outra máquina, use um túnel SSH — o `localhost` do seu computador **não** é o do Pi:
 
@@ -739,16 +788,25 @@ ssh -L 8099:127.0.0.1:8099 <usuario>@<host-do-pi>
 
 e então abra `http://127.0.0.1:8099` no seu navegador.
 
+### Atualizar o programa
+
+A versão do **console** é independente do commit do RemoteIFES implantado. Atualizar o console baixa um artefato de release, confere a **assinatura Ed25519** do manifesto e o SHA-256 do artefato, instala a versão nova ao lado da atual e troca o ponteiro; reverter é trocar o ponteiro de volta, **sem rede**. Não usa `git`, não copia o checkout e não consome o `origin/main` da aplicação. Enquanto nenhuma chave pública de publicação estiver provisionada, o console diz isso na aba **Programa** e recusa qualquer release — atualizar passa a ser reinstalar o pacote.
+
+**Estado da assinatura, sem rodeios:** o caminho de verificação está implementado e é fechado por padrão, mas **não há credencial de publicação neste repositório** — nenhuma chave privada Ed25519, nenhum certificado de assinatura de código do Windows, nenhuma conta de desenvolvedor Apple para notarização. Os artefatos que a CI constrói são de desenvolvimento e validação: eles se declaram `assinado: false` em `proveniencia.json`, e um passo da própria CI falha se essa declaração for outra. Para publicar releases de produção é preciso gerar o par de chaves com `node empacotar/assinar-manifesto.js --gerar-chave <dir>`, guardar a privada fora do repositório, embutir a pública em `src/release.js` (ou provisioná-la por `CONSOLE_CHAVE_RELEASE`) e assinar o manifesto numa etapa credenciada, separada do build e inacessível a código de pull request. Enquanto isso não for feito, o console **recusa** qualquer release em vez de aceitar artefatos não assinados.
+
+Os detalhes de empacotamento, assinatura e matriz de sistemas estão em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md).
+
 ### O que o console faz
 
 | Área | Operações |
 |---|---|
 | **Visão geral** | estado da aplicação, do serviço, do watchdog e do host, com o que exige atenção em primeiro lugar |
 | **Serviço** | reiniciar, parar (desligando o watchdog junto) e iniciar o RemoteIFES; ler o journal das unidades |
-| **Atualizações** | comparar versão em execução, checkout e `origin`; implantar um commit revisado; reverter; atualizar o próprio console |
+| **Atualizações** | comparar versão em execução, checkout e `origin`; implantar um commit revisado; reverter |
 | **Dados e recuperação** | backup verificado, restauração com o serviço parado e senha do superadministrador |
 | **Aplicativo e CI** | versões de servidor, PWA, Cordova e Android, APK publicado e execuções do GitHub Actions |
 | **Rede e domínio** | interfaces, rotas, resolvedor, portas em escuta, proxy, DNS e validade do certificado |
+| **Programa** | versão do próprio console, atualização e reversão do programa, capacidades da plataforma com o motivo de cada indisponibilidade, e onde a instalação mora |
 | **Avançado** | elevação, auditoria do console, histórico de operações e Terminal Expert |
 
 Antes de qualquer operação que interrompa o serviço, o console avalia o impacto: bloqueia quando há **OTA em andamento** (todas as fases ativas, inclusive `validando`), rollout ativo, outra manutenção em curso ou disco insuficiente; e avisa, em vez de assumir zero, quando a atividade dos ESP32 **não pode ser observada**. A avaliação é refeita no instante da execução.
@@ -863,10 +921,10 @@ As rotas `/dispositivo/*` e o acesso por `localhost` — útil justamente para u
 ```bash
 sudo systemctl status remoteifes-console.socket
 sudo journalctl -u remoteifes-console.service -e
-sudo bash /opt/remoteifes-console/atual/install-console.sh
+sudo node /opt/remoteifes-console/versoes/<versao>/instalacao/instalar.js --escopo sistema --forcar
 ```
 
-Reinstalar o console não toca no `remoteifes.service` nem no banco. Para removê-lo sem afetar o RemoteIFES: `sudo bash /opt/remoteifes-console/atual/install-console.sh --remover` — o estado em `/var/lib/remoteifes-console` é preservado.
+Reinstalar o console não toca no `remoteifes.service` nem no banco. Para removê-lo sem afetar o RemoteIFES: `sudo node /opt/remoteifes-console/versoes/<versao>/instalacao/desinstalar.js --sim` — o estado em `/var/lib/remoteifes-console` é preservado.
 
 ## Hospedagem em Raspberry Pi
 
@@ -1355,7 +1413,14 @@ Todas as actions dos workflows são referenciadas pelo SHA completo do commit (a
 
 ## Uso da API do GitHub
 
-Este projeto não depende da API do GitHub em tempo de execução — o uso do GitHub se limita à hospedagem do código-fonte, ao workflow opcional `.github/workflows/pages.yml` que publica `remoteifes-web` no GitHub Pages e ao workflow de CI descrito em [Testes e Integração Contínua](#testes-e-integração-contínua). A publicação usa apenas o `GITHUB_TOKEN` efêmero fornecido automaticamente ao workflow, com a permissão mínima `pages: write`/`id-token: write`.
+O **RemoteIFES** não depende da API do GitHub em tempo de execução: nenhuma operação do prédio — salas, agendamentos, contas, ESP32 — consulta a rede externa. O uso do GitHub no projeto se limita à hospedagem do código-fonte, ao workflow opcional `.github/workflows/pages.yml` que publica `remoteifes-web` no GitHub Pages e ao workflow de CI descrito em [Testes e Integração Contínua](#testes-e-integração-contínua). A publicação usa apenas o `GITHUB_TOKEN` efêmero fornecido automaticamente ao workflow, com a permissão mínima `pages: write`/`id-token: write`.
+
+O **Console de Operações** é a exceção, e é uma exceção deliberada e sob demanda:
+
+- a aba *Aplicativo e CI* consulta a API do GitHub **somente quando alguém clica**, para mostrar o estado das execuções de CI. A credencial fica no estado do console, nunca volta por API e não acompanha redirecionamento para outro host;
+- a atualização do **programa console** busca o manifesto e o artefato de release por HTTPS, **sem enviar credencial alguma** em nenhum salto, e só aceita o que a assinatura Ed25519 e o digest confirmarem.
+
+Nenhum dos dois é pré-requisito de operação: sem rede, o console continua administrando o host, e a aplicação continua operando o prédio.
 
 ## Estrutura de Pastas
 

@@ -224,7 +224,16 @@ test("o console não tem dependências npm", () => {
 });
 
 test("nenhum segredo fica versionado no diretório do console", () => {
-  const proibidos = [/-----BEGIN [A-Z ]*PRIVATE KEY/, /ghp_[A-Za-z0-9]{20,}/, /scrypt\$\d+\$/];
+  // Os padrões descrevem segredos **reais**, não qualquer coisa parecida. Um hash scrypt de
+  // verdade traz N de quatro dígitos ou mais e sal/chave em base64 longos; `scrypt$1$1$1$a$b`
+  // é fixture de teste e não é credencial de ninguém. Afrouxar aqui seria perder a proteção;
+  // ser específico a mantém sem alarme falso.
+  const proibidos = [
+    /-----BEGIN [A-Z ]*PRIVATE KEY/,
+    /gh[pousr]_[A-Za-z0-9]{30,}/,
+    /scrypt\$\d{4,}\$\d+\$\d+\$[A-Za-z0-9+/=]{20,}\$[A-Za-z0-9+/=]{20,}/,
+    /AKIA[0-9A-Z]{16}/,
+  ];
   const ignorar = new Set(["node_modules", ".git"]);
 
   function varrer(dir) {
@@ -235,7 +244,7 @@ test("nenhum segredo fica versionado no diretório do console", () => {
         varrer(completo);
         continue;
       }
-      if (!/\.(js|json|md|sh|css|html|modelo|socket)$/.test(entrada.name)) continue;
+      if (!/\.(js|json|md|sh|ps1|css|html|modelo|socket|plist|yml)$/.test(entrada.name)) continue;
       const texto = fs.readFileSync(completo, "utf8");
       for (const padrao of proibidos) {
         // O teste de segurança usa tokens sintéticos de propósito; eles são reconhecíveis.

@@ -71,8 +71,8 @@ const ACOES = [
         acao: "servico.reiniciar",
         rotulo: "Reiniciar o RemoteIFES",
         operador,
-        executavel: caminhoBin("servico.sh"),
-        argumentos: ["reiniciar"],
+        executavel: nodeExecutavel(),
+        argumentos: [caminhoBin("servico.js"), "reiniciar"],
         cwd: config.RAIZ_CONSOLE,
         exigeTrava: false,
         timeoutMs: 120_000,
@@ -99,8 +99,8 @@ const ACOES = [
         acao: "servico.parar",
         rotulo: "Parar o RemoteIFES",
         operador,
-        executavel: caminhoBin("servico.sh"),
-        argumentos: ["parar"],
+        executavel: nodeExecutavel(),
+        argumentos: [caminhoBin("servico.js"), "parar"],
         cwd: config.RAIZ_CONSOLE,
         exigeTrava: false,
         timeoutMs: 90_000,
@@ -129,8 +129,8 @@ const ACOES = [
         acao: "servico.iniciar",
         rotulo: "Iniciar o RemoteIFES",
         operador,
-        executavel: caminhoBin("servico.sh"),
-        argumentos: ["iniciar"],
+        executavel: nodeExecutavel(),
+        argumentos: [caminhoBin("servico.js"), "iniciar"],
         cwd: config.RAIZ_CONSOLE,
         exigeTrava: false,
         timeoutMs: 120_000,
@@ -257,30 +257,32 @@ const ACOES = [
       return null;
     },
     montar({ operador, argumentos }) {
-      const args = ["deploy.sh", argumentos.commit];
+      const args = [caminhoBin("implantar.js"), "aplicar", argumentos.commit];
       if (argumentos.offline) args.push("--offline");
       return {
         acao: "atualizacao.aplicar",
         rotulo: `Atualizar para ${argumentos.commit.slice(0, 8)}`,
         operador,
         argumentosVisiveis: { commit: argumentos.commit, offline: !!argumentos.offline },
-        executavel: "bash",
+        executavel: nodeExecutavel(),
         argumentos: args,
-        cwd: config.DIR_SERVIDOR,
-        // deploy.sh cria a mesma trava; o console a adquire antes para que a checagem de
-        // conflito aconteça na UI, e não como falha do script já em andamento.
-        exigeTrava: true,
+        cwd: config.RAIZ_CONSOLE,
+        // A trava de manutenção é adquirida pelo **runner**, não aqui. Quando o console a
+        // adquiria e em seguida chamava deploy.sh, o script tentava adquirir a mesma trava com
+        // noclobber e abortava sempre. A prontidão já detecta conflito antes de confirmar.
+        exigeTrava: false,
+        env: { CONSOLE_OPERADOR: operador },
         timeoutMs: 45 * 60 * 1000,
         faseInicial: "preparando",
         detectarFase: (texto) => {
           if (texto.includes("Backup do banco")) return "backup pré-atualização";
           if (texto.includes("npm ci")) return "instalando dependências";
-          if (texto.includes("Reiniciando remoteifes.service")) return "reiniciando";
-          if (texto.includes("Deploy concluído")) return "confirmado";
+          if (texto.includes("Reiniciando o serviço")) return "reiniciando";
+          if (texto.includes("confirmado pelo processo")) return "confirmado";
           if (texto.includes("Revertendo para")) return "revertendo";
           return null;
         },
-        faseIrreversivel: (texto) => texto.includes("Reiniciando remoteifes.service"),
+        faseIrreversivel: (texto) => texto.includes("Reiniciando o serviço"),
         verificar: async ({ estadoFinal }) => {
           if (estadoFinal !== execucao.ESTADOS.CONCLUIDO) return null;
           return verificarCommitEmExecucao(argumentos.commit);
@@ -314,27 +316,29 @@ const ACOES = [
       return null;
     },
     montar({ operador, argumentos }) {
-      const args = ["rollback.sh"];
+      const args = [caminhoBin("implantar.js"), "reverter"];
       if (argumentos.ref) args.push(argumentos.ref);
       if (argumentos.offline) args.push("--offline");
       return {
         acao: "atualizacao.reverter",
         rotulo: argumentos.ref ? `Reverter para ${argumentos.ref}` : "Reverter para a versão anterior",
         operador,
-        argumentosVisiveis: { ref: argumentos.ref || "(previous-version)", offline: !!argumentos.offline },
-        executavel: "bash",
+        argumentosVisiveis: { ref: argumentos.ref || "(versão anterior registrada)", offline: !!argumentos.offline },
+        executavel: nodeExecutavel(),
         argumentos: args,
-        cwd: config.DIR_SERVIDOR,
-        exigeTrava: true,
+        cwd: config.RAIZ_CONSOLE,
+        // Mesma razão da atualização: quem segura a trava é o runner.
+        exigeTrava: false,
+        env: { CONSOLE_OPERADOR: operador },
         timeoutMs: 45 * 60 * 1000,
         detectarFase: (texto) => {
           if (texto.includes("Backup do banco")) return "backup pré-rollback";
           if (texto.includes("npm ci")) return "instalando dependências";
-          if (texto.includes("Reiniciando remoteifes.service")) return "reiniciando";
-          if (texto.includes("Rollback concluído")) return "confirmado";
+          if (texto.includes("Reiniciando o serviço")) return "reiniciando";
+          if (texto.includes("confirmado pelo processo")) return "confirmado";
           return null;
         },
-        faseIrreversivel: (texto) => texto.includes("Reiniciando remoteifes.service"),
+        faseIrreversivel: (texto) => texto.includes("Reiniciando o serviço"),
         verificar: () => verificarAplicacaoSaudavel(),
       };
     },
@@ -342,41 +346,44 @@ const ACOES = [
 
   {
     id: "console.atualizar",
-    rotulo: "Atualizar o próprio console",
+    rotulo: "Atualizar o Console de Operações",
     grupo: "atualizacao",
     proposito:
-      "Copia o console do checkout atual para a instalação em uso e reinicia o serviço do console. " +
-      "O console roda de fora do checkout justamente para que uma atualização ou rollback do RemoteIFES não o apague.",
+      "Instala uma versão publicada do console: baixa o artefato do release, confere a assinatura do manifesto e o " +
+      "digest, instala lado a lado e troca a versão ativa. Não usa git nem o checkout do RemoteIFES.",
     impacto:
-      "Esta sessão do console cai por alguns segundos e a página reconecta sozinha. " +
-      "O RemoteIFES não é afetado: nada do serviço da aplicação é tocado.",
+      "Esta sessão do console cai por alguns segundos e a página reconecta sozinha. O RemoteIFES não é afetado. " +
+      "A versão anterior fica guardada e a reversão é uma troca de ponteiro.",
     exigeElevacao: true,
     confirmacao: null,
-    prontidao: {},
-    async validacaoExtra() {
-      const origem = path.join(config.DIR_CHECKOUT, "remoteifes-console");
-      if (!fs.existsSync(path.join(origem, "console.js"))) {
-        return (
-          "o checkout atual não contém remoteifes-console/: provavelmente ele foi revertido para uma revisão anterior ao console. " +
-          "A instalação em uso continua funcionando; a auto-atualização volta a ficar disponível quando o checkout avançar."
-        );
-      }
-      if (path.resolve(origem) === path.resolve(config.RAIZ_CONSOLE)) {
-        return "este console já roda de dentro do checkout (modo de desenvolvimento): não há o que copiar.";
-      }
-      return null;
+    esquema: {
+      versao: { tipo: "texto", regex: /^\d+\.\d+\.\d+$/, obrigatorio: true },
     },
-    montar({ operador }) {
+    prontidao: {},
+    async validacaoExtra({ argumentos }) {
+      const atualizador = require("./atualizador");
+      return atualizador.validarAlvo(argumentos.versao);
+    },
+    montar({ operador, argumentos }) {
       return {
         acao: "console.atualizar",
-        rotulo: "Atualizar o console",
+        rotulo: `Atualizar o console para ${argumentos.versao}`,
         operador,
-        executavel: caminhoBin("atualizar-console.sh"),
-        argumentos: [config.DIR_CHECKOUT, config.RAIZ_CONSOLE],
+        argumentosVisiveis: { versao: argumentos.versao },
+        executavel: nodeExecutavel(),
+        argumentos: [caminhoBin("atualizar-console.js"), argumentos.versao],
         cwd: config.RAIZ_CONSOLE,
         exigeTrava: false,
-        timeoutMs: 5 * 60 * 1000,
+        timeoutMs: 20 * 60 * 1000,
         cancelavel: false,
+        faseIrreversivel: (texto) => texto.includes("Trocando a versão ativa"),
+        detectarFase: (texto) => {
+          if (texto.includes("Baixando")) return "baixando";
+          if (texto.includes("Verificando")) return "verificando";
+          if (texto.includes("Instalando")) return "instalando";
+          if (texto.includes("Trocando a versão ativa")) return "trocando";
+          return null;
+        },
       };
     },
   },
@@ -429,11 +436,43 @@ const ACOES = [
         acao: "host.reiniciar",
         rotulo: "Reiniciar o host",
         operador,
-        executavel: caminhoBin("servico.sh"),
-        argumentos: ["reiniciar-host"],
+        executavel: nodeExecutavel(),
+        argumentos: [caminhoBin("servico.js"), "reiniciar-host"],
         cwd: config.RAIZ_CONSOLE,
         exigeTrava: false,
         timeoutMs: 60_000,
+        cancelavel: false,
+      };
+    },
+  },
+
+  {
+    id: "console.reverter",
+    rotulo: "Reverter o console para a versão anterior",
+    grupo: "atualizacao",
+    proposito: "Aponta a instalação de volta para a versão anterior já verificada, sem rede.",
+    impacto:
+      "Esta sessão cai por alguns segundos. Usa a cópia local que já passou pela verificação de assinatura; " +
+      "não baixa nada e não consulta o GitHub.",
+    exigeElevacao: true,
+    confirmacao: null,
+    prontidao: {},
+    async validacaoExtra() {
+      const atualizador = require("./atualizador");
+      const versoes = atualizador.versoesInstaladas();
+      if (versoes.anterior) return null;
+      return "não há versão anterior instalada para a qual voltar.";
+    },
+    montar({ operador }) {
+      return {
+        acao: "console.reverter",
+        rotulo: "Reverter o console",
+        operador,
+        executavel: nodeExecutavel(),
+        argumentos: [caminhoBin("atualizar-console.js"), "--reverter"],
+        cwd: config.RAIZ_CONSOLE,
+        exigeTrava: false,
+        timeoutMs: 5 * 60 * 1000,
         cancelavel: false,
       };
     },

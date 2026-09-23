@@ -13,6 +13,8 @@ const prontidao = require("./prontidao");
 const rede = require("./rede");
 const mobile = require("./mobile");
 const terminal = require("./terminal");
+const identidade = require("./identidade");
+const plataforma = require("./plataforma");
 
 // Servidor HTTP do console. Sem framework: o roteamento aqui é pequeno e explícito, e um
 // framework a mais seria dependência, RAM e superfície num host de 1 GiB sem ganho real.
@@ -240,6 +242,27 @@ async function rotear(req, res, url, params) {
   const metodo = req.method;
   const caminho = url;
 
+  // Prova de identidade do listener. Sem sessão de propósito: o lançador não tem como logar,
+  // e precisa saber, ANTES de abrir o navegador, se quem atende na porta é este console. A
+  // resposta é HMAC(segredo, desafio) com um segredo que só existe no arquivo protegido de
+  // estado; um processo que tenha tomado a porta não consegue produzi-la, e quem chama não
+  // aprende nada sobre o segredo.
+  //
+  // É **GET** de propósito. O lançador não é um navegador e não envia `Origin`; exigir Origin
+  // num POST o bloquearia, e abrir exceção na regra de origem para uma rota enfraqueceria a
+  // defesa de CSRF para todas. Como a rota não muda nada e não revela o segredo, um método
+  // seguro é a escolha correta: a regra de origem continua intacta.
+  if (caminho === "/api/identidade" && metodo === "GET") {
+    const desafio = String(params.get("desafio") || "");
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(desafio)) return responderErro(res, 400, "desafio inválido");
+    const segredo = identidade.segredoAtual();
+    if (!segredo) return responderErro(res, 503, "identidade do console ainda não provisionada");
+    return responderJson(res, 200, {
+      prova: crypto.createHmac("sha256", Buffer.from(segredo, "base64url")).update(desafio).digest("base64url"),
+      versao: identidade.versaoDoConsole(),
+    });
+  }
+
   // Bootstrap: só quando ainda não há operador. O segredo de instalação é exibido uma vez pelo
   // instalador e fica num arquivo que só o usuário do console lê.
   if (caminho === "/api/bootstrap" && metodo === "POST") {
@@ -250,7 +273,7 @@ async function rotear(req, res, url, params) {
     try {
       esperado = fs.readFileSync(arquivoSegredo, "utf8").trim();
     } catch {}
-    if (!esperado) return responderErro(res, 409, "nenhum segredo de instalação disponível; rode install-console.sh");
+    if (!esperado) return responderErro(res, 409, "nenhum segredo de instalação disponível; reinstale com `node instalacao/instalar.js` para gerar um");
     if (String(corpo.segredo || "") !== esperado) {
       estado.auditar("bootstrap-recusado", {});
       return responderErro(res, 403, "segredo de instalação incorreto");
@@ -368,6 +391,35 @@ async function rotear(req, res, url, params) {
       // deveria apenas observar.
       banco: coleta.espiarBanco({ permitirLeitura: saude.respondeu }),
       prontidaoAplicacao: await prontidao.consultarProntidaoDaAplicacao(),
+    });
+  }
+
+  // Programa instalado: **não** é o mesmo assunto que /api/atualizacao, que trata do commit do
+  // RemoteIFES implantado. Aqui é a versão do console, a plataforma e onde as coisas moram.
+  if (caminho === "/api/programa" && metodo === "GET") {
+    const atualizador = require("./atualizador");
+    const consultarRede = params.get("rede") === "1";
+    const [capacidades, situacaoConsole] = await Promise.all([
+      plataforma.capacidades(),
+      atualizador.situacao({ consultarRede }),
+    ]);
+    const registro = estado.lerJson(path.join(config.RAIZ_INSTALACAO, "estado-instalacao.json"), {});
+    const contrato = estado.lerJson(config.ARQUIVO_ENDERECO, {});
+    const padroes = plataforma.diretoriosPadrao(registro.escopo ? { escopo: registro.escopo } : {});
+    return responderJson(res, 200, {
+      console: situacaoConsole,
+      plataforma: capacidades,
+      instalacao: {
+        raiz: config.RAIZ_INSTALACAO,
+        payloadEmExecucao: config.RAIZ_CONSOLE,
+        estado: config.DIR_ESTADO,
+        checkout: config.DIR_CHECKOUT,
+        escopo: registro.escopo || null,
+        padroesDaPlataforma: { raizInstalacao: padroes.raizInstalacao, estado: padroes.estado, logs: padroes.logs },
+        modoDeExecucao: contrato.modo || null,
+        protecaoDoContrato: identidade.protecaoDoContrato(),
+      },
+      aplicacao: { url: config.urlDaAplicacao() },
     });
   }
 
@@ -654,8 +706,11 @@ function criarServidor() {
  * Saída por ociosidade. Só faz sentido com ativação por socket: o systemd guarda o socket e
  * reabre o serviço na próxima conexão, então ficar residente seria RAM parada num host de 1 GiB.
  */
-function armarSaidaPorOciosidade(servidor, aoSair) {
+function armarSaidaPorOciosidade(servidor, aoSair, { reativavel = false } = {}) {
   if (!config.OCIOSIDADE_S) return null;
+  // Sair por ociosidade só é seguro quando alguém sabe religar: o socket do systemd ou o
+  // lançador. Num `node console.js` avulso, sair deixaria o operador sem console e sem aviso.
+  if (!reativavel) return null;
   const relogio = setInterval(() => {
     const ocioso = Date.now() - ultimaAtividade > config.OCIOSIDADE_S * 1000;
     const ocupado =

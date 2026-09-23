@@ -295,6 +295,14 @@ async function baixarArtefato(runId, artefatoId, destino) {
 
 const MAX_SALTOS = 3;
 
+function mesmoHostDaApi(alvo) {
+  try {
+    return alvo.host === new URL(API).host;
+  } catch {
+    return false;
+  }
+}
+
 function baixarParaArquivo(url, destino, meta, saltos = 0) {
   let alvo;
   try {
@@ -323,7 +331,10 @@ function baixarParaArquivo(url, destino, meta, saltos = 0) {
           "User-Agent": "remoteifes-console",
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": VERSAO_API,
-          ...(segredo ? { Authorization: `Bearer ${segredo}` } : {}),
+          // A credencial só acompanha o host da própria API. A API responde com
+          // redirecionamento para um armazenamento assinado de outro domínio, e mandar o token
+          // junto o entregaria a um host que não precisa dele — e que pode registrá-lo.
+          ...(segredo && mesmoHostDaApi(alvo) ? { Authorization: `Bearer ${segredo}` } : {}),
         },
         timeout: 120_000,
       },
@@ -357,14 +368,31 @@ function baixarParaArquivo(url, destino, meta, saltos = 0) {
         res.pipe(fluxo);
         fluxo.on("finish", () => {
           if (abortado) return;
+          const sha256 = hash.digest("hex");
+          const tamanhoConfere = meta ? bytes === meta.bytes : null;
+          // O digest do artefato de CI vem da mesma origem que o artefato: conferir os dois não
+          // prova autenticidade, só integridade do transporte. Ainda assim uma divergência é
+          // falha — e é reportada como falha, não como um campo informativo que o chamador
+          // poderia ignorar. Autenticidade de artefato executável é responsabilidade do
+          // atualizador por release, com manifesto assinado.
+          if (tamanhoConfere === false) {
+            fs.rmSync(destino, { force: true });
+            return resolve({
+              ok: false,
+              erro: `tamanho divergente: ${bytes} bytes recebidos, ${meta.bytes} declarados pela API`,
+            });
+          }
           resolve({
             ok: true,
             arquivo: destino,
             bytes,
-            sha256: hash.digest("hex"),
+            sha256,
             tamanhoDeclarado: meta ? meta.bytes : null,
-            tamanhoConfere: meta ? bytes === meta.bytes : null,
+            tamanhoConfere,
             digestDeclarado: meta ? meta.digest : null,
+            ressalvaDeConfianca:
+              "integridade de transporte apenas: o digest vem da mesma origem que o artefato. " +
+              "Não use este caminho como transporte de atualização executável.",
           });
         });
         fluxo.on("error", (erro) => resolve({ ok: false, erro: erro.message }));

@@ -242,6 +242,7 @@ dl { margin: 0; }
 .btn.primario { background: var(--verde); border-color: var(--verde); color: #fff; }
 .btn.perigo { background: var(--erro); border-color: var(--erro); color: #fff; }
 .btn.pequeno { min-height: 36px; padding: 6px 10px; font-size: 13px; }
+a.btn { text-decoration: none; }
 
 .motivo-desabilitado { font-size: 13px; color: var(--texto-fraco); margin-top: 4px; }
 

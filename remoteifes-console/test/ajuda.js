@@ -7,7 +7,36 @@ const http = require("http");
 // Nada aqui toca no estado real do console nem no banco da aplicação.
 
 const RAIZ = path.join(__dirname, "..");
-const MODULOS = ["config", "estado", "auth", "processos", "execucao", "trava", "coleta", "acoes", "prontidao", "repositorio", "servidor", "rede", "mobile", "github", "terminal"];
+
+// Módulos expostos por conveniência em `ambiente()`. A limpeza de cache, porém, varre **todo**
+// o src/: uma lista fixa deixava módulos novos presos à configuração do primeiro teste que os
+// carregou, e o vazamento só aparecia como falha aparentemente aleatória num teste posterior.
+const MODULOS = ["config", "estado", "auth", "processos", "execucao", "trava", "coleta", "acoes", "prontidao", "repositorio", "servidor", "rede", "mobile", "github", "terminal", "plataforma", "release", "atualizador", "implantacao", "identidade"];
+
+function arquivosDoConsole() {
+  const arquivos = [];
+  const varrer = (dir) => {
+    for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+      const completo = path.join(dir, entrada.name);
+      if (entrada.isDirectory()) varrer(completo);
+      else if (entrada.name.endsWith(".js")) arquivos.push(completo);
+    }
+  };
+  varrer(path.join(RAIZ, "src"));
+  for (const solto of ["console.js", "launcher.js"]) {
+    const completo = path.join(RAIZ, solto);
+    if (fs.existsSync(completo)) arquivos.push(completo);
+  }
+  return arquivos;
+}
+
+function limparCache() {
+  for (const arquivo of arquivosDoConsole()) {
+    try {
+      delete require.cache[require.resolve(arquivo)];
+    } catch {}
+  }
+}
 
 function dirTemporario(prefixo = "console-teste-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefixo));
@@ -41,10 +70,13 @@ function ambiente(opcoes = {}) {
   if (opcoes.githubApi) definir("CONSOLE_GITHUB_API", opcoes.githubApi);
   if (opcoes.env) for (const [k, v] of Object.entries(opcoes.env)) definir(k, v);
 
-  for (const nome of MODULOS) delete require.cache[require.resolve(path.join(RAIZ, "src", `${nome}.js`))];
+  limparCache();
 
   const mods = {};
-  for (const nome of MODULOS) mods[nome] = require(path.join(RAIZ, "src", `${nome}.js`));
+  for (const nome of MODULOS) {
+    const arquivo = path.join(RAIZ, "src", nome === "plataforma" ? path.join("plataforma", "index.js") : `${nome}.js`);
+    if (fs.existsSync(arquivo)) mods[nome] = require(arquivo);
+  }
 
   fs.mkdirSync(estadoDir, { recursive: true });
 
@@ -57,7 +89,7 @@ function ambiente(opcoes = {}) {
         if (valor === undefined) delete process.env[chave];
         else process.env[chave] = valor;
       }
-      for (const nome of MODULOS) delete require.cache[require.resolve(path.join(RAIZ, "src", `${nome}.js`))];
+      limparCache();
       try {
         fs.rmSync(estadoDir, { recursive: true, force: true });
       } catch {}

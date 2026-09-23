@@ -9,8 +9,11 @@
   },
   "scripts": {
     "start": "node console.js",
-    "test": "node --test test/*.test.js",
-    "instalar": "bash install-console.sh",
+    "_comentario-test": "Arquivos em série (--test-concurrency=1): vários testes cronometram processos filhos reais (instalação, empacotamento, implantação) e, rodando em paralelo num runner de 2 núcleos, competiam entre si até estourar prazos. Serializar troca ~1 minuto por resultado determinístico.",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "instalar": "node instalacao/instalar.js",
+    "desinstalar": "node instalacao/desinstalar.js",
+    "empacotar": "node empacotar/construir.js",
     "medir": "node test/medicao-recursos.js"
   }
 }
