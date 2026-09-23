@@ -128,6 +128,110 @@ test("o Windows encerra a árvore por taskkill, e não por grupo POSIX", (t) => 
   assert.match(fonte, /icacls/, "proteção de arquivo no Windows é ACL, não modo POSIX");
 });
 
+test("a tarefa agendada do Windows recebe o script, e o caminho com espaço sobrevive", async (t) => {
+  // Dois defeitos moravam aqui. O primeiro: `argumentos` era descartado, então a tarefa era
+  // criada com sucesso chamando `node.exe` sem script nenhum — nada abria e nada reclamava. O
+  // segundo: o comando ia dentro de um script de PowerShell, com aspas escapadas na mão, e o
+  // alvo real é um caminho com espaço ("...\RemoteIFES Console\console-bootstrap.js").
+  //
+  // O teste olha o argv entregue ao schtasks, não o resultado: criar tarefa de verdade exige
+  // privilégio que um runner pode não ter, e pular a verificação nesse caso não provaria nada.
+  const amb = ajuda.ambiente();
+  const processos = require(path.join(ajuda.RAIZ, "src", "processos.js"));
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+  const original = processos.executar;
+  const chamadas = [];
+  processos.executar = (exe, args) => {
+    chamadas.push({ exe, args });
+    return Promise.resolve({ ok: true, codigo: 0, saida: "", erro: null });
+  };
+  t.after(() => {
+    processos.executar = original;
+    amb.restaurar();
+  });
+
+  const raiz = "C:\\Users\\op\\AppData\\Local\\Programs\\RemoteIFES Console";
+  const r = await windows.registrarInicializacao({
+    comando: "C:\\Program Files\\nodejs\\node.exe",
+    argumentos: [`${raiz}\\console-bootstrap.js`],
+    escopo: "usuario",
+  });
+  assert.equal(r.disponivel, true, r.motivo);
+
+  const criacao = chamadas.find((c) => c.args.includes("/Create"));
+  assert.ok(criacao, "a criação precisa ir para o schtasks");
+  assert.equal(criacao.exe, "schtasks.exe", "o schtasks é chamado direto, sem PowerShell em volta");
+
+  const alvo = criacao.args[criacao.args.indexOf("/TR") + 1];
+  assert.ok(alvo.includes("console-bootstrap.js"), `a tarefa precisa apontar para o bootstrap; recebeu: ${alvo}`);
+  assert.ok(alvo.includes(raiz), "o caminho da instalação precisa chegar inteiro");
+  assert.equal(alvo, '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\op\\AppData\\Local\\Programs\\RemoteIFES Console\\console-bootstrap.js"');
+
+  // O nome da tarefa vai como argumento próprio: sem aspas embutidas para o shell desfazer.
+  assert.equal(criacao.args[criacao.args.indexOf("/TN") + 1], "RemoteIFES Console");
+  assert.ok(!criacao.args.includes("/RU"), "escopo de usuário não pede execução como SYSTEM");
+
+  const comoSistema = await windows.registrarInicializacao({
+    comando: "node.exe",
+    argumentos: ["x.js"],
+    escopo: "sistema",
+  });
+  assert.equal(comoSistema.disponivel, true);
+  const criacaoSistema = chamadas.filter((c) => c.args.includes("/Create")).at(-1);
+  assert.deepEqual(criacaoSistema.args.slice(-2), ["/RU", "SYSTEM"]);
+});
+
+test("remover uma inicialização que não existe é sucesso, não falha", async (t) => {
+  const amb = ajuda.ambiente();
+  const processos = require(path.join(ajuda.RAIZ, "src", "processos.js"));
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+  const original = processos.executar;
+  processos.executar = () => Promise.resolve({ ok: false, codigo: 1, saida: "ERROR: The system cannot find the file specified.", erro: null });
+  t.after(() => {
+    processos.executar = original;
+    amb.restaurar();
+  });
+
+  // Desinstalar dá o resultado pedido: não haver tarefa É não haver tarefa. Tratar isso como
+  // erro faria a desinstalação parecer quebrada toda vez que fosse repetida.
+  const r = await windows.removerInicializacao();
+  assert.equal(r.disponivel, true);
+  assert.match(r.mecanismo, /não havia tarefa/);
+});
+
+test("o disco é medido sem abrir processo nenhum", async (t) => {
+  // Antes isso chamava o PowerShell uma vez por caminho, no Windows. A prontidão mede dois
+  // caminhos antes de cada operação, e só isso levava a avaliação a mais de 15 s num runner de
+  // dois núcleos — o operador esperando por uma tela de confirmação.
+  const amb = ajuda.ambiente();
+  const processos = require(path.join(ajuda.RAIZ, "src", "processos.js"));
+  const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
+  const original = processos.executar;
+  let abriuProcesso = false;
+  processos.executar = (...args) => {
+    abriuProcesso = true;
+    return original(...args);
+  };
+  t.after(() => {
+    processos.executar = original;
+    amb.restaurar();
+  });
+
+  const r = await plataforma.disco([ajuda.RAIZ]);
+  assert.equal(r.length, 1);
+  if (process.platform === "linux") {
+    // O Linux mantém o `df` porque ele informa o ponto de montagem real, que o statfs não dá:
+    // num Pi com /var em outro dispositivo essa distinção é a diferença entre medir o disco
+    // certo e o errado.
+    assert.ok(r[0].suportado, r[0].motivo);
+    return;
+  }
+  assert.equal(abriuProcesso, false, "a medição de disco não deve abrir processo fora do Linux");
+  assert.equal(r[0].suportado, true, r[0].motivo);
+  assert.ok(r[0].totalBytes > 0 && r[0].livreBytes >= 0);
+  assert.ok(r[0].usoPercentual >= 0 && r[0].usoPercentual <= 100);
+});
+
 test("no Windows a proteção de arquivo não é afirmada por modo POSIX", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());

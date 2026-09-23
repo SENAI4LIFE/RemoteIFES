@@ -137,8 +137,44 @@ async function throttle() {
   return recurso(ESTADO.NAO_APLICAVEL, "indicadores de subtensão/limitação são específicos do Raspberry Pi");
 }
 
+/**
+ * Espaço em disco pelo `statfs` do próprio Node — sem subprocesso, nos três sistemas.
+ *
+ * A implementação anterior do Windows chamava o PowerShell uma vez por caminho. A avaliação de
+ * prontidão mede dois caminhos antes de **toda** operação, e cada partida do PowerShell carrega
+ * o motor .NET: numa máquina modesta isso sozinho passava de 15 s, e o operador esperava esse
+ * tempo só para ver a tela de confirmação. `fs.statfsSync` responde em microssegundos.
+ *
+ * `bavail` (e não `bfree`) é o que se pode realmente usar: em POSIX parte do espaço livre é
+ * reservada ao root, e prometer esse espaço a um backup seria prometer o que não existe.
+ */
 async function disco(caminhos) {
-  return caminhos.map((caminho) => ({ caminho, suportado: false, motivo: "medição de disco não implementada nesta plataforma" }));
+  return caminhos.map((caminho) => {
+    let info;
+    try {
+      info = fs.statfsSync(caminho);
+    } catch (erro) {
+      return { caminho, suportado: false, motivo: `não foi possível medir ${caminho}: ${erro.code || erro.message}` };
+    }
+    const bloco = Number(info.bsize) || 0;
+    const total = Number(info.blocks) * bloco;
+    const livre = Number(info.bavail) * bloco;
+    const usado = (Number(info.blocks) - Number(info.bfree)) * bloco;
+    if (!Number.isFinite(total) || total <= 0) {
+      return { caminho, suportado: false, motivo: "o sistema de arquivos não informou tamanho" };
+    }
+    const montagem = path.parse(path.resolve(caminho)).root;
+    return {
+      caminho,
+      suportado: true,
+      dispositivo: montagem,
+      totalBytes: total,
+      usadoBytes: usado,
+      livreBytes: livre,
+      usoPercentual: Math.round((usado / total) * 100),
+      montagem,
+    };
+  });
 }
 
 async function relogio() {
