@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Console de Operações — RemoteIFES</title>
+  <link rel="stylesheet" href="/estilo.css" />
+</head>
+<body>
+<a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
+
+<!-- ===== Entrada ===== -->
+<section id="telaLogin" class="oculto">
+  <div class="login">
+    <div class="cartao">
+      <h2 id="loginTitulo">Console de Operações</h2>
+      <p class="fraco">Manutenção do servidor, do host e da infraestrutura do RemoteIFES. A operação do prédio continua no aplicativo.</p>
+      <div id="loginAviso" class="oculto"></div>
+
+      <form id="formLogin" autocomplete="on">
+        <div class="campo">
+          <label for="loginNome">Operador</label>
+          <input type="text" id="loginNome" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false" />
+        </div>
+        <div class="campo">
+          <label for="loginSenha">Senha</label>
+          <input type="password" id="loginSenha" name="password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn primario" style="width:100%">Entrar</button>
+      </form>
+
+      <form id="formBootstrap" class="oculto">
+        <p class="aviso info"><strong>Primeiro acesso</strong>Nenhum operador foi criado ainda. Use o segredo de instalação exibido por <code>install-console.sh</code>.</p>
+        <div class="campo">
+          <label for="bsSegredo">Segredo de instalação</label>
+          <input type="password" id="bsSegredo" required autocomplete="one-time-code" />
+        </div>
+        <div class="campo">
+          <label for="bsNome">Nome do operador</label>
+          <input type="text" id="bsNome" required autocapitalize="none" spellcheck="false" pattern="[a-z][a-z0-9._-]{2,31}" />
+          <p class="fraco">3 a 32 caracteres: letras minúsculas, dígitos, ponto, hífen ou sublinhado.</p>
+        </div>
+        <div class="campo">
+          <label for="bsSenha">Senha</label>
+          <input type="password" id="bsSenha" required autocomplete="new-password" minlength="12" />
+          <p class="fraco">Mínimo de 12 caracteres. Não reutilize a senha do superadministrador da aplicação.</p>
+        </div>
+        <button type="submit" class="btn primario" style="width:100%">Criar operador</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Console ===== -->
+<div id="telaConsole" class="oculto">
+  <header class="topo">
+    <div>
+      <h1>Console de Operações</h1>
+      <div class="subtitulo">RemoteIFES · manutenção de servidor e infraestrutura</div>
+    </div>
+    <div class="espaco"></div>
+    <span id="seloElevacao" class="selo oculto"></span>
+    <span id="seloOperador" class="selo"></span>
+    <button type="button" id="btnSair" class="btn pequeno">Sair</button>
+  </header>
+
+  <nav class="abas" role="tablist" aria-label="Áreas do console">
+    <button type="button" class="aba" role="tab" id="aba-visao" aria-controls="painel-visao" aria-selected="true" data-area="visao">Visão geral</button>
+    <button type="button" class="aba" role="tab" id="aba-servico" aria-controls="painel-servico" aria-selected="false" data-area="servico">Serviço</button>
+    <button type="button" class="aba" role="tab" id="aba-atualizacao" aria-controls="painel-atualizacao" aria-selected="false" data-area="atualizacao">Atualizações</button>
+    <button type="button" class="aba" role="tab" id="aba-dados" aria-controls="painel-dados" aria-selected="false" data-area="dados">Dados e recuperação</button>
+    <button type="button" class="aba" role="tab" id="aba-mobile" aria-controls="painel-mobile" aria-selected="false" data-area="mobile">Aplicativo e CI</button>
+    <button type="button" class="aba" role="tab" id="aba-rede" aria-controls="painel-rede" aria-selected="false" data-area="rede">Rede e domínio</button>
+    <button type="button" class="aba" role="tab" id="aba-avancado" aria-controls="painel-avancado" aria-selected="false" data-area="avancado">Avançado</button>
+  </nav>
+
+  <main id="conteudo">
+    <div id="faixaTrabalho" class="oculto"></div>
+
+    <!-- Visão geral -->
+    <section id="painel-visao" role="tabpanel" aria-labelledby="aba-visao" tabindex="-1">
+      <div id="visaoAtencao"></div>
+      <div class="grade">
+        <div class="cartao">
+          <div class="linha entre"><h2>RemoteIFES</h2><span id="visaoEstadoApp" class="estado desconhecido">consultando</span></div>
+          <dl id="visaoApp"></dl>
+        </div>
+        <div class="cartao">
+          <div class="linha entre"><h2>Host</h2><span id="visaoEstadoHost" class="estado desconhecido">consultando</span></div>
+          <dl id="visaoHost"></dl>
+        </div>
+        <div class="cartao">
+          <div class="linha entre"><h2>Versões</h2></div>
+          <dl id="visaoVersoes"></dl>
+        </div>
+      </div>
+      <div class="cartao">
+        <div class="linha entre">
+          <h2>Coleta</h2>
+          <button type="button" class="btn pequeno" id="btnAtualizarPainel">Atualizar agora</button>
+        </div>
+        <p class="fraco" id="visaoColeta">—</p>
+      </div>
+    </section>
+
+    <!-- Serviço -->
+    <section id="painel-servico" role="tabpanel" aria-labelledby="aba-servico" tabindex="-1" class="oculto">
+      <div class="cartao">
+        <h2>Serviço da aplicação</h2>
+        <dl id="servicoDetalhe"></dl>
+      </div>
+      <div class="cartao">
+        <h2>Ações</h2>
+        <div id="servicoAcoes"></div>
+      </div>
+      <div class="cartao">
+        <h2>Registros do sistema</h2>
+        <div class="linha" style="margin-bottom:10px">
+          <label class="oculto" for="logUnidade">Unidade</label>
+          <select id="logUnidade" style="max-width:220px">
+            <option value="aplicacao">Aplicação (remoteifes.service)</option>
+            <option value="saude">Watchdog de saúde</option>
+            <option value="console">Console de Operações</option>
+            <option value="recuperacao">Reinício de recuperação</option>
+          </select>
+          <label class="oculto" for="logLinhas">Linhas</label>
+          <select id="logLinhas" style="max-width:130px">
+            <option value="100">100 linhas</option>
+            <option value="200" selected>200 linhas</option>
+            <option value="500">500 linhas</option>
+            <option value="1000">1000 linhas</option>
+          </select>
+          <button type="button" class="btn pequeno" id="btnCarregarLog">Carregar</button>
+        </div>
+        <pre class="saida" id="logSaida" tabindex="0" aria-label="Conteúdo do registro"></pre>
+      </div>
+    </section>
+
+    <!-- Atualizações -->
+    <section id="painel-atualizacao" role="tabpanel" aria-labelledby="aba-atualizacao" tabindex="-1" class="oculto">
+      <div id="atualizacaoAvisos"></div>
+      <div class="cartao">
+        <div class="linha entre">
+          <h2>Situação das versões</h2>
+          <div class="linha">
+            <button type="button" class="btn pequeno" id="btnVerificarRemoto">Verificar origin</button>
+            <button type="button" class="btn pequeno" id="btnBuscarObjetos">Buscar objetos</button>
+          </div>
+        </div>
+        <dl id="atualizacaoDetalhe"></dl>
+      </div>
+      <div class="cartao" id="cartaoMudancas">
+        <h2>O que muda</h2>
+        <div id="atualizacaoMudancas"><p class="fraco">Verifique origin para comparar com a versão em execução.</p></div>
+      </div>
+      <div class="cartao">
+        <h2>Ações</h2>
+        <div id="atualizacaoAcoes"></div>
+      </div>
+      <div class="cartao">
+        <h2>Histórico de implantações</h2>
+        <div class="tabela-rolavel"><table id="tabelaHistorico"><thead><tr><th>Quando</th><th>Tipo</th><th>De</th><th>Para</th><th>Resultado</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- Dados e recuperação -->
+    <section id="painel-dados" role="tabpanel" aria-labelledby="aba-dados" tabindex="-1" class="oculto">
+      <div id="dadosAvisos"></div>
+      <div class="cartao">
+        <h2>Backups</h2>
+        <p class="fraco" id="backupEscopo"></p>
+        <div id="backupAcoes" style="margin:10px 0"></div>
+        <div class="tabela-rolavel"><table id="tabelaBackups"><thead><tr><th>Arquivo</th><th>Tamanho</th><th>Quando</th><th>Restaurar</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="cartao">
+        <h2>Recuperação</h2>
+        <div id="recuperacaoAcoes"></div>
+      </div>
+      <div class="cartao">
+        <h2>Banco de dados</h2>
+        <dl id="bancoDetalhe"></dl>
+      </div>
+    </section>
+
+    <!-- Aplicativo e CI -->
+    <section id="painel-mobile" role="tabpanel" aria-labelledby="aba-mobile" tabindex="-1" class="oculto">
+      <div class="cartao">
+        <h2>Identidades de versão</h2>
+        <p class="fraco">Estas versões são independentes: avançar uma não avança as outras.</p>
+        <dl id="mobileIdentidades"></dl>
+      </div>
+      <div class="cartao">
+        <h2>APK publicado</h2>
+        <dl id="mobileRelease"></dl>
+      </div>
+      <div class="cartao">
+        <h2>Build e publicação</h2>
+        <div id="mobileBuild"></div>
+      </div>
+      <div class="cartao">
+        <div class="linha entre">
+          <h2>Integração contínua</h2>
+          <button type="button" class="btn pequeno" id="btnCarregarCI">Consultar GitHub</button>
+        </div>
+        <div id="mobileCI"><p class="fraco">A consulta ao GitHub é sob demanda: a operação normal do RemoteIFES não depende dela.</p></div>
+      </div>
+    </section>
+
+    <!-- Rede e domínio -->
+    <section id="painel-rede" role="tabpanel" aria-labelledby="aba-rede" tabindex="-1" class="oculto">
+      <div class="cartao">
+        <div class="linha entre">
+          <h2>Diagnóstico de rede</h2>
+          <button type="button" class="btn pequeno" id="btnCarregarRede">Coletar</button>
+        </div>
+        <div id="redeConteudo"><p class="fraco">A coleta é sob demanda para não gastar CPU e rede do Pi em segundo plano.</p></div>
+      </div>
+    </section>
+
+    <!-- Avançado -->
+    <section id="painel-avancado" role="tabpanel" aria-labelledby="aba-avancado" tabindex="-1" class="oculto">
+      <div class="cartao">
+        <h2>Sessão e elevação</h2>
+        <div id="avancadoSessao"></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Terminal Expert</h2>
+        <div id="terminalEstado"></div>
+        <div id="terminalArea" class="oculto">
+          <pre id="terminalTela" tabindex="0" aria-label="Saída do terminal" role="log"></pre>
+          <div class="campo" style="margin-top:10px">
+            <label for="terminalEntrada">Entrada do terminal</label>
+            <input type="text" id="terminalEntrada" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Digite e pressione Enter" />
+          </div>
+          <div class="linha">
+            <button type="button" class="btn pequeno" id="btnTerminalFechar">Encerrar sessão</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cartao">
+        <h2>Credencial do GitHub</h2>
+        <div id="segredoGitHub"></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Operações do console</h2>
+        <div id="avancadoAcoes"></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Registro de auditoria do console</h2>
+        <p class="fraco">Metadados das operações. Nunca contém senhas, tokens nem transcrição de terminal.</p>
+        <div class="tabela-rolavel"><table id="tabelaAuditoria"><thead><tr><th>Quando</th><th>Evento</th><th>Detalhes</th></tr></thead><tbody></tbody></table></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Histórico de operações</h2>
+        <div class="tabela-rolavel"><table id="tabelaTrabalhos"><thead><tr><th>Quando</th><th>Operação</th><th>Estado</th><th>Saída</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+  </main>
+
+  <p class="rodape">Console de Operações · a operação do prédio (salas, agendamentos, usuários, ESP32) fica no aplicativo RemoteIFES.</p>
+</div>
+
+<!-- ===== Diálogos ===== -->
+<dialog id="dlgAcao" aria-labelledby="dlgAcaoTitulo">
+  <form method="dialog">
+    <div class="cabecalho" id="dlgAcaoTitulo">Confirmar operação</div>
+    <div class="corpo" id="dlgAcaoCorpo"></div>
+    <div class="rodape">
+      <button type="button" class="btn" id="dlgAcaoCancelar">Cancelar</button>
+      <button type="button" class="btn primario" id="dlgAcaoConfirmar">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgElevacao" aria-labelledby="dlgElevacaoTitulo">
+  <form method="dialog">
+    <div class="cabecalho" id="dlgElevacaoTitulo">Reautenticação necessária</div>
+    <div class="corpo">
+      <p>Esta operação é sensível. Informe a senha do operador para liberá-la por alguns minutos.</p>
+      <div class="campo">
+        <label for="elevSenha">Senha</label>
+        <input type="password" id="elevSenha" autocomplete="current-password" />
+      </div>
+      <div id="elevErro"></div>
+    </div>
+    <div class="rodape">
+      <button type="button" class="btn" id="dlgElevCancelar">Cancelar</button>
+      <button type="button" class="btn primario" id="dlgElevConfirmar">Liberar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgTrabalho" aria-labelledby="dlgTrabalhoTitulo">
+  <form method="dialog">
+    <div class="cabecalho" id="dlgTrabalhoTitulo">Operação em andamento</div>
+    <div class="corpo">
+      <div id="dlgTrabalhoEstado"></div>
+      <pre class="saida" id="dlgTrabalhoSaida" tabindex="0" aria-live="polite" aria-label="Saída da operação"></pre>
+    </div>
+    <div class="rodape">
+      <button type="button" class="btn perigo" id="dlgTrabalhoCancelar">Cancelar operação</button>
+      <button type="button" class="btn" id="dlgTrabalhoFechar">Fechar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>
