@@ -91,11 +91,16 @@ router.get("/manutencao/prontidao", autorizar, (req, res) => {
         pausado: rollout.estado === "pausado",
         // Um rollout pausado com trabalho pendente volta a mexer em dispositivos quando for
         // retomado: ele conta como manutenção conflitante, mesmo parado agora.
-        pendentes: Array.isArray(rollout.pendentes)
-          ? rollout.pendentes.length
-          : Array.isArray(rollout.fila)
-            ? rollout.fila.length
-            : null,
+        //
+        // A contagem vem de `rollout.dispositivos[].estado`, que é a estrutura real do serviço.
+        // Campos `pendentes`/`fila` no topo do objeto nunca existiram: lê-los devolvia sempre
+        // null e um rollout pausado com trabalho pendente passava despercebido.
+        pendentes: Array.isArray(rollout.dispositivos)
+          ? rollout.dispositivos.filter((d) => d && d.estado === "pendente").length
+          : null,
+        emAndamento: Array.isArray(rollout.dispositivos)
+          ? rollout.dispositivos.filter((d) => d && ["atualizando", "reiniciando", "validando"].includes(d.estado)).length
+          : null,
       }
     : null;
 

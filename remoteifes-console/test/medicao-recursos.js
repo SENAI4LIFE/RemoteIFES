@@ -20,7 +20,7 @@ const os = require("os");
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const { spawn } = require("child_process");
+const { spawn, execFileSync } = require("child_process");
 
 const RAIZ = path.join(__dirname, "..");
 const JSON_SAIDA = process.argv.includes("--json");
@@ -35,15 +35,44 @@ function agora() {
   return Number(process.hrtime.bigint() / 1000n) / 1000;
 }
 
+/**
+ * Memória residente do processo, nos três sistemas.
+ *
+ * Antes isto só media no Linux e devolvia `null` no resto, o que transformava a afirmação
+ * central — "o console é leve" — em algo não verificado justamente onde não há ativação por
+ * socket para garantir o zero ocioso. Cada sistema tem sua fonte: /proc no Linux, `ps` no
+ * macOS, `tasklist` no Windows (working set, que é o análogo prático do RSS).
+ */
 function rssDe(pid) {
-  if (process.platform === "linux") {
-    try {
-      const status = fs.readFileSync(`/proc/${pid}/status`, "utf8");
-      const m = /VmRSS:\s+(\d+)\s+kB/.exec(status);
-      if (m) return Number(m[1]) * 1024;
-    } catch {}
-  }
+  if (!pid) return null;
+  try {
+    if (process.platform === "linux") {
+      const m = /VmRSS:\s+(\d+)\s+kB/.exec(fs.readFileSync(`/proc/${pid}/status`, "utf8"));
+      return m ? Number(m[1]) * 1024 : null;
+    }
+    if (process.platform === "darwin") {
+      const saida = execFileSync("ps", ["-o", "rss=", "-p", String(pid)], { encoding: "utf8", timeout: 10_000 }).trim();
+      return saida ? Number(saida) * 1024 : null;
+    }
+    if (process.platform === "win32") {
+      const saida = execFileSync("tasklist.exe", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], { encoding: "utf8", timeout: 15_000 });
+      // "node.exe","1234","Console","1","52.184 K"  — separador de milhar depende da locale.
+      const m = /"([\d.,\u00a0 ]+) K"\s*$/m.exec(saida.trim());
+      return m ? Number(m[1].replace(/[^\d]/g, "")) * 1024 : null;
+    }
+  } catch {}
   return null;
+}
+
+/** Custo de partida de um processo Node deste host, para separar o que é nosso do que é runtime. */
+function medirPartida(args) {
+  const inicio = agora();
+  try {
+    execFileSync(process.execPath, args, { stdio: "ignore", timeout: 120_000, env: { ...process.env } });
+  } catch {
+    return null;
+  }
+  return Number((agora() - inicio).toFixed(1));
 }
 
 function pedir(porta, caminho, cabecalhos = {}) {
@@ -99,14 +128,43 @@ async function medir() {
     cenarios: {},
   };
 
-  // 1. Console desligado.
+  // 1. Console desligado. O zero é o mesmo nos três sistemas, mas o MOTIVO não é — e dizer
+  // "ativação por socket" num Windows seria descrever um mecanismo que não existe ali.
+  const mecanismoOcioso = {
+    linux:
+      "Com ativação por socket, o systemd guarda a porta e nenhum processo do console existe. " +
+      "Este zero é estrutural, não a medição de um processo enxuto.",
+    win32:
+      "Não há serviço residente: o console só existe enquanto alguém o usa. Quem o abre é o " +
+      "lançador (atalho ou tarefa agendada ONLOGON, que não mantém processo), e ele sai sozinho " +
+      "ao ficar ocioso. O zero é o mesmo do Linux, por outro caminho.",
+    darwin:
+      "Não há serviço residente: o LaunchAgent é instalado com RunAtLoad=false e KeepAlive=false, " +
+      "então nada sobe no login. O console existe enquanto alguém o usa e sai sozinho ao ficar " +
+      "ocioso. O zero é o mesmo do Linux, por outro caminho.",
+  };
   resultados.cenarios.desligado = {
-    descricao: "console instalado com ativação por socket, sem ninguém usando",
+    descricao: "console instalado, sem ninguém usando",
     processosNode: 0,
     rssBytes: 0,
+    mecanismo: process.platform === "linux" ? "socket do systemd" : "partida sob demanda pelo lançador",
+    observacao: mecanismoOcioso[process.platform] || "Nenhum processo do console fica residente neste sistema.",
+  };
+
+  // 1b. Custo de uma abertura fria: é o que o operador sente onde não há socket guardando a
+  // porta. O Node sozinho já custa uma parte disso, e separar as duas evita cobrar do console
+  // o preço do runtime.
+  const partidaNodeVazio = medirPartida(["-e", "0"]);
+  const partidaLancador = medirPartida([path.join(RAIZ, "launcher.js"), "--status"]);
+  resultados.cenarios.aberturaFria = {
+    descricao: "custo de abrir o lançador com o console parado (node frio + código do console)",
+    nodeVazioMs: partidaNodeVazio,
+    lancadorStatusMs: partidaLancador,
+    custoDoConsoleMs:
+      partidaNodeVazio !== null && partidaLancador !== null ? Number((partidaLancador - partidaNodeVazio).toFixed(1)) : null,
     observacao:
-      "Com ativação por socket, o systemd guarda a porta e nenhum processo do console existe. " +
-      "Este zero é estrutural, não uma medição de um processo enxuto.",
+      "Mede o caminho que o operador percorre onde não há ativação por socket. O lançador ainda " +
+      "sonda a saúde da aplicação e o gerenciador de serviços, então parte deste tempo é espera de I/O, não CPU.",
   };
 
   // 2. Partida do processo.
@@ -222,7 +280,12 @@ async function medir() {
     ms: Number(log.ms.toFixed(1)),
     bytesResposta: Buffer.byteLength(log.texto),
     rssBytes: rssDe(filho.pid),
-    observacao: "Neste host o journal não existe; o custo real no Pi inclui o journalctl invocado pelo auxiliar.",
+    observacao:
+      process.platform === "linux"
+        ? "No Pi o custo real inclui o journalctl invocado pelo auxiliar privilegiado."
+        : process.platform === "win32"
+          ? "No Windows a leitura passa por Get-WinEvent num PowerShell novo; o tempo acima é dominado por essa partida."
+          : "No macOS a leitura passa por `log show`; o tempo acima é dominado por essa consulta.",
   };
 
   // 6. Manutenção representativa: um backup do banco, se houver banco.
@@ -274,8 +337,12 @@ async function medir() {
       ? "Medido em Raspberry Pi: os números valem para o alvo."
       : "NÃO medido em Raspberry Pi 3. Estes números descrevem apenas o host acima e não podem ser " +
         "apresentados como desempenho do Pi. Para obter os valores do alvo, rode este mesmo script no Pi.",
+    resultados.cenarios.ligadoSemNavegador.rssBytes === null
+      ? `Não foi possível ler a memória residente neste host (${process.platform}); os campos rssBytes vêm nulos.`
+      : null,
     process.platform !== "linux"
-      ? "RSS por processo não é lido fora do Linux: os campos rssBytes vêm nulos."
+      ? "Sem systemd, o zero ocioso vem da saída por ociosidade do próprio console, não de um " +
+        "socket guardado pelo sistema: se o processo for iniciado à mão e ninguém o fechar, ele não sai sozinho."
       : null,
     "Nenhuma medição foi feita contra dispositivos ESP32 reais nem contra dados de produção.",
   ].filter(Boolean);

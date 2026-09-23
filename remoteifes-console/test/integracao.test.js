@@ -216,15 +216,49 @@ test("o console não é publicado pelo GitHub Pages nem entra no pacote Cordova"
   assert.ok(!app.includes("remoteifes-console"), "o servidor da aplicação não serve arquivos do console");
 });
 
-test("o console não tem dependências npm", () => {
+test("a única dependência do console é o verificador de releases: fixada, pequena, JavaScript puro", () => {
+  // Toda dependência viaja dentro do programa instalado e roda num Pi de 1 GiB. O verificador é o
+  // que o modelo de atestação exige, e nada mais entra ao lado dele.
   const pacote = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8"));
-  assert.equal(pacote.dependencies, undefined, "o console não deve declarar dependências de runtime");
-  assert.equal(pacote.devDependencies, undefined, "nem dependências de desenvolvimento");
+  assert.deepEqual(Object.keys(pacote.dependencies).sort(), ["@sigstore/bundle", "@sigstore/protobuf-specs", "@sigstore/tuf", "@sigstore/verify"]);
+  assert.deepEqual(Object.keys(pacote.devDependencies), ["@sigstore/mock"], "o mock que emite atestações de teste é a única dependência de desenvolvimento");
+  for (const versao of [...Object.values(pacote.dependencies), ...Object.values(pacote.devDependencies), ...Object.values(pacote.overrides)]) {
+    assert.match(versao, /^\d+\.\d+\.\d+$/, "versões exatas, sem intervalos");
+  }
   assert.match(pacote.engines.node, /22/);
+
+  const trava = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package-lock.json"), "utf8"));
+  const producao = Object.entries(trava.packages).filter(([chave, info]) => chave.startsWith("node_modules/") && !info.dev && !info.devOptional);
+  assert.ok(producao.length <= 20, `${producao.length} pacotes de produção; a árvore do verificador tem 14`);
+  for (const [chave, info] of producao) {
+    assert.ok(!info.hasInstallScript, `${chave} roda um script de instalação`);
+    assert.ok(/^https:\/\/registry\.npmjs\.org\//.test(info.resolved || ""), `${chave} não vem do registro do npm`);
+    assert.match(info.integrity || "", /^sha512-/, `${chave} não tem hash de integridade`);
+    const dir = path.join(ajuda.RAIZ, ...chave.split("/"));
+    if (!fs.existsSync(dir)) continue;
+    const nativos = [];
+    const varrer = (d) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) varrer(path.join(d, e.name));
+        else if (/\.node$|^binding\.gyp$/.test(e.name)) nativos.push(path.join(d, e.name));
+      }
+    };
+    varrer(dir);
+    assert.deepEqual(nativos, [], `${chave} traz código nativo`);
+  }
 });
 
 test("nenhum segredo fica versionado no diretório do console", () => {
-  const proibidos = [/-----BEGIN [A-Z ]*PRIVATE KEY/, /ghp_[A-Za-z0-9]{20,}/, /scrypt\$\d+\$/];
+  // Os padrões descrevem segredos **reais**, não qualquer coisa parecida. Um hash scrypt de
+  // verdade traz N de quatro dígitos ou mais e sal/chave em base64 longos; `scrypt$1$1$1$a$b`
+  // é fixture de teste e não é credencial de ninguém. Afrouxar aqui seria perder a proteção;
+  // ser específico a mantém sem alarme falso.
+  const proibidos = [
+    /-----BEGIN [A-Z ]*PRIVATE KEY/,
+    /gh[pousr]_[A-Za-z0-9]{30,}/,
+    /scrypt\$\d{4,}\$\d+\$\d+\$[A-Za-z0-9+/=]{20,}\$[A-Za-z0-9+/=]{20,}/,
+    /AKIA[0-9A-Z]{16}/,
+  ];
   const ignorar = new Set(["node_modules", ".git"]);
 
   function varrer(dir) {
@@ -235,7 +269,7 @@ test("nenhum segredo fica versionado no diretório do console", () => {
         varrer(completo);
         continue;
       }
-      if (!/\.(js|json|md|sh|css|html|modelo|socket)$/.test(entrada.name)) continue;
+      if (!/\.(js|json|md|sh|ps1|css|html|modelo|socket|plist|yml)$/.test(entrada.name)) continue;
       const texto = fs.readFileSync(completo, "utf8");
       for (const padrao of proibidos) {
         // O teste de segurança usa tokens sintéticos de propósito; eles são reconhecíveis.

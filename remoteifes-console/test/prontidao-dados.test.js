@@ -170,6 +170,31 @@ test("rollout pausado com pendências vira aviso; ativo vira bloqueio", async (t
   assert.match(aviso.detalhe, /volta a mexer nos dispositivos/);
 });
 
+test("rollout pausado com dispositivo ainda em voo bloqueia, não apenas avisa", async (t) => {
+  // Pausar o rollout não recolhe quem já está gravando: um ESP32 em "atualizando",
+  // "reiniciando" ou "validando" continua em voo. Reiniciar o serviço nesse instante é o
+  // caminho para um dispositivo que não volta, então isso bloqueia.
+  const pausado = await aplicacaoFalsa({
+    dispositivos: { conectados: 0, canaisDeComando: 0, salas: [] },
+    ota: { ativos: 0, porFase: {}, salas: [] },
+    rollout: { ativo: false, estado: "pausado", pausado: true, versao: "4.1.0", pendentes: 0, emAndamento: 2 },
+  });
+  const checkout = checkoutComDados({ porta: pausado.porta });
+  const amb = ajuda.ambiente({ checkout });
+  t.after(async () => {
+    await pausado.fechar();
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  amb.prontidao.garantirTokenProntidao();
+  const avaliacao = await amb.prontidao.avaliar({ interrompeServico: true });
+  const bloqueio = avaliacao.bloqueios.find((b) => b.titulo.includes("em atualização"));
+  assert.ok(bloqueio, `dispositivo em voo tem de bloquear. Avaliação: ${JSON.stringify(avaliacao)}`);
+  assert.match(bloqueio.detalhe, /2 em voo/);
+  assert.match(bloqueio.detalhe, /Espere os dispositivos em voo terminarem/);
+});
+
 test("canal de comandos é distinguido de presença no hub", async (t) => {
   const app = await aplicacaoFalsa({
     dispositivos: { conectados: 10, canaisDeComando: 4, salas: [] },
@@ -330,8 +355,10 @@ test("a restauração exige quiescência: com a aplicação no ar ela não insta
 
   assert.equal(codigo, 1, `sem conseguir parar a aplicação, a restauração tem de falhar. Saída:
 ${saida}`);
-  assert.match(saida, /continua respondendo ao \/health/);
-  assert.match(saida, /há um escritor ativo no banco/);
+  // Sem controle de ciclo de vida nesta plataforma e com a aplicação respondendo, a restauração
+  // recusa em vez de presumir que o silêncio do /health prova ausência de escritor.
+  assert.match(saida, /continua respondendo e o console não tem como pará-la/);
+  assert.ok(!/Instalando o backup/.test(saida), "nada pode ser instalado sem quiescência comprovada");
   assert.deepEqual(fs.readFileSync(banco), antes, "o banco atual não pode ser tocado quando a quiescência falha");
   assert.ok(!fs.existsSync(`${banco}.incoming-`), "nenhum arquivo intermediário pode sobrar");
 });

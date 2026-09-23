@@ -18,12 +18,16 @@ const redes = congelar(["npm run redes -- 10.10.0.0/16 192.168.0.0/16", "npm run
 // Console de Operações: instalação, acesso e reparo. O console passou a ser o caminho normal
 // para serviço, atualização, backup/restauração e recuperação de conta; os comandos abaixo são
 // o que continua sendo feito por terminal.
-const consoleInstalar = congelar(["cd remoteifes-console", "sudo bash install-console.sh"]);
+const consoleInstalar = congelar(["cd remoteifes-console", "sudo node instalacao/instalar.js --escopo sistema"]);
 const consoleAcesso = congelar(["ssh -L 8099:127.0.0.1:8099 <usuario>@<host-do-pi>"]);
 const consoleReparo = congelar([
   "sudo systemctl status remoteifes-console.socket",
   "sudo journalctl -u remoteifes-console.service -e",
-  "sudo bash /opt/remoteifes-console/atual/install-console.sh",
+  "sudo node /opt/remoteifes-console/versoes/<versao>/instalacao/instalar.js --escopo sistema --forcar",
+]);
+const consoleRemover = congelar([
+  "sudo node /opt/remoteifes-console/versoes/<versao>/instalacao/desinstalar.js --simular",
+  "sudo node /opt/remoteifes-console/versoes/<versao>/instalacao/desinstalar.js --sim",
 ]);
 
 const backupCriar = congelar(["npm run backup", "npm run backup -- pre-migracao"]);
@@ -86,6 +90,7 @@ module.exports = Object.freeze({
   consoleInstalar,
   consoleAcesso,
   consoleReparo,
+  consoleRemover,
   iniciar,
   desenvolvimento,
   servicoInstalar,
