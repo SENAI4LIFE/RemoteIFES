@@ -5,6 +5,8 @@ const estado = require("./src/estado");
 const execucao = require("./src/execucao");
 const prontidao = require("./src/prontidao");
 const servidor = require("./src/servidor");
+const identidade = require("./src/identidade");
+const atualizador = require("./src/atualizador");
 
 // Ponto de entrada do Console de Operações.
 //
@@ -41,6 +43,18 @@ function iniciar() {
     console.error(`aviso: não foi possível provisionar o contrato de prontidão (${erro.message})`);
   }
 
+  // Reconciliação de uma atualização do console interrompida (queda de energia entre o estágio
+  // e a troca do ponteiro). A troca em si é um rename, então nunca há instalação pela metade —
+  // o que pode sobrar é estágio a limpar.
+  try {
+    const t = atualizador.reconciliar();
+    if (t.reconciliado && t.etapaInterrompida) {
+      console.error(`atualização do console interrompida na etapa "${t.etapaInterrompida}" (versão ${t.versao}); estágio descartado.`);
+    }
+  } catch (erro) {
+    console.error(`aviso: não foi possível reconciliar a atualização do console (${erro.message})`);
+  }
+
   // Reconciliação: o processo pode ter saído por ociosidade, caído ou sido reiniciado por uma
   // auto-atualização enquanto um trabalho corria.
   const desconhecidos = execucao.reconciliar();
@@ -52,6 +66,9 @@ function iniciar() {
   const fd = descritorDoSystemd();
 
   const encerrar = (codigo = 0) => {
+    try {
+      identidade.limparContrato();
+    } catch {}
     try {
       app.close();
     } catch {}
@@ -70,22 +87,42 @@ function iniciar() {
     process.exit(1);
   });
 
+  const publicarContrato = (modo) => {
+    const endereco = app.address();
+    const porta = endereco && typeof endereco === "object" ? endereco.port : config.PORTA;
+    try {
+      identidade.publicarContrato({ porta, modo });
+    } catch (erro) {
+      console.error(`aviso: não foi possível publicar o contrato de identidade (${erro.message}); o lançador não vai confirmar este processo.`);
+    }
+    return porta;
+  };
+
+  // O lançador sabe religar o console; o socket do systemd também. Em execução avulsa não há
+  // quem reative, então a saída por ociosidade fica desarmada.
+  const reativavel = fd !== null || process.env.CONSOLE_INICIADO_PELO_LANCADOR === "1";
+
   if (fd !== null) {
     app.listen({ fd }, () => {
-      estado.auditar("console-iniciado", { modo: "socket-systemd", ociosidadeS: config.OCIOSIDADE_S });
+      const porta = publicarContrato("socket-systemd");
+      estado.auditar("console-iniciado", { modo: "socket-systemd", porta, ociosidadeS: config.OCIOSIDADE_S });
       console.log(`Console de Operações ativo pelo socket do systemd (fd ${fd}).`);
     });
   } else {
     app.listen(config.PORTA, config.ENDERECO, () => {
+      publicarContrato("tcp");
       estado.auditar("console-iniciado", { modo: "tcp", endereco: config.ENDERECO, porta: config.PORTA });
       console.log(`Console de Operações em http://${config.ENDERECO}:${config.PORTA}`);
       if (config.ENDERECO === "127.0.0.1") {
         console.log(`De outra máquina: ssh -L ${config.PORTA}:127.0.0.1:${config.PORTA} <usuario>@<host>`);
       }
+      if (!reativavel) {
+        console.log("Execução avulsa: a saída por ociosidade fica desarmada (ninguém religaria o console).");
+      }
     });
   }
 
-  servidor.armarSaidaPorOciosidade(app, () => encerrar(0));
+  servidor.armarSaidaPorOciosidade(app, () => encerrar(0), { reativavel });
 
   process.on("SIGTERM", () => encerrar(0));
   process.on("SIGINT", () => encerrar(0));
@@ -99,6 +136,9 @@ function iniciar() {
   });
 }
 
+// Entrada explícita. `require.main === module` não vale quando a camada estável de bootstrap
+// carrega este arquivo: ali o módulo principal é o bootstrap, e confiar nisso deixaria o
+// serviço subir sem escutar nada.
 if (require.main === module) iniciar();
 
-module.exports = { iniciar, descritorDoSystemd };
+module.exports = { iniciar, executar: iniciar, descritorDoSystemd };

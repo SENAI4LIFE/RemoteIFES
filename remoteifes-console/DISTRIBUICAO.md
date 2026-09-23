@@ -1,0 +1,243 @@
+# Console de Operações — runtime, empacotamento e atualização
+
+Decisão de distribuição, escrita antes da implementação multiplataforma e mantida junto do
+código. Complementa [ARQUITETURA.md](ARQUITETURA.md), que trata da fronteira de produto, da
+identidade e do modelo de privilégio.
+
+## 1. Runtime: Node do sistema, não runtime embutido
+
+| Alternativa | Tamanho no Pi | Superfície de segurança | Executa código do checkout | Veredito |
+|---|---|---|---|---|
+| **Node do sistema (escolhida)** | 0 (já obrigatório) | um runtime para corrigir | sim, mesma semântica | **Escolhida** |
+| Runtime Node privado embutido | +50–90 MiB por instalação | **dois** runtimes para corrigir a cada CVE | sim | Rejeitada |
+| Node SEA (executável único) | ~80–110 MiB | um binário congelado, corrigido só por release nossa | **não** de forma confiável | Rejeitada |
+| Shell nativo com webview | runtime de webview por plataforma | dependente da plataforma | sim | Rejeitada |
+
+O argumento decisivo não é tamanho, é **pré-requisito já existente**: o console administra uma
+instalação RemoteIFES *no mesmo host*, e `remoteifes-server` declara `node >= 22.13.0`. Um host
+sem Node não tem o que o console administre. Embutir um segundo runtime acrescentaria dezenas de
+MiB num Raspberry Pi 3 e, pior, um segundo interpretador para acompanhar em cada correção de
+segurança — exatamente o contrário de "leve".
+
+**Node SEA foi descartado por um motivo concreto, não por gosto.** Os executores do console
+usam `process.execPath` para rodar arquivos `bin/*.js` reais, e `bin/backup.js`,
+`bin/restaurar.js` e `bin/recuperar-conta.js` carregam módulos **do checkout administrado**
+(`backupService`, `node:sqlite`, `bcryptjs`). Um binário SEA não é um `node` de uso geral: ele
+resolve módulos e ativos pelas regras do próprio empacotamento. Os caminhos de backup,
+restauração e recuperação de conta deixariam de funcionar ou exigiriam um `node` do sistema
+assim mesmo — ou seja, o SEA pagaria o custo sem remover a dependência.
+
+Consequência assumida: o instalador **verifica** o Node e recusa instalar com uma mensagem
+precisa quando ele falta ou é antigo, em vez de instalar algo que não subiria.
+
+### Horizonte ARMv7 / armhf (Raspberry Pi 3)
+
+Um Pi 3 pode ter hardware de 64 bits, kernel de 64 bits e **userland de 32 bits** ao mesmo
+tempo. Por isso o console classifica quatro coisas separadamente — hardware, kernel, userland e
+runtime — e **nunca** decide por `uname -m` sozinho: a fonte primária é `process.arch` (a
+arquitetura do runtime que de fato vai executar), complementada pela arquitetura do gerenciador
+de pacotes quando existe (`dpkg --print-architecture`).
+
+O Node 22 publica binários ARMv7 e é a última linha com esse suporte em nível normal; o Node 24
+rebaixa ARMv7 a experimental. O Node 22 tem fim de suporte em **2027-04-30**. Portanto:
+
+* um Pi 3 com Raspberry Pi OS de 32 bits continua suportado enquanto o Node 22 tiver suporte;
+* a recomendação de longo prazo para produção é **migrar o Pi 3 para um sistema de 64 bits**
+  (userland arm64), o que o mantém dentro das linhas atuais do Node depois de 2027-04-30;
+* o console exibe essa classificação e o aviso de horizonte em vez de deixar o operador
+  descobrir na atualização que quebrou.
+
+## 2. Camada nativa: nenhuma, por decisão
+
+A tentação era um pequeno componente nativo por plataforma (lançador Windows + host de serviço
+SCM, ponte launchd). Foi rejeitada nesta passagem por um motivo de honestidade: **não há aqui
+ambiente para compilar e validar esse componente**, e um host de serviço SCM não testado é
+precisamente a "aproximação insegura ou enganosa" que não deve ser entregue.
+
+O que substitui cada papel:
+
+| Papel | Solução sem código nativo |
+|---|---|
+| Lançador Windows sem piscar console | atalho `.lnk` para `wscript.exe` executando `abrir-console.js` (WSH, subsistema GUI) |
+| Serviço de segundo plano Windows | **partida sob demanda pelo lançador** + tarefa agendada opcional; nenhum processo residente |
+| Ativação macOS | LaunchAgent por usuário com `RunAtLoad=false`, acionado pelo lançador; sem herança de fd |
+| Ativação Linux | **preservada**: socket do systemd com `LISTEN_FDS`, que continua sendo a melhor solução ali |
+
+O modelo Windows/macOS é **sob demanda**, não paridade com o systemd. Como não há serviço
+permanente registrado, não existe gerenciador de serviços para interpretar a saída por
+ociosidade como queda — o problema some por construção em vez de ser contornado.
+
+Quando um host de serviço SCM de verdade for necessário, o limite arquitetural já está no
+lugar: `src/plataforma/windows.js` isola tudo que dependeria dele.
+
+## 3. Formatos de pacote: só os que a CI consegue construir **e** validar
+
+| Plataforma | Artefato | Construído na CI | Instalação validada na CI |
+|---|---|---|---|
+| Linux (deb) | `remoteifes-console_<versão>_all.deb` | sim | **sim** — `dpkg -i`, layout conferido, `dpkg -r` |
+| Linux (portátil) | `.tar.gz` + `instalacao/instalar.js` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
+| Windows | `.zip` + `instalar.ps1` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
+| macOS | `.tar.gz` com bundle `.app` + `instalacao/instalar.js` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
+
+MSI/WiX, NSIS e `.pkg` assinado foram deliberadamente deixados de fora: sem credenciais de
+assinatura e sem ambiente de validação, entregariam um instalador não testado.
+
+O job `pacotes` da CI roda em `ubuntu-latest`, `windows-latest` e `macos-latest` e faz, em cada
+um: constrói o artefato; confere o que a procedência declara e que cada digest do manifesto bate
+com o arquivo; descompacta o artefato **fora da árvore de código** e instala a partir dele; confere
+o layout instalado, a coerência do ponteiro de versão e que o verificador de releases carrega de
+dentro do próprio payload; sobe o programa
+instalado com um `PATH` **sem git, npm ou compilador** e verifica que o lançador reconhece o
+console pela prova de identidade; e desinstala, confirmando que o estado sobrevive. Essa é a
+diferença entre "empacotamos" e "a instalação funciona".
+
+O `.tar.gz` é montado pelo próprio construtor, sem depender do `tar` do sistema: o Windows não
+tem GNU tar, e a forma dos cabeçalhos precisa casar exatamente com o extrator do atualizador —
+o que um teste verifica extraindo o artefato recém-construído com o extrator de produção. Pela
+mesma razão o `.deb` é montado em Node (formato `ar` + dois `tar.gz`), e pode ser construído a
+partir de qualquer um dos três sistemas.
+
+O payload leva as dependências de produção do console, e só elas: o verificador de releases
+(`@sigstore/verify` e `@sigstore/tuf`, 14 pacotes, cerca de 2 MB, JavaScript puro), cada uma na
+versão que o `package-lock.json` fixa (`instalacao/dependencias.js`). O pacote que só os testes
+usam fica de fora. Construir exige `npm ci --omit=dev` antes.
+
+## 4. Propriedade da atualização
+
+Modelo escolhido: **payload versionado lado a lado, com camada estável de bootstrap**.
+
+```
+<raiz>/console-bootstrap.js      camada estável: resolve a versão ativa e a carrega
+<raiz>/launcher-bootstrap.js     idem, para o lançador
+<raiz>/estado-instalacao.json    ponteiro da versão ativa (+ anterior, + transação em curso)
+<raiz>/versoes/2.0.0/            payload imutável, uma pasta por versão
+<raiz>/versoes/2.1.0/
+<raiz>/descargas/                área de estágio, limpa ao fim de cada transação
+```
+
+O ponteiro é um arquivo, não um link simbólico: o Windows exige privilégio para criar links
+simbólicos, e um layout que dependesse deles seria um layout diferente por sistema.
+
+Razões:
+
+* o `.deb` instala apenas a camada estável (lançador, unidades, auxiliar) e a **primeira**
+  versão; as seguintes vão para `versoes/` sem sobrescrever arquivos de propriedade do dpkg,
+  então o gerenciador de pacotes nunca fica inconsistente;
+* reverter é trocar o ponteiro, não reinstalar;
+* no Windows, o executável em uso não precisa ser substituído no lugar;
+* a unidade do systemd aponta para `console-bootstrap.js`, **nunca** para uma versão: atualizar
+  o console não reescreve arquivo do systemd nem exige `daemon-reload`.
+
+O alternativo — o atualizador baixar e instalar o próximo `.deb`/MSI pelo caminho privilegiado —
+foi rejeitado porque exigiria elevação a cada atualização e acoplaria o console ao gerenciador
+de pacotes de cada distribuição.
+
+**Regra que os dois modelos não podem misturar:** a troca do ponteiro nunca toca em arquivo
+registrado pelo gerenciador de pacotes. Um teste verifica isso.
+
+### Desinstalação
+
+`instalacao/desinstalar.js` remove integração de sistema, atalhos e o programa. Duas regras
+governam o arquivo:
+
+1. **nada é removido recursivamente sem prova de propriedade e contenção** — o diretório precisa
+   exibir as marcas de uma instalação do console, não ser raiz de disco nem a home, ter
+   profundidade mínima, pertencer a quem desinstala (uid em POSIX, permissão de escrita no
+   Windows) e **não** estar dentro de um checkout do RemoteIFES;
+2. **o estado fica por padrão** — operadores, auditoria e histórico sobrevivem; `--apagar-estado`
+   é explícito, e `--simular` mostra exatamente o que sairia antes de qualquer remoção.
+
+O desinstalador mora dentro do que apaga, então ele se copia para um diretório temporário e
+recomeça de lá. Sem isso, no Windows o arquivo em execução mantém um handle aberto e a raiz
+ficava para trás com `EPERM` depois de todo o conteúdo já ter sido removido — o pior dos dois
+mundos. Há regressão cobrindo esse caminho.
+
+## 5. Confiança da atualização
+
+Nenhuma chave de assinatura do RemoteIFES existe. Um release do console é confiável porque o
+**GitHub Actions atestou os bytes exatos dele** enquanto executava o workflow de publicação deste
+repositório para a etiqueta daquela versão: uma
+[atestação de artefato do GitHub](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations),
+sem chave.
+
+1. O workflow `.github/workflows/console-release.yml` roda quando uma etiqueta `console-v<versão>`
+   é enviada ao repositório.
+2. O job `attest` — o único com `id-token: write`, no ambiente `console-release` — troca a
+   identidade OIDC daquela execução por um certificado do Sigstore (Fulcio) válido por dez
+   minutos, que nomeia o repositório, o workflow, a etiqueta, o commit e o ambiente.
+3. A assinatura vai para o log de transparência público do Sigstore (Rekor). O pacote de atestação,
+   `atestacao.sigstore.json`, traz o certificado, a entrada do log e a declaração assinada
+   (proveniência SLSA) com o SHA-256 de **cada arquivo** do release.
+4. O console instalado confere tudo isso sozinho, antes de qualquer escrita.
+
+O que o console confere (`src/atestacao.js`), nesta ordem:
+
+| Etapa | O que precisa valer |
+|---|---|
+| Criptografia (`@sigstore/verify`) | cadeia do certificado até o Fulcio no momento da assinatura, transparência do certificado, inclusão no Rekor e a assinatura do envelope |
+| Emissor | `https://token.actions.githubusercontent.com` |
+| Repositório | `https://github.com/SENAI4LIFE/RemoteIFES`, id `1313157228` |
+| Dono | `https://github.com/SENAI4LIFE`, id `211847016` |
+| Workflow | `.github/workflows/console-release.yml`, como assinante e como workflow de nível superior |
+| Etiqueta | `refs/tags/console-v<versão do manifesto>` |
+| Gatilho, executor e ambiente | `push`, `github-hosted` e `console-release` |
+| Commit | o commit do certificado é o `commit` do manifesto |
+| Declaração | proveniência SLSA v1 que cobre o SHA-256 exato do `manifesto.json` e de cada payload que ele lista |
+
+A identidade vem **do certificado**, nunca do conteúdo da declaração, que só precisa concordar com
+ele. Os identificadores numéricos impedem que um repositório renomeado ou recriado com o mesmo nome
+herde a confiança. As comparações são exatas: nenhum padrão, nenhum prefixo. Nada disso é
+configurável — não há variável, arquivo nem opção de interface que troque a identidade aceita.
+
+Um release publicado é:
+
+```
+manifesto.json                                              (metadados)
+atestacao.sigstore.json                                     (atestação de todos os arquivos)
+remoteifes-console-<versão>-<plataforma>-<arch>.tar.gz      (payload, um por alvo)
+```
+
+Ainda não há release publicado nem workflow de publicação: enquanto nenhum existir, a aba
+**Programa** informa que não há publicação, e atualizar o console é reinstalar o pacote.
+
+O manifesto declara versão, canal, commit, alvos, SHA-256 e tamanho de cada payload e a versão
+mínima que pode atualizar para esta. Ele não tem assinatura própria: vale como os bytes exatos que
+a atestação cobre. A versão do manifesto tem de ser a da etiqueta do certificado, e o nome de cada
+payload é fixo por versão e alvo — um release antigo reapresentado como novo, ou o payload de outro
+alvo, não passa.
+
+A verificação é **fechada por padrão**, e a ordem garante isso: o payload só é baixado depois de a
+atestação, a identidade e a política de versão conferirem, e só é extraído depois de o SHA-256 dele
+bater com o manifesto atestado. Sem atestação, com atestação que não confere, identidade diferente,
+alvo ausente, digest divergente ou downgrade, nada é escrito no diretório ativo. Um SHA-256 vindo
+da mesma origem não confiável do artefato não prova autenticidade por si só: ele vale porque o
+manifesto que o declara é atestado, e a atestação traz o mesmo digest.
+
+O HTTPS protege o transporte; a decisão de instalar depende só da verificação da proveniência.
+Nenhuma credencial acompanha um download: os releases são públicos e o console não envia
+`Authorization` em nenhum salto.
+
+Downgrade só acontece por ação explícita de reversão, que usa a cópia local já verificada em
+`versoes/` e não a rede.
+
+### Raiz de confiança do Sigstore
+
+As chaves do Fulcio, do Rekor e dos logs de certificados vêm da raiz de confiança do Sigstore,
+distribuída por TUF (`tuf-repo-cdn.sigstore.dev`) e assinada pelas chaves-raiz do próprio Sigstore.
+O console parte da raiz embutida em `@sigstore/tuf` e a atualiza a cada verificação online, o que
+também faz valer aqui qualquer chave que o Sigstore retire. A cópia verificada fica em
+`<estado>/sigstore/` (cerca de 50 KB; os arquivos são sobrescritos, não acumulam). Não há arquivo
+de raiz para ninguém manter.
+
+Sem rede, a verificação usa a última raiz que uma atualização conferiu neste host ou, se nunca
+houve uma, a embutida. É a verificação offline normal do Sigstore, com o limite de sempre: ela não
+fica sabendo de uma chave revogada depois daquela cópia.
+
+## 6. O que continua sem suporte, e por quê
+
+| Capacidade | Estado | Bloqueio exato |
+|---|---|---|
+| Assinatura de código Windows / notarização macOS | **sem credenciais** | não há certificado nem conta de desenvolvedor; a procedência declara `assinaturaDeCodigo: false`. A origem dos arquivos é provada pela atestação do release (seção 5) |
+| Host de serviço SCM no Windows | **não suportado** (usa partida sob demanda) | exige componente nativo compilado e validado; ausente aqui |
+| Terminal Expert | **indisponível por padrão** nas três plataformas | `node-pty` é módulo nativo; não é distribuído aqui porque não há build por plataforma/arquitetura validado na CI. O console informa o requisito e o comando exatos **daquele** sistema (ConPTY no Windows, ferramentas do Xcode no macOS, `build-essential` no Linux) e não oferece nenhum substituto |
+| Publicação de APK de produção | inalterado, fora do host | exige Android SDK |

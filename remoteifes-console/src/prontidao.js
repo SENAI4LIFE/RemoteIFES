@@ -196,14 +196,27 @@ async function avaliar(opcoes = {}) {
       );
     }
     const rollout = prontidaoApp.rollout;
-    if (rollout && (rollout.ativo || (rollout.pausado && rollout.pendentes))) {
+    // Um rollout pausado não é um rollout inofensivo: ele volta a mexer em dispositivos quando
+    // retomado, e pode ter dispositivos AINDA EM VOO no momento da pausa — atualizando,
+    // reiniciando ou validando. Interromper o serviço com um ESP32 no meio de uma gravação é o
+    // caminho para um dispositivo que não volta.
+    const emVoo = Number(rollout && rollout.emAndamento) || 0;
+    const pendentes = Number(rollout && rollout.pendentes) || 0;
+    if (rollout && (rollout.ativo || (rollout.pausado && (pendentes || emVoo)))) {
+      const contagens = [pendentes ? `${pendentes} pendente(s)` : null, emVoo ? `${emVoo} em voo` : null].filter(Boolean).join(", ");
+      // Dispositivo em voo bloqueia mesmo com o rollout pausado; só trabalho pendente avisa.
+      const bloqueia = rollout.ativo || emVoo > 0;
       achados.push(
         achado(
-          rollout.ativo ? NIVEL.BLOQUEIO : NIVEL.AVISO,
-          rollout.ativo ? "Distribuição de firmware ativa" : "Distribuição de firmware pausada com trabalho pendente",
-          `versão ${rollout.versao || "?"}, estado ${rollout.estado || "?"}${rollout.pendentes ? `, ${rollout.pendentes} pendente(s)` : ""}. ` +
-            (rollout.ativo
-              ? "Pause ou cancele antes de interromper o serviço."
+          bloqueia ? NIVEL.BLOQUEIO : NIVEL.AVISO,
+          rollout.ativo
+            ? "Distribuição de firmware ativa"
+            : emVoo
+              ? "Distribuição pausada com dispositivos ainda em atualização"
+              : "Distribuição de firmware pausada com trabalho pendente",
+          `versão ${rollout.versao || "?"}, estado ${rollout.estado || "?"}${contagens ? `, ${contagens}` : ""}. ` +
+            (bloqueia
+              ? "Espere os dispositivos em voo terminarem, ou cancele, antes de interromper o serviço."
               : "Ela volta a mexer nos dispositivos quando for retomada.")
         )
       );

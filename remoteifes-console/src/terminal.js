@@ -65,30 +65,64 @@ function definirFabricaParaTeste(fabrica) {
   motivoIndisponivel = fabrica ? null : "fábrica de PTY removida para teste";
 }
 
+/**
+ * O que falta, em cada sistema, para o terminal existir — com o comando exato daquela
+ * plataforma. Uma instrução de `apt-get` num Windows não é ajuda: é ruído que faz o operador
+ * concluir que o recurso simplesmente não funciona.
+ */
+function comoInstalarPty() {
+  const raiz = config.RAIZ_INSTALACAO;
+  if (process.platform === "win32") {
+    return {
+      // node-pty no Windows usa ConPTY (Windows 10 1809+) e vem com binário pré-compilado para
+      // x64; em arm64 costuma exigir as Build Tools.
+      requisitos: "Windows 10 1809 ou mais novo (ConPTY). Em x64 o node-pty traz binário pronto; em arm64 exige Visual Studio Build Tools.",
+      comandos: [`cd "${raiz}"`, "npm install node-pty --omit=dev", "Feche e reabra o console pelo lançador."],
+    };
+  }
+  if (process.platform === "darwin") {
+    return {
+      requisitos: "Ferramentas de linha de comando do Xcode (`xcode-select --install`).",
+      comandos: [`cd "${raiz}"`, "npm install node-pty --omit=dev", "Feche e reabra o console pelo lançador."],
+    };
+  }
+  return {
+    requisitos: "Compilador e cabeçalhos do Node. Num Raspberry Pi a compilação leva alguns minutos.",
+    comandos: [
+      "sudo apt-get install -y build-essential python3",
+      `cd "${raiz}" && npm install node-pty --omit=dev`,
+      "sudo systemctl restart remoteifes-console.service",
+    ],
+  };
+}
+
 function disponibilidade() {
   const fabrica = detectarPty();
   if (fabrica) {
     return { disponivel: true, implementacao: fabrica.nome, shell: shellPadrao() };
   }
+  const instalacao = comoInstalarPty();
   return {
     disponivel: false,
     motivo: motivoIndisponivel || "PTY indisponível",
+    plataforma: process.platform,
     explicacao:
       "O terminal precisa de um pseudoterminal real para que tamanho de janela, sinais e programas de tela " +
       "funcionem. Node não oferece PTY nativo e o console não embute substituto: um terminal aproximado " +
       "quebraria em vim, less e htop sem avisar.",
-    instalacao: [
-      "sudo apt-get install -y build-essential python3",
-      "cd /opt/remoteifes-console/atual && npm install node-pty --omit=dev",
-      "sudo systemctl restart remoteifes-console.service",
-    ],
+    requisitos: instalacao.requisitos,
+    instalacao: instalacao.comandos,
     alternativa:
-      "Enquanto isso, o acesso de shell continua sendo por SSH. Isso NÃO substitui o terminal do console: " +
-      "é apenas o caminho que já existe, sem a integração de destravamento, prazo e auditoria daqui.",
+      process.platform === "win32"
+        ? "Enquanto isso, o acesso de linha de comando continua sendo o PowerShell da máquina. Isso NÃO " +
+          "substitui o terminal do console: não tem o destravamento, o prazo e a auditoria daqui."
+        : "Enquanto isso, o acesso de shell continua sendo por SSH. Isso NÃO substitui o terminal do console: " +
+          "é apenas o caminho que já existe, sem a integração de destravamento, prazo e auditoria daqui.",
   };
 }
 
 function shellPadrao() {
+  if (process.platform === "win32") return process.env.ComSpec || "powershell.exe";
   return process.env.SHELL && /^\/[\w./-]+$/.test(process.env.SHELL) ? process.env.SHELL : "/bin/bash";
 }
 
