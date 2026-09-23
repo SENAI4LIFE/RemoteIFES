@@ -1,17 +1,24 @@
 #!/usr/bin/env node
 // Restauração gerenciada do banco da aplicação.
 //
-// `restore-backup.js` do servidor avisa que o servidor "precisa estar PARADO", mas não
-// verifica nem garante isso: restaurar com a aplicação escrevendo é perder dados. Aqui a
-// quiescência é estabelecida e conferida, e o ciclo de vida anterior é restabelecido no fim.
+// `restore-backup.js` do servidor avisa que o servidor "precisa estar PARADO", mas não verifica:
+// restaurar com a aplicação escrevendo é perder dados. Aqui a quiescência é **estabelecida e
+// provada**, não inferida.
+//
+// A prova não pode ser "o /health parou de responder". Um processo travado, um servidor com
+// outra porta, uma instância iniciada à mão ou um proxy fora do ar produzem o mesmo silêncio
+// enquanto o banco continua com um escritor vivo. A prova positiva usada aqui é um **lock
+// exclusivo do próprio SQLite**: se alguém ainda tem o banco aberto para escrita, o lock falha
+// e a restauração não acontece.
 //
 // Sequência:
 //   1. valida o backup escolhido (identificador validado, nunca caminho livre do navegador);
-//   2. desliga o watchdog para que ele não reinicie a aplicação no meio;
-//   3. para a aplicação e confirma que o /health parou de responder (quiescência de escritor);
-//   4. delega a troca a backupService.restaurarBackup — que preserva o banco anterior,
-//      valida antes e depois e faz rollback se a verificação final falhar;
-//   5. restabelece o estado anterior do serviço e do watchdog e confere a saúde.
+//   2. desliga o watchdog, onde existe, para que ele não reinicie a aplicação no meio;
+//   3. para a aplicação pelo mecanismo da plataforma e confirma pelo gerenciador de serviços;
+//   4. **prova** que ninguém mais escreve, tomando o lock exclusivo do banco;
+//   5. delega a troca a backupService.restaurarBackup, que preserva o banco anterior, valida
+//      antes e depois e faz rollback se a verificação final falhar;
+//   6. restabelece o ciclo de vida anterior e confere a saúde.
 //
 // Em qualquer falha depois do passo 3, o ciclo de vida é restabelecido mesmo assim: deixar o
 // RemoteIFES parado e o watchdog desligado seria pior que a falha original.
@@ -23,6 +30,7 @@ const raizConsole = path.join(__dirname, "..");
 const config = require(path.join(raizConsole, "src", "config"));
 const processos = require(path.join(raizConsole, "src", "processos"));
 const coleta = require(path.join(raizConsole, "src", "coleta"));
+const plataforma = require(path.join(raizConsole, "src", "plataforma"));
 
 const nomeBackup = process.argv[2];
 const recuperarCorrompido = process.argv.includes("--recuperar-corrompido");
@@ -31,13 +39,54 @@ function passo(texto) {
   console.log(`\n== ${texto}`);
 }
 
-async function esperar(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function aplicacaoRespondendo() {
   const saude = await coleta.consultarSaude({ timeoutMs: 2000 });
   return saude.respondeu;
+}
+
+/**
+ * Prova positiva de que ninguém mais escreve no banco.
+ *
+ * Abre o arquivo e tenta um lock exclusivo do SQLite. Com outro escritor vivo — mesmo travado,
+ * mesmo em outra porta, mesmo iniciado à mão — o SQLite recusa com SQLITE_BUSY. Ausência de
+ * resposta HTTP não prova nada; isto prova.
+ */
+function provarQuiescencia(caminhoBanco) {
+  if (!fs.existsSync(caminhoBanco)) return { ok: true, motivo: "não há banco a proteger" };
+  let DatabaseSync;
+  try {
+    ({ DatabaseSync } = require("node:sqlite"));
+  } catch {
+    return { ok: false, motivo: "node:sqlite indisponível neste runtime; não é possível provar quiescência" };
+  }
+  let conexao;
+  try {
+    conexao = new DatabaseSync(caminhoBanco);
+    conexao.exec("PRAGMA busy_timeout = 3000");
+    // WAL permite vários escritores coexistirem; para provar exclusividade é preciso sair dele.
+    conexao.exec("PRAGMA journal_mode = DELETE");
+    conexao.exec("PRAGMA locking_mode = EXCLUSIVE");
+    // Só uma transação de escrita força a tomada do lock exclusivo de verdade.
+    conexao.exec("BEGIN IMMEDIATE");
+    conexao.exec("ROLLBACK");
+    return { ok: true, motivo: "lock exclusivo do SQLite obtido: nenhum outro escritor está aberto" };
+  } catch (erro) {
+    return {
+      ok: false,
+      motivo:
+        `não foi possível obter o lock exclusivo do banco (${erro.message}). ` +
+        "Há um escritor ativo — um processo do RemoteIFES em execução, possivelmente travado ou iniciado fora do serviço.",
+    };
+  } finally {
+    try {
+      if (conexao) {
+        conexao.exec("PRAGMA locking_mode = NORMAL");
+        conexao.close();
+      }
+    } catch {}
+  }
 }
 
 async function main() {
@@ -79,53 +128,57 @@ async function main() {
     return 1;
   }
 
-  const estadoServicoAntes = await coleta.estadoDoServico();
-  const watchdogAntes = await coleta.estadoDoWatchdog();
-  const precisaRestabelecerServico = estadoServicoAntes.suportado && estadoServicoAntes.ativo;
-  const precisaRestabelecerWatchdog = watchdogAntes.suportado && watchdogAntes.ativo;
+  const servicoAntes = await plataforma.estadoDoServico();
+  const watchdogAntes = await plataforma.estadoDoWatchdog();
+  const precisaRestabelecerServico = servicoAntes.disponivel && servicoAntes.ativo;
+  const precisaRestabelecerWatchdog = watchdogAntes.disponivel && watchdogAntes.ativo;
 
   passo("Desligando o watchdog de saúde");
   if (precisaRestabelecerWatchdog) {
-    const r = await processos.chamarAuxiliar("watchdog-desligar", [], { timeoutMs: 20_000 });
-    console.log(r.ok ? "Watchdog desligado." : `Aviso: não foi possível desligar o watchdog (${r.erro}).`);
-    if (!r.ok) {
-      console.error("Sem desligar o watchdog a aplicação pode ser reiniciada no meio da troca. Abortando.");
+    const r = await plataforma.controlarWatchdog("desligar");
+    if (!r.disponivel) {
+      console.error(`Sem desligar o watchdog a aplicação pode ser reiniciada no meio da troca (${r.motivo}). Abortando.`);
       return 1;
     }
+    console.log("Watchdog desligado.");
   } else {
-    console.log("Watchdog não estava ativo.");
+    console.log(watchdogAntes.disponivel ? "Watchdog não estava ativo." : `Watchdog: ${watchdogAntes.motivo}`);
   }
 
   let restaurou = false;
   let erroRestauracao = null;
   try {
-    passo("Parando a aplicação e confirmando que ninguém está escrevendo");
-    if (estadoServicoAntes.suportado) {
-      const r = await processos.chamarAuxiliar("servico-parar", [], { timeoutMs: 40_000 });
-      if (!r.ok) throw new Error(`não foi possível parar o serviço: ${r.erro || r.saida}`);
-    } else {
-      console.log("systemd indisponível: seguindo apenas com a checagem do /health.");
-    }
-
-    let quiesceu = false;
-    for (let i = 0; i < 20; i += 1) {
-      if (!(await aplicacaoRespondendo())) {
-        quiesceu = true;
-        break;
+    passo("Parando a aplicação");
+    if (servicoAntes.disponivel) {
+      const r = await plataforma.controlarServico("parar");
+      if (!r.disponivel) throw new Error(`não foi possível parar o serviço: ${r.motivo}`);
+      // Confirma pelo gerenciador de serviços, não pelo silêncio do /health.
+      let parou = false;
+      for (let i = 0; i < 20; i += 1) {
+        const atual = await plataforma.estadoDoServico();
+        if (atual.disponivel && !atual.ativo) {
+          parou = true;
+          break;
+        }
+        await esperar(1000);
       }
-      await esperar(1000);
+      if (!parou) throw new Error("o gerenciador de serviços não confirmou a parada da aplicação");
+      console.log("Serviço parado e confirmado pelo gerenciador de serviços.");
+    } else {
+      console.log(`Ciclo de vida não controlável aqui (${servicoAntes.motivo}).`);
+      if (await aplicacaoRespondendo()) {
+        throw new Error(
+          "a aplicação continua respondendo e o console não tem como pará-la nesta plataforma. " +
+            "Pare o RemoteIFES manualmente e repita a operação."
+        );
+      }
     }
-    if (!quiesceu) {
-      throw new Error(
-        "a aplicação continua respondendo ao /health depois do pedido de parada: há um escritor ativo no banco e a restauração não pode prosseguir"
-      );
-    }
-    console.log("Aplicação parada e sem responder ao /health.");
 
-    // O WAL só é reaproveitável pelo banco original. A troca cuida disso removendo os
-    // laterais antes do rename; aqui só registramos o que foi encontrado.
-    if (fs.existsSync(`${app.banco}-wal`)) {
-      console.log("Aviso: havia arquivo -wal; ele será descartado junto com o banco substituído.");
+    passo("Provando que ninguém mais escreve no banco");
+    const prova = provarQuiescencia(app.banco);
+    console.log(prova.motivo);
+    if (!prova.ok) {
+      throw new Error("quiescência não comprovada; a restauração não prossegue.");
     }
 
     passo("Instalando o backup");
@@ -148,36 +201,39 @@ async function main() {
 
   passo("Restabelecendo o ciclo de vida anterior");
   if (precisaRestabelecerServico) {
-    const r = await processos.chamarAuxiliar("servico-iniciar", [], { timeoutMs: 60_000 });
-    console.log(r.ok ? "Serviço iniciado." : `ATENÇÃO: não foi possível iniciar o serviço (${r.erro || r.saida}).`);
+    const r = await plataforma.controlarServico("iniciar");
+    console.log(r.disponivel ? "Serviço iniciado." : `ATENÇÃO: não foi possível iniciar o serviço (${r.motivo}).`);
   } else {
     console.log("O serviço não estava ativo antes; deixado como estava.");
   }
   if (precisaRestabelecerWatchdog) {
-    const r = await processos.chamarAuxiliar("watchdog-ligar", [], { timeoutMs: 20_000 });
-    console.log(r.ok ? "Watchdog religado." : `ATENÇÃO: não foi possível religar o watchdog (${r.erro}).`);
+    const r = await plataforma.controlarWatchdog("ligar");
+    console.log(r.disponivel ? "Watchdog religado." : `ATENÇÃO: não foi possível religar o watchdog (${r.motivo}).`);
   }
 
   if (erroRestauracao) return 1;
 
+  // Só faz sentido exigir saúde se a aplicação estava no ar antes: uma restauração feita com o
+  // serviço intencionalmente parado termina com ele parado, e isso não é falha.
+  if (!precisaRestabelecerServico) {
+    console.log("\nA aplicação estava parada antes da operação e continua parada, como esperado.");
+    console.log(`CONSOLE_RESULTADO ${JSON.stringify({ restaurado: restaurou, arquivo: path.basename(arquivo), aplicacaoIniciada: false })}`);
+    return 0;
+  }
+
   passo("Conferindo a aplicação com o banco restaurado");
-  let saudavel = false;
   for (let i = 0; i < 20; i += 1) {
     const saude = await coleta.consultarSaude({ timeoutMs: 2000 });
     if (saude.respondeu && saude.ok) {
-      saudavel = true;
-      console.log(`/health ok — banco ${saude.banco}, commit ${saude.commit || "não informado"}.`);
-      break;
+      console.log(`/health ok — banco ${saude.banco}, commit ${saude.commit ? saude.commit.slice(0, 12) : "não informado"}.`);
+      console.log(`\nCONSOLE_RESULTADO ${JSON.stringify({ restaurado: restaurou, arquivo: path.basename(arquivo), aplicacaoIniciada: true })}`);
+      return 0;
     }
     await esperar(2000);
   }
-  if (!saudavel && precisaRestabelecerServico) {
-    console.error("ATENÇÃO: o banco foi restaurado, mas a aplicação não voltou a responder saudável.");
-    console.error("Verifique 'journalctl -u remoteifes.service -e'. O banco anterior está preservado na pasta de backups.");
-    return 1;
-  }
-  console.log(`\nCONSOLE_RESULTADO ${JSON.stringify({ restaurado: restaurou, arquivo: path.basename(arquivo) })}`);
-  return 0;
+  console.error("ATENÇÃO: o banco foi restaurado, mas a aplicação não voltou a responder saudável.");
+  console.error("Verifique os registros do serviço. O banco anterior está preservado na pasta de backups.");
+  return 1;
 }
 
 main()

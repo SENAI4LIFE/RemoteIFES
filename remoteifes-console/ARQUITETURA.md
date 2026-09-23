@@ -49,21 +49,25 @@ Um serviço **`remoteifes-console.service`** ativado por **`remoteifes-console.s
 Custo: a primeira requisição paga a partida do Node. Está medido e reportado no README; num
 console de manutenção usado esporadicamente essa é a troca certa contra RAM ociosa permanente.
 
-## 3. Instalação fora do checkout (auto-atualização)
+## 3. Instalação fora do checkout (programa instalado)
 
 `deploy.sh` e `rollback.sh` trocam o checkout inteiro — inclusive `remoteifes-console/`, e um
-rollback para revisão anterior ao console **apaga** este diretório. Portanto:
+rollback para revisão anterior ao console **apagaria** este diretório. Por isso o console é um
+**programa instalado**, não um script do checkout. O layout está descrito em
+[DISTRIBUICAO.md](DISTRIBUICAO.md); em resumo:
 
-* o console **roda de `/opt/remoteifes-console/atual`** (cópia instalada), nunca do checkout. A raiz
-  `/opt/remoteifes-console` pertence ao usuário do console, para que a auto-atualização troque
-  `atual` por `anterior` com um rename; o que dá acesso a root é o auxiliar em
-  `/usr/local/lib/remoteifes`, que segue root:root;
-* o estado fica em `/var/lib/remoteifes-console`, fora do checkout e fora do `data/` da aplicação;
-* o auxiliar privilegiado fica em `/usr/local/lib/remoteifes/` (root:root);
-* atualizar o console é uma **ação explícita** que copia do checkout atual para `/opt`, valida e
-  reinicia o serviço depois de concluir o trabalho corrente;
-* se o checkout retroceder para uma revisão sem `remoteifes-console/`, o console **continua no ar**
-  e informa que a auto-atualização está indisponível até o checkout avançar.
+* o console roda de `<raiz>/versoes/<versao>` (payload imutável), nunca do checkout. A raiz
+  pertence ao usuário do console, para que a atualização instale a versão nova ao lado e troque
+  um ponteiro; o que dá acesso a root é o auxiliar em `/usr/local/lib/remoteifes`, root:root;
+* a **camada estável** (`console-bootstrap.js`, `estado-instalacao.json`) é o que o pacote e as
+  unidades do systemd conhecem: nenhuma atualização reescreve arquivo registrado pelo dpkg, e
+  nenhuma unidade menciona uma versão;
+* o estado fica em `/var/lib/remoteifes-console` (Linux, escopo de sistema), fora do checkout e
+  fora do `data/` da aplicação;
+* atualizar o console é uma **ação explícita** que baixa um artefato de release, confere a
+  assinatura Ed25519 do manifesto e o digest, instala lado a lado e troca a versão ativa. Não
+  usa git, não copia o checkout e não depende do `origin/main` da aplicação;
+* reverter é trocar o ponteiro de volta para a versão anterior, já verificada, **sem rede**.
 
 Trabalhos longos gravam a saída em arquivo limitado no diretório de estado e rodam em grupo de
 processos próprio, de modo que sobrevivem à queda do navegador **e** à reinicialização do console.
@@ -82,7 +86,7 @@ conclusão, desfecho **desconhecido** — nunca sucesso presumido.
 | Item | Decisão |
 |---|---|
 | Credencial | operador local, senha com `scrypt` (`node:crypto`), em `/var/lib/remoteifes-console/operadores.json` (0600) |
-| Provisionamento | `install-console.sh` gera uma senha inicial aleatória exibida **uma vez**; nunca reaproveita `SENHA_ADMIN_INICIAL` nem `superadmin/admin` |
+| Provisionamento | o instalador gera um segredo de uso único, exibido **uma vez** e gravado em `bootstrap-token` (0600); nunca reaproveita `SENHA_ADMIN_INICIAL` nem `superadmin/admin` |
 | Sessão | cookie `HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` quando houver TLS; validade absoluta 8 h e ociosidade 30 min |
 | Elevação | reautenticação por senha para operações sensíveis; validade 5 min, revogada no logout e no fim da sessão |
 | CSRF | token por sessão exigido em cabeçalho próprio em **todo** método mutante, mais checagem exata de `Origin` e de `Host` (anti-DNS-rebinding). CORS não é considerado defesa |

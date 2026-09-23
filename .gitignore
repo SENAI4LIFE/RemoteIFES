@@ -18,6 +18,11 @@ remoteifes-esp32/.pio/
 remoteifes-esp32/.pioenvs/
 remoteifes-esp32/.piolibdeps/
 remoteifes-console/node_modules/
+# Artefatos de distribuicao do console e material de assinatura: construidos, nunca versionados.
+remoteifes-console/dist/
+remoteifes-console/.signing/
+*.privada.pem
+manifesto.json.sig
 e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/

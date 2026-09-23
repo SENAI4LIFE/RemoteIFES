@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -70,6 +70,181 @@ jobs:
       - name: Medição de recursos (registra os números do runner)
         run: node test/medicao-recursos.js
         working-directory: remoteifes-console
+
+  pacotes:
+    name: Pacote instalável (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      # Construir é etapa SEM credencial: nenhum segredo é exposto aqui, e o manifesto sai sem
+      # assinatura de propósito. Assinar é etapa separada, com a chave de publicação, que não
+      # roda a partir de código de pull request.
+      - name: Construir os artefatos
+        working-directory: remoteifes-console
+        shell: bash
+        run: node empacotar/construir.js --saida "$RUNNER_TEMP/dist"
+
+      - name: Conferir a procedência declarada
+        shell: bash
+        run: |
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/remoteifes-console/empacotar/conferir-proveniencia.js" "$RUNNER_TEMP/dist"
+
+      # A instalação é feita a partir do ARTEFATO, descompactado fora da árvore de código: é o
+      # que um operador recebe. Instalar a partir do checkout não provaria que o pacote está
+      # completo.
+      - name: Instalar o artefato fora da árvore de código (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          case "$RUNNER_OS" in
+            Linux) SO=linux ;;
+            macOS) SO=macos ;;
+          esac
+          ARCO=$(node -p "process.arch")
+          mkdir -p "$RUNNER_TEMP/origem"
+          tar -xzf "$RUNNER_TEMP/dist/remoteifes-console-$VERSAO-$SO-$ARCO.tar.gz" -C "$RUNNER_TEMP/origem"
+          cd "$RUNNER_TEMP/origem"
+          node instalacao/instalar.js \
+            --escopo usuario \
+            --raiz "$RUNNER_TEMP/programa" \
+            --estado "$RUNNER_TEMP/estado" \
+            --checkout "$GITHUB_WORKSPACE"
+
+      - name: Instalar o artefato fora da árvore de código (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $versao = node -p "require('$env:GITHUB_WORKSPACE/remoteifes-console/package.json').version"
+          $arco = node -p "process.arch"
+          Expand-Archive -Path "$env:RUNNER_TEMP\dist\remoteifes-console-$versao-windows-$arco.zip" -DestinationPath "$env:RUNNER_TEMP\origem" -Force
+          Push-Location "$env:RUNNER_TEMP\origem"
+          .\instalar.ps1 -Raiz "$env:RUNNER_TEMP\programa" -Estado "$env:RUNNER_TEMP\estado" -Checkout "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { throw "instalador retornou $LASTEXITCODE" }
+          Pop-Location
+
+      - name: Conferir o layout instalado
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          RAIZ="$RUNNER_TEMP/programa"
+          for exigido in console-bootstrap.js launcher-bootstrap.js estado-instalacao.json \
+                         "versoes/$VERSAO/console.js" "versoes/$VERSAO/launcher.js" \
+                         "versoes/$VERSAO/src/servidor.js" "versoes/$VERSAO/web/index.html" \
+                         "versoes/$VERSAO/instalacao/desinstalar.js"; do
+            test -e "$RAIZ/$exigido" || { echo "instalação sem $exigido"; exit 1; }
+          done
+          # Testes e empacotamento não viajam no programa instalado.
+          test ! -e "$RAIZ/versoes/$VERSAO/test"
+          test ! -e "$RAIZ/versoes/$VERSAO/empacotar"
+          node "$GITHUB_WORKSPACE/remoteifes-console/empacotar/conferir-instalacao.js" "$RAIZ"
+          test -f "$RUNNER_TEMP/estado/bootstrap-token"
+
+      # O programa instalado roda sem ferramenta de desenvolvimento no PATH: sem git, sem npm,
+      # sem compilador. Só o Node que o RemoteIFES já exige.
+      - name: Rodar o programa instalado sem ferramentas de desenvolvimento no PATH (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_DIR=$(dirname "$(command -v node)")
+          MINIMO=$(mktemp -d)
+          ln -s "$NODE_DIR/node" "$MINIMO/node"
+          export CONSOLE_ESTADO_DIR="$RUNNER_TEMP/estado"
+          export CONSOLE_PORTA=8399
+          export CONSOLE_OCIOSIDADE_S=60
+
+          env PATH="$MINIMO" node "$RUNNER_TEMP/programa/console-bootstrap.js" &
+          CONSOLE_PID=$!
+          for _ in $(seq 1 40); do
+            [ -f "$RUNNER_TEMP/estado/endereco.json" ] && break
+            sleep 1
+          done
+          test -f "$RUNNER_TEMP/estado/endereco.json" || { echo "o console instalado não publicou o contrato de identidade"; exit 1; }
+
+          SAIDA=$(env PATH="$MINIMO" node "$RUNNER_TEMP/programa/launcher-bootstrap.js" --status)
+          echo "$SAIDA"
+          kill $CONSOLE_PID || true
+          echo "$SAIDA" | grep -q "no ar" || { echo "o lançador não reconheceu o console instalado"; exit 1; }
+
+      - name: Rodar o programa instalado sem ferramentas de desenvolvimento no PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $nodeDir = Split-Path (Get-Command node.exe).Source
+          # System32 e o PowerShell do sistema ficam no PATH porque o adaptador do Windows
+          # depende deles; o que sai é ferramenta de DESENVOLVIMENTO: git, npm, compiladores.
+          $env:PATH = "$nodeDir;$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          $env:CONSOLE_ESTADO_DIR = "$env:RUNNER_TEMP\estado"
+          $env:CONSOLE_PORTA = "8399"
+          $env:CONSOLE_OCIOSIDADE_S = "60"
+          if (Get-Command git.exe -ErrorAction SilentlyContinue) { throw "git ainda está no PATH; o teste não provaria nada" }
+          if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { throw "npm ainda está no PATH; o teste não provaria nada" }
+
+          $console = Start-Process -FilePath "node.exe" -ArgumentList "$env:RUNNER_TEMP\programa\console-bootstrap.js" -PassThru -NoNewWindow
+          $contrato = "$env:RUNNER_TEMP\estado\endereco.json"
+          for ($i = 0; $i -lt 40 -and -not (Test-Path $contrato); $i++) { Start-Sleep -Seconds 1 }
+          if (-not (Test-Path $contrato)) { throw "o console instalado não publicou o contrato de identidade" }
+
+          $saida = & node.exe "$env:RUNNER_TEMP\programa\launcher-bootstrap.js" --status | Out-String
+          Write-Host $saida
+          Stop-Process -Id $console.Id -Force
+          if ($saida -notmatch "no ar") { throw "o lançador não reconheceu o console instalado" }
+
+      # No Linux o .deb é o caminho de instalação real; instalá-lo de verdade é a única prova de
+      # que o pacote é bem formado. --force-depends porque o runner tem Node por outro caminho
+      # que não o pacote `nodejs` da distribuição.
+      - name: Instalar e remover o pacote .deb
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          sudo dpkg --force-depends -i "$RUNNER_TEMP/dist/remoteifes-console_${VERSAO}_all.deb"
+          test -f /opt/remoteifes-console/console-bootstrap.js
+          test -f /opt/remoteifes-console/launcher-bootstrap.js
+          test -f /opt/remoteifes-console/estado-instalacao.json
+          test -f "/opt/remoteifes-console/versoes/$VERSAO/console.js"
+          test -f /usr/share/applications/remoteifes-console.desktop
+          dpkg -L remoteifes-console | head -20
+          sudo dpkg -r remoteifes-console
+          test ! -e /opt/remoteifes-console/console-bootstrap.js
+
+      - name: Desinstalar e conferir que o estado sobrevive
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSAO=$(node -p "require('$GITHUB_WORKSPACE/remoteifes-console/package.json').version")
+          node "$RUNNER_TEMP/programa/versoes/$VERSAO/instalacao/desinstalar.js" \
+            --raiz "$RUNNER_TEMP/programa" --estado "$RUNNER_TEMP/estado" --sim
+          test ! -e "$RUNNER_TEMP/programa/console-bootstrap.js"
+          test -f "$RUNNER_TEMP/estado/bootstrap-token"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: console-pacotes-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/dist/*.tar.gz
+            ${{ runner.temp }}/dist/*.zip
+            ${{ runner.temp }}/dist/*.deb
+            ${{ runner.temp }}/dist/manifesto.json
+            ${{ runner.temp }}/dist/proveniencia.json
+          if-no-files-found: error
+          retention-days: 7
 
   e2e:
     name: Frontend end-to-end (${{ matrix.os }}, ${{ matrix.channel || matrix.browser }})

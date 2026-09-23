@@ -31,7 +31,7 @@
       </form>
 
       <form id="formBootstrap" class="oculto">
-        <p class="aviso info"><strong>Primeiro acesso</strong>Nenhum operador foi criado ainda. Use o segredo de instalação exibido por <code>install-console.sh</code>.</p>
+        <p class="aviso info"><strong>Primeiro acesso</strong>Nenhum operador foi criado ainda. Use o segredo de instalação exibido pelo instalador — ele também fica em <code>bootstrap-token</code>, no diretório de estado.</p>
         <div class="campo">
           <label for="bsSegredo">Segredo de instalação</label>
           <input type="password" id="bsSegredo" required autocomplete="one-time-code" />
@@ -62,6 +62,7 @@
     <div class="espaco"></div>
     <span id="seloElevacao" class="selo oculto"></span>
     <span id="seloOperador" class="selo"></span>
+    <a id="linkAplicacao" class="btn pequeno" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir o RemoteIFES</a>
     <button type="button" id="btnSair" class="btn pequeno">Sair</button>
   </header>
 
@@ -69,6 +70,7 @@
     <button type="button" class="aba" role="tab" id="aba-visao" aria-controls="painel-visao" aria-selected="true" data-area="visao">Visão geral</button>
     <button type="button" class="aba" role="tab" id="aba-servico" aria-controls="painel-servico" aria-selected="false" data-area="servico">Serviço</button>
     <button type="button" class="aba" role="tab" id="aba-atualizacao" aria-controls="painel-atualizacao" aria-selected="false" data-area="atualizacao">Atualizações</button>
+    <button type="button" class="aba" role="tab" id="aba-programa" aria-controls="painel-programa" aria-selected="false" data-area="programa">Programa</button>
     <button type="button" class="aba" role="tab" id="aba-dados" aria-controls="painel-dados" aria-selected="false" data-area="dados">Dados e recuperação</button>
     <button type="button" class="aba" role="tab" id="aba-mobile" aria-controls="painel-mobile" aria-selected="false" data-area="mobile">Aplicativo e CI</button>
     <button type="button" class="aba" role="tab" id="aba-rede" aria-controls="painel-rede" aria-selected="false" data-area="rede">Rede e domínio</button>
@@ -165,6 +167,39 @@
     </section>
 
     <!-- Dados e recuperação -->
+    <!-- Programa instalado e plataforma -->
+    <section id="painel-programa" role="tabpanel" aria-labelledby="aba-programa" tabindex="-1" class="oculto">
+      <div id="programaAvisos"></div>
+
+      <div class="cartao">
+        <div class="linha entre">
+          <h2>Console de Operações</h2>
+          <button type="button" class="btn pequeno" id="btnVerificarConsole">Verificar publicação</button>
+        </div>
+        <p class="fraco">Esta é a versão do <strong>programa console</strong>. Não é o commit do RemoteIFES implantado, que fica em Atualizações.</p>
+        <dl id="programaConsole"></dl>
+        <div id="programaAcoes"></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Plataforma e capacidades</h2>
+        <p class="fraco">O que este sistema oferece ao console. Um recurso indisponível diz por quê, e o servidor recusa a operação de verdade — não é só o botão que fica apagado.</p>
+        <dl id="programaPlataforma"></dl>
+        <div class="tabela-rolavel">
+          <table id="tabelaCapacidades">
+            <thead><tr><th>Recurso</th><th>Situação</th><th>Motivo</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="cartao">
+        <h2>Instalação</h2>
+        <dl id="programaInstalacao"></dl>
+        <div id="programaDesinstalar"></div>
+      </div>
+    </section>
+
     <section id="painel-dados" role="tabpanel" aria-labelledby="aba-dados" tabindex="-1" class="oculto">
       <div id="dadosAvisos"></div>
       <div class="cartao">

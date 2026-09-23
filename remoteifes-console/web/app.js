@@ -125,6 +125,20 @@
     trocarArea(estadoApp.area);
     carregarPainel();
     carregarTrabalhos();
+    mostrarLinkDaAplicacao();
+  }
+
+  /**
+   * O atalho para o RemoteIFES sai do endereço que a aplicação realmente publica, não de uma
+   * porta presumida. Abre em outra aba: o console não enquadra a aplicação nem é enquadrado.
+   */
+  function mostrarLinkDaAplicacao() {
+    api("/api/programa").then(function (r) {
+      if (!r.ok || !r.corpo.aplicacao || !r.corpo.aplicacao.url) return;
+      var a = $("linkAplicacao");
+      a.href = r.corpo.aplicacao.url;
+      a.hidden = false;
+    });
   }
 
   function atualizarSeloElevacao(restante) {
@@ -139,7 +153,7 @@
 
   // --- abas ----------------------------------------------------------------------------------
 
-  var AREAS = ["visao", "servico", "atualizacao", "dados", "mobile", "rede", "avancado"];
+  var AREAS = ["visao", "servico", "atualizacao", "programa", "dados", "mobile", "rede", "avancado"];
 
   function trocarArea(area) {
     estadoApp.area = area;
@@ -152,6 +166,7 @@
       painel.classList.toggle("oculto", !ativo);
     });
     if (area === "atualizacao") carregarAtualizacao();
+    if (area === "programa") carregarPrograma();
     if (area === "dados") carregarDados();
     if (area === "mobile") carregarMobile();
     if (area === "avancado") carregarAvancado();
@@ -1022,7 +1037,8 @@
 
     var acoes = $("avancadoAcoes");
     limpar(acoes);
-    botaoDeAcao(acoes, "console.atualizar", function () { return {}; });
+    // A atualização e a reversão do próprio console vivem na aba Programa, onde a versão alvo
+    // está à vista: a ação exige a versão publicada, e um botão sem ela só produziria recusa.
     botaoDeAcao(acoes, "manutencao.remover-trava", function () { return {}; });
     botaoDeAcao(acoes, "host.reiniciar", function () { return {}; }, "perigo");
 
@@ -1045,6 +1061,148 @@
     });
 
     carregarTrabalhos();
+  }
+
+  // --- programa instalado e plataforma -------------------------------------------------------
+
+  var ROTULO_CAPACIDADE = {
+    controleDeServico: "Controle do serviço do RemoteIFES",
+    watchdog: "Watchdog de saúde",
+    registrosDoSistema: "Registros do sistema",
+    inicializacaoAutomatica: "Partida com o sistema",
+    reinicioDoHost: "Reinício do host",
+    terminal: "Terminal Expert",
+  };
+
+  var ROTULO_ESTADO = {
+    suportado: ["ok", "disponível"],
+    "nao-instalado": ["alerta", "não instalado"],
+    "sem-permissao": ["alerta", "sem permissão"],
+    indisponivel: ["erro", "indisponível"],
+    "nao-aplicavel": ["desconhecido", "não se aplica"],
+    "nao-suportado": ["desconhecido", "não suportado aqui"],
+  };
+
+  function carregarPrograma(comRede) {
+    return api("/api/programa" + (comRede ? "?rede=1" : "")).then(function (r) {
+      if (!r.ok) return;
+      renderPrograma(r.corpo);
+    });
+  }
+
+  function renderPrograma(p) {
+    var avisos = $("programaAvisos");
+    limpar(avisos);
+
+    if (p.console.transacaoPendente && p.console.transacaoPendente.etapa !== "concluida") {
+      aviso(avisos, "alerta", "Atualização interrompida",
+        "Uma atualização do console parou em \"" + p.console.transacaoPendente.etapa + "\". A versão ativa continua a que funcionava; " +
+        "a reconciliação limpa o resto na próxima partida.");
+    }
+    if (!p.console.confiancaConfigurada) {
+      aviso(avisos, "info", "Atualização por release não configurada",
+        "Nenhuma chave pública de publicação foi provisionada neste console, então nenhum release é aceito. " +
+        "Atualizar aqui significa reinstalar o pacote da plataforma.");
+    }
+    if (!p.plataforma.runtime.atende) {
+      aviso(avisos, "erro", "Node abaixo do exigido", p.plataforma.runtime.motivo || "");
+    }
+
+    // --- versão do console ---------------------------------------------------------------
+    var dl = $("programaConsole");
+    limpar(dl);
+    dado(dl, "Versão em execução", p.console.versaoEmExecucao, "mono");
+    if (p.console.gerenciadoLadoALado) {
+      dado(dl, "Versão ativa registrada", p.console.versaoAtivaRegistrada, "mono");
+      dado(dl, "Versão anterior (reversível)", p.console.versaoAnterior, "mono");
+      dado(dl, "Versões no disco", p.console.versoesPresentes.join(", "), "mono");
+    } else {
+      dado(dl, "Layout", "execução a partir do código-fonte; sem versões lado a lado");
+    }
+    dado(dl, "Alvo de artefato", p.console.alvo, "mono");
+    if (p.console.ultimaObservacao) {
+      var obs = p.console.ultimaObservacao;
+      dado(dl, "Publicação observada", obs.versao + " (" + (obs.canal || "estável") + ")", "mono");
+      dado(dl, "Observada em", quando(obs.observadoEm) + (obs.recente ? "" : " — dado antigo"));
+      if (obs.ressalva) dado(dl, "Ressalva", obs.ressalva);
+    } else {
+      dado(dl, "Publicação observada", null);
+    }
+    if (p.console.consultaAgora && p.console.consultaAgora.motivo) {
+      dado(dl, "Última consulta", p.console.consultaAgora.motivo);
+    }
+    if (p.console.motivoNaoAtualizar) dado(dl, "Por que não atualizar agora", p.console.motivoNaoAtualizar);
+    dado(dl, "Escopo da distribuição", p.console.observacaoDeDistribuicao.replace(/\*\*/g, ""));
+
+    var acoes = $("programaAcoes");
+    limpar(acoes);
+    if (p.console.podeAtualizar && p.console.disponivel) {
+      botaoDeAcao(acoes, "console.atualizar", function () { return { versao: p.console.disponivel }; });
+    }
+    if (p.console.versaoAnterior) {
+      botaoDeAcao(acoes, "console.reverter", function () { return {}; });
+    }
+    if (!acoes.firstChild) {
+      acoes.appendChild(el("p", "Nenhuma operação de versão disponível agora.", "fraco"));
+    }
+
+    // --- plataforma -----------------------------------------------------------------------
+    var dp = $("programaPlataforma");
+    limpar(dp);
+    dado(dp, "Sistema", p.plataforma.rotulo);
+    dado(dp, "Node", p.plataforma.runtime.versao + " (mínimo " + p.plataforma.runtime.minimoExigido + ")", "mono");
+    var a = p.plataforma.arquitetura;
+    if (a) {
+      dado(dp, "Runtime", a.runtime, "mono");
+      dado(dp, "Kernel", a.kernel, "mono");
+      dado(dp, "Userland", a.userland ? a.userland + (a.fonteUserland ? " (" + a.fonteUserland + ")" : "") : null, "mono");
+      dado(dp, "Hardware", a.hardware, "mono");
+      if (a.ressalva) dado(dp, "Ressalva de arquitetura", a.ressalva);
+    }
+    Object.keys(p.plataforma.ferramentas || {}).forEach(function (nome) {
+      var f = p.plataforma.ferramentas[nome];
+      dado(dp, nome, f.disponivel ? (f.versao || "presente") : (f.motivo || "ausente"), f.disponivel ? "mono" : null);
+    });
+
+    var tbody = document.querySelector("#tabelaCapacidades tbody");
+    limpar(tbody);
+    Object.keys(p.plataforma.recursos).forEach(function (chave) {
+      var r = p.plataforma.recursos[chave];
+      var par = ROTULO_ESTADO[r.estado] || ["desconhecido", r.estado];
+      var tr = document.createElement("tr");
+      tr.appendChild(el("td", ROTULO_CAPACIDADE[chave] || chave));
+      var td = el("td");
+      var marca = el("span", par[1], "estado " + par[0]);
+      td.appendChild(marca);
+      tr.appendChild(td);
+      tr.appendChild(el("td", r.motivo || "—"));
+      tbody.appendChild(tr);
+    });
+
+    // --- instalação -------------------------------------------------------------------------
+    var di = $("programaInstalacao");
+    limpar(di);
+    dado(di, "Programa", p.instalacao.raiz, "mono");
+    if (p.instalacao.payloadEmExecucao !== p.instalacao.raiz) {
+      dado(di, "Payload em execução", p.instalacao.payloadEmExecucao, "mono");
+    }
+    dado(di, "Estado", p.instalacao.estado, "mono");
+    dado(di, "Checkout administrado", p.instalacao.checkout, "mono");
+    dado(di, "Escopo", p.instalacao.escopo);
+    dado(di, "Modo de execução", p.instalacao.modoDeExecucao);
+    if (p.instalacao.protecaoDoContrato && p.instalacao.protecaoDoContrato.presente) {
+      var pc = p.instalacao.protecaoDoContrato;
+      dado(di, "Contrato de identidade", (pc.restrito ? "restrito" : pc.verificavel ? "LEGÍVEL POR OUTROS" : "não verificável") + " · " + pc.mecanismo);
+    }
+    dado(di, "Aplicação", p.aplicacao.url, "mono");
+
+    var caixa = $("programaDesinstalar");
+    limpar(caixa);
+    var pd = el("p", null, "fraco");
+    pd.appendChild(document.createTextNode("Para remover o programa sem perder operadores nem auditoria: "));
+    pd.appendChild(el("code", "node " + p.instalacao.raiz + "/versoes/<versão>/instalacao/desinstalar.js --simular", "mono"));
+    pd.appendChild(document.createTextNode(". A simulação mostra exatamente o que sairia; o estado só é apagado com --apagar-estado."));
+    caixa.appendChild(pd);
   }
 
   function carregarSegredos() {
@@ -1218,6 +1376,9 @@
         if (r.ok) { estadoApp.atualizacao = r.corpo.situacao; renderAtualizacao(r.corpo.situacao); }
         else alertar((r.corpo && r.corpo.erro) || "falha ao buscar objetos");
       });
+    });
+    $("btnVerificarConsole").addEventListener("click", function () {
+      carregarPrograma(true);
     });
     $("btnCarregarCI").addEventListener("click", carregarCI);
     $("btnCarregarRede").addEventListener("click", carregarRede);

@@ -5,6 +5,7 @@ const http = require("http");
 const config = require("./config");
 const processos = require("./processos");
 const trava = require("./trava");
+const plataforma = require("./plataforma");
 
 // Observação do host e da aplicação.
 //
@@ -135,218 +136,75 @@ function espiarBanco({ permitirLeitura = null } = {}) {
   return resultado;
 }
 
-// --- Serviço systemd ---------------------------------------------------------------------
+// --- Serviço, watchdog e registros (via adaptador de plataforma) ---------------------------
+//
+// Tudo que depende do sistema operacional mudou de lugar: `src/plataforma/` decide como
+// consultar o serviço, o watchdog e os registros, e devolve um **estado explícito** em vez de
+// um booleano. "Não existe neste sistema" deixou de ser confundido com "instalado e parado".
 
 async function estadoDoServico() {
-  if (config.SEM_PRIVILEGIO && !processos.auxiliarDisponivel()) {
-    return { suportado: false, motivo: "systemd não disponível neste ambiente" };
-  }
-  const r = await processos.chamarAuxiliar("servico-estado", [], { timeoutMs: 10_000 });
-  if (!r.ok) {
-    return { suportado: false, motivo: r.erro || "não foi possível consultar o systemd", indisponivel: !!r.indisponivel };
-  }
-  const campos = {};
-  for (const linha of r.saida.split("\n")) {
-    const [chave, ...resto] = linha.split("=");
-    if (chave && resto.length) campos[chave.trim()] = resto.join("=").trim();
-  }
-  const ativo = campos.ActiveState === "active";
-  const habilitado = campos.UnitFileState === "enabled";
-  return {
-    suportado: true,
-    ativo,
-    habilitado,
-    estadoAtivo: campos.ActiveState || DESCONHECIDO,
-    subEstado: campos.SubState || DESCONHECIDO,
-    arquivoUnidade: campos.UnitFileState || DESCONHECIDO,
-    desde: campos.ActiveEnterTimestamp || DESCONHECIDO,
-    resultadoUltimaExecucao: campos.Result || DESCONHECIDO,
-    reinicios: config.inteiro(campos.NRestarts, DESCONHECIDO, 0, 1e9),
-    pid: config.inteiro(campos.MainPID, DESCONHECIDO, 0, 1e9),
-    memoriaBytes: config.inteiro(campos.MemoryCurrent, DESCONHECIDO, 0, Number.MAX_SAFE_INTEGER),
-    watchdogTimer: campos.TimerState || DESCONHECIDO,
-  };
+  const r = await plataforma.estadoDoServico();
+  // A interface e os testes existentes falam em `suportado`; o adaptador fala em estados.
+  return { ...r, suportado: r.disponivel, motivo: r.motivo };
 }
 
 async function estadoDoWatchdog() {
-  const r = await processos.chamarAuxiliar("watchdog-estado", [], { timeoutMs: 10_000 });
-  const app = config.caminhosDaAplicacao();
-  const falhas = lerTexto(app.falhasSaude);
-  const base = {
-    falhasConsecutivas: falhas === null ? 0 : config.inteiro(falhas, 0, 0, 1000),
-    limite: 3,
-    intervaloMinutos: 2,
-  };
-  if (!r.ok) return { ...base, suportado: false, motivo: r.erro };
-  const campos = {};
-  for (const linha of r.saida.split("\n")) {
-    const [chave, ...resto] = linha.split("=");
-    if (chave && resto.length) campos[chave.trim()] = resto.join("=").trim();
-  }
+  const r = await plataforma.estadoDoWatchdog();
   return {
-    ...base,
-    suportado: true,
-    ativo: campos.ActiveState === "active",
-    habilitado: campos.UnitFileState === "enabled",
-    proximaExecucao: campos.NextElapseUSecRealtime || DESCONHECIDO,
+    falhasConsecutivas: r.falhasConsecutivas ?? 0,
+    limite: r.limite ?? 3,
+    intervaloMinutos: r.intervaloMinutos ?? 2,
+    ...r,
+    suportado: r.disponivel,
   };
 }
 
 async function lerJournal({ unidade = "aplicacao", linhas = 200, prioridade = null } = {}) {
-  const permitidas = { aplicacao: "app", saude: "health", console: "console", recuperacao: "recover" };
-  if (!permitidas[unidade]) throw new Error("unidade de log não permitida");
-  const n = Math.max(10, Math.min(Number(linhas) || 200, 2000));
-  const args = [permitidas[unidade], String(n)];
-  if (prioridade) {
-    if (!/^[0-7]$/.test(String(prioridade))) throw new Error("prioridade inválida");
-    args.push(String(prioridade));
-  }
-  const r = await processos.chamarAuxiliar("journal", args, { timeoutMs: 20_000, limiteBytes: 512 * 1024 });
-  return { ok: r.ok, texto: r.saida || "", erro: r.ok ? null : r.erro || "não foi possível ler o journal" };
-}
-
-// --- Host --------------------------------------------------------------------------------
-
-function lerMemoria() {
-  // /proc/meminfo dá "disponível" de verdade; os.freemem() ignora cache recuperável e faz um
-  // Pi saudável parecer sem memória.
-  const texto = lerTexto("/proc/meminfo");
-  if (!texto) {
-    return { totalBytes: os.totalmem(), disponivelBytes: os.freemem(), fonte: "os" };
-  }
-  const campos = {};
-  for (const linha of texto.split("\n")) {
-    const m = /^(\w+):\s+(\d+)\s*kB$/.exec(linha.trim());
-    if (m) campos[m[1]] = Number(m[2]) * 1024;
-  }
+  const r = await plataforma.lerRegistros({ unidade, linhas, prioridade });
   return {
-    totalBytes: campos.MemTotal ?? os.totalmem(),
-    disponivelBytes: campos.MemAvailable ?? campos.MemFree ?? os.freemem(),
-    swapTotalBytes: campos.SwapTotal ?? DESCONHECIDO,
-    swapLivreBytes: campos.SwapFree ?? DESCONHECIDO,
-    fonte: "/proc/meminfo",
+    ok: !!r.disponivel,
+    texto: r.texto || "",
+    fonte: r.fonte || null,
+    observacao: r.observacao || null,
+    estado: r.estado,
+    erro: r.disponivel ? null : r.motivo || "não foi possível ler os registros",
   };
 }
 
-function lerTemperatura() {
-  const bruto = lerTexto("/sys/class/thermal/thermal_zone0/temp");
-  if (!bruto || !/^\d+$/.test(bruto)) return DESCONHECIDO;
-  const valor = Number(bruto);
-  return Math.round((valor > 1000 ? valor / 1000 : valor) * 10) / 10;
-}
-
-async function lerThrottle() {
-  // vcgencmd só existe no Raspberry Pi OS; ausência é "não suportado", não "tudo bem".
-  const r = await processos.executar("vcgencmd", ["get_throttled"], { timeoutMs: 4000 });
-  if (!r.ok) return { suportado: false };
-  const m = /throttled=0x([0-9a-fA-F]+)/.exec(r.saida || "");
-  if (!m) return { suportado: false };
-  const bits = Number.parseInt(m[1], 16);
-  return {
-    suportado: true,
-    bruto: `0x${m[1]}`,
-    subtensaoAgora: !!(bits & 0x1),
-    limiteFrequenciaAgora: !!(bits & 0x2),
-    throttlingAgora: !!(bits & 0x4),
-    subtensaoDesdeOBoot: !!(bits & 0x10000),
-    throttlingDesdeOBoot: !!(bits & 0x40000),
-  };
-}
-
-async function lerDisco(caminhos) {
-  if (process.platform === "win32") {
-    return caminhos.map((c) => ({ caminho: c, suportado: false }));
-  }
-  const saida = [];
-  for (const caminho of caminhos) {
-    const r = await processos.executar("df", ["-P", "-k", caminho], { timeoutMs: 6000 });
-    if (!r.ok) {
-      saida.push({ caminho, suportado: false, erro: r.erro || "df falhou" });
-      continue;
-    }
-    const linha = r.saida.trim().split("\n").pop();
-    const partes = linha.trim().split(/\s+/);
-    if (partes.length < 6) {
-      saida.push({ caminho, suportado: false });
-      continue;
-    }
-    const total = Number(partes[1]) * 1024;
-    const usado = Number(partes[2]) * 1024;
-    const livre = Number(partes[3]) * 1024;
-    saida.push({
-      caminho,
-      dispositivo: partes[0],
-      totalBytes: total,
-      usadoBytes: usado,
-      livreBytes: livre,
-      usoPercentual: total > 0 ? Math.round((usado / total) * 100) : DESCONHECIDO,
-      montagem: partes[5],
-      suportado: true,
-    });
-  }
-  return saida;
-}
-
-async function lerPacotesPendentes() {
-  // Apenas a contagem, a partir do cache que o sistema já tem. O auxiliar nunca roda
-  // `apt update` (rede e I/O num cartão SD) nem instala nada: alterar pacote do sistema
-  // continua sendo decisão humana, no terminal.
-  const r = await processos.chamarAuxiliar("pacotes-pendentes", [], { timeoutMs: 20_000 });
-  if (!r.ok) return { suportado: false, motivo: r.erro };
-  const texto = (r.saida || "").trim();
-  if (texto === "indisponivel") return { suportado: false, motivo: "gerenciador de pacotes não reconhecido" };
-  if (!/^\d+$/.test(texto)) return { suportado: false, motivo: "resposta inesperada" };
-  return {
-    suportado: true,
-    pendentes: Number(texto),
-    observacao: "Contagem do cache local, sem consultar repositórios. Instalar atualizações do sistema é operação de terminal.",
-  };
-}
-
-async function lerRelogio() {
-  const r = await processos.executar("timedatectl", ["show"], { timeoutMs: 5000 });
-  const base = { agora: new Date().toISOString(), fusoNode: Intl.DateTimeFormat().resolvedOptions().timeZone };
-  if (!r.ok) return { ...base, sincronizado: DESCONHECIDO, suportado: false };
-  const campos = {};
-  for (const linha of r.saida.split("\n")) {
-    const [chave, ...resto] = linha.split("=");
-    if (chave && resto.length) campos[chave.trim()] = resto.join("=").trim();
-  }
-  return {
-    ...base,
-    suportado: true,
-    sincronizado: campos.NTPSynchronized === "yes",
-    ntpAtivo: campos.NTP === "yes",
-    fusoHorario: campos.Timezone || base.fusoNode,
-  };
-}
+// --- Host ---------------------------------------------------------------------------------
 
 async function coletarHost({ completo = false } = {}) {
   const app = config.caminhosDaAplicacao();
-  const memoria = lerMemoria();
+  const memoria = plataforma.memoria();
   const carga = os.loadavg();
   const host = {
     hostname: os.hostname(),
     plataforma: `${os.type()} ${os.release()}`,
+    rotuloPlataforma: plataforma.rotulo,
     arquitetura: os.arch(),
     cpus: os.cpus().length,
     modelo: lerTexto("/proc/device-tree/model") || (os.cpus()[0] && os.cpus()[0].model) || DESCONHECIDO,
     uptimeSegundos: Math.round(os.uptime()),
     cargaMedia: { um: carga[0], cinco: carga[1], quinze: carga[2] },
     memoria,
-    temperaturaC: lerTemperatura(),
+    temperaturaC: plataforma.temperaturaC(),
     node: process.version,
     consoleRss: process.memoryUsage().rss,
     coletadoEm: new Date().toISOString(),
   };
   if (!completo) return host;
-  const [disco, throttle, relogio, pacotes] = await Promise.all([
-    lerDisco([...new Set([app.dirDados, config.DIR_CHECKOUT, config.DIR_ESTADO, "/"])]),
-    lerThrottle(),
-    lerRelogio(),
-    lerPacotesPendentes(),
+  const [disco, throttle, relogio, pacotes, arquiteturaDetalhada] = await Promise.all([
+    plataforma.disco([...new Set([app.dirDados, config.DIR_CHECKOUT, config.DIR_ESTADO])]),
+    plataforma.throttle(),
+    plataforma.relogio(),
+    plataforma.pacotesPendentes(),
+    plataforma.classificarArquitetura(),
   ]);
-  return { ...host, disco, throttle, relogio, pacotes };
+  return { ...host, disco, throttle, relogio, pacotes, arquiteturaDetalhada };
+}
+
+async function lerDisco(caminhos) {
+  return plataforma.disco(caminhos);
 }
 
 // --- Backups -----------------------------------------------------------------------------
@@ -495,7 +353,6 @@ module.exports = {
   estadoDoServico,
   estadoDoWatchdog,
   lerJournal,
-  lerPacotesPendentes,
   coletarHost,
   lerDisco,
   listarBackups,

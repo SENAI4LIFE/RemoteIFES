@@ -2,9 +2,9 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// Raiz do console em execução. Em produção é /opt/remoteifes-console/atual (cópia instalada); em
-// desenvolvimento é o próprio checkout. Os dois casos resolvem igual porque o módulo está
-// sempre dois níveis abaixo da raiz.
+// Raiz do payload em execução. Instalado, é <raiz>/versoes/<versao>; em desenvolvimento, o
+// próprio checkout. Os dois casos resolvem igual porque o módulo está sempre dois níveis abaixo
+// da raiz do payload.
 const RAIZ_CONSOLE = path.join(__dirname, "..");
 
 function inteiro(valor, padrao, min, max) {
@@ -21,11 +21,22 @@ function booleano(valor, padrao) {
 
 // Diretório de estado do console: fora do checkout (uma atualização não pode apagá-lo) e fora
 // do data/ da aplicação (uma restauração de banco não pode confundi-lo com dado da aplicação).
-const DIR_ESTADO = process.env.CONSOLE_ESTADO_DIR
-  ? path.resolve(process.env.CONSOLE_ESTADO_DIR)
-  : process.platform === "linux"
-    ? "/var/lib/remoteifes-console"
-    : path.join(os.homedir(), ".remoteifes-console");
+//
+// Cada sistema tem convenção própria, e trocar todas por um dotfolder no home seria errado em
+// dois deles. O escopo (sistema x usuário) é decidido na instalação e gravado; aqui só se
+// resolve o padrão de quem ainda não instalou.
+function estadoPadrao() {
+  if (process.platform === "linux") return "/var/lib/remoteifes-console";
+  if (process.platform === "win32") {
+    return path.join(process.env.ProgramData || "C:\\ProgramData", "RemoteIFES Console");
+  }
+  if (process.platform === "darwin") {
+    return path.join(os.homedir(), "Library", "Application Support", "RemoteIFES Console");
+  }
+  return path.join(os.homedir(), ".remoteifes-console");
+}
+
+const DIR_ESTADO = process.env.CONSOLE_ESTADO_DIR ? path.resolve(process.env.CONSOLE_ESTADO_DIR) : estadoPadrao();
 
 // Checkout do RemoteIFES que o console administra. Detectado a partir da instalação quando o
 // console roda de dentro do repositório; caso contrário vem do arquivo gravado na instalação.
@@ -36,11 +47,26 @@ function detectarCheckout() {
     const conteudo = fs.readFileSync(gravado, "utf8").trim();
     if (conteudo) return path.resolve(conteudo);
   } catch {}
+  // Instalação sem checkout associado ainda: o console sobe e diz que precisa ser apontado.
   // Console rodando de dentro do próprio checkout (desenvolvimento).
   const candidato = path.join(RAIZ_CONSOLE, "..");
   if (fs.existsSync(path.join(candidato, "remoteifes-server", "package.json"))) return path.resolve(candidato);
   return path.resolve(candidato);
 }
+
+// Raiz da instalação (camada estável): contém `versoes/<v>/`, o ponteiro da versão ativa e a
+// área de estágio. RAIZ_CONSOLE é o payload em execução; RAIZ_INSTALACAO é o que o pacote
+// instala e o que o atualizador administra. Em desenvolvimento, rodando do checkout, as duas
+// coincidem e o layout lado a lado simplesmente não existe.
+function detectarRaizInstalacao() {
+  if (process.env.CONSOLE_RAIZ_INSTALACAO) return path.resolve(process.env.CONSOLE_RAIZ_INSTALACAO);
+  // .../<raiz>/versoes/<versao>/  ->  <raiz>
+  const pai = path.dirname(RAIZ_CONSOLE);
+  if (path.basename(pai) === "versoes") return path.dirname(pai);
+  return RAIZ_CONSOLE;
+}
+
+const RAIZ_INSTALACAO = detectarRaizInstalacao();
 
 const DIR_CHECKOUT = detectarCheckout();
 const DIR_SERVIDOR = path.join(DIR_CHECKOUT, "remoteifes-server");
@@ -68,6 +94,26 @@ function lerEnvServidor() {
     valores[m[1]] = valor;
   }
   return valores;
+}
+
+/**
+ * Endereço em que a aplicação é realmente alcançável por um navegador. A origem configurada em
+ * CORS_ORIGIN é a que os usuários usam; só quando não há nenhuma é que se cai no loopback com a
+ * porta configurada. Nunca uma porta fixa presumida.
+ */
+function urlDaAplicacao() {
+  const env = lerEnvServidor();
+  const origens = String(env.CORS_ORIGIN || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const origem of origens) {
+    try {
+      const u = new URL(origem);
+      if (u.hostname && u.hostname !== "localhost" && u.hostname !== "127.0.0.1") return u.origin;
+    } catch {}
+  }
+  return `http://127.0.0.1:${caminhosDaAplicacao().porta}/`;
 }
 
 function caminhosDaAplicacao() {
@@ -106,6 +152,7 @@ function caminhosDaAplicacao() {
 
 const config = {
   RAIZ_CONSOLE,
+  RAIZ_INSTALACAO,
   DIR_ESTADO,
   DIR_CHECKOUT,
   DIR_SERVIDOR,
@@ -151,6 +198,7 @@ const config = {
   booleano,
   lerEnvServidor,
   caminhosDaAplicacao,
+  urlDaAplicacao,
 };
 
 // Caminhos derivados do estado.
@@ -161,5 +209,9 @@ config.ARQUIVO_AUDITORIA = path.join(DIR_ESTADO, "auditoria.log");
 config.ARQUIVO_OBSERVACAO_REMOTA = path.join(DIR_ESTADO, "observacao-remota.json");
 config.ARQUIVO_SEGREDOS = path.join(DIR_ESTADO, "segredos.json");
 config.DIR_SAIDAS = path.join(DIR_ESTADO, "saidas");
+// Contrato do lançador: endereço em que o backend atende e prova de identidade do processo.
+// Fica no estado (protegido), nunca em URL, argumento de processo ou atalho.
+config.ARQUIVO_ENDERECO = path.join(DIR_ESTADO, "endereco.json");
+config.ARQUIVO_BOOTSTRAP = path.join(DIR_ESTADO, "bootstrap-token");
 
 module.exports = config;
