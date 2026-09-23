@@ -1,18 +1,32 @@
 const C = require("./commands");
 
+// Infraestrutura, do ponto de vista do Superadministrador.
+//
+// Divisão de responsabilidade em vigor desde a entrada do Console de Operações:
+//   - o **console** é o dono dos procedimentos de rotina do host: serviço, atualização,
+//     rollback, backup, restauração, recuperação de conta, diagnóstico de rede e mobile/CI.
+//     Aqui o manual diz onde a função fica, o que ela faz, quem pode executá-la, qual é o
+//     impacto e o que fazer quando dá errado — não repete o tutorial de linha de comando;
+//   - o **README** é o dono da instalação inicial, do modelo de segurança e da referência
+//     única de recuperação por terminal, que precisa funcionar sem console e sem aplicação;
+//   - continuam por terminal, e portanto documentados com comandos aqui, apenas os
+//     procedimentos que o console deliberadamente não executa: proxy/HTTPS, criação de versão
+//     e a primeira instalação.
+
 module.exports = [
   {
     id: "operacao-admin",
     titulo: "Operação, implantação e manutenção",
     papel: "superadmin",
     categoria: "super_infra",
-    tags: ["manutenção", "normal", "destrutivo", "release", "infraestrutura"],
+    tags: ["manutenção", "normal", "destrutivo", "release", "infraestrutura", "console"],
     corpo: [
-      { t: "tabela", cabecalho: ["Classe", "Exemplos e disciplina"], linhas: [
-        ["Operação normal", "status/health, logs, notificações e controle das salas"],
-        ["Manutenção", "backup, dependências, serviço, firmware, configuração e testes em janela"],
-        ["Destrutivo/reset", "restore, erase, exclusões, reset de Wi-Fi e clear.py; exige alvo conferido e recuperação pronta"],
-        ["Release/deploy", "versão de servidor, PWA, firmware ou APK; validação e rollback próprios"],
+      { t: "p", texto: "A manutenção de rotina do servidor e do host acontece no <strong>Console de Operações</strong>, um serviço local separado do RemoteIFES. A operação do prédio — salas, agendamentos, contas e ESP32 — continua nesta aplicação." },
+      { t: "tabela", cabecalho: ["Classe", "Onde fica e disciplina"], linhas: [
+        ["Operação normal", "nesta aplicação: status/health, logs, notificações e controle das salas"],
+        ["Manutenção", "Console de Operações: serviço, backup, atualização, dependências e configuração em janela"],
+        ["Destrutivo/reset", "restauração de banco e reinício de host no console, com reautenticação; erase, exclusões e clear.py seguem no terminal"],
+        ["Release/deploy", "implantação e rollback no console; criar uma versão (tag) continua na máquina de desenvolvimento"],
       ] },
       { t: "fluxo", titulo: "Mudança segura", itens: [
         { tipo: "status", texto: "Escopo, impacto e pré-requisitos" },
@@ -22,7 +36,44 @@ module.exports = [
         { tipo: "decision", texto: "Aceitar ou recuperar" },
       ] },
       { t: "nota", nivel: "seguranca", texto: "Execute no host e diretório indicados, com conta autorizada. Não cole .env, tokens, banco, keystore, senhas, deviceId+segredo ou chaves privadas no manual, logs compartilhados ou relatos." },
-      { t: "links", itens: [{ id: "instalacao-servidor", texto: "Instalação inicial" }, { id: "backup-restauracao", texto: "Backup e restauração" }, { id: "implantacao-rollback", texto: "Deploy e rollback" }, { id: "diagnostico-testes", texto: "Diagnóstico e testes" }] },
+      { t: "links", itens: [
+        { id: "console-operacoes", texto: "Console de Operações" },
+        { id: "instalacao-servidor", texto: "Instalação inicial" },
+        { id: "backup-restauracao", texto: "Backup e restauração" },
+        { id: "implantacao-rollback", texto: "Deploy e rollback" },
+        { id: "diagnostico-testes", texto: "Diagnóstico e testes" },
+      ] },
+    ],
+  },
+  {
+    id: "console-operacoes",
+    titulo: "Console de Operações",
+    papel: "superadmin",
+    categoria: "super_infra",
+    tags: ["console", "manutenção", "host", "acesso", "SSH", "socket"],
+    corpo: [
+      { t: "p", texto: "O console é um serviço local que administra <strong>o RemoteIFES, o host e a infraestrutura</strong>. Ele tem identidade própria: a conta do console não é a do Superadministrador da aplicação, porque a autenticação da aplicação depende do banco e é encerrada a cada reinício — justamente quando a recuperação é necessária." },
+      { t: "tabela", cabecalho: ["Área do console", "O que resolve"], linhas: [
+        ["Visão geral", "estado da aplicação, do serviço, do watchdog e do host, com o que exige atenção em primeiro lugar"],
+        ["Serviço", "reiniciar, parar e iniciar o RemoteIFES; ler o journal das unidades"],
+        ["Atualizações", "comparar versão em execução, checkout e origin; implantar um commit revisado; reverter"],
+        ["Dados e recuperação", "backup verificado, restauração com o serviço parado e recuperação da senha do Superadministrador"],
+        ["Aplicativo e CI", "versões de servidor, PWA, Cordova e Android, APK publicado e estado das execuções do GitHub"],
+        ["Rede e domínio", "interfaces, rotas, resolvedor, portas em escuta, proxy, DNS e validade do certificado"],
+        ["Avançado", "elevação, auditoria do console, histórico de operações e Terminal Expert"],
+      ] },
+      { t: "comando", titulo: "Instalar o console (uma vez, no host)", comandos: C.consoleInstalar, quando: "Primeiro provisionamento, depois de o RemoteIFES já estar instalado.", preRequisitos: "Acesso root no host; Node no PATH; checkout completo.", resultado: "Instala o console em /opt/remoteifes-console/atual (fora do checkout), o auxiliar privilegiado como root, a regra de sudo restrita e as unidades systemd. Exibe uma única vez o segredo para criar o primeiro operador.", risco: "Reexecutar refaz unidades e a instalação; o estado (operadores, auditoria, histórico) é preservado." },
+      { t: "comando", titulo: "Abrir de outra máquina", comandos: C.consoleAcesso, quando: "Sempre que a manutenção não for feita no próprio Pi.", preRequisitos: "Acesso SSH ao host.", resultado: "Encaminha a porta local do console; abra então http://127.0.0.1:8099 no seu navegador.", risco: "O <code>localhost</code> do seu computador não é o do Pi: sem o túnel, o endereço aponta para a sua própria máquina. O console escuta apenas no loopback do host." },
+      { t: "passos", itens: [
+        "Entre com o operador do console; operações sensíveis pedem a senha de novo e valem por poucos minutos.",
+        "Antes de qualquer interrupção, leia a avaliação de impacto: ela bloqueia a operação quando há OTA em andamento ou outra manutenção, e avisa quando a atividade dos ESP32 não pode ser observada.",
+        "Acompanhe a operação pela janela de progresso; fechar o navegador não interrompe o trabalho.",
+        "Ao final, confira o resultado verificado: um código de saída zero não é prova de que a versão certa subiu.",
+      ] },
+      { t: "nota", nivel: "atencao", texto: "O console roda fora do checkout de propósito: uma atualização ou um rollback do RemoteIFES trocam o checkout inteiro e não derrubam o console. Se o checkout retroceder para uma revisão anterior ao console, a instalação continua funcionando e a auto-atualização fica indisponível até o checkout avançar." },
+      { t: "comando", titulo: "Reparar o console", comandos: C.consoleReparo, quando: "O console não abre, não sobe pelo socket ou ficou inconsistente após uma atualização.", preRequisitos: "Acesso ao host por SSH.", resultado: "Mostra o estado do socket e do serviço, os registros do console e reinstala a partir do checkout atual.", risco: "Nenhum para o RemoteIFES: reinstalar o console não toca no serviço da aplicação nem no banco." },
+      { t: "nota", nivel: "seguranca", texto: "O Terminal Expert é uma capacidade à parte, com destravamento e reautenticação. Um operador autorizado que use sudo tem o alcance que o host lhe der, inclusive alterar o próprio console e seus registros: o objetivo do desenho é impedir acesso não autorizado e uso acidental, não tornar o software imutável diante do root." },
+      { t: "links", itens: [{ id: "implantacao-rollback", texto: "Deploy e rollback" }, { id: "backup-restauracao", texto: "Backup e restauração" }, { id: "recuperacao-superadmin", texto: "Recuperar o Superadministrador" }] },
     ],
   },
   {
@@ -34,27 +85,36 @@ module.exports = [
     corpo: [
       { t: "comando", titulo: "Instalação rápida em macOS/Linux", comandos: C.instalacao, quando: "Primeira instalação ou ambiente de desenvolvimento integrado.", preRequisitos: "Clone completo; bash; rede para baixar Node/dependências quando ausentes.", resultado: "Node 22.13+ é verificado/instalado, dependências são instaladas, .env.example vira .env somente se ainda não existir, e o servidor inicia em 8080 por padrão.", risco: "Revise .env antes de produção; setup não sobrescreve um .env existente." },
       { t: "p", texto: "O primeiro startup cria/migra o SQLite e semeia as salas. Não existe comando separado de migração. Se <code>SENHA_ADMIN_INICIAL</code> estiver vazia em banco novo, a conta inicial é <strong>superadmin/admin</strong> e exibe aviso persistente para troca." },
-      { t: "comando", titulo: "Iniciar (todas as vezes seguintes)", comandos: C.iniciar, quando: "Operação supervisionada ou validação manual; em Linux/Raspberry Pi, o serviço systemd faz isso sozinho.", preRequisitos: "Instalação já feita; execute em remoteifes-server com .env revisado.", resultado: "Express serve website, API e WebSockets na mesma origem, em 8080 por padrão.", risco: "Não abra uma segunda instância sobre o mesmo banco: se a porta estiver ocupada, use ou pare a instância existente." },
+      { t: "comando", titulo: "Iniciar (todas as vezes seguintes)", comandos: C.iniciar, quando: "Operação supervisionada ou validação manual; em Linux/Raspberry Pi, o serviço systemd faz isso sozinho e o ciclo de vida do dia a dia fica no console.", preRequisitos: "Instalação já feita; execute em remoteifes-server com .env revisado.", resultado: "Express serve website, API e WebSockets na mesma origem, em 8080 por padrão.", risco: "Não abra uma segunda instância sobre o mesmo banco: se a porta estiver ocupada, use ou pare a instância existente." },
       { t: "comando", titulo: "Desenvolvimento do servidor (em vez de npm start)", comandos: C.desenvolvimento, quando: "Somente enquanto se altera o código do servidor.", preRequisitos: "Os mesmos de npm start; não deixe npm start rodando ao mesmo tempo.", resultado: "O mesmo conjunto integrado, reiniciando o processo ao alterar arquivos do servidor.", risco: "Não use npm run dev como gerenciador de produção." },
-      { t: "nota", texto: "Em Windows, o README orienta npm install e cópia manual de .env.example, porque npm run setup usa bash. Produção Linux/Raspberry Pi deve seguir systemd." },
+      { t: "comando", titulo: "Instalar o serviço systemd (uma vez)", comandos: C.servicoInstalar, quando: "Primeiro provisionamento Linux/Raspberry Pi, antes de instalar o console.", preRequisitos: "npm run setup concluído; sudo; .env e diretório persistente revisados. Execute em remoteifes-server.", resultado: "remoteifes.service inicia no boot e reinicia em falha; o timer de health verifica a cada 2 min e recupera após 3 falhas consecutivas; o instalador grava NODE_ENV=production e pergunta as redes autorizadas.", risco: "Reexecutar refaz as unidades do systemd; confira o .env antes." },
+      { t: "nota", texto: "Em Windows, o README orienta npm install e cópia manual de .env.example, porque npm run setup usa bash. Produção Linux/Raspberry Pi deve seguir systemd e o Console de Operações." },
+      { t: "links", itens: [{ id: "console-operacoes", texto: "Console de Operações" }] },
     ],
   },
   {
     id: "servico-systemd",
-    titulo: "Serviço systemd e health check",
+    titulo: "Serviço, watchdog e registros",
     papel: "superadmin",
     categoria: "super_infra",
-    tags: ["systemd", "journalctl", "health", "watchdog", "Raspberry Pi"],
+    tags: ["systemd", "journalctl", "health", "watchdog", "Raspberry Pi", "console"],
     corpo: [
-      { t: "comando", titulo: "Instalar o serviço (uma vez)", comandos: C.servicoInstalar, quando: "Primeiro provisionamento Linux/Raspberry Pi.", preRequisitos: "npm run setup concluído; sudo; .env e diretório persistente revisados. Execute em remoteifes-server.", resultado: "remoteifes.service inicia no boot e reinicia em falha; o timer de health verifica a cada 2 min e recupera após 3 falhas consecutivas; o instalador grava NODE_ENV=production e pergunta as redes autorizadas.", risco: "Reexecutar refaz as unidades do systemd; confira o .env antes." },
-      { t: "comando", titulo: "Consultar (não altera nada)", comandos: C.servicoConsultar, quando: "Operação diária e primeiro passo de qualquer incidente.", preRequisitos: "Serviço instalado; npm run health roda em remoteifes-server.", resultado: "Estado do serviço, log contínuo (Ctrl+C para sair) e HTTP 200 com banco ok no health.", risco: "Nenhum." },
-      { t: "comando", titulo: "Parar, iniciar ou reiniciar — um por vez", comandos: C.servicoControlar, quando: "stop antes de restore ou manutenção do host; start para voltar; restart depois de alterar .env ou redes autorizadas.", preRequisitos: "Saber por que o serviço vai sair do ar; avisar quem opera as salas.", resultado: "Sessões dos usuários são encerradas a cada reinício; os ESP32 reconectam sozinhos e recebem o estado desejado.", risco: "Enquanto parado, comandos e agendamentos não acontecem. Não reinicie repetidamente sem corrigir a causa." },
-      { t: "p", texto: "<code>npm run health</code> consulta o endpoint local: HTTP 200 com banco ok indica saúde mínima; 503 indica banco indisponível. ESP32 offline não derruba o health, portanto valide dispositivos separadamente." },
-      { t: "passos", itens: [
-        "Em incidente, confira status, depois journalctl e health.",
-        "Corrija a causa antes de reiniciar repetidamente: .env, porta, banco, permissão ou disco.",
-        "Após restart, confirme health, login, WebSocket/status de salas e Monitoramento.",
+      { t: "p", texto: "Reiniciar, parar e iniciar o RemoteIFES, acompanhar o watchdog e ler os registros do sistema são funções do <strong>Console de Operações &gt; Serviço</strong>. Cada ação mostra o impacto antes de executar e confirma o resultado depois." },
+      { t: "tabela", cabecalho: ["Ação no console", "Impacto e confirmação"], linhas: [
+        ["Verificar saúde agora", "somente leitura: banco, ambiente, commit em execução e tempo no ar"],
+        ["Reiniciar o RemoteIFES", "interrupção curta; todas as sessões de usuário caem e os ESP32 reconectam. O console só declara sucesso quando o /health volta saudável"],
+        ["Parar o RemoteIFES", "o watchdog é desligado junto, senão ele reiniciaria a aplicação em poucos minutos. Exige digitar a confirmação"],
+        ["Iniciar o RemoteIFES", "sobe o serviço e religa o watchdog; confirma pelo /health"],
+        ["Registros do sistema", "journal das unidades da aplicação, do watchdog, do console e da recuperação"],
       ] },
+      { t: "p", texto: "O health é um indicador mínimo: HTTP 200 com banco ok. ESP32 offline <strong>não</strong> derruba o health, então valide dispositivos separadamente em Status. Uma parada do serviço, por si só, não é uma parada durável: sem desligar o timer de saúde, o watchdog reinicia a aplicação após 3 falhas seguidas em intervalos de 2 minutos." },
+      { t: "passos", itens: [
+        "Em incidente, abra a Visão geral do console: ela lista primeiro o que exige atenção.",
+        "Leia os registros da unidade envolvida antes de reiniciar; corrija a causa (.env, porta, banco, permissão ou disco) em vez de reiniciar repetidamente.",
+        "Após o restart, confirme health, login, WebSocket/status de salas e Monitoramento nesta aplicação.",
+      ] },
+      { t: "nota", nivel: "atencao", texto: "Se o console estiver indisponível, os mesmos controles continuam acessíveis por terminal. A referência única desses comandos está no README, em Recuperação de emergência." },
+      { t: "links", itens: [{ id: "console-operacoes", texto: "Console de Operações" }] },
     ],
   },
   {
@@ -64,8 +124,10 @@ module.exports = [
     categoria: "super_infra",
     tags: ["CIDR", "Nginx", "HTTPS", "CORS", "TRUST_PROXY", "BIND_ADDR", ".env"],
     corpo: [
-      { t: "comando", titulo: "Redes autorizadas", comandos: C.redes, quando: "Antes de liberar produção ou ao mudar faixas institucionais.", preRequisitos: "Execute em remoteifes-server com o mesmo .env do serviço; use CIDRs reais, não os exemplos.", resultado: "A lista é gravada/mostrada e passa a valer após restart. localhost e rotas de dispositivo seguem regras próprias.", risco: "Definir a lista substitui a configuração atual; um CIDR errado bloqueia usuários ou amplia acesso." },
-      { t: "comando", titulo: "Proxy reverso", comandos: C.proxy, quando: "lan-setup para Nginx local na porta 80; https-setup para domínio público com certificado.", preRequisitos: "Serviço systemd funcional; host dedicado; para HTTPS, DNS e Internet válidos.", resultado: "Nginx encaminha HTTP e WebSocket, Node passa a 127.0.0.1 e TRUST_PROXY=1; HTTPS configura Certbot e renovação.", risco: "Não exponha também a porta interna 8080. Confira exatamente um proxy confiável antes de usar TRUST_PROXY=1." },
+      { t: "p", texto: "O diagnóstico — interfaces, rotas, resolvedor, portas em escuta, proxy, DNS do domínio e validade do certificado — fica em <strong>Console de Operações &gt; Rede e domínio</strong>, sob demanda. As <strong>faixas de rede autorizadas</strong>, o modo de teste e o modo de manutenção continuam sendo editados aqui, em <strong>Administração &gt; Sistema &gt; Configurações</strong>: o console apenas mostra o valor em vigor e explica o efeito." },
+      { t: "nota", nivel: "atencao", texto: "Uma requisição do próprio host para o domínio público não prova alcance externo: ela pode passar por /etc/hosts, DNS interno ou loopback. O console identifica o ponto de vista de cada sonda; para confirmar acesso externo, teste de um dispositivo fora da rede." },
+      { t: "comando", titulo: "Proxy reverso e HTTPS (continuam no terminal)", comandos: C.proxy, quando: "lan-setup para Nginx local na porta 80; https-setup para domínio público com certificado.", preRequisitos: "Serviço systemd funcional; host dedicado; para HTTPS, DNS e Internet válidos.", resultado: "Nginx encaminha HTTP e WebSocket, Node passa a 127.0.0.1 e TRUST_PROXY=1; HTTPS configura Certbot e renovação.", risco: "Estes scripts instalam pacotes, sobrescrevem o site Nginx do RemoteIFES, mexem nos sites habilitados, alteram o .env e recarregam serviços. Em instalação administrada ou com vários sites, revise antes. Não exponha também a porta interna 8080 e confirme que há exatamente um proxy confiável antes de TRUST_PROXY=1." },
+      { t: "comando", titulo: "Redes autorizadas pelo terminal (emergência)", comandos: C.redes, quando: "Quando a interface de Configurações estiver inacessível — por exemplo, se a faixa gravada bloqueou o próprio acesso.", preRequisitos: "Execute em remoteifes-server com o mesmo .env do serviço; use CIDRs reais, não os exemplos.", resultado: "A lista é gravada/mostrada e passa a valer após reiniciar o serviço. localhost e rotas de dispositivo seguem regras próprias.", risco: "Definir a lista substitui a configuração atual; um CIDR errado bloqueia usuários ou amplia acesso. O dono normal desta configuração é a aplicação." },
       { t: "tabela", cabecalho: ["Configuração de .env", "Finalidade operacional"], linhas: [
         ["NODE_ENV / PORTA / BIND_ADDR", "ambiente, porta e interface de escuta; atrás do proxy use 127.0.0.1"],
         ["SERVIR_FRONTEND / FRONTEND_DIR", "website servido pelo Express e eventual fonte alternativa"],
@@ -78,9 +140,9 @@ module.exports = [
         ["MOBILE_APP_RELEASE_DIR", "diretório do APK e release.json oferecidos pela página Aplicativo"],
         ["AGENDAMENTOS_MAX_ATIVOS_POR_USUARIO", "teto de agendas ativas por autor; padrão 300"],
       ] },
-      { t: "p", texto: "Preserve <code>REMOTEIFES_DATA_DIR</code> fora do checkout, restrinja permissões, use <code>SERVIR_FRONTEND=true</code> para same-origin e só configure CORS para um frontend realmente separado. Não versionar .env, dados ou backups é parte da implantação." },
-      { t: "comando", titulo: "Alterações incrementais ou limpeza de CIDRs", comandos: ["npm run redes -- --add 192.168.1.0/24", "npm run redes -- --clear"], quando: "--add acrescenta sem substituir; --clear esvazia deliberadamente a lista.", preRequisitos: "Confira o estado com npm run redes e mantenha um caminho localhost/SSH de recuperação.", resultado: "A lista persistida é atualizada; reinicie o serviço para a operação planejada.", risco: "Com modo de teste desligado, --clear bloqueia o acesso normal de produção, exceto regras específicas de dispositivo e localhost." },
-      { t: "nota", nivel: "seguranca", texto: "HTTPS é necessário quando o tráfego sai de uma LAN administrada. Modo de teste não substitui CIDR, firewall, proxy nem TLS." },
+      { t: "p", texto: "Preserve <code>REMOTEIFES_DATA_DIR</code> fora do checkout, restrinja permissões, use <code>SERVIR_FRONTEND=true</code> para same-origin e só configure CORS para um frontend realmente separado. Não versionar .env, dados ou backups é parte da implantação. <code>TRUST_PROXY</code> é fronteira de segurança: com valor maior que zero, o servidor passa a confiar em <code>X-Forwarded-For</code> para identificar o cliente, e isso decide a restrição por faixa e o limite de tentativas." },
+      { t: "p", texto: "O verificador de faixas trabalha com IPv4 em notação CIDR. Endereços IPv6 mapeados (<code>::ffff:</code>) são normalizados e <code>::1</code> equivale a <code>127.0.0.1</code>; faixas IPv6 próprias não são suportadas pelo analisador atual." },
+      { t: "nota", nivel: "seguranca", texto: "HTTPS é necessário quando o tráfego sai de uma LAN administrada. Modo de teste não substitui CIDR, firewall, proxy nem TLS. A política de exposição do console é separada da política de rede da aplicação: o console escuta apenas no loopback e é alcançado por túnel SSH." },
     ],
   },
   {
@@ -88,17 +150,25 @@ module.exports = [
     titulo: "Backup e restauração do banco",
     papel: "superadmin",
     categoria: "super_infra",
-    tags: ["backup", "restore", "SQLite", "WAL", "pre-restauração"],
+    tags: ["backup", "restore", "SQLite", "WAL", "pre-restauração", "console"],
     corpo: [
-      { t: "comando", titulo: "Criar um backup (servidor pode ficar no ar)", comandos: C.backupCriar, quando: "Antes de qualquer mudança e em rotina complementar ao backup automático.", preRequisitos: "Execute em remoteifes-server com o diretório de dados correto; o rótulo é opcional.", resultado: "Snapshot consistente (VACUUM INTO), verificado e rotacionado em BACKUP_DIR.", risco: "Nenhum para o banco ativo; ocupa disco." },
-      { t: "comando", titulo: "Restaurar (destrutivo; serviço parado)", comandos: C.backupRestaurar, quando: "Recuperação planejada, depois de conferir o arquivo.", preRequisitos: "remoteifes.service PARADO; sem argumento o script lista os backups e pede confirmação; <arquivo> pode ser nome em BACKUP_DIR ou caminho completo.", resultado: "Verifica o candidato, cria pre-restauracao do banco atual, troca e revalida.", risco: "Sobrescreve o banco ativo. --sim pula a confirmação e deve ficar restrito à automação revisada. Um servidor no ar durante a restauração corrompe o resultado." },
-      { t: "passos", itens: [
-        "Confirme Monitoramento, espaço em disco e o caminho do diretório de dados.",
-        "Crie um backup rotulado antes da mudança e copie backups críticos para armazenamento externo autorizado.",
-        "Para restaurar, pare remoteifes.service, liste e confira o arquivo e então execute a restauração.",
-        "Inicie o serviço, rode health e valide login, contas, agendas, salas e ESP32. Preserve o pre-restauracao até aceitar o resultado.",
+      { t: "p", texto: "Criar backup, listar e restaurar ficam em <strong>Console de Operações &gt; Dados e recuperação</strong>. O backup roda com o servidor no ar; a restauração é destrutiva, exige reautenticação e digitar a confirmação." },
+      { t: "tabela", cabecalho: ["Operação no console", "Garantias"], linhas: [
+        ["Criar backup", "snapshot consistente com VACUUM INTO (sem copiar arquivo ativo), verificação de integridade e de chaves estrangeiras, permissão restrita e rotação"],
+        ["Restaurar", "valida o candidato antes de tocar em qualquer coisa, desliga o watchdog, para a aplicação, confirma que o /health parou de responder, preserva o banco atual como pre-restauração, instala e revalida"],
+        ["Banco corrompido", "os arquivos danificados vão para quarentena com sufixo .corrompido-&lt;data&gt;, junto de -wal e -shm; nada é apagado"],
       ] },
-      { t: "nota", nivel: "atencao", texto: "Não copie apenas remoteifes.db enquanto ignora o WAL. Teste restauração periodicamente em ambiente separado; existência de arquivo não prova recuperabilidade." },
+      { t: "nota", nivel: "atencao", texto: "Restaurar descarta toda a atividade do prédio registrada depois do backup escolhido: comandos, agendamentos, relatos, auditoria e contas criadas no intervalo. Reverter código e restaurar banco são decisões separadas." },
+      { t: "p", texto: "<strong>Escopo do backup:</strong> ele contém o banco SQLite, inclusive as credenciais dos dispositivos. Não contém <code>.env</code>, firmware, APKs, material TLS, identidade do console nem configuração do host. Um backup de banco não é, sozinho, plano de recuperação de desastre: guarde separadamente o <code>.env</code> e a configuração do host, em local autorizado." },
+      { t: "p", texto: "Restaurar dados antigos pode deixar as credenciais dos ESP32 diferentes das gravadas na NVS das placas: dispositivos podem precisar de nova credencial depois da restauração." },
+      { t: "passos", itens: [
+        "Crie um backup rotulado antes de qualquer mudança e copie os críticos para armazenamento externo autorizado.",
+        "Para restaurar, confira o arquivo na lista e leia a avaliação de impacto antes de confirmar.",
+        "Depois da restauração, valide login, contas, agendas, salas e ESP32. Preserve a cópia pre-restauração até aceitar o resultado.",
+        "Teste restauração periodicamente em ambiente separado: a existência do arquivo não prova recuperabilidade.",
+      ] },
+      { t: "nota", texto: "Com o console indisponível, <code>npm run restore</code> continua funcionando no terminal, com o servidor parado. O README traz a referência única desse caminho." },
+      { t: "links", itens: [{ id: "console-operacoes", texto: "Console de Operações" }] },
     ],
   },
   {
@@ -106,20 +176,30 @@ module.exports = [
     titulo: "Implantação, atualização e rollback",
     papel: "superadmin",
     categoria: "super_infra",
-    tags: ["deploy", "rollback", "origin/main", "offline", "pre-update"],
+    tags: ["deploy", "rollback", "origin/main", "offline", "pre-update", "console"],
     corpo: [
-      { t: "comando", titulo: "Atualizar (uma das três formas)", comandos: C.deployAtualizar, quando: "Implantar origin/main, uma tag ou, sem rede, um ref que já exista no clone.", preRequisitos: "Clone de produção em remoteifes-server; main sem mudanças locais; serviço instalado; dados persistentes; ref já local para --offline.", resultado: "Backup pre-update, troca de código e dependências, restart e confirmação do commit pelo /health; falha aciona rollback automático.", risco: "--force descarta mudanças locais; --no-restart pula health e transfere a validação ao operador." },
-      { t: "comando", titulo: "Reverter manualmente", comandos: C.deployReverter, quando: "Voltar à versão anterior gravada pelo deploy ou a um ref conhecido.", preRequisitos: "Os mesmos do deploy; saber se a versão nova migrou o esquema do banco.", resultado: "Cria o backup pre-rollback, troca o código, reinicia e exige que o processo em execução responda saudável ao /health informando o commit alvo (um processo antigo que sobreviveu a um restart falho não conta). Uma versão alvo anterior ao campo commit só é aceita se o /health mostrar um processo que subiu depois do restart, registrada como identidade não confirmada. Se o código já está na versão pedida, o script ainda consulta o processo em execução e reinicia quando ele não a confirma.", risco: "Rollback troca só o código, não desfaz o esquema do banco: restaure o pre-update compatível se a versão antiga não abrir o banco migrado." },
-      { t: "p", texto: "Opções avançadas do script atual: <code>bash deploy.sh [&lt;ref&gt;] [--offline] [--force] [--no-restart]</code> e <code>bash rollback.sh [&lt;ref&gt;] [--offline] [--no-restart]</code>. Use <code>--force</code> só depois de revisar o diff que será descartado; <code>--no-restart</code> também pula health e transfere a validação para o operador." },
+      { t: "p", texto: "Atualizar e reverter ficam em <strong>Console de Operações &gt; Atualizações</strong>. A tela separa explicitamente coisas que costumam ser confundidas em um único número de versão." },
+      { t: "tabela", cabecalho: ["O que a tela distingue", "Por que importa"], linhas: [
+        ["Commit do processo em execução", "é o que está realmente no ar; vem do /health, não do disco"],
+        ["HEAD do checkout e sujeira", "um deploy interrompido, um git pull manual ou --no-restart deixam o disco à frente do processo"],
+        ["Ramo local e upstream", "revela HEAD destacado e clone raso"],
+        ["Último origin/main observado", "mostra a hora da observação; dado antigo é exibido como antigo, nunca como atual"],
+        ["Última implantação verificada", "vem do registro de deploy, com sucesso ou falha"],
+      ] },
+      { t: "p", texto: "O alvo escolhido é fixado em um commit exato: confirmação, pré-verificação, execução e verificação final ficam presas a ele, e um commit que apareça em origin depois da confirmação não é implantado silenciosamente. Alterações locais não commitadas <strong>recusam</strong> a atualização — o console nunca usa <code>--force</code>." },
       { t: "fluxo", titulo: "Atualização protegida", itens: [
         { tipo: "status", texto: "Árvore limpa + backup" },
-        { tipo: "action", texto: "Resolver origin/main, tag ou ref local" },
+        { tipo: "action", texto: "Resolver o commit revisado" },
         { tipo: "action", texto: "Trocar código e dependências" },
         { tipo: "status", texto: "Restart + health" },
         { tipo: "decision", texto: "Sucesso ou rollback automático" },
         { tipo: "status", texto: "Validar funções e dispositivos" },
       ] },
-      { t: "p", texto: "Depois do health, valide login, uma consulta e um comando em sala piloto, agenda, WebSocket, Monitoramento e versão da PWA. Leia deploy.log e os arquivos current-version/previous-version no diretório de dados." },
+      { t: "p", texto: "Sucesso exige que o processo em execução informe exatamente o commit alvo: um processo antigo que sobreviveu a um restart falho responde igual a um saudável. Uma versão alvo anterior ao campo de commit no /health só é aceita quando um processo saudável comprovadamente subiu depois do reinício, e o resultado é registrado como <strong>identidade não confirmada</strong>." },
+      { t: "nota", nivel: "atencao", texto: "Reverter troca apenas o código: não desfaz migração de esquema nem devolve dados. Se a versão antiga não abrir o banco migrado, restaurar o backup pre-update é uma decisão separada e explícita — nunca automática." },
+      { t: "p", texto: "A interrupção é curta, mas existe: as sessões dos usuários são encerradas e os ESP32 precisam reconectar. Não é implantação sem indisponibilidade. Depois do health, valide login, uma consulta e um comando em sala piloto, agenda, WebSocket, Monitoramento e a versão da PWA." },
+      { t: "nota", texto: "Atualizar o próprio console é uma ação à parte, também no console: ele roda de fora do checkout, então trocar o checkout não o derruba." },
+      { t: "links", itens: [{ id: "console-operacoes", texto: "Console de Operações" }, { id: "backup-restauracao", texto: "Backup e restauração" }] },
     ],
   },
   {
@@ -130,6 +210,7 @@ module.exports = [
     tags: ["release.sh", "tag", "package.json", "push"],
     corpo: [
       { t: "comando", titulo: "Marcar release", comandos: C.release, quando: "Na máquina de desenvolvimento, quando main validada estiver pronta para uma versão x.y.z.", preRequisitos: "Branch main, árvore limpa, testes concluídos e autorização para commit/tag/push.", resultado: "Atualiza package.json, cria commit e tag vX.Y.Z e, após confirmação, envia ao remoto.", risco: "Não execute no host de produção com alterações locais. Tag publicada deve ser tratada como imutável." },
+      { t: "p", texto: "Criar uma versão é autoria, não implantação: é diferente de implantar uma revisão que já existe. Por isso continua fora do console, na máquina de desenvolvimento. Depois da tag publicada, a implantação no host é feita pelo console." },
       { t: "p", texto: "A versão do servidor, a versão do frontend/PWA, a versão do firmware e versionName/versionCode Android têm ciclos distintos. Não reutilize uma delas como substituta automática das outras." },
     ],
   },
@@ -138,9 +219,13 @@ module.exports = [
     titulo: "Recuperar a senha do Superadministrador",
     papel: "superadmin",
     categoria: "super_infra",
-    tags: ["reset-admin", "senha", "sessões"],
+    tags: ["reset-admin", "senha", "sessões", "console"],
     corpo: [
-      { t: "comando", titulo: "Redefinir no host", comandos: C.recuperacaoConta, quando: "Quando o login Superadministrador não puder ser recuperado pela interface.", preRequisitos: "Acesso autorizado ao host e ao mesmo .env/banco; execute em remoteifes-server.", resultado: "Define a senha escolhida ou, sem argumento, restaura admin; nenhuma senha é impressa e todas as sessões são encerradas.", risco: "Sem argumento volta a uma senha pública e fraca. Entre imediatamente, troque-a e verifique acesso ao host." },
+      { t: "p", texto: "Em <strong>Console de Operações &gt; Dados e recuperação</strong>, a ação <em>Redefinir a senha do superadministrador</em> instala uma nova senha na conta de nível 3 desta aplicação. A senha é enviada no corpo da requisição e entregue ao processo por entrada padrão: não aparece em linha de comando, em <code>ps</code>, em log nem na auditoria." },
+      { t: "p", texto: "A conta é escolhida pelo <strong>nível</strong>, não pelo nome: o login padrão mudou de <code>admin</code> para <code>superadmin</code> e pode ter sido renomeado. Só as sessões <strong>dessa conta</strong> são encerradas; as demais continuam válidas — um reinício do serviço é que encerra todas." },
+      { t: "nota", nivel: "seguranca", texto: "A recuperação pelo console exige operador autenticado e reautenticação. Ela não define senha padrão: um valor conhecido como <code>admin</code> é recusado." },
+      { t: "comando", titulo: "Redefinir pelo terminal (emergência)", comandos: C.recuperacaoConta, quando: "Console indisponível ou aplicação sem login utilizável.", preRequisitos: "Acesso autorizado ao host e ao mesmo .env/banco; execute em remoteifes-server.", resultado: "Define a senha escolhida ou, sem argumento, restaura admin; nenhuma senha é impressa e as sessões da conta são encerradas.", risco: "Sem argumento volta a uma senha pública e fraca. Entre imediatamente, troque-a e verifique o acesso ao host. O caminho do console não tem esse fallback." },
+      { t: "links", itens: [{ id: "console-operacoes", texto: "Console de Operações" }] },
     ],
   },
 ];
