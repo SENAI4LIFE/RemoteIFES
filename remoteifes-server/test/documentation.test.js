@@ -69,11 +69,15 @@ test("catálogo público cobre as funções comuns e não contém links quebrado
   });
 });
 
-test("comandos críticos duplicados continuam iguais ao README", () => {
+// O README é o dono único dos comandos de terminal: a instalação, os procedimentos que o
+// console deliberadamente não executa e a referência de recuperação de emergência. O manual
+// privilegiado não repete esses tutoriais — ele indica o caminho no console.
+test("comandos críticos continuam com uma única forma canônica no README", () => {
   const grupos = [
     "instalacao", "iniciar", "backupCriar", "backupRestaurar", "deployAtualizar", "deployReverter", "release", "firmwareOta",
     "credenciaisConsultar", "credenciaisEmitir", "credenciaisDerrubar", "recuperacaoConta", "carga",
     "androidVersao", "androidRede", "androidPublicacao", "testes", "gitSincronizar", "gitRecriar",
+    "consoleInstalar", "consoleAcesso", "consoleReparo",
   ];
   for (const grupo of grupos) {
     for (const comando of commands[grupo]) {
@@ -140,14 +144,82 @@ test("manual e README documentam Protocolos IR, o clonador vinculado à placa, o
   assert.ok(README.includes(`atualmente \`${versaoFirmware}\``), `README precisa citar a versão do firmware compilada (${versaoFirmware})`);
 });
 
-test("procedimentos de host aparecem só no conjunto Superadministrador", () => {
-  const serializar = (secoes) => JSON.stringify(secoes);
-  const admin = serializar(service._adminSections);
-  const superadmin = serializar(service._superSections);
-  for (const trecho of ["deploy.sh", "npm run restore", "python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE"]) {
+test("procedimentos restritos continuam fora do conjunto de Administrador", () => {
+  const admin = JSON.stringify(service._adminSections);
+  for (const trecho of ["deploy.sh", "npm run restore", "python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE", "install-console.sh", "console-helper.sh"]) {
     assert.ok(!admin.includes(trecho), `admin recebeu procedimento restrito: ${trecho}`);
+  }
+  const superadmin = JSON.stringify(service._superSections);
+  for (const trecho of ["python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE"]) {
     assert.ok(superadmin.includes(trecho), `Superadministrador não recebeu: ${trecho}`);
   }
+});
+
+test("os procedimentos de rotina do host apontam para o console em vez de repetir o tutorial", () => {
+  const infra = service._superSections.filter((secao) => secao.categoria === "super_infra");
+  const porId = Object.fromEntries(infra.map((secao) => [secao.id, JSON.stringify(secao)]));
+
+  // Serviço, backup/restauração, deploy/rollback e recuperação de conta migraram para o
+  // console: o manual diz onde ficam e qual é o impacto, e não reexibe a linha de comando.
+  for (const id of ["servico-systemd", "backup-restauracao", "implantacao-rollback", "recuperacao-superadmin"]) {
+    assert.ok(porId[id], `seção ausente: ${id}`);
+    assert.match(porId[id], /Console de Opera/, `${id} precisa apontar para o console`);
+  }
+  for (const id of ["servico-systemd", "backup-restauracao", "implantacao-rollback"]) {
+    assert.ok(!/systemctl restart remoteifes\.service/.test(porId[id]), `${id} ainda repete o comando de serviço`);
+    assert.ok(!/bash deploy\.sh/.test(porId[id]), `${id} ainda repete o comando de deploy`);
+    assert.ok(!/npm run backup/.test(porId[id]), `${id} ainda repete o comando de backup`);
+  }
+
+  // O que continua sendo feito por terminal permanece documentado com comandos.
+  assert.match(porId["servidor-rede"], /lan-setup\.sh/);
+  assert.match(porId["release-servidor"], /release\.sh/);
+  assert.match(porId["instalacao-servidor"], /install-service\.sh/);
+});
+
+test("o console tem seção própria com acesso, fronteira e reparo", () => {
+  const console = service._superSections.find((secao) => secao.id === "console-operacoes");
+  assert.ok(console, "a seção do console precisa existir no conjunto Superadministrador");
+  assert.equal(console.papel, "superadmin");
+  const texto = JSON.stringify(console);
+
+  assert.match(texto, /install-console\.sh/, "precisa dizer como instalar");
+  assert.match(texto, /ssh -L 8099/, "precisa explicar o túnel SSH");
+  assert.match(texto, /não é o do Pi/, "precisa avisar que o localhost do operador não é o do Pi");
+  assert.match(texto, /fora do checkout/, "precisa explicar por que roda fora do checkout");
+  assert.match(texto, /Terminal Expert/, "precisa citar o terminal como capacidade à parte");
+
+  // O console não pode ser apresentado como dono da operação do prédio.
+  const admin = JSON.stringify(service._adminSections);
+  assert.ok(!/Console de Opera\S* &gt; .*Salas/.test(texto), "o console não opera salas");
+  assert.ok(!admin.includes("Console de Opera"), "o manual de Administrador não precisa do console");
+});
+
+test("o README mantém uma referência única de recuperação de emergência", () => {
+  assert.match(README, /^## Recuperação de emergência por terminal$/m, "a seção precisa existir");
+  assert.match(README, /^## Console de Operações$/m, "o README documenta o acesso ao console");
+
+  // Uma única seção concentra os comandos de emergência: procuramos cabeçalhos concorrentes.
+  const cabecalhos = [...README.matchAll(/^#{2,3} (.+)$/gm)].map((m) => m[1]);
+  const emergencias = cabecalhos.filter((t) => /recupera(ção|cao) de emerg/i.test(t));
+  assert.equal(emergencias.length, 1, `esperava uma seção de emergência, achei: ${emergencias.join(" | ")}`);
+
+  const inicio = README.indexOf("## Recuperação de emergência por terminal");
+  const fimSecao = README.indexOf("## Hospedagem em Raspberry Pi", inicio);
+  const secao = README.slice(inicio, fimSecao);
+  for (const comando of [
+    "sudo systemctl restart remoteifes.service",
+    "npm run health",
+    "npm run backup",
+    "npm run restore",
+    "bash deploy.sh",
+    "bash rollback.sh",
+    "npm run reset-admin",
+    "install-console.sh",
+  ]) {
+    assert.ok(secao.includes(comando), `a recuperação de emergência precisa conter: ${comando}`);
+  }
+  assert.match(secao, /sem console e sem login/, "precisa dizer que funciona sem console e sem aplicação");
 });
 
 test("manual e README descrevem a Administração agrupada em vigor", () => {
