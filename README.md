@@ -37,11 +37,13 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 |---|---|
 | instalar pela primeira vez | [Instalação Rápida](#instalação-rápida) e [Inicialização e implantação](#inicialização-e-implantação-referência-canônica) |
 | operar em produção (serviço, proxy, redes autorizadas) | [Deploy](#deploy) e [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) |
-| atualizar ou reverter uma versão | [Atualização, versões e reversão](#atualização-versões-e-reversão) |
+| manter o servidor, o host e a infraestrutura | [Console de Operações](#console-de-operações) |
+| atualizar ou reverter uma versão | [Console de Operações](#console-de-operações) e [Atualização, versões e reversão](#atualização-versões-e-reversão) |
 | fazer backup ou restaurar o banco | [Backup e restauração do banco](#backup-e-restauração-do-banco) |
 | gravar, atualizar (OTA) ou autenticar um ESP32 | [Firmware ESP32](#firmware-esp32), [OTA](#atualização-de-firmware-por-ota-esp32) e [Credenciais por Dispositivo](#credenciais-por-dispositivo-e-migração) |
 | diagnosticar um problema | [Solução de Problemas](#solução-de-problemas) e [Monitoramento Operacional](#monitoramento-operacional) |
-| recuperar a senha do superadministrador | [Solução de Problemas › contas](#contas-permissões-e-sessões) |
+| recuperar a senha do superadministrador | [Console de Operações](#console-de-operações) ou [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal) |
+| consertar com tudo fora do ar | [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal) |
 | entender o que o usuário vê | [Ajuda e Manual no App](#ajuda-e-manual-no-app) (guia por papel, dentro do próprio app) |
 
 ## Sumário
@@ -72,6 +74,8 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Inicialização e implantação (referência canônica)](#inicialização-e-implantação-referência-canônica)
 - [Configuração](#configuração)
 - [Deploy](#deploy)
+- [Console de Operações](#console-de-operações)
+- [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal)
 - [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
 - [Domínio Próprio e HTTPS](#domínio-próprio-e-https)
 - [Empacotamento como PWA e Aplicativo Nativo (Cordova)](#empacotamento-como-pwa-e-aplicativo-nativo-cordova)
@@ -672,31 +676,27 @@ O script instala Nginx e Certbot se necessário, cria um site apontando para `12
 
 ### Atualização, versões e reversão
 
-Todo o fluxo é feito por Git na própria máquina de produção — o GitHub continua sendo a origem do código, mas a atualização não depende de Actions nem do GitHub Pages.
+A atualização de rotina é feita pelo **[Console de Operações](#console-de-operações) › Atualizações**, no próprio host. O GitHub continua sendo a origem do código, mas a atualização não depende de Actions nem do GitHub Pages. Os comandos equivalentes de terminal estão em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal) e continuam válidos quando o console não estiver disponível.
 
-```bash
-cd remoteifes-server
-bash deploy.sh               # busca e implanta a origin/main, com proteção
-bash deploy.sh v3.1.0        # implanta uma versão marcada por tag
-bash deploy.sh --offline     # sem rede: implanta um ref que já exista no clone (faça o git fetch antes, com rede)
-```
+O console mostra, separadamente, cinco coisas que um único "número de versão" esconde: o **commit do processo em execução** (lido do `/health`, não do disco), o **HEAD do checkout** e se há alterações locais, o **ramo e o upstream**, o **último `origin/main` observado** com a hora da observação, e a **última implantação verificada** registrada em `deploy.log`.
 
-O `deploy.sh` já faz o `git fetch` sozinho (exceto com `--offline`); não é preciso `git pull` antes.
+O que a implantação garante, seja acionada pelo console ou pelo terminal — os dois usam os mesmos `deploy.sh` / `rollback.sh` e a mesma trava `.deploy-lock`:
 
-`deploy.sh`, em ordem: recusa se houver alterações locais não commitadas (a menos de `--force`); resolve o diretório de dados e o caminho do banco com o mesmo `src/config/paths.js` que o servidor usa (o `.env` não precisa definir `REMOTEIFES_DATA_DIR`); **cria um backup verificado do banco** (`pre-update`) antes de mexer no código; resolve o ref alvo (`origin/main` por padrão, ou uma tag/commit); aplica o código (`git reset --hard` na `main`, ou checkout da tag); roda `npm ci --omit=dev` **apenas se `package.json`/`package-lock.json` mudaram** (compatível com `--offline`) — se o `npm ci` falhar, a atualização é considerada inválida e revertida, mesmo que exista um `node_modules` antigo ou parcial; reinicia o `remoteifes.service`; espera o `/health` ficar saudável **e informar, em `commit`, exatamente o commit implantado** — um `/health` saudável de um processo antigo que sobreviveu a um `systemctl restart` que falhou, ou de um processo de outra versão, não conta como sucesso; **se isso não acontecer em 40 s, reverte sozinho** para a versão anterior, reinstala as dependências dela, reinicia e exige da mesma forma que o processo em execução confirme a versão anterior. No `rollback.sh`, um `npm ci` que falhe encerra o script com erro sem reiniciar o serviço, indicando o que corrigir, e o rollback só é dado como concluído quando o processo em execução informa o commit alvo. Em caso de sucesso, grava a versão anterior e a atual em `<REMOTEIFES_DATA_DIR>/previous-version` / `current-version` e registra a operação em `deploy.log`, com o commit confirmado; a falha também fica em `deploy.log`, com a versão que continuou em execução.
+- recusa prosseguir se houver alterações locais não commitadas; o console **nunca** usa `--force`;
+- resolve o diretório de dados e o caminho do banco com o mesmo `src/config/paths.js` que o servidor usa;
+- **cria um backup verificado do banco** (`pre-update`) antes de mexer no código;
+- aplica o código e roda `npm ci --omit=dev` **apenas se `package.json` ou `package-lock.json` mudaram**; se o `npm ci` falhar, a atualização é considerada inválida e revertida, mesmo havendo um `node_modules` antigo ou parcial;
+- reinicia o serviço e exige que o `/health` fique saudável **e informe, em `commit`, exatamente o commit implantado**. Um `/health` saudável de um processo antigo que sobreviveu a um `systemctl restart` que falhou não conta como sucesso;
+- **se isso não acontecer em 40 s, reverte sozinho** para a versão anterior, reinstala as dependências dela e exige a mesma confirmação;
+- grava `previous-version` e `current-version` em `<REMOTEIFES_DATA_DIR>` e registra a operação, com sucesso ou falha, em `deploy.log`.
 
-A verificação é a mesma nos dois scripts (`verificar-versao.sh`). Uma versão alvo **anterior ao campo `commit`** do `/health` (a árvore dela não tem `src/config/release.js`) não consegue confirmar a própria identidade: ela só é aceita quando o `/health` saudável mostra, em `uptimeSegundos`, um processo que subiu **depois** do `systemctl restart` — um processo antigo sem identidade que sobreviveu a um reinício falho tem tempo de vida maior que o decorrido e é recusado —, e o registro em `deploy.log` diz explicitamente `identidade não confirmada`. Um processo que não informa o commit nunca é aceito como uma versão alvo que o informaria. **HEAD igual ao alvo não é conclusão**: se o código já está na versão pedida (atualização ou reversão interrompida, `git pull` manual, `--no-restart` anterior), o script consulta o processo em execução — só responde "nada a fazer" quando ele confirma a versão; caso contrário reinstala as dependências se elas mudaram em relação à versão em execução (ou por inteiro, se ela é desconhecida), reinicia, verifica e registra como nas demais operações, gravando como `previous-version` a versão que estava rodando. Com `--no-restart`, o código não é tocado e nada é reiniciado nem verificado, como sempre.
+A verificação é a mesma nos dois scripts (`verificar-versao.sh`). Uma versão alvo **anterior ao campo `commit`** do `/health` (a árvore dela não tem `src/config/release.js`) não consegue confirmar a própria identidade: ela só é aceita quando o `/health` saudável mostra, em `uptimeSegundos`, um processo que subiu **depois** do `systemctl restart` — um processo antigo sem identidade que sobreviveu a um reinício falho tem tempo de vida maior que o decorrido e é recusado —, e o registro em `deploy.log` diz explicitamente `identidade não confirmada`. Um processo que não informa o commit nunca é aceito como uma versão alvo que o informaria. **HEAD igual ao alvo não é conclusão**: se o código já está na versão pedida (atualização interrompida, `git pull` manual, `--no-restart` anterior), o processo em execução é consultado antes de responder "nada a fazer".
 
-Reverter manualmente para a última versão boa conhecida (ou para um ref específico):
+A interrupção é curta, mas existe: **as sessões dos usuários são encerradas** (o servidor encerra as sessões ativas na partida) e os ESP32 precisam reconectar. Não é implantação sem indisponibilidade.
 
-```bash
-bash rollback.sh             # volta para o previous-version gravado pelo deploy
-bash rollback.sh v3.0.0      # volta para uma versão específica
-```
+Reverter troca **apenas o código**. Se a atualização revertida alterou o esquema do banco (as migrações em `src/db/schema.js` podem adicionar **e remover** colunas e tabelas), a versão anterior pode não funcionar com o banco já migrado — nesse caso, restaurar o backup `pre-update` é uma **decisão separada e explícita**, nunca automática. É por isso que a atualização sempre grava esse backup antes de mexer no código.
 
-`rollback.sh` também faz um backup `pre-rollback` do banco antes de trocar o código, reinicia e verifica pelo `/health` que o processo em execução carregou o commit alvo. O rollback troca **apenas o código**. Se a atualização que está sendo revertida alterou o esquema do banco (as migrações em `src/db/schema.js` podem adicionar **e remover** colunas/tabelas), a versão anterior pode não funcionar com o banco já migrado — nesse caso restaure também o backup `pre-update` daquela atualização com `npm run restore`. É por isso que `deploy.sh` sempre grava esse backup antes de mexer no código.
-
-Marcar uma versão (na máquina de desenvolvimento, a partir da `main` limpa):
+Marcar uma versão continua sendo trabalho da máquina de desenvolvimento, não do host de produção: é autoria de versão, não implantação.
 
 ```bash
 cd remoteifes-server
@@ -709,6 +709,164 @@ bash release.sh 3.1.0        # ajusta a versão no package.json, cria o commit e
 - **Reinício após queda** — o `remoteifes.service` tem `Restart=always`; o watchdog `remoteifes-health.timer` roda `health-watchdog.sh` (como o usuário do serviço) a cada 2 minutos e, após 3 falhas seguidas do `/health` (processo vivo mas travado), aciona o `remoteifes-recover.service`, uma unidade `root` cujo único comando é `systemctl restart remoteifes.service`. Nenhum script do checkout roda como root.
 - **Reinício após reboot do host** — `install-service.sh` habilita o serviço (`systemctl enable`), que sobe sozinho no boot. Mantenha o `REMOTEIFES_DATA_DIR` em disco persistente.
 - **Restauração do banco** — `npm run restore` lista os backups de `<REMOTEIFES_DATA_DIR>/backups/` e restaura um deles, criando antes uma cópia de segurança verificada do banco atual. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
+
+## Console de Operações
+
+O **Console de Operações** (`remoteifes-console/`) é um serviço local, separado do RemoteIFES, para manutenção do servidor, do host e da infraestrutura. A operação do prédio — salas, agendamentos, contas, ESP32, protocolos IR e configurações da aplicação — continua **no próprio RemoteIFES**; o console resume a saúde dessas áreas e leva até elas, sem duplicar seus editores.
+
+### Por que é um serviço separado
+
+A aplicação encerra todas as sessões a cada reinício, a autenticação dela vive no SQLite e o banco pode ser justamente o que quebrou. Uma ferramenta de recuperação embutida na aplicação não estaria disponível quando fosse necessária. Além disso, administrar a aplicação **não pode** conceder acesso irrestrito ao host.
+
+O console é ativado por socket do systemd: enquanto ninguém o usa, **nenhum processo dele fica residente** — o systemd apenas mantém a porta. Na primeira conexão o serviço sobe e, depois de `CONSOLE_OCIOSIDADE_S` (padrão 900 s) sem uso, ele sai sozinho. Num Raspberry Pi 3 de 1 GiB, isso troca RAM ociosa permanente por uma partida de processo na primeira requisição.
+
+O código instalado fica em `/opt/remoteifes-console/atual` e o estado em `/var/lib/remoteifes-console`, **fora do checkout**: `deploy.sh` e `rollback.sh` trocam o checkout inteiro, e um rollback para uma revisão anterior ao console apagaria o diretório de onde ele estaria rodando.
+
+### Instalar e acessar
+
+```bash
+cd remoteifes-console
+sudo bash install-console.sh
+```
+
+O instalador copia o console para `/opt`, instala o auxiliar privilegiado como `root:root`, grava uma regra de `sudo` restrita a ele (validada com `visudo`), instala o socket e o serviço systemd e exibe **uma única vez** um segredo de instalação para criar o primeiro operador.
+
+O console escuta apenas em `127.0.0.1`. De outra máquina, use um túnel SSH — o `localhost` do seu computador **não** é o do Pi:
+
+```bash
+ssh -L 8099:127.0.0.1:8099 <usuario>@<host-do-pi>
+```
+
+e então abra `http://127.0.0.1:8099` no seu navegador.
+
+### O que o console faz
+
+| Área | Operações |
+|---|---|
+| **Visão geral** | estado da aplicação, do serviço, do watchdog e do host, com o que exige atenção em primeiro lugar |
+| **Serviço** | reiniciar, parar (desligando o watchdog junto) e iniciar o RemoteIFES; ler o journal das unidades |
+| **Atualizações** | comparar versão em execução, checkout e `origin`; implantar um commit revisado; reverter; atualizar o próprio console |
+| **Dados e recuperação** | backup verificado, restauração com o serviço parado e senha do superadministrador |
+| **Aplicativo e CI** | versões de servidor, PWA, Cordova e Android, APK publicado e execuções do GitHub Actions |
+| **Rede e domínio** | interfaces, rotas, resolvedor, portas em escuta, proxy, DNS e validade do certificado |
+| **Avançado** | elevação, auditoria do console, histórico de operações e Terminal Expert |
+
+Antes de qualquer operação que interrompa o serviço, o console avalia o impacto: bloqueia quando há **OTA em andamento** (todas as fases ativas, inclusive `validando`), rollout ativo, outra manutenção em curso ou disco insuficiente; e avisa, em vez de assumir zero, quando a atividade dos ESP32 **não pode ser observada**. A avaliação é refeita no instante da execução.
+
+Operações longas não são abandonadas quando o navegador fecha: elas rodam em grupo de processos próprio, a saída vai para arquivo e o console reconcilia o que encontrar ao voltar. Um trabalho cujo processo desapareceu sem marca de conclusão fica registrado como **desfecho desconhecido** — nunca como sucesso presumido.
+
+### Modelo de segurança do console
+
+- **Identidade própria**, com senha `scrypt` guardada em `/var/lib/remoteifes-console/operadores.json`. Nunca reutiliza `SENHA_ADMIN_INICIAL` nem `superadmin/admin`.
+- **Sessão** em cookie `HttpOnly`, `SameSite=Strict`, com prazo absoluto e de ociosidade. Operações sensíveis exigem **reautenticação**, válida por poucos minutos e revogada no logout e na troca de senha.
+- **CSRF** por token em cabeçalho próprio, `Origin` exato e `Host` conferido contra lista fechada (fecha DNS rebinding). CORS não é tratado como defesa. Portas não isolam cookies: por isso a sessão não vale nada sem o cabeçalho.
+- **Privilégio** por um único auxiliar `root` em `/usr/local/lib/remoteifes/console-helper.sh`, com **verbos fixos e alvo fixo** — sem git, npm, shell, unidade, caminho ou ambiente arbitrários. O auxiliar recusa executar se ele ou qualquer diretório acima dele for gravável por quem não é root. Não existe endpoint genérico de comando.
+- **Segredos** (token do GitHub, senhas) nunca voltam por API, log, auditoria ou diagnóstico: o console informa presença e validade, jamais o valor.
+- O serviço do console **não** usa `NoNewPrivileges=yes`, ao contrário de `remoteifes.service`: isso quebraria o `sudo` do auxiliar. O endurecimento aplicado está no arquivo de unidade e é explícito sobre esse ponto.
+
+Um operador autorizado que use `sudo` tem o alcance que o host lhe der, inclusive alterar o próprio console, seus registros e o sistema. Software na mesma máquina não consegue se tornar imutável diante do root: o objetivo do desenho é impedir **acesso não autorizado e uso acidental**.
+
+### Terminal Expert
+
+O terminal do console tem destravamento explícito, reautenticação, autorização de curta duração, relock automático, limite de sessões simultâneas, limpeza da árvore de processos e auditoria **sem transcrição** (metadados apenas).
+
+O pseudoterminal em si depende do módulo nativo `node-pty`, que **não é instalado por padrão**. Sem ele o console declara o terminal indisponível e mostra como habilitá-lo; **nenhum substituto é oferecido**, porque um terminal sem PTY real quebra silenciosamente em `vim`, `less` e `htop`, e um campo de texto ligado a um endpoint genérico de execução seria risco disfarçado de recurso. Enquanto o módulo não estiver instalado, o acesso a shell continua sendo por SSH — o que **não** é a mesma coisa, e o console diz isso.
+
+A saída do terminal **não** é filtrada em busca de segredos: se o operador abrir um arquivo com credenciais, elas aparecem na tela. A proteção de segredos do console vale para suas próprias APIs e registros, não para o que um shell autorizado decide exibir.
+
+### Custo de recursos
+
+Meça, não presuma:
+
+```bash
+cd remoteifes-console
+npm run medir            # ou: node test/medicao-recursos.js --json
+```
+
+O script mede, no host onde roda, a partida do processo, o RSS, o custo de uma atualização de status, de uma leitura de registros e de uma manutenção representativa — e diz explicitamente quando **não** está num Raspberry Pi, em vez de extrapolar.
+
+### Testes do console
+
+```bash
+cd remoteifes-console
+npm test
+```
+
+## Recuperação de emergência por terminal
+
+Referência **única** para quando o console, a aplicação, a autenticação, a rede ou o banco estiverem quebrados. Funciona sem console e sem login na aplicação; exige apenas acesso ao host.
+
+**Serviço e diagnóstico**
+
+```bash
+sudo systemctl status remoteifes.service
+sudo journalctl -u remoteifes.service -f
+npm run health
+```
+
+```bash
+sudo systemctl start remoteifes.service
+sudo systemctl stop remoteifes.service
+sudo systemctl restart remoteifes.service
+```
+
+Ao parar o serviço por mais de alguns minutos, pare também o watchdog (`sudo systemctl stop remoteifes-health.timer`), senão ele reinicia a aplicação após 3 falhas seguidas do `/health`. Religue-o ao terminar.
+
+**Backup e restauração** — execute em `remoteifes-server`; a restauração exige o servidor **parado**
+
+```bash
+npm run backup
+npm run backup -- pre-migracao
+```
+
+```bash
+npm run restore
+npm run restore -- <arquivo>
+```
+
+**Atualização e reversão** — execute em `remoteifes-server`
+
+```bash
+bash deploy.sh
+bash deploy.sh v3.1.0
+bash deploy.sh --offline
+```
+
+```bash
+bash rollback.sh
+bash rollback.sh v3.0.0
+```
+
+`deploy.sh` já faz o `git fetch` sozinho (exceto com `--offline`); não é preciso `git pull` antes. Se uma trava `.deploy-lock` ficou de um processo que não existe mais, o console a reconcilia sozinho; ela **não** deve ser apagada à mão enquanto o PID registrado estiver vivo, por mais antiga que a trava pareça.
+
+**Conta do superadministrador**
+
+```bash
+npm run reset-admin -- umaSenhaEscolhida
+npm run reset-admin
+```
+
+Sem argumento, a senha volta a um valor público e fraco: entre imediatamente e troque-a. O caminho equivalente no console não tem esse fallback e recebe a senha por entrada padrão, sem passar pela linha de comando.
+
+**Redes autorizadas**, quando uma faixa errada bloqueou o próprio acesso
+
+```bash
+npm run redes -- 10.10.0.0/16 192.168.0.0/16
+npm run redes
+sudo systemctl restart remoteifes.service
+```
+
+As rotas `/dispositivo/*` e o acesso por `localhost` — útil justamente para um túnel SSH — nunca dependem dessa lista.
+
+**Reparo do console**
+
+```bash
+sudo systemctl status remoteifes-console.socket
+sudo journalctl -u remoteifes-console.service -e
+sudo bash /opt/remoteifes-console/atual/install-console.sh
+```
+
+Reinstalar o console não toca no `remoteifes.service` nem no banco. Para removê-lo sem afetar o RemoteIFES: `sudo bash /opt/remoteifes-console/atual/install-console.sh --remover` — o estado em `/var/lib/remoteifes-console` é preservado.
 
 ## Hospedagem em Raspberry Pi
 
