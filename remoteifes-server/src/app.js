@@ -105,6 +105,10 @@ app.get("/health", (req, res) => {
 
 app.use(require("./routes/dispositivoRoutes"));
 
+// Prontidão para o Console de Operações: loopback + segredo compartilhado, antes da
+// restrição de rede porque não é acesso de usuário. Sem o arquivo de segredo responde 404.
+app.use(require("./routes/prontidaoRoutes"));
+
 if (frontendDisponivel) {
   app.use((req, res, next) => {
     const caminho = req.path;
