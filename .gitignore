@@ -17,6 +17,7 @@ build.json
 remoteifes-esp32/.pio/
 remoteifes-esp32/.pioenvs/
 remoteifes-esp32/.piolibdeps/
+remoteifes-console/node_modules/
 e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
