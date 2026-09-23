@@ -49,6 +49,28 @@ jobs:
           echo "$BODY" | grep -q '"banco":"ok"' || { echo "banco indisponível"; kill $SV; exit 1; }
           kill $SV
 
+  console:
+    name: Console de Operações (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      # O console não tem dependências npm: nada a instalar. As dependências do servidor são
+      # necessárias porque os testes de backup/restauração reusam o backupService do checkout.
+      - run: npm ci
+        working-directory: remoteifes-server
+      - run: npm test
+        working-directory: remoteifes-console
+      - name: Medição de recursos (registra os números do runner)
+        run: node test/medicao-recursos.js
+        working-directory: remoteifes-console
+
   e2e:
     name: Frontend end-to-end (${{ matrix.os }}, ${{ matrix.channel || matrix.browser }})
     runs-on: ${{ matrix.os }}

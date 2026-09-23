@@ -1,0 +1,16 @@
+{
+  "name": "remoteifes-console",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Console de Operações do RemoteIFES: serviço local de manutenção do host, do ciclo de vida do software e da infraestrutura",
+  "main": "console.js",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node console.js",
+    "test": "node --test test/*.test.js",
+    "instalar": "bash install-console.sh",
+    "medir": "node test/medicao-recursos.js"
+  }
+}

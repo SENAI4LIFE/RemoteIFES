@@ -1,0 +1,14 @@
+[Unit]
+Description=RemoteIFES - socket do Console de Operações
+Documentation=file:///opt/remoteifes-console/atual/ARQUITETURA.md
+
+[Socket]
+# Loopback por padrão: o console não é um serviço de rede. De outra máquina, use um túnel SSH
+# (ssh -L 8099:127.0.0.1:8099 usuario@host). Ligação em socket é o que mantém o custo ocioso em
+# zero: o systemd segura a porta e nenhum processo Node fica residente.
+ListenStream=127.0.0.1:8099
+# Um processo por socket, que sai sozinho depois do tempo de ociosidade.
+Accept=no
+
+[Install]
+WantedBy=sockets.target
