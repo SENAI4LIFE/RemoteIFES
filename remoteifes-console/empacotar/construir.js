@@ -52,7 +52,12 @@ function cabecalhoTar({ nome, tamanho, modo, tipo = "0" }) {
   escrever(`${tamanho.toString(8).padStart(11, "0")}\0`, 124, 12);
   escrever("00000000000\0", 136, 12);
   b.write("        ", 148, 8, "utf8");
-  escrever(tipo, 156, 1);
+  // O typeflag tem exatamente 1 byte e NÃO é terminado por NUL, então não passa por
+  // `escrever`, que reserva o último byte para o terminador — com tamanho 1 isso truncava o
+  // campo para vazio. O byte ficava zerado (AREGTYPE), que a maioria dos leitores trata como
+  // arquivo comum: os arquivos saíam certos e um diretório virava um arquivo vazio de mesmo
+  // nome, quebrando tudo que viesse dentro dele.
+  b.write(String(tipo), 156, 1, "utf8");
   b.write("ustar\0", 257, 6, "utf8");
   b.write("00", 263, 2, "utf8");
   let soma = 0;
@@ -80,8 +85,28 @@ function listarArquivos(base, relativo = "") {
  */
 function montarTarGz(base, itens, { prefixo = "", extras = [] } = {}) {
   const blocos = [];
+  const diretoriosEmitidos = new Set();
+
+  // Entradas de DIRETÓRIO, antes de cada arquivo que mora nelas.
+  //
+  // O extrator do atualizador cria os diretórios sozinho (`mkdir -p`), então um tar só de
+  // arquivos passava nos testes — e o `dpkg` recusava o pacote com "No such file or directory",
+  // porque ele extrai membro a membro e não inventa o caminho. Um tar sem diretórios é um tar
+  // malformado; parecia funcionar só porque o único leitor era o nosso.
+  const garantirDiretorio = (caminhoNoArquivo) => {
+    const partes = caminhoNoArquivo.split("/").slice(0, -1);
+    let acumulado = "";
+    for (const parte of partes) {
+      acumulado += `${parte}/`;
+      if (diretoriosEmitidos.has(acumulado)) continue;
+      diretoriosEmitidos.add(acumulado);
+      blocos.push(cabecalhoTar({ nome: acumulado, tamanho: 0, modo: 0o755, tipo: "5" }));
+    }
+  };
+
   const acrescentar = (nome, conteudo, modo) => {
-    blocos.push(cabecalhoTar({ nome: `${prefixo}${nome}`, tamanho: conteudo.length, modo }));
+    garantirDiretorio(nome);
+    blocos.push(cabecalhoTar({ nome, tamanho: conteudo.length, modo }));
     blocos.push(conteudo);
     const resto = conteudo.length % 512;
     if (resto) blocos.push(Buffer.alloc(512 - resto));
@@ -93,17 +118,14 @@ function montarTarGz(base, itens, { prefixo = "", extras = [] } = {}) {
       // O bit de execução vem do shebang, não do índice do Git: o Git guarda 100644 para estes
       // arquivos e um runner sem +x falharia com EACCES na primeira operação real.
       const executavel = conteudo.slice(0, 2).toString() === "#!";
-      acrescentar(arquivo.relativo, conteudo, executavel ? 0o755 : 0o644);
+      acrescentar(`${prefixo}${arquivo.relativo}`, conteudo, executavel ? 0o755 : 0o644);
     }
   }
   for (const extra of extras) {
     // Extras trazem o caminho pronto dentro do arquivo: eles existem só no pacote e nem sempre
     // ficam sob o mesmo prefixo da árvore copiada.
     const conteudo = Buffer.isBuffer(extra.conteudo) ? extra.conteudo : Buffer.from(extra.conteudo, "utf8");
-    blocos.push(cabecalhoTar({ nome: extra.nome, tamanho: conteudo.length, modo: extra.modo === undefined ? 0o644 : extra.modo }));
-    blocos.push(conteudo);
-    const resto = conteudo.length % 512;
-    if (resto) blocos.push(Buffer.alloc(512 - resto));
+    acrescentar(extra.nome, conteudo, extra.modo === undefined ? 0o644 : extra.modo);
   }
   blocos.push(Buffer.alloc(1024));
   return zlib.gzipSync(Buffer.concat(blocos), { level: 9 });

@@ -223,6 +223,26 @@ test("o console não tem dependências npm", () => {
   assert.match(pacote.engines.node, /22/);
 });
 
+test("nenhum arquivo de código do console contém byte nulo", () => {
+  // Um NUL perdido num comentário faz o Git tratar o arquivo como binário: o diff deixa de ser
+  // revisável e a revisão passa a ser uma fé. Aconteceu de verdade numa edição automatizada.
+  const ignorar = new Set(["node_modules", ".git"]);
+  const varrer = (dir) => {
+    for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (ignorar.has(entrada.name)) continue;
+      const completo = path.join(dir, entrada.name);
+      if (entrada.isDirectory()) {
+        varrer(completo);
+        continue;
+      }
+      if (!/\.(js|json|md|sh|ps1|css|html|modelo|socket|plist|yml)$/.test(entrada.name)) continue;
+      const bytes = fs.readFileSync(completo);
+      assert.equal(bytes.indexOf(0), -1, `byte nulo em ${path.relative(ajuda.RAIZ, completo)}`);
+    }
+  };
+  varrer(ajuda.RAIZ);
+});
+
 test("nenhum segredo fica versionado no diretório do console", () => {
   // Os padrões descrevem segredos **reais**, não qualquer coisa parecida. Um hash scrypt de
   // verdade traz N de quatro dígitos ou mais e sal/chave em base64 longos; `scrypt$1$1$1$a$b`
