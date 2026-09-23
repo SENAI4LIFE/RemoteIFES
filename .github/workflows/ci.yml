@@ -190,10 +190,14 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $nodeDir = Split-Path (Get-Command node.exe).Source
-          # System32 e o PowerShell do sistema ficam no PATH porque o adaptador do Windows
-          # depende deles; o que sai é ferramenta de DESENVOLVIMENTO: git, npm, compiladores.
-          $env:PATH = "$nodeDir;$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          # Só o node.exe entra, COPIADO para um diretório isolado. Pôr o diretório de instalação
+          # do Node no PATH traria npm.cmd junto, porque no Windows o npm mora ao lado do node —
+          # e o teste não provaria que o programa instalado dispensa ferramenta de desenvolvimento.
+          # System32 e o PowerShell do sistema ficam porque o adaptador do Windows depende deles.
+          $minimo = Join-Path $env:RUNNER_TEMP "so-node"
+          New-Item -ItemType Directory -Force -Path $minimo | Out-Null
+          Copy-Item (Get-Command node.exe).Source (Join-Path $minimo "node.exe") -Force
+          $env:PATH = "$minimo;$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
           $env:CONSOLE_ESTADO_DIR = "$env:RUNNER_TEMP\estado"
           $env:CONSOLE_PORTA = "8399"
           $env:CONSOLE_OCIOSIDADE_S = "60"
