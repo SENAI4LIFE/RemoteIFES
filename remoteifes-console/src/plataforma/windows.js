@@ -23,12 +23,13 @@ const processos = require("../processos");
 // prontidão consulta serviço e watchdog antes de **toda** operação, e com PowerShell isso
 // passou de 15 s num runner de dois núcleos: o operador esperaria esse tempo só para ver a tela
 // de confirmação. `sc.exe` é um binário nativo que responde em milissegundos. O PowerShell
-// continua onde não há equivalente nativo (log de eventos, disco, portas), e ali o custo é
-// pago uma vez, sob demanda.
+// continua apenas onde não há equivalente nativo e a consulta é sob demanda (log de eventos,
+// portas em escuta, pacotes pendentes), nunca no caminho percorrido antes de cada operação.
 
 const { ESTADO, recurso } = base;
 
 const SERVICO_APP = process.env.CONSOLE_SERVICO_APP || "RemoteIFES";
+const TAREFA = "RemoteIFES Console";
 
 function powershell(script, { timeoutMs = 20_000 } = {}) {
   // -NoProfile evita herdar perfil do operador; -NonInteractive impede qualquer prompt.
@@ -215,49 +216,9 @@ async function reiniciarConsole() {
   );
 }
 
-async function disco(caminhos) {
-  const saida = [];
-  for (const caminho of caminhos) {
-    const raiz = path.parse(path.resolve(caminho)).root.replace(/\\$/, "");
-    const r = await powershell(
-      `$ErrorActionPreference='SilentlyContinue';` +
-        `$d = Get-PSDrive -Name '${raiz.replace(":", "")}' ;` +
-        `if ($null -eq $d) { 'SEMDISCO' } else { "Used=$($d.Used)"; "Free=$($d.Free)" }`,
-      { timeoutMs: 15_000 }
-    );
-    if (!r.ok || r.saida.includes("SEMDISCO")) {
-      saida.push({ caminho, suportado: false, motivo: "não foi possível medir esta unidade" });
-      continue;
-    }
-    const campos = {};
-    for (const linha of r.saida.split("\n")) {
-      const idx = linha.indexOf("=");
-      if (idx > 0) campos[linha.slice(0, idx).trim()] = linha.slice(idx + 1).trim();
-    }
-    const usado = Number(campos.Used);
-    const livre = Number(campos.Free);
-    if (!Number.isFinite(usado) || !Number.isFinite(livre)) {
-      saida.push({ caminho, suportado: false, motivo: "resposta inesperada" });
-      continue;
-    }
-    const total = usado + livre;
-    saida.push({
-      caminho,
-      suportado: true,
-      dispositivo: raiz,
-      totalBytes: total,
-      usadoBytes: usado,
-      livreBytes: livre,
-      usoPercentual: total > 0 ? Math.round((usado / total) * 100) : null,
-      montagem: raiz,
-    });
-  }
-  return saida;
-}
-
 async function relogio() {
   const comum = { agora: new Date().toISOString(), fusoNode: Intl.DateTimeFormat().resolvedOptions().timeZone };
-  const r = await powershell("w32tm /query /status", { timeoutMs: 15_000 });
+  const r = await processos.executar("w32tm.exe", ["/query", "/status"], { timeoutMs: 15_000 });
   if (!r.ok) return { ...comum, sincronizado: null, suportado: false, motivo: "w32tm indisponível" };
   return {
     ...comum,
@@ -386,28 +347,42 @@ function diretoriosPadrao({ escopo = "usuario" } = {}) {
   };
 }
 
-async function registrarInicializacao({ comando, escopo = "usuario" } = {}) {
+async function registrarInicializacao({ comando, argumentos = [], escopo = "usuario" } = {}) {
   if (!comando) return recurso(ESTADO.NAO_SUPORTADO, "comando de inicialização ausente");
   // Tarefa agendada em vez de serviço: o console é sob demanda e não precisa residir.
-  const escopoTarefa = escopo === "sistema" ? "/RU SYSTEM" : "";
-  const r = await powershell(
-    `schtasks.exe /Create /F /TN "RemoteIFES Console" /TR "${comando.replace(/"/g, '\\"')}" /SC ONLOGON ${escopoTarefa}`,
-    { timeoutMs: 30_000 }
-  );
-  if (r.ok) return { ...recurso(ESTADO.SUPORTADO), mecanismo: "Tarefa agendada (ONLOGON)" };
-  if (/Access is denied|Acesso negado/i.test(r.saida || "")) {
+  //
+  // `schtasks.exe` é chamado direto, com cada argumento no seu lugar. Passando por um script de
+  // PowerShell era preciso escapar aspas na mão, e o alvo é justamente um caminho com espaço
+  // ("...\RemoteIFES Console\console-bootstrap.js"): a citação dupla — a do PowerShell e a do
+  // schtasks — é onde esse tipo de comando quebra em silêncio e registra uma tarefa que não roda.
+  //
+  // Os `argumentos` também eram descartados aqui, então a tarefa chamava `node.exe` sem script
+  // nenhum: ela era criada com sucesso e não abria coisa alguma.
+  const alvo = [comando, ...argumentos].map((parte) => `"${parte}"`).join(" ");
+  const args = ["/Create", "/F", "/TN", TAREFA, "/TR", alvo, "/SC", "ONLOGON"];
+  if (escopo === "sistema") args.push("/RU", "SYSTEM");
+
+  const r = await processos.executar("schtasks.exe", args, { timeoutMs: 30_000 });
+  if (r.ok) return { ...recurso(ESTADO.SUPORTADO), mecanismo: "Tarefa agendada (ONLOGON)", alvo };
+  if (/Access is denied|Acesso negado/i.test(r.saida || r.erro || "")) {
     return recurso(ESTADO.SEM_PERMISSAO, "criar a tarefa neste escopo exige Administrador");
   }
   return recurso(ESTADO.INDISPONIVEL, (r.saida || r.erro || "").slice(0, 300));
 }
 
 async function removerInicializacao() {
-  const r = await powershell(`schtasks.exe /Delete /F /TN "RemoteIFES Console"`, { timeoutMs: 20_000 });
-  return r.ok ? recurso(ESTADO.SUPORTADO) : recurso(ESTADO.INDISPONIVEL, (r.saida || r.erro || "").slice(0, 300));
+  const r = await processos.executar("schtasks.exe", ["/Delete", "/F", "/TN", TAREFA], { timeoutMs: 20_000 });
+  // Apagar uma tarefa que não existe não é falha: o resultado pedido já é o estado atual.
+  if (!r.ok && /cannot find|não foi possível encontrar|does not exist/i.test(r.saida || r.erro || "")) {
+    return { ...recurso(ESTADO.SUPORTADO), mecanismo: "não havia tarefa agendada registrada" };
+  }
+  return r.ok
+    ? { ...recurso(ESTADO.SUPORTADO), mecanismo: "tarefa agendada removida" }
+    : recurso(ESTADO.INDISPONIVEL, (r.saida || r.erro || "").slice(0, 300));
 }
 
 async function estadoDaInicializacao() {
-  const r = await powershell(`schtasks.exe /Query /TN "RemoteIFES Console" /FO LIST`, { timeoutMs: 20_000 });
+  const r = await processos.executar("schtasks.exe", ["/Query", "/TN", TAREFA, "/FO", "LIST"], { timeoutMs: 20_000 });
   if (!r.ok) return { ...recurso(ESTADO.SUPORTADO), habilitado: false, mecanismo: "Tarefa agendada (ONLOGON)" };
   return { ...recurso(ESTADO.SUPORTADO), habilitado: true, mecanismo: "Tarefa agendada (ONLOGON)" };
 }
@@ -424,7 +399,6 @@ module.exports = {
   lerRegistros,
   reiniciarHost,
   reiniciarConsole,
-  disco,
   relogio,
   portasEmEscuta,
   pacotesPendentes,
