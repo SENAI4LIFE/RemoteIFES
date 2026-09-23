@@ -1,0 +1,45 @@
+[Unit]
+Description=RemoteIFES - Console de Operações
+Documentation=file:///opt/remoteifes-console/atual/ARQUITETURA.md
+Requires=remoteifes-console.socket
+After=remoteifes-console.socket
+
+[Service]
+Type=simple
+User=__USUARIO__
+WorkingDirectory=__RAIZ_CONSOLE__
+ExecStart=__NODE__ __RAIZ_CONSOLE__/console.js
+Environment=CONSOLE_ESTADO_DIR=__DIR_ESTADO__
+Environment=CONSOLE_CHECKOUT_DIR=__CHECKOUT__
+Environment=NODE_ENV=production
+# O processo sai sozinho por ociosidade; o socket reabre o serviço na próxima conexão.
+# success é a saída esperada, não um erro a ser reiniciado em laço.
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+
+# Endurecimento compatível com o desenho de privilégio.
+#
+# NoNewPrivileges NÃO é usado aqui, ao contrário de remoteifes.service: o console precisa
+# chamar `sudo` para o auxiliar root, e NoNewPrivileges=yes tornaria esse caminho inoperante.
+# Endurecer o que não conflita, e ser explícito sobre o que não dá para endurecer, é mais
+# honesto do que copiar um bloco de diretivas que quebraria a elevação.
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Caminhos graváveis, explicitamente: estado do console, dados da aplicação (backup, trava,
+# registro de deploy) e o checkout (deploy.sh troca o código e roda npm ci).
+# __RAIZ_INSTALACAO__ é gravável para que a auto-atualização troque <raiz>/atual por rename.
+ReadWritePaths=__DIR_ESTADO__ __DIR_DADOS__ __CHECKOUT__ __RAIZ_INSTALACAO__
+
+[Install]
+WantedBy=multi-user.target
