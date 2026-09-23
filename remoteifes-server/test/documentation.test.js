@@ -146,7 +146,7 @@ test("manual e README documentam Protocolos IR, o clonador vinculado à placa, o
 
 test("procedimentos restritos continuam fora do conjunto de Administrador", () => {
   const admin = JSON.stringify(service._adminSections);
-  for (const trecho of ["deploy.sh", "npm run restore", "python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE", "install-console.sh", "console-helper.sh"]) {
+  for (const trecho of ["deploy.sh", "npm run restore", "python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE", "instalacao/instalar.js", "console-helper.sh"]) {
     assert.ok(!admin.includes(trecho), `admin recebeu procedimento restrito: ${trecho}`);
   }
   const superadmin = JSON.stringify(service._superSections);
@@ -183,7 +183,7 @@ test("o console tem seção própria com acesso, fronteira e reparo", () => {
   assert.equal(console.papel, "superadmin");
   const texto = JSON.stringify(console);
 
-  assert.match(texto, /install-console\.sh/, "precisa dizer como instalar");
+  assert.match(texto, /instalacao\/instalar\.js/, "precisa dizer como instalar");
   assert.match(texto, /ssh -L 8099/, "precisa explicar o túnel SSH");
   assert.match(texto, /não é o do Pi/, "precisa avisar que o localhost do operador não é o do Pi");
   assert.match(texto, /fora do checkout/, "precisa explicar por que roda fora do checkout");
@@ -215,7 +215,7 @@ test("o README mantém uma referência única de recuperação de emergência", 
     "bash deploy.sh",
     "bash rollback.sh",
     "npm run reset-admin",
-    "install-console.sh",
+    "instalacao/instalar.js",
   ]) {
     assert.ok(secao.includes(comando), `a recuperação de emergência precisa conter: ${comando}`);
   }

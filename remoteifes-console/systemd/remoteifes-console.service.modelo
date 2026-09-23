@@ -1,14 +1,16 @@
 [Unit]
 Description=RemoteIFES - Console de Operações
-Documentation=file:///opt/remoteifes-console/atual/ARQUITETURA.md
+Documentation=file://__RAIZ_INSTALACAO__/DISTRIBUICAO.md
 Requires=remoteifes-console.socket
 After=remoteifes-console.socket
 
 [Service]
 Type=simple
 User=__USUARIO__
-WorkingDirectory=__RAIZ_CONSOLE__
-ExecStart=__NODE__ __RAIZ_CONSOLE__/console.js
+WorkingDirectory=__RAIZ_INSTALACAO__
+# A unidade aponta para a **camada estável**, nunca para uma versão. É o que permite que o
+# console se atualize trocando o ponteiro em estado-instalacao.json sem reescrever esta unidade.
+ExecStart=__NODE__ __RAIZ_INSTALACAO__/console-bootstrap.js
 Environment=CONSOLE_ESTADO_DIR=__DIR_ESTADO__
 Environment=CONSOLE_CHECKOUT_DIR=__CHECKOUT__
 Environment=NODE_ENV=production
@@ -38,7 +40,7 @@ MemoryDenyWriteExecute=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 # Caminhos graváveis, explicitamente: estado do console, dados da aplicação (backup, trava,
 # registro de deploy) e o checkout (deploy.sh troca o código e roda npm ci).
-# __RAIZ_INSTALACAO__ é gravável para que a auto-atualização troque <raiz>/atual por rename.
+# __RAIZ_INSTALACAO__ é gravável para que a atualização instale versoes/<nova> e troque o ponteiro.
 ReadWritePaths=__DIR_ESTADO__ __DIR_DADOS__ __CHECKOUT__ __RAIZ_INSTALACAO__
 
 [Install]
