@@ -54,38 +54,33 @@ function versoesPresentes() {
   }
 }
 
-function resolver() {
+/**
+ * Candidatas em ordem de preferência: o ponteiro, a anterior, a mais recente presente, e o
+ * payload ao lado (instalação de desenvolvimento).
+ *
+ * São várias porque *existir o arquivo* não é o mesmo que *conseguir carregá-lo*. Um payload
+ * assinado pode trazer todos os arquivos exigidos e ainda assim ter um erro de sintaxe ou um
+ * require que falha; nesse caso o `require()` lança e, antes, a exceção subia sem que a versão
+ * anterior fosse sequer tentada — uma atualização ruim deixava o console sem subir de jeito
+ * nenhum, justamente quando ele é a ferramenta usada para consertar as coisas.
+ */
+function candidatas() {
   const info = lerEstado();
-
-  const ativa = versaoUtilizavel(info.versaoAtiva);
-  if (ativa) return { dir: ativa, versao: info.versaoAtiva, origem: "ponteiro" };
-
-  if (info.versaoAtiva) {
-    console.error(`[bootstrap] a versão ativa (${info.versaoAtiva}) não está utilizável; procurando alternativa.`);
-  }
-
-  const anterior = versaoUtilizavel(info.versaoAnterior);
-  if (anterior) {
-    console.error(`[bootstrap] usando a versão anterior (${info.versaoAnterior}).`);
-    return { dir: anterior, versao: info.versaoAnterior, origem: "anterior" };
-  }
-
-  for (const versao of versoesPresentes()) {
+  const lista = [];
+  const juntar = (versao, origem) => {
     const dir = versaoUtilizavel(versao);
-    if (dir) {
-      console.error(`[bootstrap] ponteiro inválido; usando a versão mais recente presente (${versao}).`);
-      return { dir, versao, origem: "mais-recente" };
-    }
-  }
+    if (dir && !lista.some((c) => c.dir === dir)) lista.push({ dir, versao, origem });
+  };
 
-  // Instalação de desenvolvimento: o payload pode estar ao lado do bootstrap.
-  if (fs.existsSync(path.join(RAIZ, ALVO))) return { dir: RAIZ, versao: null, origem: "no-lugar" };
-
-  return null;
+  juntar(info.versaoAtiva, "ponteiro");
+  juntar(info.versaoAnterior, "anterior");
+  for (const versao of versoesPresentes()) juntar(versao, "mais-recente");
+  if (fs.existsSync(path.join(RAIZ, ALVO))) lista.push({ dir: RAIZ, versao: null, origem: "no-lugar" });
+  return lista;
 }
 
-const escolhida = resolver();
-if (!escolhida) {
+const disponiveis = candidatas();
+if (!disponiveis.length) {
   console.error(
     `[bootstrap] nenhuma versão utilizável do console foi encontrada em ${DIR_VERSOES}.\n` +
       "Reinstale o pacote do Console de Operações para restaurar a instalação."
@@ -97,13 +92,32 @@ if (!escolhida) {
 // administrar versoes/ e o ponteiro mesmo quando roda de dentro de versoes/<v>/.
 process.env.CONSOLE_RAIZ_INSTALACAO = RAIZ;
 
-// Chama a entrada exportada em vez de contar com efeito de carregamento: aqui o módulo
-// principal é este bootstrap, então `require.main === module` seria falso no payload e nada
-// aconteceria.
-const modulo = require(path.join(escolhida.dir, ALVO));
-if (typeof modulo.executar === "function") {
-  modulo.executar();
-} else {
-  console.error(`[bootstrap] ${ALVO} da versão ${escolhida.versao || "local"} não expõe uma entrada "executar".`);
+let iniciou = false;
+for (const [indice, candidata] of disponiveis.entries()) {
+  if (indice > 0) {
+    console.error(`[bootstrap] tentando a versão ${candidata.versao || "local"} (${candidata.origem}).`);
+  }
+  try {
+    // Chama a entrada exportada em vez de contar com efeito de carregamento: aqui o módulo
+    // principal é este bootstrap, então `require.main === module` seria falso no payload.
+    const modulo = require(path.join(candidata.dir, ALVO));
+    if (typeof modulo.executar !== "function") {
+      throw new Error(`${ALVO} não expõe uma entrada "executar"`);
+    }
+    modulo.executar();
+    iniciou = true;
+    break;
+  } catch (erro) {
+    console.error(
+      `[bootstrap] a versão ${candidata.versao || "local"} não carregou: ${erro && erro.message ? erro.message : erro}`
+    );
+  }
+}
+
+if (!iniciou) {
+  console.error(
+    "[bootstrap] nenhuma versão instalada do console conseguiu iniciar.\n" +
+      "Reinstale o pacote do Console de Operações para restaurar a instalação."
+  );
   process.exit(1);
 }

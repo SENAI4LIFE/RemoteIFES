@@ -540,3 +540,85 @@ test("situação distingue instalada, publicada e observação antiga", async (t
   assert.ok(s.alvo.includes(process.arch));
   assert.match(s.observacaoDeDistribuicao, /independente do commit do RemoteIFES/);
 });
+
+test("o bootstrap cai para a anterior quando a versão ativa EXISTE mas não carrega", (t) => {
+  // Existir o arquivo não é conseguir carregá-lo. Um payload assinado pode trazer tudo que é
+  // exigido e ainda ter erro de sintaxe ou um require que falha. Antes, a exceção subia sem que
+  // a anterior fosse tentada: uma atualização ruim deixava o console sem subir de jeito nenhum —
+  // justamente a ferramenta que se usa para consertar as coisas.
+  const raiz = ajuda.dirTemporario("console-boot-");
+  t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
+
+  const bootstrap = path.join(raiz, "console-bootstrap.js");
+  fs.copyFileSync(path.join(ajuda.RAIZ, "instalacao", "console-bootstrap.js"), bootstrap);
+
+  // 2.0.0: presente, com console.js que EXPLODE ao carregar.
+  fs.mkdirSync(path.join(raiz, "versoes", "2.0.0"), { recursive: true });
+  fs.writeFileSync(path.join(raiz, "versoes", "2.0.0", "console.js"), 'throw new Error("payload quebrado de proposito");\n');
+
+  // 1.0.0: presente e sã.
+  fs.mkdirSync(path.join(raiz, "versoes", "1.0.0"), { recursive: true });
+  fs.writeFileSync(
+    path.join(raiz, "versoes", "1.0.0", "console.js"),
+    'module.exports = { executar() { process.stdout.write("SUBIU 1.0.0\\n"); } };\n'
+  );
+
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "2.0.0", versaoAnterior: "1.0.0", transacao: null })}\n`
+  );
+
+  const r = require("child_process").spawnSync(process.execPath, [bootstrap], { encoding: "utf8", timeout: 30_000 });
+  const saida = `${r.stdout || ""}${r.stderr || ""}`;
+  assert.equal(r.status, 0, `o bootstrap deve subir a anterior. Saída:\n${saida}`);
+  assert.match(saida, /SUBIU 1\.0\.0/, "a versão anterior precisa realmente executar");
+  assert.match(saida, /não carregou/, "o motivo da falha da ativa precisa aparecer");
+  assert.match(saida, /payload quebrado de proposito/, "o erro original precisa ser mostrado, não engolido");
+});
+
+test("quando nenhuma versão carrega, o bootstrap falha dizendo isso", (t) => {
+  const raiz = ajuda.dirTemporario("console-boot2-");
+  t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
+
+  const bootstrap = path.join(raiz, "console-bootstrap.js");
+  fs.copyFileSync(path.join(ajuda.RAIZ, "instalacao", "console-bootstrap.js"), bootstrap);
+  for (const v of ["2.0.0", "1.0.0"]) {
+    fs.mkdirSync(path.join(raiz, "versoes", v), { recursive: true });
+    fs.writeFileSync(path.join(raiz, "versoes", v, "console.js"), 'throw new Error("quebrado");\n');
+  }
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "2.0.0", versaoAnterior: "1.0.0", transacao: null })}\n`
+  );
+
+  const r = require("child_process").spawnSync(process.execPath, [bootstrap], { encoding: "utf8", timeout: 30_000 });
+  const saida = `${r.stdout || ""}${r.stderr || ""}`;
+  assert.equal(r.status, 1, "sem nenhuma versão utilizável, o bootstrap tem de falhar");
+  assert.match(saida, /nenhuma versão instalada do console conseguiu iniciar/);
+  assert.match(saida, /Reinstale o pacote/);
+});
+
+test("um payload sem a entrada executar é tratado como falha de carregamento", (t) => {
+  const raiz = ajuda.dirTemporario("console-boot3-");
+  t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
+
+  const bootstrap = path.join(raiz, "console-bootstrap.js");
+  fs.copyFileSync(path.join(ajuda.RAIZ, "instalacao", "console-bootstrap.js"), bootstrap);
+  fs.mkdirSync(path.join(raiz, "versoes", "2.0.0"), { recursive: true });
+  fs.writeFileSync(path.join(raiz, "versoes", "2.0.0", "console.js"), "module.exports = {};\n");
+  fs.mkdirSync(path.join(raiz, "versoes", "1.0.0"), { recursive: true });
+  fs.writeFileSync(
+    path.join(raiz, "versoes", "1.0.0", "console.js"),
+    'module.exports = { executar() { process.stdout.write("SUBIU 1.0.0\\n"); } };\n'
+  );
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "2.0.0", versaoAnterior: "1.0.0", transacao: null })}\n`
+  );
+
+  const r = require("child_process").spawnSync(process.execPath, [bootstrap], { encoding: "utf8", timeout: 30_000 });
+  const saida = `${r.stdout || ""}${r.stderr || ""}`;
+  assert.equal(r.status, 0, saida);
+  assert.match(saida, /SUBIU 1\.0\.0/);
+  assert.match(saida, /executar/);
+});
