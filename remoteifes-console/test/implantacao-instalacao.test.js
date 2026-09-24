@@ -37,6 +37,10 @@ function checkoutGit({ porta = 8188 } = {}) {
   fs.writeFileSync(path.join(servidor, "package.json"), JSON.stringify({ version: "3.0.0" }));
   fs.writeFileSync(path.join(servidor, ".env"), `PORTA=${porta}\n`);
   fs.writeFileSync(path.join(servidor, "src", "config", "release.js"), "module.exports={};\n");
+  // O checkout real ignora `remoteifes-server/data/`; sem isso o preflight veria o diretório
+  // de dados como trabalho local não rastreado e recusaria toda operação — artefato do
+  // fixture, não do produto.
+  fs.writeFileSync(path.join(raiz, ".gitignore"), "remoteifes-server/data/\nremoteifes-server/node_modules/\n");
   git(raiz, ["add", "-A"]);
   git(raiz, ["commit", "--quiet", "-m", "base"]);
   return raiz;
@@ -780,4 +784,60 @@ test("o atalho do Windows usa extensão .vbs, porque o wscript escolhe o motor p
   assert.ok(!/abrir-console\.js/.test(fonte), "não pode sobrar referência ao .js");
   // E o conteúdo gravado continua sendo VBScript, coerente com a extensão.
   assert.match(fonte, /CreateObject\("WScript\.Shell"\)/);
+});
+
+test("a reversão recusa árvore suja e não descarta trabalho local", async (t) => {
+  // `implantar()` já recusava; `reverter()` lia o estado do checkout e não o consultava, seguindo
+  // para `reset --hard`/`checkout --force`. As duas operações trocam código do mesmo jeito, então
+  // a garantia "nunca descarta trabalho local" tem de valer para as duas.
+  const checkout = checkoutGit();
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+  const implantacao = require(path.join(ajuda.RAIZ, "src", "implantacao.js"));
+
+  // Um segundo commit, para haver de onde e para onde voltar.
+  fs.writeFileSync(path.join(checkout, "remoteifes-server", "novo.js"), "// v2\n");
+  git(checkout, ["add", "-A"]);
+  git(checkout, ["commit", "--quiet", "-m", "v2"]);
+  const destino = git(checkout, ["rev-parse", "HEAD~1"]);
+
+  // Trabalho local RASTREADO, não commitado.
+  const rastreado = path.join(checkout, "remoteifes-server", "package.json");
+  const conteudoRastreado = `${fs.readFileSync(rastreado, "utf8")}\n// ajuste local em andamento\n`;
+  fs.writeFileSync(rastreado, conteudoRastreado);
+
+  const r = await implantacao.reverter({ alvo: destino, offline: true, semReiniciar: true, log: () => {} });
+  assert.equal(r.ok, false, "a reversão não pode prosseguir com árvore suja");
+  assert.match(r.erro, /nunca descarta trabalho local/);
+  assert.equal(fs.readFileSync(rastreado, "utf8"), conteudoRastreado, "o arquivo local fica intacto");
+  assert.equal(git(checkout, ["rev-parse", "HEAD"]), git(checkout, ["rev-parse", "main"]), "HEAD não se move");
+});
+
+test("arquivo não rastreado também conta como trabalho local", async (t) => {
+  // Com `--untracked-files=no` um arquivo não rastreado era invisível, e um `checkout --force`
+  // para um commit que passou a conter aquele mesmo caminho o sobrescrevia sem aviso.
+  const checkout = checkoutGit();
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+  const implantacao = require(path.join(ajuda.RAIZ, "src", "implantacao.js"));
+
+  const naoRastreado = path.join(checkout, "remoteifes-server", "rascunho-do-operador.txt");
+  fs.writeFileSync(naoRastreado, "medições que eu não quero perder\n");
+
+  const estado = await implantacao.estadoDoCheckout();
+  assert.equal(estado.limpo, false, "um arquivo não rastreado deixa a árvore suja");
+  assert.ok(
+    estado.naoRastreados.some((n) => n.includes("rascunho-do-operador")),
+    `o não rastreado precisa ser nomeado; recebi ${JSON.stringify(estado.naoRastreados)}`
+  );
+
+  const r = await implantacao.implantar({ commit: git(checkout, ["rev-parse", "HEAD"]), offline: true, semReiniciar: true, log: () => {} });
+  assert.equal(r.ok, false);
+  assert.equal(fs.readFileSync(naoRastreado, "utf8"), "medições que eu não quero perder\n");
 });
