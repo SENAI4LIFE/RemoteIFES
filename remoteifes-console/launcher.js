@@ -3,6 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const http = require("http");
+const net = require("net");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
 const readline = require("readline");
@@ -26,7 +27,9 @@ const moduloIdentidade = require(path.join(raiz, "src", "identidade"));
 // aleatório; a prova é um HMAC calculado com um segredo que só existe no arquivo protegido de
 // estado — um impostor que tenha tomado a porta não consegue produzi-lo.
 
-const ESPERA_MAXIMA_MS = 30_000;
+// Prazo para o backend ficar pronto. Ajustável porque um Raspberry Pi frio leva mais tempo que
+// um desktop, e porque um teste não deve gastar 30 s provando que a espera termina.
+const ESPERA_MAXIMA_MS = Number(process.env.CONSOLE_LANCADOR_ESPERA_MS) > 0 ? Number(process.env.CONSOLE_LANCADOR_ESPERA_MS) : 30_000;
 
 function log(linha) {
   process.stdout.write(`${linha}\n`);
@@ -122,6 +125,37 @@ function caminhoDoBackend() {
   return fs.existsSync(bootstrap) ? bootstrap : path.join(raiz, "console.js");
 }
 
+/** A porta aceita conexão? Distingue "ninguém ali" de "reservada por alguém". */
+function portaOcupada(porta) {
+  return new Promise((resolver) => {
+    const socket = net.connect({ host: "127.0.0.1", port: porta });
+    const encerrar = (valor) => {
+      socket.destroy();
+      resolver(valor);
+    };
+    socket.setTimeout(2000);
+    socket.once("connect", () => encerrar(true));
+    socket.once("timeout", () => encerrar(false));
+    socket.once("error", () => encerrar(false));
+  });
+}
+
+/** Uma conexão HTTP qualquer, só para que o systemd ative o serviço por trás do socket. */
+function tocarPorta(porta) {
+  return new Promise((resolver) => {
+    const req = http.request({ host: "127.0.0.1", port: porta, path: "/api/sessao", method: "GET", timeout: 5000 }, (res) => {
+      res.resume();
+      res.on("end", () => resolver(true));
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      resolver(false);
+    });
+    req.on("error", () => resolver(false));
+    req.end();
+  });
+}
+
 async function garantirBackend() {
   const contrato = lerContrato();
   if (contrato) {
@@ -132,6 +166,26 @@ async function garantirBackend() {
     if (backendNoAr(contrato)) {
       return { ok: false, motivo: `o processo ${contrato.pid} está vivo mas não responde; encerre-o antes de tentar de novo` };
     }
+  }
+
+  // Se alguém já detém a porta sem haver contrato, o caminho certo é **conectar**, não subir
+  // outro processo.
+  //
+  // É o estado normal de um Linux com ativação por socket depois da saída por ociosidade: o
+  // contrato foi apagado, mas o systemd continua dono da porta. Criar um backend TCP ali recebe
+  // EADDRINUSE, e o lançador reportaria falha exatamente no estado que o desenho pretende.
+  // Uma conexão basta para o systemd subir o serviço; então o contrato novo aparece.
+  if (await portaOcupada(config.PORTA)) {
+    log("A porta já está reservada (ativação por socket); conectando para ativar o serviço...");
+    await tocarPorta(config.PORTA);
+    const ativado = await esperarPronto();
+    if (ativado.ok) return { ok: true, jaEstava: false, contrato: ativado.contrato, versao: ativado.versao };
+    return {
+      ok: false,
+      motivo:
+        `a porta ${config.PORTA} está ocupada, mas o console não publicou identidade depois da conexão ` +
+        `(${ativado.motivo}). Verifique quem detém a porta antes de prosseguir.`,
+    };
   }
 
   const alvo = caminhoDoBackend();

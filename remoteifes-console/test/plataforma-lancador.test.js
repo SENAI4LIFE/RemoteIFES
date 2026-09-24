@@ -429,3 +429,163 @@ test("a saída por ociosidade fica desarmada quando ninguém sabe religar o cons
   assert.ok(comReativacao, "arma quando o lançador ou o socket podem religar");
   clearInterval(comReativacao);
 });
+
+// --- sc.exe em Windows localizado -------------------------------------------------------------
+
+// Saídas reais de `sc.exe`, en-US e pt-BR. O `sc.exe` traduz os RÓTULOS; o que não muda é a
+// ordem dos campos e o código numérico no início do valor.
+const SC_QUERY_EN = [
+  "SERVICE_NAME: RemoteIFES",
+  "        TYPE               : 10  WIN32_OWN_PROCESS",
+  "        STATE              : 4  RUNNING",
+  "                                (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)",
+  "        WIN32_EXIT_CODE    : 0  (0x0)",
+  "        SERVICE_EXIT_CODE  : 0  (0x0)",
+  "        CHECKPOINT         : 0x0",
+  "        WAIT_HINT          : 0x0",
+  "",
+].join("\r\n");
+
+const SC_QUERY_PT = [
+  "NOME_DO_SERVIÇO: RemoteIFES",
+  "        TIPO                : 10  WIN32_OWN_PROCESS",
+  "        ESTADO              : 4  RUNNING",
+  "                                (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)",
+  "        CÓDIGO_DE_SAÍDA_WIN32    : 0  (0x0)",
+  "        CÓDIGO_DE_SAÍDA_DO_SERVIÇO  : 0  (0x0)",
+  "        PONTO_DE_VERIFICAÇÃO       : 0x0",
+  "        SUGESTÃO_DE_ESPERA         : 0x0",
+  "",
+].join("\r\n");
+
+const SC_QUERY_PT_PARADO = SC_QUERY_PT.replace("ESTADO              : 4  RUNNING", "ESTADO              : 1  STOPPED");
+
+const SC_QC_PT = [
+  "NOME_DO_SERVIÇO: RemoteIFES",
+  "        TIPO                : 10  WIN32_OWN_PROCESS",
+  "        TIPO_DE_INÍCIO      : 2   AUTO_START",
+  "        CONTROLE_DE_ERRO    : 1   NORMAL",
+  "        NOME_DO_CAMINHO_BINÁRIO: C:\\nodejs\\node.exe servidor.js",
+  "",
+].join("\r\n");
+
+const SC_QC_PT_MANUAL = SC_QC_PT.replace("TIPO_DE_INÍCIO      : 2   AUTO_START", "TIPO_DE_INÍCIO      : 3   DEMAND_START");
+
+test("o estado do serviço é lido por código, não pelo rótulo em inglês", (t) => {
+  // Num Windows em português o `sc.exe` imprime ESTADO em vez de STATE. Procurar pelo nome
+  // inglês fazia um serviço em execução ser reportado como parado, e start/stop esperava até o
+  // prazo e devolvia falha — num host que é justamente o alvo provável deste projeto.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+
+  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_EN), 4, "en-US: em execução");
+  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT), 4, "pt-BR: em execução");
+  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT_PARADO), 1, "pt-BR: parado");
+
+  // O tipo (10) nunca pode ser confundido com um estado.
+  assert.notEqual(windows.codigoDeEstadoSc(SC_QUERY_PT), 10);
+});
+
+test("o tipo de início é lido por código, e não exige o rótulo AUTO_START", (t) => {
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+
+  assert.equal(windows.inicioAutomaticoSc(SC_QC_PT).automatico, true, "2 = automático, em qualquer idioma");
+  assert.equal(windows.inicioAutomaticoSc(SC_QC_PT_MANUAL).automatico, false, "3 = manual");
+  assert.match(windows.inicioAutomaticoSc(SC_QC_PT).rotulo || "", /AUTO_START/);
+});
+
+test("estados de transição são distinguidos de parado e em execução", (t) => {
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+
+  // 2 = START_PENDING, 3 = STOP_PENDING. Tratá-los como 1 ou 4 faria a espera pela transição
+  // concluir cedo e relatar sucesso sobre um serviço que ainda estava mudando de estado.
+  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT.replace("4  RUNNING", "2  START_PENDING")), 2);
+  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT.replace("4  RUNNING", "3  STOP_PENDING")), 3);
+});
+
+test("com a porta já reservada, o lançador conecta em vez de disputar o endereço", async (t) => {
+  // Estado normal de um Linux com ativação por socket depois da saída por ociosidade: o contrato
+  // foi apagado, mas o systemd continua dono da porta. Subir um backend TCP ali recebe
+  // EADDRINUSE, e o lançador reportaria falha exatamente no estado que o desenho pretende.
+  // Uma conexão basta para ativar o serviço; então o contrato novo aparece.
+  const amb = ajuda.ambiente();
+  const crypto = require("crypto");
+
+  // Faz o papel do socket do systemd: detém a porta e, na primeira conexão, publica o contrato
+  // como o console faria ao subir.
+  const segredo = crypto.randomBytes(32).toString("base64url");
+  let conexoes = 0;
+  const detentor = require("http").createServer((req, res) => {
+    conexoes += 1;
+    if (conexoes === 1) {
+      const fsl = require("fs");
+      fsl.writeFileSync(
+        require(path.join(ajuda.RAIZ, "src", "config")).ARQUIVO_ENDERECO,
+        `${JSON.stringify({ porta: detentor.address().port, pid: process.pid, modo: "socket-systemd", versao: "1.0.0", segredo })}\n`
+      );
+    }
+    const url = new URL(req.url, "http://127.0.0.1");
+    const desafio = url.searchParams.get("desafio");
+    if (url.pathname === "/api/identidade" && desafio) {
+      const prova = crypto.createHmac("sha256", Buffer.from(segredo, "base64url")).update(desafio).digest("base64url");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ prova, versao: "1.0.0" }));
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end("{}");
+  });
+  await new Promise((r) => detentor.listen(0, "127.0.0.1", r));
+  const porta = detentor.address().port;
+  t.after(async () => {
+    await new Promise((r) => detentor.close(() => r()));
+    amb.restaurar();
+  });
+
+  // O lançador precisa ver essa porta como a sua.
+  const amb2 = ajuda.ambiente({ estadoDir: amb.estadoDir, porta });
+  t.after(() => amb2.restaurar());
+  const lancador = require(path.join(ajuda.RAIZ, "launcher.js"));
+
+  // Sem contrato no início: é o estado após a saída por ociosidade.
+  const arquivoContrato = require(path.join(ajuda.RAIZ, "src", "config")).ARQUIVO_ENDERECO;
+  try {
+    require("fs").rmSync(arquivoContrato, { force: true });
+  } catch {}
+
+  const r = await lancador.garantirBackend();
+  assert.equal(r.ok, true, `o lançador deve compor com o socket, não disputar a porta: ${r.motivo}`);
+  assert.ok(conexoes >= 1, "precisa ter havido uma conexão para ativar o serviço");
+  assert.equal(r.contrato.porta, porta);
+});
+
+test("porta ocupada por um impostor não é aceita só porque respondeu", async (t) => {
+  // Conectar ativa o serviço, mas não prova identidade: se quem atende não souber o segredo, o
+  // lançador tem de recusar em vez de tratar a porta ocupada como console no ar.
+  const amb = ajuda.ambiente();
+  const intruso = require("http").createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ prova: "prova-errada" }));
+  });
+  await new Promise((r) => intruso.listen(0, "127.0.0.1", r));
+  const porta = intruso.address().port;
+  t.after(async () => {
+    await new Promise((r) => intruso.close(() => r()));
+    amb.restaurar();
+  });
+
+  const amb2 = ajuda.ambiente({ estadoDir: amb.estadoDir, porta, env: { CONSOLE_LANCADOR_ESPERA_MS: "1500" } });
+  t.after(() => amb2.restaurar());
+  const lancador = require(path.join(ajuda.RAIZ, "launcher.js"));
+  try {
+    require("fs").rmSync(require(path.join(ajuda.RAIZ, "src", "config")).ARQUIVO_ENDERECO, { force: true });
+  } catch {}
+
+  const r = await lancador.garantirBackend();
+  assert.equal(r.ok, false, "sem identidade publicada, a porta ocupada não vira sucesso");
+  assert.match(r.motivo, /não publicou identidade|ocupada/);
+});
