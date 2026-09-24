@@ -1099,6 +1099,9 @@
         "Uma atualização do console parou em \"" + p.console.transacaoPendente.etapa + "\". A versão ativa continua a que funcionava; " +
         "a reconciliação limpa o resto na próxima partida.");
     }
+    if (p.console.divergenciaDeVersao) {
+      aviso(avisos, "erro", "A versão em execução não é a versão ativa", p.console.divergenciaDeVersao.motivo);
+    }
     if (!p.console.confiancaConfigurada) {
       aviso(avisos, "info", "Atualização por release não configurada",
         "Nenhuma chave pública de publicação foi provisionada neste console, então nenhum release é aceito. " +

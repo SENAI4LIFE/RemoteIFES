@@ -460,6 +460,71 @@ test("o bootstrap cai para a versão anterior quando a ativa está quebrada", (t
   assert.ok(true, saida);
 });
 
+test("o ponteiro apontando para uma versão que não subiu é denunciado, não escondido", async (t) => {
+  // O bootstrap cai para uma versão utilizável quando a ativa não carrega — a rede de segurança
+  // funcionando. O problema é o silêncio: a atualização relatou sucesso, o console voltou ao ar,
+  // e o operador acredita rodar código que não está rodando. A divergência entre o ponteiro e o
+  // processo tem de aparecer.
+  const raiz = ajuda.dirTemporario("console-diverg-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const emExecucao = atualizador.versaoEmExecucao();
+
+  // Layout lado a lado com o ponteiro numa versão que NÃO é a que este processo carregou.
+  for (const v of [emExecucao, "99.0.0"]) {
+    fs.mkdirSync(path.join(raiz, "versoes", v), { recursive: true });
+    fs.writeFileSync(path.join(raiz, "versoes", v, "package.json"), `${JSON.stringify({ version: v })}\n`);
+  }
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "99.0.0", versaoAnterior: emExecucao, transacao: null })}\n`
+  );
+
+  const s = await atualizador.situacao();
+  assert.ok(s.divergenciaDeVersao, "a divergência precisa ser reportada");
+  assert.equal(s.divergenciaDeVersao.registrada, "99.0.0");
+  assert.equal(s.divergenciaDeVersao.emExecucao, emExecucao);
+  assert.match(s.divergenciaDeVersao.motivo, /não subiu/);
+  assert.match(s.divergenciaDeVersao.motivo, /NÃO é o que a versão ativa indica/);
+});
+
+test("sem divergência, a situação não inventa um alarme", async (t) => {
+  const raiz = ajuda.dirTemporario("console-ok-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const emExecucao = atualizador.versaoEmExecucao();
+
+  fs.mkdirSync(path.join(raiz, "versoes", emExecucao), { recursive: true });
+  fs.writeFileSync(path.join(raiz, "versoes", emExecucao, "package.json"), `${JSON.stringify({ version: emExecucao })}\n`);
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: emExecucao, versaoAnterior: null, transacao: null })}\n`
+  );
+
+  const s = await atualizador.situacao();
+  assert.equal(s.divergenciaDeVersao, null, "instalação coerente não pode gerar aviso");
+});
+
+test("execução a partir do código-fonte não é tratada como divergência", async (t) => {
+  // Sem layout lado a lado não existe ponteiro com que divergir; avisar aqui seria ruído em
+  // toda sessão de desenvolvimento.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  const s = await atualizador.situacao();
+  assert.equal(s.gerenciadoLadoALado, false);
+  assert.equal(s.divergenciaDeVersao, null);
+});
+
 test("situação distingue instalada, publicada e observação antiga", async (t) => {
   const raiz = instalacaoFalsa("1.0.0");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });

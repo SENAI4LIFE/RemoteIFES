@@ -5,7 +5,7 @@ const path = require("path");
 
 // Desinstalação do Console de Operações.
 //
-// Duas regras governam este arquivo, e valem mais do que qualquer conveniência:
+// Três regras governam este arquivo, e valem mais do que qualquer conveniência:
 //
 //   1. **Nada é apagado sem prova de que é nosso.** Antes de qualquer remoção recursiva, o
 //      diretório precisa exibir a assinatura de uma instalação do console (camada estável +
@@ -15,6 +15,10 @@ const path = require("path");
 //   2. **O estado fica, por padrão.** Operadores, auditoria e backups sobrevivem à remoção do
 //      programa; quem quiser apagá-los pede explicitamente. Reinstalar e descobrir que a conta
 //      sumiu é pior do que deixar um diretório para trás.
+//   3. **Nada de processo órfão.** O console em execução é encerrado antes de o programa sair;
+//      caso contrário a desinstalação "dá certo" e deixa um processo atendendo no loopback,
+//      ainda capaz de operações privilegiadas de um programa que já não existe. E o que autoriza
+//      encerrar não é o PID do contrato — PID é reciclado —, é a prova de identidade.
 //
 // O checkout do RemoteIFES (código e banco da aplicação) **nunca** é tocado: o console o
 // administra, não é dono dele.
@@ -166,6 +170,71 @@ function reexecutarForaDaInstalacao(raiz, dirEstado) {
   return true;
 }
 
+/**
+ * Encerra o console em execução antes de apagar o programa.
+ *
+ * Sem isto, a desinstalação "dá certo" e deixa um processo vivo: ele continua atendendo no
+ * loopback, continua com o contrato de identidade publicado e continua capaz de executar
+ * operações privilegiadas de um programa que, para o operador, já não existe. No Linux o
+ * `systemctl disable --now` resolvia por acidente; no Windows e no macOS, onde quem sobe o
+ * console é o lançador, nada parava o processo.
+ *
+ * O PID sozinho não autoriza um kill — PID é reciclado. O que autoriza é a **prova de
+ * identidade**: quem responde naquela porta demonstra possuir o segredo que só este console
+ * publicou. Se a prova falhar, nada é encerrado e o operador é avisado, porque aí ou o contrato
+ * está velho ou há outro processo na porta — e matar um processo alheio é pior do que deixar o
+ * nosso vivo.
+ */
+async function encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log }) {
+  const identidade = require(path.join(__dirname, "..", "src", "identidade"));
+  const contrato = identidade.lerContrato(path.join(dirEstado, "endereco.json"));
+  if (!contrato) {
+    log("   nenhum console em execução (sem contrato publicado).");
+    return { encerrado: false };
+  }
+
+  const prova = await identidade.verificarIdentidade(contrato);
+  if (!prova.ok) {
+    if (prova.impostor) {
+      log(`   ATENÇÃO: há algo escutando em 127.0.0.1:${contrato.porta} que NÃO é este console.`);
+      log("   Nada foi encerrado. Investigue qual processo tomou a porta antes de prosseguir.");
+      return { encerrado: false, impostor: true };
+    }
+    log(`   o console não está respondendo (${prova.motivo}); nada a encerrar.`);
+    return { encerrado: false };
+  }
+
+  if (simular) {
+    log(`   [simulação] encerraria o console em execução (pid ${contrato.pid}, porta ${contrato.porta}).`);
+    return { encerrado: false, simulado: true };
+  }
+
+  log(`   encerrando o console em execução (pid ${contrato.pid}, porta ${contrato.porta})...`);
+  try {
+    plataforma.encerrarArvore(contrato.pid, "SIGTERM");
+  } catch (erro) {
+    log(`   não foi possível encerrar: ${erro.message}`);
+    return { encerrado: false };
+  }
+
+  // Espera a porta parar de responder. Não é retentativa cega: é confirmar a transição que o
+  // sinal pediu, exatamente como se espera um serviço parar de fato antes de seguir.
+  for (let i = 0; i < 40; i += 1) {
+    const ainda = await identidade.verificarIdentidade(contrato, { timeoutMs: 500 });
+    if (!ainda.ok) {
+      log("   console encerrado.");
+      return { encerrado: true };
+    }
+    await new Promise((resolver) => setTimeout(resolver, 250));
+  }
+
+  log("   o console não encerrou no prazo; forçando.");
+  try {
+    plataforma.encerrarArvore(contrato.pid, "SIGKILL");
+  } catch {}
+  return { encerrado: true, forcado: true };
+}
+
 async function main() {
   const plataforma = require(path.join(__dirname, "..", "src", "plataforma"));
   const simular = temFlag("simular");
@@ -204,6 +273,13 @@ async function main() {
     const resposta = await perguntar("  Confirmar a desinstalação? digite 'desinstalar': ");
     if (resposta.trim() !== "desinstalar") falhar("  Cancelado.");
     log("");
+  }
+
+  // --- Console em execução -----------------------------------------------------------------
+  log("== Encerrando o console, se estiver em execução");
+  const encerramento = await encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log });
+  if (encerramento.impostor && !temFlag("sim")) {
+    falhar("  Desinstalação interrompida: a porta do console está ocupada por outro processo.");
   }
 
   // --- Integração com a plataforma ------------------------------------------------------------

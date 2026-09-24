@@ -229,6 +229,31 @@ async function verificarPublicacao({ forcar = false } = {}) {
   return { ok: true, ...observacao, manifesto: verificacao.manifesto };
 }
 
+/**
+ * O ponteiro diz uma versão e o processo carregou outra.
+ *
+ * Isso acontece quando a troca de ponteiro dá certo mas o payload novo não sobe: o bootstrap cai
+ * para a versão anterior — o que é a rede de segurança funcionando — e só avisa por stderr. Numa
+ * unidade systemd isso vai para o journal; num atalho do Windows aberto por wscript não aparece
+ * em lugar nenhum. O resultado silencioso é o pior possível: a atualização relata sucesso, o
+ * console volta a funcionar, e o operador acredita estar rodando código que não está rodando.
+ *
+ * Só vale para instalação gerenciada lado a lado: numa execução a partir do código-fonte não há
+ * ponteiro com que divergir.
+ */
+function divergenciaDeVersao(instaladas, emExecucao) {
+  if (!instaladas.gerenciadoLadoALado || !instaladas.ativa || !emExecucao) return null;
+  if (instaladas.ativa === emExecucao) return null;
+  return {
+    registrada: instaladas.ativa,
+    emExecucao,
+    motivo:
+      `o ponteiro aponta para ${instaladas.ativa}, mas o console em execução é ${emExecucao}. ` +
+      "A versão apontada não subiu e o bootstrap caiu para uma utilizável. Reinstale ou reverta: " +
+      "até lá, o programa em uso NÃO é o que a versão ativa indica.",
+  };
+}
+
 /** Situação para a interface: instalado, disponível, alvo, prontidão e ressalvas. */
 async function situacao({ consultarRede = false } = {}) {
   const instaladas = versoesInstaladas();
@@ -246,6 +271,7 @@ async function situacao({ consultarRede = false } = {}) {
   return {
     versaoEmExecucao: emExecucao,
     versaoAtivaRegistrada: instaladas.ativa,
+    divergenciaDeVersao: divergenciaDeVersao(instaladas, emExecucao),
     versaoAnterior: instaladas.anterior,
     versoesPresentes: instaladas.presentes,
     gerenciadoLadoALado: instaladas.gerenciadoLadoALado,
