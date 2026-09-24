@@ -366,7 +366,10 @@ function main() {
     plataformaDeBuild: `${process.platform}-${process.arch}`,
     commit: (() => {
       try {
-        return execFileSync("git", ["rev-parse", "HEAD"], { cwd: RAIZ, encoding: "utf8" }).trim();
+        // stderr silenciado: construir fora de um checkout é legítimo (o payload extraído de um
+        // artefato, por exemplo), e um "fatal: not a git repository" na tela faz um build que
+        // deu certo parecer quebrado. A ausência do commit fica registrada como `null`.
+        return execFileSync("git", ["rev-parse", "HEAD"], { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
       } catch {
         return null;
       }
