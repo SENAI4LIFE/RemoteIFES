@@ -377,7 +377,7 @@ medir()
   .then((r) => {
     if (JSON_SAIDA) {
       console.log(JSON.stringify(r, null, 2));
-      return;
+      return r;
     }
     const mib = (b) => (b === null || b === undefined ? "n/d" : `${(b / 1048576).toFixed(1)} MiB`);
     console.log("Medição de recursos do Console de Operações");
@@ -396,6 +396,20 @@ medir()
     }
     console.log("Ressalvas:");
     r.ressalvas.forEach((o) => console.log(`  * ${o}`));
+    return r;
+  })
+  .then((r) => {
+    if (!r) return;
+    // Um cenário OBRIGATÓRIO que não foi medido é falha da medição, não um campo informativo.
+    // Tolerar tudo faria o passo da CI passar verde sem número nenhum — e o objetivo do script é
+    // justamente não aceitar "é leve" sem medida.
+    const OBRIGATORIOS = ["ligadoSemNavegador", "atualizacaoDeStatus"];
+    const faltando = OBRIGATORIOS.filter((nome) => !r.cenarios[nome] || r.cenarios[nome].medido === false);
+    if (faltando.length) {
+      console.error(`
+medição incompleta: ${faltando.join(", ")} não foi medido neste host.`);
+      process.exitCode = 1;
+    }
   })
   .catch((erro) => {
     console.error(`falha na medição: ${erro.message}`);
