@@ -10,6 +10,7 @@ const readline = require("readline");
 const raiz = path.join(__dirname);
 const config = require(path.join(raiz, "src", "config"));
 const plataforma = require(path.join(raiz, "src", "plataforma"));
+const moduloIdentidade = require(path.join(raiz, "src", "identidade"));
 
 // Lançador do Console de Operações.
 //
@@ -35,16 +36,12 @@ function erro(linha) {
   process.stderr.write(`${linha}\n`);
 }
 
-function lerContrato() {
-  try {
-    const bruto = JSON.parse(fs.readFileSync(config.ARQUIVO_ENDERECO, "utf8"));
-    if (!bruto || typeof bruto !== "object") return null;
-    if (!Number.isInteger(bruto.porta) || !bruto.segredo) return null;
-    return bruto;
-  } catch {
-    return null;
-  }
-}
+// A leitura do contrato e a prova de identidade moram em src/identidade.js: o desinstalador faz
+// a mesma pergunta antes de encerrar um processo, e duas implementações da mesma prova é uma a
+// mais do que se pode auditar.
+const lerContrato = (...a) => moduloIdentidade.lerContrato(...a);
+const verificarIdentidade = (...a) => moduloIdentidade.verificarIdentidade(...a);
+
 
 function pedir(porta, caminho, { metodo = "GET", corpo = null, timeoutMs = 4000 } = {}) {
   return new Promise((resolve) => {
@@ -94,26 +91,6 @@ function pedir(porta, caminho, { metodo = "GET", corpo = null, timeoutMs = 4000 
  * verificação, e a resposta é `HMAC-SHA256(segredo, desafio)`; o segredo vive só no arquivo de
  * estado protegido, que o impostor não lê.
  */
-async function verificarIdentidade(contrato) {
-  const desafio = crypto.randomBytes(32).toString("base64url");
-  const r = await pedir(contrato.porta, `/api/identidade?desafio=${encodeURIComponent(desafio)}`);
-  if (!r.ok || !r.json || typeof r.json.prova !== "string") {
-    return { ok: false, motivo: r.erro || `o processo na porta ${contrato.porta} não respondeu à verificação de identidade` };
-  }
-  const esperado = crypto.createHmac("sha256", Buffer.from(contrato.segredo, "base64url")).update(desafio).digest("base64url");
-  const a = Buffer.from(r.json.prova, "utf8");
-  const b = Buffer.from(esperado, "utf8");
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return {
-      ok: false,
-      impostor: true,
-      motivo:
-        `algo está escutando em 127.0.0.1:${contrato.porta}, mas NÃO é este console: a prova de identidade não confere. ` +
-        "Não abra o navegador nesse endereço e investigue qual processo tomou a porta.",
-    };
-  }
-  return { ok: true, versao: r.json.versao || null };
-}
 
 function backendNoAr(contrato) {
   if (!contrato) return false;
