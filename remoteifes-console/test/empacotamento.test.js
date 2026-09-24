@@ -263,6 +263,98 @@ test("cadeia completa: construir, atestar, publicar e atualizar de verdade", asy
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1");
 });
 
+test("importação offline instala de verdade, sem rede nenhuma", async (t) => {
+  // Um Pi sem Internet recebe manifesto, atestação e artefato em pendrive. Antes isto apenas
+  // verificava e mandava "usar a ação de atualização" — que vai à rede: um beco sem saída
+  // exatamente no caso que a função existe para atender.
+  const NOVA = "99.9.2";
+  const fonte = arvoreNaVersao(NOVA);
+  const saida = ajuda.dirTemporario("console-dist-");
+  const instalacao = instalacaoCom("0.0.1");
+  t.after(() => {
+    for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  await release(fonte, saida);
+
+  // Nenhuma base de release configurada: qualquer tentativa de rede falharia.
+  const amb = ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao, CONSOLE_RELEASE_BASE: undefined });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
+
+  const linhas = [];
+  const r = await atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    atestacao: path.join(saida, "atestacao.sigstore.json"),
+    artefato: path.join(saida, manifesto.artefatos[0].arquivo),
+    log: (l) => linhas.push(l),
+  });
+
+  assert.equal(r.ok, true, r.erro);
+  assert.equal(r.versao, NOVA);
+  assert.ok(fs.existsSync(path.join(instalacao, "versoes", NOVA, "src", "servidor.js")), "o payload precisa ficar instalado");
+  const info = atualizador.lerEstadoInstalacao();
+  assert.equal(info.versaoAtiva, NOVA, "o ponteiro tem de apontar para a versão importada");
+  assert.equal(info.versaoAnterior, "0.0.1");
+  assert.equal(info.transacao.etapa, "concluida");
+  assert.deepEqual(amb.atestacao.raizDeConfianca.chamadas, [{ rede: false }], "e só pediu a raiz de confiança local");
+});
+
+test("importação offline recusa artefato adulterado e não instala nada", async (t) => {
+  const NOVA = "99.9.3";
+  const fonte = arvoreNaVersao(NOVA);
+  const saida = ajuda.dirTemporario("console-dist-");
+  const instalacao = instalacaoCom("0.0.1");
+  t.after(() => {
+    for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  await release(fonte, saida);
+
+  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
+  const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
+  fs.appendFileSync(artefato, "conteudo-extra");
+
+  ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  const r = await atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    atestacao: path.join(saida, "atestacao.sigstore.json"),
+    artefato,
+    log: () => {},
+  });
+  assert.equal(r.ok, false);
+  assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nada pode ser instalado com digest divergente");
+  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "o ponteiro não se move");
+});
+
+test("importação offline de um release que a raiz do Sigstore não reconhece não instala nada", async (t) => {
+  const NOVA = "99.9.6";
+  const fonte = arvoreNaVersao(NOVA);
+  const saida = ajuda.dirTemporario("console-dist-");
+  const instalacao = instalacaoCom("0.0.1");
+  t.after(() => {
+    for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
+  });
+  const manifesto = await release(fonte, saida);
+  // Sem confiança de teste aqui: a raiz do próprio console (a do Sigstore real) não conhece a CA de
+  // teste.
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: instalacao } });
+  t.after(() => amb.restaurar());
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  const r = await atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    atestacao: path.join(saida, "atestacao.sigstore.json"),
+    artefato: path.join(saida, manifesto.artefatos[0].arquivo),
+    log: () => {},
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.erro, /não confere criptograficamente/);
+  assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)));
+});
+
 test("um manifesto alterado depois da atestação é recusado", async (t) => {
   const saida = ajuda.dirTemporario("console-dist-");
   t.after(() => fs.rmSync(saida, { recursive: true, force: true }));
