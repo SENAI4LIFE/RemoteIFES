@@ -398,6 +398,77 @@ function registrarTransacao(versao, etapa) {
 }
 
 /**
+ * Instala um artefato **já verificado** (assinatura do manifesto e digest conferidos) e troca o
+ * ponteiro da versão ativa.
+ *
+ * Fica separada porque há duas origens legítimas para o mesmo artefato: o release baixado pela
+ * rede e o arquivo trazido à mão para um host sem Internet. O que não pode variar entre elas é
+ * justamente esta parte — extração recusada para caminho que escape, conteúdo conferido, versão
+ * interna batendo com a pedida, e só então o rename. Duplicar isso seria duplicar o risco.
+ */
+async function instalarArtefatoVerificado({ versaoAlvo, arquivoLocal, alvo, origem, log = () => {} }) {
+  const destino = path.join(dirVersoes(), versaoAlvo);
+  const abortar = (etapa, erro) => {
+    limparDescargas();
+    registrarTransacao(versaoAlvo, etapa);
+    reconciliar();
+    return { ok: false, erro };
+  };
+
+  log("Instalando lado a lado...");
+  registrarTransacao(versaoAlvo, "instalando");
+  const parcial = `${destino}.parcial-${crypto.randomBytes(3).toString("hex")}`;
+  try {
+    extrairTarGz(arquivoLocal, parcial);
+  } catch (erro) {
+    fs.rmSync(parcial, { recursive: true, force: true });
+    return abortar("falhou-extracao", `extração recusada: ${erro.message}`);
+  }
+
+  // O payload precisa ter o que o bootstrap vai carregar, senão a troca deixaria o console sem subir.
+  for (const exigido of ["console.js", "package.json", path.join("src", "servidor.js")]) {
+    if (!fs.existsSync(path.join(parcial, exigido))) {
+      fs.rmSync(parcial, { recursive: true, force: true });
+      return abortar("falhou-conteudo", `o artefato não contém ${exigido}; instalação abortada antes de trocar a versão ativa.`);
+    }
+  }
+  const pacoteNovo = JSON.parse(fs.readFileSync(path.join(parcial, "package.json"), "utf8"));
+  if (pacoteNovo.version !== versaoAlvo) {
+    fs.rmSync(parcial, { recursive: true, force: true });
+    return abortar("falhou-identidade", `o artefato declara versão ${pacoteNovo.version}, não ${versaoAlvo}.`);
+  }
+
+  fs.mkdirSync(dirVersoes(), { recursive: true });
+  fs.renameSync(parcial, destino);
+  limparDescargas();
+
+  log("Trocando a versão ativa...");
+  registrarTransacao(versaoAlvo, "trocando");
+  const info = lerEstadoInstalacao();
+  const anterior = info.versaoAtiva || versaoEmExecucao();
+  gravarEstadoInstalacao({
+    versaoAtiva: versaoAlvo,
+    versaoAnterior: anterior && anterior !== versaoAlvo ? anterior : info.versaoAnterior,
+    transacao: { versao: versaoAlvo, etapa: "concluida", em: new Date().toISOString() },
+    atualizadoEm: new Date().toISOString(),
+  });
+
+  podarVersoes({ manter: [versaoAlvo, anterior].filter(Boolean) });
+  estado.auditar("atualizacao-console-aplicada", { de: anterior, para: versaoAlvo, alvo, origem });
+
+  log(`Versão ativa agora é ${versaoAlvo} (anterior: ${anterior || "nenhuma"}).`);
+  log("Reiniciando o console para carregar a nova versão...");
+  const reinicio = await plataforma.reiniciarConsole();
+  return {
+    ok: true,
+    versao: versaoAlvo,
+    anterior,
+    reinicio: reinicio.disponivel ? "solicitado" : reinicio.motivo,
+    resumo: `console ${versaoAlvo} ativo; a versão ${anterior || "anterior"} fica guardada para reversão`,
+  };
+}
+
+/**
  * Instala uma versão publicada e troca o ponteiro. Só escreve no diretório ativo depois de
  * assinatura, política de versão e digest conferirem.
  */
@@ -458,66 +529,7 @@ async function atualizar(versaoAlvo, { log = () => {} } = {}) {
   }
   log(`SHA-256 confere (${conferencia.sha256.slice(0, 16)}…).`);
 
-  log("Instalando lado a lado...");
-  registrarTransacao(versaoAlvo, "instalando");
-  const parcial = `${destino}.parcial-${crypto.randomBytes(3).toString("hex")}`;
-  try {
-    extrairTarGz(arquivoLocal, parcial);
-  } catch (erro) {
-    fs.rmSync(parcial, { recursive: true, force: true });
-    limparDescargas();
-    registrarTransacao(versaoAlvo, "falhou-extracao");
-    reconciliar();
-    return { ok: false, erro: `extração recusada: ${erro.message}` };
-  }
-
-  // O payload precisa ter o que o bootstrap vai carregar, senão a troca deixaria o console sem subir.
-  for (const exigido of ["console.js", "package.json", path.join("src", "servidor.js")]) {
-    if (!fs.existsSync(path.join(parcial, exigido))) {
-      fs.rmSync(parcial, { recursive: true, force: true });
-      limparDescargas();
-      registrarTransacao(versaoAlvo, "falhou-conteudo");
-      reconciliar();
-      return { ok: false, erro: `o artefato não contém ${exigido}; instalação abortada antes de trocar a versão ativa.` };
-    }
-  }
-  const pacoteNovo = JSON.parse(fs.readFileSync(path.join(parcial, "package.json"), "utf8"));
-  if (pacoteNovo.version !== versaoAlvo) {
-    fs.rmSync(parcial, { recursive: true, force: true });
-    limparDescargas();
-    registrarTransacao(versaoAlvo, "falhou-identidade");
-    reconciliar();
-    return { ok: false, erro: `o artefato declara versão ${pacoteNovo.version}, não ${versaoAlvo}.` };
-  }
-
-  fs.mkdirSync(dirVersoes(), { recursive: true });
-  fs.renameSync(parcial, destino);
-  limparDescargas();
-
-  log("Trocando a versão ativa...");
-  registrarTransacao(versaoAlvo, "trocando");
-  const info = lerEstadoInstalacao();
-  const anterior = info.versaoAtiva || emExecucao;
-  gravarEstadoInstalacao({
-    versaoAtiva: versaoAlvo,
-    versaoAnterior: anterior && anterior !== versaoAlvo ? anterior : info.versaoAnterior,
-    transacao: { versao: versaoAlvo, etapa: "concluida", em: new Date().toISOString() },
-    atualizadoEm: new Date().toISOString(),
-  });
-
-  podarVersoes({ manter: [versaoAlvo, anterior].filter(Boolean) });
-  estado.auditar("atualizacao-console-aplicada", { de: anterior, para: versaoAlvo, alvo: artefato.alvo });
-
-  log(`Versão ativa agora é ${versaoAlvo} (anterior: ${anterior || "nenhuma"}).`);
-  log("Reiniciando o console para carregar a nova versão...");
-  const reinicio = await plataforma.reiniciarConsole();
-  return {
-    ok: true,
-    versao: versaoAlvo,
-    anterior,
-    reinicio: reinicio.disponivel ? "solicitado" : reinicio.motivo,
-    resumo: `console ${versaoAlvo} ativo; a versão ${anterior || "anterior"} fica guardada para reversão`,
-  };
+  return instalarArtefatoVerificado({ versaoAlvo, arquivoLocal, alvo: artefato.alvo, origem: "release", log });
 }
 
 /** Reversão: troca o ponteiro para a versão anterior já instalada e verificada. Sem rede. */
@@ -576,8 +588,34 @@ async function importarOffline({ manifesto, assinatura, artefato, log = () => {}
   }
   const conferencia = release.conferirArtefato(artefato, escolha.artefato);
   if (!conferencia.ok) return { ok: false, erro: conferencia.motivo };
-  log("Manifesto e artefato verificados; instalando a partir do arquivo local.");
-  return { ok: true, versao: verificacao.manifesto.versao, observacao: "use a ação de atualização para aplicar esta versão" };
+
+  const versaoAlvo = verificacao.manifesto.versao;
+  const emExecucao = versaoEmExecucao();
+  const politica = release.politicaDeVersao(verificacao.manifesto, emExecucao);
+  if (!politica.ok) return { ok: false, erro: politica.motivo };
+
+  const instaladas = versoesInstaladas();
+  if (!instaladas.gerenciadoLadoALado) {
+    return {
+      ok: false,
+      erro:
+        "esta instalação não usa o layout de versões lado a lado, então a troca de ponteiro não se aplica. " +
+        "Reinstale com o instalador desta versão para migrar o layout.",
+    };
+  }
+  if (fs.existsSync(path.join(dirVersoes(), versaoAlvo))) {
+    return { ok: false, erro: `a versão ${versaoAlvo} já está presente; remova-a antes de reinstalar.` };
+  }
+
+  log(`Manifesto e artefato verificados (SHA-256 ${conferencia.sha256.slice(0, 16)}…).`);
+  estado.auditar("atualizacao-console-offline", { versao: versaoAlvo, alvo: escolha.artefato.alvo });
+  return instalarArtefatoVerificado({
+    versaoAlvo,
+    arquivoLocal: artefato,
+    alvo: escolha.artefato.alvo,
+    origem: "arquivo-local",
+    log,
+  });
 }
 
 module.exports = {

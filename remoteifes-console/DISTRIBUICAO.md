@@ -174,6 +174,20 @@ Rotação de chave: o manifesto pode declarar `proximaChave`, assinada pela chav
 console a aceita para o release seguinte. Downgrade só acontece por ação explícita de reversão,
 que usa a cópia local já verificada em `versoes/` e não a rede.
 
+### Host sem Internet
+
+Um Pi atrás de uma rede fechada recebe os três arquivos à mão (pendrive, `scp`) e instala com:
+
+```bash
+node bin/atualizar-console.js --importar manifesto.json manifesto.json.sig <artefato>.tar.gz
+```
+
+O caminho é o mesmo do release baixado — assinatura do manifesto, alvo, digest, política de
+versão, instalação lado a lado, troca de ponteiro — e a **única** diferença é a origem do
+arquivo. A metade que instala é uma função só (`instalarArtefatoVerificado`), compartilhada
+pelos dois caminhos: duplicá-la seria duplicar o risco de divergirem justamente nas conferências
+que impedem uma instalação ruim.
+
 ## 6. O que continua sem suporte, e por quê
 
 | Capacidade | Estado | Bloqueio exato |

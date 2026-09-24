@@ -40,7 +40,12 @@ async function main() {
       console.error(r.erro);
       return 1;
     }
-    log(`Verificado: versão ${r.versao}. ${r.observacao}`);
+    log(`
+${r.resumo}`);
+    if (r.reinicio !== "solicitado") {
+      log(`Reinício automático indisponível (${r.reinicio}); a próxima abertura do console já carrega a versão nova.`);
+    }
+    log(`CONSOLE_RESULTADO ${JSON.stringify({ versao: r.versao, anterior: r.anterior, origem: "arquivo-local" })}`);
     return 0;
   }
 
