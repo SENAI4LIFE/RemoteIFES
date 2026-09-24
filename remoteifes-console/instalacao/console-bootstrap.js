@@ -15,6 +15,10 @@ const path = require("path");
 const RAIZ = __dirname;
 const ARQUIVO_ESTADO = path.join(RAIZ, "estado-instalacao.json");
 const DIR_VERSOES = path.join(RAIZ, "versoes");
+// Qual entrada carregar. `launcher-bootstrap.js` marca "launcher"; qualquer outro valor (ou a
+// ausência dele) significa o console. Quem inicia o backend precisa mandar o valor
+// explicitamente, porque herdar "launcher" de um lançador faria este bootstrap carregar outro
+// lançador — e não o console que o lançador estava tentando subir.
 const ALVO = process.env.CONSOLE_BOOTSTRAP_ALVO === "launcher" ? "launcher.js" : "console.js";
 
 function lerEstado() {
