@@ -57,14 +57,90 @@ function servicoNaoInstalado() {
   );
 }
 
-/** Campos "CHAVE : valor" da saída de `sc query`/`sc qc`, tolerante a idioma e espaçamento. */
+/**
+ * Pares "CHAVE : valor" da saída de `sc.exe`, **na ordem em que aparecem**.
+ *
+ * O rótulo não serve de chave: num Windows em português o `sc.exe` imprime `ESTADO` em vez de
+ * `STATE`, `TIPO_DE_INÍCIO` em vez de `START_TYPE`. Procurar pelo nome inglês faria um serviço
+ * em execução ser reportado como parado, e `start`/`stop` esperariam até o prazo e devolveriam
+ * falha — num host que é justamente o alvo provável deste projeto.
+ *
+ * O que é estável é a **ordem** dos campos, fixada pelo `sc.exe`:
+ *   query:    SERVICE_NAME, TYPE, STATE, WIN32_EXIT_CODE, SERVICE_EXIT_CODE, CHECKPOINT, ...
+ *   qc:       ..., TYPE, START_TYPE, ERROR_CONTROL, BINARY_PATH_NAME, ...
+ * e o **formato** do valor: o estado começa com o código numérico (1..7), o tipo com o seu.
+ */
+function paresSc(texto) {
+  const pares = [];
+  for (const linha of String(texto).split(/\r?\n/)) {
+    // A chave pode ter acento e underscore; o valor é o resto da linha.
+    const m = /^\s*([^\s:][^:]*?)\s*:\s*(.+?)\s*$/.exec(linha);
+    if (m) pares.push({ chave: m[1].toUpperCase(), valor: m[2] });
+  }
+  return pares;
+}
+
+/** Compatibilidade: mapa por rótulo, para quem só precisa do caso inglês. */
 function camposSc(texto) {
   const campos = {};
-  for (const linha of String(texto).split(/\r?\n/)) {
-    const m = /^\s*([A-Z_]+)\s*:\s*(.+?)\s*$/.exec(linha);
-    if (m) campos[m[1]] = m[2];
-  }
+  for (const par of paresSc(texto)) campos[par.chave] = par.valor;
   return campos;
+}
+
+/**
+ * Código de estado do serviço a partir de `sc query`/`sc queryex`.
+ *
+ * Tenta o rótulo inglês; se ele não existir (Windows localizado), usa a posição: o estado é o
+ * terceiro par, depois de SERVICE_NAME e TYPE. Confere também que o valor tem a forma de estado
+ * (número de 1 a 7 seguido de um rótulo), para não confundir com o tipo.
+ */
+function codigoDeEstadoSc(texto) {
+  const pares = paresSc(texto);
+  const numeroDe = (valor) => {
+    const m = /^(\d+)\b/.exec(String(valor || "").trim());
+    return m ? Number(m[1]) : null;
+  };
+
+  const porRotulo = pares.find((p) => p.chave === "STATE");
+  if (porRotulo) {
+    const n = numeroDe(porRotulo.valor);
+    if (n !== null) return n;
+  }
+  // Posicional: SERVICE_NAME(0), TYPE(1), ESTADO(2).
+  if (pares.length >= 3) {
+    const n = numeroDe(pares[2].valor);
+    if (n !== null && n >= 1 && n <= 7) return n;
+  }
+  // Último recurso: o primeiro par cujo valor pareça um estado e que não seja o tipo.
+  for (let i = 1; i < pares.length; i += 1) {
+    const n = numeroDe(pares[i].valor);
+    if (n !== null && n >= 1 && n <= 7 && /^[A-Z_ ]+$/.test(String(pares[i].valor).replace(/^\d+\s*/, "").trim())) {
+      return n;
+    }
+  }
+  return null;
+}
+
+/** Rótulo textual do estado, só para exibição — pode vir localizado, e isso é aceitável. */
+function rotuloDeEstadoSc(texto) {
+  const pares = paresSc(texto);
+  const par = pares.find((p) => p.chave === "STATE") || pares[2];
+  return par ? String(par.valor).replace(/^\d+\s*/, "").trim().toLowerCase() || null : null;
+}
+
+/**
+ * Tipo de início a partir de `sc qc`. O valor vem como "2   AUTO_START"; o número é estável
+ * (2 = automático, 3 = manual, 4 = desabilitado), o rótulo não.
+ */
+function inicioAutomaticoSc(texto) {
+  const pares = paresSc(texto);
+  const porRotulo = pares.find((p) => p.chave === "START_TYPE");
+  const candidato = porRotulo || pares[2]; // qc: SERVICE_NAME(0), TYPE(1), START_TYPE(2)
+  if (!candidato) return { automatico: false, rotulo: null };
+  const m = /^(\d+)/.exec(String(candidato.valor).trim());
+  const numero = m ? Number(m[1]) : null;
+  const rotulo = String(candidato.valor).replace(/^\d+\s*/, "").trim() || null;
+  return { automatico: numero === 2 || /AUTO_START/i.test(rotulo || ""), rotulo };
 }
 
 async function estadoDoServico() {
@@ -74,25 +150,25 @@ async function estadoDoServico() {
     return recurso(ESTADO.INDISPONIVEL, (consulta.saida || consulta.erro || "não foi possível consultar o gerenciador de serviços").slice(0, 300));
   }
 
-  const campos = camposSc(consulta.saida);
-  // "STATE : 4  RUNNING" — o número é estável entre idiomas, o rótulo não.
-  const codigoEstado = config.inteiro((campos.STATE || "").trim().split(/\s+/)[0], null, 0, 10);
+  // "ESTADO : 4  RUNNING" em pt-BR, "STATE : 4  RUNNING" em en-US: o número é estável, o
+  // rótulo não. 4 = SERVICE_RUNNING.
+  const codigoEstado = codigoDeEstadoSc(consulta.saida);
   const ativo = codigoEstado === 4;
 
   // Tipo de início e PID vêm de chamadas separadas e baratas; nenhuma é obrigatória para
   // responder o essencial, então uma falha ali não derruba a consulta inteira.
   const [configuracao, detalhe] = await Promise.all([sc(["qc", SERVICO_APP]), sc(["queryex", SERVICO_APP])]);
-  const camposConfig = configuracao.ok ? camposSc(configuracao.saida) : {};
+  const inicio = configuracao.ok ? inicioAutomaticoSc(configuracao.saida) : { automatico: false, rotulo: null };
+  // PID: o rótulo é o mesmo em qualquer idioma, então aqui o mapa por chave basta.
   const camposDetalhe = detalhe.ok ? camposSc(detalhe.saida) : {};
-  const inicio = camposConfig.START_TYPE || "";
 
   return {
     ...recurso(ESTADO.SUPORTADO),
     ativo,
-    habilitado: /AUTO_START/i.test(inicio),
+    habilitado: inicio.automatico,
     estadoAtivo: ativo ? "active" : "inactive",
-    subEstado: (campos.STATE || "").replace(/^\d+\s+/, "").toLowerCase() || null,
-    arquivoUnidade: inicio.replace(/^\d+\s+/, "") || null,
+    subEstado: rotuloDeEstadoSc(consulta.saida),
+    arquivoUnidade: inicio.rotulo,
     pid: config.inteiro(camposDetalhe.PID, null, 1, 1e9),
     memoriaBytes: null,
     reinicios: null,
@@ -149,8 +225,7 @@ async function esperarEstado(codigoDesejado, prazoMs) {
   const limite = Date.now() + prazoMs;
   for (;;) {
     const r = await sc(["query", SERVICO_APP]);
-    const codigo = config.inteiro((camposSc(r.saida).STATE || "").trim().split(/\s+/)[0], null, 0, 10);
-    if (codigo === codigoDesejado) return true;
+    if (codigoDeEstadoSc(r.saida) === codigoDesejado) return true;
     if (Date.now() >= limite) return false;
     await new Promise((resolver) => setTimeout(resolver, 500));
   }
@@ -432,4 +507,6 @@ module.exports = {
   registrarInicializacao,
   removerInicializacao,
   estadoDaInicializacao,
+  codigoDeEstadoSc,
+  inicioAutomaticoSc,
 };
