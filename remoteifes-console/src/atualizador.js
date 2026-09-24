@@ -322,8 +322,10 @@ async function validarAlvo(versao) {
  * aceitar caminho que escape do destino. Suporta apenas arquivo comum e diretório: link
  * simbólico, hardlink e dispositivo são **recusados**, porque um artefato é conteúdo remoto.
  */
-function extrairTarGz(arquivo, destino) {
-  const bruto = zlib.gunzipSync(fs.readFileSync(arquivo));
+function extrairTarGz(arquivoOuConteudo, destino) {
+  // Aceita um Buffer para que a instalação extraia exatamente os bytes que passaram pelo digest,
+  // sem reler o caminho — reler seria reabrir a janela entre verificar e instalar.
+  const bruto = zlib.gunzipSync(Buffer.isBuffer(arquivoOuConteudo) ? arquivoOuConteudo : fs.readFileSync(arquivoOuConteudo));
   const raizReal = path.resolve(destino);
   fs.mkdirSync(raizReal, { recursive: true });
 
@@ -432,7 +434,7 @@ function registrarTransacao(versao, etapa) {
  * justamente esta parte — extração recusada para caminho que escape, conteúdo conferido, versão
  * interna batendo com a pedida, e só então o rename. Duplicar isso seria duplicar o risco.
  */
-async function instalarArtefatoVerificado({ versaoAlvo, arquivoLocal, alvo, origem, log = () => {} }) {
+async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, log = () => {} }) {
   const destino = path.join(dirVersoes(), versaoAlvo);
   const abortar = (etapa, erro) => {
     limparDescargas();
@@ -445,7 +447,7 @@ async function instalarArtefatoVerificado({ versaoAlvo, arquivoLocal, alvo, orig
   registrarTransacao(versaoAlvo, "instalando");
   const parcial = `${destino}.parcial-${crypto.randomBytes(3).toString("hex")}`;
   try {
-    extrairTarGz(arquivoLocal, parcial);
+    extrairTarGz(conteudo, parcial);
   } catch (erro) {
     fs.rmSync(parcial, { recursive: true, force: true });
     return abortar("falhou-extracao", `extração recusada: ${erro.message}`);
@@ -555,7 +557,7 @@ async function atualizar(versaoAlvo, { log = () => {} } = {}) {
   }
   log(`SHA-256 confere (${conferencia.sha256.slice(0, 16)}…).`);
 
-  return instalarArtefatoVerificado({ versaoAlvo, arquivoLocal, alvo: artefato.alvo, origem: "release", log });
+  return instalarArtefatoVerificado({ versaoAlvo, conteudo: conferencia.conteudo, alvo: artefato.alvo, origem: "release", log });
 }
 
 /** Reversão: troca o ponteiro para a versão anterior já instalada e verificada. Sem rede. */
@@ -637,7 +639,7 @@ async function importarOffline({ manifesto, assinatura, artefato, log = () => {}
   estado.auditar("atualizacao-console-offline", { versao: versaoAlvo, alvo: escolha.artefato.alvo });
   return instalarArtefatoVerificado({
     versaoAlvo,
-    arquivoLocal: artefato,
+    conteudo: conferencia.conteudo,
     alvo: escolha.artefato.alvo,
     origem: "arquivo-local",
     log,

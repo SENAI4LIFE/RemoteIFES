@@ -290,6 +290,62 @@ test("importação offline instala de verdade, sem rede nenhuma", async (t) => {
   assert.equal(info.transacao.etapa, "concluida");
 });
 
+test("trocar o artefato depois da verificação não muda o que é instalado", async (t) => {
+  // Janela entre verificar e instalar: o digest era calculado numa leitura e a extração fazia
+  // outra leitura do MESMO caminho. Quem pudesse trocar o arquivo no intervalo instalaria
+  // conteúdo que nunca passou pela verificação. No caminho offline o arquivo fica onde o
+  // operador apontou — um /tmp compartilhado, um pendrive —, onde a troca é plausível.
+  //
+  // O teste troca o arquivo exatamente nesse intervalo, interceptando a conferência.
+  const NOVA = "99.9.4";
+  const fonte = arvoreNaVersao(NOVA);
+  const saida = ajuda.dirTemporario("console-dist-");
+  const chaves = ajuda.dirTemporario("console-chave-");
+  const instalacao = instalacaoCom("0.0.1");
+  t.after(() => {
+    for (const d of [fonte, saida, chaves, instalacao]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  construir(fonte, saida);
+  const par = gerarChave(chaves);
+  assinar(path.join(saida, "manifesto.json"), par.privada);
+
+  const amb = ajuda.ambiente({
+    env: { CONSOLE_CHAVE_RELEASE: par.publicaB64, CONSOLE_RAIZ_INSTALACAO: instalacao },
+  });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
+  const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
+
+  // Assim que a conferência passa, o arquivo em disco vira lixo. Se a instalação reler o
+  // caminho, ela extrai o lixo (ou falha); se extrair o buffer conferido, nada muda.
+  const originalConferir = release.conferirArtefato;
+  release.conferirArtefato = (caminho, meta) => {
+    const r = originalConferir(caminho, meta);
+    fs.writeFileSync(caminho, Buffer.from("conteudo-trocado-depois-da-verificacao"));
+    return r;
+  };
+  t.after(() => {
+    release.conferirArtefato = originalConferir;
+  });
+
+  const r = await atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    assinatura: `${path.join(saida, "manifesto.json")}.sig`,
+    artefato,
+    log: () => {},
+  });
+
+  assert.equal(r.ok, true, `a instalação deve usar os bytes verificados: ${r.erro}`);
+  const instalado = path.join(instalacao, "versoes", NOVA);
+  assert.ok(fs.existsSync(path.join(instalado, "src", "servidor.js")), "o payload verificado é o que ficou instalado");
+  const pacote = JSON.parse(fs.readFileSync(path.join(instalado, "package.json"), "utf8"));
+  assert.equal(pacote.version, NOVA, "o conteúdo instalado é o do artefato original, não o trocado");
+});
+
 test("importação offline recusa artefato adulterado e não instala nada", async (t) => {
   const NOVA = "99.9.3";
   const fonte = arvoreNaVersao(NOVA);
