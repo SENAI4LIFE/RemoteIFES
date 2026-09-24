@@ -172,17 +172,21 @@ jobs:
           export CONSOLE_PORTA=8399
           export CONSOLE_OCIOSIDADE_S=60
 
-          env PATH="$MINIMO" node "$RUNNER_TEMP/programa/console-bootstrap.js" &
-          CONSOLE_PID=$!
-          for _ in $(seq 1 40); do
-            [ -f "$RUNNER_TEMP/estado/endereco.json" ] && break
-            sleep 1
-          done
-          test -f "$RUNNER_TEMP/estado/endereco.json" || { echo "o console instalado não publicou o contrato de identidade"; exit 1; }
+          # O console é iniciado PELO LANÇADOR, como o atalho do sistema faz — e não invocando o
+          # backend direto. Essa diferença deixou passar um defeito em que o lançador subia outra
+          # cópia de si mesmo em vez do console: iniciar o backend na mão contornava exatamente o
+          # caminho que os operadores usam.
+          env PATH="$MINIMO" node "$RUNNER_TEMP/programa/launcher-bootstrap.js" --iniciar
+          test -f "$RUNNER_TEMP/estado/endereco.json" || { echo "o lançador não deixou o console publicar o contrato de identidade"; exit 1; }
+          CONSOLE_PID=$(CONTRATO="$RUNNER_TEMP/estado/endereco.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.CONTRATO,"utf8")).pid)')
+
+          # Nenhum descendente recursivo: um lançador que sobe lançadores acumularia processos.
+          NODES=$(pgrep -c node || true)
+          echo "processos node após a partida: $NODES"
 
           SAIDA=$(env PATH="$MINIMO" node "$RUNNER_TEMP/programa/launcher-bootstrap.js" --status)
           echo "$SAIDA"
-          kill $CONSOLE_PID || true
+          kill "$CONSOLE_PID" || true
           echo "$SAIDA" | grep -q "no ar" || { echo "o lançador não reconheceu o console instalado"; exit 1; }
 
       - name: Rodar o programa instalado sem ferramentas de desenvolvimento no PATH (Windows)
@@ -204,14 +208,19 @@ jobs:
           if (Get-Command git.exe -ErrorAction SilentlyContinue) { throw "git ainda está no PATH; o teste não provaria nada" }
           if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { throw "npm ainda está no PATH; o teste não provaria nada" }
 
-          $console = Start-Process -FilePath "node.exe" -ArgumentList "$env:RUNNER_TEMP\programa\console-bootstrap.js" -PassThru -NoNewWindow
+          # O console é iniciado PELO LANÇADOR, como o atalho do menu Iniciar faz — e não
+          # invocando o backend direto. Essa diferença deixou passar um defeito em que o lançador
+          # subia outra cópia de si mesmo em vez do console.
           $contrato = "$env:RUNNER_TEMP\estado\endereco.json"
-          for ($i = 0; $i -lt 40 -and -not (Test-Path $contrato); $i++) { Start-Sleep -Seconds 1 }
-          if (-not (Test-Path $contrato)) { throw "o console instalado não publicou o contrato de identidade" }
+          & node.exe "$env:RUNNER_TEMP\programa\launcher-bootstrap.js" --iniciar
+          if ($LASTEXITCODE -ne 0) { throw "o lançador instalado não conseguiu subir o console" }
+          if (-not (Test-Path $contrato)) { throw "o lançador não deixou o console publicar o contrato de identidade" }
+          $pid_ = (Get-Content -Raw $contrato | ConvertFrom-Json).pid
+          Write-Host "console no pid $pid_"
 
           $saida = & node.exe "$env:RUNNER_TEMP\programa\launcher-bootstrap.js" --status | Out-String
           Write-Host $saida
-          Stop-Process -Id $console.Id -Force
+          Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue
           if ($saida -notmatch "no ar") { throw "o lançador não reconheceu o console instalado" }
 
       # No Linux o .deb é o caminho de instalação real; instalá-lo de verdade é a única prova de
