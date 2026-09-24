@@ -145,16 +145,29 @@ async function reiniciarServico(log) {
   return { ok: true, reinicioEm: Date.now() };
 }
 
+/**
+ * Estado do checkout antes de qualquer operação que troque código.
+ *
+ * Inclui arquivos **não rastreados**. Com `--untracked-files=no` eles eram invisíveis, e um
+ * `git checkout --force` para um commit que passou a conter aquele mesmo caminho sobrescreve o
+ * arquivo do operador sem aviso. "Nunca descarta trabalho local" só vale se o trabalho local
+ * ainda não commitado também contar.
+ */
 async function estadoDoCheckout() {
   const [head, sujo, ramo] = await Promise.all([
     git(["rev-parse", "HEAD"]),
-    git(["status", "--porcelain", "--untracked-files=no"]),
+    git(["status", "--porcelain", "--untracked-files=normal"]),
     git(["symbolic-ref", "--quiet", "--short", "HEAD"]),
   ]);
+  const linhas = sujo.ok ? sujo.saida.trim() : "";
   return {
     head: head.ok ? head.saida.trim() : null,
-    limpo: sujo.ok && !sujo.saida.trim(),
-    sujeira: sujo.ok ? sujo.saida.trim() : "",
+    limpo: sujo.ok && !linhas,
+    sujeira: linhas,
+    naoRastreados: linhas
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith("?? "))
+      .map((l) => l.slice(3)),
     ramo: ramo.ok && ramo.saida.trim() ? ramo.saida.trim() : null,
   };
 }
@@ -237,10 +250,40 @@ async function implantar({ alvo, offline = false, semReiniciar = false, log = ()
 
     const deps = await instalarDependencias(antes, commitAlvo, { offline, log });
     if (!deps.ok) {
+      // A recuperação é CONFERIDA antes de ser anunciada.
+      //
+      // Antes, o resultado da volta do código e da reinstalação das dependências era descartado e
+      // a resposta afirmava que a atualização tinha sido desfeita. Se a própria volta falhasse —
+      // npm ausente, módulo em uso, rede fora —, o operador recebia "código voltou para a versão
+      // anterior" com um checkout possivelmente em HEAD novo e `node_modules` pela metade. Um
+      // desfecho desconhecido precisa se apresentar como desconhecido.
       log("npm ci falhou; revertendo o código para a versão anterior.");
-      await reverterCodigo(antes, inicial.ramo, log);
-      await instalarDependencias(commitAlvo, antes, { offline, log });
-      return { ok: false, erro: "npm ci falhou; a atualização foi desfeita e o código voltou para a versão anterior.", revertido: true };
+      const voltaCodigo = await reverterCodigo(antes, inicial.ramo, log);
+      const voltaDeps = voltaCodigo.ok ? await instalarDependencias(commitAlvo, antes, { offline, log }) : { ok: false };
+      const headAgora = await git(["rev-parse", "HEAD"]);
+      const noCommitAnterior = headAgora.ok && headAgora.saida.trim() === antes;
+      const recuperado = voltaCodigo.ok && voltaDeps.ok && noCommitAnterior;
+
+      if (recuperado) {
+        return {
+          ok: false,
+          erro: "npm ci falhou; a atualização foi desfeita e o código voltou para a versão anterior.",
+          revertido: true,
+          reversaoConfirmada: true,
+        };
+      }
+      return {
+        ok: false,
+        revertido: false,
+        reversaoConfirmada: false,
+        erro:
+          `npm ci falhou E a recuperação não pôde ser confirmada. Estado a conferir à mão: HEAD=${
+            headAgora.ok ? headAgora.saida.trim() : "desconhecido"
+          }, alvo pretendido=${antes}` +
+          `${voltaCodigo.ok ? "" : "; a volta do código falhou"}` +
+          `${voltaDeps.ok ? "" : "; as dependências da versão anterior não foram reinstaladas"}` +
+          ". O serviço NÃO foi reiniciado.",
+      };
     }
   }
 
@@ -313,6 +356,17 @@ async function reverter({ alvo = null, offline = false, semReiniciar = false, lo
 
   const inicial = await estadoDoCheckout();
   if (!inicial.head) return { ok: false, erro: `${config.DIR_CHECKOUT} não é um repositório git utilizável` };
+  // A reversão faz `reset --hard`/`checkout --force`: sem esta recusa ela descartava exatamente
+  // o trabalho local que a implantação se nega a tocar. As duas operações trocam código da mesma
+  // forma; a garantia tem de ser a mesma.
+  if (!inicial.limpo) {
+    return {
+      ok: false,
+      erro:
+        "há alterações locais não commitadas no repositório. Reverta-as antes de voltar a versão; " +
+        "esta operação nunca descarta trabalho local.\n" + inicial.sujeira.slice(0, 2000),
+    };
+  }
 
   if (!offline) await git(["fetch", "--tags", "--prune", "origin"], { timeoutMs: 300_000 });
   const resolvido = await git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
