@@ -47,6 +47,19 @@ function iniciar() {
   // e a troca do ponteiro). A troca em si é um rename, então nunca há instalação pela metade —
   // o que pode sobrar é estágio a limpar.
   try {
+    // Divergência entre o ponteiro e o código que de fato carregou: o bootstrap já caiu para
+    // uma versão utilizável, então o console está no ar — e é justamente por isso que precisa
+    // ficar registrado, senão o sucesso aparente encobre uma atualização que não pegou.
+    const instaladas = atualizador.versoesInstaladas();
+    const emExecucao = atualizador.versaoEmExecucao();
+    if (instaladas.gerenciadoLadoALado && instaladas.ativa && emExecucao && instaladas.ativa !== emExecucao) {
+      estado.auditar("console-versao-divergente", { registrada: instaladas.ativa, emExecucao });
+      console.error(
+        `aviso: a versão ativa registrada é ${instaladas.ativa}, mas este processo é ${emExecucao}. ` +
+          "A versão apontada não subiu; reinstale ou reverta."
+      );
+    }
+
     const t = atualizador.reconciliar();
     if (t.reconciliado && t.etapaInterrompida) {
       console.error(`atualização do console interrompida na etapa "${t.etapaInterrompida}" (versão ${t.versao}); estágio descartado.`);
