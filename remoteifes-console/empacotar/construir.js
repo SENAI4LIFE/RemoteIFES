@@ -325,9 +325,10 @@ function montarDeb(saida) {
 
 function commitDoCheckout() {
   try {
-    // Fora de um checkout (um payload extraído, a cópia da árvore de um teste), --commit informa o
-    // commit construído.
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: RAIZ, encoding: "utf8" }).trim();
+    // stderr silenciado: construir fora de um checkout é legítimo (o payload extraído de um
+    // artefato, por exemplo), e um "fatal: not a git repository" na tela faz um build que
+    // deu certo parecer quebrado. Fora de um checkout, --commit informa o commit.
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
   }
