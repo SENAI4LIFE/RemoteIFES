@@ -142,7 +142,18 @@ async function garantirBackend() {
     detached: true,
     stdio: "ignore",
     windowsHide: true,
-    env: { ...process.env, CONSOLE_INICIADO_PELO_LANCADOR: "1" },
+    env: {
+      ...process.env,
+      CONSOLE_INICIADO_PELO_LANCADOR: "1",
+      // O alvo do bootstrap vai EXPLÍCITO, nunca herdado.
+      //
+      // Quando o atalho do sistema roda `launcher-bootstrap.js`, ele marca
+      // CONSOLE_BOOTSTRAP_ALVO=launcher no ambiente deste processo. Herdar isso aqui faria o
+      // bootstrap filho carregar `launcher.js` outra vez em vez de `console.js`: um lançador
+      // subindo outro lançador, cada um esperando 30 s e desistindo, em cadeia — e o console
+      // nunca subindo. É o caminho normal de quem abre pelo atalho no Windows e no macOS.
+      CONSOLE_BOOTSTRAP_ALVO: "console",
+    },
   });
   filho.unref();
 
@@ -303,13 +314,28 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.includes("--ajuda") || args.includes("-h")) {
-    log("uso: launcher.js [--menu|--status|--abrir-app|--abrir-console]");
+    log("uso: launcher.js [--menu|--status|--iniciar|--abrir-app|--abrir-console]");
     log("  sem argumento: sobe o console se necessário, verifica a identidade e abre o navegador");
+    log("  --iniciar: sobe o console e sai, sem abrir navegador (host sem interface gráfica)");
     return 0;
   }
 
   if (args.includes("--status")) {
     imprimirStatus(await coletarStatus());
+    return 0;
+  }
+
+  if (args.includes("--iniciar")) {
+    // Sobe o console e sai, sem abrir navegador: é o que serve um host sem interface gráfica
+    // (um Pi sem systemd, por exemplo), e é o caminho que a CI exercita para provar que o
+    // lançador instalado realmente inicia o **console**, e não outra cópia de si mesmo.
+    const r = await garantirBackend();
+    if (!r.ok) {
+      erro(r.motivo);
+      return 1;
+    }
+    log(r.jaEstava ? "Console já estava no ar." : "Console iniciado.");
+    log(urlDoConsole(r.contrato));
     return 0;
   }
 

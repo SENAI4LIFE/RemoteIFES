@@ -607,3 +607,177 @@ test("a desinstalação não encerra um processo alheio que só ocupa a porta", 
   // O processo do teste (cujo pid estava no contrato) continua vivo, e o intruso também.
   assert.equal(intruso.listening, true, "o processo alheio não pode ser encerrado");
 });
+
+test("REGRESSÃO: o atalho instalado sobe o CONSOLE, não outra cópia do lançador", async (t) => {
+  // O atalho do sistema executa `launcher-bootstrap.js`, que marca CONSOLE_BOOTSTRAP_ALVO=launcher
+  // para que o bootstrap carregue o lançador. O lançador então sobe o backend — e herdava aquele
+  // ambiente, de modo que o bootstrap filho carregava `launcher.js` de novo: um lançador subindo
+  // outro lançador, destacado, cada um esperando 30 s e desistindo, em cadeia, sem nunca subir o
+  // console. Era o caminho normal de quem abre pelo atalho no Windows e no macOS.
+  //
+  // Os testes anteriores não pegavam porque exercitavam `garantirBackend` dentro do processo, sem
+  // passar pelo bootstrap, então a variável nunca estava marcada.
+  const amb = ajuda.ambiente();
+  const raiz = ajuda.dirTemporario("console-rec-");
+  const estadoDir = ajuda.dirTemporario("console-rec-est-");
+  t.after(() => {
+    amb.restaurar();
+    for (const d of [raiz, estadoDir]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  const inst = await instalar(["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--checkout", path.join(ajuda.RAIZ, "..")]);
+  assert.equal(inst.codigo, 0, inst.saida);
+
+  const porta = 8553;
+  const ambienteDoAtalho = {
+    CONSOLE_ESTADO_DIR: estadoDir,
+    CONSOLE_PORTA: String(porta),
+    CONSOLE_OCIOSIDADE_S: "120",
+    CONSOLE_RAIZ_INSTALACAO: raiz,
+  };
+
+  // Exatamente o que o atalho faz, pedindo só a partida (sem abrir navegador).
+  const r = await rodarNodeAsync([path.join(raiz, "launcher-bootstrap.js"), "--iniciar"], ambienteDoAtalho);
+  assert.equal(r.codigo, 0, `o lançador do atalho precisa subir o console. Saída:\n${r.saida}`);
+  assert.match(r.saida, /Console iniciado|Console já estava no ar/);
+
+  // A prova: quem subiu é o CONSOLE — ele publica contrato de identidade e atende HTTP. Um
+  // lançador recursivo não publicaria contrato nenhum.
+  const contrato = path.join(estadoDir, "endereco.json");
+  assert.ok(fs.existsSync(contrato), "o console precisa publicar o contrato de identidade");
+  const dados = JSON.parse(fs.readFileSync(contrato, "utf8"));
+  assert.equal(dados.porta, porta);
+  t.after(() => {
+    try {
+      require(path.join(ajuda.RAIZ, "src", "plataforma")).encerrarArvore(dados.pid, "SIGKILL");
+    } catch {}
+  });
+
+  const atende = await new Promise((resolver) => {
+    const req = http.request({ host: "127.0.0.1", port: porta, path: "/api/sessao", timeout: 5000 }, (res) => resolver(res.statusCode));
+    req.on("error", () => resolver(0));
+    req.on("timeout", () => {
+      req.destroy();
+      resolver(0);
+    });
+    req.end();
+  });
+  assert.ok(atende > 0, "o console iniciado pelo atalho tem de atender HTTP");
+});
+
+test("o bootstrap do console ignora um alvo de lançador herdado do ambiente", (t) => {
+  // Defesa em profundidade para o mesmo defeito: mesmo que alguém volte a herdar a variável, é
+  // preciso que fique claro no arquivo qual entrada é carregada, e o lançador manda o valor.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+
+  const lancador = fs.readFileSync(path.join(ajuda.RAIZ, "launcher.js"), "utf8");
+  assert.match(
+    lancador,
+    /CONSOLE_BOOTSTRAP_ALVO:\s*"console"/,
+    "ao subir o backend, o lançador precisa fixar o alvo do bootstrap em vez de herdá-lo"
+  );
+});
+
+test("REGRESSÃO: o reparo documentado reinstala por cima de si mesmo sem destruir o payload", async (t) => {
+  // O comando de reparo do README e do manual roda `versoes/<v>/instalacao/instalar.js --forcar`.
+  // Ali a ORIGEM **é** o destino: apagar o destino antes de copiar removia a própria origem e
+  // terminava em ENOENT, deixando a instalação inutilizável — exatamente quando o operador
+  // estava tentando consertá-la.
+  const amb = ajuda.ambiente();
+  const raiz = ajuda.dirTemporario("console-rep-");
+  const estadoDir = ajuda.dirTemporario("console-rep-est-");
+  t.after(() => {
+    amb.restaurar();
+    for (const d of [raiz, estadoDir]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  const inst = await instalar(["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--checkout", path.join(ajuda.RAIZ, "..")]);
+  assert.equal(inst.codigo, 0, inst.saida);
+  const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
+  const instaladoEm = path.join(raiz, "versoes", versao);
+  const antes = fs.readdirSync(instaladoEm).sort();
+
+  // Exatamente o comando documentado, a partir do payload instalado.
+  const r = await rodarNodeAsync([
+    path.join(instaladoEm, "instalacao", "instalar.js"),
+    "--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--forcar",
+  ]);
+  assert.equal(r.codigo, 0, `o reparo precisa concluir. Saída:\n${r.saida}`);
+
+  assert.ok(fs.existsSync(path.join(instaladoEm, "console.js")), "o payload precisa sobreviver ao reparo");
+  assert.ok(fs.existsSync(path.join(instaladoEm, "src", "servidor.js")));
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "a camada estável sobrevive");
+  assert.deepEqual(fs.readdirSync(instaladoEm).sort(), antes, "o conteúdo do payload continua completo");
+  assert.ok(!fs.readdirSync(path.join(raiz, "versoes")).some((n) => n.includes("parcial") || n.includes("substituido")), "nenhum estágio fica para trás");
+});
+
+test("--simular não remove a integração com o sistema", async (t) => {
+  // Um ensaio que mexe no sistema não é ensaio. `removerInicializacao` para o console, apaga
+  // unidades do systemd, a regra de sudo e o auxiliar privilegiado: chamá-la em simulação
+  // desmontava de verdade a instalação que o operador só queria inspecionar.
+  const amb = ajuda.ambiente();
+  const raiz = ajuda.dirTemporario("console-sim-");
+  const estadoDir = ajuda.dirTemporario("console-sim-est-");
+  t.after(() => {
+    amb.restaurar();
+    for (const d of [raiz, estadoDir]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  const inst = await instalar(["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--checkout", path.join(ajuda.RAIZ, "..")]);
+  assert.equal(inst.codigo, 0, inst.saida);
+  const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
+
+  const r = await rodarNodeAsync([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--simular"]);
+  assert.equal(r.codigo, 0, r.saida);
+
+  assert.match(r.saida, /\[simulação\] removeria o registro de inicialização/, "a simulação precisa declarar o que faria");
+  // Nenhuma das mensagens do caminho real pode aparecer.
+  for (const real of ["tarefa agendada removida", "não havia tarefa agendada registrada", "registro de inicialização removido"]) {
+    assert.ok(!r.saida.includes(real), `a simulação executou o caminho real: "${real}"`);
+  }
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "a simulação não apaga o programa");
+});
+
+test("a autorização de remoção exige TODAS as marcas da instalação, não apenas uma", (t) => {
+  // Aceitar "pelo menos uma marca" deixava um diretório qualquer que por acaso tivesse um
+  // `versoes/` dentro ser apagado recursivamente. Um `--raiz` digitado errado é justamente o
+  // caso que esta verificação existe para pegar.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const { autorizarRemocao } = require(path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"));
+  const marcas = ["console-bootstrap.js", "versoes", "estado-instalacao.json"];
+
+  const parcial = ajuda.dirTemporario("console-parcial-");
+  t.after(() => fs.rmSync(parcial, { recursive: true, force: true }));
+  // Só uma marca: um diretório de trabalho alheio que contém um "versoes".
+  fs.mkdirSync(path.join(parcial, "versoes"), { recursive: true });
+  fs.writeFileSync(path.join(parcial, "planilha-do-setor.csv"), "nao me apague\n");
+
+  const r = autorizarRemocao(parcial, { marcas, rotulo: "instalação do console", exigirTodas: true });
+  assert.equal(r.ok, false, "uma marca sozinha não pode autorizar remoção recursiva");
+  assert.match(r.motivo, /faltam:/);
+  assert.ok(fs.existsSync(path.join(parcial, "planilha-do-setor.csv")));
+
+  // Com todas as marcas, autoriza.
+  const completa = ajuda.dirTemporario("console-completa-");
+  t.after(() => fs.rmSync(completa, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(completa, "versoes"), { recursive: true });
+  fs.writeFileSync(path.join(completa, "console-bootstrap.js"), "//\n");
+  fs.writeFileSync(path.join(completa, "estado-instalacao.json"), "{}\n");
+  assert.equal(autorizarRemocao(completa, { marcas, rotulo: "instalação do console", exigirTodas: true }).ok, true);
+});
+
+test("o atalho do Windows usa extensão .vbs, porque o wscript escolhe o motor pela extensão", (t) => {
+  // VBScript num arquivo .js é interpretado como JScript e falha; com `//B` o erro é silencioso
+  // e o atalho do menu Iniciar simplesmente não abre nada. Verificado empiricamente:
+  // wscript.exe sai com 1 no .js e 0 no .vbs para o mesmo conteúdo.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "instalacao", "instalar.js"), "utf8");
+
+  assert.match(fonte, /abrir-console\.vbs/, "o script oculto do Windows precisa ser .vbs");
+  assert.ok(!/abrir-console\.js/.test(fonte), "não pode sobrar referência ao .js");
+  // E o conteúdo gravado continua sendo VBScript, coerente com a extensão.
+  assert.match(fonte, /CreateObject\("WScript\.Shell"\)/);
+});

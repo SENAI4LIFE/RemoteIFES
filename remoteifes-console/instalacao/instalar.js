@@ -25,6 +25,11 @@ const { execFileSync } = require("child_process");
 
 const ORIGEM = path.resolve(path.join(__dirname, ".."));
 
+// O que nunca entra no payload instalado. `.signing/`, chaves e assinaturas ficam de fora
+// porque instalar não é publicar: copiar uma chave privada de publicação para dentro de uma
+// instalação a espalharia, possivelmente com permissão mais frouxa que a do original.
+const IGNORAR_NA_COPIA = new Set(["node_modules", ".git", "test", "empacotar", ".signing", "dist"]);
+
 function argumento(nome, padrao = null) {
   const i = process.argv.indexOf(`--${nome}`);
   return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith("--") ? process.argv[i + 1] : padrao;
@@ -117,18 +122,32 @@ async function main() {
   // --- Payload lado a lado ------------------------------------------------------------------
   const destinoVersao = path.join(raiz, "versoes", versao);
   log(`== Instalando o payload em versoes/${versao}`);
-  if (fs.existsSync(destinoVersao)) {
-    if (!temFlag("forcar")) {
-      log("   já presente; mantendo (use --forcar para reescrever).");
-    } else {
-      fs.rmSync(destinoVersao, { recursive: true, force: true });
-      copiarArvore(ORIGEM, destinoVersao, { ignorar: new Set(["node_modules", ".git", "test"]) });
-    }
+  // Reinstalar por cima de si mesmo é o comando de reparo documentado: ele roda
+  // `versoes/<v>/instalacao/instalar.js --forcar`, e ali ORIGEM **é** o destino. Apagar o destino
+  // antes de copiar destruía o payload ativo e terminava em ENOENT com a instalação inutilizada.
+  // A cópia vai sempre para um estágio ao lado e entra por rename; a origem só é removida depois.
+  const origemEhODestino = ORIGEM === destinoVersao || ORIGEM.startsWith(destinoVersao + path.sep);
+  if (fs.existsSync(destinoVersao) && !temFlag("forcar")) {
+    log("   já presente; mantendo (use --forcar para reescrever).");
   } else {
     const parcial = `${destinoVersao}.parcial-${crypto.randomBytes(3).toString("hex")}`;
-    copiarArvore(ORIGEM, parcial, { ignorar: new Set(["node_modules", ".git", "test"]) });
+    fs.rmSync(parcial, { recursive: true, force: true });
+    copiarArvore(ORIGEM, parcial, { ignorar: IGNORAR_NA_COPIA });
+    if (!fs.existsSync(path.join(parcial, "console.js"))) {
+      fs.rmSync(parcial, { recursive: true, force: true });
+      falhar(`a cópia do payload ficou incompleta em ${parcial}; nada foi substituído.`);
+    }
     fs.mkdirSync(path.dirname(destinoVersao), { recursive: true });
-    fs.renameSync(parcial, destinoVersao);
+    if (fs.existsSync(destinoVersao)) {
+      const aposentado = `${destinoVersao}.substituido-${crypto.randomBytes(3).toString("hex")}`;
+      fs.renameSync(destinoVersao, aposentado);
+      fs.renameSync(parcial, destinoVersao);
+      // Só agora a árvore antiga sai — e se ela era a origem, a cópia já está feita.
+      fs.rmSync(aposentado, { recursive: true, force: true });
+      log(origemEhODestino ? "   payload substituído a partir de si mesmo, com estágio intermediário." : "   payload substituído.");
+    } else {
+      fs.renameSync(parcial, destinoVersao);
+    }
   }
 
   // node_modules é preservado entre versões: o terminal opcional (node-pty) é instalado ali
@@ -341,7 +360,10 @@ function criarAtalho({ plataforma, raiz, log }) {
   if (plataforma.nome === "windows") {
     // O atalho aponta para wscript.exe, que é subsistema GUI: sem isso, abrir o console piscaria
     // uma janela de console preta a cada execução.
-    const oculto = path.join(raiz, "abrir-console.js");
+    // Extensão .vbs, não .js: o `wscript.exe` escolhe o motor de script pela EXTENSÃO, então
+    // VBScript num arquivo .js é interpretado como JScript e falha. Com `//B` o erro é silencioso
+    // e o atalho simplesmente não abre nada.
+    const oculto = path.join(raiz, "abrir-console.vbs");
     fs.writeFileSync(
       oculto,
       [

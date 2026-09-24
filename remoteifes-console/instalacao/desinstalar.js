@@ -50,9 +50,10 @@ function falhar(mensagem) {
  * não explica o que faltou leva o operador a apagar na mão, que é exatamente o risco.
  *
  * @param {string} caminho  diretório candidato
- * @param {object} exigido  `marcas`: nomes que **precisam** existir dentro; `rotulo`: o que é.
+ * @param {object} exigido  `marcas`: nomes que identificam o diretório; `rotulo`: o que é;
+ *                          `exigirTodas`: quando verdadeiro, a ausência de qualquer marca recusa.
  */
-function autorizarRemocao(caminho, { marcas, rotulo }) {
+function autorizarRemocao(caminho, { marcas, rotulo, exigirTodas = false }) {
   const alvo = path.resolve(caminho);
 
   if (!fs.existsSync(alvo)) return { ok: false, ausente: true, motivo: `${rotulo} não existe em ${alvo}` };
@@ -73,9 +74,18 @@ function autorizarRemocao(caminho, { marcas, rotulo }) {
   if (profundidade < 2) return { ok: false, motivo: `recusado: ${alvo} é raso demais para ser removido recursivamente` };
 
   // Identidade: o diretório tem de parecer o que dizemos que é.
+  //
+  // Para a raiz do programa, TODAS as marcas são exigidas. Aceitar "pelo menos uma" deixava um
+  // diretório qualquer que por acaso tivesse um `versoes/` dentro ser apagado recursivamente —
+  // e um `--raiz` digitado errado é justamente o caso que estas verificações existem para pegar.
   const faltando = marcas.filter((m) => !fs.existsSync(path.join(alvo, m)));
-  if (faltando.length === marcas.length) {
-    return { ok: false, motivo: `${alvo} não tem nenhuma marca de ${rotulo} (esperado: ${marcas.join(", ")})` };
+  if (exigirTodas ? faltando.length > 0 : faltando.length === marcas.length) {
+    return {
+      ok: false,
+      motivo: exigirTodas
+        ? `${alvo} não tem as marcas de ${rotulo} (faltam: ${faltando.join(", ")})`
+        : `${alvo} não tem nenhuma marca de ${rotulo} (esperado: ${marcas.join(", ")})`,
+    };
   }
 
   // Nunca dentro de um checkout do RemoteIFES: ali moram o código e o banco da aplicação.
@@ -260,6 +270,7 @@ async function main() {
   const autorizacao = autorizarRemocao(raiz, {
     marcas: ["console-bootstrap.js", "versoes", "estado-instalacao.json"],
     rotulo: "instalação do console",
+    exigirTodas: true,
   });
   if (!autorizacao.ok && !autorizacao.ausente) falhar(`  ${autorizacao.motivo}`);
 
@@ -284,11 +295,18 @@ async function main() {
 
   // --- Integração com a plataforma ------------------------------------------------------------
   log("== Removendo a integração com o sistema");
-  try {
-    const r = await plataforma.removerInicializacao({ escopo });
-    log(r.disponivel ? `   ${r.mecanismo || "registro de inicialização removido"}` : `   nada a remover (${r.motivo})`);
-  } catch (erro) {
-    log(`   não foi possível remover o registro de inicialização: ${erro.message}`);
+  if (simular) {
+    // `removerInicializacao` é destrutiva: no Linux ela para o console, apaga as unidades do
+    // systemd, a regra de sudo e o auxiliar privilegiado. Chamá-la em modo de simulação fazia o
+    // "ensaio" desmontar de verdade a instalação que o operador só queria inspecionar.
+    log("   [simulação] removeria o registro de inicialização e, no Linux, unidades, regra de sudo e auxiliar.");
+  } else {
+    try {
+      const r = await plataforma.removerInicializacao({ escopo });
+      log(r.disponivel ? `   ${r.mecanismo || "registro de inicialização removido"}` : `   nada a remover (${r.motivo})`);
+    } catch (erro) {
+      log(`   não foi possível remover o registro de inicialização: ${erro.message}`);
+    }
   }
 
   // --- Atalhos ---------------------------------------------------------------------------------
