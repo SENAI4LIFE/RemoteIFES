@@ -501,3 +501,110 @@ test("o .deb é montado no formato ar que o dpkg entende", (t) => {
     assert.ok(conteudo.includes(Buffer.from(membro)), `membro ${membro} ausente`);
   }
 });
+
+// --- Credencial em redirecionamento -----------------------------------------------------------
+
+/** Servidor HTTP que registra os cabeçalhos de cada requisição recebida. */
+function servidorQueRegistra(responder) {
+  const recebidas = [];
+  const servidor = http.createServer((req, res) => {
+    recebidas.push({ url: req.url, autorizacao: req.headers.authorization || null });
+    responder(req, res, servidor);
+  });
+  return new Promise((r) =>
+    servidor.listen(0, "127.0.0.1", () =>
+      r({
+        porta: servidor.address().port,
+        recebidas,
+        fechar: () =>
+          new Promise((f) => {
+            servidor.closeAllConnections && servidor.closeAllConnections();
+            servidor.close(() => f());
+          }),
+      })
+    )
+  );
+}
+
+const CORPO_ARTEFATO = Buffer.from("conteudo-de-artefato-de-ci-para-teste");
+
+test("o token do GitHub não acompanha o redirecionamento para outro host", async (t) => {
+  // O download de artefato responde 302 para um armazenamento assinado em outro domínio. Mandar
+  // o `Authorization` junto entregaria o token a um host que não precisa dele e que pode
+  // registrá-lo. A regra existia no código e NADA a provava: mover o cabeçalho para fora da
+  // condição passaria em todos os testes da suíte.
+  const cdn = await servidorQueRegistra((req, res) => {
+    res.writeHead(200, { "Content-Length": CORPO_ARTEFATO.length });
+    res.end(CORPO_ARTEFATO);
+  });
+  t.after(() => cdn.fechar());
+
+  const api = await servidorQueRegistra((req, res) => {
+    if (req.url.includes("/artifacts?")) {
+      const corpo = JSON.stringify({
+        artifacts: [{ id: 7, name: "pacote", size_in_bytes: CORPO_ARTEFATO.length, expired: false, created_at: null, expires_at: null }],
+      });
+      res.writeHead(200, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(corpo) });
+      return res.end(corpo);
+    }
+    if (req.url.includes("/artifacts/7/zip")) {
+      res.writeHead(302, { Location: `http://127.0.0.1:${cdn.porta}/armazenamento-assinado/pacote.zip` });
+      return res.end();
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  t.after(() => api.fechar());
+
+  const amb = ajuda.ambiente({ githubApi: `http://127.0.0.1:${api.porta}` });
+  t.after(() => amb.restaurar());
+  const github = require(path.join(ajuda.RAIZ, "src", "github.js"));
+  github.gravarToken("ghp_umtokenfalsoparateste0000000000");
+
+  const dir = ajuda.dirTemporario("console-dl-");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const destino = path.join(dir, "pacote.zip");
+
+  const r = await github.baixarArtefato(1, 7, destino);
+  assert.equal(r.ok, true, r.erro);
+
+  const daApi = api.recebidas.filter((x) => x.url.includes("/artifacts"));
+  assert.ok(daApi.length >= 2, `esperava listagem + download na API; recebi ${JSON.stringify(api.recebidas)}`);
+  assert.ok(
+    daApi.every((x) => /^Bearer /.test(x.autorizacao || "")),
+    "o host da API precisa receber a credencial em todas as chamadas"
+  );
+
+  assert.equal(cdn.recebidas.length, 1, "o armazenamento recebe o download redirecionado");
+  assert.equal(cdn.recebidas[0].autorizacao, null, "o armazenamento NÃO pode receber a credencial");
+  assert.equal(fs.readFileSync(destino).toString(), CORPO_ARTEFATO.toString(), "o conteúdo baixado é o do armazenamento");
+});
+
+test("um redirecionamento em laço é cortado em vez de seguir para sempre", async (t) => {
+  let saltos = 0;
+  const laco = await servidorQueRegistra((req, res, servidor) => {
+    if (req.url.includes("/artifacts?")) {
+      const corpo = JSON.stringify({ artifacts: [{ id: 9, name: "p", size_in_bytes: 10, expired: false }] });
+      res.writeHead(200, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(corpo) });
+      return res.end(corpo);
+    }
+    saltos += 1;
+    res.writeHead(302, { Location: `http://127.0.0.1:${servidor.address().port}/de-novo/${saltos}` });
+    res.end();
+  });
+  t.after(() => laco.fechar());
+
+  const amb = ajuda.ambiente({ githubApi: `http://127.0.0.1:${laco.porta}` });
+  t.after(() => amb.restaurar());
+  const github = require(path.join(ajuda.RAIZ, "src", "github.js"));
+
+  const dir = ajuda.dirTemporario("console-laco-");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const destino = path.join(dir, "p.zip");
+
+  const r = await github.baixarArtefato(1, 9, destino);
+  assert.equal(r.ok, false);
+  assert.match(r.erro, /redirecionamentos/);
+  assert.ok(saltos <= 6, `o laço tem de ser cortado rápido; houve ${saltos} redirecionamentos`);
+  assert.ok(!fs.existsSync(destino), "nada é gravado quando o download não conclui");
+});
