@@ -200,23 +200,31 @@ function politicaDeVersao(manifesto, versaoInstalada) {
 }
 
 /** Confere o arquivo realmente gravado contra o manifesto autenticado. */
+/**
+ * Confere um artefato contra o manifesto assinado e **devolve os bytes conferidos**.
+ *
+ * Devolver o conteúdo não é conveniência: é o que fecha a janela entre verificar e instalar.
+ * Antes, o digest era calculado numa leitura e a extração fazia outra leitura do mesmo caminho —
+ * quem pudesse trocar o arquivo entre as duas instalaria conteúdo que nunca passou pela
+ * verificação. No caminho online o arquivo está numa área nossa, mas no caminho offline ele é um
+ * caminho que o operador informou (um /tmp compartilhado, um pendrive montado), e ali a troca é
+ * plausível. Verificando e extraindo o MESMO buffer, não existe segunda leitura para atacar.
+ */
 function conferirArtefato(caminho, artefato) {
-  let info;
+  let conteudo;
   try {
-    info = fs.statSync(caminho);
+    conteudo = fs.readFileSync(caminho);
   } catch {
     return { ok: false, motivo: "o arquivo baixado não existe" };
   }
-  if (info.size !== artefato.bytes) {
-    return { ok: false, motivo: `tamanho divergente: ${info.size} bytes gravados, ${artefato.bytes} declarados no manifesto` };
+  if (conteudo.length !== artefato.bytes) {
+    return { ok: false, motivo: `tamanho divergente: ${conteudo.length} bytes lidos, ${artefato.bytes} declarados no manifesto` };
   }
-  const hash = crypto.createHash("sha256");
-  hash.update(fs.readFileSync(caminho));
-  const digest = hash.digest("hex");
+  const digest = crypto.createHash("sha256").update(conteudo).digest("hex");
   if (digest !== artefato.sha256) {
     return { ok: false, motivo: `SHA-256 divergente: ${digest} calculado, ${artefato.sha256} declarado no manifesto` };
   }
-  return { ok: true, sha256: digest, bytes: info.size };
+  return { ok: true, sha256: digest, bytes: conteudo.length, conteudo };
 }
 
 module.exports = {
