@@ -32,12 +32,20 @@ $origem = Split-Path -Parent $MyInvocation.MyCommand.Path
 function Resolver-Node {
     # Ordem: o Node do PATH; depois as instalações padrão do MSI. Um Node só de usuário costuma
     # estar no PATH; um de máquina nem sempre está, numa sessão elevada recém-aberta.
+    #
+    # Cada base é conferida ANTES do Join-Path: com $ErrorActionPreference = "Stop", montar um
+    # caminho sobre uma variável de ambiente ausente derruba o instalador com um erro de binding
+    # que não diz nada ao operador. ${env:ProgramFiles(x86)} não existe em toda instalação.
     $candidatos = @()
     $doCaminho = Get-Command node.exe -ErrorAction SilentlyContinue
     if ($null -ne $doCaminho) { $candidatos += $doCaminho.Source }
-    $candidatos += Join-Path $env:ProgramFiles "nodejs\node.exe"
-    $candidatos += Join-Path ${env:ProgramFiles(x86)} "nodejs\node.exe"
-    $candidatos += Join-Path $env:LOCALAPPDATA "Programs\nodejs\node.exe"
+
+    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if (-not [string]::IsNullOrWhiteSpace($base)) { $candidatos += (Join-Path $base "nodejs\node.exe") }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $candidatos += (Join-Path $env:LOCALAPPDATA "Programs\nodejs\node.exe")
+    }
 
     foreach ($c in $candidatos) {
         if (-not [string]::IsNullOrWhiteSpace($c) -and (Test-Path -LiteralPath $c)) { return $c }

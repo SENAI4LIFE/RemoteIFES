@@ -233,6 +233,21 @@ Sem rede, a verificação usa a última raiz que uma atualização conferiu nest
 houve uma, a embutida. É a verificação offline normal do Sigstore, com o limite de sempre: ela não
 fica sabendo de uma chave revogada depois daquela cópia.
 
+### Host sem Internet
+
+Um Pi atrás de uma rede fechada recebe os três arquivos do release à mão (pendrive, `scp`) e
+instala com:
+
+```bash
+node bin/atualizar-console.js --importar manifesto.json atestacao.sigstore.json <artefato>.tar.gz
+```
+
+O caminho é o mesmo do release baixado — atestação, identidade, alvo, digest, política de versão,
+instalação lado a lado, troca de ponteiro —, sem nenhum acesso à rede: a raiz do Sigstore é a
+local (acima). A metade que instala é uma função só (`instalarArtefatoVerificado`), compartilhada
+pelos dois caminhos: duplicá-la seria duplicar o risco de divergirem justamente nas conferências
+que impedem uma instalação ruim.
+
 ## 6. O que continua sem suporte, e por quê
 
 | Capacidade | Estado | Bloqueio exato |
