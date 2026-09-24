@@ -169,20 +169,41 @@ async function lerRegistros({ unidade = "aplicacao", linhas = 200 } = {}) {
   const fonte = fontes[unidade];
   if (!fonte) return recurso(ESTADO.NAO_SUPORTADO, "unidade de log não permitida");
 
+  // A origem é conferida ANTES de filtrar o log.
+  //
+  // `Get-WinEvent -FilterHashtable @{ProviderName='X'}` com uma origem que nunca registrou nada
+  // não retorna rápido: ele varre o log de Aplicativo inteiro antes de concluir que não há
+  // correspondência. Num host onde o RemoteIFES roda manualmente — que é o caso comum, e o da
+  // CI — isso levava a leitura além do prazo e o console reportava indisponibilidade onde a
+  // resposta certa é "esta origem não registra eventos". `-ListProvider` responde na hora.
   const r = await powershell(
     `$ErrorActionPreference='SilentlyContinue';` +
+      `if ($null -eq (Get-WinEvent -ListProvider '${fonte}' -ErrorAction SilentlyContinue)) { 'SEMPROVEDOR' } else {` +
       `$e = Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='${fonte}'} -MaxEvents ${n};` +
       `if ($null -eq $e) { 'SEMEVENTOS' } else { $e | Sort-Object TimeCreated | ` +
-      `ForEach-Object { "{0:yyyy-MM-ddTHH:mm:ss} [{1}] {2}" -f $_.TimeCreated, $_.LevelDisplayName, $_.Message } }`,
+      `ForEach-Object { "{0:yyyy-MM-ddTHH:mm:ss} [{1}] {2}" -f $_.TimeCreated, $_.LevelDisplayName, $_.Message } } }`,
     { timeoutMs: 30_000, limiteBytes: 512 * 1024 }
   );
-  if (!r.ok) return recurso(ESTADO.INDISPONIVEL, r.erro || "não foi possível ler o log de eventos");
+  if (!r.ok) {
+    const prazo = r.expirou ? " (a consulta passou do prazo)" : "";
+    return recurso(ESTADO.INDISPONIVEL, `${r.erro || "não foi possível ler o log de eventos"}${prazo}`);
+  }
+  if (r.saida.includes("SEMPROVEDOR")) {
+    return {
+      ...recurso(ESTADO.NAO_INSTALADO),
+      texto: "",
+      fonte: "Log de Aplicativo do Windows",
+      observacao:
+        `A origem "${fonte}" não está registrada no log de eventos deste Windows. Isso é o esperado quando o ` +
+        "RemoteIFES é iniciado manualmente: ele escreve no console que o iniciou, não no log do sistema.",
+    };
+  }
   if (r.saida.includes("SEMEVENTOS")) {
     return {
       ...recurso(ESTADO.SUPORTADO),
       texto: "",
       fonte: "Log de Aplicativo do Windows",
-      observacao: `Nenhum evento registrado pela origem "${fonte}". Um RemoteIFES iniciado manualmente escreve no console, não no log de eventos.`,
+      observacao: `A origem "${fonte}" está registrada, mas ainda não gravou nenhum evento.`,
     };
   }
   return { ...recurso(ESTADO.SUPORTADO), texto: r.saida, fonte: "Log de Aplicativo do Windows" };
