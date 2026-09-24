@@ -55,6 +55,24 @@ function rodar(script, args, env) {
   });
 }
 
+/**
+ * Versão assíncrona, obrigatória quando o teste também precisa ATENDER requisições enquanto o
+ * script roda: `spawnSync` bloqueia o event loop, e um servidor falso hospedado no próprio
+ * processo de teste jamais responderia ao desafio de identidade.
+ */
+function rodarNodeAsync(args, env) {
+  return new Promise((resolver) => {
+    const filho = spawn(process.execPath, args, {
+      env: { ...process.env, CONSOLE_SEM_PRIVILEGIO: "1", ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let saida = "";
+    filho.stdout.on("data", (d) => (saida += d));
+    filho.stderr.on("data", (d) => (saida += d));
+    filho.on("close", (codigo) => resolver({ codigo, saida }));
+  });
+}
+
 /** Roda um script do console e devolve saída e código, sem estourar em falha esperada. */
 function rodarNode(args, env) {
   const r = require("child_process").spawnSync(process.execPath, args, {
@@ -493,4 +511,99 @@ test("REGRESSÃO: desinstalar de dentro da própria instalação remove a raiz i
   assert.equal(d.codigo, 0, d.saida);
   assert.ok(!fs.existsSync(raiz), `a raiz inteira precisa sair; restou: ${fs.existsSync(raiz) ? fs.readdirSync(raiz).join(", ") : ""}`);
   assert.ok(fs.existsSync(path.join(estadoDir, "operadores.json")) || fs.existsSync(path.join(estadoDir, "bootstrap-token")), "o estado fica");
+});
+
+test("desinstalar encerra o console que está no ar, em vez de deixá-lo órfão", async (t) => {
+  // A desinstalação "dava certo" e deixava um processo vivo: ainda atendendo no loopback, ainda
+  // com o contrato de identidade publicado, ainda capaz de executar operações privilegiadas de
+  // um programa que para o operador já não existe. No Linux o `systemctl disable --now` cobria
+  // isso por acidente; no Windows e no macOS, onde quem sobe o console é o lançador, nada
+  // parava o processo.
+  const amb = ajuda.ambiente();
+  const raiz = ajuda.dirTemporario("console-vivo-");
+  const estadoDir = ajuda.dirTemporario("console-vivo-est-");
+  t.after(() => {
+    amb.restaurar();
+    for (const d of [raiz, estadoDir]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  const inst = await instalar(["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--checkout", path.join(ajuda.RAIZ, "..")]);
+  assert.equal(inst.codigo, 0, inst.saida);
+  const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
+
+  // Sobe o console a partir da instalação, como o lançador faria.
+  const porta = 8531;
+  const filho = spawn(process.execPath, [path.join(raiz, "console-bootstrap.js")], {
+    env: { ...process.env, CONSOLE_SEM_PRIVILEGIO: "1", CONSOLE_ESTADO_DIR: estadoDir, CONSOLE_PORTA: String(porta), CONSOLE_OCIOSIDADE_S: "120" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  t.after(() => {
+    try {
+      filho.kill("SIGKILL");
+    } catch {}
+  });
+
+  const contrato = path.join(estadoDir, "endereco.json");
+  let subiu = false;
+  for (let i = 0; i < 60 && !subiu; i += 1) {
+    if (fs.existsSync(contrato)) subiu = true;
+    else await new Promise((r) => setTimeout(r, 250));
+  }
+  assert.ok(subiu, "o console instalado precisa subir para que o teste signifique algo");
+
+  const r = rodarNode([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"]);
+  assert.equal(r.codigo, 0, r.saida);
+  assert.match(r.saida, /encerrando o console em execução/);
+  assert.match(r.saida, /console encerrado/);
+  assert.ok(!fs.existsSync(raiz), "o programa sai por inteiro");
+
+  // A prova que importa: a porta parou de atender.
+  const aindaAtende = await new Promise((resolver) => {
+    const req = http.request({ host: "127.0.0.1", port: porta, path: "/api/sessao", timeout: 2000 }, () => resolver(true));
+    req.on("error", () => resolver(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolver(false);
+    });
+    req.end();
+  });
+  assert.equal(aindaAtende, false, "o console não pode continuar atendendo depois de desinstalado");
+});
+
+test("a desinstalação não encerra um processo alheio que só ocupa a porta", async (t) => {
+  // O PID do contrato não autoriza um kill por si só: PID é reciclado, e a porta pode ter sido
+  // tomada por outro programa. Quem autoriza é a prova de identidade. Sem ela, nada morre.
+  const amb = ajuda.ambiente();
+  const raiz = ajuda.dirTemporario("console-imp-");
+  const estadoDir = ajuda.dirTemporario("console-imp-est-");
+  t.after(() => {
+    amb.restaurar();
+    for (const d of [raiz, estadoDir]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  const inst = await instalar(["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--checkout", path.join(ajuda.RAIZ, "..")]);
+  assert.equal(inst.codigo, 0, inst.saida);
+  const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
+
+  // Um servidor qualquer na porta, e um contrato que aponta para ele com um segredo que ele
+  // não conhece — exatamente o cenário do impostor.
+  const intruso = http.createServer((_req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ prova: "nao-e-a-prova-certa" }));
+  });
+  await new Promise((r) => intruso.listen(0, "127.0.0.1", r));
+  t.after(() => new Promise((r) => intruso.close(() => r())));
+  const portaIntruso = intruso.address().port;
+
+  fs.writeFileSync(
+    path.join(estadoDir, "endereco.json"),
+    `${JSON.stringify({ porta: portaIntruso, pid: process.pid, modo: "tcp", versao, segredo: "c2VncmVkby1xdWUtbmluZ3VlbS1zYWJl" })}\n`
+  );
+
+  const r = await rodarNodeAsync([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"]);
+  assert.match(r.saida, /NÃO é este console/, `esperava recusa de impostor. Saída:\n${r.saida}`);
+  assert.match(r.saida, /Nada foi encerrado/);
+
+  // O processo do teste (cujo pid estava no contrato) continua vivo, e o intruso também.
+  assert.equal(intruso.listening, true, "o processo alheio não pode ser encerrado");
 });
