@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const http = require("http");
 const config = require("./config");
 const estado = require("./estado");
 const plataforma = require("./plataforma");
@@ -77,4 +78,96 @@ function protecaoDoContrato() {
   };
 }
 
-module.exports = { publicarContrato, limparContrato, segredoAtual, versaoDoConsole, protecaoDoContrato };
+/**
+ * Lê o contrato publicado pelo console em execução. Só devolve algo que sirva para verificar:
+ * sem porta inteira e sem segredo não há prova possível.
+ *
+ * O caminho é parametrizável porque o desinstalador recebe o diretório de estado por argumento
+ * e roda de uma cópia temporária: ali `config` já foi carregado apontando para o padrão da
+ * plataforma, e ler o contrato errado faria o desinstalador concluir que não há console no ar.
+ */
+function lerContrato(arquivo = config.ARQUIVO_ENDERECO) {
+  try {
+    const bruto = JSON.parse(fs.readFileSync(arquivo, "utf8"));
+    if (!bruto || typeof bruto !== "object") return null;
+    if (!Number.isInteger(bruto.porta) || !bruto.segredo) return null;
+    return bruto;
+  } catch {
+    return null;
+  }
+}
+
+function pedirProva(porta, desafio, timeoutMs) {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: "127.0.0.1",
+        port: porta,
+        path: `/api/identidade?desafio=${encodeURIComponent(desafio)}`,
+        method: "GET",
+        headers: { Host: `127.0.0.1:${porta}` },
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let texto = "";
+        res.setEncoding("utf8");
+        res.on("data", (d) => {
+          texto += d;
+        });
+        res.on("end", () => {
+          try {
+            resolve({ ok: res.statusCode === 200, json: JSON.parse(texto) });
+          } catch {
+            resolve({ ok: false, erro: "resposta ilegível" });
+          }
+        });
+      }
+    );
+    req.on("timeout", () => {
+      req.destroy();
+      resolve({ ok: false, erro: "tempo esgotado" });
+    });
+    req.on("error", (erro) => resolve({ ok: false, erro: erro.code || erro.message }));
+    req.end();
+  });
+}
+
+/**
+ * Prova que quem responde na porta do contrato é ESTE console, por desafio/resposta HMAC sobre
+ * um segredo que só o processo em execução conhece.
+ *
+ * Vive aqui, e não no lançador, porque há dois consumidores com a mesma pergunta e consequências
+ * opostas se ela for respondida errado: o lançador decide se abre o navegador (e entregaria a
+ * senha do operador a um impostor), e o desinstalador decide se encerra um processo (e mataria
+ * um processo alheio que só calhou de estar naquela porta). Uma implementação só.
+ */
+async function verificarIdentidade(contrato, { timeoutMs = 4000 } = {}) {
+  const desafio = crypto.randomBytes(32).toString("base64url");
+  const r = await pedirProva(contrato.porta, desafio, timeoutMs);
+  if (!r.ok || !r.json || typeof r.json.prova !== "string") {
+    return { ok: false, motivo: r.erro || `o processo na porta ${contrato.porta} não respondeu à verificação de identidade` };
+  }
+  const esperado = crypto.createHmac("sha256", Buffer.from(contrato.segredo, "base64url")).update(desafio).digest("base64url");
+  const a = Buffer.from(r.json.prova, "utf8");
+  const b = Buffer.from(esperado, "utf8");
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return {
+      ok: false,
+      impostor: true,
+      motivo:
+        `algo está escutando em 127.0.0.1:${contrato.porta}, mas NÃO é este console: a prova de identidade não confere. ` +
+        "Não abra o navegador nesse endereço e investigue qual processo tomou a porta.",
+    };
+  }
+  return { ok: true, versao: r.json.versao || null };
+}
+
+module.exports = {
+  publicarContrato,
+  limparContrato,
+  segredoAtual,
+  versaoDoConsole,
+  protecaoDoContrato,
+  lerContrato,
+  verificarIdentidade,
+};
