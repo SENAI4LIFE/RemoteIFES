@@ -166,10 +166,15 @@ function reexecutarForaDaInstalacao(raiz, dirEstado) {
       if (anterior === "--raiz" || anterior === "--estado") return false;
       return true;
     });
+    // O cwd precisa sair da instalação, no pai e no filho: no Windows um handle de diretório
+    // aberto também impede a remoção da raiz, e o processo pai continua vivo durante o spawnSync.
+    try {
+      if (path.resolve(process.cwd()).startsWith(alvo)) process.chdir(os.tmpdir());
+    } catch {}
     const r = require("child_process").spawnSync(
       process.execPath,
       [copia, ...repassar, "--raiz", alvo, "--estado", path.resolve(dirEstado)],
-      { stdio: "inherit" }
+      { stdio: "inherit", cwd: temp }
     );
     process.exitCode = r.status === null ? 1 : r.status;
   } finally {
