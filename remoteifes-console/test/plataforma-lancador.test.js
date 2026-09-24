@@ -199,13 +199,16 @@ test("remover uma inicialização que não existe é sucesso, não falha", async
   assert.match(r.mecanismo, /não havia tarefa/);
 });
 
-test("o disco é medido sem abrir processo nenhum", async (t) => {
-  // Antes isso chamava o PowerShell uma vez por caminho, no Windows. A prontidão mede dois
+test("no Windows o disco é medido sem abrir processo nenhum", async (t) => {
+  // O adaptador do Windows chamava o PowerShell uma vez por caminho. A prontidão mede dois
   // caminhos antes de cada operação, e só isso levava a avaliação a mais de 15 s num runner de
   // dois núcleos — o operador esperando por uma tela de confirmação.
+  //
+  // O teste olha o adaptador do Windows diretamente, e por isso vale rodando em qualquer
+  // sistema: a medição dele é a herdada do adaptador base, que usa `fs.statfsSync`.
   const amb = ajuda.ambiente();
   const processos = require(path.join(ajuda.RAIZ, "src", "processos.js"));
-  const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
   const original = processos.executar;
   let abriuProcesso = false;
   processos.executar = (...args) => {
@@ -217,19 +220,30 @@ test("o disco é medido sem abrir processo nenhum", async (t) => {
     amb.restaurar();
   });
 
+  const r = await windows.disco([ajuda.RAIZ, require("os").tmpdir()]);
+  assert.equal(abriuProcesso, false, "a medição de disco do Windows não pode abrir processo");
+  assert.equal(r.length, 2);
+  for (const d of r) {
+    assert.equal(d.suportado, true, d.motivo);
+    assert.ok(d.totalBytes > 0, "o total precisa ser um número real");
+    assert.ok(d.livreBytes >= 0 && d.livreBytes <= d.totalBytes);
+    assert.ok(d.usoPercentual >= 0 && d.usoPercentual <= 100);
+  }
+});
+
+test("cada sistema mede o disco e diz qual dispositivo mediu", async (t) => {
+  // Linux e macOS mantêm o `df`: ele nomeia o dispositivo e o ponto de montagem reais, que o
+  // statfs não dá. Num Pi com /var em outro dispositivo, essa distinção é a diferença entre
+  // medir o disco certo e o errado antes de um backup.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
+
   const r = await plataforma.disco([ajuda.RAIZ]);
   assert.equal(r.length, 1);
-  if (process.platform === "linux") {
-    // O Linux mantém o `df` porque ele informa o ponto de montagem real, que o statfs não dá:
-    // num Pi com /var em outro dispositivo essa distinção é a diferença entre medir o disco
-    // certo e o errado.
-    assert.ok(r[0].suportado, r[0].motivo);
-    return;
-  }
-  assert.equal(abriuProcesso, false, "a medição de disco não deve abrir processo fora do Linux");
   assert.equal(r[0].suportado, true, r[0].motivo);
-  assert.ok(r[0].totalBytes > 0 && r[0].livreBytes >= 0);
-  assert.ok(r[0].usoPercentual >= 0 && r[0].usoPercentual <= 100);
+  assert.ok(r[0].totalBytes > 0);
+  assert.ok(r[0].montagem, "a medição precisa dizer onde mediu");
 });
 
 test("no Windows a proteção de arquivo não é afirmada por modo POSIX", (t) => {
