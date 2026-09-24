@@ -248,6 +248,83 @@ test("cadeia completa: construir, assinar, publicar e atualizar de verdade", asy
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1");
 });
 
+test("importação offline instala de verdade, sem rede nenhuma", async (t) => {
+  // Um Pi sem Internet recebe manifesto, assinatura e artefato em pendrive. Antes isto apenas
+  // verificava e mandava "usar a ação de atualização" — que vai à rede: um beco sem saída
+  // exatamente no caso que a função existe para atender.
+  const NOVA = "99.9.2";
+  const fonte = arvoreNaVersao(NOVA);
+  const saida = ajuda.dirTemporario("console-dist-");
+  const chaves = ajuda.dirTemporario("console-chave-");
+  const instalacao = instalacaoCom("0.0.1");
+  t.after(() => {
+    for (const d of [fonte, saida, chaves, instalacao]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  construir(fonte, saida);
+  const par = gerarChave(chaves);
+  assinar(path.join(saida, "manifesto.json"), par.privada);
+
+  // Nenhuma base de release configurada: qualquer tentativa de rede falharia.
+  const amb = ajuda.ambiente({
+    env: { CONSOLE_CHAVE_RELEASE: par.publicaB64, CONSOLE_RAIZ_INSTALACAO: instalacao, CONSOLE_RELEASE_BASE: undefined },
+  });
+  t.after(() => amb.restaurar());
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
+
+  const linhas = [];
+  const r = await atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    assinatura: path.join(saida, "manifesto.json.sig"),
+    artefato: path.join(saida, manifesto.artefatos[0].arquivo),
+    log: (l) => linhas.push(l),
+  });
+
+  assert.equal(r.ok, true, r.erro);
+  assert.equal(r.versao, NOVA);
+  assert.ok(fs.existsSync(path.join(instalacao, "versoes", NOVA, "src", "servidor.js")), "o payload precisa ficar instalado");
+  const info = atualizador.lerEstadoInstalacao();
+  assert.equal(info.versaoAtiva, NOVA, "o ponteiro tem de apontar para a versão importada");
+  assert.equal(info.versaoAnterior, "0.0.1");
+  assert.equal(info.transacao.etapa, "concluida");
+});
+
+test("importação offline recusa artefato adulterado e não instala nada", async (t) => {
+  const NOVA = "99.9.3";
+  const fonte = arvoreNaVersao(NOVA);
+  const saida = ajuda.dirTemporario("console-dist-");
+  const chaves = ajuda.dirTemporario("console-chave-");
+  const instalacao = instalacaoCom("0.0.1");
+  t.after(() => {
+    for (const d of [fonte, saida, chaves, instalacao]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  construir(fonte, saida);
+  const par = gerarChave(chaves);
+  assinar(path.join(saida, "manifesto.json"), par.privada);
+
+  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
+  const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
+  fs.appendFileSync(artefato, "conteudo-extra");
+
+  const amb = ajuda.ambiente({
+    env: { CONSOLE_CHAVE_RELEASE: par.publicaB64, CONSOLE_RAIZ_INSTALACAO: instalacao },
+  });
+  t.after(() => amb.restaurar());
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  const r = await atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    assinatura: path.join(saida, "manifesto.json.sig"),
+    artefato,
+    log: () => {},
+  });
+  assert.equal(r.ok, false);
+  assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nada pode ser instalado com digest divergente");
+  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "o ponteiro não se move");
+});
+
 test("um manifesto adulterado depois de assinado é recusado", async (t) => {
   const saida = ajuda.dirTemporario("console-dist-");
   const chaves = ajuda.dirTemporario("console-chave-");
