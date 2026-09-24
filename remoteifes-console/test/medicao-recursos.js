@@ -31,6 +31,19 @@ const ESTADO_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "console-medicao-"));
 process.env.CONSOLE_ESTADO_DIR = ESTADO_DIR;
 process.env.CONSOLE_SEM_PRIVILEGIO = "1";
 
+/**
+ * Mede um cenário isoladamente. Uma sonda lenta não pode derrubar a medição inteira: um
+ * relatório que morre porque uma leitura passou do prazo não diz nada sobre as outras cinco, e
+ * "não medido, porque X" é informação — um traceback não é.
+ */
+async function cenario(nome, fn) {
+  try {
+    return await fn();
+  } catch (erro) {
+    return { descricao: nome, medido: false, motivo: erro && erro.message ? erro.message : String(erro) };
+  }
+}
+
 function agora() {
   return Number(process.hrtime.bigint() / 1000n) / 1000;
 }
@@ -75,11 +88,11 @@ function medirPartida(args) {
   return Number((agora() - inicio).toFixed(1));
 }
 
-function pedir(porta, caminho, cabecalhos = {}) {
+function pedir(porta, caminho, cabecalhos = {}, { timeoutMs = 30_000 } = {}) {
   return new Promise((resolve, reject) => {
     const inicio = agora();
     const req = http.request(
-      { host: "127.0.0.1", port: porta, path: caminho, method: "GET", headers: { Host: `127.0.0.1:${porta}`, ...cabecalhos }, timeout: 30_000 },
+      { host: "127.0.0.1", port: porta, path: caminho, method: "GET", headers: { Host: `127.0.0.1:${porta}`, ...cabecalhos }, timeout: timeoutMs },
       (res) => {
         let texto = "";
         res.setEncoding("utf8");
@@ -259,23 +272,29 @@ async function medir() {
   };
 
   // 4. Atualização de status.
-  const amostrasPainel = [];
-  for (let i = 0; i < 10; i += 1) {
-    const r = await pedir(porta, "/api/painel", cabecalhosSessao);
-    amostrasPainel.push(r.ms);
-  }
-  amostrasPainel.sort((a, b) => a - b);
-  resultados.cenarios.atualizacaoDeStatus = {
-    descricao: "GET /api/painel (serviço, watchdog, host, backups, versões)",
-    amostras: amostrasPainel.length,
-    medianaMs: Number(amostrasPainel[Math.floor(amostrasPainel.length / 2)].toFixed(1)),
-    piorMs: Number(amostrasPainel.at(-1).toFixed(1)),
-    rssBytes: rssDe(filho.pid),
-  };
+  resultados.cenarios.atualizacaoDeStatus = await cenario(
+    "GET /api/painel (serviço, watchdog, host, backups, versões)",
+    async () => {
+      const amostras = [];
+      for (let i = 0; i < 10; i += 1) {
+        const r = await pedir(porta, "/api/painel", cabecalhosSessao, { timeoutMs: 60_000 });
+        amostras.push(r.ms);
+      }
+      amostras.sort((a, b) => a - b);
+      return {
+        descricao: "GET /api/painel (serviço, watchdog, host, backups, versões)",
+        amostras: amostras.length,
+        medianaMs: Number(amostras[Math.floor(amostras.length / 2)].toFixed(1)),
+        piorMs: Number(amostras.at(-1).toFixed(1)),
+        rssBytes: rssDe(filho.pid),
+      };
+    }
+  );
 
   // 5. Leitura de registros.
-  const log = await pedir(porta, "/api/logs?unidade=aplicacao&linhas=200", cabecalhosSessao);
-  resultados.cenarios.leituraDeRegistros = {
+  resultados.cenarios.leituraDeRegistros = await cenario("GET /api/logs com 200 linhas", async () => {
+  const log = await pedir(porta, "/api/logs?unidade=aplicacao&linhas=200", cabecalhosSessao, { timeoutMs: 90_000 });
+  return {
     descricao: "GET /api/logs com 200 linhas",
     ms: Number(log.ms.toFixed(1)),
     bytesResposta: Buffer.byteLength(log.texto),
@@ -287,6 +306,7 @@ async function medir() {
           ? "No Windows a leitura passa por Get-WinEvent num PowerShell novo; o tempo acima é dominado por essa partida."
           : "No macOS a leitura passa por `log show`; o tempo acima é dominado por essa consulta.",
   };
+  });
 
   // 6. Manutenção representativa: um backup do banco, se houver banco.
   const config = require(path.join(RAIZ, "src", "config"));
@@ -345,6 +365,9 @@ async function medir() {
         "socket guardado pelo sistema: se o processo for iniciado à mão e ninguém o fechar, ele não sai sozinho."
       : null,
     "Nenhuma medição foi feita contra dispositivos ESP32 reais nem contra dados de produção.",
+    ...Object.entries(resultados.cenarios)
+      .filter(([, c]) => c.medido === false)
+      .map(([nome, c]) => `Cenário "${nome}" NÃO foi medido neste host: ${c.motivo}.`),
   ].filter(Boolean);
 
   return resultados;
