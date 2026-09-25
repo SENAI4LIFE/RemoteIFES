@@ -217,21 +217,21 @@ test("layouts: single column on phones, balanced grid on desktop, no horizontal 
     await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome]);
     await esperarGraficos(page);
     const medidas = await medirFiguras(page);
-    expect(await semRolagemHorizontal(page), `rolagem horizontal em ${nome}`).toBe(true);
+    expect(await semRolagemHorizontal(page), `horizontal scroll at ${nome}`).toBe(true);
     expect(medidas.figuras.length).toBe(FIGURAS_HISTORICO.length + FIGURAS_ATUAIS.length);
     for (const f of medidas.figuras) {
-      expect(f.right, `${f.id} dentro do bloco em ${nome}`).toBeLessThanOrEqual(medidas.blocoRight + 2);
-      expect(f.svgRight, `svg de ${f.id} dentro da figura em ${nome}`).toBeLessThanOrEqual(f.right + 1);
+      expect(f.right, `${f.id} inside the block at ${nome}`).toBeLessThanOrEqual(medidas.blocoRight + 2);
+      expect(f.svgRight, `svg of ${f.id} inside the figure at ${nome}`).toBeLessThanOrEqual(f.right + 1);
       expect(f.svgWidth, `svg de ${f.id} ocupa a largura em ${nome}`).toBeGreaterThan(f.width * 0.6);
-      expect(f.cortados, `texto cortado em ${f.id} (${nome})`).toBe(0);
-      expect(f.legendaDentro, `legenda de ${f.id} dentro da figura em ${nome}`).toBe(true);
+      expect(f.cortados, `clipped text in ${f.id} (${nome})`).toBe(0);
+      expect(f.legendaDentro, `legend of ${f.id} inside the figure at ${nome}`).toBe(true);
     }
     const esquerdas = new Set(medidas.figuras.filter((f) => !f.largo).map((f) => f.left));
     if (VIEWPORTS[nome].width <= 414) {
       expect(esquerdas.size, `single column at ${nome}`).toBe(1);
       expect(medidas.figuras[0].width, `figure takes the usable width at ${nome}`).toBeGreaterThan(VIEWPORTS[nome].width * 0.7);
     } else if (VIEWPORTS[nome].width >= 1366) {
-      expect(esquerdas.size, `duas ou mais colunas em ${nome}`).toBeGreaterThanOrEqual(2);
+      expect(esquerdas.size, `two or more columns at ${nome}`).toBeGreaterThanOrEqual(2);
       const largos = medidas.figuras.filter((f) => f.largo);
       expect(largos.length).toBe(2);
       for (const l of largos) expect(l.width, `${l.id} ocupa a largura total em ${nome}`).toBeGreaterThan(medidas.figuras.find((f) => !f.largo).width * 1.8);
@@ -244,12 +244,12 @@ test("with maximum accessibility font the charts stay legible, without clipping 
     await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome], { ...A11Y_MAXIMA, remoteifes_font_type: tipoFonte });
     await esperarGraficos(page);
     const medidas = await medirFiguras(page);
-    expect(await semRolagemHorizontal(page), `rolagem horizontal em ${nome}`).toBe(true);
+    expect(await semRolagemHorizontal(page), `horizontal scroll at ${nome}`).toBe(true);
     for (const f of medidas.figuras) {
-      expect(f.right, `${f.id} dentro do bloco em ${nome}`).toBeLessThanOrEqual(medidas.blocoRight + 2);
-      expect(f.cortados, `texto cortado em ${f.id} (${nome}, fonte ${tipoFonte})`).toBe(0);
+      expect(f.right, `${f.id} inside the block at ${nome}`).toBeLessThanOrEqual(medidas.blocoRight + 2);
+      expect(f.cortados, `clipped text in ${f.id} (${nome}, font ${tipoFonte})`).toBe(0);
       expect(f.fonteTick, `enlarged axis labels in ${f.id}`).toBeGreaterThanOrEqual(20);
-      expect(f.legendaDentro, `legenda de ${f.id} dentro da figura em ${nome}`).toBe(true);
+      expect(f.legendaDentro, `legend of ${f.id} inside the figure at ${nome}`).toBe(true);
     }
     const colunas = await page.evaluate(() => {
       const el = document.getElementById("grEventos");
@@ -260,7 +260,7 @@ test("with maximum accessibility font the charts stay legible, without clipping 
     expect(colunas.barras).toBeGreaterThan(0);
     expect(colunas.dentro, `columns inside the chart at ${nome}`).toBe(true);
     expect(colunas.minLargura).toBeGreaterThanOrEqual(1);
-    if (VIEWPORTS[nome].width <= 414) expect(colunas.agrupamento, "intervalos agrupados no celular").toBeGreaterThan(1);
+    if (VIEWPORTS[nome].width <= 414) expect(colunas.agrupamento, "grouped intervals on the phone").toBeGreaterThan(1);
     const controles = await page.locator("#monGraficosBloco .gr-faixa").evaluateAll((btns) => btns.map((b) => b.getBoundingClientRect().height));
     for (const h of controles) expect(h).toBeGreaterThanOrEqual(44);
   }
@@ -448,6 +448,6 @@ test("changing letter spacing or font family redraws chart geometry without chan
 
   await expect(page.locator("#monGraficosBloco .gr-faixa[data-faixa='24h']")).toHaveAttribute("aria-pressed", "true");
   const medidas = await medirFiguras(page);
-  for (const f of medidas.figuras) expect(f.cortados, `texto cortado em ${f.id}`).toBe(0);
+  for (const f of medidas.figuras) expect(f.cortados, `clipped text in ${f.id}`).toBe(0);
   expect(await semRolagemHorizontal(page)).toBe(true);
 });

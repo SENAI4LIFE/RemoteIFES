@@ -23,7 +23,7 @@ function bloco(nome) {
     if (ino[i] === "}") nivel -= 1;
     if (nivel === 0) return ino.slice(inicio, i + 1);
   }
-  throw new Error(`bloco de ${nome} não fechado`);
+  throw new Error(`${nome} block not closed`);
 }
 
 test("the reference hardware GPIOs are the validated ones: receiver 15, emitter 4, switch 26 and buzzer 27", () => {
@@ -40,7 +40,7 @@ test("the reference hardware GPIOs are the validated ones: receiver 15, emitter 
 
 test("the firmware version advanced from 4.0.0 and is what the server uses to choose enter_clone", () => {
   const versao = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/);
-  assert.ok(versao, "FW_VERSAO ausente em platformio.ini");
+  assert.ok(versao, "FW_VERSAO missing from platformio.ini");
   assert.equal(compararVersoes(versao[1], "4.0.0"), 1);
   const limiar = rotas.match(/FIRMWARE_COM_MODO_CLONE = "(\d+\.\d+\.\d+)"/);
   assert.ok(limiar);
@@ -91,7 +91,7 @@ test("the failsafe OFF is persisted in NVS, compared before rewriting and transm
   assert.match(ino, /#define CAPTURE_BUFFER_SIZE 1024/);
   const transmitir = bloco("bool transmitirFailsafeSalvo");
   assert.match(transmitir, /sendRawIR\(rawData, length, failsafeCarrierHzSalvo\(\) \/ 1000\)/);
-  assert.match(transmitir, /lerRegistroFailsafe\(cabecalho, rawData, length\)/, "o RAW transmitido sai do registro validado por CRC");
+  assert.match(transmitir, /lerRegistroFailsafe\(cabecalho, rawData, length\)/, "the transmitted RAW comes from the CRC-validated record");
   assert.doesNotMatch(transmitir, /WiFi\.status|estadoWsServidor == WS_ESTADO_CONECTADO \|\|/, "the local failsafe does not depend on the network");
   assert.match(transmitir, /definirFailsafeLatch\(true\)/, "the local OFF stays latched until an explicit command");
   assert.match(ino, /doc\["tipo"\] = "failsafe_status"/);

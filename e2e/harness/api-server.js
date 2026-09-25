@@ -344,7 +344,7 @@ server.listen(PORT, "127.0.0.1", () => {
     sala: SALA_COM_DISPOSITIVO,
     mac: MAC_DISPOSITIVO,
   });
-  console.log(`[e2e-api] pronto em http://127.0.0.1:${PORT} (db ${process.env.REMOTEIFES_DB_PATH})`);
+  console.log(`[e2e-api] ready at http://127.0.0.1:${PORT} (db ${process.env.REMOTEIFES_DB_PATH})`);
 });
 
 function encerrar() {

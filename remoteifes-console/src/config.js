@@ -191,7 +191,7 @@ const config = {
   // Privileged helper. Fixed path; never taken from a request.
   AUXILIAR: process.env.CONSOLE_AUXILIAR || "/usr/local/lib/remoteifes/console-helper.sh",
   SUDO: process.env.CONSOLE_SUDO || "sudo",
-  // Desliga o uso de sudo/auxiliar (desenvolvimento e teste).
+  // Disables sudo/helper use (development and tests).
   SEM_PRIVILEGIO: booleano(process.env.CONSOLE_SEM_PRIVILEGIO, process.platform !== "linux"),
 
   inteiro,
@@ -201,7 +201,7 @@ const config = {
   urlDaAplicacao,
 };
 
-// Caminhos derivados do estado.
+// Paths derived from the state directory.
 config.ARQUIVO_OPERADORES = path.join(DIR_ESTADO, "operadores.json");
 config.ARQUIVO_SESSOES = path.join(DIR_ESTADO, "sessoes.json");
 config.ARQUIVO_TRABALHOS = path.join(DIR_ESTADO, "trabalhos.json");

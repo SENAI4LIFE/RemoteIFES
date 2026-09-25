@@ -636,7 +636,7 @@ function validarArgumentos(acao, brutos) {
   return saida;
 }
 
-// --- API do registro --------------------------------------------------------------------------
+// --- Registry API --------------------------------------------------------------------------
 
 function listar() {
   return ACOES.map((a) => ({

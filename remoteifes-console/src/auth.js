@@ -58,7 +58,7 @@ function validarForcaDaSenha(senha) {
   return null;
 }
 
-// --- Operadores -------------------------------------------------------------------------
+// --- Operators -------------------------------------------------------------------------
 
 function lerOperadores() {
   const dados = estado.lerJson(config.ARQUIVO_OPERADORES, { operadores: [] });

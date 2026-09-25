@@ -383,7 +383,7 @@ async function main() {
     );
   }
 
-  // --- Atalhos ---------------------------------------------------------------------------------
+  // --- Shortcuts ---------------------------------------------------------------------------------
   log("== Removendo atalhos");
   let removeuAtalho = false;
   const atalhos = plataforma.diretoriosPadrao({ escopo: "usuario" }).atalhos;
@@ -399,7 +399,7 @@ async function main() {
   }
   if (!removeuAtalho) log("   nenhum atalho encontrado.");
 
-  // --- Programa ---------------------------------------------------------------------------------
+  // --- Program ---------------------------------------------------------------------------------
   log("== Removendo o programa");
   if (autorizacao.ausente) {
     log(`   nada a remover: ${autorizacao.motivo}`);
@@ -413,7 +413,7 @@ async function main() {
     })();
     if (versoes.length) log(`   versões instaladas: ${versoes.join(", ")}`);
 
-    // No macOS, remover a raiz (Contents/Resources) deixaria um bundle quebrado em Aplicativos.
+    // On macOS, removing the root (Contents/Resources) would leave a broken bundle in Applications.
     const bundle = plataforma.nome === "macos" && plataforma.bundleDaRaiz ? plataforma.bundleDaRaiz(raiz) : null;
     if (bundle) {
       const autBundle = autorizarRemocao(bundle, { marcas: [path.join("Contents", "Info.plist")], rotulo: "bundle do console" });
@@ -424,7 +424,7 @@ async function main() {
     }
   }
 
-  // --- Estado ------------------------------------------------------------------------------------
+  // --- State ------------------------------------------------------------------------------------
   log("== Estado (operadores, auditoria, saídas de trabalhos)");
   if (!temFlag("apagar-estado")) {
     log(`   preservado em ${dirEstado}`);

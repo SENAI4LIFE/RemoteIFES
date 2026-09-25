@@ -124,7 +124,7 @@ function shellPadrao() {
   return process.env.SHELL && /^\/[\w./-]+$/.test(process.env.SHELL) ? process.env.SHELL : "/bin/bash";
 }
 
-// --- Buffer circular de rolagem ----------------------------------------------------------------
+// --- Scrollback ring buffer ----------------------------------------------------------------
 
 class Rolagem {
   constructor(limite) {
@@ -342,7 +342,7 @@ function listar(operador) {
     }));
 }
 
-// --- Rotas -------------------------------------------------------------------------------------
+// --- Routes -------------------------------------------------------------------------------------
 
 async function rotear({ req, res, caminho, metodo, params, sessao, lerCorpo, responderJson, responderErro, exigirElevacao }) {
   if (caminho === "/api/terminal" && metodo === "GET") {

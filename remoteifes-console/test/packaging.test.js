@@ -171,7 +171,7 @@ test("the tar is well formed for ANY reader, not only our extractor", (t) => {
     posicao += 512 + Math.ceil(tamanho / 512) * 512;
   }
 
-  assert.ok(membros.length > 40, "o payload tem o programa inteiro");
+  assert.ok(membros.length > 40, "the payload has the whole program");
   for (const m of membros) {
     assert.ok(m.tipo === "0" || m.tipo === "5", `${m.nome} has typeflag ${JSON.stringify(m.tipo)}; only file (0) and directory (5) are emitted`);
     assert.equal(m.ustar, "ustar", `${m.nome} does not declare the ustar format`);
@@ -196,9 +196,9 @@ test("the tar is well formed for ANY reader, not only our extractor", (t) => {
 
   // The executable bit comes from the shebang; no setuid/setgid comes out of here.
   const runner = membros.find((m) => m.nome === "bin/backup.js");
-  assert.ok(runner, "os runners viajam no payload");
+  assert.ok(runner, "the runners travel in the payload");
   assert.equal(runner.modo, 0o755, "a runner with a shebang must be executable");
-  assert.ok(membros.every((m) => (m.modo & 0o6000) === 0), "nenhum membro pode carregar setuid/setgid");
+  assert.ok(membros.every((m) => (m.modo & 0o6000) === 0), "no member may carry setuid/setgid");
 });
 
 test("complete chain: build, sign, publish and actually update", async (t) => {
@@ -268,7 +268,7 @@ test("offline import actually installs, without any network", async (t) => {
   const par = gerarChave(chaves);
   assinar(path.join(saida, "manifesto.json"), par.privada);
 
-  // Nenhuma base de release configurada: qualquer tentativa de rede falharia.
+  // No release base configured: any network attempt would fail.
   const amb = ajuda.ambiente({
     env: { CONSOLE_CHAVE_RELEASE: par.publicaB64, CONSOLE_RAIZ_INSTALACAO: instalacao, CONSOLE_RELEASE_BASE: undefined },
   });
@@ -505,7 +505,7 @@ test("the .deb is assembled in the ar format dpkg understands", (t) => {
   }
 });
 
-// --- Credencial em redirecionamento -----------------------------------------------------------
+// --- Credential on redirect -----------------------------------------------------------
 
 /**
  * HTTP server that records the headers of every request received.
@@ -573,7 +573,7 @@ test("the GitHub token does not follow a redirect to another host", async (t) =>
   assert.equal(r.ok, true, r.erro);
 
   const daApi = api.recebidas.filter((x) => x.url.includes("/artifacts"));
-  assert.ok(daApi.length >= 2, `esperava listagem + download na API; recebi ${JSON.stringify(api.recebidas)}`);
+  assert.ok(daApi.length >= 2, `expected listing + download from the API; got ${JSON.stringify(api.recebidas)}`);
   assert.ok(
     daApi.every((x) => /^Bearer /.test(x.autorizacao || "")),
     "the API host must receive the credential on every call"

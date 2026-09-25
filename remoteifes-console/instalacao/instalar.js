@@ -118,7 +118,7 @@ async function main() {
   // --- Migration from the previous Linux layout (atual/anterior) ----------------------------
   const migrado = migrarLayoutAntigo(raiz, log);
 
-  // --- Payload lado a lado ------------------------------------------------------------------
+  // --- Side-by-side payload ------------------------------------------------------------------
   const destinoVersao = path.join(raiz, "versoes", versao);
   log(`== Instalando o payload em versoes/${versao}`);
   // Reinstalling over itself is the documented repair command: it runs
@@ -210,7 +210,7 @@ async function main() {
     )}\n`
   );
 
-  // --- Estado -------------------------------------------------------------------------------
+  // --- State -------------------------------------------------------------------------------
   log("== Preparando o diretório de estado");
   fs.mkdirSync(dirEstado, { recursive: true });
   fs.mkdirSync(path.join(dirEstado, "saidas"), { recursive: true });
@@ -236,7 +236,7 @@ async function main() {
     }
   }
 
-  // --- Primeiro operador ---------------------------------------------------------------------
+  // --- First operator ---------------------------------------------------------------------
   const arquivoOperadores = path.join(dirEstado, "operadores.json");
   const jaTemOperador = (() => {
     try {
@@ -261,7 +261,7 @@ async function main() {
     ? { pulado: true }
     : await integrarComPlataforma({ plataforma, raiz, dirEstado, dirLogs, escopo: escopoPedido, admin, log });
 
-  // --- Encerramento ----------------------------------------------------------------------------
+  // --- Wrap-up ----------------------------------------------------------------------------
   log("");
   log("  Instalação concluída.");
   log("");

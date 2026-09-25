@@ -187,7 +187,7 @@ function versaoEmExecucao() {
   }
 }
 
-// --- Descoberta ------------------------------------------------------------------------------
+// --- Discovery ------------------------------------------------------------------------------
 
 function baixar(url, { destino = null, limiteBytes = LIMITE_ARTEFATO, saltos = 0, timeoutMs = 120_000 } = {}) {
   let alvo;

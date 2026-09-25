@@ -247,7 +247,7 @@ function calcular(metricaPedida, periodoPedido) {
   const janelaConectividadeSegundos = horasEfetivas * 3600;
 
   const salas = salasBase();
-  // As duas consultas de conectividade servem tanto ao valor quanto ao detalhe do tooltip.
+  // Both connectivity queries serve the value and the tooltip detail.
   const precisaConectividade = definicao.exigeDispositivo;
   const offlinePorSala = precisaConectividade ? segundosOfflinePorSala(inicioConectividade, fim) : new Map();
   const quedasPorSala = precisaConectividade

@@ -143,7 +143,7 @@ function espiarBanco({ permitirLeitura = null } = {}) {
 
 async function estadoDoServico() {
   const r = await plataforma.estadoDoServico();
-  // A interface e os testes existentes falam em `suportado`; o adaptador fala em estados.
+  // The UI and the existing tests speak of `suportado`; the adapter speaks of states.
   return { ...r, suportado: r.disponivel, motivo: r.motivo };
 }
 
@@ -315,7 +315,7 @@ function versoesDeclaradas() {
   };
 }
 
-// --- Painel --------------------------------------------------------------------------------
+// --- Dashboard --------------------------------------------------------------------------------
 
 async function painel({ completo = false } = {}) {
   const [saude, servico, watchdog, host] = await Promise.all([

@@ -90,7 +90,7 @@ test("semantic tones paint the glyph with contrast, in normal and high-contrast 
       expect(problemas, `${rota} (alto contraste: ${contraste})`).toEqual([]);
       Object.keys(tons).forEach((t) => vistos.add(t));
       const distintas = new Set(Object.values(tons));
-      expect(distintas.size, `${rota} usa mais de um tom`).toBeGreaterThan(1);
+      expect(distintas.size, `${rota} uses more than one tone`).toBeGreaterThan(1);
     }
   }
 
@@ -109,7 +109,7 @@ test("public screen: icon tones survive high contrast on light surfaces", async 
 
   await appPage.locator('.portal-option[data-tipo="normal"]').click();
   await expect(appPage.locator("#screen-login")).toBeVisible();
-  expect((await auditarTons(appPage)).problemas, "login em alto contraste").toEqual([]);
+  expect((await auditarTons(appPage)).problemas, "login in high contrast").toEqual([]);
 });
 
 test("the top bar and status chips stay outside the tone system", async ({ page, context }) => {

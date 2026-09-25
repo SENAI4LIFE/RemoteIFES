@@ -265,7 +265,7 @@ test("the HTTP heartbeat authenticates by credential and the secret never appear
     Object.assign(logger, originais);
   }
   assert.ok(capturado.length > 0);
-  assert.ok(capturado.every((linha) => !linha.includes(segredo)), "nenhuma linha de log pode conter o segredo");
+  assert.ok(capturado.every((linha) => !linha.includes(segredo)), "no log line may contain the secret");
 });
 
 test("provisioning pushes the credential to a device already connected by MAC", async () => {
