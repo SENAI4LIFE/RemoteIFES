@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
-const { execFileSync, spawn } = require("child_process");
+const { execFileSync, spawn, spawnSync } = require("child_process");
 
 /**
  * Runs a Console runner without blocking the event loop. `execFileSync` would freeze the test
@@ -363,6 +363,65 @@ test("restore requires quiescence: with the application running it installs noth
   assert.ok(!/Instalando o backup/.test(saida), "nothing may be installed without proven quiescence");
   assert.deepEqual(fs.readFileSync(banco), antes, "the current database must not be touched when quiescence fails");
   assert.ok(!fs.existsSync(`${banco}.incoming-`), "no intermediate file may remain");
+});
+
+test("no RemoteIFES process can open the database while the restore swaps it", async (t) => {
+  // No application answers: on this platform the lifecycle is not controllable, so the restore
+  // proceeds after proving quiescence. The checkout's backupService is wrapped so that, at the very
+  // moment of the swap, a RemoteIFES process tries to open the database, as a server started by hand
+  // or by a terminal script would.
+  const checkout = checkoutComDados({ porta: 8199 });
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  const servidor = path.join(checkout, "remoteifes-server");
+  const origem = path.join(ajuda.RAIZ, "..", "remoteifes-server");
+  for (const relativo of [["src", "config", "database.js"], ["src", "config", "restauracao.js"]]) {
+    fs.copyFileSync(path.join(origem, ...relativo), path.join(servidor, ...relativo));
+  }
+  const servicos = path.join(servidor, "src", "services");
+  fs.renameSync(path.join(servicos, "backupService.js"), path.join(servicos, "backupService.real.js"));
+  const relatorio = path.join(checkout, "tentativa.json");
+  fs.writeFileSync(
+    path.join(servicos, "backupService.js"),
+    `const real = require("./backupService.real");
+     const { spawnSync } = require("child_process");
+     module.exports = {
+       ...real,
+       restaurarBackup(...args) {
+         const r = spawnSync(process.execPath, ["-e", "require('./src/config/database')"], {
+           cwd: ${JSON.stringify(servidor)},
+           encoding: "utf8",
+         });
+         require("fs").writeFileSync(${JSON.stringify(relatorio)}, JSON.stringify({ status: r.status, stderr: r.stderr }));
+         return real.restaurarBackup(...args);
+       },
+     };`
+  );
+
+  const dados = path.join(servidor, "data");
+  const banco = path.join(dados, "remoteifes.db");
+  criarBancoDeTeste(banco, { usuarios: 2 });
+  criarBancoDeTeste(path.join(dados, "backups", "remoteifes-20260101-010101-abcdef.db"), { usuarios: 1 });
+
+  const { codigo, saida } = await rodarRunner("restaurar.js", ["remoteifes-20260101-010101-abcdef.db"], {
+    CONSOLE_CHECKOUT_DIR: checkout,
+    CONSOLE_ESTADO_DIR: amb.estadoDir,
+    CONSOLE_SEM_PRIVILEGIO: "1",
+  });
+  assert.equal(codigo, 0, saida);
+  assert.match(saida, /Instalando o backup/);
+
+  const tentativa = JSON.parse(fs.readFileSync(relatorio, "utf8"));
+  assert.notEqual(tentativa.status, 0, "a server starting during the swap must refuse to open the database");
+  assert.match(tentativa.stderr, /restauração do banco em andamento/);
+
+  assert.ok(!fs.existsSync(`${banco}.restauracao`), "the marker is removed when the swap ends");
+  const depois = spawnSync(process.execPath, ["-e", "require('./src/config/database')"], { cwd: servidor, encoding: "utf8" });
+  assert.equal(depois.status, 0, `after the restore the application opens the database again: ${depois.stderr}`);
 });
 
 test("observing the database neither creates nor changes files in the data directory", (t) => {
