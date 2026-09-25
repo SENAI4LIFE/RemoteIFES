@@ -24,6 +24,17 @@ function hash(segredo) {
   return crypto.createHash("sha256").update(String(segredo)).digest("hex");
 }
 
+// Key a board uses to authenticate itself through a mesh gateway (src/services/meshService.js). It
+// is derived from the board's own secret, so the gateway that relays the traffic never holds it; the
+// server keeps it because a challenge-response needs the key, not just a hash of the secret. A
+// credential created before mesh support gets its key the next time the board connects directly
+// with its current secret.
+const ROTULO_CHAVE_MESH = "remoteifes-mesh-v1";
+
+function chaveMeshDe(segredo) {
+  return crypto.createHmac("sha256", String(segredo)).update(ROTULO_CHAVE_MESH).digest("hex");
+}
+
 function iguaisConstante(a, b) {
   const ba = Buffer.from(String(a), "utf8");
   const bb = Buffer.from(String(b), "utf8");
@@ -125,11 +136,14 @@ function provisionar(sala) {
   const deviceId = novoDeviceId();
   const segredo = gerarSegredo();
   db.prepare(`
-    INSERT INTO esp_credenciais (sala, deviceId, segredoHash, criadoEm)
-    VALUES (?, ?, ?, datetime('now'))
+    INSERT INTO esp_credenciais (sala, deviceId, segredoHash, chaveMesh, criadoEm)
+    VALUES (?, ?, ?, ?, datetime('now'))
     ON CONFLICT(sala) DO UPDATE SET
       deviceId = excluded.deviceId,
       segredoHash = excluded.segredoHash,
+      chaveMesh = excluded.chaveMesh,
+      chaveMeshAnterior = NULL,
+      chaveMeshPendente = NULL,
       segredoHashAnterior = NULL,
       anteriorExpiraEm = NULL,
       segredoHashPendente = NULL,
@@ -139,7 +153,7 @@ function provisionar(sala) {
       rotacionadoEm = NULL,
       ultimoUsoEm = NULL,
       revogadoEm = NULL
-  `).run(sala, deviceId, hash(segredo));
+  `).run(sala, deviceId, hash(segredo), chaveMeshDe(segredo));
   limparPendente(sala);
   limparAtivado(sala);
   logger.info("credencial-provisionada", { sala, deviceId });
@@ -156,10 +170,11 @@ function rotacionar(sala) {
   db.prepare(`
     UPDATE esp_credenciais SET
       segredoHashPendente = ?,
+      chaveMeshPendente = ?,
       pendenteCriadoEm = datetime('now'),
       pendenteEntregueEm = NULL
     WHERE sala = ?
-  `).run(hash(segredo), sala);
+  `).run(hash(segredo), chaveMeshDe(segredo), sala);
   segredosPendentesEmMemoria.set(sala, { deviceId: linha.deviceId, segredo });
   logger.info("credencial-rotacao-pendente", { sala, deviceId: linha.deviceId });
   const enviadoAoDispositivo = entregarPendente(sala);
@@ -171,8 +186,11 @@ function ativarPendente(linha) {
   db.prepare(`
     UPDATE esp_credenciais SET
       segredoHashAnterior = segredoHash,
+      chaveMeshAnterior = chaveMesh,
       anteriorExpiraEm = ?,
       segredoHash = segredoHashPendente,
+      chaveMesh = chaveMeshPendente,
+      chaveMeshPendente = NULL,
       segredoHashPendente = NULL,
       pendenteCriadoEm = NULL,
       pendenteEntregueEm = NULL,
@@ -197,6 +215,9 @@ function substituir(sala) {
     UPDATE esp_credenciais SET
       deviceId = ?,
       segredoHash = ?,
+      chaveMesh = ?,
+      chaveMeshAnterior = NULL,
+      chaveMeshPendente = NULL,
       segredoHashAnterior = NULL,
       anteriorExpiraEm = NULL,
       segredoHashPendente = NULL,
@@ -207,7 +228,7 @@ function substituir(sala) {
       ultimoUsoEm = NULL,
       revogadoEm = NULL
     WHERE sala = ?
-  `).run(deviceId, hash(segredo), sala);
+  `).run(deviceId, hash(segredo), chaveMeshDe(segredo), sala);
   limparPendente(sala);
   limparAtivado(sala);
   logger.info("credencial-substituida", { sala, deviceId });
@@ -224,7 +245,8 @@ function revogar(sala) {
   if (!linha) throw new Error("esta sala não tem credencial");
   db.prepare(`
     UPDATE esp_credenciais SET revogadoEm = datetime('now'), segredoHashAnterior = NULL, anteriorExpiraEm = NULL,
-      segredoHashPendente = NULL, pendenteCriadoEm = NULL, pendenteEntregueEm = NULL
+      segredoHashPendente = NULL, pendenteCriadoEm = NULL, pendenteEntregueEm = NULL,
+      chaveMesh = NULL, chaveMeshPendente = NULL, chaveMeshAnterior = NULL
     WHERE sala = ?
   `).run(sala);
   limparPendente(sala);
@@ -252,6 +274,13 @@ function verificar(deviceId, segredo) {
     ativarPendente(linha);
     ok = true;
   }
+  // The current secret was presented: its mesh key is derived here when missing (credentials
+  // created before mesh support), so the board can later join through a gateway.
+  if (ok) {
+    const chave = chaveMeshDe(segredo);
+    db.prepare(`UPDATE esp_credenciais SET chaveMesh = ? WHERE deviceId = ? AND segredoHash = ? AND (chaveMesh IS NULL OR chaveMesh <> ?)`)
+      .run(chave, deviceId, alvo, chave);
+  }
   if (!ok && linha.segredoHashAnterior && linha.anteriorExpiraEm) {
     const expiraMs = new Date(linha.anteriorExpiraEm.replace(" ", "T") + "Z").getTime();
     if (Number.isFinite(expiraMs) && expiraMs > Date.now() && iguaisConstante(alvo, linha.segredoHashAnterior)) {
@@ -263,6 +292,34 @@ function verificar(deviceId, segredo) {
   if (!ok) return null;
   db.prepare(`UPDATE esp_credenciais SET ultimoUsoEm = datetime('now') WHERE deviceId = ?`).run(deviceId);
   return { sala: linha.sala, grace, expiraEm };
+}
+
+/**
+ * Mesh keys a board may prove, newest generation first: current, pending (a rotation the board may
+ * already have stored) and previous during its grace period. Null when revoked or unknown.
+ */
+function chavesMeshPara(deviceId) {
+  if (typeof deviceId !== "string" || !RE_DEVICE_ID.test(deviceId)) return null;
+  const linha = db.prepare(`SELECT * FROM esp_credenciais WHERE deviceId = ? AND revogadoEm IS NULL`).get(deviceId);
+  if (!linha) return null;
+  const chaves = [];
+  if (linha.chaveMesh) chaves.push({ geracao: "atual", chave: Buffer.from(linha.chaveMesh, "hex") });
+  if (linha.chaveMeshPendente) chaves.push({ geracao: "pendente", chave: Buffer.from(linha.chaveMeshPendente, "hex") });
+  if (linha.chaveMeshAnterior && linha.anteriorExpiraEm) {
+    const expiraMs = new Date(linha.anteriorExpiraEm.replace(" ", "T") + "Z").getTime();
+    if (Number.isFinite(expiraMs) && expiraMs > Date.now()) chaves.push({ geracao: "anterior", chave: Buffer.from(linha.chaveMeshAnterior, "hex") });
+  }
+  return { sala: linha.sala, deviceId, chaves };
+}
+
+/** A board proved the pending generation through a gateway: same effect as presenting it directly. */
+function ativarPendentePorMesh(deviceId) {
+  const linha = db.prepare(`SELECT * FROM esp_credenciais WHERE deviceId = ? AND revogadoEm IS NULL`).get(deviceId);
+  if (linha && linha.segredoHashPendente) ativarPendente(linha);
+}
+
+function registrarUsoMesh(deviceId) {
+  db.prepare(`UPDATE esp_credenciais SET ultimoUsoEm = datetime('now') WHERE deviceId = ?`).run(deviceId);
 }
 
 function estado(sala) {
@@ -315,6 +372,10 @@ function resumoMigracao() {
 }
 
 module.exports = {
+  chaveMeshDe,
+  chavesMeshPara,
+  ativarPendentePorMesh,
+  registrarUsoMesh,
   provisionar,
   rotacionar,
   entregarPendente,
