@@ -192,7 +192,9 @@ Section "Console" SecConsole
   SetOutPath "$PLUGINSDIR\pacote"
   SetDetailsPrint textonly
   DetailPrint "Preparando os arquivos do console..."
-  File /r "${PAYLOAD}\*.*"
+  ; `\*` and not `\*.*`: a payload file without an extension would be silently left out of the
+  ; installer, and the operator would only find out when the installed program failed to load.
+  File /r "${PAYLOAD}\*"
   SetDetailsPrint both
 
   StrCpy $R0 '"$Node" "$PLUGINSDIR\pacote\instalacao\instalar.js" --escopo usuario --raiz "$INSTDIR"'
