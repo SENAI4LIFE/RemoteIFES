@@ -219,7 +219,14 @@ function montarDeb(saida) {
   //
   // The package owns only the stable layer and the first version. Later updates go to `versoes/`
   // without touching files registered by dpkg, so the package manager never becomes inconsistent
-  // because of a self-update.
+  // because of a self-update. The version pointer (estado-instalacao.json) is not a package file:
+  // the updater rewrites it, so the postinst creates it through the installer instead.
+  //
+  // Maintainer scripts delegate to the same installer and uninstaller used for manual
+  // installation (`--pacote` mode), so there is one verified provisioning path:
+  //   postinst configure  -> instalar.js --pacote (state, setup secret, units, helper, sudo rule)
+  //   prerm remove        -> desinstalar.js --pacote (integration, running Console, non-package files)
+  //   postrm purge        -> the Console state and logs
   const raizPacote = "opt/remoteifes-console";
 
   const atalho = [
@@ -248,10 +255,6 @@ function montarDeb(saida) {
           '#!/usr/bin/env node\nprocess.env.CONSOLE_BOOTSTRAP_ALVO = "launcher";\nrequire(require("path").join(__dirname, "console-bootstrap.js"));\n',
         modo: 0o755,
       },
-      {
-        nome: `${raizPacote}/estado-instalacao.json`,
-        conteudo: `${JSON.stringify({ versaoAtiva: VERSAO, versaoAnterior: null, transacao: null, escopo: "sistema" }, null, 2)}\n`,
-      },
       { nome: "usr/share/applications/remoteifes-console.desktop", conteudo: atalho },
     ],
   });
@@ -272,7 +275,58 @@ function montarDeb(saida) {
     "",
   ].join("\n");
 
-  const controlTarGz = montarTarGz(RAIZ, [], { extras: [{ nome: "control", conteudo: controle }] });
+  const payload = `/${raizPacote}/versoes/${VERSAO}`;
+  const postinst = [
+    "#!/bin/sh",
+    "set -e",
+    'if [ "$1" = "configure" ]; then',
+    '  NODE="$(command -v node || true)"',
+    '  if [ -z "$NODE" ]; then',
+    '    echo "remoteifes-console: Node não encontrado no PATH; instale o Node 22.13+ e rode: sudo dpkg-reconfigure remoteifes-console" >&2',
+    "    exit 1",
+    "  fi",
+    `  "$NODE" "${payload}/instalacao/instalar.js" --pacote --raiz "/${raizPacote}"`,
+    "  # An upgrade restarts a running Console into the new active version. Jobs survive: the unit",
+    "  # uses KillMode=process and each job has its own supervisor.",
+    '  if [ -n "$2" ] && [ -d /run/systemd/system ]; then',
+    "    systemctl try-restart remoteifes-console.service >/dev/null 2>&1 || true",
+    "  fi",
+    "fi",
+    "exit 0",
+    "",
+  ].join("\n");
+  const prerm = [
+    "#!/bin/sh",
+    "set -e",
+    'if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then',
+    '  NODE="$(command -v node || true)"',
+    `  if [ -n "$NODE" ] && [ -f "${payload}/instalacao/desinstalar.js" ]; then`,
+    `    "$NODE" "${payload}/instalacao/desinstalar.js" --pacote --sim --raiz "/${raizPacote}"`,
+    "  fi",
+    "fi",
+    "exit 0",
+    "",
+  ].join("\n");
+  const postrm = [
+    "#!/bin/sh",
+    "set -e",
+    'if [ "$1" = "purge" ]; then',
+    "  # Operators, audit and job outputs go only on purge; a plain remove keeps them.",
+    "  rm -rf /var/lib/remoteifes-console /var/log/remoteifes-console /var/cache/remoteifes-console",
+    `  rm -rf "/${raizPacote}"`,
+    "fi",
+    "exit 0",
+    "",
+  ].join("\n");
+
+  const controlTarGz = montarTarGz(RAIZ, [], {
+    extras: [
+      { nome: "control", conteudo: controle },
+      { nome: "postinst", conteudo: postinst, modo: 0o755 },
+      { nome: "prerm", conteudo: prerm, modo: 0o755 },
+      { nome: "postrm", conteudo: postrm, modo: 0o755 },
+    ],
+  });
 
   const membro = (nome, conteudo) => {
     const cab = Buffer.alloc(60, 0x20);

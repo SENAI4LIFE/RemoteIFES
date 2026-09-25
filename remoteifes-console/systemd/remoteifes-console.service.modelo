@@ -47,7 +47,9 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 # Caminhos graváveis, explicitamente: estado do console, dados da aplicação (backup, trava,
 # registro de deploy) e o checkout (deploy.sh troca o código e roda npm ci).
 # __RAIZ_INSTALACAO__ é gravável para que a atualização instale versoes/<nova> e troque o ponteiro.
-ReadWritePaths=__DIR_ESTADO__ __DIR_DADOS__ __CHECKOUT__ __RAIZ_INSTALACAO__
+# O diretório de dados leva "-": ele só existe depois que o RemoteIFES roda pela primeira vez, e um
+# caminho ausente sem "-" impede o serviço de subir (erro de namespace 226).
+ReadWritePaths=__DIR_ESTADO__ -__DIR_DADOS__ __CHECKOUT__ __RAIZ_INSTALACAO__
 
 [Install]
 WantedBy=multi-user.target

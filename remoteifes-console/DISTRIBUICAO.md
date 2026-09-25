@@ -74,7 +74,7 @@ lugar: `src/plataforma/windows.js` isola tudo que dependeria dele.
 
 | Plataforma | Artefato | Construído na CI | Instalação validada na CI |
 |---|---|---|---|
-| Linux (deb) | `remoteifes-console_<versão>_all.deb` | sim | **sim** — `dpkg -i`, layout conferido, `dpkg -r` |
+| Linux (deb) | `remoteifes-console_<versão>_all.deb` | sim | **sim** — `dpkg -i` com provisionamento real (estado, segredo, unidades, auxiliar, regra de sudo, console respondendo pelo socket), `dpkg --verify`, `dpkg -r` e `dpkg -P` |
 | Linux (portátil) | `.tar.gz` + `instalacao/instalar.js` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
 | Windows | `.zip` + `instalar.ps1` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
 | macOS | `.tar.gz` com bundle `.app` + `instalacao/instalar.js` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
@@ -114,9 +114,20 @@ simbólicos, e um layout que dependesse deles seria um layout diferente por sist
 
 Razões:
 
-* o `.deb` instala apenas a camada estável (lançador, unidades, auxiliar) e a **primeira**
-  versão; as seguintes vão para `versoes/` sem sobrescrever arquivos de propriedade do dpkg,
-  então o gerenciador de pacotes nunca fica inconsistente;
+* o `.deb` é dono apenas da camada estável (`console-bootstrap.js`, `launcher-bootstrap.js`), da
+  **primeira** versão em `versoes/` e da entrada de menu; as seguintes vão para `versoes/` sem
+  sobrescrever arquivos de propriedade do dpkg, então o gerenciador de pacotes nunca fica
+  inconsistente (`dpkg --verify` limpo). O ponteiro `estado-instalacao.json` **não** é arquivo do
+  pacote, porque o atualizador o reescreve;
+* os scripts do pacote delegam ao mesmo instalador da instalação manual, em modo `--pacote`: o
+  `postinst` cria o ponteiro (sem nunca voltar para uma versão mais antiga que uma já instalada
+  por autoatualização), o diretório de estado e o segredo de uso único (que **não** é impresso,
+  porque o apt copia a saída para `/var/log/apt/term.log`) e, com o checkout conhecido
+  (`CONSOLE_CHECKOUT_DIR` na instalação, ou já registrado), as unidades, o auxiliar e a regra de
+  sudo, com o serviço rodando como o dono do checkout, nunca root. Sem checkout, ele imprime o
+  único comando que conclui o provisionamento. O `prerm` remove a integração, encerra o console
+  e apaga só o que o dpkg não possui (versões de autoatualização, o ponteiro); o estado sai
+  apenas no `purge`;
 * reverter é trocar o ponteiro, não reinstalar;
 * no Windows, o executável em uso não precisa ser substituído no lugar;
 * a unidade do systemd aponta para `console-bootstrap.js`, **nunca** para uma versão: atualizar

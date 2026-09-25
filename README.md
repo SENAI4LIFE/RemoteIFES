@@ -788,7 +788,28 @@ node instalacao/instalar.js                           # macOS, ou Linux por usu�
 .\instalar.ps1
 ```
 
-No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket`/`.service`. Em qualquer sistema ele cria o atalho de aplicativo e exibe **uma única vez** um segredo de instalação para criar o primeiro operador — que também fica em `bootstrap-token`, no diretório de estado, legível só por quem administra o host. Isso faz a instalação funcionar igual com interface gráfica e por SSH sem terminal interativo.
+No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket`/`.service`. Em qualquer sistema ele cria o atalho de aplicativo e gera um segredo de instalação de uso único, gravado em `bootstrap-token` no diretório de estado, legível só por quem administra o host.
+
+**Pelo pacote `.deb`**, informe o checkout que o console administra na própria instalação; o pacote provisiona estado, segredo, unidades, auxiliar e regra de sudo pelo mesmo instalador, com o serviço rodando como o dono do checkout:
+
+```bash
+sudo CONSOLE_CHECKOUT_DIR=/home/pi/RemoteIFES apt install ./remoteifes-console_<versão>_all.deb
+```
+
+Sem o checkout, a instalação prepara estado e segredo e imprime o único comando que conclui o provisionamento. `apt remove` retira a integração e preserva operadores e auditoria; `apt purge` apaga também o estado.
+
+**Primeiro operador.** Nenhum segredo precisa ser copiado à mão:
+
+- **com interface gráfica**, abra o console pelo atalho do sistema, com a conta que administra o host: o lançador lê o segredo, troca-o por um convite de uso único válido por 10 minutos e abre o navegador direto no formulário de primeiro acesso. O convite chega por uma página privada (arquivo legível só por você), nunca por argumento de processo, e sai da barra de endereço e do histórico antes de ser usado;
+- **sem interface gráfica** (Pi por SSH), crie o operador no próprio host — nome e senha são pedidos no terminal, nunca passados como argumento:
+
+  ```bash
+  sudo node /opt/remoteifes-console/launcher-bootstrap.js --criar-operador
+  ```
+
+- a tela de primeiro acesso ainda aceita o segredo digitado, lido de `bootstrap-token`.
+
+Criado o operador, o segredo e qualquer convite pendente deixam de valer. Reparar ou reinstalar preserva os operadores existentes. A instalação manual (fora do pacote) ainda exibe o segredo uma vez no terminal.
 
 Para remover: `node instalacao/desinstalar.js --simular` mostra exatamente o que sairia, sem chamar nada que mute; sem `--apagar-estado`, operadores, auditoria e histórico são preservados. A remoção encerra o console em execução antes de apagar o programa — e o que autoriza encerrar é a prova de identidade, não o PID, que é reciclado. Ela recusa qualquer caminho que não prove ser uma instalação do console, e nunca toca no checkout do RemoteIFES. Raiz, estado e escopo são inferidos da instalação, então o comando funciona sem argumentos.
 
@@ -807,7 +828,7 @@ provar que o lançador instalado sobe o **console** — não outra cópia de si 
 
 Antes de abrir o navegador, o lançador **confere a identidade** de quem responde na porta esperada: envia um desafio e exige a resposta HMAC derivada do segredo que só o console em execução conhece. Se outro processo tiver tomado a porta, o navegador não é aberto. Nenhuma credencial reutilizável viaja em URL, argumento de processo ou atalho.
 
-Num host **sem interface gráfica** — o caso normal de um Raspberry Pi — não há navegador para abrir, e nada disso é necessário: o socket do systemd já sobe o console na primeira conexão, então basta o túnel SSH acima. O segredo de instalação do primeiro operador é impresso pelo instalador **e** gravado em `bootstrap-token` no diretório de estado, justamente para que a instalação por SSH, sem terminal interativo, funcione igual à instalação com interface.
+Num host **sem interface gráfica** — o caso normal de um Raspberry Pi — não há navegador para abrir, e nada disso é necessário: o socket do systemd já sobe o console na primeira conexão, então basta o túnel SSH acima. O primeiro operador é criado no próprio host com `--criar-operador` (veja [Instalar](#instalar)); o segredo de instalação fica em `bootstrap-token` no diretório de estado.
 
 O console escuta apenas em `127.0.0.1`. De outra máquina, use um túnel SSH — o `localhost` do seu computador **não** é o do Pi:
 
