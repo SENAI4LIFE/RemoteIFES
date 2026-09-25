@@ -13,9 +13,10 @@ permissions:
   pages: write
   id-token: write
 
+# A deployment in progress is never cancelled; a newer push waits and then publishes.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -30,6 +31,6 @@ jobs:
         with:
           path: remoteifes-web
           include-hidden-files: true
-      - name: Publicar GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -913,6 +913,7 @@
         return;
       }
       aviso(caixa, "info", "Estados distintos", c.estadosDistintos);
+      if (c.origemMobile) aviso(caixa, "info", "Builds móveis", c.origemMobile);
       [["CI", c.ci], ["Android", c.android], ["iOS", c.ios]].forEach(function (par) {
         var det = el("details");
         det.appendChild(el("summary", par[0] + " — " + par[1].length + " execução(ões)"));

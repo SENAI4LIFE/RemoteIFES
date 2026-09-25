@@ -161,6 +161,9 @@ async function estadoCI() {
     estadosDistintos:
       "Sucesso do workflow, artefato disponível, verificação de produção, publicação e instalação bem-sucedida " +
       "são estados diferentes. Um workflow verde não significa APK publicado.",
+    origemMobile:
+      "Os builds Android e iOS disparados por mudanças no código rodam como jobs dentro do workflow CI. " +
+      "As listas Android e iOS mostram apenas execuções disparadas manualmente desses workflows.",
   };
 }
 
