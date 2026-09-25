@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Version and remote discovery, with the states that actually happen on a Pi: dirty checkout,
 // detached HEAD, ahead, diverged, no remote, unreachable remote and shallow clone. Each must

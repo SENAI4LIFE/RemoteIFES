@@ -14,6 +14,6 @@
     "instalar": "node instalacao/instalar.js",
     "desinstalar": "node instalacao/desinstalar.js",
     "empacotar": "node empacotar/construir.js",
-    "medir": "node test/medicao-recursos.js"
+    "medir": "node test/measure-resources.js"
   }
 }

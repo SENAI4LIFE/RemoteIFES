@@ -5,7 +5,7 @@ const path = require("path");
 const http = require("http");
 const zlib = require("zlib");
 const crypto = require("crypto");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Release updater: trust, transaction and recovery.
 //
