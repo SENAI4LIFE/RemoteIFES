@@ -3,23 +3,26 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 const crypto = require("crypto");
-const { execFileSync } = require("child_process");
+const os = require("os");
+const { execFileSync, spawnSync } = require("child_process");
 
 // Builds the distribution artifacts.
 //
 // Only formats CI can **build and install** on a real machine of the target system are produced.
-// MSI/WiX, NSIS and a signed `.pkg` are deliberately excluded: without signing credentials and a
-// validation environment they would ship an untested installer.
+// MSI/WiX and a signed `.pkg` remain excluded: without signing credentials and a validation
+// environment they would ship an untested installer. The NSIS `.exe` is built because CI installs
+// and removes it on a real Windows runner; it is unsigned, and the provenance file says so.
 //
 //   payload .tar.gz   consumed by the release updater on every platform
 //   .deb              Linux with dpkg (CI installs and verifies)
-//   .zip              Windows (CI installs with instalar.ps1 and verifies)
+//   .zip              Windows, portable/headless (CI installs with instalar.ps1 and verifies)
+//   .exe              Windows, normal installer (needs makensis; CI installs and removes it)
 //
 // The `tar` is assembled here without the system binary: Windows has no GNU tar and the header
 // layout must match the updater's extractor exactly.
 //
 // Usage:
-//   node empacotar/construir.js [--saida <dir>] [--alvo <so-arch>] [--formato payload|deb|zip|todos]
+//   node empacotar/construir.js [--saida <dir>] [--alvo <so-arch>] [--formato payload|deb|zip|exe|todos]
 
 const RAIZ = path.join(__dirname, "..");
 const PACOTE = JSON.parse(fs.readFileSync(path.join(RAIZ, "package.json"), "utf8"));
@@ -350,6 +353,95 @@ function montarDeb(saida) {
   return deb.length;
 }
 
+// --- exe (Windows installer) ---------------------------------------------------------------------
+
+/**
+ * Locates `makensis`. MAKENSIS overrides the search, which lets a build machine use a compiler that
+ * is not on PATH. Without it the `.exe` is simply not built, like the `.deb` on a machine that
+ * cannot assemble it.
+ */
+function acharMakensis() {
+  const candidatos = [];
+  if (process.env.MAKENSIS) candidatos.push(process.env.MAKENSIS);
+  candidatos.push(process.platform === "win32" ? "makensis.exe" : "makensis");
+  if (process.platform === "win32") {
+    for (const base of [process.env["ProgramFiles(x86)"], process.env.ProgramFiles]) {
+      if (base) candidatos.push(path.join(base, "NSIS", "makensis.exe"));
+    }
+  }
+  for (const candidato of candidatos) {
+    try {
+      execFileSync(candidato, ["/VERSION"], { stdio: "ignore" });
+      return candidato;
+    } catch {
+      try {
+        // POSIX builds of makensis take -VERSION; the Windows build takes /VERSION.
+        execFileSync(candidato, ["-VERSION"], { stdio: "ignore" });
+        return candidato;
+      } catch {
+        // Not this one.
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Builds the Windows installer. The payload is staged on disk because makensis reads files, and it
+ * is the same tree the `.zip` carries: one installed result, two ways of starting it.
+ */
+function montarExe(saida) {
+  const makensis = acharMakensis();
+  if (!makensis) throw new Error("makensis não encontrado (defina MAKENSIS ou instale o NSIS)");
+
+  const script = path.join(__dirname, "windows", "instalador.nsi");
+  if (!fs.existsSync(script)) throw new Error(`${script} não existe`);
+
+  const estagio = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-console-exe-"));
+  try {
+    const payload = path.join(estagio, "pacote");
+    for (const item of INCLUIR) {
+      const origem = path.join(RAIZ, item);
+      if (!fs.existsSync(origem)) continue;
+      for (const arquivo of listarArquivos(RAIZ, item)) {
+        const destino = path.join(payload, arquivo.relativo);
+        fs.mkdirSync(path.dirname(destino), { recursive: true });
+        fs.copyFileSync(arquivo.completo, destino);
+      }
+    }
+    // NSIS resolves relative includes against the script, so the switches carry absolute paths.
+    const args = [
+      "-NOCD",
+      "-INPUTCHARSET", "UTF8",
+      `-DVERSAO=${VERSAO}`,
+      `-DPAYLOAD=${payload}`,
+      `-DSHIM=${path.join(__dirname, "windows", "desinstalar-console.js")}`,
+      `-DSAIDA=${saida}`,
+      script,
+    ];
+    const r = spawnSync(makensis, args, { encoding: "utf8" });
+    if (r.error) throw r.error;
+    if (r.status !== 0) {
+      const detalhe = `${r.stdout || ""}${r.stderr || ""}`.trim().split("\n").slice(-6).join("; ");
+      throw new Error(`makensis falhou (${r.status}): ${detalhe}`);
+    }
+    if (!fs.existsSync(saida)) throw new Error("makensis terminou sem erro mas não escreveu o instalador");
+    // A Windows executable starts with "MZ". Checked here so a broken cross-build fails at build
+    // time instead of on an operator's machine.
+    const cabecalho = Buffer.alloc(2);
+    const fd = fs.openSync(saida, "r");
+    try {
+      fs.readSync(fd, cabecalho, 0, 2, 0);
+    } finally {
+      fs.closeSync(fd);
+    }
+    if (cabecalho.toString("latin1") !== "MZ") throw new Error("o arquivo gerado não é um executável do Windows");
+    return fs.statSync(saida).size;
+  } finally {
+    fs.rmSync(estagio, { recursive: true, force: true });
+  }
+}
+
 // --- Main ----------------------------------------------------------------------------------
 
 function main() {
@@ -377,6 +469,18 @@ function main() {
     fs.writeFileSync(caminhoZip, montarZip(RAIZ, [...INCLUIR, "instalar.ps1"].filter((i) => fs.existsSync(path.join(RAIZ, i)))));
     artefatos.push({ alvo, formato: "zip", arquivo: nomeZip, caminho: caminhoZip });
     log(`  zip: ${nomeZip}`);
+  }
+
+  if (["todos", "exe"].includes(formato) && alvo.startsWith("windows")) {
+    const nomeExe = `remoteifes-console-${VERSAO}-${alvo}-instalador.exe`;
+    const caminhoExe = path.join(saida, nomeExe);
+    try {
+      const bytes = montarExe(caminhoExe);
+      artefatos.push({ alvo, formato: "exe", arquivo: nomeExe, caminho: caminhoExe });
+      log(`  exe: ${nomeExe} (${(bytes / 1024).toFixed(0)} KiB)`);
+    } catch (erro) {
+      log(`  exe: não construído (${erro.message})`);
+    }
   }
 
   if (["todos", "deb"].includes(formato) && alvo.startsWith("linux")) {

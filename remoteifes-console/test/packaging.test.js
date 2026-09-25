@@ -523,6 +523,71 @@ test("the .deb is assembled in the ar format dpkg understands", (t) => {
   assert.ok(!dados["opt/remoteifes-console/estado-instalacao.json"], "the version pointer is rewritten by the updater, so dpkg must not own it");
 });
 
+test("the Windows installer script delegates to the portable installer and asks for no privilege", () => {
+  const nsi = fs.readFileSync(path.join(ajuda.RAIZ, "empacotar", "windows", "instalador.nsi"), "utf8");
+
+  // A per-user installation must not ask for elevation: the scheduled task that opens the Console on
+  // logon is registered for the user, and the destination is under %LOCALAPPDATA%.
+  assert.match(nsi, /^RequestExecutionLevel user$/m);
+  assert.match(nsi, /InstallDir "\$LOCALAPPDATA\\Programs\\RemoteIFES Console"/);
+
+  // The destination chosen here is handed to the portable installer, so there is one answer to
+  // where the program goes, and one implementation of how it gets there.
+  assert.match(nsi, /instalacao\\instalar\.js" --escopo usuario --raiz "\$INSTDIR"/);
+  assert.ok(!/--escopo sistema/.test(nsi), "a machine-wide install is a separate elevated path");
+
+  // Removal goes through the Console's own uninstaller, which refuses a directory that does not
+  // prove to be an installation. The installer never deletes a tree by itself.
+  assert.match(nsi, /desinstalar-console\.js" --sim --raiz "\$INSTDIR"/);
+  assert.ok(!/RMDir \/r/.test(nsi), "no recursive removal outside the Console's own uninstaller");
+
+  // Programs and Features entry, and the no-console-window launcher for both shortcuts.
+  for (const chave of ["DisplayName", "DisplayVersion", "UninstallString", "QuietUninstallString", "InstallLocation"]) {
+    assert.ok(nsi.includes(`"${chave}"`), `uninstall entry missing ${chave}`);
+  }
+  assert.match(nsi, /wscript\.exe/, "the shortcuts open the Console without a console window");
+  assert.match(nsi, /MUI_LANGUAGE "PortugueseBR"/);
+});
+
+test("the Windows installer executable is built as a real Windows program", (t) => {
+  let makensis = null;
+  for (const candidato of [process.env.MAKENSIS, "makensis"].filter(Boolean)) {
+    try {
+      execFileSync(candidato, ["-VERSION"], { stdio: "ignore" });
+      makensis = candidato;
+      break;
+    } catch {
+      // Not available here.
+    }
+  }
+  if (!makensis) {
+    // The CI job that installs and removes the executable runs on a Windows runner, where NSIS is
+    // provisioned; this check only adds the cross-build on a machine that can compile it.
+    t.skip("makensis não disponível nesta máquina");
+    return;
+  }
+
+  const saida = ajuda.dirTemporario("console-exe-");
+  t.after(() => fs.rmSync(saida, { recursive: true, force: true }));
+  construir(ajuda.RAIZ, saida, ["--alvo", "windows-x64", "--formato", "exe"]);
+
+  const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
+  const exe = path.join(saida, `remoteifes-console-${versao}-windows-x64-instalador.exe`);
+  assert.ok(fs.existsSync(exe), "o instalador .exe não foi construído");
+  const conteudo = fs.readFileSync(exe);
+  assert.equal(conteudo.subarray(0, 2).toString("latin1"), "MZ", "must be a Windows executable");
+  assert.ok(conteudo.includes(Buffer.from("Nullsoft")), "must be the NSIS installer");
+  // The payload travels inside the installer: an executable without it would install nothing.
+  assert.ok(conteudo.length > 150 * 1024, `instalador pequeno demais (${conteudo.length} bytes)`);
+
+  const proveniencia = JSON.parse(fs.readFileSync(path.join(saida, "proveniencia.json"), "utf8"));
+  assert.equal(proveniencia.assinado, false, "there is no code-signing credential; provenance must say so");
+  assert.ok(
+    proveniencia.artefatos.some((a) => a.formato === "exe" && a.arquivo === path.basename(exe)),
+    "o .exe deve constar na procedência"
+  );
+});
+
 function membrosAr(buffer) {
   const membros = {};
   let pos = 8;

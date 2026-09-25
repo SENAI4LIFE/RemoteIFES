@@ -152,6 +152,22 @@ jobs:
         with:
           node-version: 22
 
+      # makensis builds the Windows installer executable. It is provisioned here instead of being
+      # assumed: when the runner image stops shipping NSIS the job must fail loudly, not silently
+      # produce a package without the installer.
+      - name: Provision NSIS (Windows installer)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $padrao = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Get-Command makensis.exe -ErrorAction SilentlyContinue) -and -not (Test-Path $padrao)) {
+            choco install nsis -y --no-progress
+          }
+          if (Get-Command makensis.exe -ErrorAction SilentlyContinue) { exit 0 }
+          if (-not (Test-Path $padrao)) { throw "makensis not available after provisioning" }
+          "MAKENSIS=$padrao" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       # Building uses no credential: no secret is exposed here and the manifest is unsigned on
       # purpose. Signing is a separate step with the publishing key and never runs from
       # pull request code.
@@ -339,6 +355,65 @@ jobs:
           test ! -e "$RUNNER_TEMP/programa/console-bootstrap.js"
           test -f "$RUNNER_TEMP/estado/bootstrap-token"
 
+      # The .exe is the normal Windows experience: a double-clickable installer, an entry in
+      # Programs and Features and shortcuts that open the Console without a console window. Only a
+      # real Windows runner proves it installs, registers and removes itself.
+      - name: Install, verify and remove the Windows installer executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $versao = (Get-Content -Raw "$env:GITHUB_WORKSPACE\remoteifes-console\package.json" | ConvertFrom-Json).version
+          $arco = node -p "process.arch"
+          $exe = "$env:RUNNER_TEMP\dist\remoteifes-console-$versao-windows-$arco-instalador.exe"
+          if (-not (Test-Path $exe)) { throw "the Windows installer executable was not built" }
+
+          $raiz = "$env:RUNNER_TEMP\programa-exe"
+          $estado = "$env:APPDATA\RemoteIFES Console"
+          $chave = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RemoteIFESConsole"
+          $menu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Console de Operações RemoteIFES.lnk"
+          $mesa = Join-Path ([Environment]::GetFolderPath("Desktop")) "Console de Operações RemoteIFES.lnk"
+
+          # /S silent, /ATALHO desktop shortcut, /D destination (must be last and unquoted).
+          $p = Start-Process -FilePath $exe -ArgumentList "/S","/ATALHO","/CHECKOUT=$env:GITHUB_WORKSPACE","/D=$raiz" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "the installer exited with $($p.ExitCode)" }
+
+          foreach ($exigido in @("console-bootstrap.js", "launcher-bootstrap.js", "estado-instalacao.json",
+                                 "abrir-console.vbs", "desinstalar.exe", "desinstalar-console.js",
+                                 "versoes\$versao\console.js", "versoes\$versao\launcher.js")) {
+            if (-not (Test-Path (Join-Path $raiz $exigido))) { throw "installation is missing $exigido" }
+          }
+          node "$env:GITHUB_WORKSPACE\remoteifes-console\empacotar\conferir-instalacao.js" $raiz
+          if ($LASTEXITCODE -ne 0) { throw "the installed layout did not check out" }
+          if (-not (Test-Path $menu)) { throw "the Start Menu shortcut was not created" }
+          if (-not (Test-Path $mesa)) { throw "/ATALHO did not create the desktop shortcut" }
+          if (-not (Test-Path (Join-Path $estado "bootstrap-token"))) { throw "the setup secret was not prepared" }
+
+          $registro = Get-ItemProperty -Path $chave
+          if ($registro.DisplayName -ne "Console de Operações RemoteIFES") { throw "wrong DisplayName in Programs and Features" }
+          if ($registro.DisplayVersion -ne $versao) { throw "wrong DisplayVersion in Programs and Features" }
+          if ($registro.InstallLocation -ne $raiz) { throw "wrong InstallLocation in Programs and Features" }
+          if (-not $registro.UninstallString) { throw "no UninstallString in Programs and Features" }
+
+          # The shortcuts target wscript.exe so no console window flashes when the Console opens.
+          $sh = New-Object -ComObject WScript.Shell
+          foreach ($atalho in @($menu, $mesa)) {
+            $alvo = $sh.CreateShortcut($atalho).TargetPath
+            if ($alvo -notmatch "wscript\.exe$") { throw "$atalho opens $alvo instead of wscript.exe" }
+          }
+
+          # `_?=` keeps the uninstaller in place so this step can wait for it; Programs and Features
+          # runs it without that switch, which lets NSIS copy itself out and delete the directory.
+          $u = Start-Process -FilePath "$raiz\desinstalar.exe" -ArgumentList "/S","_?=$raiz" -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "the uninstaller exited with $($u.ExitCode)" }
+          if (Test-Path (Join-Path $raiz "console-bootstrap.js")) { throw "the program was not removed" }
+          if (Test-Path $menu) { throw "the Start Menu shortcut survived the uninstall" }
+          if (Test-Path $mesa) { throw "the desktop shortcut survived the uninstall" }
+          if (Test-Path $chave) { throw "the Programs and Features entry survived the uninstall" }
+          # State survives program removal on purpose: operators, audit and backups are not program files.
+          if (-not (Test-Path (Join-Path $estado "bootstrap-token"))) { throw "the uninstall deleted the state" }
+          Remove-Item -LiteralPath "$raiz\desinstalar.exe" -Force -ErrorAction SilentlyContinue
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
@@ -347,6 +422,7 @@ jobs:
             ${{ runner.temp }}/dist/*.tar.gz
             ${{ runner.temp }}/dist/*.zip
             ${{ runner.temp }}/dist/*.deb
+            ${{ runner.temp }}/dist/*.exe
             ${{ runner.temp }}/dist/manifesto.json
             ${{ runner.temp }}/dist/proveniencia.json
           if-no-files-found: error
