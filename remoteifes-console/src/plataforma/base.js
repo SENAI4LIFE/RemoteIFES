@@ -239,6 +239,15 @@ function encerrarArvore(pid, sinal) {
 }
 
 /**
+ * Starts the Console through the platform's service manager when that manager owns it (macOS
+ * LaunchAgent). Elsewhere the launcher starts the process itself (Windows) or the socket activates
+ * it (Linux with systemd).
+ */
+async function iniciarConsoleGerenciado() {
+  return recurso(ESTADO.NAO_APLICAVEL, "nesta plataforma o lançador inicia o processo do console diretamente");
+}
+
+/**
  * Spawn options so the child gets its own group and survives the Console.
  */
 function opcoesDeGrupo() {
@@ -332,6 +341,7 @@ module.exports = {
   reiniciarHost,
   reiniciarConsole,
   encerrarArvore,
+  iniciarConsoleGerenciado,
   opcoesDeGrupo,
   abrirNavegador,
   protegerArquivo,
