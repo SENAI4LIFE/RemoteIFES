@@ -1308,6 +1308,9 @@ button.btn:disabled {
   /* Only the selector label is enlarged on phones: the button font (and the icon sized from it),
      the group headings and the inner tabs keep their sizes. The row scrolls inside itself. */
   .admin-subtab-label { white-space: nowrap; overflow-wrap: normal; word-break: normal; font-size: calc(14px * var(--a11y-font-scale)); }
+  /* Room for the glyphs: with a font whose ascent plus descent exceeds the line height (Segoe UI
+     at the largest text) the text would otherwise overflow the label box vertically. */
+  .admin-subtabs .admin-subtab-label { padding-block: 0.15em; }
   .admin-content { width: 100%; }
   .admin-subtab-group { display: contents; }
   .admin-group-btn {
