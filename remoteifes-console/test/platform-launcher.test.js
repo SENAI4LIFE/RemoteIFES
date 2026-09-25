@@ -5,7 +5,7 @@ const path = require("path");
 const http = require("http");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Platform adapters, capability model and launcher protection against local phishing.
 

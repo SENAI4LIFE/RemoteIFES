@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Managed execution: path containment, argument validation, maintenance lock shared with the CLI,
 // job lifecycle and outcome reconciliation.

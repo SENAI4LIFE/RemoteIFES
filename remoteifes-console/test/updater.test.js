@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const zlib = require("zlib");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 const { criarAutoridade, confiarEm, sha256 } = require("./support/atestacoes");
 
 // Release updater: trust, transaction and recovery.
@@ -12,7 +12,7 @@ const { criarAutoridade, confiarEm, sha256 } = require("./support/atestacoes");
 // These tests protect the difference between "downloading a file" and "updating an installed
 // program": provenance before writing, correct target, checked digest, extraction that does not
 // escape the destination, atomic swap and no silent downgrade. The attestations come from a
-// private test Sigstore (test/support/atestacoes.js); proveniencia.test.js covers the
+// private test Sigstore (test/support/atestacoes.js); release-provenance.test.js covers the
 // attestation itself.
 
 // --- Support -------------------------------------------------------------------------------

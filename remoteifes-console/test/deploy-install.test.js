@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const { execFileSync, spawn } = require("child_process");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Portable deploy and installation, including the regression for the Console and the script
 // competing for the same lock.

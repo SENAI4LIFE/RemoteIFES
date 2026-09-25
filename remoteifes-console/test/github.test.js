@@ -4,7 +4,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // GitHub integration, exercised against a fake server. The cases that matter are the edges: missing
 // credential, no permission, rate limit, dispatch without an id in the response, ambiguous

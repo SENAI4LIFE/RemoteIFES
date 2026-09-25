@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Complete flow of a managed operation through the API, and the Console's isolation guarantees with
 // respect to the project's public surfaces.

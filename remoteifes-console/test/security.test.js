@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Authentication, authorization, elevation and the Console's transport defenses.
 
