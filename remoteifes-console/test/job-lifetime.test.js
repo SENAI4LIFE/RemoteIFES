@@ -262,3 +262,9 @@ test("the systemd unit stops only the Console process, not the job supervisors",
   const unidade = fs.readFileSync(path.join(ajuda.RAIZ, "systemd", "remoteifes-console.service.modelo"), "utf8");
   assert.match(unidade, /^KillMode=process$/m, "the default control-group mode would kill running jobs on a Console restart");
 });
+
+test("the systemd unit starts before the application has ever created its data directory", () => {
+  const unidade = fs.readFileSync(path.join(ajuda.RAIZ, "systemd", "remoteifes-console.service.modelo"), "utf8");
+  const linha = unidade.split("\n").find((l) => l.startsWith("ReadWritePaths="));
+  assert.match(linha, /\s-__DIR_DADOS__(\s|$)/, "a missing path without '-' fails the service with a namespace error");
+});
