@@ -173,6 +173,8 @@ function versoesInstaladas() {
     presentes,
     transacaoPendente: info.transacao || null,
     gerenciadoLadoALado: presentes.length > 0,
+    ativacaoPendente: info.ativacao && !info.ativacao.confirmada ? info.ativacao : null,
+    reversaoAutomatica: info.reversaoAutomatica || null,
   };
 }
 
@@ -401,6 +403,8 @@ async function situacao({ consultarRede = false } = {}) {
     versoesPresentes: instaladas.presentes,
     gerenciadoLadoALado: instaladas.gerenciadoLadoALado,
     transacaoPendente: instaladas.transacaoPendente,
+    ativacaoPendente: instaladas.ativacaoPendente,
+    reversaoAutomatica: instaladas.reversaoAutomatica,
     alvo,
     confiancaConfigurada: release.confianciaConfigurada(),
     ultimaObservacao: observacao
@@ -652,11 +656,20 @@ async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, 
   registrarTransacao(versaoAlvo, "trocando");
   const info = lerEstadoInstalacao();
   const anterior = info.versaoAtiva || versaoEmExecucao();
+  // Activation is confirmed by the new version itself once it stays up (src/ativacao.js); until
+  // then the stable bootstrap counts its starts and reverts to `anterior` after repeated failures.
+  // A payload without that module cannot confirm, so it gets no pending activation.
+  const podeConfirmar = fs.existsSync(path.join(destino, "src", "ativacao.js"));
   gravarEstadoInstalacao({
     versaoAtiva: versaoAlvo,
     versaoAnterior: anterior && anterior !== versaoAlvo ? anterior : info.versaoAnterior,
     transacao: { versao: versaoAlvo, etapa: "concluida", em: new Date().toISOString() },
     atualizadoEm: new Date().toISOString(),
+    ativacao:
+      podeConfirmar && anterior && anterior !== versaoAlvo
+        ? { versao: versaoAlvo, anterior, partidas: 0, confirmada: false, desde: new Date().toISOString() }
+        : null,
+    reversaoAutomatica: null,
   });
 
   podarVersoes({ manter: [versaoAlvo, anterior].filter(Boolean) });
@@ -778,6 +791,8 @@ async function reverterComTrava({ log = () => {} } = {}) {
     versaoAnterior: instaladas.ativa,
     transacao: { versao: instaladas.anterior, etapa: "concluida", em: new Date().toISOString() },
     atualizadoEm: new Date().toISOString(),
+    // Going back to a version that already ran is not a pending activation.
+    ativacao: null,
   });
   estado.auditar("atualizacao-console-revertida", { de: instaladas.ativa, para: instaladas.anterior });
   const reinicio = await plataforma.reiniciarConsole();
