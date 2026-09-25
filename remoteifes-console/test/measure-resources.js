@@ -65,7 +65,7 @@ function rssDe(pid) {
     }
     if (process.platform === "win32") {
       const saida = execFileSync("tasklist.exe", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], { encoding: "utf8", timeout: 15_000 });
-      // "node.exe","1234","Console","1","52.184 K"  — separador de milhar depende da locale.
+      // "node.exe","1234","Console","1","52.184 K"  — the thousands separator depends on the locale.
       const m = /"([\d.,\u00a0 ]+) K"\s*$/m.exec(saida.trim());
       return m ? Number(m[1].replace(/[^\d]/g, "")) * 1024 : null;
     }
@@ -177,7 +177,7 @@ async function medir() {
       "sonda a saúde da aplicação e o gerenciador de serviços, então parte deste tempo é espera de I/O, não CPU.",
   };
 
-  // 2. Partida do processo.
+  // 2. Process start.
   const inicioPartida = agora();
   const filho = spawn(process.execPath, [path.join(RAIZ, "console.js")], {
     env: {
@@ -288,7 +288,7 @@ async function medir() {
     }
   );
 
-  // 5. Leitura de registros.
+  // 5. Log reading.
   resultados.cenarios.leituraDeRegistros = await cenario("GET /api/logs com 200 linhas", async () => {
   const log = await pedir(porta, "/api/logs?unidade=aplicacao&linhas=200", cabecalhosSessao, { timeoutMs: 90_000 });
   return {

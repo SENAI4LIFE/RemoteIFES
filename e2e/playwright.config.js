@@ -22,7 +22,7 @@ const projects = (process.env.E2E_BROWSERS || "chromium")
   .map((nome) => nome.trim())
   .filter(Boolean)
   .map((nome) => {
-    if (!NAVEGADORES[nome]) throw new Error(`E2E_BROWSERS: navegador desconhecido "${nome}" (use chromium, firefox ou webkit)`);
+    if (!NAVEGADORES[nome]) throw new Error(`E2E_BROWSERS: unknown browser "${nome}" (use chromium, firefox or webkit)`);
     return NAVEGADORES[nome];
   });
 

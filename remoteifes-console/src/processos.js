@@ -217,7 +217,7 @@ function chamarAuxiliar(verbo, args = [], opcoes = {}) {
   });
 }
 
-// --- Caminhos --------------------------------------------------------------------------
+// --- Paths --------------------------------------------------------------------------
 
 /**
  * Resolves a path ensuring it stays inside `raiz`, even after following symlinks. Used by backup

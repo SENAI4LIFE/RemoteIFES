@@ -46,7 +46,7 @@ for (const [rota, alvo] of Object.entries(TITULOS)) {
       };
     });
     expect(medida.largura).toBeGreaterThan(0);
-    expect(medida.desvio, `recuo inesperado em ${alvo.texto}`).toBeLessThanOrEqual(2);
+    expect(medida.desvio, `unexpected indent in ${alvo.texto}`).toBeLessThanOrEqual(2);
     expect(["start", "left"]).toContain(medida.alinhamento);
   });
 }
@@ -229,8 +229,8 @@ test("accessibility and help stay close together, without overlap, with 44px tar
     });
     const folga = medida.h.t - medida.a.b;
     expect(folga, `separation at ${nome}`).toBeGreaterThan(0);
-    expect(folga, `proximidade em ${nome}`).toBeLessThanOrEqual(40);
-    expect(Math.abs(medida.a.r - medida.h.r), `alinhamento horizontal em ${nome}`).toBeLessThanOrEqual(1);
+    expect(folga, `proximity at ${nome}`).toBeLessThanOrEqual(40);
+    expect(Math.abs(medida.a.r - medida.h.r), `horizontal alignment at ${nome}`).toBeLessThanOrEqual(1);
     [medida.a, medida.h].forEach((c) => {
       expect(c.w).toBeGreaterThanOrEqual(44);
       expect(c.h).toBeGreaterThanOrEqual(44);
@@ -332,7 +332,7 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
         });
         return achados;
       }, sub);
-      expect(problemas, `${rota} em ${tamanhoNome}`).toEqual([]);
+      expect(problemas, `${rota} at ${tamanhoNome}`).toEqual([]);
     }
   });
 }

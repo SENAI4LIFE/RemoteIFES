@@ -187,7 +187,7 @@ for (const acao of ["pausar", "retomar", "cancelar"]) {
     const antes = rollout.atual();
     const escrever = fs.writeFileSync;
     fs.writeFileSync = function(p, ...args) {
-      if (String(p).endsWith("rollout-ota.json.tmp")) throw new Error("disco indisponível");
+      if (String(p).endsWith("rollout-ota.json.tmp")) throw new Error("disk unavailable");
       return escrever.call(this, p, ...args);
     };
     assert.throws(() => rollout[${JSON.stringify(acao)}](), /persistir/);

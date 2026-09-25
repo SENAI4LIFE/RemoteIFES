@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => {
-  console.log(`[e2e-web] servindo ${RAIZ_WEB} em http://127.0.0.1:${PORT}`);
+  console.log(`[e2e-web] serving ${RAIZ_WEB} at http://127.0.0.1:${PORT}`);
 });
 
 process.on("SIGTERM", () => server.close(() => process.exit(0)));

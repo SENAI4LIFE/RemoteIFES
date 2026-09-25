@@ -33,8 +33,8 @@ async function ehRepositorio() {
 }
 
 /**
- * Estado local: HEAD, ramo, upstream, sujeira, profundidade, remoto configurado.
- * Tudo offline — nenhuma chamada de rede.
+ * Local state: HEAD, branch, upstream, dirty files, depth, configured remote.
+ * Entirely offline: no network call.
  */
 async function estadoLocal() {
   if (!(await ehRepositorio())) {

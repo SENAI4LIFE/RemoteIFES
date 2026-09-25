@@ -435,7 +435,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-landscape", "ta
         });
         return achados;
       }, sub);
-      expect(problemas, `${sub} em ${nome}`).toEqual([]);
+      expect(problemas, `${sub} at ${nome}`).toEqual([]);
       expect(await semRolagemHorizontal(page), `${sub} without horizontal scroll`).toBe(true);
     }
 
