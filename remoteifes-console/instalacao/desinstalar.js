@@ -248,7 +248,8 @@ async function encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log }
 
   // Prazos ajustáveis: um Pi carregado demora mais que um desktop, e um teste não deve gastar
   // 15 s provando que a espera termina.
-  const prazoNormal = Number(process.env.CONSOLE_PARADA_MS) > 0 ? Number(process.env.CONSOLE_PARADA_MS) : 10_000;
+  const prazoPedido = Number(process.env.CONSOLE_PARADA_MS);
+  const prazoNormal = Number.isFinite(prazoPedido) && prazoPedido > 0 ? Math.min(prazoPedido, 5 * 60 * 1000) : 10_000;
   const prazoForcado = Math.max(Math.round(prazoNormal / 2), 500);
 
   if (await esperarPortaFechar(contrato.porta, prazoNormal)) {

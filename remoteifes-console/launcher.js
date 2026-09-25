@@ -29,7 +29,13 @@ const moduloIdentidade = require(path.join(raiz, "src", "identidade"));
 
 // Prazo para o backend ficar pronto. Ajustável porque um Raspberry Pi frio leva mais tempo que
 // um desktop, e porque um teste não deve gastar 30 s provando que a espera termina.
-const ESPERA_MAXIMA_MS = Number(process.env.CONSOLE_LANCADOR_ESPERA_MS) > 0 ? Number(process.env.CONSOLE_LANCADOR_ESPERA_MS) : 30_000;
+const ESPERA_MAXIMA_MS = (() => {
+  // Finito e com teto: `Infinity` e `1e309` passavam por "> 0" e transformavam um prazo limitado
+  // numa espera sem fim — exatamente o que o prazo existe para evitar.
+  const pedido = Number(process.env.CONSOLE_LANCADOR_ESPERA_MS);
+  if (!Number.isFinite(pedido) || pedido <= 0) return 30_000;
+  return Math.min(pedido, 10 * 60 * 1000);
+})();
 
 function log(linha) {
   process.stdout.write(`${linha}\n`);
