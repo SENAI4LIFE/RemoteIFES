@@ -66,9 +66,20 @@ function cabecalhoTar({ nome, tamanho, modo, tipo = "0" }) {
   return b;
 }
 
+/**
+ * Arquivos a empacotar. Usa `lstat` e **recusa** qualquer link.
+ *
+ * Com `statSync` o link era seguido: um link dentro de um diretório incluído empacotaria um
+ * arquivo de fora da árvore como se fosse conteúdo do programa — configuração do Git, chave de
+ * assinatura, o que estivesse do outro lado. Um ciclo de diretórios também levaria a recursão
+ * infinita. Recusar é melhor que resolver: um payload não tem por que conter links.
+ */
 function listarArquivos(base, relativo = "") {
   const completo = path.join(base, relativo);
-  const info = fs.statSync(completo);
+  const info = fs.lstatSync(completo);
+  if (info.isSymbolicLink()) {
+    throw new Error(`${relativo || completo} é um link simbólico; um payload não distribui links. Remova-o ou exclua-o da lista.`);
+  }
   if (info.isFile()) return [{ relativo: relativo.split(path.sep).join("/"), completo, modo: info.mode, bytes: info.size }];
   if (!info.isDirectory()) return [];
   const saida = [];
