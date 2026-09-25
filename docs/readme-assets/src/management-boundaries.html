@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>management-boundaries</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  .donos { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .dono {
+    border: 1px solid var(--painel-borda);
+    border-top: 4px solid var(--tom);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--tom-suave) 60%, transparent);
+    padding: 12px 12px 14px;
+  }
+  .cabeca { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .cabeca .titulo { font-size: 16px; }
+  .cabeca .sub { font-size: 12.5px; }
+  .lista { display: flex; flex-direction: column; gap: 6px; }
+  .item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 10px;
+    background: var(--cartao);
+    border: 1px solid var(--cartao-borda);
+    border-radius: 9px;
+    font-size: 13.5px;
+    box-shadow: var(--sombra);
+  }
+  .item .ic { color: var(--tom); width: 18px; height: 18px; }
+  .item .nota { margin-left: auto; font-size: 11.5px; color: var(--texto-fraco); white-space: nowrap; }
+  .item.consulta {
+    background: transparent;
+    box-shadow: none;
+    border: 1.5px dashed var(--linha);
+    color: var(--texto-fraco);
+  }
+  .item.consulta .ic { color: var(--texto-fraco); }
+  .separador {
+    display: flex; align-items: center; gap: 8px; margin: 6px 2px 0;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--texto-fraco);
+  }
+  .separador::after { content: ""; flex: 1; border-top: 1px solid var(--painel-borda); }
+  .terminal {
+    margin-top: 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 12px;
+    border: 1px solid var(--painel-borda);
+    border-radius: 12px;
+    background: var(--neutro-suave);
+  }
+  .terminal .ic { width: 22px; height: 22px; color: var(--texto-fraco); }
+  .terminal .titulo { font-size: 13.5px; }
+  .terminal .sub { font-size: 12px; margin: 0; }
+  .terminal .itens { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .terminal .pilula { color: var(--texto); border-color: var(--cartao-borda); font-weight: 500; font-size: 12px; padding: 3px 9px; }
+</style>
+</head>
+<body>
+<div id="tela">
+  <div class="donos">
+    <section class="dono tom-verde" id="site">
+      <div class="cabeca">
+        <img class="modulo" src="../modules/browser.png" alt="">
+        <div><div class="titulo">Site RemoteIFES</div><div class="sub">opera o prédio · por papel de usuário</div></div>
+      </div>
+      <div class="lista">
+        <div class="item"><svg class="ic"><use href="#i-power"/></svg>Salas e ar-condicionado</div>
+        <div class="item"><svg class="ic"><use href="#i-agenda"/></svg>Agendamentos e grade</div>
+        <div class="item"><svg class="ic"><use href="#i-usuarios"/></svg>Usuários, papéis e proprietários</div>
+        <div class="item"><svg class="ic"><use href="#i-dispositivo"/></svg>ESP32: cadastro, credenciais, OTA, IR</div>
+        <div class="item"><svg class="ic"><use href="#i-status"/></svg>Monitoramento, alertas e topologia</div>
+        <div class="item"><svg class="ic"><use href="#i-auditoria"/></svg>Relatos, logs e auditoria</div>
+        <div class="item"><svg class="ic"><use href="#i-config"/></svg>Configurações da aplicação</div>
+      </div>
+    </section>
+
+    <section class="dono tom-roxo" id="console">
+      <div class="cabeca">
+        <img class="modulo" src="../modules/console.png" alt="">
+        <div><div class="titulo">Console de Operações</div><div class="sub">opera o host e o software · operador próprio</div></div>
+      </div>
+      <div class="lista">
+        <div class="item"><svg class="ic"><use href="#i-logs"/></svg>Serviço e registros do host</div>
+        <div class="item"><svg class="ic"><use href="#x-atualizar"/></svg>Atualizar e reverter a aplicação</div>
+        <div class="item"><svg class="ic"><use href="#x-banco"/></svg>Backup, restauração, senha do superadmin</div>
+        <div class="item"><svg class="ic"><use href="#x-rede"/></svg>Acesso de rede da aplicação<span class="nota">o site só exibe</span></div>
+        <div class="item"><svg class="ic"><use href="#i-ferramenta"/></svg>Programa do console, reiniciar o host</div>
+        <div class="separador">Somente leitura</div>
+        <div class="item consulta"><svg class="ic"><use href="#x-olho"/></svg>Rede, proxy, DNS e TLS</div>
+        <div class="item consulta"><svg class="ic"><use href="#x-olho"/></svg>Aplicativo e CI</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="terminal">
+    <svg class="ic"><use href="#x-terminal"/></svg>
+    <div><div class="titulo">Terminal do servidor</div><div class="sub">fora das duas interfaces</div></div>
+    <div class="itens">
+      <span class="pilula">Instalação do servidor</span>
+      <span class="pilula">Proxy e HTTPS</span>
+      <span class="pilula">Recuperação de emergência</span>
+    </div>
+  </div>
+
+  <div class="legenda">
+    <span><svg width="22" height="14"><rect x="1" y="1" width="20" height="12" rx="4" fill="var(--cartao)" stroke="var(--cartao-borda)"/></svg>altera aqui</span>
+    <span><svg width="22" height="14"><rect x="1" y="1" width="20" height="12" rx="4" fill="none" stroke="var(--linha)" stroke-width="1.5" stroke-dasharray="3 2.5"/></svg>só consulta, nunca altera</span>
+    <span>cada valor tem um único dono</span>
+  </div>
+</div>
+<script src="conectores.js"></script>
+<script>window.CONECTORES = [];</script>
+</body>
+</html>
