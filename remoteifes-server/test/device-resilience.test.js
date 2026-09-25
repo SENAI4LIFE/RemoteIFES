@@ -73,21 +73,21 @@ test("a reconnection storm converges to one session per room, with no duplicates
   assert.ok(await ate(() => abertos(primeira) === TOTAL), "todos os dispositivos deveriam conectar");
   assert.ok(
     await ate(() => salas.every((sala) => deviceHub.estadoPublico(sala).conectado)),
-    "todas as salas deveriam constar como conectadas"
+    "every room should be listed as connected"
   );
 
   for (const ws of primeira) ws._socket.destroy();
-  assert.ok(await ate(() => salas.every((sala) => !deviceHub.estadoPublico(sala).conectado)), "as sessões deveriam ser liberadas");
+  assert.ok(await ate(() => salas.every((sala) => !deviceHub.estadoPublico(sala).conectado)), "the sessions should be released");
 
   const segunda = salas.map(conectar);
-  assert.ok(await ate(() => abertos(segunda) === TOTAL), "todos deveriam reconectar após a queda");
+  assert.ok(await ate(() => abertos(segunda) === TOTAL), "everyone should reconnect after the drop");
   assert.ok(
     await ate(() => salas.every((sala) => deviceHub.estadoPublico(sala).conectado)),
-    "o estado deveria convergir para conectado após a tempestade"
+    "the state should converge to connected after the storm"
   );
 
   const estados = deviceHub.listarEstados();
-  assert.equal(Object.keys(estados).length, TOTAL, "não deveria sobrar sessão de sala alguma");
+  assert.equal(Object.keys(estados).length, TOTAL, "no room session should remain");
   assert.equal(abertos(primeira), 0, "nenhum socket antigo deveria continuar aberto");
 
   for (const ws of segunda) ws.close();
@@ -102,8 +102,8 @@ test("a duplicate connection for the same room drops the previous one with 4002 
 
   const nova = conectar(sala);
   assert.ok(await ate(() => nova.readyState === WebSocket.OPEN));
-  assert.ok(await ate(() => antiga.fechamentos.includes(4002)), "a conexão anterior deveria receber o código 4002");
-  assert.equal(deviceHub.estadoPublico(sala).conectado, true, "a sala deveria seguir com exatamente uma sessão ativa");
+  assert.ok(await ate(() => antiga.fechamentos.includes(4002)), "the previous connection should receive code 4002");
+  assert.equal(deviceHub.estadoPublico(sala).conectado, true, "the room should keep exactly one active session");
 
   nova.close();
   assert.ok(await ate(() => !deviceHub.estadoPublico(sala).conectado));
@@ -115,7 +115,7 @@ test("telemetry from an unknown device creates neither session nor state", async
   ws.on("close", (codigo) => ws.fechamentos.push(codigo));
   ws.on("error", () => {});
   clientes.add(ws);
-  assert.ok(await ate(() => ws.fechamentos.length > 0), "a conexão deveria ser recusada");
+  assert.ok(await ate(() => ws.fechamentos.length > 0), "the connection should be refused");
   assert.equal(ws.fechamentos[0], 4001);
-  assert.equal(Object.keys(deviceHub.listarEstados()).length, 0, "uma credencial inválida não deveria registrar sessão");
+  assert.equal(Object.keys(deviceHub.listarEstados()).length, 0, "an invalid credential should not register a session");
 });

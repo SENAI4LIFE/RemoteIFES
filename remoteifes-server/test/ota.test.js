@@ -151,7 +151,7 @@ test("an OTA offer reaches the device; a concurrent offer for the same room is 4
   await espera(80);
 
   const oferta = mensagens.find((m) => m.tipo === "ota_oferta");
-  assert.ok(oferta, "o dispositivo deve receber ota_oferta");
+  assert.ok(oferta, "the device must receive ota_oferta");
   assert.equal(oferta.versao, "4.0.0-test");
   assert.equal(oferta.tamanho, manifesto.tamanho);
   assert.equal(oferta.sha256, manifesto.sha256);
@@ -216,7 +216,7 @@ test("an unexpected version ends the OTA without proving a rollback", async () =
   assert.match(estado.erro, /rollback não comprovado/);
 
   const respReofertar = await authFetch("/admin/esp32/ota-sala-3/ota", token, { method: "POST" });
-  assert.equal(respReofertar.status, 200, "re-oferta é permitida após uma falha");
+  assert.equal(respReofertar.status, 200, "a new offer is allowed after a failure");
 
   ws.close();
 });

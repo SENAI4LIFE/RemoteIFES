@@ -119,7 +119,7 @@ test("a device connects over WS, sends telemetry and receives commands relayed b
   const sala = db.prepare(`SELECT * FROM salas WHERE sala = ?`).get("teste-esp32-online");
   assert.equal(sala.online, 1);
   assert.equal(sala.temperatura, 23.5);
-  assert.equal(sala.ligado, 0, "o ligado reportado é o eco da placa, não altera o estado desejado");
+  assert.equal(sala.ligado, 0, "the reported ligado is the board's echo and does not change the desired state");
 
   const estado = deviceHub.estadoPublico("teste-esp32-online");
   assert.equal(estado.conectado, true);
@@ -135,7 +135,7 @@ test("a device connects over WS, sends telemetry and receives commands relayed b
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   const recebidoPeloDispositivo = mensagens.find((m) => m.tipo === "enter_config");
-  assert.ok(recebidoPeloDispositivo, "o dispositivo deve receber o comando enter_config retransmitido");
+  assert.ok(recebidoPeloDispositivo, "the device must receive the relayed enter_config command");
   assert.equal(Object.prototype.hasOwnProperty.call(recebidoPeloDispositivo, "senha"), false);
 
   const fechou = new Promise((resolve) => ws.once("close", resolve));
@@ -146,7 +146,7 @@ test("a device connects over WS, sends telemetry and receives commands relayed b
     indisponibilidade = db.prepare("SELECT * FROM esp_indisponibilidades WHERE sala = ? AND onlineEm IS NULL").all("teste-esp32-online");
     if (indisponibilidade.length === 0) await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  assert.equal(indisponibilidade.length, 1, "a queda do WebSocket deve abrir um único período de indisponibilidade");
+  assert.equal(indisponibilidade.length, 1, "the WebSocket drop must open a single outage period");
   const wsReconectado = new WebSocket(baseWsDispositivoUrl, {
     headers: { "x-device-sala": "teste-esp32-online", "x-device-mac": "AA:BB:CC:DD:EE:02" },
   });
@@ -182,12 +182,12 @@ test("out-of-range telemetry values do not corrupt state or broadcast", async ()
   await new Promise((resolve) => setTimeout(resolve, 120));
 
   const sala = db.prepare(`SELECT temperatura FROM salas WHERE sala = ?`).get("teste-esp32-telemetria-ruim");
-  assert.equal(sala.temperatura, 22, "temperatura absurda não deve sobrescrever o banco");
+  assert.equal(sala.temperatura, 22, "an absurd temperature must not overwrite the database");
 
   const estado = deviceHub.estadoPublico("teste-esp32-telemetria-ruim");
-  assert.equal(estado.ultimaTelemetria.temp, null, "temp fora de faixa não deve ir para a telemetria pública");
-  assert.equal(estado.ultimaTelemetria.hum, null, "umidade fora de faixa não deve ir para a telemetria pública");
-  assert.equal(estado.modo, "operation", "modo desconhecido não deve chegar à interface administrativa");
+  assert.equal(estado.ultimaTelemetria.temp, null, "an out-of-range temp must not reach public telemetry");
+  assert.equal(estado.ultimaTelemetria.hum, null, "an out-of-range humidity must not reach public telemetry");
+  assert.equal(estado.modo, "operation", "an unknown mode must not reach the administrative interface");
 
   ws.close();
 });

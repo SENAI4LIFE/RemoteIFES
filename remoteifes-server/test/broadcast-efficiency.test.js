@@ -89,14 +89,14 @@ test("the query cost of a rebroadcast does not grow with the number of connected
 
   const comUm = contarConsultas(() => salasService.aplicarComando("A-108", "temperatura", 23, contexto));
   const comTodos = contarConsultas(() => salasService.aplicarComando("A-108", "temperatura", 24, contexto));
-  assert.ok(comTodos <= 20, `retransmissão para 13 clientes custou ${comTodos} consultas`);
-  assert.ok(Math.abs(comTodos - comUm) <= 2, `o custo deve ser independente do número de clientes (${comUm} vs ${comTodos})`);
+  assert.ok(comTodos <= 20, `rebroadcast to 13 clients cost ${comTodos} queries`);
+  assert.ok(Math.abs(comTodos - comUm) <= 2, `the cost must be independent of the number of clients (${comUm} vs ${comTodos})`);
   assert.ok(await ate(() => conexoes.every((c) => c.ultimaLista() && c.ultimaLista().salas.length > 0)));
   for (const c of conexoes) {
     const lista = c.ultimaLista().salas;
-    assert.equal(lista.find((s) => s.sala === "A-108").podeControlarEsta, true, "quem tem acesso à sala restrita pode controlá-la");
-    assert.equal(lista.find((s) => s.sala === "A-106").podeControlarEsta, false, "sala restrita sem acesso concedido");
-    assert.equal(lista.find((s) => s.sala === "A-201a").podeControlarEsta, true, "sala livre para quem pode controlar");
+    assert.equal(lista.find((s) => s.sala === "A-108").podeControlarEsta, true, "whoever has access to the restricted room can control it");
+    assert.equal(lista.find((s) => s.sala === "A-106").podeControlarEsta, false, "restricted room without granted access");
+    assert.equal(lista.find((s) => s.sala === "A-201a").podeControlarEsta, true, "unrestricted room for whoever can control");
   }
   assert.equal(supervisor.ultimaLista().salas.every((s) => s.podeControlarEsta), true);
 });
@@ -119,7 +119,7 @@ test("authorization stays fresh: revoking access or disabling the account takes 
   usuariosService.atualizarPermissoes(u.id, { ativo: false }, { id: 0, nivel: 3 });
   salasService.eventos.emit("mudanca");
   assert.ok(await ate(() => c.fechamento() !== null));
-  assert.equal(c.fechamento(), 4001, "sessão de conta desativada é encerrada na validação em lote");
+  assert.equal(c.fechamento(), 4001, "a disabled account's session is closed by batch validation");
 });
 
 test("a session ended elsewhere is dropped by batch validation and the others keep receiving", async () => {
@@ -161,7 +161,7 @@ test("session use is written at most every 30 s per session, without changing id
   } finally {
     db.prepare = preparar;
   }
-  assert.equal(escritas, 1, "a primeira validação após 2 min grava; as seguintes no mesmo instante não");
+  assert.equal(escritas, 1, "the first validation after 2 min writes; the following ones at the same instant do not");
   db.prepare("UPDATE sessoes SET ultimoUso = datetime('now', '-61 minutes') WHERE usuarioId = ?").run(u.id);
-  assert.equal(tokenService.validarToken(token), null, "a inatividade continua sendo avaliada pelo valor persistido");
+  assert.equal(tokenService.validarToken(token), null, "inactivity is still evaluated from the persisted value");
 });

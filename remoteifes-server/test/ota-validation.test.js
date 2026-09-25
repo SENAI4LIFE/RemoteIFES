@@ -127,10 +127,10 @@ test("the offer carries the attempt identifier and capable firmware completes on
   await gravarEReiniciar(d);
 
   const novo = await abrirDispositivo("VAL-1", "AA:BB:CC:0A:00:01", VERSAO_NOVA);
-  assert.equal(fase("VAL-1"), "validando", "reportar a versão-alvo ainda não é conclusão para firmware que sabe validar");
+  assert.equal(fase("VAL-1"), "validando", "reporting the target version is not yet completion for firmware that can validate");
   novo.enviar({ tipo: "ota_validado", tentativa: "outra-tentativa", sha256: manifesto.sha256, versao: VERSAO_NOVA });
   await esperar(80);
-  assert.equal(fase("VAL-1"), "validando", "evidência de outra tentativa é ignorada");
+  assert.equal(fase("VAL-1"), "validando", "evidence from another attempt is ignored");
   assert.equal(novo.acks().length, 0);
   novo.enviar({ tipo: "ota_validado", tentativa: oferta.tentativa, sha256: manifesto.sha256, versao: VERSAO_NOVA });
   assert.ok(await ate(() => fase("VAL-1") === "concluido"));
@@ -138,7 +138,7 @@ test("the offer carries the attempt identifier and capable firmware completes on
   assert.ok(await ate(() => novo.acks().length === 1));
   assert.equal(novo.acks()[0].tentativa, oferta.tentativa);
   novo.enviar({ tipo: "ota_validado", tentativa: oferta.tentativa, sha256: manifesto.sha256, versao: VERSAO_NOVA });
-  assert.ok(await ate(() => novo.acks().length === 2), "o duplicado é confirmado de novo para a placa limpar sua evidência");
+  assert.ok(await ate(() => novo.acks().length === 2), "the duplicate is confirmed again so the board clears its evidence");
   assert.equal(fase("VAL-1"), "concluido");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM notificacoes WHERE tipo = 'esp32_ota_ok' AND sala = 'VAL-1'").get().n, 1);
   await novo.fechar();
@@ -171,7 +171,7 @@ test("a canary that reports the target version and then reverts stops the rollou
   const canarioNovo = await abrirDispositivo("ROL-V1", "AA:BB:CC:0A:01:01", VERSAO_NOVA);
   assert.ok(await ate(() => dispositivoDoRollout("ROL-V1").estado === "validando"));
   await esperar(150);
-  assert.equal(seguinte.ofertas().length, 0, "o lote seguinte não começa enquanto o canário só reportou a versão");
+  assert.equal(seguinte.ofertas().length, 0, "the next batch does not start while the canary has only reported the version");
   assert.equal(otaRolloutService.atual().loteAtual, 0);
 
   await canarioNovo.fechar();
@@ -224,7 +224,7 @@ test("validation survives a server restart and board reconnection and completes 
   const novo = await abrirDispositivo("VAL-3", "AA:BB:CC:0A:00:03", VERSAO_NOVA);
   assert.ok(await ate(() => fase("VAL-3") === "validando"));
   await novo.fechar();
-  assert.equal(fase("VAL-3"), "validando", "cair durante a validação não é falha nem conclusão");
+  assert.equal(fase("VAL-3"), "validando", "dropping during validation is neither failure nor completion");
 
   envelhecerEstado("VAL-3", 10);
   const depois = emProcessoNovo(`
@@ -235,7 +235,7 @@ test("validation survives a server restart and board reconnection and completes 
     return { antes, aposTimeout, aceita, final: ota.estadoDaSala('VAL-3').fase, evidencia: ota.estadoDaSala('VAL-3').evidencia };
   `, "VAL-3", "AA:BB:CC:0A:00:03");
   assert.equal(depois.antes, "validando");
-  assert.equal(depois.aposTimeout, "validando", "o reinício do servidor concede uma janela nova de validação");
+  assert.equal(depois.aposTimeout, "validando", "a server restart grants a new validation window");
   assert.equal(depois.aceita, true);
   assert.equal(depois.final, "concluido");
   assert.equal(depois.evidencia, "boot");

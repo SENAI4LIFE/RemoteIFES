@@ -89,25 +89,25 @@ test("late telemetry does not erase an already persisted command, and reconnecti
   d.enviar({ tipo: "info", fw: "4.2.0", failsafeConfigurado: false, failsafeLatched: false });
   assert.ok(await ate(() => d.estados().length === 1));
   assert.equal(d.estados()[0].power, false);
-  assert.equal(d.estados()[0].restauracao, true, "a sincronização inicial é marcada como restauração");
+  assert.equal(d.estados()[0].restauracao, true, "the initial synchronization is marked as restoration");
 
   const resultado = salasService.aplicarComando("REL-1", "ligar", undefined, ADMIN);
-  assert.equal(resultado.enviadoAoDispositivo, true, "a resposta distingue a submissão ao socket da aplicação pela placa");
+  assert.equal(resultado.enviadoAoDispositivo, true, "the response distinguishes submission to the socket from application by the board");
   assert.equal(linha("REL-1").ligado, 1);
   assert.ok(await ate(() => d.estados().length === 2));
-  assert.equal(d.estados()[1].restauracao, undefined, "um comando explícito não é restauração");
+  assert.equal(d.estados()[1].restauracao, undefined, "an explicit command is not restoration");
   assert.equal(d.estados()[1].versao, linha("REL-1").estadoVersao);
 
   d.enviar({ tipo: "telemetria", fw: "4.2.0", modo: "operation", ligado: false, rssi: -50, temp: 24, ultimoComando: { tipo: "known_state", protocol: 16, temp: 23, power: false, turbo: false } });
   await ate(() => deviceHub.estadoPublico("REL-1").ultimaTelemetria?.ligado === false);
-  assert.equal(linha("REL-1").ligado, 1, "o eco antigo da placa não desfaz o comando");
-  assert.equal(status("REL-1").dispositivoConfirmou, false, "e também não conta como confirmação");
+  assert.equal(linha("REL-1").ligado, 1, "the board's old echo does not undo the command");
+  assert.equal(status("REL-1").dispositivoConfirmou, false, "and does not count as confirmation either");
 
   await d.fechar();
   const r = await conectar("REL-1", "AA:BB:CC:E1:00:01");
   r.enviar({ tipo: "info", fw: "4.2.0", failsafeConfigurado: false, failsafeLatched: false });
   assert.ok(await ate(() => r.estados().length === 1));
-  assert.equal(r.estados()[0].power, true, "a reconexão reaplica a intenção que o usuário pediu");
+  assert.equal(r.estados()[0].power, true, "reconnection reapplies the intent the user requested");
   await r.fechar();
 });
 
@@ -116,13 +116,13 @@ test("the HTTP heartbeat does not rewrite the intent with the board's echo eithe
   salasService.heartbeatDispositivo("REL-2", { ligado: false, temperatura: 25 }, "AA:BB:CC:E1:00:02", "127.0.0.1");
   const row = db.prepare("SELECT ligado, temperatura, online FROM salas WHERE sala = 'REL-2'").get();
   assert.equal(row.ligado, 1);
-  assert.equal(row.temperatura, 25, "a leitura do sensor continua sendo registrada");
+  assert.equal(row.temperatura, 25, "the sensor reading is still recorded");
   assert.equal(row.online, 1);
 });
 
 test("confirmation by the board is exposed to the panel and notifies only room observers", async (t) => {
   sala("REL-3", "AA:BB:CC:E1:00:03", false);
-  assert.equal(status("REL-3").dispositivoConfirmou, null, "sem placa conectada não há o que confirmar");
+  assert.equal(status("REL-3").dispositivoConfirmou, null, "without a connected board there is nothing to confirm");
   const mudancas = ouvirMudancasDeSala(t, "REL-3");
   const d = await conectar("REL-3", "AA:BB:CC:E1:00:03");
   d.enviar({ tipo: "info", fw: "4.3.0", failsafeConfigurado: false, failsafeLatched: false });
@@ -132,16 +132,16 @@ test("confirmation by the board is exposed to the panel and notifies only room o
   const versao = d.estados()[0].versao;
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao, failsafeConfigurado: false, failsafeLatched: false });
   assert.ok(await ate(() => status("REL-3").dispositivoConfirmou === true));
-  assert.equal(mudancas.valor, 1, "a mudança de confirmação avisa os observadores da sala");
+  assert.equal(mudancas.valor, 1, "the confirmation change notifies the room's observers");
   assert.equal(deviceHub.estadoPublico("REL-3").estadoConfirmado, true);
   assert.equal(deviceHub.estadoPublico("REL-3").versaoEstadoReportada, versao);
 
   salasService.aplicarComando("REL-3", "temperatura", 25, ADMIN);
-  assert.equal(status("REL-3").dispositivoConfirmou, false, "um comando novo volta a aguardar a placa");
+  assert.equal(status("REL-3").dispositivoConfirmou, false, "a new command waits for the board again");
   assert.ok(await ate(() => d.estados().length === 2));
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: true, versao, failsafeConfigurado: false, failsafeLatched: false });
   await esperar(100);
-  assert.equal(status("REL-3").dispositivoConfirmou, false, "o eco da versão anterior não confirma a nova");
+  assert.equal(status("REL-3").dispositivoConfirmou, false, "an echo of the previous version does not confirm the new one");
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: true, versao: d.estados()[1].versao, failsafeConfigurado: false, failsafeLatched: false });
   assert.ok(await ate(() => status("REL-3").dispositivoConfirmou === true));
   await d.fechar();
@@ -155,7 +155,7 @@ test("firmware without version echo confirms through the last reported command",
   assert.ok(await ate(() => d.estados().length === 1));
   d.enviar({ tipo: "telemetria", fw: "4.2.0", modo: "operation", ligado: true, ultimoComando: { tipo: "known_state", protocol: 16, temp: 22, power: true, turbo: false } });
   await esperar(100);
-  assert.equal(status("REL-4").dispositivoConfirmou, false, "temperatura diferente da desejada não confirma");
+  assert.equal(status("REL-4").dispositivoConfirmou, false, "a temperature different from the desired one does not confirm");
   d.enviar({ tipo: "telemetria", fw: "4.2.0", modo: "operation", ligado: true, ultimoComando: { tipo: "known_state", protocol: 16, temp: 23, power: true, turbo: false } });
   assert.ok(await ate(() => status("REL-4").dispositivoConfirmou === true));
   await d.fechar();
@@ -164,22 +164,22 @@ test("firmware without version echo confirms through the last reported command",
 test("late info: restoration is flagged, the late info does not adopt the latch, and new firmware's failsafe_status does", async () => {
   sala("REL-5", "AA:BB:CC:E1:00:05", true);
   const d = await conectar("REL-5", "AA:BB:CC:E1:00:05");
-  assert.ok(await ate(() => d.estados().length === 1, 4000), "sem info, o estado sai após a espera de segurança");
+  assert.ok(await ate(() => d.estados().length === 1, 4000), "without info, the state goes out after the safety wait");
   assert.equal(d.estados()[0].restauracao, true);
   assert.equal(d.estados()[0].power, true);
   const versao = d.estados()[0].versao;
 
   d.enviar({ tipo: "info", fw: "4.2.0", ...FAILSAFE, failsafeLatched: true, ligado: false });
   await ate(() => deviceHub.estadoPublico("REL-5").failsafe?.latched === true);
-  assert.equal(linha("REL-5").ligado, 1, "um info anterior à restauração não pode ser tomado como o estado atual da placa");
+  assert.equal(linha("REL-5").ligado, 1, "an info older than the restoration must not be taken as the board's current state");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM comandos_log WHERE sala = 'REL-5' AND cmd = 'failsafe_off_local'").get().n, 0);
 
   d.enviar({ tipo: "failsafe_status", ...FAILSAFE, failsafeLatched: true, versao });
-  assert.ok(await ate(() => linha("REL-5").ligado === 0), "a recusa da restauração pela placa travada é adotada como desligamento local");
-  assert.equal(linha("REL-5").estadoVersao, versao, "adotar o OFF local não avança a versão");
+  assert.ok(await ate(() => linha("REL-5").ligado === 0), "the latched board's refusal of the restoration is adopted as a local shutdown");
+  assert.equal(linha("REL-5").estadoVersao, versao, "adopting the local OFF does not advance the version");
   assert.ok(db.prepare("SELECT 1 FROM comandos_log WHERE sala = 'REL-5' AND cmd = 'failsafe_off_local' AND valor = 'adotado_em_operacao' AND origem = 'esp32_local'").get());
-  assert.equal(status("REL-5").dispositivoConfirmou, true, "placa desligada e intenção desligada estão reconciliadas");
-  assert.equal(d.estados().length, 1, "nada mais é reenviado");
+  assert.equal(status("REL-5").dispositivoConfirmou, true, "board off and intent off are reconciled");
+  assert.equal(d.estados().length, 1, "nothing else is resent");
   await d.fechar();
 });
 
@@ -197,7 +197,7 @@ test("an info already received on the socket is processed before the timeout-dri
     d.ws.ping();
   });
   await esperar(200);
-  assert.equal(d.estados().length, 0, "o info enfileirado vence a sincronização por tempo: nenhum estado é reenviado sobre a trava");
+  assert.equal(d.estados().length, 0, "the queued info wins over the timeout synchronization: no state is resent over the latch");
   assert.equal(linha("REL-6").ligado, 0);
   assert.ok(db.prepare("SELECT 1 FROM comandos_log WHERE sala = 'REL-6' AND cmd = 'failsafe_off_local' AND valor = 'mantido_na_reconexao'").get());
   await d.fechar();
@@ -213,7 +213,7 @@ test("latch reported during operation: adopted when it reflects the current inte
   assert.ok(await ate(() => status("REL-7").dispositivoConfirmou === true));
 
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v1, ...FAILSAFE, failsafeLatched: true });
-  assert.ok(await ate(() => linha("REL-7").ligado === 0), "o switch físico desligou a sala depois do último comando: o servidor adota");
+  assert.ok(await ate(() => linha("REL-7").ligado === 0), "the physical switch turned the room off after the last command: the server adopts it");
   assert.equal(status("REL-7").dispositivoConfirmou, true);
 
   salasService.aplicarComando("REL-7", "ligar", undefined, ADMIN);
@@ -222,7 +222,7 @@ test("latch reported during operation: adopted when it reflects the current inte
   assert.ok(v2 > v1);
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v1, ...FAILSAFE, failsafeLatched: true });
   await esperar(100);
-  assert.equal(linha("REL-7").ligado, 1, "um relato anterior ao comando não apaga a intenção nova");
+  assert.equal(linha("REL-7").ligado, 1, "a report older than the command does not erase the new intent");
   assert.equal(status("REL-7").dispositivoConfirmou, false);
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: true, versao: v2, ...FAILSAFE, failsafeLatched: false });
   assert.ok(await ate(() => status("REL-7").dispositivoConfirmou === true));
@@ -237,12 +237,12 @@ test("firmware 4.2.0: a latch during operation is adopted only after the connect
   assert.ok(await ate(() => d.estados().length === 1));
   d.enviar({ tipo: "telemetria", fw: "4.2.0", modo: "operation", ligado: false, ...FAILSAFE, failsafeLatched: true, ultimoComando: { tipo: "failsafe" } });
   await esperar(100);
-  assert.equal(linha("REL-8").ligado, 1, "sem prova de que a placa já processou a intenção, a trava pode ser anterior a ela");
+  assert.equal(linha("REL-8").ligado, 1, "without proof the board has processed the intent, the latch may predate it");
 
   d.enviar({ tipo: "telemetria", fw: "4.2.0", modo: "operation", ligado: true, ...FAILSAFE, failsafeLatched: false, ultimoComando: { tipo: "known_state", protocol: 16, temp: 23, power: true, turbo: false } });
   assert.ok(await ate(() => status("REL-8").dispositivoConfirmou === true));
   d.enviar({ tipo: "telemetria", fw: "4.2.0", modo: "operation", ligado: false, ...FAILSAFE, failsafeLatched: true, ultimoComando: { tipo: "failsafe" } });
-  assert.ok(await ate(() => linha("REL-8").ligado === 0), "depois da confirmação, a ordem das mensagens prova que a trava é posterior");
+  assert.ok(await ate(() => linha("REL-8").ligado === 0), "after confirmation, message order proves the latch is later");
   await d.fechar();
 });
 
@@ -275,15 +275,15 @@ test("every intent change advances the state version and resends it with the com
   const configuracoes = require("../src/services/configuracoesService");
   const limitesAntes = configuracoes.limitesTemperatura();
   configuracoes.validarEAtualizar({ turboFuncaoExtra: configuracoes.turboFuncaoExtra() === "swing" ? "nenhuma" : "swing" }, ADMIN.usuario);
-  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "uma configuração global que muda o estado IR avança a versão");
+  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "a global setting that changes the IR state advances the version");
   assert.equal(salasService.comandoEstadoIR(salasService.buscar("REL-10")).versao, v0 + 7);
   salasService.reenviarEstadoIRParaTodas();
-  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "reenviar o mesmo estado não é uma intenção nova");
+  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "resending the same state is not new intent");
   configuracoes.validarEAtualizar({ modoManutencao: false }, ADMIN.usuario);
-  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "uma configuração que não toca o estado IR não avança a versão");
+  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "a setting that does not touch the IR state does not advance the version");
   assert.deepEqual(configuracoes.limitesTemperatura(), limitesAntes);
   salasService.adotarDesligamentoLocal("REL-10");
-  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "adotar o OFF local não é uma intenção nova");
+  assert.equal(linha("REL-10").estadoVersao, v0 + 7, "adopting the local OFF is not new intent");
 });
 
 test("an explicit command sent before the late initial info is not erased by the old latch, and the board confirms it", async () => {
@@ -297,8 +297,8 @@ test("an explicit command sent before the late initial info is not erased by the
 
   d.enviar({ tipo: "info", fw: "4.3.0", ...FAILSAFE, failsafeLatched: true, ligado: false, versao: v - 1 });
   await esperar(150);
-  assert.equal(linha("REL-12").ligado, 1, "o info descreve a placa de antes do comando: a trava antiga não apaga a intenção nova");
-  assert.equal(d.estados().length, 1, "nada é restaurado por cima do comando explícito já enviado");
+  assert.equal(linha("REL-12").ligado, 1, "the info describes the board before the command: the old latch does not erase the new intent");
+  assert.equal(d.estados().length, 1, "nothing is restored over the explicit command already sent");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM comandos_log WHERE sala = 'REL-12' AND cmd = 'failsafe_off_local'").get().n, 0);
   assert.equal(status("REL-12").dispositivoConfirmou, false);
 
@@ -307,7 +307,7 @@ test("an explicit command sent before the late initial info is not erased by the
   assert.equal(linha("REL-12").ligado, 1);
 
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v, ...FAILSAFE, failsafeLatched: true });
-  assert.ok(await ate(() => linha("REL-12").ligado === 0), "uma trava posterior ao comando continua sendo adotada");
+  assert.ok(await ate(() => linha("REL-12").ligado === 0), "a latch after the command is still adopted");
   await d.fechar();
 
   sala("REL-13", "AA:BB:CC:E1:00:13", false);
@@ -316,9 +316,9 @@ test("an explicit command sent before the late initial info is not erased by the
   assert.ok(await ate(() => e.estados().length === 1));
   e.enviar({ tipo: "info", fw: "4.2.0", ...FAILSAFE, failsafeLatched: true, ligado: false });
   await esperar(150);
-  assert.equal(linha("REL-13").ligado, 1, "sem eco de versão o info atrasado também não adota a trava anterior ao comando");
+  assert.equal(linha("REL-13").ligado, 1, "without version echo the late info does not adopt a latch older than the command either");
   await esperar(3200);
-  assert.equal(e.estados().length, 1, "a sincronização por tempo esgotado não reenvia o estado já enviado");
+  assert.equal(e.estados().length, 1, "the timeout synchronization does not resend the state already sent");
   await e.fechar();
 });
 
@@ -333,16 +333,16 @@ test("an administrative IR test invalidates confirmation until newer intent is s
 
   const mudancas = ouvirMudancasDeSala(t, "REL-14");
   assert.equal(deviceHub.enviarTesteIR("REL-14", { tipo: "send_known_state", protocol: 16, temp: 30, power: false, turbo: false, fan: "", swing: false }), true);
-  assert.equal(status("REL-14").dispositivoConfirmou, false, "o aparelho foi posto num estado que não é a intenção");
-  assert.equal(linha("REL-14").ligado, 1, "o teste não muda a intenção nem a versão");
+  assert.equal(status("REL-14").dispositivoConfirmou, false, "the appliance was put into a state that is not the intent");
+  assert.equal(linha("REL-14").ligado, 1, "the test changes neither the intent nor the version");
   assert.equal(linha("REL-14").estadoVersao, v);
-  assert.equal(mudancas.valor, 1, "o painel é avisado da perda de confirmação");
+  assert.equal(mudancas.valor, 1, "the panel is notified of the lost confirmation");
   assert.ok(await ate(() => d.estados().length === 2));
-  assert.equal(d.estados()[1].versao, undefined, "o teste sai sem versão");
+  assert.equal(d.estados()[1].versao, undefined, "the test goes out without a version");
 
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v, ...FAILSAFE, failsafeLatched: false, ultimoComando: { tipo: "known_state", protocol: 16, temp: 30, power: false, turbo: false } });
   await esperar(150);
-  assert.equal(status("REL-14").dispositivoConfirmou, false, "o eco da versão anterior ao teste não volta a confirmar");
+  assert.equal(status("REL-14").dispositivoConfirmou, false, "an echo of the version before the test does not confirm again");
   assert.equal(linha("REL-14").ligado, 1);
 
   salasService.aplicarComando("REL-14", "ligar", undefined, ADMIN);
@@ -350,13 +350,13 @@ test("an administrative IR test invalidates confirmation until newer intent is s
   const v2 = d.estados()[2].versao;
   assert.ok(v2 > v);
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: true, versao: v2, ...FAILSAFE, failsafeLatched: false });
-  assert.ok(await ate(() => status("REL-14").dispositivoConfirmou === true), "a intenção nova volta a ser confirmável");
+  assert.ok(await ate(() => status("REL-14").dispositivoConfirmou === true), "the new intent becomes confirmable again");
 
   assert.equal(deviceHub.enviarTesteIR("REL-14", { tipo: "send_raw", raw: [9000, 4500, 560, 560], carrierHz: 38000 }), true);
-  assert.equal(status("REL-14").dispositivoConfirmou, false, "um RAW também tira a placa do estado desejado");
+  assert.equal(status("REL-14").dispositivoConfirmou, false, "a RAW also takes the board out of the desired state");
   d.enviar({ tipo: "telemetria", fw: "4.3.0", modo: "operation", ligado: false, versao: v2, ...FAILSAFE, failsafeLatched: true });
-  assert.ok(await ate(() => linha("REL-14").ligado === 0), "a trava depois do teste ainda é adotada: o eco prova que ela é posterior à intenção");
-  assert.equal(status("REL-14").dispositivoConfirmou, true, "placa e intenção desligadas estão reconciliadas");
+  assert.ok(await ate(() => linha("REL-14").ligado === 0), "a latch after the test is still adopted: the echo proves it is later than the intent");
+  assert.equal(status("REL-14").dispositivoConfirmou, true, "board and intent off are reconciled");
   await d.fechar();
 });
 
@@ -376,16 +376,16 @@ test("a failure writing global limits leaves no half intent or version and sends
     return preparar(sql, ...resto);
   });
   assert.throws(() => configuracoes.validarEAtualizar({ temperaturaMinima: 20, temperaturaMaxima: 28 }, ADMIN.usuario), /SQLITE_FULL/);
-  assert.deepEqual(configuracoes.limitesTemperatura(), antesCfg, "a configuração não foi gravada");
-  assert.deepEqual(linha("REL-15"), antes, "o alvo não foi ajustado sem a versão avançar junto");
-  assert.equal(enviados.length, 0, "nada é submetido à placa sem commit");
+  assert.deepEqual(configuracoes.limitesTemperatura(), antesCfg, "the configuration was not written");
+  assert.deepEqual(linha("REL-15"), antes, "the target was not adjusted without the version advancing with it");
+  assert.equal(enviados.length, 0, "nothing is submitted to the board without a commit");
 
   db.prepare.mock.restore();
   configuracoes.validarEAtualizar({ temperaturaMinima: 20, temperaturaMaxima: 28 }, ADMIN.usuario);
   const depois = linha("REL-15");
-  assert.equal(depois.temperaturaAlvo, 20, "o alvo é ajustado ao novo limite");
+  assert.equal(depois.temperaturaAlvo, 20, "the target is adjusted to the new limit");
   assert.equal(depois.estadoVersao, antes.estadoVersao + 1);
-  assert.equal(enviados.find((e) => e.sala === "REL-15").payload.versao, depois.estadoVersao, "o reenvio sai com a versão gravada");
+  assert.equal(enviados.find((e) => e.sala === "REL-15").payload.versao, depois.estadoVersao, "the resend goes out with the stored version");
   configuracoes.validarEAtualizar({ temperaturaMinima: antesCfg.minima, temperaturaMaxima: antesCfg.maxima }, ADMIN.usuario);
 
   t.mock.method(db, "prepare", (sql, ...resto) => {
@@ -395,7 +395,7 @@ test("a failure writing global limits leaves no half intent or version and sends
   const antesSala = linha("REL-15");
   enviados.length = 0;
   assert.throws(() => salasService.definirLimitesTemperatura("REL-15", { minima: 22, maxima: 26 }), /SQLITE_FULL/);
-  assert.deepEqual(linha("REL-15"), antesSala, "limites por sala: a sala não muda se a segunda escrita falha");
+  assert.deepEqual(linha("REL-15"), antesSala, "per-room limits: the room does not change if the second write fails");
   assert.equal(enviados.length, 0);
 });
 
@@ -422,16 +422,16 @@ test("the scheduler does not repeat a command whose execution record failed: sta
 
   scheduler.iniciarScheduler();
   t.mock.timers.tick(60000);
-  assert.equal(linha(codigo).ligado, 0, "com o registro falhando, a sala não muda de estado");
+  assert.equal(linha(codigo).ligado, 0, "with the record failing, the room does not change state");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM comandos_log WHERE sala = ?").get(codigo).n, 0);
   assert.equal(agendamentos.jaExecutadoHoje(ag.id, "ligar", dataAtualBrasiliaISO()), false);
 
   t.mock.timers.tick(60000);
-  assert.equal(linha(codigo).ligado, 1, "no tick seguinte o agendamento é aplicado uma única vez");
+  assert.equal(linha(codigo).ligado, 1, "on the next tick the schedule is applied exactly once");
   assert.equal(agendamentos.jaExecutadoHoje(ag.id, "ligar", dataAtualBrasiliaISO()), true);
   assert.deepEqual(db.prepare("SELECT cmd FROM comandos_log WHERE sala = ? ORDER BY id").all(codigo).map((l) => l.cmd), ["ligar", "temperatura"]);
 
   salasService.aplicarComando(codigo, "desligar", undefined, ADMIN);
   t.mock.timers.tick(60000);
-  assert.equal(linha(codigo).ligado, 0, "o desligamento manual não é sobrescrito por uma repetição do agendamento");
+  assert.equal(linha(codigo).ligado, 0, "the manual shutdown is not overwritten by a repeated schedule");
 });

@@ -20,7 +20,7 @@ test("the heatmap is superadministrator-only", async ({ page, context, request }
     const resp = await request.get(`${API_URL}/admin/heatmap?metrica=comandos&periodo=24h`, {
       headers: { Authorization: `Bearer ${tokenDe(papel)}` },
     });
-    expect(resp.status(), `HTTP para ${papel}`).toBe(status);
+    expect(resp.status(), `HTTP for ${papel}`).toBe(status);
   }
 
   await abrirMonitoramento(page, context, "admin");
@@ -38,7 +38,7 @@ test("nothing is computed before the section is opened", async ({ page, context 
   await abrirMonitoramento(page, context);
   await expect(page.locator("#heatmapBloco")).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(3000);
-  expect(chamadas, "consulta emitida com a seção fechada").toEqual([]);
+  expect(chamadas, "query issued with the section closed").toEqual([]);
 
   await abrirHeatmap(page);
   expect(chamadas.length).toBe(1);
