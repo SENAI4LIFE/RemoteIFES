@@ -313,7 +313,7 @@ jobs:
           sudo visudo -cf /etc/sudoers.d/remoteifes-console
           codigo=""
           for _ in $(seq 1 30); do
-            codigo=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/ || true)
+            codigo=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/ || true)
             [ "$codigo" = "200" ] && break
             sleep 1
           done
