@@ -11,12 +11,15 @@
 //
 // Sequence:
 //   1. validates the chosen backup (validated identifier, never a free path from the browser);
-//   2. disables the watchdog, where it exists, so it does not restart the application midway;
-//   3. stops the application through the platform mechanism and confirms with the service manager;
-//   4. **proves** nobody else writes by taking the exclusive database lock;
-//   5. delegates the swap to backupService.restaurarBackup, which preserves the previous database,
+//   2. publishes the restore marker (`<database>.restauracao`, this PID): from here until the swap
+//      ends, every RemoteIFES process refuses to open the database (src/config/restauracao.js), so
+//      no writer can start between the proof below and the swap;
+//   3. disables the watchdog, where it exists, so it does not restart the application midway;
+//   4. stops the application through the platform mechanism and confirms with the service manager;
+//   5. **proves** nobody else writes by taking the exclusive database lock;
+//   6. delegates the swap to backupService.restaurarBackup, which preserves the previous database,
 //      validates before and after, and rolls back if the final check fails;
-//   6. restores the previous lifecycle and checks health.
+//   7. removes the marker and restores the previous lifecycle, then checks health.
 //
 // On any failure after step 3 the lifecycle is restored anyway: leaving RemoteIFES stopped and the
 // watchdog disabled would be worse than the original failure.
@@ -87,6 +90,19 @@ function provarQuiescencia(caminhoBanco) {
   }
 }
 
+function publicarMarcador(caminhoBanco, backup) {
+  const marcador = `${caminhoBanco}.restauracao`;
+  const temporario = `${marcador}.${process.pid}.tmp`;
+  fs.writeFileSync(temporario, JSON.stringify({ pid: process.pid, desde: new Date().toISOString(), backup }), { mode: 0o644 });
+  fs.renameSync(temporario, marcador);
+  return () => {
+    try {
+      const atual = JSON.parse(fs.readFileSync(marcador, "utf8"));
+      if (atual.pid === process.pid) fs.rmSync(marcador, { force: true });
+    } catch {}
+  };
+}
+
 async function main() {
   const app = config.caminhosDaAplicacao();
 
@@ -126,6 +142,17 @@ async function main() {
     return 1;
   }
 
+  passo("Bloqueando a abertura do banco durante a troca");
+  let removerMarcador;
+  try {
+    removerMarcador = publicarMarcador(app.banco, path.basename(arquivo));
+  } catch (erro) {
+    console.error(`Não foi possível publicar o aviso de restauração ao lado do banco (${erro.message}). Abortando.`);
+    return 1;
+  }
+  console.log("Nenhum processo do RemoteIFES abre o banco até a troca terminar.");
+  process.on("exit", removerMarcador);
+
   const servicoAntes = await plataforma.estadoDoServico();
   const watchdogAntes = await plataforma.estadoDoWatchdog();
   const precisaRestabelecerServico = servicoAntes.disponivel && servicoAntes.ativo;
@@ -136,6 +163,7 @@ async function main() {
     const r = await plataforma.controlarWatchdog("desligar");
     if (!r.disponivel) {
       console.error(`Sem desligar o watchdog a aplicação pode ser reiniciada no meio da troca (${r.motivo}). Abortando.`);
+      removerMarcador();
       return 1;
     }
     console.log("Watchdog desligado.");
@@ -198,6 +226,8 @@ async function main() {
   }
 
   passo("Restabelecendo o ciclo de vida anterior");
+  // The swap is over (or was abandoned): the application may open the database again.
+  removerMarcador();
   if (precisaRestabelecerServico) {
     const r = await plataforma.controlarServico("iniciar");
     console.log(r.disponivel ? "Serviço iniciado." : `ATENÇÃO: não foi possível iniciar o serviço (${r.motivo}).`);
