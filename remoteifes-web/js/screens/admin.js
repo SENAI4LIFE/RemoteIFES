@@ -464,9 +464,11 @@ const Admin = {
     document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
     document.getElementById("cfgTurboFuncaoExtra").value = cfg.turboFuncaoExtra || "nenhuma";
     document.getElementById("cfgAutoLigar").checked = cfg.autoLigar !== false;
-    document.getElementById("cfgModoTeste").checked = !!cfg.modoTeste;
+    // Network access is shown read-only: the Operations Console owns it and the server refuses
+    // changes from the website.
+    document.getElementById("cfgModoTesteValor").textContent = cfg.modoTeste ? "ligado" : "desligado";
     document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !cfg.modoTeste);
-    document.getElementById("cfgRedesAutorizadas").value = (cfg.redesAutorizadas || []).join("\n");
+    document.getElementById("cfgRedesAutorizadasValor").textContent = (cfg.redesAutorizadas || []).join(", ") || "nenhuma";
     document.getElementById("cfgModoManutencao").checked = !!cfg.modoManutencao;
     document.getElementById("cfgEspCredenciaisObrigatorias").checked = !!cfg.espCredenciaisObrigatorias;
     document.getElementById("cfgEspApExigirCredencial").checked = !!cfg.espApExigirCredencial;
@@ -1240,11 +1242,6 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     temperaturaMaxima: Number(document.getElementById("cfgTemperaturaMaxima").value),
     turboFuncaoExtra: document.getElementById("cfgTurboFuncaoExtra").value,
     autoLigar: document.getElementById("cfgAutoLigar").checked,
-    modoTeste: document.getElementById("cfgModoTeste").checked,
-    redesAutorizadas: document.getElementById("cfgRedesAutorizadas").value
-      .split("\n")
-      .map((v) => v.trim())
-      .filter(Boolean),
     modoManutencao: document.getElementById("cfgModoManutencao").checked,
     espCredenciaisObrigatorias: document.getElementById("cfgEspCredenciaisObrigatorias").checked,
     espApExigirCredencial: document.getElementById("cfgEspApExigirCredencial").checked,
@@ -1432,6 +1429,3 @@ document.getElementById("proprietariosConcederDonoBtn").addEventListener("click"
   await Admin.carregarProprietariosDaSala(sala);
 });
 
-document.getElementById("cfgModoTeste").addEventListener("change", (e) => {
-  document.getElementById("cfgModoTesteAviso").classList.toggle("hidden", !e.target.checked);
-});

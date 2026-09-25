@@ -14,13 +14,20 @@ O RemoteIFES continua operando o prédio.
 | Serviço systemd, watchdog, logs do host | Salas, comandos, agendamentos, grade |
 | Atualização, rollback, versões em execução | Usuários, permissões, propriedade de sala |
 | Backup, restauração, quarentena de banco | Cadastro/OTA/credenciais/IR dos ESP32 |
-| Rede, domínio, TLS, proxy (diagnóstico) | Configurações da aplicação, relatos, auditoria |
+| Rede, domínio, TLS, proxy (diagnóstico); política de acesso de rede da aplicação (modo de teste e CIDR autorizados) | Demais configurações da aplicação, relatos, auditoria |
 | Mobile/CI (status, disparo, artefatos) | Página Aplicativo e download do APK pelo usuário |
 | Recuperação de conta e do próprio console | Monitoramento e mapas operacionais |
 
 O console **resume** a saúde da aplicação e oferece links profundos; não recria editores que já
-existem. Sobreposições conhecidas (CIDR autorizados, modo teste, modo manutenção) seguem com dono
-único na aplicação: o console lê e aponta, não edita.
+existem. Cada valor tem um único dono. O modo de manutenção continua na aplicação: o console lê e
+aponta, não edita. Os **CIDR autorizados** e o **modo de teste** passaram para o console, porque
+decidem quem alcança o site: gravados pelo site, uma faixa errada trancava do lado de fora o próprio
+navegador que poderia desfazê-la. A ação `rede.acesso-aplicacao` exige elevação, é serializada com
+implantação e restauração pela trava de manutenção, grava as duas chaves e o evento de auditoria da
+aplicação (`configuracao_alterada`, autor `console:<operador>`) numa única transação `IMMEDIATE` e
+confere o efeito relendo o banco. O servidor recusa com `403` qualquer mudança desses valores vinda
+do site (reenviar o valor vigente é aceito, para frontends antigos em cache); o terminal
+(`npm run redes`) continua como caminho de emergência sem o console.
 
 ## 2. Alternativas comparadas
 
