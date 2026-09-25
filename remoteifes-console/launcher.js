@@ -52,7 +52,7 @@ const lerContrato = (...a) => moduloIdentidade.lerContrato(...a);
 const verificarIdentidade = (...a) => moduloIdentidade.verificarIdentidade(...a);
 
 
-function pedir(porta, caminho, { metodo = "GET", corpo = null, timeoutMs = 4000 } = {}) {
+function pedir(porta, caminho, { metodo = "GET", corpo = null, timeoutMs = 4000, comOrigem = false } = {}) {
   return new Promise((resolve) => {
     const dados = corpo === null ? null : JSON.stringify(corpo);
     const req = http.request(
@@ -64,6 +64,8 @@ function pedir(porta, caminho, { metodo = "GET", corpo = null, timeoutMs = 4000 
         timeout: timeoutMs,
         headers: {
           Host: `127.0.0.1:${porta}`,
+          // Mutating requests carry the exact origin the Console expects from its own page.
+          ...(comOrigem ? { Origin: `http://127.0.0.1:${porta}` } : {}),
           ...(dados ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(dados) } : {}),
         },
       },
@@ -78,7 +80,7 @@ function pedir(porta, caminho, { metodo = "GET", corpo = null, timeoutMs = 4000 
           try {
             json = JSON.parse(texto);
           } catch {}
-          resolve({ ok: res.statusCode === 200, status: res.statusCode, json });
+          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json });
         });
       }
     );
@@ -252,6 +254,166 @@ async function abrir(url) {
   return { ok: true };
 }
 
+// --- First access --------------------------------------------------------------------------------
+//
+// While the Console has no operator, whoever can read the installation secret file (the local
+// administrator, by file permission) is authorized to create the first one. The launcher never
+// shows the secret: it trades it for a single-use invitation valid for a few minutes and opens the
+// browser on a private page (a file only this user can read) that redirects to the Console with the
+// invitation in the URL fragment. The invitation never appears in a process argument, and the page
+// removes it from the address bar and history before using it.
+
+const ESPERA_NAVEGADOR_MS = (() => {
+  const pedido = Number(process.env.CONSOLE_LANCADOR_ESPERA_NAVEGADOR_MS);
+  return Number.isFinite(pedido) && pedido >= 0 ? Math.min(pedido, 120_000) : 45_000;
+})();
+
+function lerSegredoDeInstalacao() {
+  try {
+    const segredo = fs.readFileSync(path.join(config.DIR_ESTADO, "bootstrap-token"), "utf8").trim();
+    return segredo ? { segredo } : { segredo: null, motivo: "o segredo de instalação está vazio" };
+  } catch (e) {
+    if (e.code === "EACCES" || e.code === "EPERM") {
+      return { segredo: null, motivo: "sem permissão para ler o segredo de instalação; use uma conta de administrador deste host" };
+    }
+    return { segredo: null, motivo: "o segredo de instalação não existe (já foi usado ou a instalação precisa de reparo)" };
+  }
+}
+
+async function precisaPrimeiroAcesso(contrato) {
+  const r = await pedir(contrato.porta, "/api/sessao");
+  return !!(r.json && r.json.precisaBootstrap);
+}
+
+function paginaDeRedirecionamento(destino) {
+  return [
+    "<!doctype html>",
+    '<html lang="pt-BR"><head><meta charset="utf-8">',
+    '<meta name="referrer" content="no-referrer">',
+    "<title>Console de Operações RemoteIFES</title></head>",
+    "<body><p>Abrindo o primeiro acesso ao Console de Operações…</p>",
+    `<script>location.replace(${JSON.stringify(destino)});</script>`,
+    "</body></html>",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Opens the first-access page. `abrirNavegador` is injectable for tests; by default it is the
+ * platform's.
+ */
+async function abrirPrimeiroAcesso(contrato, { abrirNavegador = (u) => plataforma.abrirNavegador(u), esperaMs = ESPERA_NAVEGADOR_MS } = {}) {
+  const { segredo, motivo } = lerSegredoDeInstalacao();
+  if (!segredo) {
+    log(`Primeiro acesso: ${motivo}. A tela do console explica as alternativas.`);
+    return abrir(urlDoConsole(contrato));
+  }
+  const r = await pedir(contrato.porta, "/api/bootstrap/convite", { metodo: "POST", corpo: { segredo }, comOrigem: true });
+  if (!r.ok || !r.json || !r.json.convite) {
+    log(`Primeiro acesso: o console recusou o convite (${(r.json && r.json.erro) || r.erro || r.status}).`);
+    return abrir(urlDoConsole(contrato));
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-console-"));
+  const pagina = path.join(dir, "primeiro-acesso.html");
+  fs.writeFileSync(pagina, paginaDeRedirecionamento(`${urlDoConsole(contrato)}#primeiro-acesso=${r.json.convite}`), { mode: 0o600 });
+  try {
+    const abertura = await abrirNavegador(require("url").pathToFileURL(pagina).toString());
+    if (!abertura || !abertura.disponivel) {
+      log(`Não foi possível abrir o navegador automaticamente (${(abertura && abertura.motivo) || "motivo desconhecido"}).`);
+      log("Para criar o primeiro operador sem navegador, use: --criar-operador");
+      return { ok: false, manual: true };
+    }
+    // The browser reads the page asynchronously; it is deleted once it had time to load.
+    if (esperaMs > 0) {
+      log("Abrindo o primeiro acesso no navegador...");
+      await new Promise((resolver) => setTimeout(resolver, esperaMs));
+    }
+    return { ok: true, primeiroAcesso: true };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function perguntarOculto(rl, pergunta) {
+  return new Promise((resolver) => {
+    const escrever = rl._writeToOutput;
+    rl._writeToOutput = (texto) => {
+      if (texto.startsWith(pergunta)) escrever.call(rl, pergunta);
+    };
+    rl.question(pergunta, (resposta) => {
+      rl._writeToOutput = escrever;
+      process.stdout.write("\n");
+      resolver(resposta);
+    });
+  });
+}
+
+/**
+ * Operator name and password: prompted on a terminal (password hidden and confirmed), or read as two
+ * lines from stdin for unattended use. Never from process arguments.
+ */
+async function lerCredenciais(entrada = process.stdin) {
+  if (entrada.isTTY) {
+    const rl = readline.createInterface({ input: entrada, output: process.stdout, terminal: true });
+    try {
+      const nome = (await new Promise((r) => rl.question("Nome do operador: ", r))).trim();
+      const senha = await perguntarOculto(rl, "Senha (mínimo de 12 caracteres): ");
+      const confirmacao = await perguntarOculto(rl, "Repita a senha: ");
+      if (senha !== confirmacao) return { erro: "as senhas não conferem" };
+      return { nome, senha };
+    } finally {
+      rl.close();
+    }
+  }
+  const texto = await new Promise((resolver, rejeitar) => {
+    let dados = "";
+    entrada.setEncoding("utf8");
+    entrada.on("data", (d) => {
+      dados += d;
+      if (dados.length > 4096) rejeitar(new Error("entrada grande demais"));
+    });
+    entrada.on("end", () => resolver(dados));
+    entrada.on("error", rejeitar);
+  });
+  const [nome = "", senha = ""] = texto.split(/\r?\n/);
+  return { nome: nome.trim(), senha };
+}
+
+async function criarOperadorPeloTerminal({ entrada = process.stdin } = {}) {
+  const r = await garantirBackend();
+  if (!r.ok) {
+    erro(r.motivo);
+    return 1;
+  }
+  if (!(await precisaPrimeiroAcesso(r.contrato))) {
+    erro("O console já tem um operador; entre pela tela de login.");
+    return 1;
+  }
+  const { segredo, motivo } = lerSegredoDeInstalacao();
+  if (!segredo) {
+    erro(`Não é possível criar o operador: ${motivo}.`);
+    return 1;
+  }
+  const credenciais = await lerCredenciais(entrada);
+  if (credenciais.erro) {
+    erro(`Operador não criado: ${credenciais.erro}.`);
+    return 1;
+  }
+  const resposta = await pedir(r.contrato.porta, "/api/bootstrap", {
+    metodo: "POST",
+    corpo: { segredo, nome: credenciais.nome, senha: credenciais.senha },
+    comOrigem: true,
+    timeoutMs: 15_000,
+  });
+  if (resposta.status === 201) {
+    log(`Operador "${credenciais.nome}" criado. O segredo de instalação deixou de valer.`);
+    log(`Entre em ${urlDoConsole(r.contrato)} (de outra máquina, por túnel SSH).`);
+    return 0;
+  }
+  erro(`Operador não criado: ${(resposta.json && resposta.json.erro) || resposta.erro || `HTTP ${resposta.status}`}.`);
+  return 1;
+}
+
 // --- Status -----------------------------------------------------------------------------------
 
 async function coletarStatus() {
@@ -377,9 +539,10 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.includes("--ajuda") || args.includes("-h")) {
-    log("uso: launcher.js [--menu|--status|--iniciar|--abrir-app|--abrir-console]");
+    log("uso: launcher.js [--menu|--status|--iniciar|--criar-operador|--abrir-app|--abrir-console]");
     log("  sem argumento: sobe o console se necessário, verifica a identidade e abre o navegador");
     log("  --iniciar: sobe o console e sai, sem abrir navegador (host sem interface gráfica)");
+    log("  --criar-operador: cria o primeiro operador pelo terminal (nome e senha pedidos, nunca em argumentos)");
     return 0;
   }
 
@@ -400,6 +563,10 @@ async function main() {
     log(r.jaEstava ? "Console já estava no ar." : "Console iniciado.");
     log(urlDoConsole(r.contrato));
     return 0;
+  }
+
+  if (args.includes("--criar-operador")) {
+    return criarOperadorPeloTerminal();
   }
 
   if (args.includes("--abrir-app")) {
@@ -423,6 +590,10 @@ async function main() {
     return 1;
   }
   if (r.jaEstava) log("Console já estava no ar.");
+  if (await precisaPrimeiroAcesso(r.contrato)) {
+    const primeiro = await abrirPrimeiroAcesso(r.contrato);
+    return primeiro.ok ? 0 : 1;
+  }
   const abertura = await abrir(urlDoConsole(r.contrato));
   return abertura.ok ? 0 : 1;
 }
@@ -442,4 +613,15 @@ function executar() {
 // module is the bootstrap, and `require.main === module` would make the launcher do nothing.
 if (require.main === module) executar();
 
-module.exports = { executar, lerContrato, verificarIdentidade, garantirBackend, urlDaAplicacao, urlDoConsole, coletarStatus, abrir };
+module.exports = {
+  executar,
+  lerContrato,
+  verificarIdentidade,
+  garantirBackend,
+  urlDaAplicacao,
+  urlDoConsole,
+  coletarStatus,
+  abrir,
+  abrirPrimeiroAcesso,
+  criarOperadorPeloTerminal,
+};
