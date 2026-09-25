@@ -1,10 +1,12 @@
 name: Android APK
+# Called from ci.yml when the web or Cordova sources change; can also be dispatched directly.
 on:
-  push:
-    branches: [main]
-    paths: ['remoteifes-cordova/**', 'remoteifes-web/**', '.github/workflows/android.yml']
-  pull_request:
-    paths: ['remoteifes-cordova/**', 'remoteifes-web/**', '.github/workflows/android.yml']
+  workflow_call:
+    inputs:
+      broad_matrix:
+        description: 'Run native smoke on APIs 24, 29, 34 and 36'
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       broad_matrix:
@@ -15,6 +17,7 @@ permissions:
   contents: read
 jobs:
   build:
+    name: APK build and inspection
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -69,6 +72,7 @@ jobs:
             remoteifes-cordova/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
           retention-days: 7
   smoke:
+    name: Native smoke (API ${{ matrix.api }})
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 25
