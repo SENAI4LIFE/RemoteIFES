@@ -70,7 +70,7 @@ test.after(async () => {
 
 test("a reconnection storm converges to one session per room, with no duplicates or leftovers", async () => {
   const primeira = salas.map(conectar);
-  assert.ok(await ate(() => abertos(primeira) === TOTAL), "todos os dispositivos deveriam conectar");
+  assert.ok(await ate(() => abertos(primeira) === TOTAL), "every device should connect");
   assert.ok(
     await ate(() => salas.every((sala) => deviceHub.estadoPublico(sala).conectado)),
     "every room should be listed as connected"
@@ -88,7 +88,7 @@ test("a reconnection storm converges to one session per room, with no duplicates
 
   const estados = deviceHub.listarEstados();
   assert.equal(Object.keys(estados).length, TOTAL, "no room session should remain");
-  assert.equal(abertos(primeira), 0, "nenhum socket antigo deveria continuar aberto");
+  assert.equal(abertos(primeira), 0, "no old socket should stay open");
 
   for (const ws of segunda) ws.close();
   assert.ok(await ate(() => salas.every((sala) => !deviceHub.estadoPublico(sala).conectado)), "encerramento limpo");

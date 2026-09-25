@@ -147,7 +147,7 @@ test("OTA in the validando phase blocks the interruption", async (t) => {
   const avaliacao = await amb.prontidao.avaliar({ interrompeServico: true });
   assert.equal(avaliacao.pronto, false);
   const bloqueio = avaliacao.bloqueios.find((b) => b.titulo === "Atualização de firmware em andamento");
-  assert.ok(bloqueio, "OTA em validando tem de bloquear");
+  assert.ok(bloqueio, "an OTA in validando must block");
   assert.match(bloqueio.detalhe, /validando: 1/);
 });
 
@@ -330,7 +330,7 @@ test("the restore runner refuses a traversal identifier before any effect", (t) 
     assert.equal(codigo, 2, `should refuse ${ruim} as an invalid argument`);
     assert.match(saida, /recusado|não encontrado/i);
   }
-  assert.deepEqual(fs.readFileSync(path.join(dados, "remoteifes.db")), antes, "nada pode ser tocado numa recusa de argumento");
+  assert.deepEqual(fs.readFileSync(path.join(dados, "remoteifes.db")), antes, "nothing may be touched when an argument is refused");
 });
 
 test("restore requires quiescence: with the application running it installs nothing", async (t) => {
@@ -391,7 +391,7 @@ test("observing the database neither creates nor changes files in the data direc
   assert.equal(espiada.lido, false);
   assert.match(espiada.erro, /criaria arquivos auxiliares/);
   assert.equal(espiada.bytes > 0, true, "the file metadata stays available");
-  assert.deepEqual(fs.readdirSync(dados).sort(), antes, "nenhum arquivo novo pode aparecer");
+  assert.deepEqual(fs.readdirSync(dados).sort(), antes, "no new file may appear");
 
   // With the application running the Console reads content: the database is already open by another
   // process.

@@ -10,7 +10,7 @@
 
   var estadoApp = { csrf: null, operador: null, elevada: false, area: "visao", painel: null, atualizacao: null, fluxo: null };
 
-  // --- utilidades -------------------------------------------------------------------------
+  // --- utilities -------------------------------------------------------------------------
 
   function $(id) { return document.getElementById(id); }
 
@@ -71,7 +71,7 @@
 
   function curto(commit) { return commit ? String(commit).slice(0, 8) : null; }
 
-  // --- rede ---------------------------------------------------------------------------------
+  // --- network ---------------------------------------------------------------------------------
 
   function api(caminho, opcoes) {
     opcoes = opcoes || {};
@@ -91,7 +91,7 @@
     });
   }
 
-  // --- entrada ------------------------------------------------------------------------------
+  // --- login ------------------------------------------------------------------------------
 
   function mostrarLogin(mensagem) {
     estadoApp.operador = null;
@@ -152,7 +152,7 @@
     }
   }
 
-  // --- abas ----------------------------------------------------------------------------------
+  // --- tabs ----------------------------------------------------------------------------------
 
   var AREAS = ["visao", "servico", "atualizacao", "programa", "dados", "mobile", "rede", "avancado"];
 
@@ -175,7 +175,7 @@
     if (area === "rede") carregarAcessoRede();
   }
 
-  // --- painel --------------------------------------------------------------------------------
+  // --- dashboard --------------------------------------------------------------------------------
 
   function classeDoEstadoApp(p) {
     if (!p.aplicacao.respondeu) {
@@ -450,7 +450,7 @@
     $("elevSenha").focus();
   }
 
-  // --- trabalhos ---------------------------------------------------------------------------------
+  // --- jobs ---------------------------------------------------------------------------------
 
   function abrirTrabalho(id) {
     var dlg = $("dlgTrabalho");
@@ -759,7 +759,7 @@
     });
   }
 
-  // --- dados ---------------------------------------------------------------------------------------
+  // --- data ---------------------------------------------------------------------------------------
 
   function carregarDados() {
     api("/api/backups").then(function (r) {
@@ -942,7 +942,7 @@
     });
   }
 
-  // --- rede -------------------------------------------------------------------------------------------
+  // --- network -------------------------------------------------------------------------------------------
 
   function carregarAcessoRede() {
     var situacao = $("acessoSituacao");
@@ -1094,7 +1094,7 @@
     carregarTrabalhos();
   }
 
-  // --- programa instalado e plataforma -------------------------------------------------------
+  // --- installed program and platform -------------------------------------------------------
 
   var ROTULO_CAPACIDADE = {
     controleDeServico: "Controle do serviço do RemoteIFES",
@@ -1187,7 +1187,7 @@
       acoes.appendChild(el("p", "Nenhuma operação de versão disponível agora.", "fraco"));
     }
 
-    // --- plataforma -----------------------------------------------------------------------
+    // --- platform -----------------------------------------------------------------------
     var dp = $("programaPlataforma");
     limpar(dp);
     dado(dp, "Sistema", p.plataforma.rotulo);
@@ -1348,7 +1348,7 @@
     carregarTerminal();
   }
 
-  // --- auxiliares de UI -----------------------------------------------------------------------------------
+  // --- UI helpers -----------------------------------------------------------------------------------
 
   function alertar(mensagem, nivel) {
     var faixa = $("faixaTrabalho");

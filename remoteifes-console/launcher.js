@@ -318,7 +318,7 @@ function imprimirStatus(s) {
   log("");
 }
 
-// --- Menu interativo ----------------------------------------------------------------------------
+// --- Interactive menu ----------------------------------------------------------------------------
 
 async function menu() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -371,7 +371,7 @@ async function menu() {
   rl.close();
 }
 
-// --- Entrada ------------------------------------------------------------------------------------
+// --- Entry point ------------------------------------------------------------------------------------
 
 async function main() {
   const args = process.argv.slice(2);

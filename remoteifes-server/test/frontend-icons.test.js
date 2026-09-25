@@ -65,7 +65,7 @@ test("no emoji or pictogram is used as a functional icon again", () => {
       if (pictograma.test(linha)) ofensas.push(`${path.relative(WEB_ROOT, arquivo)}:${i + 1}: ${linha.trim().slice(0, 80)}`);
     });
   }
-  assert.deepEqual(ofensas, [], `use o sprite SVG em vez de emoji:\n${ofensas.join("\n")}`);
+  assert.deepEqual(ofensas, [], `use the SVG sprite instead of emoji:\n${ofensas.join("\n")}`);
 });
 
 test("sprite icons are decorative and do not replace the accessible name", () => {
@@ -74,7 +74,7 @@ test("sprite icons are decorative and do not replace the accessible name", () =>
   svgsDeIcone.forEach((svg) => assert.match(svg, /aria-hidden="true"/, `icon without aria-hidden: ${svg}`));
 
   const sprite = index.match(/<svg class="icone-sprite"[^>]*>/);
-  assert.ok(sprite, "bloco do sprite ausente");
+  assert.ok(sprite, "sprite block missing");
   assert.match(sprite[0], /aria-hidden="true"/, "the sprite must stay out of the accessibility tree");
 });
 

@@ -203,11 +203,11 @@ test("the Console is not published by GitHub Pages and does not enter the Cordov
   const raiz = path.join(ajuda.RAIZ, "..");
 
   const pages = fs.readFileSync(path.join(raiz, ".github", "workflows", "pages.yml"), "utf8");
-  assert.match(pages, /path:\s*remoteifes-web/, "o Pages publica apenas o frontend");
+  assert.match(pages, /path:\s*remoteifes-web/, "Pages publishes only the frontend");
   assert.ok(!pages.includes("remoteifes-console"), "the Console must not enter the Pages artifact");
 
   const sync = fs.readFileSync(path.join(raiz, "remoteifes-cordova", "sync-www.js"), "utf8");
-  assert.match(sync, /remoteifes-web/, "o Cordova empacota apenas o frontend");
+  assert.match(sync, /remoteifes-web/, "Cordova packages only the frontend");
   assert.ok(!sync.includes("remoteifes-console"), "the Console must not enter the Cordova www");
 
   // The application serves the frontend from remoteifes-web; the Console stays outside that root.
@@ -236,7 +236,7 @@ test("no Console source file contains a NUL byte", () => {
       }
       if (!/\.(js|json|md|sh|ps1|css|html|modelo|socket|plist|yml)$/.test(entrada.name)) continue;
       const bytes = fs.readFileSync(completo);
-      assert.equal(bytes.indexOf(0), -1, `byte nulo em ${path.relative(ajuda.RAIZ, completo)}`);
+      assert.equal(bytes.indexOf(0), -1, `null byte in ${path.relative(ajuda.RAIZ, completo)}`);
     }
   };
   varrer(ajuda.RAIZ);

@@ -14,7 +14,7 @@ const ajuda = require("./helpers");
 // signature before writing, correct target, checked digest, extraction that does not escape the
 // destination, atomic swap and no silent downgrade.
 
-// --- Apoio -------------------------------------------------------------------------------
+// --- Support -------------------------------------------------------------------------------
 
 function parDeChaves() {
   const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
@@ -84,7 +84,7 @@ function manifestoDe({ versao, artefatos, expiraEm = null, minimoParaAtualizar =
   )}\n`;
 }
 
-/** Servidor de releases falso: serve manifesto, assinatura e artefatos. */
+/** Fake release server: serves the manifest, signature and artifacts. */
 function servidorDeRelease(arquivos) {
   const pedidos = [];
   const servidor = http.createServer((req, res) => {
@@ -239,7 +239,7 @@ test("extraction refuses a path that escapes the destination", (t) => {
   const malicioso = path.join(dir, "mal.tar.gz");
   fs.writeFileSync(malicioso, tarGz({ "../fora.txt": "escapou" }));
   assert.throws(() => atualizador.extrairTarGz(malicioso, path.join(dir, "destino")), /escapa do destino|fora do destino/);
-  assert.ok(!fs.existsSync(path.join(dir, "fora.txt")), "nada pode ser gravado fora");
+  assert.ok(!fs.existsSync(path.join(dir, "fora.txt")), "nothing may be written outside");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -316,7 +316,7 @@ test("complete flow: verifies, installs side by side and swaps the pointer", asy
   assert.ok(!fs.existsSync(path.join(raiz, "descargas")) || fs.readdirSync(path.join(raiz, "descargas")).length === 0);
   assert.ok(linhas.some((l) => /SHA-256 confere/.test(l)));
 
-  // Nenhuma credencial foi enviada ao servidor de release.
+  // No credential was sent to the release server.
   assert.ok(servidor.pedidos.every((p) => p.autorizacao === null), "release downloads carry no credential");
 });
 
@@ -694,7 +694,7 @@ test("orphan lock recovery does not let two processes in", (t) => {
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
   const arquivo = path.join(raiz, "operacao-em-andamento.json");
 
-  // Trava de um processo morto.
+  // Lock held by a dead process.
   fs.writeFileSync(arquivo, `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: 999999, em: new Date().toISOString() })}\n`);
 
   const primeira = atualizador.adquirirTrava("A");
@@ -896,6 +896,6 @@ test("a tar of directories only also hits the entry ceiling", (t) => {
   assert.throws(
     () => atualizador.extrairTarGz(arquivo, path.join(dir, "saida")),
     /mais de \d+ entradas/,
-    "um tar só de diretórios tem de ser recusado pelo teto de entradas"
+    "a directory-only tar must be refused by the entry cap"
   );
 });

@@ -308,7 +308,7 @@ test("GET /admin/monitoramento/historico requires superadministrator, validates 
   assert.equal(padrao.faixa, "24h");
   for (const invalida of ["1h", "abc", "%20", "24h;DROP"]) {
     const resp = await authGet(`/admin/monitoramento/historico?faixa=${invalida}`, token);
-    assert.equal(resp.status, 400, `faixa ${invalida}`);
+    assert.equal(resp.status, 400, `range ${invalida}`);
     assert.equal((await resp.json()).ok, false);
   }
   assert.equal((await authGet("/admin/monitoramento/historico?faixa=24h&faixa=7d", token)).status, 400);

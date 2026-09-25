@@ -46,7 +46,7 @@ function marcarAtividade() {
   ultimaAtividade = Date.now();
 }
 
-// --- Utilidades de resposta ----------------------------------------------------------------
+// --- Response helpers ----------------------------------------------------------------
 
 function cabecalhosBase(res) {
   res.setHeader("Content-Security-Policy", CSP);
@@ -146,7 +146,7 @@ function limparCookieSessao(res) {
   res.setHeader("Set-Cookie", atributos.join("; "));
 }
 
-// --- Corpo ------------------------------------------------------------------------------------
+// --- Request body ------------------------------------------------------------------------------------
 
 function lerCorpo(req, limite = 64 * 1024) {
   return new Promise((resolve, reject) => {
@@ -237,7 +237,7 @@ function exigirElevacao(res, sessao) {
   return true;
 }
 
-// --- Rotas -------------------------------------------------------------------------------------
+// --- Routes -------------------------------------------------------------------------------------
 
 async function rotear(req, res, url, params) {
   const metodo = req.method;
@@ -545,7 +545,7 @@ async function rotear(req, res, url, params) {
     }
   }
 
-  // --- Trabalhos --------------------------------------------------------------------------------
+  // --- Jobs --------------------------------------------------------------------------------
 
   if (caminho === "/api/trabalhos" && metodo === "GET") {
     return responderJson(res, 200, { trabalhos: execucao.listar(Math.min(Number(params.get("limite")) || 20, 50)) });
@@ -655,7 +655,7 @@ function fluxoDeEventos(req, res, id) {
   return undefined;
 }
 
-// --- Servidor -----------------------------------------------------------------------------------
+// --- Server -----------------------------------------------------------------------------------
 
 function criarServidor() {
   const servidor = http.createServer(async (req, res) => {

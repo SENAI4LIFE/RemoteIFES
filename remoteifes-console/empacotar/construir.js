@@ -296,7 +296,7 @@ function montarDeb(saida) {
   return deb.length;
 }
 
-// --- Principal ----------------------------------------------------------------------------------
+// --- Main ----------------------------------------------------------------------------------
 
 function main() {
   const saida = path.resolve(arg("saida", path.join(RAIZ, "dist")));

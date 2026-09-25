@@ -60,10 +60,10 @@ test("the public catalog covers the common functions and contains no broken link
   ]) assert.ok(ids.has(id), `missing public topic: ${id}`);
   assert.equal(ids.size, manual.secoes.length);
   manual.secoes.forEach((secao) => {
-    assert.ok(manual.categorias[secao.categoria], `categoria ausente em ${secao.id}`);
+    assert.ok(manual.categorias[secao.categoria], `missing category in ${secao.id}`);
     for (const bloco of secao.corpo) {
       if (bloco.t === "links") {
-        bloco.itens.forEach((link) => assert.ok(ids.has(link.id), `link quebrado em ${secao.id}: ${link.id}`));
+        bloco.itens.forEach((link) => assert.ok(ids.has(link.id), `broken link in ${secao.id}: ${link.id}`));
       }
     }
   });
@@ -81,7 +81,7 @@ test("critical commands keep a single canonical form in the README", () => {
   ];
   for (const grupo of grupos) {
     for (const comando of commands[grupo]) {
-      assert.ok(README.includes(comando), `${grupo}: comando ausente ou divergente no README: ${comando}`);
+      assert.ok(README.includes(comando), `${grupo}: command missing from or different in the README: ${comando}`);
     }
   }
 });
@@ -197,7 +197,7 @@ test("the Console has its own section with access, boundary and repair", () => {
 
 test("the README keeps a single emergency recovery reference", () => {
   assert.match(README, /^## Recuperação de emergência por terminal$/m, "the section must exist");
-  assert.match(README, /^## Console de Operações$/m, "o README documenta o acesso ao console");
+  assert.match(README, /^## Console de Operações$/m, "the README documents access to the console");
 
   // A single section holds the emergency commands: look for competing headings.
   const cabecalhos = [...README.matchAll(/^#{2,3} (.+)$/gm)].map((m) => m[1]);
@@ -242,7 +242,7 @@ test("manual and README describe the current grouped Administration", () => {
     "Administração &gt; Sistema &gt; Status &gt; Sistema",
     "Administração &gt; Sistema &gt; Configurações",
   ]) {
-    assert.ok(documentacao.includes(caminho), `caminho ausente no manual: ${caminho}`);
+    assert.ok(documentacao.includes(caminho), `path missing from the manual: ${caminho}`);
   }
 
   for (const obsoleto of [
@@ -281,7 +281,7 @@ test("manual and README describe the current grouped Administration", () => {
     "Administração > Sistema > Status > Sistema",
     "Administração > Sistema > Configurações",
   ]) {
-    assert.ok(README.includes(caminho), `caminho ausente no README: ${caminho}`);
+    assert.ok(README.includes(caminho), `path missing from the README: ${caminho}`);
   }
 
   for (const obsoleto of [
@@ -306,8 +306,8 @@ test("manual and README describe the current grouped Administration", () => {
   }
 
   for (const grupo of ["Gestão", "Dispositivos", "Sistema"]) {
-    assert.ok(documentacao.includes(grupo), `grupo ausente no manual: ${grupo}`);
-    assert.ok(README.includes(`**${grupo}**`), `grupo ausente na tabela do README: ${grupo}`);
+    assert.ok(documentacao.includes(grupo), `group missing from the manual: ${grupo}`);
+    assert.ok(README.includes(`**${grupo}**`), `group missing from the README table: ${grupo}`);
   }
 });
 

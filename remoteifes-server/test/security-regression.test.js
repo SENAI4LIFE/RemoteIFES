@@ -72,7 +72,7 @@ test("finding #12: a regular admin cannot delete another admin", () => {
   assert.throws(
     () => usuariosService.remover(admin2.id, { id: admin1.id, nivel: usuariosService.NIVEL_ADMIN }),
     /apenas o superadministrador/,
-    "um admin comum não pode remover outro admin"
+    "a regular admin cannot remove another admin"
   );
   assert.ok(usuariosService.buscarPorId(admin2.id), "the target account must still exist after the blocked attempt");
 });

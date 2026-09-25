@@ -37,7 +37,7 @@ function lerTokens() {
 
 function tokenDe(role) {
   const t = lerTokens()[role];
-  if (!t) throw new Error(`sem token de sessão para o papel "${role}" (global-setup rodou?)`);
+  if (!t) throw new Error(`no session token for role "${role}" (did global-setup run?)`);
   return t;
 }
 
@@ -68,7 +68,7 @@ const test = base.test.extend({
   loginComo: async ({ page }, use) => {
     async function loginComo(role) {
       const u = USERS[role];
-      if (!u) throw new Error(`papel desconhecido: ${role}`);
+      if (!u) throw new Error(`unknown role: ${role}`);
       await base.expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
       await page.locator(`.portal-option[data-tipo="${u.tipo}"]`).click();
       await base.expect(page.locator("#screen-login")).toBeVisible();
@@ -85,7 +85,7 @@ const test = base.test.extend({
     async function sessaoComo(role) {
       await injetarSessao(context, role);
       const reset = await page.request.post(`${API_URL}/__e2e/resetar-dispositivo`);
-      if (!reset.ok()) throw new Error(`não foi possível preparar o estado do dispositivo E2E (HTTP ${reset.status()})`);
+      if (!reset.ok()) throw new Error(`could not prepare the E2E device state (HTTP ${reset.status()})`);
       await page.goto("/");
       await base.expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
       await base.expect(page.locator("#screen-server-status")).toBeHidden();
@@ -111,11 +111,11 @@ async function semRolagemHorizontal(page) {
 async function publicarApkFixture(request) {
   const resp = await request.post(`${API_URL}/__e2e/publicar-apk`);
   if (!resp.ok()) {
-    throw new Error(`/__e2e/publicar-apk falhou (HTTP ${resp.status()}): ${await resp.text()}`);
+    throw new Error(`/__e2e/publicar-apk failed (HTTP ${resp.status()}): ${await resp.text()}`);
   }
   const corpo = await resp.json();
   if (!corpo || corpo.ok !== true) {
-    throw new Error(`/__e2e/publicar-apk não confirmou a publicação: ${JSON.stringify(corpo)}`);
+    throw new Error(`/__e2e/publicar-apk did not confirm the publication: ${JSON.stringify(corpo)}`);
   }
   return corpo;
 }
@@ -123,19 +123,19 @@ async function publicarApkFixture(request) {
 async function despublicarApkFixture(request) {
   const resp = await request.post(`${API_URL}/__e2e/despublicar-apk`);
   if (!resp.ok()) {
-    throw new Error(`/__e2e/despublicar-apk falhou (HTTP ${resp.status()})`);
+    throw new Error(`/__e2e/despublicar-apk failed (HTTP ${resp.status()})`);
   }
 }
 
 async function publicarFirmwareFixture(request, versao = "4.1.0") {
   const resp = await request.post(`${API_URL}/__e2e/publicar-firmware?versao=${encodeURIComponent(versao)}`);
-  if (!resp.ok()) throw new Error(`/__e2e/publicar-firmware falhou (HTTP ${resp.status()}): ${await resp.text()}`);
+  if (!resp.ok()) throw new Error(`/__e2e/publicar-firmware failed (HTTP ${resp.status()}): ${await resp.text()}`);
   return (await resp.json()).manifesto;
 }
 
 async function removerFirmwareFixture(request) {
   const resp = await request.post(`${API_URL}/__e2e/remover-firmware`);
-  if (!resp.ok()) throw new Error(`/__e2e/remover-firmware falhou (HTTP ${resp.status()})`);
+  if (!resp.ok()) throw new Error(`/__e2e/remover-firmware failed (HTTP ${resp.status()})`);
 }
 
 async function irParaSala(page, sala, andar = "1") {

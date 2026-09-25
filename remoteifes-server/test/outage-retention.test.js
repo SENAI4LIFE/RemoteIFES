@@ -44,7 +44,7 @@ test("the row limit also spares open intervals", () => {
   retencaoService.aplicarLimite("esp_indisponibilidades", 10);
   const restantes = db.prepare("SELECT onlineEm FROM esp_indisponibilidades WHERE sala = 'RET-03'").all();
   assert.equal(restantes.length, 11);
-  assert.equal(restantes.filter((r) => r.onlineEm === null).length, 1, "o intervalo aberto sobrevive ao corte por quantidade");
+  assert.equal(restantes.filter((r) => r.onlineEm === null).length, 1, "the open interval survives the count-based cut");
 });
 
 test("in the 30-day heatmap availability is computed over the span with retained evidence, not over the whole period", () => {
@@ -59,8 +59,8 @@ test("in the 30-day heatmap availability is computed over the span with retained
   assert.match(trinta.avisoRetencao, /168 h/);
   const ret01 = trinta.salas.find((s) => s.sala === "RET-01");
   const ret02 = trinta.salas.find((s) => s.sala === "RET-02");
-  assert.ok(Math.abs(ret01.valor - (100 * (1 - 1 / 7))) < 0.2, `um dia offline em 7 dias retidos ≈ 85,7%, obtido ${ret01.valor}`);
-  assert.equal(ret02.valor, 0, "queda em andamento cobre todo o trecho retido");
+  assert.ok(Math.abs(ret01.valor - (100 * (1 - 1 / 7))) < 0.2, `one offline day in 7 retained days ≈ 85.7%, got ${ret01.valor}`);
+  assert.equal(ret02.valor, 0, "an ongoing outage covers the whole retained span");
   assert.equal(ret02.minutosOffline, 7 * 24 * 60);
 
   const sete = heatmapService.calcular("disponibilidade", "7d");

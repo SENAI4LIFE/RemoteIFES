@@ -87,14 +87,14 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
     const porta = await portaLivre();
     const servidor = iniciar(porta);
 
-    assert.ok(await esperar(() => saudavel(porta)), "o servidor deveria responder em /health");
+    assert.ok(await esperar(() => saudavel(porta)), "the server should answer on /health");
 
     servidor.filho.send({ encerrar: sinal });
     const codigo = await servidor.encerrado;
     assert.equal(codigo, 0, `clean exit after ${sinal}: ${servidor.texto()}`);
     assert.ok(
       servidor.texto().includes(`[shutdown] {"sinal":"${sinal}"}`),
-      `o encerramento gracioso deveria ser registrado: ${servidor.texto()}`
+      `the graceful shutdown should be logged: ${servidor.texto()}`
     );
     assert.doesNotMatch(servidor.texto(), /uncaught-exception/);
 
@@ -103,7 +103,7 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
     await new Promise((r) => liberada.close(r));
 
     const reinicio = iniciar(porta);
-    assert.ok(await esperar(() => saudavel(porta)), "o servidor deveria subir de novo na mesma porta");
+    assert.ok(await esperar(() => saudavel(porta)), "the server should start again on the same port");
     reinicio.filho.send({ encerrar: "SIGTERM" });
     assert.equal(await reinicio.encerrado, 0);
   });

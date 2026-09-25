@@ -297,7 +297,7 @@ test("migrating the old Linux layout moves atual/ to versoes/ without touching s
   const raiz = ajuda.dirTemporario("console-migra-");
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
 
-  // Layout anterior: <raiz>/atual e <raiz>/anterior
+  // Previous layout: <raiz>/atual and <raiz>/anterior
   const antigo = path.join(raiz, "atual");
   fs.mkdirSync(antigo, { recursive: true });
   fs.writeFileSync(path.join(antigo, "package.json"), JSON.stringify({ version: "1.0.0" }));
@@ -512,7 +512,7 @@ test("REGRESSION: uninstalling from inside the installation removes the whole ro
 
   const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
   const deDentro = path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js");
-  assert.ok(fs.existsSync(deDentro), "o desinstalador viaja dentro do payload");
+  assert.ok(fs.existsSync(deDentro), "the uninstaller travels inside the payload");
 
   const d = rodarNode([deDentro, "--raiz", raiz, "--estado", estadoDir, "--sim"]);
   assert.equal(d.codigo, 0, d.saida);
@@ -885,7 +885,7 @@ test("REGRESSION: the program started from the shortcut finds state where the in
   const r = await rodarNodeAsync([path.join(raiz, "launcher-bootstrap.js"), "--iniciar"], limpo);
   assert.equal(r.codigo, 0, `the shortcut must start the Console without an injected environment. Output:\n${r.saida}`);
 
-  // A prova: o contrato aparece no estado REGISTRADO, e na porta registrada.
+  // The proof: the contract appears in the RECORDED state, on the recorded port.
   const contrato = path.join(estadoDir, "endereco.json");
   assert.ok(fs.existsSync(contrato), "the contract must appear in the recorded state directory");
   const dados = JSON.parse(fs.readFileSync(contrato, "utf8"));
