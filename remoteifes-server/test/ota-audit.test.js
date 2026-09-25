@@ -30,6 +30,8 @@ function executar(corpo) {
       eventos,
       estadoPublico: (s) => ({ conectado: online.has(s), fwVersao: versoes.get(s), modo: "operation" }),
       dispositivoConectado: (s) => online.has(s),
+      // Every stubbed board is directly connected (OTA over the mesh is refused elsewhere).
+      conexaoDaSala: (s) => (online.has(s) ? { canal: { transporte: "direto" } } : null),
       enviarComando: (s, m) => { ofertas.push({ sala: s, ...m }); return true; },
     });
     function sala(s) {

@@ -18,6 +18,30 @@ let wss = null;
 let intervaloPing = null;
 let proximoIdCaptura = 1;
 
+// --- Transport boundary -------------------------------------------------------------------------
+//
+// A connection entry is the logical device: room, identity, desired-state confirmation, telemetry,
+// firmware and command status. How frames reach it is its channel: a direct WebSocket (the default)
+// or a mesh session relayed by a gateway board (meshService). Everything in this module talks to the
+// channel; only the direct channel knows about a socket.
+
+function canalDireto(ws) {
+  return {
+    transporte: "direto",
+    ws,
+    aberto: () => ws.readyState === ws.OPEN,
+    enviar: (payload) => {
+      ws.send(JSON.stringify(payload));
+      return true;
+    },
+    fechar: (codigo, motivo) => ws.close(codigo, motivo),
+  };
+}
+
+function canalAberto(entrada) {
+  return !!entrada && entrada.canal.aberto();
+}
+
 function protocolosIr() {
   return require("./protocolosIrService");
 }
@@ -78,6 +102,8 @@ function estadoPublico(sala) {
   if (!entrada) return { conectado: false, role, ota };
   return {
     conectado: true,
+    transporte: entrada.canal.transporte,
+    mesh: entrada.mesh ? { gateway: entrada.mesh.gateway, saltos: entrada.mesh.saltos, rssi: entrada.mesh.rssi } : null,
     mac: entrada.mac,
     ip: entrada.ip,
     conectadoEm: entrada.conectadoEm,
@@ -100,7 +126,7 @@ function estadoPublico(sala) {
 // is not enough to deliver a command).
 function canalDeComandos(sala) {
   const entrada = conexoes.get(sala);
-  return !!entrada && entrada.ws.readyState === entrada.ws.OPEN;
+  return canalAberto(entrada);
 }
 
 // true/false: the connected board has (or has not) reported the current desired state; null: no
@@ -151,11 +177,11 @@ function vinculoValido(salaRow, entrada) {
 
 function enviarAtualizacaoCredencial(sala, payload) {
   const entrada = conexoes.get(sala);
-  if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN || !salasService.buscar(sala)) return false;
-  entrada.ws.send(JSON.stringify(payload));
+  if (!canalAberto(entrada) || !salasService.buscar(sala)) return false;
+  entrada.canal.enviar(payload);
   const timer = setTimeout(() => {
     if (conexoes.get(sala) === entrada && !vinculoValido(salasService.buscar(sala), entrada)) {
-      entrada.ws.close(4001, "credencial do dispositivo alterada");
+      entrada.canal.fechar(4001, "credencial do dispositivo alterada");
     }
   }, 1000);
   timer.unref();
@@ -164,14 +190,14 @@ function enviarAtualizacaoCredencial(sala, payload) {
 
 function enviarComando(sala, payload) {
   const entrada = conexoes.get(sala);
-  if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN) return false;
+  if (!canalAberto(entrada)) return false;
   const salaRow = salasService.buscar(sala);
   if (!vinculoValido(salaRow, entrada)) {
-    entrada.ws.close(4001, "vínculo do dispositivo alterado");
+    entrada.canal.fechar(4001, "vínculo do dispositivo alterado");
     return false;
   }
   try {
-    entrada.ws.send(JSON.stringify(payload));
+    if (entrada.canal.enviar(payload) === false) return false;
   } catch (erro) {
     logger.warn("device-ws-envio-falhou", { sala, tipo: payload && payload.tipo, mensagem: erro.message });
     return false;
@@ -208,14 +234,14 @@ function difundirPoliticaAp(exigirCredencial) {
 
 function dispositivoConectado(sala) {
   const entrada = conexoes.get(sala);
-  if (!entrada || entrada.ws.readyState !== entrada.ws.OPEN) return false;
+  if (!canalAberto(entrada)) return false;
   return vinculoValido(salasService.buscar(sala), entrada);
 }
 
 function desconectarSala(sala) {
   const entrada = conexoes.get(sala);
   if (!entrada) return false;
-  entrada.ws.close(4001, "vínculo do dispositivo alterado");
+  entrada.canal.fechar(4001, "vínculo do dispositivo alterado");
   return true;
 }
 
@@ -307,7 +333,7 @@ function sincronizarEstadoInicial(sala, entrada, info) {
     clearTimeout(entrada.sincronizacaoInicial);
     entrada.sincronizacaoInicial = null;
   }
-  if (entrada.estadoInicialSincronizado || conexoes.get(sala) !== entrada || entrada.ws.readyState !== entrada.ws.OPEN) return;
+  if (entrada.estadoInicialSincronizado || conexoes.get(sala) !== entrada || !canalAberto(entrada)) return;
   entrada.estadoInicialSincronizado = true;
   // An explicit command already left on this connection before the info (or the wait): the info
   // describes the board before that command, so it must not adopt a latch or erase the newer
@@ -326,7 +352,7 @@ function sincronizarEstadoInicial(sala, entrada, info) {
   const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
   if (comandoInicial) {
     try {
-      entrada.ws.send(JSON.stringify({ ...comandoInicial, restauracao: true }));
+      entrada.canal.enviar({ ...comandoInicial, restauracao: true });
     } catch (erro) {
       logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
     }
@@ -401,6 +427,170 @@ function registrarCaptura(sala, entrada, msg, salaRow) {
   eventos.emit("captura", { sala, captura });
 }
 
+/**
+ * Registers an authenticated device on its channel. Shared by the direct WebSocket and by a mesh
+ * session: the logical device is the same, only the channel differs.
+ */
+function conectarDispositivo({ sala, mac, viaCredencial, deviceId, ip, credencialGrace = null, canal, mesh = null }) {
+  const agora = new Date().toISOString();
+
+  const antiga = conexoes.get(sala);
+  if (antiga && canalAberto(antiga)) {
+    antiga.canal.fechar(4002, "nova conexão do mesmo dispositivo");
+  }
+
+  const entrada = {
+    canal,
+    mac,
+    viaCredencial: !!viaCredencial,
+    deviceId,
+    ip,
+    mesh,
+    conectadoEm: agora,
+    ultimaAtividadeEm: agora,
+    wifiRssi: null,
+    modo: "operation",
+    fwVersao: null,
+    ultimaTelemetria: null,
+    ultimoComando: null,
+    failsafe: null,
+    capacidades: {},
+    credencialExpiraEm: credencialGrace || null,
+    sincronizacaoInicial: null,
+    estadoInicialSincronizado: false,
+    versaoConfirmada: null,
+    versaoEstadoReportada: null,
+    versaoEnviada: null,
+    versaoInvalidadaAte: null,
+  };
+  conexoes.set(sala, entrada);
+
+  try {
+    salasService.marcarOnline(sala, {}, mac, ip, { viaCredencial });
+  } catch (err) {
+    logger.warn("device-ws-conectar-marcar-online-falhou", { sala, mensagem: err.message });
+  }
+  logger.info("device-ws-conectado", { sala, mac, ip, transporte: canal.transporte });
+  monitoramentoService.registrarConexaoDispositivo(sala);
+  eventos.emit("conexao", { sala, conectado: true });
+  const salaInicial = salasService.buscar(sala);
+  try {
+    entrada.canal.enviar({ tipo: "device_role", role: papelDaEntrada(sala, entrada, salaInicial) });
+    entrada.canal.enviar(salasService.comandoFailsafeIR(salaInicial));
+  } catch (erro) {
+    logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
+  }
+  // setImmediate: after a long event-loop pause, an info already received on the socket is
+  // processed (I/O phase) before this timeout-driven synchronization.
+  entrada.sincronizacaoInicial = setTimeout(() => setImmediate(() => sincronizarEstadoInicial(sala, entrada, null)), ESPERA_INFO_INICIAL_MS);
+  entrada.sincronizacaoInicial.unref();
+  if (viaCredencial) {
+    try {
+      const credenciaisService = require("./esp32CredenciaisService");
+      if (entrada.credencialExpiraEm) credenciaisService.reentregarAtual(sala);
+      else credenciaisService.entregarPendente(sala);
+    } catch (erro) {
+      logger.warn("device-ws-credencial-pendente-falhou", { sala, mensagem: erro.message });
+    }
+  }
+  try {
+    entrada.canal.enviar(require("./configuracoesService").politicaApDispositivo());
+  } catch (erro) {
+    logger.warn("device-ws-politica-ap-falhou", { sala, mensagem: erro.message });
+  }
+  return entrada;
+}
+
+/**
+ * Handles one message from a device, whatever channel carried it.
+ */
+function processarMensagem(sala, entrada, msg, salaAtual) {
+  if (msg.tipo === "telemetria") {
+    registrarTelemetria(sala, entrada, msg);
+  } else if (msg.tipo === "info") {
+    registrarCapacidades(entrada, msg);
+    registrarVersaoFirmware(sala, entrada, msg.fw);
+    atualizarFailsafeReportado(entrada, msg);
+    if (!entrada.estadoInicialSincronizado) sincronizarEstadoInicial(sala, entrada, msg);
+    else if (reconciliarRelato(sala, entrada, msg)) salasService.eventos.emit("mudanca-sala", { sala });
+  } else if (msg.tipo === "ota_validado") {
+    registrarCapacidades(entrada, { otaValidacao: true });
+    if (require("./otaService").registrarValidacao(sala, msg)) {
+      try {
+        entrada.canal.enviar({ tipo: "ota_validacao_ok", tentativa: msg.tentativa });
+      } catch (erro) {
+        logger.warn("device-ws-ota-validacao-ack-falhou", { sala, mensagem: erro.message });
+      }
+    }
+  } else if (msg.tipo === "failsafe_status") {
+    if (atualizarFailsafeReportado(entrada, msg)) {
+      if (reconciliarRelato(sala, entrada, msg)) salasService.eventos.emit("mudanca-sala", { sala });
+      eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
+    }
+  } else if (msg.tipo === "ota_progresso") {
+    require("./otaService").registrarProgresso(sala, msg);
+  } else if (msg.tipo === "ota_resultado") {
+    require("./otaService").registrarResultado(sala, msg);
+  } else if (msg.tipo === "captura") {
+    registrarCaptura(sala, entrada, msg, salaAtual);
+  } else if (msg.tipo === "acesso") {
+    salasService.registrarAcessoEsp(sala, {
+      ip: typeof msg.ip === "string" ? msg.ip : entrada.ip,
+      userAgent: typeof msg.userAgent === "string" ? msg.userAgent.slice(0, 500) : null,
+    });
+  } else if (msg.tipo === "comando") {
+    if (typeof msg.cmd === "string" && msg.cmd.length <= 100) {
+      const valor = (typeof msg.valor === "string" || typeof msg.valor === "number")
+        ? msg.valor
+        : undefined;
+      salasService.registrarComandoDispositivo(sala, msg.cmd, valor);
+    }
+  } else if (msg.tipo === "modo_alterado") {
+    entrada.modo = MODOS_VALIDOS.has(msg.modo) ? msg.modo : entrada.modo;
+    eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
+  }
+}
+
+function desconectarDispositivo(sala, entrada, code, motivo) {
+  if (entrada.sincronizacaoInicial) {
+    clearTimeout(entrada.sincronizacaoInicial);
+    entrada.sincronizacaoInicial = null;
+  }
+  if (conexoes.get(sala) !== entrada) return;
+  conexoes.delete(sala);
+  logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString(), transporte: entrada.canal.transporte });
+  try {
+    if (salasService.marcarOffline(sala, null, "websocket-fechado")) salasService.eventos.emit("mudanca");
+  } catch (erro) {
+    logger.warn("device-ws-marcar-offline-falhou", { sala, mensagem: erro.message });
+  }
+  try {
+    require("./otaService").aoDesconectarDispositivo(sala);
+  } catch (erro) {
+    logger.warn("device-ws-ota-desconectar-falhou", { sala, mensagem: erro.message });
+  }
+  if (entrada.canal.transporte === "direto") {
+    // A gateway that goes away takes its mesh sessions with it: gateway availability never proved
+    // the boards behind it, and their absence is now certain.
+    try {
+      require("./meshService").aoDesconectarGateway(sala);
+    } catch (erro) {
+      logger.warn("mesh-gateway-desconectar-falhou", { sala, mensagem: erro.message });
+    }
+  }
+  eventos.emit("conexao", { sala, conectado: false });
+}
+
+// A gateway's socket carries the traffic of the boards behind it, so its message budget grows with
+// the authenticated nodes it serves, within a hard ceiling.
+function limiteDeMensagens(sala) {
+  let nos = 0;
+  try {
+    nos = require("./meshService").nosDoGateway(sala);
+  } catch {}
+  return Math.min(MAX_MENSAGENS_JANELA + nos * MAX_MENSAGENS_JANELA, MAX_MENSAGENS_JANELA * 20);
+}
+
 function iniciar(server) {
   const { WebSocketServer } = require("ws");
   wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
@@ -433,79 +623,19 @@ function iniciar(server) {
       return;
     }
 
-    const { sala, mac, viaCredencial, deviceId } = auth;
-    const ip = req.socket.remoteAddress;
-    const agora = new Date().toISOString();
-
-    const antiga = conexoes.get(sala);
-    if (antiga && antiga.ws.readyState === antiga.ws.OPEN) {
-      antiga.ws.close(4002, "nova conexão do mesmo dispositivo");
-    }
-
-    const entrada = {
-      ws,
-      mac,
-      viaCredencial: !!viaCredencial,
-      deviceId,
-      ip,
-      conectadoEm: agora,
-      ultimaAtividadeEm: agora,
-      wifiRssi: null,
-      modo: "operation",
-      fwVersao: null,
-      ultimaTelemetria: null,
-      ultimoComando: null,
-      failsafe: null,
-      capacidades: {},
-      credencialExpiraEm: req.credencialGrace || null,
-      sincronizacaoInicial: null,
-      estadoInicialSincronizado: false,
-      versaoConfirmada: null,
-      versaoEstadoReportada: null,
-      versaoEnviada: null,
-      versaoInvalidadaAte: null,
-    };
-    conexoes.set(sala, entrada);
+    const { sala } = auth;
+    const entrada = conectarDispositivo({
+      ...auth,
+      ip: req.socket.remoteAddress,
+      credencialGrace: req.credencialGrace || null,
+      canal: canalDireto(ws),
+    });
     ws.isAlive = true;
     ws.janelaMensagensInicio = Date.now();
     ws.mensagensNaJanela = 0;
     ws.on("pong", () => {
       ws.isAlive = true;
     });
-
-    try {
-      salasService.marcarOnline(sala, {}, mac, ip, { viaCredencial });
-    } catch (err) {
-      logger.warn("device-ws-conectar-marcar-online-falhou", { sala, mensagem: err.message });
-    }
-    logger.info("device-ws-conectado", { sala, mac, ip });
-    monitoramentoService.registrarConexaoDispositivo(sala);
-    eventos.emit("conexao", { sala, conectado: true });
-    const salaInicial = salasService.buscar(sala);
-    try {
-      ws.send(JSON.stringify({ tipo: "device_role", role: papelDaEntrada(sala, entrada, salaInicial) }));
-      ws.send(JSON.stringify(salasService.comandoFailsafeIR(salaInicial)));
-    } catch (erro) {
-      logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
-    }
-    // setImmediate: after a long event-loop pause, an info already received on the socket is
-    // processed (I/O phase) before this timeout-driven synchronization.
-    entrada.sincronizacaoInicial = setTimeout(() => setImmediate(() => sincronizarEstadoInicial(sala, entrada, null)), ESPERA_INFO_INICIAL_MS);
-    entrada.sincronizacaoInicial.unref();
-    if (viaCredencial) {
-      try {
-        const credenciaisService = require("./esp32CredenciaisService");
-        if (entrada.credencialExpiraEm) credenciaisService.reentregarAtual(sala);
-        else credenciaisService.entregarPendente(sala);
-      } catch (erro) {
-        logger.warn("device-ws-credencial-pendente-falhou", { sala, mensagem: erro.message });
-      }
-    }
-    try {
-      ws.send(JSON.stringify(require("./configuracoesService").politicaApDispositivo()));
-    } catch (erro) {
-      logger.warn("device-ws-politica-ap-falhou", { sala, mensagem: erro.message });
-    }
 
     ws.on("message", (dados) => {
       if (conexoes.get(sala) !== entrada || ws.readyState !== ws.OPEN) return;
@@ -515,7 +645,7 @@ function iniciar(server) {
         ws.mensagensNaJanela = 0;
       }
       ws.mensagensNaJanela += 1;
-      if (ws.mensagensNaJanela > MAX_MENSAGENS_JANELA) {
+      if (ws.mensagensNaJanela > limiteDeMensagens(sala)) {
         ws.close(4008, "limite de mensagens excedido");
         return;
       }
@@ -532,85 +662,31 @@ function iniciar(server) {
         return;
       }
       if (!msg || typeof msg.tipo !== "string") return;
-
-      if (msg.tipo === "telemetria") {
-        registrarTelemetria(sala, entrada, msg);
-      } else if (msg.tipo === "info") {
-        registrarCapacidades(entrada, msg);
-        registrarVersaoFirmware(sala, entrada, msg.fw);
-        atualizarFailsafeReportado(entrada, msg);
-        if (!entrada.estadoInicialSincronizado) sincronizarEstadoInicial(sala, entrada, msg);
-        else if (reconciliarRelato(sala, entrada, msg)) salasService.eventos.emit("mudanca-sala", { sala });
-      } else if (msg.tipo === "ota_validado") {
-        registrarCapacidades(entrada, { otaValidacao: true });
-        if (require("./otaService").registrarValidacao(sala, msg)) {
-          try {
-            ws.send(JSON.stringify({ tipo: "ota_validacao_ok", tentativa: msg.tentativa }));
-          } catch (erro) {
-            logger.warn("device-ws-ota-validacao-ack-falhou", { sala, mensagem: erro.message });
-          }
-        }
-      } else if (msg.tipo === "failsafe_status") {
-        if (atualizarFailsafeReportado(entrada, msg)) {
-          if (reconciliarRelato(sala, entrada, msg)) salasService.eventos.emit("mudanca-sala", { sala });
-          eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
-        }
-      } else if (msg.tipo === "ota_progresso") {
-        require("./otaService").registrarProgresso(sala, msg);
-      } else if (msg.tipo === "ota_resultado") {
-        require("./otaService").registrarResultado(sala, msg);
-      } else if (msg.tipo === "captura") {
-        registrarCaptura(sala, entrada, msg, salaAtual);
-      } else if (msg.tipo === "acesso") {
-        salasService.registrarAcessoEsp(sala, {
-          ip: typeof msg.ip === "string" ? msg.ip : entrada.ip,
-          userAgent: typeof msg.userAgent === "string" ? msg.userAgent.slice(0, 500) : null,
-        });
-      } else if (msg.tipo === "comando") {
-        if (typeof msg.cmd === "string" && msg.cmd.length <= 100) {
-          const valor = (typeof msg.valor === "string" || typeof msg.valor === "number")
-            ? msg.valor
-            : undefined;
-          salasService.registrarComandoDispositivo(sala, msg.cmd, valor);
-        }
-      } else if (msg.tipo === "modo_alterado") {
-        entrada.modo = MODOS_VALIDOS.has(msg.modo) ? msg.modo : entrada.modo;
-        eventos.emit("telemetria", { sala, estado: estadoPublico(sala) });
+      // Frames a gateway relays for the boards behind it. They never reach the room's own handling.
+      if (msg.tipo === "mesh" || msg.tipo === "mesh_evento") {
+        require("./meshService").doGateway(sala, entrada, msg);
+        return;
       }
+      processarMensagem(sala, entrada, msg, salaAtual);
     });
 
     ws.on("close", (code, motivo) => {
-      if (entrada.sincronizacaoInicial) {
-        clearTimeout(entrada.sincronizacaoInicial);
-        entrada.sincronizacaoInicial = null;
-      }
-      if (conexoes.get(sala) === entrada) {
-        conexoes.delete(sala);
-        logger.info("device-ws-desconectado", { sala, code, motivo: motivo?.toString() });
-        try {
-          if (salasService.marcarOffline(sala, null, "websocket-fechado")) salasService.eventos.emit("mudanca");
-        } catch (erro) {
-          logger.warn("device-ws-marcar-offline-falhou", { sala, mensagem: erro.message });
-        }
-        try {
-          require("./otaService").aoDesconectarDispositivo(sala);
-        } catch (erro) {
-          logger.warn("device-ws-ota-desconectar-falhou", { sala, mensagem: erro.message });
-        }
-        eventos.emit("conexao", { sala, conectado: false });
-      }
+      desconectarDispositivo(sala, entrada, code, motivo);
     });
   });
 
   intervaloPing = setInterval(() => {
     conexoes.forEach((entrada, sala) => {
       if (encerrarSeCredencialExpirou(sala, entrada)) return;
-      if (!entrada.ws.isAlive) {
-        entrada.ws.terminate();
+      // Mesh sessions have their own liveness (meshService); only sockets are pinged here.
+      if (entrada.canal.transporte !== "direto") return;
+      const ws = entrada.canal.ws;
+      if (!ws.isAlive) {
+        ws.terminate();
         return;
       }
-      entrada.ws.isAlive = false;
-      entrada.ws.ping();
+      ws.isAlive = false;
+      ws.ping();
     });
   }, PING_MS);
   intervaloPing.unref();
@@ -622,7 +698,7 @@ function encerrarSeCredencialExpirou(sala, entrada) {
   if (!Number.isFinite(expiraMs) || expiraMs > Date.now()) return false;
   logger.info("device-ws-credencial-anterior-expirou", { sala });
   try {
-    entrada.ws.close(4001, "credencial anterior expirou; reconecte com a credencial atual");
+    entrada.canal.fechar(4001, "credencial anterior expirou; reconecte com a credencial atual");
   } catch (erro) {}
   return true;
 }
@@ -642,10 +718,13 @@ function encerrar() {
   }
   conexoes.forEach((entrada) => {
     try {
-      entrada.ws.close(1001, "servidor encerrando");
+      entrada.canal.fechar(1001, "servidor encerrando");
     } catch (erro) {}
   });
   conexoes.clear();
+  try {
+    require("./meshService").encerrar();
+  } catch {}
   capturasPorSala.clear();
   if (wss) {
     try {
@@ -657,6 +736,13 @@ function encerrar() {
 module.exports = {
   iniciar,
   encerrar,
+  conectarDispositivo,
+  desconectarDispositivo,
+  processarMensagem,
+  vinculoValido,
+  canalAberto,
+  conexaoDaSala: (sala) => conexoes.get(sala) || null,
+  listarConexoes: () => Array.from(conexoes.entries()),
   eventos,
   estadoPublico,
   estadoConfirmado,
