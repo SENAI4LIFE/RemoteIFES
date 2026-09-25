@@ -24,22 +24,22 @@ function simbolosDoSprite() {
 
 test("the Power button uses the local SVG icon, not a font-dependent Unicode glyph", () => {
   const botao = index.match(/<button id="btnPower"[\s\S]*?<\/button>/);
-  assert.ok(botao, "botão Power não encontrado no index.html");
+  assert.ok(botao, "Power button not found in index.html");
   const marcacao = botao[0];
 
-  assert.match(marcacao, /<use href="#i-power">/, "o Power precisa referenciar o símbolo #i-power do sprite");
-  assert.ok(simbolosDoSprite().has("i-power"), "o sprite precisa definir o símbolo i-power");
+  assert.match(marcacao, /<use href="#i-power">/, "Power must reference the sprite's #i-power symbol");
+  assert.ok(simbolosDoSprite().has("i-power"), "the sprite must define the i-power symbol");
 
-  assert.doesNotMatch(marcacao, /&#9211;|&#x23fb;/i, "o glifo U+23FB não renderiza de forma confiável na WebView do Android");
-  assert.doesNotMatch(marcacao, /[⏻⏼⏽⭘]/u, "o Power não pode voltar a depender de um caractere de energia do sistema");
+  assert.doesNotMatch(marcacao, /&#9211;|&#x23fb;/i, "the U+23FB glyph does not render reliably in the Android WebView");
+  assert.doesNotMatch(marcacao, /[⏻⏼⏽⭘]/u, "Power must not depend on a system power character again");
 
-  assert.match(marcacao, /aria-label="Ligar ou desligar o ar-condicionado"/, "o nome acessível do Power precisa continuar no botão");
-  assert.match(marcacao, /<span class="ac-remote-control-label">Power<\/span>/, "o rótulo visível Power precisa continuar");
+  assert.match(marcacao, /aria-label="Ligar ou desligar o ar-condicionado"/, "Power's accessible name must stay on the button");
+  assert.match(marcacao, /<span class="ac-remote-control-label">Power<\/span>/, "the visible Power label must stay");
 });
 
 test("every referenced icon exists in the sprite and every sprite symbol is used", () => {
   const simbolos = simbolosDoSprite();
-  assert.ok(simbolos.size > 0, "sprite de ícones ausente no index.html");
+  assert.ok(simbolos.size > 0, "icon sprite missing from index.html");
 
   const referenciados = new Set();
   for (const arquivo of arquivosDoFrontend()) {
@@ -51,10 +51,10 @@ test("every referenced icon exists in the sprite and every sprite symbol is used
   }
 
   const semSimbolo = [...referenciados].filter((id) => !simbolos.has(id));
-  assert.deepEqual(semSimbolo, [], `ícones referenciados sem símbolo no sprite: ${semSimbolo.join(", ")}`);
+  assert.deepEqual(semSimbolo, [], `icons referenced without a sprite symbol: ${semSimbolo.join(", ")}`);
 
   const semUso = [...simbolos].filter((id) => !referenciados.has(id));
-  assert.deepEqual(semUso, [], `símbolos do sprite que ninguém usa: ${semUso.join(", ")}`);
+  assert.deepEqual(semUso, [], `sprite symbols nobody uses: ${semUso.join(", ")}`);
 });
 
 test("no emoji or pictogram is used as a functional icon again", () => {
@@ -70,12 +70,12 @@ test("no emoji or pictogram is used as a functional icon again", () => {
 
 test("sprite icons are decorative and do not replace the accessible name", () => {
   const svgsDeIcone = [...index.matchAll(/<svg class="icone[^"]*"[^>]*>/g)].map((m) => m[0]);
-  assert.ok(svgsDeIcone.length > 0, "nenhum ícone do sprite encontrado no index.html");
-  svgsDeIcone.forEach((svg) => assert.match(svg, /aria-hidden="true"/, `ícone sem aria-hidden: ${svg}`));
+  assert.ok(svgsDeIcone.length > 0, "no sprite icon found in index.html");
+  svgsDeIcone.forEach((svg) => assert.match(svg, /aria-hidden="true"/, `icon without aria-hidden: ${svg}`));
 
   const sprite = index.match(/<svg class="icone-sprite"[^>]*>/);
   assert.ok(sprite, "bloco do sprite ausente");
-  assert.match(sprite[0], /aria-hidden="true"/, "o sprite precisa ficar fora da árvore de acessibilidade");
+  assert.match(sprite[0], /aria-hidden="true"/, "the sprite must stay out of the accessibility tree");
 });
 
 test("frontend sources contain no text control characters used as glyphs", () => {

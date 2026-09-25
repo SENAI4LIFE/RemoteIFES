@@ -103,7 +103,7 @@ test("the readiness contract secret is created with restricted permissions", asy
   assert.ok(token.length >= 32);
   const arquivo = amb.prontidao.caminhoTokenProntidao();
   assert.ok(fs.existsSync(arquivo));
-  assert.ok(!path.resolve(arquivo).includes("remoteifes-console"), "o segredo fica no data/ da aplicação, que é quem o lê");
+  assert.ok(!path.resolve(arquivo).includes("remoteifes-console"), "the secret lives in the application's data/, which reads it");
   // Calling again does not change the secret (changing it would invalidate the application's
   // in-flight read).
   assert.equal(amb.prontidao.garantirTokenProntidao(), token);
@@ -122,7 +122,7 @@ test("an application without the readiness contract yields 'unknown', never zero
   amb.prontidao.garantirTokenProntidao();
   const avaliacao = await amb.prontidao.avaliar({ interrompeServico: true });
   const desconhecido = avaliacao.avisos.find((a) => a.titulo === "Atividade dos ESP32 desconhecida");
-  assert.ok(desconhecido, "a ausência do contrato precisa virar aviso explícito");
+  assert.ok(desconhecido, "the missing contract must become an explicit warning");
   assert.match(desconhecido.detalhe, /trate como desconhecido, não como zero/);
   assert.equal(avaliacao.contexto.prontidaoObservavel, false);
 });
@@ -168,7 +168,7 @@ test("a paused rollout with pending work becomes a warning; an active one blocks
   amb.prontidao.garantirTokenProntidao();
   const avaliacao = await amb.prontidao.avaliar({ interrompeServico: true });
   const aviso = avaliacao.avisos.find((a) => a.titulo.includes("pausada com trabalho pendente"));
-  assert.ok(aviso, "rollout pausado com pendências não pode desaparecer da avaliação");
+  assert.ok(aviso, "a paused rollout with pending work must not disappear from the assessment");
   assert.match(aviso.detalhe, /7 pendente/);
   assert.match(aviso.detalhe, /volta a mexer nos dispositivos/);
 });
@@ -193,7 +193,7 @@ test("a paused rollout with a device still in flight blocks, not just warns", as
   amb.prontidao.garantirTokenProntidao();
   const avaliacao = await amb.prontidao.avaliar({ interrompeServico: true });
   const bloqueio = avaliacao.bloqueios.find((b) => b.titulo.includes("em atualização"));
-  assert.ok(bloqueio, `dispositivo em voo tem de bloquear. Avaliação: ${JSON.stringify(avaliacao)}`);
+  assert.ok(bloqueio, `a device in flight must block. Assessment: ${JSON.stringify(avaliacao)}`);
   assert.match(bloqueio.detalhe, /2 em voo/);
   assert.match(bloqueio.detalhe, /Espere os dispositivos em voo terminarem/);
 });
@@ -327,7 +327,7 @@ test("the restore runner refuses a traversal identifier before any effect", (t) 
       saida = `${erro.stdout || ""}${erro.stderr || ""}`;
       codigo = erro.status;
     }
-    assert.equal(codigo, 2, `deveria recusar ${ruim} como argumento inválido`);
+    assert.equal(codigo, 2, `should refuse ${ruim} as an invalid argument`);
     assert.match(saida, /recusado|não encontrado/i);
   }
   assert.deepEqual(fs.readFileSync(path.join(dados, "remoteifes.db")), antes, "nada pode ser tocado numa recusa de argumento");
@@ -356,14 +356,13 @@ test("restore requires quiescence: with the application running it installs noth
     CONSOLE_SEM_PRIVILEGIO: "1",
   });
 
-  assert.equal(codigo, 1, `sem conseguir parar a aplicação, a restauração tem de falhar. Saída:
-${saida}`);
+  assert.equal(codigo, 1, `without being able to stop the application, restore must fail. Output:\n${saida}`);
   // Without lifecycle control on this platform and with the application answering, restore refuses
   // instead of assuming that /health silence proves there is no writer.
   assert.match(saida, /continua respondendo e o console não tem como pará-la/);
-  assert.ok(!/Instalando o backup/.test(saida), "nada pode ser instalado sem quiescência comprovada");
-  assert.deepEqual(fs.readFileSync(banco), antes, "o banco atual não pode ser tocado quando a quiescência falha");
-  assert.ok(!fs.existsSync(`${banco}.incoming-`), "nenhum arquivo intermediário pode sobrar");
+  assert.ok(!/Instalando o backup/.test(saida), "nothing may be installed without proven quiescence");
+  assert.deepEqual(fs.readFileSync(banco), antes, "the current database must not be touched when quiescence fails");
+  assert.ok(!fs.existsSync(`${banco}.incoming-`), "no intermediate file may remain");
 });
 
 test("observing the database neither creates nor changes files in the data directory", (t) => {
@@ -379,7 +378,7 @@ test("observing the database neither creates nor changes files in the data direc
   // No database: observing must not create it.
   const semBanco = amb.coleta.espiarBanco();
   assert.equal(semBanco.existe, false);
-  assert.ok(!fs.existsSync(path.join(dados, "remoteifes.db")), "observar não pode criar o banco");
+  assert.ok(!fs.existsSync(path.join(dados, "remoteifes.db")), "observing must not create the database");
 
   criarBancoDeTeste(path.join(dados, "remoteifes.db"), { usuarios: 3 });
   // The creator closed the connection; -shm and -wal are not left behind.
@@ -391,7 +390,7 @@ test("observing the database neither creates nor changes files in the data direc
   assert.equal(espiada.existe, true);
   assert.equal(espiada.lido, false);
   assert.match(espiada.erro, /criaria arquivos auxiliares/);
-  assert.equal(espiada.bytes > 0, true, "os metadados do arquivo continuam disponíveis");
+  assert.equal(espiada.bytes > 0, true, "the file metadata stays available");
   assert.deepEqual(fs.readdirSync(dados).sort(), antes, "nenhum arquivo novo pode aparecer");
 
   // With the application running the Console reads content: the database is already open by another

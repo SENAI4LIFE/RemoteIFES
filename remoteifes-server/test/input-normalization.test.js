@@ -82,7 +82,7 @@ test("PATCH /agendamentos/:id accepts only a boolean ativo", async () => {
     const resp = await chamar(`/agendamentos/${ag.id}`, { method: "PATCH", token: tokenSuper, body: { ativo: valor } });
     assert.equal(resp.status, 400, JSON.stringify(valor));
     assert.equal(resp.corpo.erro, "ativo deve ser verdadeiro ou falso");
-    assert.equal(agendamentos.buscarPorId(ag.id).ativo, 0, `${JSON.stringify(valor)} não pode reativar por coerção`);
+    assert.equal(agendamentos.buscarPorId(ag.id).ativo, 0, `${JSON.stringify(valor)} must not reactivate by coercion`);
   }
   assert.equal((await chamar(`/agendamentos/${ag.id}`, { method: "PATCH", token: tokenSuper, body: {} })).status, 400);
 
@@ -100,25 +100,25 @@ test("disabling an account with ativo=false revokes the session immediately; amb
     const resp = await chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body: { ativo: valor } });
     assert.equal(resp.status, 400, JSON.stringify(valor));
     assert.equal(resp.corpo.erro, "ativo deve ser verdadeiro ou falso");
-    assert.equal(usuariosService.buscarPorId(conta.id).ativo, 1, `${JSON.stringify(valor)} não altera a conta`);
-    assert.equal((await chamar("/me", { token: sessao })).status, 200, "e não mexe na sessão");
+    assert.equal(usuariosService.buscarPorId(conta.id).ativo, 1, `${JSON.stringify(valor)} does not change the account`);
+    assert.equal((await chamar("/me", { token: sessao })).status, 200, "and does not touch the session");
   }
   assert.equal((await chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body: { podeControlar: 1 } })).status, 400);
   assert.equal((await chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body: { isAdmin: "true" } })).status, 400);
 
   const noop = await chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body: { ativo: true } });
   assert.equal(noop.status, 200);
-  assert.equal((await chamar("/me", { token: sessao })).status, 200, "confirmar o valor já vigente não revoga nada");
+  assert.equal((await chamar("/me", { token: sessao })).status, 200, "confirming the current value revokes nothing");
 
   const desativar = await chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body: { ativo: false } });
   assert.equal(desativar.status, 200);
   assert.equal(desativar.corpo.usuario.ativo, false);
-  assert.equal((await chamar("/me", { token: sessao })).status, 401, "o token antigo é recusado imediatamente");
-  assert.equal((await login("norm-ativo", "senhaSegura123")).status, 401, "conta inativa não faz login");
+  assert.equal((await chamar("/me", { token: sessao })).status, 401, "the old token is refused immediately");
+  assert.equal((await login("norm-ativo", "senhaSegura123")).status, 401, "an inactive account does not log in");
 
   const reativar = await chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body: { ativo: true } });
   assert.equal(reativar.status, 200);
-  assert.equal((await chamar("/me", { token: sessao })).status, 401, "reativar não ressuscita a sessão revogada");
+  assert.equal((await chamar("/me", { token: sessao })).status, 401, "reactivating does not revive the revoked session");
   assert.equal((await login("norm-ativo", "senhaSegura123")).status, 200, "mas permite entrar de novo");
 });
 
@@ -128,7 +128,7 @@ test("the permissions audit lists exactly the fields that changed", async () => 
 
   assert.equal((await patch({})).status, 200);
   assert.equal((await patch({ ativo: true, podeControlar: true })).status, 200);
-  assert.deepEqual(auditoriaDe(conta.id).filter((e) => e.tipo === "conta_permissoes_alteradas"), [], "sem mudança efetiva não há evento");
+  assert.deepEqual(auditoriaDe(conta.id).filter((e) => e.tipo === "conta_permissoes_alteradas"), [], "without an effective change there is no event");
 
   assert.equal((await patch({ podeControlar: false })).status, 200);
   assert.equal((await patch({ ativo: false })).status, 200);
@@ -161,5 +161,5 @@ test("the list of detected ESP32 boards is capped to the most recent, keeping th
   const lista = await chamar("/admin/esp32/detectados", { token: tokenSuper });
   assert.equal(lista.status, 200);
   assert.equal(lista.corpo.length, 100);
-  assert.equal(lista.corpo[0].mac, "02:00:00:00:00:00", "a identidade que acabou de se apresentar vem primeiro");
+  assert.equal(lista.corpo[0].mac, "02:00:00:00:00:00", "the identity that just announced itself comes first");
 });

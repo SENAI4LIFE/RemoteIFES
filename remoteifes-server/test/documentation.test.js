@@ -57,7 +57,7 @@ test("the public catalog covers the common functions and contains no broken link
     "inicio", "navegacao", "inicio-acoes", "papeis", "selecao-sala", "estados-sala",
     "controlador", "controle-acesso-sala", "conta-sessao", "conexao", "relatos",
     "pwa-mobile", "acessibilidade", "solucao-problemas",
-  ]) assert.ok(ids.has(id), `tópico público ausente: ${id}`);
+  ]) assert.ok(ids.has(id), `missing public topic: ${id}`);
   assert.equal(ids.size, manual.secoes.length);
   manual.secoes.forEach((secao) => {
     assert.ok(manual.categorias[secao.categoria], `categoria ausente em ${secao.id}`);
@@ -90,18 +90,18 @@ test("the manual describes the AP only as a provisioning portal, without a perma
   const manual = carregarManualPublico();
   const tudo = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
   for (const obsoleto of [/rede aberta/i, /ponto de acesso aberto/i, /AP de recuperação/i, /portal de recuperação/i, /AP permanente/i, /fica no ar o tempo todo/i, /energia estimada/i, /kWh/i, /BTU/i]) {
-    assert.ok(!obsoleto.test(tudo), `texto obsoleto ainda presente no manual: ${obsoleto}`);
+    assert.ok(!obsoleto.test(tudo), `obsolete text still in the manual: ${obsoleto}`);
   }
   for (const obsoleto of [/## Energia Estimada/, /energia_resumos_diarios/, /rede aberta `RemoteIFES-Setup`/, /ponto de acesso aberto `RemoteIFES-Setup`/, /permanentemente no ar/, /permanentemente ativa/, /acessar interface do ESP32" continua/, /status\.html/]) {
-    assert.ok(!obsoleto.test(README), `texto obsoleto ainda presente no README: ${obsoleto}`);
+    assert.ok(!obsoleto.test(README), `obsolete text still in the README: ${obsoleto}`);
   }
-  assert.ok(/criada apenas no modo AP de provisionamento/.test(README), "o README precisa dizer que o RemoteIFES-Setup só existe durante o provisionamento");
-  assert.ok(/encerra o AP e não serve frontend local durante a operação normal/.test(README), "o README precisa deixar claro que o frontend local é desligado após o setup");
-  assert.ok(/clique curto no switch físico/.test(README), "o README precisa documentar o clique no switch para reabrir o portal");
-  assert.ok(/Exigir senha na rede de configuração dos ESP32/.test(README), "o README precisa documentar a opção global");
+  assert.ok(/criada apenas no modo AP de provisionamento/.test(README), "the README must say RemoteIFES-Setup only exists during provisioning");
+  assert.ok(/encerra o AP e não serve frontend local durante a operação normal/.test(README), "the README must make clear the local frontend is turned off after setup");
+  assert.ok(/clique curto no switch físico/.test(README), "the README must document the switch click that reopens the portal");
+  assert.ok(/Exigir senha na rede de configuração dos ESP32/.test(README), "the README must document the global option");
   const superadmin = JSON.stringify(service._superSections);
   assert.ok(/RemoteIFES-Setup/.test(superadmin) && /Exigir senha na rede de configuração dos ESP32/.test(superadmin));
-  assert.ok(/credencial do dispositivo no servidor/.test(superadmin), "a autenticação no servidor continua documentada à parte");
+  assert.ok(/credencial do dispositivo no servidor/.test(superadmin), "server authentication is still documented separately");
 });
 
 test("manual and README document IR Protocols, the board-bound cloner, the physical switch and Auto-ON", () => {
@@ -111,15 +111,15 @@ test("manual and README document IR Protocols, the board-bound cloner, the physi
   const admin = JSON.stringify(service._adminSections);
 
   assert.ok(service._superSections.some((secao) => secao.id === "protocolos-ir" && secao.verNoApp === "/admin/protocolos"));
-  assert.ok(!admin.includes("\"id\":\"protocolos-ir\""), "a seção de Protocolos IR é exclusiva do Superadministrador");
+  assert.ok(!admin.includes("\"id\":\"protocolos-ir\""), "the IR Protocols section is superadministrator-only");
   for (const trecho of ["Administração &gt; Dispositivos &gt; Protocolos IR", "clonador", "failsafe OFF", "GPIO 26", "GPIO 27", "5 s", "40 ms", "pull-up interno"]) {
-    assert.ok(superadmin.toLowerCase().includes(trecho.toLowerCase()), `manual do Superadministrador sem: ${trecho}`);
+    assert.ok(superadmin.toLowerCase().includes(trecho.toLowerCase()), `superadministrator manual missing: ${trecho}`);
   }
   assert.match(superadmin, /MAC e a credencial/);
   assert.match(superadmin, /Auto-ON/);
   assert.match(publico, /Auto-ON/);
   for (const antigo of ["Com o aparelho ligado, use <strong>Turbo</strong>", "<strong>Turbo</strong>: só pode ser alterado com o aparelho ligado."]) {
-    assert.ok(!publico.includes(antigo), `o manual público ainda descreve o Turbo sem Auto-ON: ${antigo}`);
+    assert.ok(!publico.includes(antigo), `the public manual still describes Turbo without Auto-ON: ${antigo}`);
   }
 
   for (const trecho of [
@@ -137,11 +137,11 @@ test("manual and README document IR Protocols, the board-bound cloner, the physi
     "auto-on.spec.js",
     "firmware-contract.test.js",
   ]) {
-    assert.ok(README.includes(trecho), `README sem: ${trecho}`);
+    assert.ok(README.includes(trecho), `README missing: ${trecho}`);
   }
   const platformio = fs.readFileSync(path.join(__dirname, "..", "..", "remoteifes-esp32", "platformio.ini"), "utf8");
   const versaoFirmware = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/)[1];
-  assert.ok(README.includes(`atualmente \`${versaoFirmware}\``), `README precisa citar a versão do firmware compilada (${versaoFirmware})`);
+  assert.ok(README.includes(`atualmente \`${versaoFirmware}\``), `the README must cite the compiled firmware version (${versaoFirmware})`);
 });
 
 test("restricted procedures stay out of the Administrator set", () => {
@@ -151,7 +151,7 @@ test("restricted procedures stay out of the Administrator set", () => {
   }
   const superadmin = JSON.stringify(service._superSections);
   for (const trecho of ["python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE"]) {
-    assert.ok(superadmin.includes(trecho), `Superadministrador não recebeu: ${trecho}`);
+    assert.ok(superadmin.includes(trecho), `superadministrator did not receive: ${trecho}`);
   }
 });
 
@@ -162,13 +162,13 @@ test("routine host procedures point to the Console instead of repeating the tuto
   // Service, backup/restore, deploy/rollback and account recovery moved to the Console: the manual
   // states where they live and their impact, and does not repeat the command line.
   for (const id of ["servico-systemd", "backup-restauracao", "implantacao-rollback", "recuperacao-superadmin"]) {
-    assert.ok(porId[id], `seção ausente: ${id}`);
-    assert.match(porId[id], /Console de Opera/, `${id} precisa apontar para o console`);
+    assert.ok(porId[id], `missing section: ${id}`);
+    assert.match(porId[id], /Console de Opera/, `${id} must point to the Console`);
   }
   for (const id of ["servico-systemd", "backup-restauracao", "implantacao-rollback"]) {
-    assert.ok(!/systemctl restart remoteifes\.service/.test(porId[id]), `${id} ainda repete o comando de serviço`);
-    assert.ok(!/bash deploy\.sh/.test(porId[id]), `${id} ainda repete o comando de deploy`);
-    assert.ok(!/npm run backup/.test(porId[id]), `${id} ainda repete o comando de backup`);
+    assert.ok(!/systemctl restart remoteifes\.service/.test(porId[id]), `${id} still repeats the service command`);
+    assert.ok(!/bash deploy\.sh/.test(porId[id]), `${id} still repeats the deploy command`);
+    assert.ok(!/npm run backup/.test(porId[id]), `${id} still repeats the backup command`);
   }
 
   // What still runs from a terminal remains documented with commands.
@@ -179,30 +179,30 @@ test("routine host procedures point to the Console instead of repeating the tuto
 
 test("the Console has its own section with access, boundary and repair", () => {
   const console = service._superSections.find((secao) => secao.id === "console-operacoes");
-  assert.ok(console, "a seção do console precisa existir no conjunto Superadministrador");
+  assert.ok(console, "the Console section must exist in the superadministrator set");
   assert.equal(console.papel, "superadmin");
   const texto = JSON.stringify(console);
 
-  assert.match(texto, /instalacao\/instalar\.js/, "precisa dizer como instalar");
-  assert.match(texto, /ssh -L 8099/, "precisa explicar o túnel SSH");
-  assert.match(texto, /não é o do Pi/, "precisa avisar que o localhost do operador não é o do Pi");
-  assert.match(texto, /fora do checkout/, "precisa explicar por que roda fora do checkout");
-  assert.match(texto, /Terminal Expert/, "precisa citar o terminal como capacidade à parte");
+  assert.match(texto, /instalacao\/instalar\.js/, "must say how to install");
+  assert.match(texto, /ssh -L 8099/, "must explain the SSH tunnel");
+  assert.match(texto, /não é o do Pi/, "must warn that the operator's localhost is not the Pi's");
+  assert.match(texto, /fora do checkout/, "must explain why it runs outside the checkout");
+  assert.match(texto, /Terminal Expert/, "must cite the terminal as a separate capability");
 
   // The Console must not be presented as the owner of building operation.
   const admin = JSON.stringify(service._adminSections);
-  assert.ok(!/Console de Opera\S* &gt; .*Salas/.test(texto), "o console não opera salas");
-  assert.ok(!admin.includes("Console de Opera"), "o manual de Administrador não precisa do console");
+  assert.ok(!/Console de Opera\S* &gt; .*Salas/.test(texto), "the Console does not operate rooms");
+  assert.ok(!admin.includes("Console de Opera"), "the Administrator manual does not need the Console");
 });
 
 test("the README keeps a single emergency recovery reference", () => {
-  assert.match(README, /^## Recuperação de emergência por terminal$/m, "a seção precisa existir");
+  assert.match(README, /^## Recuperação de emergência por terminal$/m, "the section must exist");
   assert.match(README, /^## Console de Operações$/m, "o README documenta o acesso ao console");
 
   // A single section holds the emergency commands: look for competing headings.
   const cabecalhos = [...README.matchAll(/^#{2,3} (.+)$/gm)].map((m) => m[1]);
   const emergencias = cabecalhos.filter((t) => /recupera(ção|cao) de emerg/i.test(t));
-  assert.equal(emergencias.length, 1, `esperava uma seção de emergência, achei: ${emergencias.join(" | ")}`);
+  assert.equal(emergencias.length, 1, `expected one emergency section, found: ${emergencias.join(" | ")}`);
 
   const inicio = README.indexOf("## Recuperação de emergência por terminal");
   const fimSecao = README.indexOf("## Hospedagem em Raspberry Pi", inicio);
@@ -217,9 +217,9 @@ test("the README keeps a single emergency recovery reference", () => {
     "npm run reset-admin",
     "instalacao/instalar.js",
   ]) {
-    assert.ok(secao.includes(comando), `a recuperação de emergência precisa conter: ${comando}`);
+    assert.ok(secao.includes(comando), `emergency recovery must contain: ${comando}`);
   }
-  assert.match(secao, /sem console e sem login/, "precisa dizer que funciona sem console e sem aplicação");
+  assert.match(secao, /sem console e sem login/, "must say it works without the Console and without the application");
 });
 
 test("manual and README describe the current grouped Administration", () => {
@@ -264,7 +264,7 @@ test("manual and README describe the current grouped Administration", () => {
     /Saúde do sistema/,
     /Admin &gt; ESP32/,
   ]) {
-    assert.ok(!obsoleto.test(documentacao), `navegação obsoleta ainda no manual: ${obsoleto}`);
+    assert.ok(!obsoleto.test(documentacao), `obsolete navigation still in the manual: ${obsoleto}`);
   }
 
   for (const caminho of [
@@ -302,7 +302,7 @@ test("manual and README describe the current grouped Administration", () => {
     /Saúde do sistema/,
     /\*\*Monitoramento\*\* \| /,
   ]) {
-    assert.ok(!obsoleto.test(README), `navegação obsoleta ainda no README: ${obsoleto}`);
+    assert.ok(!obsoleto.test(README), `obsolete navigation still in the README: ${obsoleto}`);
   }
 
   for (const grupo of ["Gestão", "Dispositivos", "Sistema"]) {
@@ -319,7 +319,7 @@ test("the documentation presents Logs and Status as inner tabs, without standalo
   assert.match(documentacao, /Sistema &gt; Status/);
   assert.match(documentacao, /aba <strong>Acessos<\/strong>/);
   assert.match(documentacao, /aba <strong>Dispositivos<\/strong>/);
-  assert.ok(!/Acessos ESP32/.test(documentacao), "Acessos ESP32 não pode mais aparecer como função da Administração");
+  assert.ok(!/Acessos ESP32/.test(documentacao), "ESP32 access must no longer appear as an Administration function");
 
   const secaoLogs = service._adminSections.find((secao) => secao.id === "logs-dispositivos");
   const abasLogs = secaoLogs.corpo.find((bloco) => bloco.t === "tabela").linhas.map(([aba]) => aba);

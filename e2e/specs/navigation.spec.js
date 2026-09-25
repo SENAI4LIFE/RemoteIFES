@@ -270,7 +270,7 @@ test("a route with a nonexistent room does not leave an infinite retry running a
   await page.waitForTimeout(300);
   const aoSair = await page.evaluate(() => window.__retentativas);
   await page.waitForTimeout(2000);
-  expect(await page.evaluate(() => window.__retentativas), "nenhuma nova tentativa após a navegação").toBe(aoSair);
+  expect(await page.evaluate(() => window.__retentativas), "no new attempt after navigating").toBe(aoSair);
 
   await page.evaluate(() => Router.ir("/agenda/OUTRA-INEXISTENTE"));
   await expect(page.locator("#screen-agenda")).toBeVisible();

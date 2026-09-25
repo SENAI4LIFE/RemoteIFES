@@ -33,7 +33,7 @@ test("leaving Status > Sistema through the main navigation stops monitoring poll
   await expect(page.locator("#screen-admin")).toBeHidden();
   const aoSair = consultas.length;
   await page.waitForTimeout(22_000);
-  expect(consultas.length, "nenhuma consulta de monitoramento após sair da Administração").toBe(aoSair);
+  expect(consultas.length, "no monitoring query after leaving Administration").toBe(aoSair);
 
   await page.locator('.tab-btn[data-tab="admin"]').click();
   await expect(page.locator("#screen-admin")).toBeVisible();
@@ -47,7 +47,7 @@ test("leaving Usuários ativos clears the sessions timer, and leaving Firmware/O
   expect(await page.evaluate(() => Admin._ativosIntervalId !== null)).toBe(true);
   await page.locator('.tab-btn[data-tab="inicio"]').click();
   await expect(page.locator("#screen-admin")).toBeHidden();
-  expect(await page.evaluate(() => Admin._ativosIntervalId), "cronômetro dos usuários ativos encerrado").toBe(null);
+  expect(await page.evaluate(() => Admin._ativosIntervalId), "active users timer stopped").toBe(null);
 
   await page.goto("/#/admin/esp32");
   await expect(page.locator("#adminSub-esp32")).toBeVisible({ timeout: 15_000 });
@@ -80,5 +80,5 @@ test("leaving Administration while Status > Sistema is still loading does not le
   await expect(page.locator("#screen-admin")).toBeHidden();
   liberar();
   await page.waitForTimeout(22_000);
-  expect(consultas.length, "a entrada assíncrona atrasada não pode iniciar a sondagem depois da saída").toBe(1);
+  expect(consultas.length, "a late asynchronous entry must not start polling after leaving").toBe(1);
 });

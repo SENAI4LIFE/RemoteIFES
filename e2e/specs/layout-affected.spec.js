@@ -110,7 +110,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
         })
         .slice(0, 8)
         .map((el) => `${el.tagName.toLowerCase()}#${el.id}.${el.className}`));
-      expect(semOverflow, `${rota} sem rolagem horizontal da página: ${ofensores.join(", ")}`).toBe(true);
+      expect(semOverflow, `${rota} without horizontal page scroll: ${ofensores.join(", ")}`).toBe(true);
     }
 
     await page.locator('.admin-subtab-btn[data-sub="notificacoes"]').click();

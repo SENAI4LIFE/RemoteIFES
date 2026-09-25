@@ -29,12 +29,12 @@ for (const [nome, preparar] of [
     await page.locator("#a11yToggleBtn").click();
     await expect(page.locator("#a11yPanel")).toBeVisible();
     await expect(page.locator("#a11yToggleBtn")).toHaveAttribute("aria-expanded", "true");
-    await expect(page.locator("#a11yCloseBtn"), "o foco inicial fica no botão de fechar do painel").toBeFocused();
+    await expect(page.locator("#a11yCloseBtn"), "initial focus is on the panel's close button").toBeFocused();
 
     await page.keyboard.press("Escape");
     await expect(page.locator("#a11yPanel")).toBeHidden();
     await expect(page.locator("#a11yToggleBtn")).toHaveAttribute("aria-expanded", "false");
-    await expect(page.locator("#a11yToggleBtn"), "Esc devolve o foco ao botão que abriu").toBeFocused();
+    await expect(page.locator("#a11yToggleBtn"), "Esc returns focus to the button that opened it").toBeFocused();
   });
 }
 
@@ -70,7 +70,7 @@ test("closing with the × button does not leave focus on a hidden control", asyn
   await page.locator("#a11yCloseBtn").click();
   await expect(page.locator("#a11yPanel")).toBeHidden();
   const foco = await focoAtual(page);
-  expect(foco.escondido, "nenhum elemento escondido fica com o foco").toBe(false);
+  expect(foco.escondido, "no hidden element keeps focus").toBe(false);
   expect(foco.dentroDoPainel).toBe(false);
   await expect(page.locator("#a11yToggleBtn")).toBeFocused();
 });
@@ -118,7 +118,7 @@ test("opening the help panel closes the accessibility panel and vice versa, with
   // accessibility panel): wait for focus to enter before pressing keys, so focus return is checked
   // from the documented state. Focus on a hidden control is also caught here.
   await expect(page.locator("#helpFabCloseBtn"), "o foco entra no painel de ajuda").toBeFocused();
-  expect((await focoAtual(page)).escondido, "o foco não fica em controle escondido").toBe(false);
+  expect((await focoAtual(page)).escondido, "focus does not stay on a hidden control").toBe(false);
 
   // The open help panel covers the floating button column; Esc closes it and returns focus to its
   // button, after which the accessibility panel opens normally.
@@ -146,7 +146,7 @@ test("with the help panel open, Esc closes it even with focus on the floating bu
 
   await page.locator("#helpFabToggleBtn").focus();
   await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
-  await expect(page.locator("#helpFabPanel"), "voltar ao botão não fecha o painel").toBeVisible();
+  await expect(page.locator("#helpFabPanel"), "returning to the button does not close the panel").toBeVisible();
 
   await page.keyboard.press("Escape");
   await expect(page.locator("#helpFabPanel")).toBeHidden();

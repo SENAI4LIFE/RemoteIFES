@@ -82,12 +82,12 @@ function assentar(ws, ms = 200) {
 
 async function esperaAceita(ws) {
   const r = await assentar(ws);
-  assert.ok(r.aberto && !r.fechado, `esperava conexão aceita, obtive ${JSON.stringify(r)}`);
+  assert.ok(r.aberto && !r.fechado, `expected an accepted connection, got ${JSON.stringify(r)}`);
 }
 
 async function esperaRecusada(ws) {
   const r = await assentar(ws, 5000);
-  assert.ok(r.fechado, `esperava conexão recusada, obtive ${JSON.stringify(r)}`);
+  assert.ok(r.fechado, `expected a refused connection, got ${JSON.stringify(r)}`);
 }
 
 test.before(async () => {
@@ -169,7 +169,7 @@ test("rotation: the old secret stays valid during the grace period", async () =>
   assert.equal(antigo.deviceId, novo.deviceId);
 
   assert.ok(credenciaisService.verificar(novo.deviceId, novo.segredo));
-  assert.ok(credenciaisService.verificar(antigo.deviceId, antigo.segredo), "segredo anterior aceito na janela de tolerância");
+  assert.ok(credenciaisService.verificar(antigo.deviceId, antigo.segredo), "previous secret accepted within the grace window");
   assert.equal(credenciaisService.estado("cred-5").graceRotacaoAtivo, true);
 });
 

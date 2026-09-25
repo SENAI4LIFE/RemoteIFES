@@ -38,7 +38,7 @@ test("a mutation whose body is lost after the headers has an unknown outcome and
   assert.equal(resultado.desfechoDesconhecido, true);
   assert.equal(resultado.respostaIncompleta, true);
   assert.match(resultado.erro, /chegou incompleta \(status 200\); o pedido pode ter sido aplicado — confira o estado antes de repetir/);
-  assert.equal(chamadas.length, 1, "nenhuma repetição automática");
+  assert.equal(chamadas.length, 1, "no automatic retry");
 });
 
 test("an unusable body (truncated JSON) on an accepted mutation also preserves the uncertainty; a 4xx is a refusal", async () => {
@@ -50,12 +50,12 @@ test("an unusable body (truncated JSON) on an accepted mutation also preserves t
   const recusa = carregarApi(async () => respostaCom(404, () => Promise.reject(new SyntaxError("Unexpected token <"))));
   const r2 = await recusa.removerAgendamento(7);
   assert.equal(r2.ok, false);
-  assert.equal(r2.desfechoDesconhecido, false, "o próprio servidor recusou: nada foi aplicado");
+  assert.equal(r2.desfechoDesconhecido, false, "the server itself refused: nothing was applied");
   assert.equal(r2.erro, "resposta inválida do servidor (status 404)");
 
   const intermediario = carregarApi(async () => respostaCom(502, () => Promise.reject(new SyntaxError("Unexpected token <"))));
   const r3 = await intermediario.enviarComando("A-101", "desligar");
-  assert.equal(r3.desfechoDesconhecido, true, "um 5xx de intermediário não prova que o servidor não aplicou");
+  assert.equal(r3.desfechoDesconhecido, true, "an intermediary 5xx does not prove the server did not apply it");
 });
 
 test("a query with an invalid body remains just an invalid response", async () => {
@@ -72,7 +72,7 @@ test("the call deadline covers reading the body, and an intact response passes u
   })));
   const inicio = Date.now();
   const r1 = await lenta.chamar("/comando", { method: "POST", tempoLimiteMs: 50 });
-  assert.ok(Date.now() - inicio < 5000, "o corpo que nunca termina é abortado pelo prazo");
+  assert.ok(Date.now() - inicio < 5000, "a body that never ends is aborted by the deadline");
   assert.equal(r1.semResposta, true);
   assert.equal(r1.tempoEsgotado, true);
   assert.equal(r1.desfechoDesconhecido, true);

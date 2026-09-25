@@ -196,7 +196,7 @@ test("a heartbeat without a state change does not rebroadcast the room list", as
   const cliente = await clienteObservando("estavel", sala);
   salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
   const tipos = (await coletarPor(cliente, 400)).map((m) => m.tipo);
-  assert.deepEqual(tipos, [], `heartbeat sem mudanca nao deveria gerar trafego, veio ${JSON.stringify(tipos)}`);
+  assert.deepEqual(tipos, [], `a heartbeat without changes should not produce traffic, got ${JSON.stringify(tipos)}`);
   cliente.ws.close();
 });
 
@@ -233,8 +233,8 @@ test("ligado reported in the heartbeat does not change the desired state or rebr
   salasService.marcarOnline(sala, { ligado: true, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
   const tipos = (await coleta).map((m) => m.tipo);
   cliente.ws.close();
-  assert.equal(salasService.buscar(sala).ligado, 0, "o eco da placa não vira intenção");
-  assert.deepEqual(tipos, [], `um relato que não muda nada exibido nao deveria gerar trafego, veio ${JSON.stringify(tipos)}`);
+  assert.equal(salasService.buscar(sala).ligado, 0, "the board's echo does not become intent");
+  assert.deepEqual(tipos, [], `a report that changes nothing displayed should not produce traffic, got ${JSON.stringify(tipos)}`);
 });
 
 async function clienteAutenticado(sufixo, nivel) {
@@ -253,7 +253,7 @@ async function clienteAutenticado(sufixo, nivel) {
 function salaSemDispositivo() {
   const salasService = require("../src/services/salasService");
   const sala = salasService.listar().find((s) => !s.mac && !s.online);
-  assert.ok(sala, "o cenário precisa de uma sala sem ESP32 cadastrado e offline");
+  assert.ok(sala, "the scenario needs a room without a registered ESP32 and offline");
   return sala.sala;
 }
 
@@ -276,15 +276,15 @@ test("registering a room's MAC notifies every administrative session in real tim
     const avisosAdmin = (await doAdmin).filter((m) => m.tipo === "dispositivo_cadastro");
     const avisosComum = (await doComum).filter((m) => m.tipo === "dispositivo_cadastro");
 
-    assert.equal(avisosSuper.length, 1, "a sessão que cadastrou recebe exatamente um aviso");
-    assert.equal(avisosAdmin.length, 1, "uma segunda sessão autorizada recebe o mesmo aviso");
-    assert.equal(avisosComum.length, 0, "usuário comum não recebe dados de cadastro de dispositivo");
+    assert.equal(avisosSuper.length, 1, "the session that registered receives exactly one notification");
+    assert.equal(avisosAdmin.length, 1, "a second authorized session receives the same notification");
+    assert.equal(avisosComum.length, 0, "a regular user does not receive device registration data");
 
     const aviso = avisosSuper[0];
     assert.equal(aviso.sala, sala);
     assert.equal(aviso.cadastro.sala, sala);
     assert.equal(aviso.cadastro.mac, "AA:BB:CC:11:22:33");
-    assert.equal(aviso.cadastro.online, false, "cadastrado não implica online");
+    assert.equal(aviso.cadastro.online, false, "registered does not imply online");
     assert.deepEqual(avisosAdmin[0], aviso);
   } finally {
     superadmin.ws.close();
@@ -302,7 +302,7 @@ test("a refused registration produces no registered-device notification", async 
     const coleta = coletarPor(cliente, 400);
     assert.throws(() => salasService.cadastrarMac(sala, "mac-invalido"));
     const avisos = (await coleta).filter((m) => m.tipo === "dispositivo_cadastro");
-    assert.deepEqual(avisos, [], "um cadastro recusado não pode ser anunciado como persistido");
+    assert.deepEqual(avisos, [], "a refused registration must not be announced as persisted");
     assert.equal(salasService.buscar(sala).mac, null);
   } finally {
     cliente.ws.close();

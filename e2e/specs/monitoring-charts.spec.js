@@ -75,7 +75,7 @@ test("monitoring history is superadministrator-only and validates the range", as
     const resp = await request.get(`${API_URL}/admin/monitoramento/historico?faixa=24h`, {
       headers: { Authorization: `Bearer ${tokenDe(papel)}` },
     });
-    expect(resp.status(), `HTTP para ${papel}`).toBe(status);
+    expect(resp.status(), `HTTP for ${papel}`).toBe(status);
   }
   const invalida = await request.get(`${API_URL}/admin/monitoramento/historico?faixa=2h`, {
     headers: { Authorization: `Bearer ${tokenDe("superadmin")}` },
@@ -122,7 +122,7 @@ test("every chart has a title, a legend when there is more than one series, a te
   await expect(page.locator("#grDisco .gr-legenda li")).toHaveCount(2);
   await expect(page.locator("#grEventos .gr-legenda")).toContainText("Reconexões");
   const eventos = (await page.locator("#grEventos .gr-resumo").innerText()).match(/(\d+) reconexões, (\d+) quedas/);
-  expect(eventos, "resumo de reconexões e quedas").not.toBeNull();
+  expect(eventos, "reconnections and drops summary").not.toBeNull();
   expect(Number(eventos[1])).toBeGreaterThanOrEqual(5);
   expect(Number(eventos[2])).toBeGreaterThanOrEqual(5);
   await expect(page.locator("#grFalhas .gr-resumo")).toContainText("2 credencial");
@@ -168,7 +168,7 @@ test("the time range is a single control above the charts: changing it queries o
 
   await page.locator('.gr-faixa[data-faixa="7d"]').click();
   await page.waitForTimeout(500);
-  expect(chamadas.length, "faixa repetida não consulta de novo").toBe(2);
+  expect(chamadas.length, "a repeated range does not query again").toBe(2);
 
   await page.locator('.gr-faixa[data-faixa="30d"]').click();
   await expect.poll(() => chamadas.length).toBe(3);
@@ -205,9 +205,9 @@ test("the 20 s card refresh neither reloads history nor redraws the charts", asy
   });
   await expect.poll(() => atual.length, { timeout: 30_000 }).toBeGreaterThan(antesAtual);
   await page.waitForTimeout(1500);
-  expect(historico.length, "nenhuma nova consulta de histórico no refresh dos cartões").toBe(1);
+  expect(historico.length, "no new history query on the card refresh").toBe(1);
   const preservados = await page.evaluate(() => [...document.querySelectorAll("#monGraficosSeries svg")].every((svg) => svg.dataset.marca === "original"));
-  expect(preservados, "os SVGs do histórico continuam os mesmos nós após o refresh dos cartões").toBe(true);
+  expect(preservados, "the history SVGs stay the same nodes after the card refresh").toBe(true);
   const composicao = await page.evaluate(() => document.querySelectorAll("#monGraficosAtual svg").length);
   expect(composicao).toBe(FIGURAS_ATUAIS.length);
 });
@@ -228,8 +228,8 @@ test("layouts: single column on phones, balanced grid on desktop, no horizontal 
     }
     const esquerdas = new Set(medidas.figuras.filter((f) => !f.largo).map((f) => f.left));
     if (VIEWPORTS[nome].width <= 414) {
-      expect(esquerdas.size, `coluna única em ${nome}`).toBe(1);
-      expect(medidas.figuras[0].width, `figura ocupa a largura útil em ${nome}`).toBeGreaterThan(VIEWPORTS[nome].width * 0.7);
+      expect(esquerdas.size, `single column at ${nome}`).toBe(1);
+      expect(medidas.figuras[0].width, `figure takes the usable width at ${nome}`).toBeGreaterThan(VIEWPORTS[nome].width * 0.7);
     } else if (VIEWPORTS[nome].width >= 1366) {
       expect(esquerdas.size, `duas ou mais colunas em ${nome}`).toBeGreaterThanOrEqual(2);
       const largos = medidas.figuras.filter((f) => f.largo);
@@ -248,7 +248,7 @@ test("with maximum accessibility font the charts stay legible, without clipping 
     for (const f of medidas.figuras) {
       expect(f.right, `${f.id} dentro do bloco em ${nome}`).toBeLessThanOrEqual(medidas.blocoRight + 2);
       expect(f.cortados, `texto cortado em ${f.id} (${nome}, fonte ${tipoFonte})`).toBe(0);
-      expect(f.fonteTick, `rótulos de eixo ampliados em ${f.id}`).toBeGreaterThanOrEqual(20);
+      expect(f.fonteTick, `enlarged axis labels in ${f.id}`).toBeGreaterThanOrEqual(20);
       expect(f.legendaDentro, `legenda de ${f.id} dentro da figura em ${nome}`).toBe(true);
     }
     const colunas = await page.evaluate(() => {
@@ -258,7 +258,7 @@ test("with maximum accessibility font the charts stay legible, without clipping 
       return { agrupamento: Number(el.dataset.grAgrupamento), barras: barras.length, dentro: barras.every((b) => b.left >= r.left - 1 && b.right <= r.right + 1), minLargura: Math.min(...barras.map((b) => b.width)) };
     });
     expect(colunas.barras).toBeGreaterThan(0);
-    expect(colunas.dentro, `colunas dentro do gráfico em ${nome}`).toBe(true);
+    expect(colunas.dentro, `columns inside the chart at ${nome}`).toBe(true);
     expect(colunas.minLargura).toBeGreaterThanOrEqual(1);
     if (VIEWPORTS[nome].width <= 414) expect(colunas.agrupamento, "intervalos agrupados no celular").toBeGreaterThan(1);
     const controles = await page.locator("#monGraficosBloco .gr-faixa").evaluateAll((btns) => btns.map((b) => b.getBoundingClientRect().height));
@@ -359,7 +359,7 @@ test("the collapsed section does not query history, and the preference is rememb
   expect(await page.locator("#monGraficosBloco").evaluate((el) => el.open)).toBe(false);
   await expect(page.locator("#monGrid .mon-card").first()).toBeVisible();
   await page.waitForTimeout(2000);
-  expect(chamadas, "nada consultado com a seção fechada").toEqual([]);
+  expect(chamadas, "nothing queried with the section closed").toEqual([]);
 
   const marcador = await page.locator("#monGraficosBloco > summary").evaluate((el) => {
     const css = getComputedStyle(el, "::after");
@@ -375,7 +375,7 @@ test("the collapsed section does not query history, and the preference is rememb
   await page.locator('.admin-subtab-btn[data-sub="usuarios"]').click();
   await expect(page.locator("#adminSub-usuarios")).toBeVisible();
   await page.waitForTimeout(1000);
-  expect(chamadas.length, "sair da aba não gera consultas").toBe(1);
+  expect(chamadas.length, "leaving the tab produces no queries").toBe(1);
 });
 
 test("the PWA shell stores the charts module together with the rest of the frontend", async ({ page }) => {
@@ -424,9 +424,9 @@ test("changing letter spacing or font family redraws chart geometry without chan
   await page.evaluate(() => document.documentElement.style.setProperty("--a11y-letter-spacing", "0.25em"));
   await expect.poll(async () => (await geometria()).marca, { timeout: 5_000 }).toBe("");
   const comEspacamento = await geometria();
-  expect(comEspacamento.largura, "o contêiner não mudou de largura").toBe(antes.largura);
-  expect(comEspacamento.margemEsquerda, "a margem dos rótulos do eixo cresce com o espaçamento").toBeGreaterThan(antes.margemEsquerda);
-  expect(comEspacamento.focado, "o foco continua no gráfico").toBe(true);
+  expect(comEspacamento.largura, "the container did not change width").toBe(antes.largura);
+  expect(comEspacamento.margemEsquerda, "the axis label margin grows with the spacing").toBeGreaterThan(antes.margemEsquerda);
+  expect(comEspacamento.focado, "focus stays on the chart").toBe(true);
   await expect(page.locator("#grRss .gr-leitura")).toHaveText(leituraAntes);
   expect(await page.locator("#grRss .gr-cursor").getAttribute("visibility")).toBe("visible");
 
