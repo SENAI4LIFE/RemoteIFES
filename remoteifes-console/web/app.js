@@ -172,6 +172,7 @@
     if (area === "mobile") carregarMobile();
     if (area === "avancado") carregarAvancado();
     if (area === "servico") carregarServico();
+    if (area === "rede") carregarAcessoRede();
   }
 
   // --- painel --------------------------------------------------------------------------------
@@ -514,6 +515,7 @@
         estadoApp.fluxo = null;
         carregarPainel();
         carregarTrabalhos();
+        if (estadoApp.area === "rede") carregarAcessoRede();
       });
       fonte.onerror = function () { /* reconecta sozinho; o estado final também é lido no fechamento */ };
     });
@@ -942,6 +944,30 @@
 
   // --- rede -------------------------------------------------------------------------------------------
 
+  function carregarAcessoRede() {
+    var situacao = $("acessoSituacao");
+    limpar(situacao);
+    api("/api/rede/acesso").then(function (r) {
+      limpar(situacao);
+      var a = r.ok ? r.corpo : null;
+      if (!a || !a.lido) {
+        aviso(situacao, "alerta", "Valores atuais não lidos", (a && a.erro) || "não foi possível ler o banco da aplicação");
+      } else {
+        var dl = el("dl");
+        dado(dl, "Modo de teste", a.modoTeste === null ? (a.modoTestePadrao ? "ligado (padrão fora de produção)" : "desligado (padrão)") : a.modoTeste ? "ligado" : "desligado");
+        dado(dl, "Faixas autorizadas", a.redesAutorizadas.join(", ") || "(nenhuma)");
+        situacao.appendChild(dl);
+        $("acessoModoTeste").checked = a.modoTeste === null ? !!a.modoTestePadrao : a.modoTeste;
+        $("acessoRedes").value = a.redesAutorizadas.join("\n");
+      }
+    });
+    var acoesAcesso = $("acessoAcoes");
+    limpar(acoesAcesso);
+    botaoDeAcao(acoesAcesso, "rede.acesso-aplicacao", function () {
+      return { modoTeste: $("acessoModoTeste").checked, redesAutorizadas: $("acessoRedes").value.trim() };
+    });
+  }
+
   function carregarRede() {
     var caixa = $("redeConteudo");
     limpar(caixa);
@@ -983,13 +1009,13 @@
       dado(dle, "Ambiente", n.exposicaoAplicacao.ambiente);
       dado(dle, "CORS_ORIGIN", n.exposicaoAplicacao.corsOrigin.join(", ") || "(vazio)");
       dado(dle, "TRUST_PROXY", n.exposicaoAplicacao.trustProxy);
-      dado(dle, "Faixas autorizadas (dono: aplicação)", n.exposicaoAplicacao.redesAutorizadas.lido ? (n.exposicaoAplicacao.redesAutorizadas.valores.join(", ") || "(nenhuma)") : "não lidas");
+      dado(dle, "Faixas autorizadas", n.exposicaoAplicacao.redesAutorizadas.lido ? (n.exposicaoAplicacao.redesAutorizadas.valores.join(", ") || "(nenhuma)") : "não lidas");
       dado(dle, "Console escuta em", n.exposicaoConsole.endereco + ":" + n.exposicaoConsole.porta);
       dado(dle, "Hosts aceitos pelo console", n.exposicaoConsole.hostsAceitos.join(", "));
       expd.appendChild(dle);
       aviso(expd, "info", "Acesso remoto", n.exposicaoConsole.orientacao);
       aviso(expd, "info", "TRUST_PROXY", n.exposicaoAplicacao.observacao);
-      aviso(expd, "info", "Faixas de rede", n.exposicaoAplicacao.redesAutorizadas.observacao + " Quem edita as faixas é a aplicação, em Administração > Sistema > Configurações.");
+      aviso(expd, "info", "Faixas de rede", n.exposicaoAplicacao.redesAutorizadas.observacao + " As faixas e o modo de teste são editados acima, em Acesso à aplicação.");
       exp.appendChild(expd);
       caixa.appendChild(exp);
 

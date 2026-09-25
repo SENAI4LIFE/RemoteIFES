@@ -245,6 +245,19 @@
     <!-- Rede e domínio -->
     <section id="painel-rede" role="tabpanel" aria-labelledby="aba-rede" tabindex="-1" class="oculto">
       <div class="cartao">
+        <h2>Acesso à aplicação</h2>
+        <p class="fraco">Quem pode abrir o RemoteIFES em produção. Este console é o único lugar que altera estes valores; o site apenas os exibe.</p>
+        <div id="acessoSituacao"></div>
+        <div class="campo">
+          <label class="checkbox"><input type="checkbox" id="acessoModoTeste" /> Modo de teste (desativa a restrição de rede)</label>
+        </div>
+        <div class="campo">
+          <label for="acessoRedes">Faixas autorizadas (CIDR IPv4, uma por linha)</label>
+          <textarea id="acessoRedes" rows="4" spellcheck="false" autocapitalize="none" placeholder="10.10.0.0/16"></textarea>
+        </div>
+        <div id="acessoAcoes"></div>
+      </div>
+      <div class="cartao">
         <div class="linha entre">
           <h2>Diagnóstico de rede</h2>
           <button type="button" class="btn pequeno" id="btnCarregarRede">Coletar</button>

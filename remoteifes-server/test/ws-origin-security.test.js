@@ -16,7 +16,7 @@ let server;
 let port;
 
 test.before(async () => {
-  configuracoesService.validarEAtualizar({ redesAutorizadas: ["10.0.0.0/8"] }, { id: "test", nivel: 3 });
+  configuracoesService.validarEAtualizar({ redesAutorizadas: ["10.0.0.0/8"] }, { id: "test", nivel: 3 }, { infraestrutura: true });
   server = http.createServer(app);
   statusHub.iniciar(server);
   await new Promise((resolve) => server.listen(0, resolve));

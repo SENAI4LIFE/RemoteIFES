@@ -21,6 +21,11 @@ const trava = require("./trava");
 const RE_COMMIT = /^[0-9a-f]{7,40}$/;
 const RE_REF = /^[A-Za-z0-9._\/-]{1,120}$/;
 const RE_BACKUP = /^(?:remoteifes|pre-restauracao)-\d{8}-\d{6}-[0-9a-f]{6}(?:-[a-z0-9-]+)?\.db$/;
+// A list of IPv4 CIDR ranges separated by commas, spaces or line breaks; each item is checked again
+// in faixasDoTexto and by the runner.
+const RE_LISTA_FAIXAS = /^[0-9./,\s]{0,2400}$/;
+const RE_FAIXA = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/;
+const LIMITE_FAIXAS = 64;
 
 function erroDeValidacao(mensagem) {
   const erro = new Error(mensagem);
@@ -34,6 +39,15 @@ function nodeExecutavel() {
 
 function caminhoBin(nome) {
   return path.join(config.RAIZ_CONSOLE, "bin", nome);
+}
+
+function faixasDoTexto(texto) {
+  const faixas = [...new Set(String(texto || "").split(/[\s,]+/).filter(Boolean))];
+  const invalidas = faixas.filter((f) => {
+    const m = RE_FAIXA.exec(f);
+    return !m || m.slice(1, 5).some((o) => Number(o) > 255) || Number(m[5]) > 32;
+  });
+  return { faixas, invalidas };
 }
 
 // --- Action definitions --------------------------------------------------------------------
@@ -420,6 +434,58 @@ const ACOES = [
   },
 
   {
+    id: "rede.acesso-aplicacao",
+    rotulo: "Definir o acesso de rede da aplicação",
+    grupo: "rede",
+    proposito:
+      "Liga ou desliga o modo de teste e define as faixas de IP (CIDR IPv4) que podem abrir a aplicação em produção.",
+    impacto:
+      "Vale na próxima requisição, sem reinício. Uma faixa errada bloqueia navegadores fora dela; este console não " +
+      "passa pela restrição e continua disponível para desfazer. Com o modo de teste ligado, qualquer rede alcança a aplicação.",
+    exigeElevacao: true,
+    confirmacao: null,
+    esquema: {
+      modoTeste: { tipo: "booleano", obrigatorio: true },
+      redesAutorizadas: { tipo: "texto", obrigatorio: false, padrao: "", regex: RE_LISTA_FAIXAS },
+    },
+    prontidao: {},
+    async validacaoExtra({ argumentos }) {
+      const { faixas, invalidas } = faixasDoTexto(argumentos.redesAutorizadas);
+      if (invalidas.length) return `faixa(s) inválida(s): ${invalidas.join(", ")}. Use a notação CIDR IPv4, ex.: 10.10.0.0/16.`;
+      if (faixas.length > LIMITE_FAIXAS) return `no máximo ${LIMITE_FAIXAS} faixas.`;
+      return null;
+    },
+    montar({ operador, argumentos }) {
+      const { faixas } = faixasDoTexto(argumentos.redesAutorizadas);
+      return {
+        acao: "rede.acesso-aplicacao",
+        rotulo: "Definir o acesso de rede da aplicação",
+        operador,
+        argumentosVisiveis: { modoTeste: argumentos.modoTeste, redesAutorizadas: faixas.join(", ") || "(nenhuma)" },
+        executavel: nodeExecutavel(),
+        argumentos: [caminhoBin("acesso-rede.js")],
+        cwd: config.RAIZ_CONSOLE,
+        entrada: JSON.stringify({ operador, modoTeste: argumentos.modoTeste, redesAutorizadas: faixas }),
+        // Serialized with deploy and restore: a write racing a database swap would be lost.
+        exigeTrava: true,
+        timeoutMs: 60_000,
+        cancelavel: false,
+        verificar: async ({ estadoFinal }) => {
+          if (estadoFinal !== execucao.ESTADOS.CONCLUIDO) return null;
+          const lido = require("./rede").acessoDaAplicacao();
+          if (!lido.lido) {
+            return { ok: true, resumo: "gravação confirmada pelo executor; releitura não feita porque a aplicação está parada" };
+          }
+          const confere = lido.modoTeste === argumentos.modoTeste && JSON.stringify(lido.redesAutorizadas) === JSON.stringify(faixas);
+          return confere
+            ? { ok: true, resumo: "releitura do banco confirma a política gravada" }
+            : { ok: false, resumo: "a releitura do banco não confere com o que foi pedido" };
+        },
+      };
+    },
+  },
+
+  {
     id: "host.reiniciar",
     rotulo: "Reiniciar o host",
     grupo: "host",
@@ -645,4 +711,4 @@ async function executar(id, brutos, { operador, forcarAvisos = false } = {}) {
   return { imediata: false, trabalho };
 }
 
-module.exports = { listar, obter, preparar, executar, validarArgumentos, ACOES };
+module.exports = { listar, obter, preparar, executar, validarArgumentos, faixasDoTexto, ACOES };

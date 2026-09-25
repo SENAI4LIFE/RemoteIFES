@@ -253,7 +253,7 @@ test("a privileged route without a session answers 401 and does not leak state",
     amb.restaurar();
   });
 
-  for (const rota of ["/api/painel", "/api/host", "/api/backups", "/api/logs", "/api/auditoria", "/api/acoes", "/api/trabalhos", "/api/terminal"]) {
+  for (const rota of ["/api/painel", "/api/host", "/api/backups", "/api/logs", "/api/auditoria", "/api/acoes", "/api/trabalhos", "/api/terminal", "/api/rede/acesso"]) {
     const r = await ajuda.pedir(s.porta, rota);
     assert.equal(r.status, 401, `${rota} should require a session`);
     assert.equal(r.json.erro, "não autenticado");
