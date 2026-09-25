@@ -1347,7 +1347,7 @@ Registre APK/SHA-256, API, versão Android, ABI, WebView, resolução/densidade,
 
 #### CI e regeneração
 
-`ci.yml` mantém validação Cordova e testes existentes. `android.yml` faz builds limpos e inspeção de APK quando frontend/Android/workflow mudam, mais smoke nativo API 36. `workflow_dispatch` com `broad_matrix=true` amplia para 24/29/34/36: nas imagens 24 e 29 o smoke valida a tela de incompatibilidade do WebView de fábrica; em 34 e 36, o app. Runners descartáveis provisionam o SDK; o doctor local não instala nada. Os artefatos do CI são de validação, não releases de produção. A matriz manual de UI/rede/acessibilidade continua necessária.
+`ci.yml` mantém a validação Cordova e chama `android.yml` (build limpo, inspeção de APK e smoke nativo na API 36) sempre que o frontend ou o Cordova mudam. `android.yml` também pode ser disparado sozinho; `broad_matrix=true` (ou `android_broad_matrix` no **Run workflow** do CI) amplia para 24/29/34/36: nas imagens 24 e 29 o smoke valida a tela de incompatibilidade do WebView de fábrica; em 34 e 36, o app. Runners descartáveis provisionam o SDK; o doctor local não instala nada. Os artefatos do CI são de validação, não releases de produção. A matriz manual de UI/rede/acessibilidade continua necessária.
 
 Para regeneração limpa, com o aplicativo de teste parado, remova **somente** `remoteifes-cordova/platforms/`, `plugins/` e `www/` após conferir os caminhos absolutos. Execute `npm ci`, `npm run prepare-android` e o build. Nunca remova `.signing/` junto com os gerados. Não versione APKs ou caminhos de SDK.
 
@@ -1401,13 +1401,34 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 
 ### CI
 
-`.github/workflows/ci.yml` roda em cada push e pull request para `main` (e sob demanda em **Actions > CI > Run workflow**) cinco jobs independentes, vários em matriz de sistema operacional para que Windows e macOS sejam validados como sistemas reais, e não inferidos dos resultados em Linux:
+`.github/workflows/ci.yml` roda em cada pull request, em cada push para `main` e sob demanda em **Actions > CI > Run workflow**. O primeiro job (*Select checks*) compara os arquivos alterados pelo evento e escolhe o que precisa rodar; o último (*CI result*) sempre roda e só fica verde se todo job escolhido passou e todo job não escolhido foi de fato pulado, então é ele que deve ser exigido caso um status check obrigatório seja configurado. Há dois níveis:
 
-- servidor (`npm test` + health check) em Ubuntu, Windows e macOS;
-- frontend end-to-end (Playwright) em Ubuntu com Chromium, Firefox e WebKit, em Windows com o Microsoft Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox, e em macOS com o Google Chrome do sistema;
+- **Validação rápida** (pull requests): só os subsistemas afetados, com o end-to-end apenas no Chromium do Ubuntu, dividido em quatro shards paralelos;
+- **Validação completa**: todos os navegadores e sistemas dos subsistemas afetados em cada push para `main` (que é o que vai para produção), e de **todos** os subsistemas no **Run workflow**. O campo opcional `expected_sha` faz a execução falhar se o ramo tiver avançado para outro commit, garantindo que o resultado vale exatamente para o SHA escolhido.
+
+| Mudança em | Validação rápida | Validação completa acrescenta |
+|---|---|---|
+| `remoteifes-server/` | servidor em Ubuntu, Windows e macOS; Console de Operações; end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
+| `remoteifes-console/` | Console de Operações e instalação do pacote nos três sistemas | — |
+| `remoteifes-web/` | contratos do frontend nos testes do servidor (Ubuntu); end-to-end Chromium; Cordova; builds Android e iOS | end-to-end em todos os navegadores; Safari nativo |
+| `remoteifes-cordova/` | contratos do app nos testes do servidor; Cordova; builds Android e iOS | — |
+| `remoteifes-esp32/` | build do firmware; contratos de dispositivo nos testes do servidor | — |
+| `e2e/specs/` | end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
+| `e2e/` (harness, configuração, lockfile) | end-to-end em todos os navegadores; Safari nativo | — |
+| `README.md`, `docs/`, scripts Git da raiz | testes de contrato da documentação (servidor, Ubuntu) | — |
+| `.github/workflows/`, `.github/scripts/`, caminho não mapeado ou diff indeterminável | validação completa de tudo | — |
+
+Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também contam. As regras ficam em `.github/scripts/select-checks.js`, testadas por `select-checks.test.js` no próprio job de seleção. Uma execução nova no mesmo pull request ou ramo cancela a anterior; um **Run workflow** nunca é cancelado por um push posterior, e o deploy do GitHub Pages nunca é interrompido no meio.
+
+O que cada job cobre:
+
+- servidor (`npm test` + health check); os testes do servidor incluem os contratos do frontend, do app Cordova, do firmware e da documentação;
+- Console de Operações (`npm test` + medição de recursos) e pacote instalável (build, procedência, instalação a partir do artefato, execução pelo lançador sem ferramentas de desenvolvimento no PATH, `.deb` no Linux, desinstalação preservando o estado) em Ubuntu, Windows e macOS;
+- frontend end-to-end (Playwright) em Ubuntu com Chromium, Firefox e WebKit, em Windows com o Microsoft Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox, e em macOS com o Google Chrome do sistema, cada combinação dividida em shards independentes (cada shard sobe seu próprio harness);
 - Safari nativo: `e2e/harness/safari-smoke.js` dirige o Safari do macOS pelo `safaridriver` (WebDriver, sem dependência npm), contra os mesmos servidores do harness — portal, login pela interface, sala com ESP32 simulado por WebSocket, ligar/desligar, administração, logout, ausência de rolagem horizontal e de erros de JavaScript. O WebKit do Playwright não é usado como evidência de Safari. O mesmo smoke no Safari de um iPhone do iOS Simulator só roda sob demanda (**Run workflow** com `ios_safari`), porque nos runners hospedados o pareamento do `safaridriver` com o simulador e a entrega dos toques foram intermitentes; ele é um diagnóstico, não uma evidência exigida;
 - validação de configuração Cordova em Ubuntu e Windows (o checkout com CRLF do Windows exercita a restauração byte a byte de `harden-config.js`);
-- build do firmware ESP32.
+- build do firmware ESP32;
+- Android (`android.yml`) e iOS (`ios.yml`), chamados pelo CI como workflows reutilizáveis.
 
 `.github/workflows/ios.yml` (macOS) prepara a plataforma iOS com o `cordova-ios` travado no lockfile, compila o app para o iOS Simulator com o Xcode do runner e executa `npm run test-ios`; veja [iOS e recursos visuais](#ios-e-recursos-visuais) para o que essa execução comprova. Nenhum token adicional é necessário.
 

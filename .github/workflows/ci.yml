@@ -1,27 +1,87 @@
 name: CI
 
+# Validation levels:
+#   pull_request            affected subsystems, fast depth (Chromium E2E only)
+#   push to main            affected subsystems, full browser/platform depth
+#   workflow_dispatch       Full Validation: every subsystem at full depth on the dispatched SHA
+# Changes to the CI definition, unknown paths or an undeterminable diff widen to Full Validation.
+# The "CI result" job always runs and fails unless every selected job succeeded and every
+# unselected job was skipped, so it is safe to use as the single required check.
+
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
+      expected_sha:
+        description: 'Optional: fail unless the dispatched ref is exactly this commit SHA'
+        type: string
+        default: ''
       ios_safari:
         description: 'Also run the Safari smoke on an iOS Simulator (diagnostic; pairing is intermittent on hosted runners)'
+        type: boolean
+        default: false
+      android_broad_matrix:
+        description: 'Run the Android native smoke on APIs 24, 29, 34 and 36'
         type: boolean
         default: false
 
 permissions:
   contents: read
 
+# Superseded runs on the same pull request or branch are cancelled. A dispatched Full
+# Validation gets its own group so a later push never cancels an explicit exact-SHA run.
+concurrency:
+  group: ci-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: Select checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.select.outputs.plan }}
+      server_os: ${{ steps.select.outputs.server_os }}
+      console_os: ${{ steps.select.outputs.console_os }}
+      packages_os: ${{ steps.select.outputs.packages_os }}
+      e2e_matrix: ${{ steps.select.outputs.e2e_matrix }}
+      cordova_os: ${{ steps.select.outputs.cordova_os }}
+      safari: ${{ steps.select.outputs.safari }}
+      firmware: ${{ steps.select.outputs.firmware }}
+      android: ${{ steps.select.outputs.android }}
+      ios: ${{ steps.select.outputs.ios }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Test the selection rules
+        run: node --test .github/scripts/select-checks.test.js
+      - name: Select jobs for the changed files
+        id: select
+        run: node .github/scripts/select-checks.js
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          HEAD_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+
   server:
-    name: Servidor (API + banco, ${{ matrix.os }})
+    name: Server tests (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.server_os != '[]'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.changes.outputs.server_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -33,7 +93,7 @@ jobs:
         working-directory: remoteifes-server
       - run: npm test
         working-directory: remoteifes-server
-      - name: Health check do servidor central
+      - name: Server health check
         working-directory: remoteifes-server
         shell: bash
         run: |
@@ -45,70 +105,77 @@ jobs:
           done
           BODY=$(curl -sf http://127.0.0.1:8099/health)
           echo "$BODY"
-          echo "$BODY" | grep -q '"ok":true' || { echo "health check falhou"; kill $SV; exit 1; }
-          echo "$BODY" | grep -q '"banco":"ok"' || { echo "banco indisponível"; kill $SV; exit 1; }
+          echo "$BODY" | grep -q '"ok":true' || { echo "health check failed"; kill $SV; exit 1; }
+          echo "$BODY" | grep -q '"banco":"ok"' || { echo "database unavailable"; kill $SV; exit 1; }
           kill $SV
 
   console:
-    name: Console de Operações (${{ matrix.os }})
+    name: Operations Console tests (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.console_os != '[]'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.changes.outputs.console_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-      # O console não tem dependências npm: nada a instalar. As dependências do servidor são
-      # necessárias porque os testes de backup/restauração reusam o backupService do checkout.
+          cache: npm
+          cache-dependency-path: remoteifes-server/package-lock.json
+      # The Console has no npm dependencies. The server dependencies are installed because the
+      # backup and restore tests reuse backupService from the checkout.
       - run: npm ci
         working-directory: remoteifes-server
       - run: npm test
         working-directory: remoteifes-console
-      - name: Medição de recursos (registra os números do runner)
+      - name: Resource measurement (records runner figures)
         run: node test/medicao-recursos.js
         working-directory: remoteifes-console
 
-  pacotes:
-    name: Pacote instalável (${{ matrix.os }})
+  packages:
+    name: Console package install (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.packages_os != '[]'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: ${{ fromJSON(needs.changes.outputs.packages_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
-      # Construir é etapa SEM credencial: nenhum segredo é exposto aqui, e o manifesto sai sem
-      # assinatura de propósito. Assinar é etapa separada, com a chave de publicação, que não
-      # roda a partir de código de pull request.
-      - name: Construir os artefatos
+      # Building uses no credential: no secret is exposed here and the manifest is unsigned on
+      # purpose. Signing is a separate step with the publishing key and never runs from
+      # pull request code.
+      - name: Build the artifacts
         working-directory: remoteifes-console
         shell: bash
         run: node empacotar/construir.js --saida "$RUNNER_TEMP/dist"
 
-      - name: Conferir a procedência declarada
+      - name: Check declared provenance
         shell: bash
         run: |
           set -euo pipefail
           node "$GITHUB_WORKSPACE/remoteifes-console/empacotar/conferir-proveniencia.js" "$RUNNER_TEMP/dist"
 
-      # A instalação é feita a partir do ARTEFATO, descompactado fora da árvore de código: é o
-      # que um operador recebe. Instalar a partir do checkout não provaria que o pacote está
-      # completo.
-      - name: Instalar o artefato fora da árvore de código (Linux/macOS)
+      # Installation starts from the ARTIFACT, extracted outside the source tree: that is what
+      # an operator receives. Installing from the checkout would not prove the package complete.
+      - name: Install the artifact outside the source tree (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
-          # O caminho do package.json vai por variável de ambiente, nunca interpolado dentro de
-          # um literal JavaScript: num runner Windows o bash entrega "D:\a\RemoteIFES\..." e o
-          # literal JS comeria as barras invertidas, deixando "D:aRemoteIFES...".
+          # The package.json path travels in an environment variable, never inside a JavaScript
+          # literal: on Windows bash yields "D:\a\RemoteIFES\..." and the literal would consume
+          # the backslashes.
           VERSAO=$(CONSOLE_PKG="$GITHUB_WORKSPACE/remoteifes-console/package.json" node -p "require(process.env.CONSOLE_PKG).version")
           case "$RUNNER_OS" in
             Linux) SO=linux ;;
@@ -124,23 +191,22 @@ jobs:
             --estado "$RUNNER_TEMP/estado" \
             --checkout "$GITHUB_WORKSPACE"
 
-      - name: Instalar o artefato fora da árvore de código (Windows)
+      - name: Install the artifact outside the source tree (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          # A versão é lida com ConvertFrom-Json, não com `node -p "require('<caminho>')"`: ao
-          # passar um caminho do Windows como argumento nativo, o PowerShell come as barras
-          # invertidas e o require recebe "D:aRemoteIFES...".
+          # The version is read with ConvertFrom-Json rather than `node -p "require('<path>')"`:
+          # PowerShell passes a native argument that loses the Windows backslashes.
           $versao = (Get-Content -Raw "$env:GITHUB_WORKSPACE\remoteifes-console\package.json" | ConvertFrom-Json).version
           $arco = node -p "process.arch"
           Expand-Archive -Path "$env:RUNNER_TEMP\dist\remoteifes-console-$versao-windows-$arco.zip" -DestinationPath "$env:RUNNER_TEMP\origem" -Force
           Push-Location "$env:RUNNER_TEMP\origem"
           .\instalar.ps1 -Raiz "$env:RUNNER_TEMP\programa" -Estado "$env:RUNNER_TEMP\estado" -Checkout "$env:GITHUB_WORKSPACE"
-          if ($LASTEXITCODE -ne 0) { throw "instalador retornou $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "installer exited with $LASTEXITCODE" }
           Pop-Location
 
-      - name: Conferir o layout instalado
+      - name: Check the installed layout
         shell: bash
         run: |
           set -euo pipefail
@@ -150,17 +216,17 @@ jobs:
                          "versoes/$VERSAO/console.js" "versoes/$VERSAO/launcher.js" \
                          "versoes/$VERSAO/src/servidor.js" "versoes/$VERSAO/web/index.html" \
                          "versoes/$VERSAO/instalacao/desinstalar.js"; do
-            test -e "$RAIZ/$exigido" || { echo "instalação sem $exigido"; exit 1; }
+            test -e "$RAIZ/$exigido" || { echo "installation is missing $exigido"; exit 1; }
           done
-          # Testes e empacotamento não viajam no programa instalado.
+          # Tests and packaging tools are not part of the installed program.
           test ! -e "$RAIZ/versoes/$VERSAO/test"
           test ! -e "$RAIZ/versoes/$VERSAO/empacotar"
           node "$GITHUB_WORKSPACE/remoteifes-console/empacotar/conferir-instalacao.js" "$RAIZ"
           test -f "$RUNNER_TEMP/estado/bootstrap-token"
 
-      # O programa instalado roda sem ferramenta de desenvolvimento no PATH: sem git, sem npm,
-      # sem compilador. Só o Node que o RemoteIFES já exige.
-      - name: Rodar o programa instalado sem ferramentas de desenvolvimento no PATH (Linux/macOS)
+      # The installed program runs with no development tool on PATH: no git, no npm, no
+      # compiler. Only the Node runtime RemoteIFES already requires.
+      - name: Run the installed program without development tools on PATH (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
         run: |
@@ -172,32 +238,30 @@ jobs:
           export CONSOLE_PORTA=8399
           export CONSOLE_OCIOSIDADE_S=60
 
-          # O console é iniciado PELO LANÇADOR, como o atalho do sistema faz — e não invocando o
-          # backend direto. Essa diferença deixou passar um defeito em que o lançador subia outra
-          # cópia de si mesmo em vez do console: iniciar o backend na mão contornava exatamente o
-          # caminho que os operadores usam.
+          # The Console is started THROUGH THE LAUNCHER, as the system shortcut does, not by
+          # invoking the backend directly: starting the backend by hand bypasses the path
+          # operators use.
           env PATH="$MINIMO" node "$RUNNER_TEMP/programa/launcher-bootstrap.js" --iniciar
-          test -f "$RUNNER_TEMP/estado/endereco.json" || { echo "o lançador não deixou o console publicar o contrato de identidade"; exit 1; }
+          test -f "$RUNNER_TEMP/estado/endereco.json" || { echo "the launcher did not let the Console publish its identity contract"; exit 1; }
           CONSOLE_PID=$(CONTRATO="$RUNNER_TEMP/estado/endereco.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.CONTRATO,"utf8")).pid)')
 
-          # Nenhum descendente recursivo: um lançador que sobe lançadores acumularia processos.
+          # No recursive descendants: a launcher that starts launchers would accumulate processes.
           NODES=$(pgrep -c node || true)
-          echo "processos node após a partida: $NODES"
+          echo "node processes after start: $NODES"
 
           SAIDA=$(env PATH="$MINIMO" node "$RUNNER_TEMP/programa/launcher-bootstrap.js" --status)
           echo "$SAIDA"
           kill "$CONSOLE_PID" || true
-          echo "$SAIDA" | grep -q "no ar" || { echo "o lançador não reconheceu o console instalado"; exit 1; }
+          echo "$SAIDA" | grep -q "no ar" || { echo "the launcher did not recognize the installed Console"; exit 1; }
 
-      - name: Rodar o programa instalado sem ferramentas de desenvolvimento no PATH (Windows)
+      - name: Run the installed program without development tools on PATH (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          # Só o node.exe entra, COPIADO para um diretório isolado. Pôr o diretório de instalação
-          # do Node no PATH traria npm.cmd junto, porque no Windows o npm mora ao lado do node —
-          # e o teste não provaria que o programa instalado dispensa ferramenta de desenvolvimento.
-          # System32 e o PowerShell do sistema ficam porque o adaptador do Windows depende deles.
+          # Only node.exe is COPIED into an isolated directory. Putting the Node installation
+          # directory on PATH would bring npm.cmd along, since on Windows npm lives next to node.
+          # System32 and the system PowerShell stay because the Windows adapter depends on them.
           $minimo = Join-Path $env:RUNNER_TEMP "so-node"
           New-Item -ItemType Directory -Force -Path $minimo | Out-Null
           Copy-Item (Get-Command node.exe).Source (Join-Path $minimo "node.exe") -Force
@@ -205,28 +269,26 @@ jobs:
           $env:CONSOLE_ESTADO_DIR = "$env:RUNNER_TEMP\estado"
           $env:CONSOLE_PORTA = "8399"
           $env:CONSOLE_OCIOSIDADE_S = "60"
-          if (Get-Command git.exe -ErrorAction SilentlyContinue) { throw "git ainda está no PATH; o teste não provaria nada" }
-          if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { throw "npm ainda está no PATH; o teste não provaria nada" }
+          if (Get-Command git.exe -ErrorAction SilentlyContinue) { throw "git is still on PATH; the check would prove nothing" }
+          if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { throw "npm is still on PATH; the check would prove nothing" }
 
-          # O console é iniciado PELO LANÇADOR, como o atalho do menu Iniciar faz — e não
-          # invocando o backend direto. Essa diferença deixou passar um defeito em que o lançador
-          # subia outra cópia de si mesmo em vez do console.
+          # The Console is started THROUGH THE LAUNCHER, as the Start Menu shortcut does.
           $contrato = "$env:RUNNER_TEMP\estado\endereco.json"
           & node.exe "$env:RUNNER_TEMP\programa\launcher-bootstrap.js" --iniciar
-          if ($LASTEXITCODE -ne 0) { throw "o lançador instalado não conseguiu subir o console" }
-          if (-not (Test-Path $contrato)) { throw "o lançador não deixou o console publicar o contrato de identidade" }
+          if ($LASTEXITCODE -ne 0) { throw "the installed launcher could not start the Console" }
+          if (-not (Test-Path $contrato)) { throw "the launcher did not let the Console publish its identity contract" }
           $pid_ = (Get-Content -Raw $contrato | ConvertFrom-Json).pid
-          Write-Host "console no pid $pid_"
+          Write-Host "Console running as pid $pid_"
 
           $saida = & node.exe "$env:RUNNER_TEMP\programa\launcher-bootstrap.js" --status | Out-String
           Write-Host $saida
           Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue
-          if ($saida -notmatch "no ar") { throw "o lançador não reconheceu o console instalado" }
+          if ($saida -notmatch "no ar") { throw "the launcher did not recognize the installed Console" }
 
-      # No Linux o .deb é o caminho de instalação real; instalá-lo de verdade é a única prova de
-      # que o pacote é bem formado. --force-depends porque o runner tem Node por outro caminho
-      # que não o pacote `nodejs` da distribuição.
-      - name: Instalar e remover o pacote .deb
+      # On Linux the .deb is the real installation path; installing it is the only proof the
+      # package is well formed. --force-depends because the runner provides Node outside the
+      # distribution's nodejs package.
+      - name: Install and remove the .deb package
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -242,7 +304,7 @@ jobs:
           sudo dpkg -r remoteifes-console
           test ! -e /opt/remoteifes-console/console-bootstrap.js
 
-      - name: Desinstalar e conferir que o estado sobrevive
+      - name: Uninstall and check that state survives
         shell: bash
         run: |
           set -euo pipefail
@@ -255,7 +317,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: console-pacotes-${{ matrix.os }}
+          name: console-packages-${{ matrix.os }}
           path: |
             ${{ runner.temp }}/dist/*.tar.gz
             ${{ runner.temp }}/dist/*.zip
@@ -266,34 +328,46 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: Frontend end-to-end (${{ matrix.os }}, ${{ matrix.channel || matrix.browser }})
+    name: Browser E2E (${{ matrix.os }}, ${{ matrix.channel || matrix.browser }}, ${{ matrix.shard }}/${{ matrix.shards }})
+    needs: changes
+    if: needs.changes.outputs.e2e_matrix != '[]'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: ubuntu-latest, browser: chromium }
-          - { os: ubuntu-latest, browser: firefox }
-          - { os: ubuntu-latest, browser: webkit }
-          - { os: windows-latest, browser: chromium, channel: msedge }
-          - { os: windows-latest, browser: firefox }
-          - { os: macos-latest, browser: chromium, channel: chrome }
+        include: ${{ fromJSON(needs.changes.outputs.e2e_matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            remoteifes-server/package-lock.json
+            e2e/package-lock.json
       - run: npm ci
         working-directory: remoteifes-server
       - run: npm ci
         working-directory: e2e
+      # Browser binaries are keyed by the lockfile, which pins the Playwright version and
+      # therefore the exact browser revisions. System channels (msedge, chrome) are preinstalled.
+      - name: Cache Playwright browsers
+        if: ${{ !matrix.channel }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+            ~/AppData/Local/ms-playwright
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('e2e/package-lock.json') }}
       - if: ${{ !matrix.channel && runner.os == 'Linux' }}
         run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: e2e
       - if: ${{ !matrix.channel && runner.os != 'Linux' }}
         run: npx playwright install ${{ matrix.browser }}
         working-directory: e2e
-      - run: npx playwright test
+      - run: npx playwright test --shard=${{ matrix.shard }}/${{ matrix.shards }}
         working-directory: e2e
         env:
           CI: "1"
@@ -302,12 +376,14 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
-          name: playwright-report-${{ matrix.os }}-${{ matrix.channel || matrix.browser }}
+          name: playwright-report-${{ matrix.os }}-${{ matrix.channel || matrix.browser }}-${{ matrix.shard }}
           path: e2e/playwright-report
           retention-days: 7
 
   safari:
-    name: Safari nativo (macOS e iOS Simulator)
+    name: Native Safari (macOS)
+    needs: changes
+    if: needs.changes.outputs.safari == 'true'
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -315,15 +391,19 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            remoteifes-server/package-lock.json
+            e2e/package-lock.json
       - run: npm ci
         working-directory: remoteifes-server
       - run: npm ci
         working-directory: e2e
       - run: sudo safaridriver --enable
-      - name: Safari no macOS
+      - name: Safari on macOS
         run: npm run test:safari
         working-directory: e2e
-      - name: Safari no iOS Simulator
+      - name: Safari on the iOS Simulator
         if: ${{ inputs.ios_safari }}
         run: npm run test:safari
         working-directory: e2e
@@ -336,13 +416,16 @@ jobs:
           path: ~/Library/Logs/com.apple.dt.safaridriver
           retention-days: 7
 
-  cordova-config:
-    name: Validação de configuração Cordova (${{ matrix.os }})
+  cordova:
+    name: Cordova config (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.cordova_os != '[]'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: ${{ fromJSON(needs.changes.outputs.cordova_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -356,8 +439,11 @@ jobs:
         working-directory: remoteifes-cordova
 
   firmware:
-    name: Build do firmware ESP32
+    name: ESP32 firmware build
+    needs: changes
+    if: needs.changes.outputs.firmware == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -373,3 +459,33 @@ jobs:
       - run: pip install platformio==6.1.19
       - run: pio run
         working-directory: remoteifes-esp32
+
+  android:
+    name: Android
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    uses: ./.github/workflows/android.yml
+    with:
+      broad_matrix: ${{ inputs.android_broad_matrix || false }}
+
+  ios:
+    name: iOS
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    uses: ./.github/workflows/ios.yml
+
+  result:
+    name: CI result
+    if: always()
+    needs: [changes, server, console, packages, e2e, safari, cordova, firmware, android, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/scripts
+      - name: Verify every selected job passed
+        run: node .github/scripts/select-checks.js --verify
+        env:
+          PLAN: ${{ needs.changes.outputs.plan }}
+          NEEDS: ${{ toJSON(needs) }}
