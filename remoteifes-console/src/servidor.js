@@ -474,6 +474,10 @@ async function rotear(req, res, url, params) {
     return responderJson(res, 200, { itens: estado.lerAuditoria(Math.min(Number(params.get("limite")) || 100, 500)) });
   }
 
+  if (caminho === "/api/rede/acesso" && metodo === "GET") {
+    return responderJson(res, 200, rede.acessoDaAplicacao());
+  }
+
   if (caminho === "/api/rede" && metodo === "GET") {
     return responderJson(res, 200, await rede.diagnostico({ alvo: params.get("alvo") }));
   }

@@ -67,6 +67,59 @@ async function escutas() {
   return { suportado: true, comProcesso: true, linhas: r.saida.split("\n").filter(Boolean).slice(0, 40) };
 }
 
+const DONO_ACESSO = "Console de Operações (Rede e domínio > Acesso à aplicação)";
+
+function lerJson(conexao, chave) {
+  const linha = conexao.prepare("SELECT valor FROM configuracoes WHERE chave = ?").get(chave);
+  if (!linha || typeof linha.valor !== "string") return undefined;
+  try {
+    return JSON.parse(linha.valor);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The application's network access policy, read-only. `modoTeste` is null when the database has no
+ * stored value: the application then applies its default (on outside production), reported as
+ * `modoTestePadrao`.
+ */
+function acessoDaAplicacao() {
+  const app = config.caminhosDaAplicacao();
+  const env = config.lerEnvServidor();
+  const resultado = {
+    dono: DONO_ACESSO,
+    lido: false,
+    modoTeste: null,
+    modoTestePadrao: (env.NODE_ENV || "development") !== "production",
+    redesAutorizadas: null,
+    modoManutencao: null,
+  };
+  const banco = coleta.espiarBanco();
+  if (!banco.existe || !banco.lido) {
+    resultado.erro = banco.existe ? banco.erro || "banco não lido" : "banco não encontrado";
+    return resultado;
+  }
+  try {
+    const { DatabaseSync } = require("node:sqlite");
+    const conexao = new DatabaseSync(app.banco, { readOnly: true });
+    try {
+      const redes = lerJson(conexao, "redesAutorizadas");
+      const teste = lerJson(conexao, "modoTeste");
+      const manutencao = lerJson(conexao, "modoManutencao");
+      resultado.redesAutorizadas = Array.isArray(redes) ? redes.filter((v) => typeof v === "string") : [];
+      resultado.modoTeste = typeof teste === "boolean" ? teste : null;
+      resultado.modoManutencao = typeof manutencao === "boolean" ? manutencao : null;
+      resultado.lido = true;
+    } finally {
+      conexao.close();
+    }
+  } catch (erro) {
+    resultado.erro = erro.message;
+  }
+  return resultado;
+}
+
 /**
  * Application exposure configuration, read from .env and the database (read-only). Kept separate
  * from the Console's own exposure on purpose: different policies with different owners.
@@ -87,40 +140,13 @@ function exposicaoDaAplicacao() {
       "Use exatamente o número de proxies confiáveis à frente.",
   };
 
-  // Authorized ranges: the application edits them (Configurações). The Console only shows and
-  // explains.
-  const banco = coleta.espiarBanco();
-  resultado.redesAutorizadas = { dono: "aplicação (Administração > Sistema > Configurações)", valores: null, lido: false };
-  if (banco.existe && banco.lido) {
-    try {
-      const { DatabaseSync } = require("node:sqlite");
-      const conexao = new DatabaseSync(app.banco, { readOnly: true });
-      try {
-        const linha = conexao.prepare("SELECT valor FROM configuracoes WHERE chave = 'redesAutorizadas'").get();
-        if (linha && typeof linha.valor === "string") {
-          let valores;
-          try {
-            valores = JSON.parse(linha.valor);
-          } catch {
-            valores = linha.valor.split(",").map((s) => s.trim()).filter(Boolean);
-          }
-          resultado.redesAutorizadas.valores = Array.isArray(valores) ? valores : [];
-          resultado.redesAutorizadas.lido = true;
-        } else {
-          resultado.redesAutorizadas.valores = [];
-          resultado.redesAutorizadas.lido = true;
-        }
-        const teste = conexao.prepare("SELECT valor FROM configuracoes WHERE chave = 'modoTeste'").get();
-        resultado.modoTeste = teste ? teste.valor : null;
-        const manutencao = conexao.prepare("SELECT valor FROM configuracoes WHERE chave = 'modoManutencao'").get();
-        resultado.modoManutencao = manutencao ? manutencao.valor : null;
-      } finally {
-        conexao.close();
-      }
-    } catch (erro) {
-      resultado.redesAutorizadas.erro = erro.message;
-    }
-  }
+  // Authorized ranges and test mode are owned by this Console (action rede.acesso-aplicacao); the
+  // website only displays them.
+  const acesso = acessoDaAplicacao();
+  resultado.redesAutorizadas = { dono: DONO_ACESSO, valores: acesso.redesAutorizadas, lido: acesso.lido };
+  if (acesso.erro) resultado.redesAutorizadas.erro = acesso.erro;
+  resultado.modoTeste = acesso.modoTeste;
+  resultado.modoManutencao = acesso.modoManutencao;
   resultado.redesAutorizadas.observacao =
     "O verificador de faixas do RemoteIFES trabalha com IPv4 em notação CIDR; endereços IPv6 mapeados (::ffff:) são " +
     "normalizados e ::1 vira 127.0.0.1. Faixas IPv6 próprias não são suportadas pelo analisador atual.";
@@ -328,4 +354,4 @@ async function diagnostico({ alvo = null } = {}) {
   };
 }
 
-module.exports = { diagnostico, interfaces, exposicaoDaAplicacao, exposicaoDoConsole, dominioConfigurado, certificadoTls, nginx };
+module.exports = { diagnostico, interfaces, acessoDaAplicacao, exposicaoDaAplicacao, exposicaoDoConsole, dominioConfigurado, certificadoTls, nginx };

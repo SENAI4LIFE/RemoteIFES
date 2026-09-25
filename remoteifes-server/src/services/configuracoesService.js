@@ -94,6 +94,14 @@ const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
 const CHAVES_TEXTO_CRITICAS = ["turboFuncaoExtra"];
 const CHAVES_OBJETO = ["desligamentoDiario"];
+// Network exposure policy is infrastructure: only the Operations Console and the terminal CLI change
+// it. A website session may resend the current values (an older cached frontend does), but never
+// change them.
+const CHAVES_INFRAESTRUTURA = ["modoTeste", "redesAutorizadas"];
+
+function normalizarRedes(lista) {
+  return Array.isArray(lista) ? lista.map((v) => String(v).trim()).filter(Boolean) : lista;
+}
 
 function obter() {
   const linhas = db.prepare(`SELECT chave, valor FROM configuracoes`).all();
@@ -164,7 +172,14 @@ function modoManutencaoAtivo(cfg = null) {
   return !!(cfg || obter()).modoManutencao;
 }
 
-function validarEAtualizar(patch, requisitante) {
+/**
+ * @param {object} patch
+ * @param {object} requisitante
+ * @param {object} [opcoes]
+ * @param {boolean} [opcoes.infraestrutura] true only for the Operations Console runner and the
+ *   terminal CLI, which may change the network exposure keys.
+ */
+function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {}) {
   const souSuperAdmin = !!requisitante && requisitante.nivel === 3;
   if (!souSuperAdmin) {
     const erro = new Error("apenas o superadministrador pode alterar configurações do sistema");
@@ -173,6 +188,20 @@ function validarEAtualizar(patch, requisitante) {
   }
 
   const atual = obter();
+  if (!infraestrutura) {
+    patch = { ...patch };
+    for (const chave of CHAVES_INFRAESTRUTURA) {
+      if (!Object.prototype.hasOwnProperty.call(patch, chave)) continue;
+      const pedido = chave === "redesAutorizadas" ? normalizarRedes(patch[chave]) : !!patch[chave];
+      const vigente = chave === "redesAutorizadas" ? normalizarRedes(atual[chave] || []) : !!atual[chave];
+      if (JSON.stringify(pedido) !== JSON.stringify(vigente)) {
+        const erro = new Error("o acesso de rede (modo de teste e redes autorizadas) é configurado no Console de Operações");
+        erro.permissao = true;
+        throw erro;
+      }
+      delete patch[chave];
+    }
+  }
   const proximo = { ...atual };
 
   for (const chave of CHAVES_NUMERICAS) {
@@ -243,7 +272,9 @@ function validarEAtualizar(patch, requisitante) {
     ...CHAVES_LISTA_CRITICAS,
     ...CHAVES_TEXTO_CRITICAS,
     ...CHAVES_OBJETO,
-  ];
+  ].filter((chave) => infraestrutura || !CHAVES_INFRAESTRUTURA.includes(chave));
+  // A website save does not rewrite the network keys at all: rewriting them from the snapshot read
+  // above would undo a Console change committed in between.
   const estadoIRAlterado = proximo.temperaturaMinima !== atual.temperaturaMinima
     || proximo.temperaturaMaxima !== atual.temperaturaMaxima
     || proximo.turboFuncaoExtra !== atual.turboFuncaoExtra;
@@ -311,6 +342,7 @@ module.exports = {
   acessoRestritoAtivo,
   modoManutencaoAtivo,
   normalizarDesligamentoDiario,
+  CHAVES_INFRAESTRUTURA,
   eventos,
   PADROES,
 };

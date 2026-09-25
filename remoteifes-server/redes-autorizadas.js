@@ -34,7 +34,7 @@ function aplicar(lista) {
     process.exit(1);
   }
   const unicas = [...new Set(lista.map((f) => f.trim()))];
-  configuracoesService.validarEAtualizar({ redesAutorizadas: unicas }, REQUISITANTE);
+  configuracoesService.validarEAtualizar({ redesAutorizadas: unicas }, REQUISITANTE, { infraestrutura: true });
   console.log(`Redes autorizadas: ${unicas.length ? unicas.join(", ") : "(nenhuma)"}`);
   if (!unicas.length) {
     console.log("Com a lista vazia e modo de teste desligado, o acesso em produção fica bloqueado (exceto /dispositivo e localhost via túnel).");
