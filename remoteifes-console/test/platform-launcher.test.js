@@ -587,3 +587,77 @@ test("a port held by an impostor is not accepted just because it answered", asyn
   assert.equal(r.ok, false, "without a published identity, the occupied port does not become success");
   assert.match(r.motivo, /não publicou identidade|ocupada/);
 });
+
+// --- macOS: one logical Console process, owned by launchd ------------------------------------
+
+test("the LaunchAgent arms idle exit and loads the Console entry", (t) => {
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const macos = require(path.join(ajuda.RAIZ, "src", "plataforma", "macos.js"));
+  const plist = macos.plistDoAgente({ comando: "/usr/bin/node", argumentos: ["/opt/x/console-bootstrap.js"], logs: "/tmp/logs" });
+  assert.match(plist, /<key>CONSOLE_INICIADO_PELO_LANCADOR<\/key>\s*<string>1<\/string>/);
+  assert.match(plist, /<key>CONSOLE_BOOTSTRAP_ALVO<\/key>\s*<string>console<\/string>/);
+});
+
+test("on macOS the Console is started as the launchd job, never with kickstart -k", { skip: process.platform === "win32" && "POSIX shell script as launchctl" }, async (t) => {
+  const casa = ajuda.dirTemporario("console-casa-");
+  const bin = ajuda.dirTemporario("console-bin-");
+  const registro = path.join(bin, "chamadas.log");
+  // Fake launchctl: records every call; `print` fails once (job not loaded yet).
+  fs.writeFileSync(
+    path.join(bin, "launchctl"),
+    `#!/bin/sh\necho "$*" >> "${registro}"\ncase "$1" in print) [ -f "${bin}/carregado" ] && exit 0; exit 113;; bootstrap) touch "${bin}/carregado";; esac\nexit 0\n`,
+    { mode: 0o755 }
+  );
+  const amb = ajuda.ambiente({ env: { HOME: casa, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(casa, { recursive: true, force: true });
+    fs.rmSync(bin, { recursive: true, force: true });
+  });
+  const macos = require(path.join(ajuda.RAIZ, "src", "plataforma", "macos.js"));
+
+  assert.equal((await macos.iniciarConsoleGerenciado()).estado, "nao-aplicavel", "without the agent the launcher spawns directly");
+
+  const plist = path.join(casa, "Library", "LaunchAgents", "br.edu.ifes.remoteifes.console.plist");
+  fs.mkdirSync(path.dirname(plist), { recursive: true });
+  fs.writeFileSync(plist, macos.plistDoAgente({ comando: "/usr/bin/node", argumentos: ["/x/console-bootstrap.js"], logs: casa }));
+  const r = await macos.iniciarConsoleGerenciado();
+  assert.equal(r.disponivel, true);
+  assert.equal(r.mecanismo, "launchd");
+  const uid = process.getuid();
+  const chamadas = fs.readFileSync(registro, "utf8").trim().split("\n");
+  assert.deepEqual(chamadas, [
+    `print gui/${uid}/br.edu.ifes.remoteifes.console`,
+    `bootstrap gui/${uid} ${plist}`,
+    `kickstart gui/${uid}/br.edu.ifes.remoteifes.console`,
+  ]);
+});
+
+test("the launcher lets the service manager start the Console when it owns it", async (t) => {
+  const amb = ajuda.ambiente();
+  let s = null;
+  t.after(async () => {
+    if (s) await s.fechar();
+    amb.restaurar();
+  });
+  const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
+  const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
+  let chamadas = 0;
+  plataforma.iniciarConsoleGerenciado = async () => {
+    chamadas += 1;
+    // Stands in for launchd: the managed job starts and publishes its identity.
+    s = await ajuda.subir(amb);
+    require(path.join(ajuda.RAIZ, "src", "identidade.js")).publicarContrato({ porta: s.porta, modo: "teste" });
+    return { estado: "suportado", disponivel: true, mecanismo: "launchd" };
+  };
+  const r = await launcher.garantirBackend();
+  assert.equal(r.ok, true, r.motivo);
+  assert.equal(r.gerenciadoPor, "launchd");
+  assert.equal(chamadas, 1);
+  assert.equal(r.contrato.pid, process.pid, "the ready Console is the managed one, not a second spawned process");
+
+  const denovo = await launcher.garantirBackend();
+  assert.equal(denovo.jaEstava, true);
+  assert.equal(chamadas, 1, "a running Console is never started again");
+});
