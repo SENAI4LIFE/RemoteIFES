@@ -25,7 +25,13 @@ const net = require("net");
 //
 // Usage:
 //   node instalacao/desinstalar.js [--escopo usuario|sistema] [--raiz <dir>] [--estado <dir>]
-//                                 [--apagar-estado] [--simular] [--sim]
+//                                 [--apagar-estado] [--simular] [--sim] [--pacote]
+//
+// `--pacote` is the removal step of the Linux package (the .deb prerm runs it). It removes the
+// integration the package's postinst created (units, helper, sudo rule), stops the Console and
+// removes only the program files dpkg does not own (other versions installed by self-update, the
+// version pointer, shared node_modules). dpkg removes its own files; the state stays unless the
+// package is purged.
 
 const RE_VERSAO = /^\d+\.\d+\.\d+$/;
 
@@ -301,6 +307,34 @@ function esperarPortaFechar(porta, prazoMs) {
   })();
 }
 
+const MODO_PACOTE = temFlag("pacote");
+
+/**
+ * Package removal: what dpkg does not own inside the installation root.
+ */
+function removerForaDoPacote(raiz, { simular }) {
+  let versaoDoPacote = null;
+  try {
+    versaoDoPacote = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version;
+  } catch {}
+  const alvos = [path.join(raiz, "estado-instalacao.json"), path.join(raiz, "node_modules")];
+  try {
+    for (const nome of fs.readdirSync(path.join(raiz, "versoes"))) {
+      if (nome !== versaoDoPacote) alvos.push(path.join(raiz, "versoes", nome));
+    }
+  } catch {}
+  for (const alvo of alvos) {
+    if (!fs.existsSync(alvo)) continue;
+    if (simular) {
+      log(`   [simulação] removeria ${alvo}`);
+      continue;
+    }
+    fs.rmSync(alvo, { recursive: true, force: true });
+    log(`   removido: ${alvo}`);
+  }
+  log(`   os arquivos do pacote (versão ${versaoDoPacote || "?"} e a camada estável) ficam para o dpkg remover.`);
+}
+
 async function main() {
   const plataforma = require(path.join(__dirname, "..", "src", "plataforma"));
   const simular = temFlag("simular");
@@ -319,7 +353,9 @@ async function main() {
   const raiz = path.resolve(argumento("raiz", pareceInstalacao ? raizDoProprioScript : padroes.raizInstalacao));
   const dirEstado = path.resolve(argumento("estado", registro.estado || padroes.estado));
 
-  if (!temFlag("simular") && reexecutarForaDaInstalacao(raiz, dirEstado, escopoEfetivo)) return;
+  // In package mode dpkg removes the program files, so the script never deletes its own tree and
+  // does not need to run from a copy outside it.
+  if (!MODO_PACOTE && !temFlag("simular") && reexecutarForaDaInstalacao(raiz, dirEstado, escopoEfetivo)) return;
 
   log("");
   log("  Console de Operações RemoteIFES — desinstalação");
@@ -332,19 +368,20 @@ async function main() {
   log("");
 
   const autorizacao = autorizarRemocao(raiz, {
-    marcas: ["console-bootstrap.js", "versoes", "estado-instalacao.json"],
+    // A package whose provisioning did not finish has no version pointer yet.
+    marcas: MODO_PACOTE ? ["console-bootstrap.js", "versoes"] : ["console-bootstrap.js", "versoes", "estado-instalacao.json"],
     rotulo: "instalação do console",
     exigirTodas: true,
   });
   if (!autorizacao.ok && !autorizacao.ausente) falhar(`  ${autorizacao.motivo}`);
 
-  if (!simular && !temFlag("sim") && !process.stdin.isTTY) {
+  if (!simular && !temFlag("sim") && !MODO_PACOTE && !process.stdin.isTTY) {
     falhar(
       "  Sem terminal interativo, a desinstalação exige --sim para confirmar.\n" +
         "  Use --simular primeiro para ver exatamente o que seria removido."
     );
   }
-  if (!simular && !temFlag("sim") && process.stdin.isTTY) {
+  if (!simular && !temFlag("sim") && !MODO_PACOTE && process.stdin.isTTY) {
     const resposta = await perguntar("  Confirmar a desinstalação? digite 'desinstalar': ");
     if (resposta.trim() !== "desinstalar") falhar("  Cancelado.");
     log("");
@@ -403,6 +440,8 @@ async function main() {
   log("== Removendo o programa");
   if (autorizacao.ausente) {
     log(`   nada a remover: ${autorizacao.motivo}`);
+  } else if (MODO_PACOTE) {
+    removerForaDoPacote(raiz, { simular });
   } else {
     const versoes = (() => {
       try {
@@ -446,7 +485,7 @@ async function main() {
   log("   • o Node instalado no host.");
   if (!temFlag("apagar-estado")) log(`   • o estado do console em ${dirEstado}.`);
   log("");
-  if (plataforma.nome === "linux" && escopoEfetivo === "sistema") {
+  if (plataforma.nome === "linux" && escopoEfetivo === "sistema" && !MODO_PACOTE) {
     log("  Se o console foi instalado por pacote (.deb), remova-o também com:");
     log("      sudo apt-get remove remoteifes-console");
     log("");
