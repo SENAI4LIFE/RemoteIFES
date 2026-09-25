@@ -68,7 +68,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("tempestade de reconexão converge para uma sessão por sala, sem duplicatas nem sobras", async () => {
+test("a reconnection storm converges to one session per room, with no duplicates or leftovers", async () => {
   const primeira = salas.map(conectar);
   assert.ok(await ate(() => abertos(primeira) === TOTAL), "todos os dispositivos deveriam conectar");
   assert.ok(
@@ -94,7 +94,7 @@ test("tempestade de reconexão converge para uma sessão por sala, sem duplicata
   assert.ok(await ate(() => salas.every((sala) => !deviceHub.estadoPublico(sala).conectado)), "encerramento limpo");
 });
 
-test("conexão duplicada da mesma sala derruba a anterior com 4002 e mantém uma só sessão", async () => {
+test("a duplicate connection for the same room drops the previous one with 4002 and keeps a single session", async () => {
   const sala = salas[0];
   const antiga = conectar(sala);
   assert.ok(await ate(() => antiga.readyState === WebSocket.OPEN));
@@ -109,7 +109,7 @@ test("conexão duplicada da mesma sala derruba a anterior com 4002 e mantém uma
   assert.ok(await ate(() => !deviceHub.estadoPublico(sala).conectado));
 });
 
-test("telemetria de dispositivo desconhecido não cria sessão nem estado", async () => {
+test("telemetry from an unknown device creates neither session nor state", async () => {
   const ws = new WebSocket(baseWsUrl, { headers: { "x-device-id": "esp_0000000000000000", "x-device-secret": "invalido" } });
   ws.fechamentos = [];
   ws.on("close", (codigo) => ws.fechamentos.push(codigo));

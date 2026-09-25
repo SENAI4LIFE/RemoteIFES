@@ -59,7 +59,7 @@ function executar(corpo) {
   assert.equal(resultado.status, 0, resultado.stderr || resultado.stdout);
 }
 
-test("falha no lote não preenche a vaga liberada e drena somente os já ofertados", () => executar(`
+test("a batch failure does not fill the freed slot and drains only those already offered", () => executar(`
   ["a", "b", "c", "d", "fora"].forEach(sala);
   rollout.iniciar({ salas: ["a", "b", "c", "d"], tamanhoLote: 3 });
   validar("a");
@@ -71,7 +71,7 @@ test("falha no lote não preenche a vaga liberada e drena somente os já ofertad
   assert.equal(rollout.atual().dispositivos.find(d => d.sala === "d").estado, "pendente");
 `));
 
-test("OTA avulsa respeita seleção reservada e compartilha o limite global", () => executar(`
+test("a standalone OTA respects the reserved selection and shares the global limit", () => executar(`
   ["a", "b", "fora", "extra"].forEach(sala);
   rollout.iniciar({ salas: ["a", "b"] });
   assert.throws(() => ota.ofertar("b"), /reservado/);
@@ -84,7 +84,7 @@ test("OTA avulsa respeita seleção reservada e compartilha o limite global", ()
 `));
 
 for (const fase of ["ofertado", "baixando", "gravado", "reiniciando", "concluido", "falhou"]) {
-  test("reinício preserva tentativa em " + fase + " sem segunda oferta", () => executar(`
+  test("a restart preserves an attempt in " + fase + " without a second offer", () => executar(`
     sala("a");
     rollout.iniciar({ salas: ["a"] });
     if (${JSON.stringify(fase)} === "baixando") ota.registrarProgresso("a", { recebido: 100 });
@@ -99,7 +99,7 @@ for (const fase of ["ofertado", "baixando", "gravado", "reiniciando", "concluido
 }
 
 for (const registro of ["ausente", "anterior"]) {
-  test("intenção persistida sem oferta confirmada e registro " + registro + " nunca é repetida", () => executar(`
+  test("a persisted intent without a confirmed offer and a " + registro + " record is never repeated", () => executar(`
     sala("a"); rollout.iniciar({ salas: ["a"] });
     const r = rollout.atual(); r.dispositivos[0].ofertadoEm = null;
     fs.writeFileSync(rollout.ARQUIVO_ROLLOUT, JSON.stringify(r));
@@ -116,7 +116,7 @@ for (const registro of ["ausente", "anterior"]) {
 }
 
 for (const alvo of ["rollout-ota.json.tmp", "estados-ota.json.tmp"]) {
-  test("falha de persistência em " + alvo + " impede oferta", () => executar(`
+  test("a persistence failure in " + alvo + " prevents the offer", () => executar(`
     sala("a");
     const escrever = fs.writeFileSync;
     fs.writeFileSync = function(p, ...args) {
@@ -132,7 +132,7 @@ for (const alvo of ["rollout-ota.json.tmp", "estados-ota.json.tmp"]) {
 }
 
 for (const mudanca of ["removido", "substituido"]) {
-  test("dispositivo pendente " + mudanca + " não recebe oferta", () => executar(`
+  test("a pending device that is " + mudanca + " receives no offer", () => executar(`
     ["a", "b"].forEach(sala);
     rollout.iniciar({ salas: ["a", "b"] }); rollout.pausar(); validar("a");
     if (${JSON.stringify(mudanca)} === "removido") salas.delete("b");
@@ -143,7 +143,7 @@ for (const mudanca of ["removido", "substituido"]) {
   `));
 }
 
-test("registro apagado em voo termina indeterminado sem travar cancelamento", () => executar(`
+test("a record deleted in flight ends indeterminate without blocking cancellation", () => executar(`
   sala("a"); rollout.iniciar({ salas: ["a"] }); rollout.cancelar();
   ota.limparEstado("a"); rollout.tick();
   assert.equal(rollout.atual().estado, "cancelado");
@@ -151,7 +151,7 @@ test("registro apagado em voo termina indeterminado sem travar cancelamento", ()
 `));
 
 for (const versao of ["4.0.0", "3.0.0", null]) {
-  test("versão inesperada " + versao + " não comprova rollback", () => executar(`
+  test("an unexpected version " + versao + " does not prove a rollback", () => executar(`
     sala("a"); rollout.iniciar({ salas: ["a"] });
     ota.registrarResultado("a", { resultado: "ok" }); ota.aoDesconectarDispositivo("a");
     ota.aoReconectarDispositivo("a", ${JSON.stringify(versao)});
@@ -160,7 +160,7 @@ for (const versao of ["4.0.0", "3.0.0", null]) {
   `));
 }
 
-test("pausa e cancelamento sobrevivem ao reinício sem novas ofertas", () => executar(`
+test("pause and cancellation survive a restart without new offers", () => executar(`
   ["a", "b"].forEach(sala); rollout.iniciar({ salas: ["a", "b"] });
   rollout.pausar(); validar("a"); reiniciar(); rollout.tick();
   assert.equal(rollout.atual().estado, "pausado");
@@ -169,7 +169,7 @@ test("pausa e cancelamento sobrevivem ao reinício sem novas ofertas", () => exe
   assert.deepEqual(ofertas.map(o => o.sala), ["a"]);
 `));
 
-test("dispositivo offline expira sem oferta e início concorrente não substitui seleção", () => executar(`
+test("an offline device expires without an offer and a concurrent start does not replace the selection", () => executar(`
   ["a", "b"].forEach(sala); online.delete("b");
   rollout.iniciar({ salas: ["a", "b"] });
   assert.throws(() => rollout.iniciar({ salas: ["a"] }), /andamento/);
@@ -181,7 +181,7 @@ test("dispositivo offline expira sem oferta e início concorrente não substitui
 `));
 
 for (const acao of ["pausar", "retomar", "cancelar"]) {
-  test("controle " + acao + " não confirma sucesso se o disco falhar", () => executar(`
+  test("the " + acao + " control does not confirm success if the disk fails", () => executar(`
     ["a", "b"].forEach(sala); rollout.iniciar({ salas: ["a", "b"] });
     if (${JSON.stringify(acao)} === "retomar") rollout.pausar();
     const antes = rollout.atual();
@@ -197,7 +197,7 @@ for (const acao of ["pausar", "retomar", "cancelar"]) {
   `));
 }
 
-test("troca de firmware drena o lote em voo sem iniciar os pendentes", () => executar(`
+test("a firmware change drains the batch in flight without starting pending ones", () => executar(`
   ["a", "b", "c", "d"].forEach(sala);
   rollout.iniciar({ salas: ["a", "b", "c", "d"], tamanhoLote: 3 }); validar("a");
   ota.publicarFirmware({ origem: bin, versao: "4.2.0" }); rollout.tick();
@@ -208,21 +208,21 @@ test("troca de firmware drena o lote em voo sem iniciar os pendentes", () => exe
   assert.equal(rollout.atual().dispositivos[2].estado, "validado");
 `));
 
-test("estado persistido incompleto não entra no agendador", () => executar(`
+test("incomplete persisted state does not enter the scheduler", () => executar(`
   fs.writeFileSync(rollout.ARQUIVO_ROLLOUT, JSON.stringify({ id: "incompleto", estado: "lotes", dispositivos: [{ sala: "a", estado: "pendente" }] }));
   reiniciar();
   assert.equal(rollout.atual(), null);
   rollout.tick(); assert.equal(ofertas.length, 0);
 `));
 
-test("registro legado de reversão é exibido como indeterminado", () => executar(`
+test("a legacy rollback record is shown as indeterminate", () => executar(`
   sala("a"); rollout.iniciar({ salas: ["a"] });
   const r = rollout.atual(); r.estado = "interrompido"; r.dispositivos[0].estado = "revertido";
   fs.writeFileSync(rollout.ARQUIVO_ROLLOUT, JSON.stringify(r)); reiniciar();
   assert.equal(rollout.atual().dispositivos[0].estado, "indeterminado");
 `));
 
-test("progresso duplicado não renova o timeout de uma transferência parada", () => executar(`
+test("duplicate progress does not renew the timeout of a stalled transfer", () => executar(`
   sala("a"); rollout.iniciar({ salas: ["a"] });
   ota.registrarProgresso("a", { recebido: 100 });
   const e = ota.estadoDaSala("a"); e.atualizadoEm = new Date(Date.now() - 5 * 60 * 1000).toISOString();

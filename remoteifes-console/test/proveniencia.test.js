@@ -66,7 +66,7 @@ function recusada(resultado, codigo, padrao) {
 
 // --- Accepted ----------------------------------------------------------------------------------
 
-test("um release atestado pelo workflow oficial para a sua própria etiqueta e o seu commit é aceito", async () => {
+test("a release attested by the official workflow for its own tag and commit is accepted", async () => {
   const r = novaRelease();
   const v = verificar(r, await atestada(r));
   assert.equal(v.ok, true, v.motivo);
@@ -76,7 +76,7 @@ test("um release atestado pelo workflow oficial para a sua própria etiqueta e o
   assert.equal(v.identidade.assinante, "https://github.com/SENAI4LIFE/RemoteIFES/.github/workflows/console-release.yml@refs/tags/console-v1.1.0");
 });
 
-test("a política fixa repositório e dono por nome e identificador numérico, o workflow, o gatilho, o executor e o ambiente", () => {
+test("the policy pins the repository and owner by name and numeric id, the workflow, trigger, runner and environment", () => {
   assert.deepEqual({ ...atestacao.IDENTIDADE_OFICIAL }, {
     emissor: "https://token.actions.githubusercontent.com",
     repositorio: "https://github.com/SENAI4LIFE/RemoteIFES",
@@ -92,7 +92,7 @@ test("a política fixa repositório e dono por nome e identificador numérico, o
 
 // --- The artifact and the manifest -------------------------------------------------------------
 
-test("um manifesto que não é byte a byte o atestado é recusado, reformatação inclusive", async () => {
+test("a manifest that is not byte for byte the attested one is refused, reformatting included", async () => {
   const r = novaRelease();
   const bundle = await atestada(r);
   const mesmoConteudo = { ...r, manifesto: Buffer.from(JSON.stringify(JSON.parse(r.manifesto.toString("utf8")))) };
@@ -103,13 +103,13 @@ test("um manifesto que não é byte a byte o atestado é recusado, reformataçã
   recusada(verificar({ ...r, manifesto: Buffer.from(JSON.stringify(outraVersao)) }, bundle), "sujeito");
 });
 
-test("uma atestação feita para outro release é recusada", async () => {
+test("an attestation made for another release is refused", async () => {
   const r = novaRelease();
   const outra = novaRelease({ versao: "1.1.0", alvos: ["linux-x64"] });
   recusada(verificar(r, await atestada(outra)), "sujeito", /não é o arquivo que a atestação cobre/);
 });
 
-test("todo artefato que o manifesto lista precisa estar atestado com o digest que o manifesto declara", async () => {
+test("every artifact the manifest lists must be attested with the digest the manifest declares", async () => {
   const r = novaRelease();
   const [primeiro] = Object.keys(r.artefatos);
   const semUm = r.sujeitos.filter((s) => s.name !== primeiro);
@@ -119,7 +119,7 @@ test("todo artefato que o manifesto lista precisa estar atestado com o digest qu
   recusada(verificar(r, await autoridade.atestar({ sujeitos: trocado, versao: r.versao, commit: r.commit })), "sujeito", /não está coberto/);
 });
 
-test("os nomes dos artefatos do manifesto são fixados pela versão e pelo alvo", async () => {
+test("the manifest's artifact names are fixed by version and target", async () => {
   const r = novaRelease({ alvos: ["linux-x64"] });
   const m = JSON.parse(r.manifesto.toString("utf8"));
   // A payload for another target served under this target's entry.
@@ -131,7 +131,7 @@ test("os nomes dos artefatos do manifesto são fixados pela versão e pelo alvo"
 
 // --- Identity -----------------------------------------------------------------------------------
 
-test("uma atestação de outro repositório é recusada, mesmo com o mesmo nome de repositório", async () => {
+test("an attestation from another repository is refused, even with the same repository name", async () => {
   const r = novaRelease();
   recusada(
     verificar(r, await atestada(r, { identidade: { repositorio: "https://github.com/outro/RemoteIFES", repositorioId: "999", dono: "https://github.com/outro", donoId: "998" } })),
@@ -142,13 +142,13 @@ test("uma atestação de outro repositório é recusada, mesmo com o mesmo nome 
   recusada(verificar(r, await atestada(r, { identidade: { repositorioId: "1313157229" } })), "identidade", /identificador diferente/);
 });
 
-test("uma atestação de outro dono é recusada", async () => {
+test("an attestation from another owner is refused", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { identidade: { donoId: "12345" } })), "identidade", /outro dono/);
   recusada(verificar(r, await atestada(r, { identidade: { dono: "https://github.com/outro" } })), "identidade", /outro dono/);
 });
 
-test("outro workflow deste mesmo repositório não produz uma atestação aceita", async () => {
+test("another workflow of this same repository cannot produce an accepted attestation", async () => {
   const r = novaRelease();
   for (const workflow of [".github/workflows/ci.yml", ".github/workflows/android.yml", ".github/workflows/console-release.yaml"]) {
     recusada(verificar(r, await atestada(r, { identidade: { workflow } })), "identidade", /workflow de publicação/);
@@ -159,7 +159,7 @@ test("outro workflow deste mesmo repositório não produz uma atestação aceita
   recusada(verificar(r, await atestada(r, { identidade: { configuracao: chamador } })), "identidade", /workflow de publicação/);
 });
 
-test("uma atestação feita a partir de um branch ou de outra etiqueta é recusada", async () => {
+test("an attestation made from a branch or from another tag is refused", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { identidade: { ref: "refs/heads/main" } })), "identidade");
   recusada(verificar(r, await atestada(r, { identidade: { ref: "refs/tags/console-v1.0.0" } })), "identidade");
@@ -169,14 +169,14 @@ test("uma atestação feita a partir de um branch ou de outra etiqueta é recusa
   recusada(verificar(r, await atestada(r, { identidade: { ref: "refs/heads/main", assinante: san, configuracao: san, san } })), "identidade", /outra etiqueta/);
 });
 
-test("uma atestação não emitida pelo OIDC do GitHub Actions é recusada", async () => {
+test("an attestation not issued by GitHub Actions' OIDC is refused", async () => {
   const r = novaRelease();
   for (const emissor of ["https://accounts.google.com", "https://token.actions.githubusercontent.com.evil.example", "https://gitlab.com"]) {
     recusada(verificar(r, await atestada(r, { identidade: { emissor } })), "identidade", /GitHub Actions/);
   }
 });
 
-test("gatilho, executor e ambiente fazem parte da identidade", async () => {
+test("trigger, runner and environment are part of the identity", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { identidade: { gatilho: "pull_request_target" } })), "identidade", /publicação de uma etiqueta/);
   recusada(verificar(r, await atestada(r, { identidade: { gatilho: "workflow_dispatch" } })), "identidade");
@@ -185,48 +185,48 @@ test("gatilho, executor e ambiente fazem parte da identidade", async () => {
   recusada(verificar(r, await atestada(r, { omitir: ["ambiente"] })), "identidade", /ausente/);
 });
 
-test("o commit que o manifesto nomeia precisa ser o commit que o certificado diz ter sido construído", async () => {
+test("the commit the manifest names must be the commit the certificate says was built", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { identidade: { commit: OUTRO_COMMIT } })), "identidade", /outro commit/);
   recusada(verificar(r, await atestada(r, { identidade: { configuracaoCommit: OUTRO_COMMIT } })), "identidade", /workflow de outro commit/);
 });
 
-test("um certificado sem qualquer uma das extensões de identidade é recusado", async () => {
+test("a certificate missing any identity extension is refused", async () => {
   const r = novaRelease();
   for (const campo of ["repositorioId", "donoId", "ref", "commit", "gatilho", "executor", "assinante"]) {
     recusada(verificar(r, await atestada(r, { omitir: [campo] })), "identidade", /ausente/);
   }
 });
 
-test("a declaração precisa ser proveniência de build SLSA", async () => {
+test("the statement must be SLSA build provenance", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { tipoPredicado: "https://in-toto.io/attestation/release/v0.1" })), "declaracao", /proveniência SLSA/);
 });
 
 // --- Cryptography ------------------------------------------------------------------------------
 
-test("um certificado de uma CA que a raiz de confiança não conhece é recusado", async () => {
+test("a certificate from a CA the trusted root does not know is refused", async () => {
   const r = novaRelease();
   const estranha = await criarAutoridade();
   recusada(verificar(r, await estranha.atestar({ sujeitos: r.sujeitos, versao: r.versao, commit: r.commit })), "criptografia", /CERTIFICATE/);
 });
 
-test("uma assinatura que não corresponde à declaração é recusada", async () => {
+test("a signature that does not match the statement is refused", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { adulterar: "assinatura" })), "criptografia", /SIGNATURE/);
 });
 
-test("uma declaração alterada depois de registrada no log é recusada", async () => {
+test("a statement changed after it was logged is refused", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { adulterar: "payload" })), "criptografia");
 });
 
-test("um certificado já expirado quando a entrada foi registrada é recusado", async () => {
+test("a certificate already expired when the entry was logged is refused", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { atrasoDoLogMs: 11 * MINUTO })), "criptografia", /CERTIFICATE/);
 });
 
-test("uma entrada do log de transparência que não confere é recusada", async () => {
+test("a transparency log entry that does not verify is refused", async () => {
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { adulterar: "promessa" })), "criptografia", /TLOG/);
 
@@ -237,7 +237,7 @@ test("uma entrada do log de transparência que não confere é recusada", async 
   recusada(verificar(r, await atestada(r), TrustedRoot.fromJSON(semOLog)), "criptografia", /TLOG/);
 });
 
-test("pacotes malformados são recusados antes de qualquer criptografia", async () => {
+test("malformed bundles are refused before any cryptography", async () => {
   const r = novaRelease();
   recusada(verificar(r, Buffer.alloc(0)), "malformada");
   recusada(verificar(r, Buffer.from("isto não é json")), "malformada");
@@ -250,7 +250,7 @@ test("pacotes malformados são recusados antes de qualquer criptografia", async 
   recusada(verificar(r, Buffer.from(JSON.stringify(bundle))), "malformada", /certificado/);
 });
 
-test("valores de extensão só são lidos como UTF8String DER exatas", () => {
+test("extension values are read only as exact DER UTF8Strings", () => {
   assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x03, 0x61, 0x62, 0x63])), "abc");
   assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x03, 0x61, 0x62])), null, "valor curto");
   assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x01, 0x61, 0x62])), null, "bytes sobrando");
@@ -260,7 +260,7 @@ test("valores de extensão só são lidos como UTF8String DER exatas", () => {
   assert.equal(atestacao.textoDer(Buffer.concat([Buffer.from([0x0c, 0x81, 200]), Buffer.from(longo)])), longo);
 });
 
-test("sem rede, a raiz de confiança é a última cópia verificada, ou então a embutida", async (t) => {
+test("without the network, the trusted root is the last verified copy, else the embedded one", async (t) => {
   const https = require("https");
   const http = require("http");
   const originais = { https: https.request, http: http.request, fetch: globalThis.fetch };
@@ -296,7 +296,7 @@ test("sem rede, a raiz de confiança é a última cópia verificada, ou então a
   assert.equal(tentativas.length, 0, "nenhum acesso à rede");
 });
 
-test("o console não carrega chave de release de tipo nenhum: a confiança dele é a atestação", () => {
+test("the Console carries no release key of any kind: its trust is the attestation", () => {
   // Keyless means nothing to leak, back up or rotate: no private key material anywhere in the
   // program, and no embedded public key standing in for the attestation either.
   const fontes = [];

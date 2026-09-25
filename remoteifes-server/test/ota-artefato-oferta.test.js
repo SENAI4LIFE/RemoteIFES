@@ -90,7 +90,7 @@ test.after(async () => {
   fs.rmSync(RAIZ_TMP, { recursive: true, force: true });
 });
 
-test("o download de uma oferta devolve exatamente o artefato ofertado, mesmo depois de outro firmware ser publicado", async () => {
+test("an offer's download returns exactly the offered artifact, even after other firmware is published", async () => {
   sala("ART-1", "AA:BB:CC:AA:00:01");
   sala("ART-2", "AA:BB:CC:AA:00:02");
   const a = criarBin(3);
@@ -142,7 +142,7 @@ test("o download de uma oferta devolve exatamente o artefato ofertado, mesmo dep
   otaService.limparEstado("ART-2");
 });
 
-test("sem oferta ativa a sala baixa o firmware publicado; uma oferta que falhou libera o artefato antigo", async () => {
+test("without an active offer the room downloads the published firmware; a failed offer releases the old artifact", async () => {
   sala("ART-3", "AA:BB:CC:AA:00:03");
   sala("ART-4", "AA:BB:CC:AA:00:04");
   const c = criarBin(11);
@@ -169,7 +169,7 @@ test("sem oferta ativa a sala baixa o firmware publicado; uma oferta que falhou 
   otaService.limparEstado("ART-3");
 });
 
-test("republicar a mesma versão com bytes diferentes é recusado enquanto uma oferta a referencia; com os mesmos bytes é aceito", async () => {
+test("republishing the same version with different bytes is refused while an offer references it; with the same bytes it is accepted", async () => {
   sala("ART-5", "AA:BB:CC:AA:00:05");
   const e = criarBin(17);
   const manifestoE = otaService.publicarFirmware({ origem: e.origem, versao: "4.5.0", notas: "E" });
@@ -196,7 +196,7 @@ test("republicar a mesma versão com bytes diferentes é recusado enquanto uma o
   otaService.limparEstado("ART-5");
 });
 
-test("se o artefato ofertado sumir do disco, o download é recusado em vez de entregar outro firmware", async () => {
+test("if the offered artifact disappears from disk, the download is refused instead of delivering other firmware", async () => {
   sala("ART-6", "AA:BB:CC:AA:00:06");
   const f = criarBin(23);
   otaService.publicarFirmware({ origem: f.origem, versao: "4.6.0", notas: "F" });

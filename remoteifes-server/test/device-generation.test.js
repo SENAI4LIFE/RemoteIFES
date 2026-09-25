@@ -9,7 +9,7 @@ require("../src/app");
 const db = require("../src/config/database");
 const hub = require("../src/services/deviceHub");
 
-test("frames pendentes do socket substituido nao alteram telemetria nem logs", (t) => {
+test("pending frames from a replaced socket do not change telemetry or logs", (t) => {
   let servidorWs;
   t.mock.method(WebSocketServer.prototype, "on", function (evento, listener) {
     servidorWs = this;

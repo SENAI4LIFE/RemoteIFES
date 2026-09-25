@@ -83,7 +83,7 @@ async function saudavel(porta) {
 }
 
 for (const sinal of ["SIGINT", "SIGTERM"]) {
-  test(`${sinal} encerra o servidor com graciosidade e devolve a porta`, async () => {
+  test(`${sinal} shuts the server down gracefully and releases the port`, async () => {
     const porta = await portaLivre();
     const servidor = iniciar(porta);
 
@@ -109,7 +109,7 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
-test("porta ocupada produz erro objetivo, sem stack de exceção não tratada", async () => {
+test("a port in use produces a clear error, without an unhandled exception stack", async () => {
   const porta = await portaLivre();
   const bloqueio = await ocupar(porta);
   try {

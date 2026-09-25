@@ -76,7 +76,7 @@ test.after(async () => {
   fs.rmSync(RAIZ_TMP, { recursive: true, force: true });
 });
 
-test("o hash da imagem publicada é calculado uma vez e reaproveitado enquanto o arquivo for o mesmo", () => {
+test("the published image hash is computed once and reused while the file is the same", () => {
   const publicado = otaService.publicarFirmware({ origem: criarBinFake(1), versao: "4.9.1", notas: "memo" });
   const primeira = contarHashes(() => otaService.lerManifesto());
   assert.equal(primeira.resultado.sha256, publicado.sha256);
@@ -84,7 +84,7 @@ test("o hash da imagem publicada é calculado uma vez e reaproveitado enquanto o
   assert.equal(repetidas.hashes, 0, "cinco leituras seguidas não devem reler nem rehashear a imagem");
 });
 
-test("republicar outra imagem ou adulterar o arquivo invalida o hash memorizado", () => {
+test("republishing another image or tampering with the file invalidates the memoized hash", () => {
   const segundo = otaService.publicarFirmware({ origem: criarBinFake(2), versao: "4.9.2", notas: "memo" });
   const leitura = contarHashes(() => otaService.lerManifesto());
   assert.equal(leitura.resultado.sha256, segundo.sha256);
@@ -101,7 +101,7 @@ test("republicar outra imagem ou adulterar o arquivo invalida o hash memorizado"
   assert.equal(recusada.hashes, 1);
 });
 
-test("a distribuição só regrava seu arquivo de estado quando algo mudou", async () => {
+test("the rollout rewrites its state file only when something changed", async () => {
   otaService.publicarFirmware({ origem: criarBinFake(3), versao: "4.9.3", notas: "persistencia" });
   db.prepare("INSERT INTO salas (sala, nome, bloco, andar, mac) VALUES ('ROL-P1', 'P1', 'A', 1, 'AA:BB:CC:0E:00:01')").run();
   db.prepare("INSERT INTO salas (sala, nome, bloco, andar, mac) VALUES ('ROL-P2', 'P2', 'A', 1, 'AA:BB:CC:0E:00:02')").run();

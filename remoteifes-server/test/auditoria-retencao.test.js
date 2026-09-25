@@ -50,7 +50,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("auditoria e conectividade são exclusivas do superadministrador", async () => {
+test("audit and connectivity are superadministrator-only", async () => {
   for (const caminho of ["/admin/auditoria", "/admin/auditoria/tipos", "/admin/auditoria/conectividade"]) {
     assert.equal((await requisitar(caminho)).status, 401);
     assert.equal((await requisitar(caminho, { token: tokenUsuario })).status, 403);
@@ -59,7 +59,7 @@ test("auditoria e conectividade são exclusivas do superadministrador", async ()
   }
 });
 
-test("criação, renomeação, mudança de papel, senha e exclusão geram histórico sem segredos", async () => {
+test("creation, rename, role change, password and deletion produce history without secrets", async () => {
   const segredoSenha = "NaoPodeAparecer-987";
   const criadaResp = await requisitar("/admin/usuarios", {
     token: tokenSuper,
@@ -90,7 +90,7 @@ test("criação, renomeação, mudança de papel, senha e exclusão geram histó
   assert.ok(!bruto.includes("segredoHash"));
 });
 
-test("paginação e filtros têm limite de consulta", async () => {
+test("pagination and filters have a query limit", async () => {
   for (let i = 0; i < 31; i += 1) {
     auditoriaService.registrar({ tipo: "evento_paginado", ator: { id: 1, usuario: "ator-pagina" }, alvoTipo: "teste", alvoId: i, alvoRotulo: `alvo-${i}`, descricao: `Evento ${i}` });
   }
@@ -104,7 +104,7 @@ test("paginação e filtros têm limite de consulta", async () => {
   assert.equal((await requisitar("/admin/auditoria?limite=101", { token: tokenSuper })).status, 400);
 });
 
-test("indisponibilidade fecha na reconexão e suprime offline duplicado", () => {
+test("an outage closes on reconnection and a duplicate offline is suppressed", () => {
   const sala = "AUD-CONNECT";
   assert.equal(auditoriaService.registrarOffline(sala, "2026-08-30T14:32:10Z"), true);
   assert.equal(auditoriaService.registrarOffline(sala, "2026-08-30T14:33:10Z"), false);
@@ -116,7 +116,7 @@ test("indisponibilidade fecha na reconexão e suprime offline duplicado", () => 
   assert.equal(lista.itens[0].onlineEm, "2026-08-30 14:37:42");
 });
 
-test("retenção padrão é 7 dias, configurável e preserva dados permanentes", () => {
+test("default retention is 7 days, configurable, and preserves permanent data", () => {
   assert.equal(configuracoesService.obter().retencaoAuditoriaDias, 7);
   const adminId = db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get().id;
   db.prepare("INSERT INTO auditoria_eventos (tipo, descricao, criadoEm) VALUES ('antigo', 'antigo', datetime('now', '-8 days'))").run();
@@ -136,7 +136,7 @@ test("retenção padrão é 7 dias, configurável e preserva dados permanentes",
   assert.throws(() => configuracoesService.validarEAtualizar({ retencaoAuditoriaDias: 366 }, { nivel: 3 }), /entre 1 e 365/);
 });
 
-test("simulação de meses fica limitada por retenção e teto de linhas", () => {
+test("months of simulated data stay bounded by retention and the row ceiling", () => {
   configuracoesService.validarEAtualizar({ retencaoAuditoriaDias: 7 }, { nivel: 3 });
   const inserir = db.prepare("INSERT INTO auditoria_eventos (tipo, descricao, criadoEm) VALUES ('simulacao_meses', 'evento sintetico', datetime('now', ?))");
   db.exec("BEGIN");
@@ -157,7 +157,7 @@ test("simulação de meses fica limitada por retenção e teto de linhas", () =>
   assert.ok(total <= retencaoService.LIMITES_LINHAS.auditoria_eventos);
 });
 
-test("limiares de armazenamento distinguem alerta e condição crítica", () => {
+test("storage thresholds distinguish warning from critical", () => {
   const gb = 1024 ** 3;
   assert.deepEqual(monitoramentoService.avaliarEspaco(100 * gb, 20 * gb), { livrePercent: 20, alerta: false, critico: false });
   assert.deepEqual(monitoramentoService.avaliarEspaco(100 * gb, 8 * gb), { livrePercent: 8, alerta: true, critico: false });
@@ -165,7 +165,7 @@ test("limiares de armazenamento distinguem alerta e condição crítica", () => 
   assert.equal(monitoramentoService.avaliarEspaco(10 * gb, 400 * 1024 ** 2).critico, true);
 });
 
-test("banco novo usa vacuum incremental e limites leves de WAL", () => {
+test("a new database uses incremental vacuum and light WAL limits", () => {
   assert.equal(db.prepare("PRAGMA auto_vacuum").get().auto_vacuum, 2);
   assert.equal(db.prepare("PRAGMA wal_autocheckpoint").get().wal_autocheckpoint, 1000);
   assert.equal(db.prepare("PRAGMA journal_size_limit").get().journal_size_limit, 16 * 1024 * 1024);

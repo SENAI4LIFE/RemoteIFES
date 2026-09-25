@@ -33,7 +33,7 @@ function simularFalhaNoLog(t) {
   return () => mock.mock.restore();
 }
 
-test("uma falha ao gravar o registro do comando desfaz a mutação de estado e não envia nada ao dispositivo", (t) => {
+test("a failure writing the command record rolls back the state mutation and sends nothing to the device", (t) => {
   const antes = estado("ATOM-1");
   const enviados = [];
   t.mock.method(deviceHub, "enviarComando", (sala, comando) => { enviados.push(comando); return true; });
@@ -53,7 +53,7 @@ test("uma falha ao gravar o registro do comando desfaz a mutação de estado e n
   restaurar();
 });
 
-test("depois da falha o banco não fica em transação aberta e o próximo comando é gravado por completo", (t) => {
+test("after the failure the database is not left in an open transaction and the next command is written in full", (t) => {
   const enviados = [];
   t.mock.method(deviceHub, "enviarComando", (sala, comando) => { enviados.push(comando); return true; });
   const resultado = salas.aplicarComando("ATOM-1", "temperatura", 25, contexto);
@@ -66,7 +66,7 @@ test("depois da falha o banco não fica em transação aberta e o próximo coman
   assert.equal(enviados[0].temp, 25);
 });
 
-test("o início de agendamento também é atômico entre estado e registro", (t) => {
+test("schedule start is also atomic between state and record", (t) => {
   db.prepare("UPDATE salas SET ligado = 0, temperaturaAlvo = 23 WHERE sala = 'ATOM-1'").run();
   db.prepare("DELETE FROM comandos_log WHERE sala = 'ATOM-1'").run();
   const antes = estado("ATOM-1");

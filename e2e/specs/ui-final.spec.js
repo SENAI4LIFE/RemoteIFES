@@ -30,7 +30,7 @@ const TITULOS = {
 };
 
 for (const [rota, alvo] of Object.entries(TITULOS)) {
-  test(`o título "${alvo.texto}" mantém o alinhamento natural à esquerda`, async ({ page, context }) => {
+  test(`the title "${alvo.texto}" keeps its natural left alignment`, async ({ page, context }) => {
     await abrir(page, context, "superadmin", rota, VIEWPORTS.notebook);
     const cabecalho = page.locator(`${alvo.tela} .screen-head`).first();
     await expect(cabecalho.locator("h1")).toHaveText(alvo.texto);
@@ -51,7 +51,7 @@ for (const [rota, alvo] of Object.entries(TITULOS)) {
   });
 }
 
-test("subtítulos, seleções e rótulos de formulário permanecem à esquerda", async ({ page, context }) => {
+test("subtitles, selections and form labels stay left-aligned", async ({ page, context }) => {
   await abrir(page, context, "superadmin", "#/agenda", VIEWPORTS.notebook);
   const alinhamentos = await page.$$eval("#screen-agenda > .screen-head + .hint, #screen-agenda label", (els) =>
     els.filter((el) => el.offsetParent !== null).map((el) => getComputedStyle(el).textAlign)
@@ -73,7 +73,7 @@ test("subtítulos, seleções e rótulos de formulário permanecem à esquerda",
   alinhamentosAdmin.forEach((alinhamento) => expect(["start", "left"]).toContain(alinhamento));
 });
 
-test("o alinhamento padrão é à esquerda e uma preferência salva é preservada", async ({ page, context }) => {
+test("the default alignment is left and a saved preference is preserved", async ({ page, context }) => {
   await page.goto("/");
   await expect(page.locator("body")).toHaveClass(/a11y-align-left/);
   await expect(page.locator("#a11yAlignLeftBtn")).toHaveClass(/is-active/);
@@ -89,7 +89,7 @@ test("o alinhamento padrão é à esquerda e uma preferência salva é preservad
   expect(await page.evaluate(() => window.localStorage.getItem("remoteifes_text_align"))).toBe("right");
 });
 
-test("o acesso mantém o botão centralizado e o título à esquerda com acessibilidade máxima", async ({ page, context }) => {
+test("the access screen keeps the button centered and the title left-aligned with maximum accessibility", async ({ page, context }) => {
   await context.addInitScript((ajustes) => {
     Object.entries(ajustes).forEach(([chave, valor]) => window.localStorage.setItem(chave, valor));
   }, MAXIMO_A11Y);
@@ -133,7 +133,7 @@ test("o acesso mantém o botão centralizado e o título à esquerda com acessib
   expect(await semRolagemHorizontal(page)).toBe(true);
 });
 
-test("Notificações e Relatar problema nunca ficam abertos ao mesmo tempo", async ({ page, context }) => {
+test("Notificações and Relatar problema are never open at the same time", async ({ page, context }) => {
   await abrir(page, context, "admin", "#/inicio", VIEWPORTS.notebook);
   const notif = page.locator("#notifPanel");
   const relatos = page.locator("#relatosPanel");
@@ -154,7 +154,7 @@ test("Notificações e Relatar problema nunca ficam abertos ao mesmo tempo", asy
   await expect(page.locator("#bugReportBtn")).toHaveAttribute("aria-expanded", "false");
 });
 
-test("o menu rápido de ajuda e o botão de inseto usam o mesmo estado dos painéis", async ({ page, context }) => {
+test("the quick help menu and the bug button share the panels' state", async ({ page, context }) => {
   await abrir(page, context, "admin", "#/inicio", VIEWPORTS.notebook);
   await page.locator("#notifBellBtn").click();
   await expect(page.locator("#notifPanel")).toBeVisible();
@@ -180,7 +180,7 @@ async function abrirPlantaB2(page, context) {
   await expect(page.locator('#fpScaleInner .fp-section[data-fp-section="b-2pav"]')).toBeVisible();
 }
 
-test("a geometria de B-207 corresponde à planta baixa original e escala junto com o mapa", async ({ page, context }) => {
+test("the B-207 geometry matches the original floor plan and scales with the map", async ({ page, context }) => {
   await abrirPlantaB2(page, context);
   const medida = await page.evaluate(() => {
     const sala = document.querySelector('#fpScaleInner .fp-section[data-fp-section="b-2pav"] .room[data-sala="B-207"]');
@@ -204,7 +204,7 @@ test("a geometria de B-207 corresponde à planta baixa original e escala junto c
   expect(medida.razaoAltura).toBeCloseTo(190 / 180, 2);
 });
 
-test("os identificadores de sala mantêm o hífen original", async ({ page, context }) => {
+test("room identifiers keep the original hyphen", async ({ page, context }) => {
   await abrirPlantaB2(page, context);
   const codigos = await page.$$eval("#fpScaleInner .room.selectable[data-sala]", (els) => els.map((e) => e.dataset.sala));
   expect(codigos).toContain("B-207");
@@ -214,7 +214,7 @@ test("os identificadores de sala mantêm o hífen original", async ({ page, cont
   expect(texto).not.toMatch(/\bB 20\d\b/);
 });
 
-test("acessibilidade e ajuda ficam próximos, sem sobreposição, com alvos de 44px", async ({ page, context }) => {
+test("accessibility and help stay close together, without overlap, with 44px targets", async ({ page, context }) => {
   for (const [nome, tamanho] of Object.entries({
     "mobile portrait": VIEWPORTS["mobile-portrait"],
     "mobile landscape": VIEWPORTS["mobile-landscape"],
@@ -238,7 +238,7 @@ test("acessibilidade e ajuda ficam próximos, sem sobreposição, com alvos de 4
   }
 });
 
-test("os glifos dos controles fixos não crescem com a ampliação do texto", async ({ page, context }) => {
+test("the glyphs of fixed controls do not grow with text enlargement", async ({ page, context }) => {
   const medir = () =>
     page.evaluate(() => {
       const ajuda = document.getElementById("helpFabToggleBtn");
@@ -268,7 +268,7 @@ test("os glifos dos controles fixos não crescem com a ampliação do texto", as
 const SUBABAS = ["usuarios", "usuarios/proprietarios", "notificacoes", "status/sistema", "config", "esp32", "protocolos", "macs", "logs/auditoria"];
 
 for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
-  test(`Administração continua utilizável na fonte máxima em ${tamanhoNome}`, async ({ page, context }) => {
+  test(`Administration stays usable at maximum font at ${tamanhoNome}`, async ({ page, context }) => {
     test.setTimeout(90_000);
     await abrir(page, context, "superadmin", "#/admin", VIEWPORTS[tamanhoNome], true);
 
@@ -337,7 +337,7 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
   });
 }
 
-test("Status > Sistema não corta conteúdo à direita na fonte máxima", async ({ page, context }) => {
+test("Status > Sistema does not clip content on the right at maximum font", async ({ page, context }) => {
   await abrir(page, context, "superadmin", "#/admin/status/sistema", VIEWPORTS.notebook, true);
   await expect(page.locator("#statusAba-sistema")).toBeVisible();
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -350,7 +350,7 @@ test("Status > Sistema não corta conteúdo à direita na fonte máxima", async 
   expect(cortados).toEqual([]);
 });
 
-test("no ajuste padrão a interface permanece como antes", async ({ page, context }) => {
+test("with default settings the interface stays as before", async ({ page, context }) => {
   await abrir(page, context, "superadmin", "#/admin", VIEWPORTS.notebook);
   const escala = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--a11y-font-scale").trim());
   expect(escala === "" || escala === "1").toBe(true);
@@ -363,7 +363,7 @@ test("no ajuste padrão a interface permanece como antes", async ({ page, contex
 const PAINEL_DUAS_COLUNAS = ["tablet-compact", "tablet-portrait", "tablet-large", "tablet-landscape", "notebook", "desktop-compact", "desktop", "wide-desktop"];
 
 for (const tamanhoNome of PAINEL_DUAS_COLUNAS) {
-  test(`Turbo e Temperatura − ficam na mesma linha do controle da sala em ${tamanhoNome}`, async ({ page, context }) => {
+  test(`Turbo and Temperatura − stay on the same row as the room control at ${tamanhoNome}`, async ({ page, context }) => {
     await injetarSessao(context, "user");
     await page.setViewportSize(VIEWPORTS[tamanhoNome]);
     await page.goto("/");
@@ -397,7 +397,7 @@ const LAYOUTS_POWER = ["mobile-portrait", "mobile-landscape", "tablet-compact", 
 
 for (const [ajusteNome, a11yMaximo] of [["ajuste padrão", false], ["texto máximo", true]]) {
   for (const tamanhoNome of LAYOUTS_POWER) {
-    test(`o rótulo Power fica centrado sob o círculo (${ajusteNome}, ${tamanhoNome})`, async ({ page, context }) => {
+    test(`the Power label is centered under the circle (${ajusteNome}, ${tamanhoNome})`, async ({ page, context }) => {
       await abrir(page, context, "user", "/", VIEWPORTS[tamanhoNome], a11yMaximo);
       await irParaSala(page, "A-108");
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));

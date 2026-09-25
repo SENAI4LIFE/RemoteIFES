@@ -1,6 +1,6 @@
 const { test, expect, API_URL, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
-test("avatar usa duas iniciais e o menu funciona por teclado", async ({ page, context }) => {
+test("the avatar uses two initials and the menu works by keyboard", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/");
   await expect(page.locator("#accountMenuBtn")).toHaveText("UE");
@@ -15,7 +15,7 @@ test("avatar usa duas iniciais e o menu funciona por teclado", async ({ page, co
   await expect(page.locator("#accountMenuBtn")).toBeFocused();
 });
 
-test("página móvel é autenticada, responsiva e não oferece APK não publicado", async ({ page, context, request }) => {
+test("the mobile page is authenticated, responsive and does not offer an unpublished APK", async ({ page, context, request }) => {
   await request.post(`${API_URL}/__e2e/despublicar-apk`);
   await injetarSessao(context, "user");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -28,7 +28,7 @@ test("página móvel é autenticada, responsiva e não oferece APK não publicad
   expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);
 });
 
-test("o menu da conta não oferece ajuda nem manual, só aplicativo e sair", async ({ page, context }) => {
+test("the account menu offers neither help nor manual, only app and logout", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/");
   await page.locator("#accountMenuBtn").click();
@@ -44,13 +44,13 @@ test("o menu da conta não oferece ajuda nem manual, só aplicativo e sair", asy
   await expect(page.locator("#helpFabPrimaryLinks")).toContainText("Manual completo");
 });
 
-test("rota direta do aplicativo não abre sem autenticação", async ({ page }) => {
+test("the direct app route does not open without authentication", async ({ page }) => {
   await page.goto("/#/aplicativo");
   await expect(page.locator("#screen-portal")).toBeVisible();
   await expect(page.locator("#screen-mobile-app")).toBeHidden();
 });
 
-test("documentação privilegiada é entregue pelo servidor conforme o papel", async ({ request, tokens }) => {
+test("privileged documentation is delivered by the server according to role", async ({ request, tokens }) => {
   const anonimo = await request.get(`${API_URL}/documentation`);
   expect(anonimo.status()).toBe(401);
   const comum = await request.get(`${API_URL}/documentation`, { headers: { Authorization: `Bearer ${tokens.user}` } });
@@ -67,14 +67,14 @@ test("documentação privilegiada é entregue pelo servidor conforme o papel", a
   expect(superIds).toContain("monitoramento");
 });
 
-test("download Android exige sessão e não publica artefato ausente", async ({ request, tokens }) => {
+test("Android download requires a session and does not publish a missing artifact", async ({ request, tokens }) => {
   expect((await request.get(`${API_URL}/mobile-app/android`)).status()).toBe(401);
   const autenticado = await request.get(`${API_URL}/mobile-app/android`, { headers: { Authorization: `Bearer ${tokens.user}` } });
   expect(autenticado.status()).toBe(404);
   expect((await autenticado.json()).erro).toContain("não publicado");
 });
 
-test("assets públicos não contêm procedimentos privilegiados", async ({ request }) => {
+test("public assets contain no privileged procedures", async ({ request }) => {
   const caminhosManuais = [
     "/js/manual-content.js",
     "/js/manual/common-start.js",
@@ -91,7 +91,7 @@ test("assets públicos não contêm procedimentos privilegiados", async ({ reque
   }
 });
 
-test("administrador comum não abre documentação de infraestrutura por URL", async ({ page, context }) => {
+test("a regular administrator cannot open infrastructure documentation by URL", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/ajuda/operacao-admin");
   await expect(page.locator("#screen-manual")).toBeVisible();
@@ -99,7 +99,7 @@ test("administrador comum não abre documentação de infraestrutura por URL", a
   await expect(page.locator("#manual-sec-operacao-admin")).toHaveCount(0);
 });
 
-test("menu rápido de ajuda expõe todas as ações comuns e fecha com Escape", async ({ page, context }) => {
+test("the quick help menu exposes every common action and closes with Escape", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/");
   await page.locator("#helpFabToggleBtn").click();
@@ -115,7 +115,7 @@ test("menu rápido de ajuda expõe todas as ações comuns e fecha com Escape", 
   await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
 });
 
-test("atalhos do menu de ajuda de admin não incluem infraestrutura", async ({ page, context }) => {
+test("admin help menu shortcuts do not include infrastructure", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/");
   await expect(page.locator("#adminTabBtn")).toBeVisible();
@@ -124,7 +124,7 @@ test("atalhos do menu de ajuda de admin não incluem infraestrutura", async ({ p
   await expect(page.locator("#helpFabLinks")).not.toContainText("Monitoramento");
 });
 
-test("atalhos do menu de ajuda de superadmin incluem infraestrutura", async ({ page, context }) => {
+test("superadmin help menu shortcuts include infrastructure", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/");
   await expect(page.locator("#adminTabBtn")).toBeVisible();

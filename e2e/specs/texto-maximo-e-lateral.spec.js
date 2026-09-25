@@ -27,7 +27,7 @@ async function abrir(page, context, papel, rota, tamanho, ajustes, seletor) {
 
 for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], ["mobile-portrait", VIEWPORTS["mobile-portrait"]], ["mobile-large", VIEWPORTS["mobile-large"]], ["mobile-landscape", VIEWPORTS["mobile-landscape"]]]) {
   for (const papel of ["user", "superadmin"]) {
-    test(`Início com texto máximo não rola na horizontal e os selos ficam nos cartões (${papel}, ${nome})`, async ({ page, context }) => {
+    test(`Início with maximum text does not scroll horizontally and badges stay in the cards (${papel}, ${nome})`, async ({ page, context }) => {
       await abrir(page, context, papel, "/#/inicio", tamanho, MAXIMO_A11Y, "#screen-inicio");
       await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--a11y-font-scale").trim())).toBe("2");
       await expect(page.locator(".hub-card-badge:not(.hidden)").first()).toBeVisible();
@@ -57,7 +57,7 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
   }
 }
 
-test("com texto padrão o selo continua na mesma linha do título do cartão", async ({ page, context }) => {
+test("with default text the badge stays on the card title's line", async ({ page, context }) => {
   await abrir(page, context, "superadmin", "/#/inicio", VIEWPORTS["mobile-compact"], {}, "#screen-inicio");
   const selo = page.locator('[data-hub-card="salas"] .hub-card-badge');
   await expect(selo).toBeVisible();
@@ -109,7 +109,7 @@ const CENARIOS_LATERAL = [
 ];
 
 for (const [nome, tamanho, ajustes] of CENARIOS_LATERAL) {
-  test(`a barra lateral da Administração termina acima da barra inferior parada e rolada (${nome})`, async ({ page, context }) => {
+  test(`the Administration sidebar ends above the bottom bar at rest and scrolled (${nome})`, async ({ page, context }) => {
     await abrir(page, context, "superadmin", "/#/admin/config", tamanho, ajustes, "#adminSub-config");
     await expect(page.locator(".admin-subtabs")).toBeVisible();
 
@@ -170,7 +170,7 @@ const CENARIOS_PAGINACAO = [
 
 for (const [nome, tamanho] of CENARIOS_PAGINACAO) {
   for (const [modo, ajustes] of [["texto padrão", {}], ["texto máximo", MAXIMO_A11Y]]) {
-    test(`a paginação da auditoria mantém os rótulos inteiros e alcançáveis (${modo}, ${nome})`, async ({ page, context }) => {
+    test(`audit pagination keeps labels whole and reachable (${modo}, ${nome})`, async ({ page, context }) => {
       await abrir(page, context, "superadmin", "/#/admin/logs/auditoria", tamanho, ajustes, "#adminSub-logs");
       await expect(page.locator("#auditPageInfo")).not.toBeEmpty({ timeout: 15_000 });
       if (ajustes.remoteifes_font_scale) {

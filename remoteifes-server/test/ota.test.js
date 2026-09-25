@@ -110,7 +110,7 @@ test.after(async () => {
   fs.rmSync(RAIZ_TMP, { recursive: true, force: true });
 });
 
-test("publicarFirmware valida o byte mágico ESP e grava um manifesto verificável", () => {
+test("publicarFirmware validates the ESP magic byte and writes a verifiable manifest", () => {
   assert.equal(manifesto.versao, "4.0.0-test");
   assert.equal(manifesto.tamanho, fs.statSync(binPath).size);
   assert.match(manifesto.sha256, /^[0-9a-f]{64}$/);
@@ -121,7 +121,7 @@ test("publicarFirmware valida o byte mágico ESP e grava um manifesto verificáv
   assert.throws(() => otaService.publicarFirmware({ origem: binPath, versao: "espaço inválido" }), /versão inválida/);
 });
 
-test("manifesto OTA adulterado nao atravessa o diretorio de firmware", () => {
+test("a tampered OTA manifest does not traverse the firmware directory", () => {
   const caminhoManifesto = path.join(otaService.DIR_FIRMWARE, "manifesto.json");
   const original = fs.readFileSync(caminhoManifesto);
   try {
@@ -132,7 +132,7 @@ test("manifesto OTA adulterado nao atravessa o diretorio de firmware", () => {
   }
 });
 
-test("GET /admin/esp32/firmware expõe o manifesto ao superadmin", async () => {
+test("GET /admin/esp32/firmware exposes the manifest to the superadmin", async () => {
   const token = await tokenSuperAdmin();
   const resp = await authFetch("/admin/esp32/firmware", token);
   assert.equal(resp.status, 200);
@@ -141,7 +141,7 @@ test("GET /admin/esp32/firmware expõe o manifesto ao superadmin", async () => {
   assert.equal(corpo.manifesto.sha256, manifesto.sha256);
 });
 
-test("oferta de OTA chega ao dispositivo; oferta concorrente para a mesma sala é 409", async () => {
+test("an OTA offer reaches the device; a concurrent offer for the same room is 409", async () => {
   novaSalaComMac("ota-sala-1", MAC_A);
   const token = await tokenSuperAdmin();
   const { ws, mensagens } = await abrirDispositivo("ota-sala-1", MAC_A);
@@ -163,7 +163,7 @@ test("oferta de OTA chega ao dispositivo; oferta concorrente para a mesma sala �
   ws.close();
 });
 
-test("progresso e resultado do dispositivo avançam o estado e concluem na reconexão com a nova versão", async () => {
+test("device progress and result advance the state and complete on reconnection with the new version", async () => {
   novaSalaComMac("ota-sala-2", MAC_B);
   const token = await tokenSuperAdmin();
   const { ws } = await abrirDispositivo("ota-sala-2", MAC_B);
@@ -198,7 +198,7 @@ test("progresso e resultado do dispositivo avançam o estado e concluem na recon
   ws.close();
 });
 
-test("versão inesperada encerra a OTA sem comprovar rollback", async () => {
+test("an unexpected version ends the OTA without proving a rollback", async () => {
   novaSalaComMac("ota-sala-3", "AA:BB:CC:DD:0A:03");
   const token = await tokenSuperAdmin();
   const { ws } = await abrirDispositivo("ota-sala-3", "AA:BB:CC:DD:0A:03");
@@ -221,7 +221,7 @@ test("versão inesperada encerra a OTA sem comprovar rollback", async () => {
   ws.close();
 });
 
-test("erro reportado pelo dispositivo marca falha e notifica", async () => {
+test("an error reported by the device marks failure and notifies", async () => {
   novaSalaComMac("ota-sala-4", "AA:BB:CC:DD:0A:04");
   const token = await tokenSuperAdmin();
   const { ws } = await abrirDispositivo("ota-sala-4", "AA:BB:CC:DD:0A:04");
@@ -243,7 +243,7 @@ test("erro reportado pelo dispositivo marca falha e notifica", async () => {
   ws.close();
 });
 
-test("timeout de reinício encerra OTA que ficou em reiniciando", async () => {
+test("a restart timeout ends an OTA stuck in reiniciando", async () => {
   novaSalaComMac("ota-sala-timeout", "AA:BB:CC:DD:0A:08");
   const token = await tokenSuperAdmin();
   const { ws } = await abrirDispositivo("ota-sala-timeout", "AA:BB:CC:DD:0A:08");
@@ -274,7 +274,7 @@ test("timeout de reinício encerra OTA que ficou em reiniciando", async () => {
   assert.match(estado.erro, /não voltou/);
 });
 
-test("download de firmware exige MAC correspondente e devolve os bytes exatos", async () => {
+test("firmware download requires a matching MAC and returns the exact bytes", async () => {
   novaSalaComMac("ota-sala-5", "AA:BB:CC:DD:0A:05");
 
   const semSala = await fetch(`${baseUrl}/dispositivo/firmware`);
@@ -296,14 +296,14 @@ test("download de firmware exige MAC correspondente e devolve os bytes exatos", 
   assert.equal(corpo[0], 0xe9);
 });
 
-test("oferta para dispositivo desconectado retorna 409", async () => {
+test("an offer to a disconnected device returns 409", async () => {
   novaSalaComMac("ota-sala-6", "AA:BB:CC:DD:0A:06");
   const token = await tokenSuperAdmin();
   const resp = await authFetch("/admin/esp32/ota-sala-6/ota", token, { method: "POST" });
   assert.equal(resp.status, 409);
 });
 
-test("um admin comum não pode ofertar OTA", async () => {
+test("a regular admin cannot offer OTA", async () => {
   const usuariosService = require("../src/services/usuariosService");
   usuariosService.criar(
     { usuario: "ota-admin-comum", senha: "senhaSegura123", nome: "Admin Comum", isAdmin: true },
@@ -315,7 +315,7 @@ test("um admin comum não pode ofertar OTA", async () => {
   assert.equal(resp.status, 403);
 });
 
-test("estado de OTA sobrevive ao reinício do processo do servidor", () => {
+test("OTA state survives a server process restart", () => {
   assert.equal(fs.existsSync(otaService.ARQUIVO_ESTADOS), true);
   const script = `
     process.env.REMOTEIFES_DB_PATH = ':memory:';

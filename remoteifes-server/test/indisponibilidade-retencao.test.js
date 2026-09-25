@@ -21,7 +21,7 @@ test.before(() => {
   sala("RET-03");
 });
 
-test("uma queda em andamento que começou antes do corte de retenção nunca é apagada e ainda fecha na reconexão", () => {
+test("an ongoing outage that started before the retention cutoff is never deleted and still closes on reconnection", () => {
   assert.equal(configuracoesService.obter().retencaoAuditoriaDias, 7);
   db.prepare("INSERT INTO esp_indisponibilidades (sala, offlineEm) VALUES ('RET-01', datetime('now', '-12 days'))").run();
   db.prepare("INSERT INTO esp_indisponibilidades (sala, offlineEm, onlineEm, duracaoSegundos) VALUES ('RET-02', datetime('now', '-12 days'), datetime('now', '-11 days'), 86400)").run();
@@ -37,7 +37,7 @@ test("uma queda em andamento que começou antes do corte de retenção nunca é 
   assert.equal(db.prepare("SELECT COUNT(*) n FROM esp_indisponibilidades WHERE sala = 'RET-01' AND onlineEm IS NULL").get().n, 0);
 });
 
-test("o limite de linhas também poupa os intervalos abertos", () => {
+test("the row limit also spares open intervals", () => {
   const inserirFechada = db.prepare("INSERT INTO esp_indisponibilidades (sala, offlineEm, onlineEm, duracaoSegundos) VALUES ('RET-03', datetime('now', ?), datetime('now', ?), 60)");
   for (let i = 0; i < 30; i += 1) inserirFechada.run(`-${(i + 1) * 60} minutes`, `-${i * 60 + 1} minutes`);
   db.prepare("INSERT INTO esp_indisponibilidades (sala, offlineEm) VALUES ('RET-03', datetime('now', '-40 hours'))").run();
@@ -47,7 +47,7 @@ test("o limite de linhas também poupa os intervalos abertos", () => {
   assert.equal(restantes.filter((r) => r.onlineEm === null).length, 1, "o intervalo aberto sobrevive ao corte por quantidade");
 });
 
-test("no mapa de calor de 30 dias a disponibilidade é calculada sobre o trecho com evidência retida, não sobre o período inteiro", () => {
+test("in the 30-day heatmap availability is computed over the span with retained evidence, not over the whole period", () => {
   db.prepare("DELETE FROM esp_indisponibilidades").run();
   db.prepare("INSERT INTO esp_indisponibilidades (sala, offlineEm, onlineEm, duracaoSegundos) VALUES ('RET-01', datetime('now', '-3 days'), datetime('now', '-2 days'), 86400)").run();
   db.prepare("INSERT INTO esp_indisponibilidades (sala, offlineEm) VALUES ('RET-02', datetime('now', '-20 days'))").run();

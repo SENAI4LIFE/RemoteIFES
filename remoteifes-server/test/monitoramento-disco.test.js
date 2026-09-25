@@ -26,7 +26,7 @@ test.after(() => {
   fs.rmSync(raiz, { recursive: true, force: true });
 });
 
-test("o armazenamento medido é o sistema de arquivos que contém o banco, não o diretório de dados", () => {
+test("the measured storage is the file system that contains the database, not the data directory", () => {
   const arm = monitoramento.coletarArmazenamento();
   assert.equal(arm.caminho, dirBanco);
   assert.equal(arm.rotulo, "banco de dados");
@@ -34,7 +34,7 @@ test("o armazenamento medido é o sistema de arquivos que contém o banco, não 
   assert.equal(arm.backups, undefined, "mesmo dispositivo: não há medição separada de backups");
 });
 
-test("quando os backups ficam em outro dispositivo, ele é medido e rotulado separadamente", (t) => {
+test("when backups live on another device, it is measured and labeled separately", (t) => {
   const original = fs.statSync;
   t.mock.method(fs, "statSync", (alvo, ...resto) => {
     const st = original(alvo, ...resto);
@@ -49,7 +49,7 @@ test("quando os backups ficam em outro dispositivo, ele é medido e rotulado sep
   assert.equal(typeof arm.backups.livreBytes, "number");
 });
 
-test("um alerta de espaço no volume de backups aparece junto dos alertas de monitoramento", (t) => {
+test("a space alert on the backup volume appears with the monitoring alerts", (t) => {
   const original = fs.statSync;
   t.mock.method(fs, "statSync", (alvo, ...resto) => {
     const st = original(alvo, ...resto);

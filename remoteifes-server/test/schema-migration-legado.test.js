@@ -108,7 +108,7 @@ test.after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-test("um banco no formato do primeiro lançamento migra sem erro: colunas antes dos índices que dependem delas", () => {
+test("a database in the first-release format migrates without error: columns before the indexes that depend on them", () => {
   assert.doesNotThrow(() => criarSchema());
   const colunasAg = db.prepare("PRAGMA table_info(agendamentos)").all().map((c) => c.name);
   const colunasEx = db.prepare("PRAGMA table_info(agendamentos_execucoes)").all().map((c) => c.name);
@@ -119,7 +119,7 @@ test("um banco no formato do primeiro lançamento migra sem erro: colunas antes 
   }
 });
 
-test("os dados históricos são preservados e a conta privilegiada não é duplicada", () => {
+test("historical data is preserved and the privileged account is not duplicated", () => {
   popularBanco();
   const sala = db.prepare("SELECT * FROM salas WHERE sala = 'A-101'").get();
   assert.equal(sala.nome, "Sala 101");
@@ -145,7 +145,7 @@ test("os dados históricos são preservados e a conta privilegiada não é dupli
   assert.equal(db.prepare("SELECT COUNT(*) n FROM comandos_log").get().n, 1);
 });
 
-test("rodar a migração de novo é idempotente", () => {
+test("running the migration again is idempotent", () => {
   assert.doesNotThrow(() => criarSchema());
   assert.doesNotThrow(() => popularBanco());
   assert.equal(db.prepare("SELECT COUNT(*) n FROM usuarios").get().n, 2);

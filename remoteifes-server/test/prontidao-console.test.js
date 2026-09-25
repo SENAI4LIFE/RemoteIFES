@@ -69,7 +69,7 @@ function chamar(router, req) {
   });
 }
 
-test("sem o arquivo de segredo a rota responde 404 e não expõe nada", async () => {
+test("without the secret file the route answers 404 and exposes nothing", async () => {
   fs.rmSync(CAMINHO_TOKEN, { force: true });
   const router = carregarRota();
   const { res } = await chamar(router, requisicaoFalsa({ autorizacao: "Bearer qualquer" }));
@@ -78,7 +78,7 @@ test("sem o arquivo de segredo a rota responde 404 e não expõe nada", async ()
   assert.equal(res.corpo.dispositivos, undefined);
 });
 
-test("requisição de fora do loopback é recusada mesmo com o segredo certo", async () => {
+test("a request from outside loopback is refused even with the right secret", async () => {
   fs.writeFileSync(CAMINHO_TOKEN, "um-segredo-de-teste-bem-comprido\n", { mode: 0o600 });
   const router = carregarRota();
   const { res } = await chamar(
@@ -89,7 +89,7 @@ test("requisição de fora do loopback é recusada mesmo com o segredo certo", a
   assert.match(res.corpo.erro, /apenas no host/);
 });
 
-test("segredo ausente ou errado é recusado com 401", async () => {
+test("a missing or wrong secret is refused with 401", async () => {
   fs.writeFileSync(CAMINHO_TOKEN, "um-segredo-de-teste-bem-comprido\n", { mode: 0o600 });
   const router = carregarRota();
 
@@ -103,7 +103,7 @@ test("segredo ausente ou errado é recusado com 401", async () => {
   assert.equal(tipoErrado.res.statusCode, 401);
 });
 
-test("com segredo e loopback devolve o retrato de prontidão", async () => {
+test("with secret and loopback it returns the readiness snapshot", async () => {
   fs.writeFileSync(CAMINHO_TOKEN, "um-segredo-de-teste-bem-comprido\n", { mode: 0o600 });
   const router = carregarRota();
   const { res } = await chamar(router, requisicaoFalsa({ autorizacao: "Bearer um-segredo-de-teste-bem-comprido" }));
@@ -116,7 +116,7 @@ test("com segredo e loopback devolve o retrato de prontidão", async () => {
   assert.equal(res.cabecalhos["Cache-Control"], "no-store");
 });
 
-test("todas as fases ativas de OTA entram na contagem, inclusive validando", async () => {
+test("every active OTA phase counts, including validando", async () => {
   fs.writeFileSync(CAMINHO_TOKEN, "um-segredo-de-teste-bem-comprido\n", { mode: 0o600 });
   const router = carregarRota();
   const { res } = await chamar(router, requisicaoFalsa({ autorizacao: "Bearer um-segredo-de-teste-bem-comprido" }));
@@ -130,7 +130,7 @@ test("todas as fases ativas de OTA entram na contagem, inclusive validando", asy
   assert.ok(otaService.listarEstados, "otaService precisa expor listarEstados para este contrato");
 });
 
-test("o corpo da resposta não inclui o segredo nem credenciais de dispositivo", async () => {
+test("the response body includes neither the secret nor device credentials", async () => {
   fs.writeFileSync(CAMINHO_TOKEN, "um-segredo-de-teste-bem-comprido\n", { mode: 0o600 });
   const router = carregarRota();
   const { res } = await chamar(router, requisicaoFalsa({ autorizacao: "Bearer um-segredo-de-teste-bem-comprido" }));

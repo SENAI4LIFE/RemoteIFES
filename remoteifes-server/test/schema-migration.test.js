@@ -71,7 +71,7 @@ test.after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-test("migração da tabela legada de salas preserva dados e cria fwVersao", () => {
+test("migrating the legacy rooms table preserves data and creates fwVersao", () => {
   criarSchema();
 
   const colunas = db.prepare("PRAGMA table_info(salas)").all().map((c) => c.name);
@@ -99,7 +99,7 @@ test("migração da tabela legada de salas preserva dados e cria fwVersao", () =
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'energia_resumos_diarios'").get());
 });
 
-test("a biblioteca de protocolos IR ganha as colunas de failsafe e origem sem perder registros anteriores", () => {
+test("the IR protocol library gains the failsafe and origin columns without losing earlier records", () => {
   const colunas = db.prepare("PRAGMA table_info(protocolos_ir)").all().map((c) => c.name);
   for (const coluna of ["failsafeRawJson", "failsafeCarrierHz", "failsafeAtualizadoEm", "origemMac"]) {
     assert.ok(colunas.includes(coluna), `coluna ${coluna} ausente após a migração`);
@@ -122,7 +122,7 @@ test("a biblioteca de protocolos IR ganha as colunas de failsafe e origem sem pe
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 });
 
-test("a conta padrão 'admin' é migrada para 'superadmin' preservando id, nível e hash", () => {
+test("the default 'admin' account is migrated to 'superadmin' preserving id, level and hash", () => {
   db.prepare("DELETE FROM usuarios").run();
   const info = db
     .prepare(
@@ -143,7 +143,7 @@ test("a conta padrão 'admin' é migrada para 'superadmin' preservando id, níve
   assert.equal(db.prepare("SELECT COUNT(*) AS c FROM usuarios WHERE usuario = 'superadmin'").get().c, 1);
 });
 
-test("a migração não sobrescreve uma conta 'superadmin' já existente nem o nome personalizado", () => {
+test("the migration does not overwrite an existing 'superadmin' account or a custom name", () => {
   db.prepare("DELETE FROM usuarios").run();
   db.prepare(
     "INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo) VALUES ('superadmin', 'hash-novo', 'Superadministrador', 1, 3, 1, 1)"

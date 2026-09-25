@@ -89,7 +89,7 @@ function aplicacaoFalsa(prontidao, { saudavel = true } = {}) {
   });
 }
 
-test("o segredo do contrato de prontidão é criado com permissão restrita", async (t) => {
+test("the readiness contract secret is created with restricted permissions", async (t) => {
   const app = await aplicacaoFalsa({ dispositivos: { conectados: 0, canaisDeComando: 0 }, ota: { ativos: 0, porFase: {} }, rollout: null });
   const checkout = checkoutComDados({ porta: app.porta });
   const amb = ajuda.ambiente({ checkout });
@@ -109,7 +109,7 @@ test("o segredo do contrato de prontidão é criado com permissão restrita", as
   assert.equal(amb.prontidao.garantirTokenProntidao(), token);
 });
 
-test("aplicação sem o contrato de prontidão gera 'desconhecido', nunca zero", async (t) => {
+test("an application without the readiness contract yields 'unknown', never zero", async (t) => {
   const app = await aplicacaoFalsa(null);
   const checkout = checkoutComDados({ porta: app.porta });
   const amb = ajuda.ambiente({ checkout });
@@ -127,7 +127,7 @@ test("aplicação sem o contrato de prontidão gera 'desconhecido', nunca zero",
   assert.equal(avaliacao.contexto.prontidaoObservavel, false);
 });
 
-test("OTA na fase validando bloqueia a interrupção", async (t) => {
+test("OTA in the validando phase blocks the interruption", async (t) => {
   const app = await aplicacaoFalsa({
     dispositivos: { conectados: 3, canaisDeComando: 2, salas: [] },
     // `validando` is exactly the phase monitoramentoService leaves out when counting
@@ -151,7 +151,7 @@ test("OTA na fase validando bloqueia a interrupção", async (t) => {
   assert.match(bloqueio.detalhe, /validando: 1/);
 });
 
-test("rollout pausado com pendências vira aviso; ativo vira bloqueio", async (t) => {
+test("a paused rollout with pending work becomes a warning; an active one blocks", async (t) => {
   const pausado = await aplicacaoFalsa({
     dispositivos: { conectados: 0, canaisDeComando: 0, salas: [] },
     ota: { ativos: 0, porFase: {}, salas: [] },
@@ -173,7 +173,7 @@ test("rollout pausado com pendências vira aviso; ativo vira bloqueio", async (t
   assert.match(aviso.detalhe, /volta a mexer nos dispositivos/);
 });
 
-test("rollout pausado com dispositivo ainda em voo bloqueia, não apenas avisa", async (t) => {
+test("a paused rollout with a device still in flight blocks, not just warns", async (t) => {
   // Pausing the rollout does not recall devices already writing: an ESP32 in "atualizando",
   // "reiniciando" or "validando" stays in flight. Restarting the service at that instant risks a
   // device that does not come back, so this blocks.
@@ -198,7 +198,7 @@ test("rollout pausado com dispositivo ainda em voo bloqueia, não apenas avisa",
   assert.match(bloqueio.detalhe, /Espere os dispositivos em voo terminarem/);
 });
 
-test("canal de comandos é distinguido de presença no hub", async (t) => {
+test("the command channel is distinguished from presence in the hub", async (t) => {
   const app = await aplicacaoFalsa({
     dispositivos: { conectados: 10, canaisDeComando: 4, salas: [] },
     ota: { ativos: 0, porFase: {}, salas: [] },
@@ -220,7 +220,7 @@ test("canal de comandos é distinguido de presença no hub", async (t) => {
   assert.match(info.detalhe, /reconectam sozinhos/);
 });
 
-test("uma operação em andamento bloqueia outra", async (t) => {
+test("an operation in progress blocks another", async (t) => {
   const app = await aplicacaoFalsa({ dispositivos: { conectados: 0, canaisDeComando: 0, salas: [] }, ota: { ativos: 0, porFase: {}, salas: [] }, rollout: null });
   const checkout = checkoutComDados({ porta: app.porta });
   const amb = ajuda.ambiente({ checkout });
@@ -239,7 +239,7 @@ test("uma operação em andamento bloqueia outra", async (t) => {
   assert.ok(avaliacao.bloqueios.some((b) => b.titulo === "Operação do console em andamento"));
 });
 
-test("sessões de usuário são descritas como atividade recente, não contagem exata", async (t) => {
+test("user sessions are described as recent activity, not an exact count", async (t) => {
   const app = await aplicacaoFalsa({ dispositivos: { conectados: 0, canaisDeComando: 0, salas: [] }, ota: { ativos: 0, porFase: {}, salas: [] }, rollout: null });
   const checkout = checkoutComDados({ porta: app.porta });
   const amb = ajuda.ambiente({ checkout });
@@ -275,7 +275,7 @@ function criarBancoDeTeste(caminho, { usuarios = 1 } = {}) {
   db.close();
 }
 
-test("um candidato corrompido é recusado antes de tocar no banco atual", (t) => {
+test("a corrupted candidate is refused before touching the current database", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -288,7 +288,7 @@ test("um candidato corrompido é recusado antes de tocar no banco atual", (t) =>
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("um backup sem usuários é recusado (banco vazio é indício de corrupção)", (t) => {
+test("a backup without users is refused (an empty database indicates corruption)", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -301,7 +301,7 @@ test("um backup sem usuários é recusado (banco vazio é indício de corrupçã
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("o runner de restauração recusa identificador com travessia antes de qualquer efeito", (t) => {
+test("the restore runner refuses a traversal identifier before any effect", (t) => {
   const checkout = checkoutComDados({ porta: 8188 });
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -333,7 +333,7 @@ test("o runner de restauração recusa identificador com travessia antes de qual
   assert.deepEqual(fs.readFileSync(path.join(dados, "remoteifes.db")), antes, "nada pode ser tocado numa recusa de argumento");
 });
 
-test("a restauração exige quiescência: com a aplicação no ar ela não instala nada", async (t) => {
+test("restore requires quiescence: with the application running it installs nothing", async (t) => {
   const app = await aplicacaoFalsa({ dispositivos: { conectados: 0, canaisDeComando: 0, salas: [] }, ota: { ativos: 0, porFase: {}, salas: [] }, rollout: null });
   const checkout = checkoutComDados({ porta: app.porta });
   const amb = ajuda.ambiente({ checkout });
@@ -366,7 +366,7 @@ ${saida}`);
   assert.ok(!fs.existsSync(`${banco}.incoming-`), "nenhum arquivo intermediário pode sobrar");
 });
 
-test("observar o banco não cria nem altera arquivo no diretório de dados", (t) => {
+test("observing the database neither creates nor changes files in the data directory", (t) => {
   const checkout = checkoutComDados({ porta: 8188 });
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -401,7 +401,7 @@ test("observar o banco não cria nem altera arquivo no diretório de dados", (t)
   assert.equal(comPermissao.usuarios, 3);
 });
 
-test("o escopo dos backups é declarado com honestidade", async (t) => {
+test("the backup scope is declared honestly", async (t) => {
   const checkout = checkoutComDados({ porta: 8188 });
   const amb = ajuda.ambiente({ checkout });
   const s = await ajuda.subir(amb);

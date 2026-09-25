@@ -46,7 +46,7 @@ test.after(async () => {
   db.close();
 });
 
-test("corpo acima do limite recebe 413 em qualquer rota JSON, sem erro interno; JSON malformado continua 400", async () => {
+test("a body above the limit receives 413 on any JSON route without an internal error; malformed JSON is still 400", async () => {
   const grande = JSON.stringify({ usuario: "x".repeat(200 * 1024), senha: "y" });
   const login = await chamar("/login", { method: "POST", bruto: grande });
   assert.equal(login.status, 413);
@@ -61,7 +61,7 @@ test("corpo acima do limite recebe 413 em qualquer rota JSON, sem erro interno; 
   assert.equal(malformado.corpo.erro, "corpo da requisição inválido");
 });
 
-test("GET /agendamentos exige sala escalar: array, chave repetida e objeto recebem 400", async () => {
+test("GET /agendamentos requires a scalar sala: array, repeated key and object receive 400", async () => {
   for (const consulta of ["sala[]=x", "sala=x&sala=y", "sala[a]=b"]) {
     const resp = await chamar(`/agendamentos?${consulta}`, { token: tokenSuper });
     assert.equal(resp.status, 400, consulta);
@@ -71,7 +71,7 @@ test("GET /agendamentos exige sala escalar: array, chave repetida e objeto receb
   assert.equal((await chamar("/agendamentos", { token: tokenSuper })).status, 200);
 });
 
-test("PATCH /agendamentos/:id aceita só booleano em ativo", async () => {
+test("PATCH /agendamentos/:id accepts only a boolean ativo", async () => {
   const superadmin = db.prepare("SELECT * FROM usuarios WHERE nivel = 3").get();
   const ag = agendamentos.criar({ sala: "A-109", usuarioId: superadmin.id, data: dataAtualBrasiliaISO(), horaInicio: "08:00", horaFim: "09:00", temperatura: 24, modo: "reserva" });
   const desativar = await chamar(`/agendamentos/${ag.id}`, { method: "PATCH", token: tokenSuper, body: { ativo: false } });
@@ -91,7 +91,7 @@ test("PATCH /agendamentos/:id aceita só booleano em ativo", async () => {
   assert.equal(agendamentos.buscarPorId(ag.id).ativo, 1);
 });
 
-test("desativar uma conta com ativo=false revoga a sessão na hora; representações ambíguas são recusadas; reativar devolve o acesso", async () => {
+test("disabling an account with ativo=false revokes the session immediately; ambiguous representations are refused; re-enabling restores access", async () => {
   const conta = usuariosService.criar({ usuario: "norm-ativo", senha: "senhaSegura123", nome: "Normalização", podeControlar: true }, { nivel: 3 });
   const sessao = (await login("norm-ativo", "senhaSegura123")).corpo.token;
   assert.equal((await chamar("/me", { token: sessao })).status, 200);
@@ -122,7 +122,7 @@ test("desativar uma conta com ativo=false revoga a sessão na hora; representaç
   assert.equal((await login("norm-ativo", "senhaSegura123")).status, 200, "mas permite entrar de novo");
 });
 
-test("a auditoria de permissões lista exatamente os campos que mudaram", async () => {
+test("the permissions audit lists exactly the fields that changed", async () => {
   const conta = usuariosService.criar({ usuario: "norm-audit", senha: "senhaSegura123", nome: "Auditoria", podeControlar: true }, { nivel: 3 });
   const patch = (body) => chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body });
 
@@ -141,7 +141,7 @@ test("a auditoria de permissões lista exatamente os campos que mudaram", async 
   );
 });
 
-test("conceder acesso ou propriedade a um usuário inexistente responde com mensagem própria, não com o erro do SQLite", async () => {
+test("granting access or ownership to a nonexistent user answers with its own message, not the SQLite error", async () => {
   for (const rota of ["/admin/salas/A-108/acesso/999999", "/admin/salas/A-108/donos/999999"]) {
     const resp = await chamar(rota, { method: "POST", token: tokenSuper });
     assert.equal(resp.status, 400, rota);
@@ -150,7 +150,7 @@ test("conceder acesso ou propriedade a um usuário inexistente responde com mens
   }
 });
 
-test("a lista de ESP32 detectados é limitada aos mais recentes, mantendo quem acabou de se apresentar", async () => {
+test("the list of detected ESP32 boards is capped to the most recent, keeping the one that just announced itself", async () => {
   const salasService = require("../src/services/salasService");
   db.prepare("DELETE FROM esp_detectados").run();
   for (let i = 0; i < 130; i += 1) {

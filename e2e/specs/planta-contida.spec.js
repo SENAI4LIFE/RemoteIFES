@@ -71,7 +71,7 @@ function medirPlanta() {
 }
 
 for (const [nome, tamanho] of Object.entries(LARGURAS)) {
-  test(`a planta baixa fica contida e sem rolagem horizontal da página em ${nome}`, async ({ page, context }) => {
+  test(`the floor plan stays contained without horizontal page scroll at ${nome}`, async ({ page, context }) => {
     await abrirPlanta(page, context, tamanho);
     expect(await semRolagemHorizontal(page), "página sem rolagem horizontal").toBe(true);
     const medida = await page.evaluate(medirPlanta);
@@ -101,7 +101,7 @@ for (const [nome, tamanho] of Object.entries(LARGURAS)) {
   });
 }
 
-test("aproximar a planta rola dentro do invólucro e restaurar volta a caber, sem rolagem da página", async ({ page, context }) => {
+test("zooming the plan scrolls inside the wrapper and restoring fits again, without page scroll", async ({ page, context }) => {
   await abrirPlanta(page, context, VIEWPORTS.notebook);
   const antes = await page.evaluate(medirPlanta);
   expect(antes.rolaDentro).toBe(false);
@@ -134,7 +134,7 @@ test("aproximar a planta rola dentro do invólucro e restaurar volta a caber, se
 // The CORREDOR label has the size of the room codes and stays inside the corridor band, without
 // touching a room or legend, on every floor plan.
 for (const [nome, tamanho] of [["mobile-portrait", VIEWPORTS["mobile-portrait"]], ["mobile-landscape", VIEWPORTS["mobile-landscape"]], ["notebook", VIEWPORTS.notebook]]) {
-  test(`o rótulo CORREDOR é legível e fica dentro da faixa do corredor em ${nome}`, async ({ page, context }) => {
+  test(`the CORREDOR label is legible and stays inside the corridor band at ${nome}`, async ({ page, context }) => {
     await abrirPlanta(page, context, tamanho);
     for (const secao of ["a-terreo", "a-2pav", "a-3pav", "b-terreo", "b-2pav", "b-3pav"]) {
       await page.goto(`/#/salas/planta/${secao}`);

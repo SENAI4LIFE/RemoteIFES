@@ -116,7 +116,7 @@ test.after(async () => {
   fs.rmSync(RAIZ_TMP, { recursive: true, force: true });
 });
 
-test("a oferta carrega o identificador da tentativa e firmware capaz só conclui com a evidência de boot; relatórios duplicados são idempotentes", async () => {
+test("the offer carries the attempt identifier and capable firmware completes only with boot evidence; duplicate reports are idempotent", async () => {
   novaSala("VAL-1", "AA:BB:CC:0A:00:01");
   const d = await abrirDispositivo("VAL-1", "AA:BB:CC:0A:00:01", VERSAO_ANTIGA);
   otaService.ofertar("VAL-1");
@@ -144,7 +144,7 @@ test("a oferta carrega o identificador da tentativa e firmware capaz só conclui
   await novo.fechar();
 });
 
-test("firmware sem a capacidade continua concluindo pela versão reportada (semântica anterior preservada)", async () => {
+test("firmware without the capability still completes by the reported version (previous semantics preserved)", async () => {
   novaSala("VAL-2", "AA:BB:CC:0A:00:02");
   const d = await abrirDispositivo("VAL-2", "AA:BB:CC:0A:00:02", VERSAO_ANTIGA, { capaz: false });
   otaService.ofertar("VAL-2");
@@ -156,7 +156,7 @@ test("firmware sem a capacidade continua concluindo pela versão reportada (sem�
   await novo.fechar();
 });
 
-test("o canário que reporta a versão-alvo e depois reverte interrompe a distribuição sem iniciar o próximo lote", async () => {
+test("a canary that reports the target version and then reverts stops the rollout without starting the next batch", async () => {
   otaService.limparEstado("VAL-1");
   otaService.limparEstado("VAL-2");
   for (let i = 1; i <= 3; i += 1) novaSala(`ROL-V${i}`, `AA:BB:CC:0A:01:0${i}`);
@@ -214,7 +214,7 @@ function envelhecerEstado(sala, minutos) {
   fs.writeFileSync(otaService.ARQUIVO_ESTADOS, JSON.stringify(persistidos));
 }
 
-test("a validação sobrevive ao reinício do servidor e à reconexão da placa e conclui com a evidência reenviada", async () => {
+test("validation survives a server restart and board reconnection and completes with the resent evidence", async () => {
   novaSala("VAL-3", "AA:BB:CC:0A:00:03");
   const d = await abrirDispositivo("VAL-3", "AA:BB:CC:0A:00:03", VERSAO_ANTIGA);
   otaService.ofertar("VAL-3");
@@ -242,7 +242,7 @@ test("a validação sobrevive ao reinício do servidor e à reconexão da placa 
   otaService.limparEstado("VAL-3");
 });
 
-test("uma identidade substituída depois da gravação não consegue validar a tentativa", async () => {
+test("an identity replaced after flashing cannot validate the attempt", async () => {
   novaSala("VAL-5", "AA:BB:CC:0A:00:05");
   const outro = await abrirDispositivo("VAL-5", "AA:BB:CC:0A:00:05", VERSAO_ANTIGA);
   otaService.ofertar("VAL-5");
@@ -257,7 +257,7 @@ test("uma identidade substituída depois da gravação não consegue validar a t
   otaService.limparEstado("VAL-5");
 });
 
-test("o prazo de validação encerra a tentativa como falha de validação, que a distribuição trata como sem confirmação", (t) => {
+test("the validation deadline ends the attempt as a validation failure, which the rollout treats as unconfirmed", (t) => {
   novaSala("VAL-6", "AA:BB:CC:0A:00:06");
   const agoraMenos = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const estados = JSON.parse(fs.readFileSync(otaService.ARQUIVO_ESTADOS, "utf8"));
@@ -282,7 +282,7 @@ test("o prazo de validação encerra a tentativa como falha de validação, que 
   fs.writeFileSync(otaService.ARQUIVO_ESTADOS, JSON.stringify(salvos));
 });
 
-test("um dispositivo validado que volta à versão anterior depois da conclusão reconcilia o estado e a distribuição", async () => {
+test("a validated device that reverts to the previous version after completion reconciles the state and the rollout", async () => {
   novaSala("ROL-T1", "AA:BB:CC:0A:02:01");
   const d = await abrirDispositivo("ROL-T1", "AA:BB:CC:0A:02:01", VERSAO_ANTIGA);
   otaRolloutService.iniciar({ salas: ["ROL-T1"], canario: "ROL-T1", tamanhoLote: 1, ator: ATOR });

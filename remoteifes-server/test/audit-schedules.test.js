@@ -10,7 +10,7 @@ const salas = require("../src/services/salasService");
 const { dataAtualBrasiliaISO } = require("../src/utils/tempo");
 const usuario = db.prepare("SELECT * FROM usuarios WHERE nivel = 3").get();
 
-test("reativacao recusa conflito sem alterar o agendamento desativado", () => {
+test("reactivation refuses a conflict without changing the disabled schedule", () => {
   const dados = { sala: "A-108", usuarioId: usuario.id, data: dataAtualBrasiliaISO(), horaInicio: "08:00", horaFim: "09:00", temperatura: 24 };
   const anterior = agendamentos.criar(dados);
   agendamentos.alternar(anterior.id, false, usuario);
@@ -23,7 +23,7 @@ test("reativacao recusa conflito sem alterar o agendamento desativado", () => {
   assert.equal(agendamentos.alternar(anterior.id, true, usuario).ativo, 1);
 });
 
-test("mapa de reservas preserva bloqueios e usa uma consulta para todas as salas", (t) => {
+test("the reservation map preserves locks and uses one query for all rooms", (t) => {
   const inserir = db.prepare("INSERT INTO agendamentos (sala, usuarioId, data, horaInicio, horaFim, temperatura, ativo) VALUES (?, ?, ?, '00:00', '23:59', 24, ?)");
   inserir.run("A-103a", usuario.id, dataAtualBrasiliaISO(), 1);
   inserir.run("A-108", usuario.id, "2000-01-01", 1);
@@ -43,7 +43,7 @@ test("mapa de reservas preserva bloqueios e usa uma consulta para todas as salas
   assert.equal(consultas, 1);
 });
 
-test("reservas consecutivas criadas fora de ordem terminam com o estado da reserva atual", (t) => {
+test("consecutive reservations created out of order end with the current reservation's state", (t) => {
   t.mock.timers.enable({ apis: ["Date", "setInterval", "setTimeout"], now: new Date("2026-09-06T11:59:00Z") });
   const scheduler = require("../src/scheduler/schedulerService");
   t.after(() => scheduler.pararScheduler());

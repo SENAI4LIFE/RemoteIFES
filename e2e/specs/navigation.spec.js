@@ -7,7 +7,7 @@ async function abrirComo(page, context, role, hash = "/") {
   await expect(page.locator("#screen-server-status")).toBeHidden();
 }
 
-test("atualizar a página preserva a aba Grade", async ({ page, context }) => {
+test("refreshing the page preserves the Grade tab", async ({ page, context }) => {
   await abrirComo(page, context, "admin");
   await page.locator('#gradeTabBtn').click();
   await expect(page.locator("#screen-grade")).toBeVisible();
@@ -17,7 +17,7 @@ test("atualizar a página preserva a aba Grade", async ({ page, context }) => {
   await expect(page.locator("#screen-grade")).toBeVisible({ timeout: 20_000 });
 });
 
-test("atualizar a página preserva a sub-aba de administração", async ({ page, context }) => {
+test("refreshing the page preserves the administration sub-tab", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin");
   await page.locator("#adminTabBtn").click();
   await page.locator('.admin-subtab-btn[data-sub="macs"]').click();
@@ -29,7 +29,7 @@ test("atualizar a página preserva a sub-aba de administração", async ({ page,
   await expect(page.locator("#adminSub-usuarios")).toBeHidden();
 });
 
-test("atualizar a página preserva o painel de controle da sala aberta", async ({ page, context }) => {
+test("refreshing the page preserves the open room's control panel", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/sala/A-108");
   await expect(page.locator("#screen-panel")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#panelRoomName")).toContainText("A-108");
@@ -39,13 +39,13 @@ test("atualizar a página preserva o painel de controle da sala aberta", async (
   await expect(page.locator("#panelRoomName")).toContainText("A-108");
 });
 
-test("link direto para uma seção da planta baixa ativa a aba certa", async ({ page, context }) => {
+test("a direct link to a floor plan section activates the right tab", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/salas/planta/b-2pav");
   await expect(page.locator("#screen-floorplan")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#screen-floorplan .fp-tab-btn.active')).toHaveAttribute("data-fp-section", "b-2pav");
 });
 
-test("usuário comum com link direto para a administração cai nas salas", async ({ page, context }) => {
+test("a regular user with a direct link to administration lands on the rooms", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/admin/macs");
   await expect(page.locator("#screen-admin")).toBeHidden();
   await expect(page.locator("#adminTabBtn")).toBeHidden();
@@ -54,7 +54,7 @@ test("usuário comum com link direto para a administração cai nas salas", asyn
   ).toBeVisible();
 });
 
-test("administrador comum com link direto para o Status técnico cai em Usuários ativos", async ({ page, context }) => {
+test("a regular administrator with a direct link to technical Status lands on Usuários ativos", async ({ page, context }) => {
   await abrirComo(page, context, "admin", "/admin/monitoramento");
   await expect(page.locator("#screen-admin")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#adminSub-status")).toBeVisible();
@@ -64,13 +64,13 @@ test("administrador comum com link direto para o Status técnico cai em Usuário
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/status");
 });
 
-test("uma rota desconhecida recai no Início e normaliza o endereço", async ({ page, context }) => {
+test("an unknown route falls back to Início and normalizes the address", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/rota-que-nao-existe");
   await expect(page.locator("#screen-inicio")).toBeVisible({ timeout: 20_000 });
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/inicio");
 });
 
-test("fechar a página do aplicativo volta para o Início", async ({ page, context }) => {
+test("closing the app page returns to Início", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/aplicativo");
   await expect(page.locator("#screen-mobile-app")).toBeVisible({ timeout: 20_000 });
   await page.locator("#mobileAppBackBtn").click();
@@ -79,7 +79,7 @@ test("fechar a página do aplicativo volta para o Início", async ({ page, conte
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/inicio");
 });
 
-test("sair limpa o endereço de navegação", async ({ page, loginComo }) => {
+test("logout clears the navigation address", async ({ page, loginComo }) => {
   await page.goto("/");
   await loginComo("admin");
   await page.locator("#gradeTabBtn").click();
@@ -90,7 +90,7 @@ test("sair limpa o endereço de navegação", async ({ page, loginComo }) => {
   expect(await page.evaluate(() => location.hash)).toBe("");
 });
 
-test("voltar e avançar do navegador percorrem as seções visitadas", async ({ page, context }) => {
+test("browser back and forward walk through the visited sections", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin");
   await expect(page.locator("#screen-inicio")).toBeVisible();
 
@@ -114,7 +114,7 @@ test("voltar e avançar do navegador percorrem as seções visitadas", async ({ 
   await expect(page.locator("#screen-grade")).toBeVisible();
 });
 
-test("voltar percorre as sub-abas de administração visitadas", async ({ page, context }) => {
+test("back walks through the visited administration sub-tabs", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin");
   await page.locator("#adminTabBtn").click();
   await page.locator('.admin-subtab-btn[data-sub="logs"]').click();
@@ -129,7 +129,7 @@ test("voltar percorre as sub-abas de administração visitadas", async ({ page, 
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/logs/dispositivos");
 });
 
-test("voltar troca a seção ativa da planta baixa", async ({ page, context }) => {
+test("back switches the active floor plan section", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/salas/planta/a-2pav");
   await expect(page.locator("#screen-floorplan .fp-tab-btn.active")).toHaveAttribute(
     "data-fp-section",
@@ -146,19 +146,19 @@ test("voltar troca a seção ativa da planta baixa", async ({ page, context }) =
   );
 });
 
-test("link direto abre a sub-aba ESP32 e sobrevive ao refresh (superadmin)", async ({ page, context }) => {
+test("a direct link opens the ESP32 sub-tab and survives a refresh (superadmin)", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin", "/admin/esp32");
   await expect(page.locator("#adminSub-esp32")).toBeVisible({ timeout: 20_000 });
   await page.reload();
   await expect(page.locator("#adminSub-esp32")).toBeVisible({ timeout: 20_000 });
 });
 
-test("link direto /relatos abre o painel de relatos", async ({ page, context }) => {
+test("direct link /relatos opens the reports panel", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/relatos");
   await expect(page.locator("#relatosPanel")).toBeVisible({ timeout: 20_000 });
 });
 
-test("link direto /admin/relatos abre a sub-aba de gestão de relatos e sobrevive ao refresh (superadmin)", async ({ page, context }) => {
+test("direct link /admin/relatos opens the report management sub-tab and survives a refresh (superadmin)", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin", "/admin/relatos");
   await expect(page.locator("#screen-admin")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#adminSub-relatos")).toBeVisible({ timeout: 20_000 });
@@ -168,34 +168,34 @@ test("link direto /admin/relatos abre a sub-aba de gestão de relatos e sobreviv
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/relatos");
 });
 
-test("link direto /admin/relatos não concede a gestão de relatos a um admin comum", async ({ page, context }) => {
+test("direct link /admin/relatos does not grant report management to a regular admin", async ({ page, context }) => {
   await abrirComo(page, context, "admin", "/admin/relatos");
   await expect(page.locator("#screen-admin")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#adminSub-relatos")).toBeHidden();
   await expect(page.locator('.admin-subtab-btn[data-sub="relatos"]')).toBeHidden();
 });
 
-test("o alias /agendamentos abre a aba Agenda", async ({ page, context }) => {
+test("the /agendamentos alias opens the Agenda tab", async ({ page, context }) => {
   await abrirComo(page, context, "admin", "/agendamentos");
   await expect(page.locator("#screen-agenda")).toBeVisible({ timeout: 20_000 });
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/agenda");
 });
 
-test("link de documentação /ajuda/ota abre o manual na seção de OTA", async ({ page, context }) => {
+test("documentation link /ajuda/ota opens the manual at the OTA section", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin", "/ajuda/ota");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#manual-sec-ota-credenciais")).toBeVisible();
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/ajuda/ota-credenciais");
 });
 
-test("o manual abre por link direto mesmo deslogado, sem expor seções restritas", async ({ page }) => {
+test("the manual opens by direct link even logged out, without exposing restricted sections", async ({ page }) => {
   await page.goto("/#/ajuda/monitoramento");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#manual-sec-inicio")).toBeVisible();
   await expect(page.locator("#manual-sec-monitoramento")).toHaveCount(0);
 });
 
-test("a navegação nunca altera o caminho da URL, apenas o fragmento (Cordova/file://)", async ({ page, context }) => {
+test("navigation never changes the URL path, only the fragment (Cordova/file://)", async ({ page, context }) => {
   await abrirComo(page, context, "superadmin");
   const caminho = await page.evaluate(() => location.pathname);
 
@@ -209,7 +209,7 @@ test("a navegação nunca altera o caminho da URL, apenas o fragmento (Cordova/f
   expect(await page.evaluate(() => location.search)).toBe("");
 });
 
-test("deep link em caminho com /index.html é restaurado após refresh (estilo Cordova)", async ({ page, context }) => {
+test("a deep link on a path with /index.html is restored after refresh (Cordova style)", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/index.html#/sala/A-108");
   await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
@@ -220,7 +220,7 @@ test("deep link em caminho com /index.html é restaurado após refresh (estilo C
   expect(await page.evaluate(() => location.pathname)).toMatch(/\/index\.html$/);
 });
 
-test("o manual abre por link direto mesmo offline, servido pelo cache do PWA", async ({ page, context, browserName }) => {
+test("the manual opens by direct link even offline, served from the PWA cache", async ({ page, context, browserName }) => {
   test.skip(browserName === "webkit", "no projeto WebKit o service worker fica bloqueado para que page.route intercepte a API; a emulação offline do Playwright tampouco alcança navegações servidas pelo worker nesse motor");
   await page.goto("/");
   await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
@@ -240,7 +240,7 @@ test("o manual abre por link direto mesmo offline, servido pelo cache do PWA", a
   }
 });
 
-test("uma rota protegida no endereço não concede acesso: usuário comum em /admin cai nas salas", async ({ page, context }) => {
+test("a protected route in the address grants no access: a regular user at /admin lands on the rooms", async ({ page, context }) => {
   await abrirComo(page, context, "user", "/admin/config");
   await expect(page.locator("#screen-admin")).toBeHidden();
   await expect(page.locator("#adminTabBtn")).toBeHidden();
@@ -250,7 +250,7 @@ test("uma rota protegida no endereço não concede acesso: usuário comum em /ad
   await expect(page.locator("#adminSub-config")).toBeHidden();
 });
 
-test("uma rota com sala inexistente não deixa uma repetição infinita rodando depois de navegar para outra tela", async ({ page, context }) => {
+test("a route with a nonexistent room does not leave an infinite retry running after navigating to another screen", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await context.addInitScript(() => {
     window.__retentativas = 0;

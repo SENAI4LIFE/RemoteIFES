@@ -36,14 +36,14 @@ test.after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-test("sem clonador definido nenhuma sala é clonadora e nada pode ser salvo", () => {
+test("without a defined cloner no room is a cloner and nothing can be saved", () => {
   assert.equal(protocolos.obterClonador(), null);
   assert.equal(protocolos.papelDaSala("CLONE-1"), "transmitter");
   assert.equal(protocolos.estadoClonador().motivo, "nao-designado");
   assert.throws(() => protocolos.criar({ label: "Qualquer", captura: captura() }), /nenhum módulo clonador/);
 });
 
-test("definir o clonador exige sala existente com MAC e guarda a identidade física da placa", () => {
+test("defining the cloner requires an existing room with a MAC and stores the board's physical identity", () => {
   assert.throws(() => protocolos.definirClonador("NAO-EXISTE"), /não encontrada/);
   assert.throws(() => protocolos.definirClonador("SEM-MAC"), /não possui ESP32/);
   assert.throws(() => protocolos.definirClonador(42), /inválida/);
@@ -61,14 +61,14 @@ test("definir o clonador exige sala existente com MAC e guarda a identidade fís
   assert.equal(gravado.mac, "AA:BB:CC:DD:EE:C1");
 });
 
-test("a autorização de uma conexão compara o MAC físico e a credencial com o vínculo guardado", () => {
+test("authorizing a connection compares the physical MAC and credential with the stored binding", () => {
   assert.equal(protocolos.papelDaConexao("CLONE-1", { mac: "aa:bb:cc:dd:ee:c1", deviceId: null }), "cloner");
   assert.equal(protocolos.papelDaConexao("CLONE-1", { mac: "AA:BB:CC:DD:EE:99", deviceId: null }), "transmitter");
   assert.equal(protocolos.papelDaConexao("TX-1", { mac: "AA:BB:CC:DD:EE:C1", deviceId: null }), "transmitter");
   assert.equal(protocolos.papelDaConexao("CLONE-1", null), "transmitter");
 });
 
-test("capturas com origem em outra sala, RAW ou portadora inválidos são recusadas", () => {
+test("captures originating in another room, or with invalid RAW or carrier, are refused", () => {
   assert.throws(() => protocolos.criar({ label: "Origem errada", captura: captura({ sala: "TX-1" }) }), /não veio do módulo clonador/);
   assert.throws(() => protocolos.criar({ label: "Sem raw", captura: captura({ raw: [] }) }), /entre 1 e 1024 pulsos/);
   assert.throws(() => protocolos.criar({ label: "Raw longo", captura: captura({ raw: new Array(1025).fill(500) }) }), /entre 1 e 1024 pulsos/);
@@ -81,7 +81,7 @@ test("capturas com origem em outra sala, RAW ou portadora inválidos são recusa
   assert.equal(protocolos.listar().length, 0);
 });
 
-test("labels são normalizados, limitados a 2–80 caracteres e únicos sem diferenciar maiúsculas", () => {
+test("labels are normalized, limited to 2-80 characters and unique case-insensitively", () => {
   assert.throws(() => protocolos.criar({ label: "A", captura: captura() }), /entre 2 e 80/);
   assert.throws(() => protocolos.criar({ label: "x".repeat(81), captura: captura() }), /entre 2 e 80/);
   assert.throws(() => protocolos.criar({ label: 12, captura: captura() }), /obrigatório/);
@@ -102,7 +102,7 @@ test("labels são normalizados, limitados a 2–80 caracteres e únicos sem dife
   assert.equal(protocolos.listar().length, 1);
 });
 
-test("sinal RAW genérico é guardado sem virar protocolo de ar-condicionado com estado", () => {
+test("a generic RAW signal is stored without becoming a stateful air conditioner protocol", () => {
   const generico = protocolos.criar({
     label: "Projetor - power",
     captura: captura({ isKnown: false, protocolId: 7, protocol: "UNKNOWN", hex: "0x0", raw: [100, 200, 300], carrierHz: undefined }),
@@ -114,7 +114,7 @@ test("sinal RAW genérico é guardado sem virar protocolo de ar-condicionado com
   assert.throws(() => protocolos.criar({ label: "Reconhecido sem id", captura: captura({ isKnown: true, protocolId: -1 }) }), /protocolId válido/);
 });
 
-test("failsafe OFF é opcional, validado como qualquer RAW e pode ser removido", () => {
+test("failsafe OFF is optional, validated like any RAW and can be removed", () => {
   const id = protocolos.listar().find((p) => p.label === "Ar laboratório - ligar").id;
   assert.throws(() => protocolos.definirFailsafe(999, captura()), /não encontrado/);
   assert.throws(() => protocolos.definirFailsafe(id, captura({ raw: [70000] })), /entre 0 e 65535/);
@@ -130,7 +130,7 @@ test("failsafe OFF é opcional, validado como qualquer RAW e pode ser removido",
   assert.throws(() => protocolos.limparFailsafe(999), /não encontrado/);
 });
 
-test("renomear respeita unicidade e excluir desfaz o vínculo das salas com o registro", () => {
+test("renaming respects uniqueness and deleting unlinks rooms from the record", () => {
   const lista = protocolos.listar();
   const ar = lista.find((p) => p.label === "Ar laboratório - ligar");
   const projetor = lista.find((p) => p.label === "Projetor - power");
@@ -155,7 +155,7 @@ test("renomear respeita unicidade e excluir desfaz o vínculo das salas com o re
   assert.equal(protocolos.listar()[0].id, projetor.id);
 });
 
-test("o comando de failsafe para a sala reflete o registro vinculado e o RAW guardado", () => {
+test("the room's failsafe command reflects the linked record and the stored RAW", () => {
   const projetor = protocolos.listar()[0];
   assert.deepEqual(salasService.comandoFailsafeIR({ sala: "TX-1", irProtocoloRegistroId: null }), { tipo: "failsafe_raw_clear" });
   assert.deepEqual(salasService.comandoFailsafeIR({ sala: "TX-1", irProtocoloRegistroId: projetor.id }), { tipo: "failsafe_raw_clear", protocolRecordId: projetor.id });
@@ -166,7 +166,7 @@ test("o comando de failsafe para a sala reflete o registro vinculado e o RAW gua
   assert.deepEqual(salasService.comandoFailsafeIR({ sala: "TX-1", irProtocoloRegistroId: 999 }), { tipo: "failsafe_raw_clear", protocolRecordId: 999 });
 });
 
-test("trocar o MAC da sala clonadora invalida o vínculo até uma nova confirmação", () => {
+test("changing the cloner room's MAC invalidates the binding until a new confirmation", () => {
   salasService.cadastrarMac("CLONE-1", "AA:BB:CC:DD:EE:C2");
   assert.equal(protocolos.papelDaSala("CLONE-1"), "transmitter");
   assert.equal(protocolos.papelDaConexao("CLONE-1", { mac: "AA:BB:CC:DD:EE:C2", deviceId: null }), "transmitter");
@@ -181,7 +181,7 @@ test("trocar o MAC da sala clonadora invalida o vínculo até uma nova confirma�
   assert.equal(protocolos.papelDaSala("CLONE-1"), "cloner");
 });
 
-test("com credencial provisionada o vínculo passa a exigir o mesmo deviceId; substituir ou revogar derruba a autorização", () => {
+test("with a provisioned credential the binding requires the same deviceId; replacing or revoking removes the authorization", () => {
   const { deviceId } = credenciais.provisionar("CLONE-1");
   assert.equal(protocolos.papelDaSala("CLONE-1"), "cloner", "provisionar credencial na mesma placa não invalida o vínculo por MAC");
   const confirmado = protocolos.definirClonador("CLONE-1");
@@ -202,7 +202,7 @@ test("com credencial provisionada o vínculo passa a exigir o mesmo deviceId; su
   assert.equal(protocolos.estadoClonador().motivo, "credencial-alterada");
 });
 
-test("remover o clonador limpa a configuração e volta todas as salas a transmissoras", () => {
+test("removing the cloner clears the configuration and returns every room to transmitter", () => {
   assert.equal(protocolos.definirClonador(null), null);
   assert.equal(protocolos.obterClonador(), null);
   assert.equal(JSON.parse(db.prepare("SELECT valor FROM configuracoes WHERE chave = 'espClonador'").get().valor), null);

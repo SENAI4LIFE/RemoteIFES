@@ -10,14 +10,14 @@ const { executarLimpezaRetencao, normalizarDiasRetencao } = require("../src/serv
 
 test.after(() => db.close());
 
-test("configuração de retenção rejeita valores que ampliariam a exclusão", () => {
+test("retention configuration rejects values that would widen deletion", () => {
   assert.equal(normalizarDiasRetencao("-1", 180), 180);
   assert.equal(normalizarDiasRetencao("0", 180), 180);
   assert.equal(normalizarDiasRetencao("1.5", 180), 180);
   assert.equal(normalizarDiasRetencao("30", 180), 30);
 });
 
-test("retenção remove somente histórico elegível e preserva dados persistentes", () => {
+test("retention removes only eligible history and preserves persistent data", () => {
   const adminId = db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get().id;
   const sala = db.prepare("SELECT sala FROM salas LIMIT 1").get().sala;
 
@@ -40,7 +40,7 @@ test("retenção remove somente histórico elegível e preserva dados persistent
   assert.equal(db.prepare("SELECT COUNT(*) n FROM relatos WHERE titulo = 'persistente'").get().n, 1);
 });
 
-test("retenção de agendamentos remove datas passadas antigas e suas execuções, preservando as recentes", () => {
+test("schedule retention removes old past dates and their executions, keeping recent ones", () => {
   const adminId = db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get().id;
   const sala = db.prepare("SELECT sala FROM salas LIMIT 1").get().sala;
 
@@ -59,7 +59,7 @@ test("retenção de agendamentos remove datas passadas antigas e suas execuçõe
   assert.equal(db.prepare("SELECT COUNT(*) n FROM agendamentos_execucoes WHERE agendamentoId = ?").get(antigo).n, 0);
 });
 
-test("retenção de relatos resolvidos é opt-in e nunca remove relatos pendentes", () => {
+test("retention of resolved reports is opt-in and never removes pending reports", () => {
   const adminId = db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get().id;
   db.prepare("INSERT INTO relatos (usuarioId, titulo, descricao, status, atualizadoEm) VALUES (?, 'resolvido antigo', 'descrição do relato', 'resolvido', datetime('now', '-500 days'))").run(adminId);
   db.prepare("INSERT INTO relatos (usuarioId, titulo, descricao, status, atualizadoEm) VALUES (?, 'pendente antigo', 'descrição do relato', 'aberto', datetime('now', '-500 days'))").run(adminId);

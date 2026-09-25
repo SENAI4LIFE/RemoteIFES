@@ -55,7 +55,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("criar, desativar, reativar e excluir um agendamento deixam registros centrais de auditoria", async () => {
+test("creating, disabling, re-enabling and deleting a schedule leave central audit records", async () => {
   const data = dataAtualBrasiliaISO();
   const criado = await requisitar("/agendamentos", {
     token: tokenAdmin,
@@ -86,7 +86,7 @@ test("criar, desativar, reativar e excluir um agendamento deixam registros centr
   assert.match(exclusao[0].descricao, /A-108/);
 });
 
-test("um agendamento recusado não gera registro de auditoria", async () => {
+test("a refused schedule produces no audit record", async () => {
   const antes = db.prepare("SELECT COUNT(*) n FROM auditoria_eventos").get().n;
   const resp = await requisitar("/agendamentos", {
     token: tokenAdmin,
@@ -97,7 +97,7 @@ test("um agendamento recusado não gera registro de auditoria", async () => {
   assert.equal(db.prepare("SELECT COUNT(*) n FROM auditoria_eventos").get().n, antes);
 });
 
-test("o proprietário conceder e revogar acesso à sua sala fica registrado com o ator correto", async () => {
+test("an owner granting and revoking access to their room is recorded with the correct actor", async () => {
   const concedido = await requisitar(`/salas/A-108/proprietario/acesso/${convidado.id}`, { token: tokenDono, method: "POST" });
   assert.equal(concedido.status, 200);
   const concessoes = eventos("sala_usuario_autorizado").filter((e) => e.atorLogin === "ev-dono");
@@ -115,7 +115,7 @@ test("o proprietário conceder e revogar acesso à sua sala fica registrado com 
   assert.match(revogacoes[0].descricao, /A-108/);
 });
 
-test("uma concessão recusada pelo proprietário não é auditada", async () => {
+test("a grant refused for the owner is not audited", async () => {
   const antes = db.prepare("SELECT COUNT(*) n FROM auditoria_eventos").get().n;
   const resp = await requisitar(`/salas/A-108/proprietario/acesso/${dono.id}`, { token: tokenDono, method: "POST" });
   assert.equal(resp.status, 400);

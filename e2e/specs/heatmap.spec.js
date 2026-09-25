@@ -15,7 +15,7 @@ async function abrirHeatmap(page) {
   await expect.poll(() => page.locator("#heatmapTabelaCorpo tr").count(), { timeout: 20_000 }).toBeGreaterThan(0);
 }
 
-test("o mapa de calor é exclusivo do superadministrador", async ({ page, context, request }) => {
+test("the heatmap is superadministrator-only", async ({ page, context, request }) => {
   for (const [papel, status] of [["user", 403], ["admin", 403], ["superadmin", 200]]) {
     const resp = await request.get(`${API_URL}/admin/heatmap?metrica=comandos&periodo=24h`, {
       headers: { Authorization: `Bearer ${tokenDe(papel)}` },
@@ -28,7 +28,7 @@ test("o mapa de calor é exclusivo do superadministrador", async ({ page, contex
   await expect(page.locator("#heatmapBloco")).toBeHidden();
 });
 
-test("nada é calculado antes de a seção ser aberta", async ({ page, context }) => {
+test("nothing is computed before the section is opened", async ({ page, context }) => {
   const chamadas = [];
   await page.route("**/admin/heatmap*", (rota) => {
     chamadas.push(rota.request().url());
@@ -47,7 +47,7 @@ test("nada é calculado antes de a seção ser aberta", async ({ page, context }
   expect(chamadas.length).toBe(1);
 });
 
-test("métrica e período recalculam o mapa e refletem no cabeçalho da tabela", async ({ page, context }) => {
+test("metric and period recompute the map and are reflected in the table header", async ({ page, context }) => {
   await abrirMonitoramento(page, context);
   await abrirHeatmap(page);
 
@@ -66,7 +66,7 @@ test("métrica e período recalculam o mapa e refletem no cabeçalho da tabela",
   await expect.poll(legenda, { timeout: 15_000 }).toContain("30 dias");
 });
 
-test("cada sala do mapa recebe o valor da sala correspondente", async ({ page, context }) => {
+test("each room on the map receives the value of the matching room", async ({ page, context }) => {
   await abrirMonitoramento(page, context);
   await abrirHeatmap(page);
   await page.locator("#heatmapMetrica").selectOption("comandos");
@@ -94,7 +94,7 @@ test("cada sala do mapa recebe o valor da sala correspondente", async ({ page, c
   expect(conferencia.divergencias).toEqual([]);
 });
 
-test("a escala de cor cobre frio a quente e o estado Sem dados é distinto", async ({ page, context }) => {
+test("the color scale covers cold to hot and the Sem dados state is distinct", async ({ page, context }) => {
   await abrirMonitoramento(page, context);
   await abrirHeatmap(page);
 
@@ -126,7 +126,7 @@ test("a escala de cor cobre frio a quente e o estado Sem dados é distinto", asy
   expect(estado.classes.some((c) => /^heatmap-f\d$/.test(c) || c === "heatmap-sem-dados")).toBe(true);
 });
 
-test("clicar em uma sala mostra métrica, período e números dela", async ({ page, context }) => {
+test("clicking a room shows its metric, period and numbers", async ({ page, context }) => {
   await abrirMonitoramento(page, context);
   await abrirHeatmap(page);
 
@@ -140,7 +140,7 @@ test("clicar em uma sala mostra métrica, período e números dela", async ({ pa
   await expect(detalhe).toContainText("7 dias");
 });
 
-test("o mapa de calor é responsivo e não cria rolagem horizontal na página", async ({ page, context }) => {
+test("the heatmap is responsive and creates no horizontal page scroll", async ({ page, context }) => {
   for (const nome of ["mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
     await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome]);
     await abrirHeatmap(page);
@@ -154,7 +154,7 @@ test("o mapa de calor é responsivo e não cria rolagem horizontal na página", 
   }
 });
 
-test("a seção fecha ao sair do Monitoramento e não recalcula sozinha", async ({ page, context }) => {
+test("the section closes when leaving Monitoramento and does not recompute by itself", async ({ page, context }) => {
   const chamadas = [];
   await page.route("**/admin/heatmap*", (rota) => {
     chamadas.push(rota.request().url());

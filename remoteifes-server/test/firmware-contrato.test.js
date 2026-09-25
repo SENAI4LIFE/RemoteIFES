@@ -26,7 +26,7 @@ function bloco(nome) {
   throw new Error(`bloco de ${nome} não fechado`);
 }
 
-test("os GPIOs do hardware de referência são os validados: receptor 15, emissor 4, switch 26 e buzzer 27", () => {
+test("the reference hardware GPIOs are the validated ones: receiver 15, emitter 4, switch 26 and buzzer 27", () => {
   assert.match(ino, /#define IR_RECV_PIN 15\b/);
   assert.match(ino, /#define IR_SEND_PIN 4\b/);
   assert.match(ino, /#define ACTION_SWITCH_PIN 26\b/);
@@ -38,7 +38,7 @@ test("os GPIOs do hardware de referência são os validados: receptor 15, emisso
   }
 });
 
-test("a versão do firmware avançou a partir de 4.0.0 e é a que o servidor usa para escolher enter_clone", () => {
+test("the firmware version advanced from 4.0.0 and is what the server uses to choose enter_clone", () => {
   const versao = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/);
   assert.ok(versao, "FW_VERSAO ausente em platformio.ini");
   assert.equal(compararVersoes(versao[1], "4.0.0"), 1);
@@ -47,7 +47,7 @@ test("a versão do firmware avançou a partir de 4.0.0 e é a que o servidor usa
   assert.ok(compararVersoes(versao[1], limiar[1]) >= 0, "o firmware publicado precisa entender enter_clone");
 });
 
-test("o switch usa pull-up interno, nível baixo, debounce de 40 ms e 5 s para o failsafe", () => {
+test("the switch uses the internal pull-up, active low, 40 ms debounce and 5 s for the failsafe", () => {
   assert.match(ino, /const unsigned long ACTION_SWITCH_DEBOUNCE_MS = 40;/);
   assert.match(ino, /const unsigned long FAILSAFE_SWITCH_HOLD_MS = 5000;/);
   assert.match(ino, /pinMode\(ACTION_SWITCH_PIN, INPUT_PULLUP\)/);
@@ -62,7 +62,7 @@ test("o switch usa pull-up interno, nível baixo, debounce de 40 ms e 5 s para o
   assert.match(configurar, /actionSwitchLongPressConsumed = ativo;/, "um botão preso no boot não dispara nem o AP nem o failsafe");
 });
 
-test("o failsafe OFF é persistido na NVS, comparado antes de regravar e transmitido sem servidor", () => {
+test("the failsafe OFF is persisted in NVS, compared before rewriting and transmitted without the server", () => {
   assert.match(ino, /strcmp\(tipo, "failsafe_raw_set"\) == 0/);
   assert.match(ino, /strcmp\(tipo, "failsafe_raw_clear"\) == 0/);
   const salvar = bloco("bool salvarFailsafeRaw");
@@ -100,7 +100,7 @@ test("o failsafe OFF é persistido na NVS, comparado antes de regravar e transmi
   assert.match(bloco("void preencherStatusFailsafe"), /doc\["failsafeLatched"\] = failsafeLatched;/);
 });
 
-test("o OFF local persistido só é desfeito por um comando explícito do servidor e nunca deixa a placa presa", () => {
+test("the persisted local OFF is only undone by an explicit server command and never leaves the board stuck", () => {
   const setup = bloco("void setup");
   assert.match(setup, /failsafeLatched = preferences\.isKey\(FAILSAFE_LATCH_KEY\)/);
   assert.match(setup, /if \(failsafeLatched\) \{\s*lastKnownPower = false;\s*powerConhecido = true;/);
@@ -119,7 +119,7 @@ test("o OFF local persistido só é desfeito por um comando explícito do servid
   assert.match(bloco("void enviarInfoDispositivo"), /if \(powerConhecido\) doc\["ligado"\] = lastKnownPower;/);
 });
 
-test("durante a OTA o switch físico e o buzzer continuam sendo atendidos e o download tem prazo total", () => {
+test("during OTA the physical switch and buzzer are still serviced and the download has a total deadline", () => {
   const ota = bloco("void iniciarOtaOferta");
   const laco = ota.slice(ota.indexOf("while (recebido < tamanho)"));
   assert.match(laco, /^\s*while \(recebido < tamanho\) \{\s*processarSwitchAcao\(\);\s*atualizarBuzzer\(\);/);
@@ -127,7 +127,7 @@ test("durante a OTA o switch físico e o buzzer continuam sendo atendidos e o do
   assert.match(ino, /const unsigned long OTA_TOTAL_TIMEOUT_MS = 600000;/);
 });
 
-test("o papel vem do servidor: só a clonadora entra em modo clone ou captura e o papel não é persistido", () => {
+test("the role comes from the server: only the cloner enters clone or capture mode and the role is not persisted", () => {
   assert.match(ino, /strcmp\(tipo, "device_role"\) == 0/);
   assert.match(ino, /strcmp\(tipo, "enter_clone"\) == 0/);
   assert.match(ino, /if \(preferences\.isKey\("role"\)\) preferences\.remove\("role"\);/);
@@ -140,7 +140,7 @@ test("o papel vem do servidor: só a clonadora entra em modo clone ou captura e 
   assert.doesNotMatch(setupHtml, /clonador/i);
 });
 
-test("o ponto de acesso fica desligado em operação e só volta sem configuração, após reset ou pelo switch", () => {
+test("the access point stays off in operation and only returns without configuration, after reset or through the switch", () => {
   assert.match(bloco("void setup"), /WiFi\.mode\(WIFI_STA\);\s*WiFi\.softAPdisconnect\(true\);/);
   assert.doesNotMatch(bloco("void setup"), /aplicarPontoDeAcesso\(/, "o boot configurado não sobe o AP");
   assert.match(bloco("void startAPMode"), /aplicarPontoDeAcesso\(false\)/);
@@ -154,7 +154,7 @@ test("o ponto de acesso fica desligado em operação e só volta sem configuraç
   assert.match(ino, /strcmp\(tipo, "reset_wifi"\) == 0/);
 });
 
-test("o buzzer acompanha cada transmissão IR sem atraso bloqueante", () => {
+test("the buzzer follows every IR transmission without a blocking delay", () => {
   assert.match(bloco("void sendRawIR"), /iniciarAvisoBuzzer\(\);\s*irsend\.sendRaw\(rawData, length, frequency\);\s*atualizarBuzzer\(\);/);
   assert.match(bloco("void sendKnownACState"), /iniciarAvisoBuzzer\(\);\s*universalAC\.sendAc\(\);\s*atualizarBuzzer\(\);/);
   assert.doesNotMatch(bloco("void iniciarAvisoBuzzer"), /delay\(/);
@@ -163,7 +163,7 @@ test("o buzzer acompanha cada transmissão IR sem atraso bloqueante", () => {
   assert.match(ino, /const unsigned long BUZZER_MIN_MS = 60;/);
 });
 
-test("a placa ecoa a versão do estado desejado e não trata a restauração automática como comando explícito", () => {
+test("the board echoes the desired state version and does not treat automatic restoration as an explicit command", () => {
   const versao = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/);
   assert.ok(compararVersoes(versao[1], "4.3.0") >= 0, "o eco de versão e a recusa da restauração existem a partir de 4.3.0");
   assert.match(ino, /uint32_t ultimaVersaoEstado = 0;/);
@@ -184,7 +184,7 @@ test("a placa ecoa a versão do estado desejado e não trata a restauração aut
   assert.doesNotMatch(raw, /restauracao/, "send_raw continua sendo sempre explícito");
 });
 
-test("a credencial só troca em RAM e só reconecta depois de gravada e relida na NVS; falha mantém a atual", () => {
+test("the credential changes only in RAM and reconnects only after being written and reread from NVS; failure keeps the current one", () => {
   const aplicar = bloco("void aplicarCredencial");
   assert.match(aplicar, /bool gravado = gravarChaveNvsVerificada\("devId", novoId\) && gravarChaveNvsVerificada\("devSec", novoSegredo\);/);
   assert.match(aplicar, /if \(!gravado\) \{\s*restaurarChaveNvs\("devId", idAnterior\);\s*restaurarChaveNvs\("devSec", segredoAnterior\);\s*reportComando\("credencial", "falha_nvs"\);/, "gravação parcial é desfeita e reportada");
@@ -198,7 +198,7 @@ test("a credencial só troca em RAM e só reconecta depois de gravada e relida n
   assert.match(restaurar, /else if \(preferences\.isKey\(chave\)\) preferences\.remove\(chave\);/, "sem valor anterior, a chave é removida em vez de ficar vazia");
 });
 
-test("o firmware não carrega comentários de código", () => {
+test("the firmware carries no code comments", () => {
   assert.doesNotMatch(ino, /^\s*\/\//m);
   assert.doesNotMatch(ino, /\/\*/);
 });

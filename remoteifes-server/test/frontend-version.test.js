@@ -6,7 +6,7 @@ const path = require("path");
 const WEB_ROOT = path.join(__dirname, "..", "..", "remoteifes-web");
 const version = JSON.parse(fs.readFileSync(path.join(WEB_ROOT, "version.json"), "utf8")).version;
 
-test("a versão do frontend é única em HTML, JavaScript, manifesto e service worker", () => {
+test("the frontend version is unique across HTML, JavaScript, manifest and service worker", () => {
   const index = fs.readFileSync(path.join(WEB_ROOT, "index.html"), "utf8");
   const manifest = fs.readFileSync(path.join(WEB_ROOT, "manifest.webmanifest"), "utf8");
   const versionJs = fs.readFileSync(path.join(WEB_ROOT, "js", "version.js"), "utf8");
@@ -21,7 +21,7 @@ test("a versão do frontend é única em HTML, JavaScript, manifesto e service w
   JSON.parse(manifest).icons.forEach((icone) => assert.equal(new URL(icone.src, "https://remoteifes.invalid/").searchParams.get("v"), version, icone.src));
 });
 
-test("o shell do service worker cobre exatamente os arquivos que o index.html carrega", () => {
+test("the service worker shell covers exactly the files index.html loads", () => {
   const worker = fs.readFileSync(path.join(WEB_ROOT, "sw.js"), "utf8");
   const index = fs.readFileSync(path.join(WEB_ROOT, "index.html"), "utf8");
   const lista = worker.match(/const VERSIONED_SHELL = \[([\s\S]*?)\];/);

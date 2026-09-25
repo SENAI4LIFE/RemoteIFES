@@ -13,7 +13,7 @@ test.afterEach(async ({ request }) => {
   await definirAutoLigar(request, true);
 });
 
-test("Auto-ON vem ativado por padrão na configuração global e o usuário não precisa configurar nada", async ({ page, context, request }) => {
+test("Auto-ON is enabled by default in the global configuration and the user does not need to configure anything", async ({ page, context, request }) => {
   await definirAutoLigar(request, true);
   await injetarSessao(context, "superadmin");
   await page.goto("/#/admin/config");
@@ -22,7 +22,7 @@ test("Auto-ON vem ativado por padrão na configuração global e o usuário não
   await expect(page.locator("#cfgCriticoCard")).toContainText("Auto-ON");
 });
 
-test("com Auto-ON, ajustar a temperatura ou o Turbo de um aparelho desligado o liga", async ({ page, sessaoComo }) => {
+test("with Auto-ON, adjusting the temperature or Turbo of an appliance that is off turns it on", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, SALA_ONLINE);
   await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
@@ -49,7 +49,7 @@ test("com Auto-ON, ajustar a temperatura ou o Turbo de um aparelho desligado o l
   await expect(page.locator("#btnTurbo")).not.toHaveClass(/is-on/);
 });
 
-test("com Auto-ON desativado pelo superadministrador, o painel reflete a opção: temperatura não liga e Turbo exige aparelho ligado", async ({ page, context, request }) => {
+test("with Auto-ON disabled by the superadministrator, the panel reflects the option: temperature does not turn on and Turbo requires the appliance on", async ({ page, context, request }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/admin/config");
   await expect(page.locator("#adminSub-config")).toBeVisible({ timeout: 20_000 });
