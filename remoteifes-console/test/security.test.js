@@ -12,7 +12,7 @@ test("the password is stored with scrypt and checked in constant time", (t) => {
 
   const hash = amb.auth.hashDeSenha("uma-senha-longa-o-bastante");
   assert.match(hash, /^scrypt\$\d+\$\d+\$\d+\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+$/);
-  assert.ok(!hash.includes("uma-senha-longa"), "o hash não pode conter a senha");
+  assert.ok(!hash.includes("uma-senha-longa"), "the hash must not contain the password");
   assert.equal(amb.auth.conferirSenha("uma-senha-longa-o-bastante", hash), true);
   assert.equal(amb.auth.conferirSenha("outra-coisa-qualquer-aqui", hash), false);
   assert.equal(amb.auth.conferirSenha("", hash), false);
@@ -26,7 +26,7 @@ test("the application's known default passwords are refused as Console credentia
   for (const proibida of ["admin", "superadmin", "SuperAdmin", "senha", "password"]) {
     assert.ok(amb.auth.validarForcaDaSenha(proibida), `deveria recusar "${proibida}"`);
   }
-  assert.ok(amb.auth.validarForcaDaSenha("curta"), "senha curta deve ser recusada");
+  assert.ok(amb.auth.validarForcaDaSenha("curta"), "a short password must be refused");
   assert.equal(amb.auth.validarForcaDaSenha("uma-senha-aceitavel-123"), null);
 });
 
@@ -38,7 +38,7 @@ test("the operators file lives outside the checkout and without the plaintext pa
   const arquivo = path.join(amb.estadoDir, "operadores.json");
   assert.ok(fs.existsSync(arquivo));
   const conteudo = fs.readFileSync(arquivo, "utf8");
-  assert.ok(!conteudo.includes("senha-de-teste-12345"), "a senha em claro não pode ir para o disco");
+  assert.ok(!conteudo.includes("senha-de-teste-12345"), "the plaintext password must not go to disk");
   assert.ok(!path.resolve(arquivo).startsWith(path.resolve(amb.checkout, "remoteifes-console")));
 });
 
@@ -57,14 +57,14 @@ test("a session expires on idle and at the absolute deadline", (t) => {
   dados.sessoes[id].vistaEm = Date.now() - 61_000;
   fs.writeFileSync(arquivo, JSON.stringify(dados));
   amb.auth.limparTudoParaTeste();
-  assert.equal(amb.auth.validarSessao(token), null, "sessão ociosa deve ser invalidada");
+  assert.equal(amb.auth.validarSessao(token), null, "an idle session must be invalidated");
 
   const { token: t2 } = amb.auth.criarSessao("operador");
   const dados2 = JSON.parse(fs.readFileSync(arquivo, "utf8"));
   for (const chave of Object.keys(dados2.sessoes)) dados2.sessoes[chave].expiraEm = Date.now() - 1000;
   fs.writeFileSync(arquivo, JSON.stringify(dados2));
   amb.auth.limparTudoParaTeste();
-  assert.equal(amb.auth.validarSessao(t2), null, "sessão vencida deve ser invalidada");
+  assert.equal(amb.auth.validarSessao(t2), null, "an expired session must be invalidated");
 });
 
 test("changing the password revokes the operator's other sessions", (t) => {
@@ -103,7 +103,7 @@ test("elevation expires by itself and is revoked on logout", (t) => {
   const dados = JSON.parse(fs.readFileSync(arquivo, "utf8"));
   for (const chave of Object.keys(dados.sessoes)) dados.sessoes[chave].elevadaAte = Date.now() - 1;
   fs.writeFileSync(arquivo, JSON.stringify(dados));
-  assert.equal(amb.auth.validarSessao(token).elevada, false, "elevação vencida não vale mais");
+  assert.equal(amb.auth.validarSessao(token).elevada, false, "expired elevation is no longer valid");
 });
 
 test("repeated login attempts are limited per operator", (t) => {
@@ -113,7 +113,7 @@ test("repeated login attempts are limited per operator", (t) => {
   const chave = "login:alvo";
   assert.equal(amb.auth.bloqueado(chave), 0);
   for (let i = 0; i < 8; i += 1) amb.auth.registrarFalha(chave);
-  assert.ok(amb.auth.bloqueado(chave) > 0, "deve bloquear após as tentativas");
+  assert.ok(amb.auth.bloqueado(chave) > 0, "must block after the attempts");
   amb.auth.limparTentativas(chave);
   assert.equal(amb.auth.bloqueado(chave), 0);
 });
@@ -202,10 +202,10 @@ test("the session cookie is HttpOnly, SameSite=Strict and cleared on logout", as
     origem: s.base,
   });
   assert.match(saida.cabecalhos["set-cookie"][0], /Max-Age=0/);
-  assert.ok(saida.cabecalhos["clear-site-data"], "logout deve pedir limpeza de armazenamento da origem");
+  assert.ok(saida.cabecalhos["clear-site-data"], "logout must ask to clear the origin's storage");
 
   const depois = await ajuda.pedir(s.porta, "/api/painel", { cookie: sessao.cookie, origem: s.base });
-  assert.equal(depois.status, 401, "o cookie revogado não pode mais valer");
+  assert.equal(depois.status, 401, "the revoked cookie must no longer be valid");
 });
 
 test("an unexpected content-type in a POST is refused", async (t) => {
@@ -255,7 +255,7 @@ test("a privileged route without a session answers 401 and does not leak state",
 
   for (const rota of ["/api/painel", "/api/host", "/api/backups", "/api/logs", "/api/auditoria", "/api/acoes", "/api/trabalhos", "/api/terminal"]) {
     const r = await ajuda.pedir(s.porta, rota);
-    assert.equal(r.status, 401, `${rota} deveria exigir sessão`);
+    assert.equal(r.status, 401, `${rota} should require a session`);
     assert.equal(r.json.erro, "não autenticado");
   }
 });
@@ -303,7 +303,7 @@ test("bootstrap requires the installation secret and works only once", async (t)
     origem: s.base,
   });
   assert.equal(certo.status, 201);
-  assert.ok(!fs.existsSync(path.join(amb.estadoDir, "bootstrap-token")), "o segredo é consumido");
+  assert.ok(!fs.existsSync(path.join(amb.estadoDir, "bootstrap-token")), "the secret is consumed");
 
   const denovo = await ajuda.pedir(s.porta, "/api/bootstrap", {
     metodo: "POST",
@@ -340,7 +340,7 @@ test("the GitHub token never returns through the API", async (t) => {
   const sessao = await ajuda.autenticar(amb, s.porta);
   const r = await ajuda.pedir(s.porta, "/api/mobile", { cookie: sessao.cookie, origem: s.base });
   assert.equal(r.status, 200);
-  assert.ok(!r.texto.includes("ghp_umtokenfalsoparateste1234567890"), "o valor do token não pode sair pela API");
+  assert.ok(!r.texto.includes("ghp_umtokenfalsoparateste1234567890"), "the token value must not leave through the API");
   assert.equal(r.json.credencialGitHub.presente, true);
   assert.equal(r.json.credencialGitHub.githubToken, undefined);
 });
@@ -355,8 +355,8 @@ test("Console files are not served outside the web folder", async (t) => {
 
   for (const tentativa of ["/../package.json", "/..%2fpackage.json", "/../../remoteifes-server/.env", "/src/auth.js"]) {
     const r = await ajuda.pedir(s.porta, tentativa);
-    assert.ok(r.status === 404 || r.status === 400, `${tentativa} não deveria ser servido (status ${r.status})`);
-    assert.ok(!r.texto.includes("scrypt$"), "nenhum conteúdo sensível pode vazar");
+    assert.ok(r.status === 404 || r.status === 400, `${tentativa} should not be served (status ${r.status})`);
+    assert.ok(!r.texto.includes("scrypt$"), "no sensitive content may leak");
   }
   const ok = await ajuda.pedir(s.porta, "/");
   assert.equal(ok.status, 200);

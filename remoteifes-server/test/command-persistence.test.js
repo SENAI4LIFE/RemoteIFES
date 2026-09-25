@@ -44,7 +44,7 @@ test("a failure writing the command record rolls back the state mutation and sen
 
   const restaurar = simularFalhaNoLog(t);
   assert.throws(() => salas.aplicarComando("ATOM-1", "temperatura", 25, contexto), /disco cheio/);
-  assert.deepEqual(estado("ATOM-1"), antes, "ligado/temperaturaAlvo não podem mudar sem o registro do comando");
+  assert.deepEqual(estado("ATOM-1"), antes, "ligado/temperaturaAlvo must not change without the command record");
   assert.deepEqual(logs("ATOM-1"), []);
   assert.equal(enviados.length, 0);
   assert.equal(mudancas, 0);

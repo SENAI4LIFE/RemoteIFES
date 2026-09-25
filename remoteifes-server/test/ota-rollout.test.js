@@ -207,13 +207,13 @@ test("preflight separates eligible from ineligible devices and picks the canary 
   const { status, corpo } = await iniciarRollout({ salas: ["rol-pf-atualizado", "rol-pf-novo", "rol-pf-apto"] });
   assert.equal(status, 200);
   const rollout = corpo.rollout;
-  assert.equal(dispositivoDoRollout(rollout, "rol-pf-apto").lote, 0, "o canário é o primeiro dispositivo apto");
+  assert.equal(dispositivoDoRollout(rollout, "rol-pf-apto").lote, 0, "the canary is the first eligible device");
   assert.equal(dispositivoDoRollout(rollout, "rol-pf-atualizado").estado, "ignorado");
   assert.match(dispositivoDoRollout(rollout, "rol-pf-atualizado").motivo, /versão publicada/);
   assert.equal(dispositivoDoRollout(rollout, "rol-pf-novo").estado, "ignorado");
   assert.match(dispositivoDoRollout(rollout, "rol-pf-novo").motivo, /downgrade/);
-  assert.equal(atualizado.ofertas().length, 0, "dispositivo já atualizado não pode receber oferta");
-  assert.equal(novo.ofertas().length, 0, "dispositivo com versão maior não pode receber oferta");
+  assert.equal(atualizado.ofertas().length, 0, "an already updated device must not receive an offer");
+  assert.equal(novo.ofertas().length, 0, "a device with a higher version must not receive an offer");
   assert.equal(apto.ofertas().length, 1);
 
   await gravarEValidar(apto);
@@ -240,7 +240,7 @@ test("a validated canary releases batches, respects the concurrency limit and co
   assert.equal(corpo.rollout.estado, "canario");
   assert.deepEqual(corpo.rollout.dispositivos.map((d) => d.lote), [0, 1, 1, 2, 2]);
 
-  assert.equal(dispositivos[0].ofertas().length, 1, "só o canário recebe oferta na primeira etapa");
+  assert.equal(dispositivos[0].ofertas().length, 1, "only the canary receives an offer in the first stage");
   assert.equal(dispositivos.slice(1).reduce((n, d) => n + d.ofertas().length, 0), 0);
 
   let maximoSimultaneo = 0;
@@ -255,7 +255,7 @@ test("a validated canary releases batches, respects the concurrency limit and co
   await gravarEValidar(dispositivos[0]);
   await ateRollout((r) => r.loteAtual === 1, "lote 1 iniciado");
   await ateEstadoDoDispositivo("rol-ok-3", "atualizando");
-  assert.equal(dispositivos[3].ofertas().length, 0, "o lote 2 não começa antes do lote 1 terminar");
+  assert.equal(dispositivos[3].ofertas().length, 0, "batch 2 does not start before batch 1 finishes");
 
   await gravarEValidar(dispositivos[1]);
   await gravarEValidar(dispositivos[2]);
@@ -267,9 +267,9 @@ test("a validated canary releases batches, respects the concurrency limit and co
   deviceHub.eventos.off("ota-rollout", observador);
   assert.ok(fim.dispositivos.every((d) => d.estado === "validado"), JSON.stringify(fim.dispositivos));
   assert.equal(fim.motivoParada, null);
-  assert.ok(maximoSimultaneo <= otaService.MAX_SIMULTANEOS, `houve ${maximoSimultaneo} atualizações simultâneas`);
+  assert.ok(maximoSimultaneo <= otaService.MAX_SIMULTANEOS, `there were ${maximoSimultaneo} concurrent updates`);
   dispositivos.forEach((d) => assert.equal(d.ofertas().length, 1, `${d.sala} recebeu ${d.ofertas().length} ofertas`));
-  assert.equal(fora.ofertas().length, 0, "dispositivo fora da seleção não pode receber oferta");
+  assert.equal(fora.ofertas().length, 0, "a device outside the selection must not receive an offer");
 
   for (const d of dispositivos) await fechar(d);
   await fechar(fora);
@@ -318,7 +318,7 @@ test("a connection drop during transfer fails the device and stops the batch", a
   const fim = await ateRollout((r) => r.estado === "interrompido", "distribuição interrompida");
   assert.equal(dispositivoDoRollout(fim, "rol-tr-2").estado, "falhou");
   assert.match(dispositivoDoRollout(fim, "rol-tr-2").motivo, /conexão/);
-  assert.equal(dispositivoDoRollout(fim, "rol-tr-3").estado, "validado", "falha parcial não invalida quem terminou bem");
+  assert.equal(dispositivoDoRollout(fim, "rol-tr-3").estado, "validado", "a partial failure does not invalidate devices that finished well");
   assert.match(fim.motivoParada, /lote 1/);
 
   await fechar(dispositivos[0]);
@@ -388,12 +388,12 @@ test("pausing does not abort devices updating and resuming continues with the ne
   await ateEstadoDoDispositivo("rol-pa-1", "atualizando");
   const pausa = await authFetch("/admin/esp32/rollout/pausar", tokenSuper, { method: "POST" });
   assert.equal(pausa.status, 200);
-  assert.equal(otaRolloutService.atual().estado, "canario", "a pausa não derruba a atualização em andamento");
+  assert.equal(otaRolloutService.atual().estado, "canario", "pausing does not abort the update in progress");
 
   await gravarEValidar(dispositivos[0]);
   const pausado = await ateRollout((r) => r.estado === "pausado", "distribuição pausada");
   assert.equal(dispositivoDoRollout(pausado, "rol-pa-1").estado, "validado");
-  assert.equal(dispositivos[1].ofertas().length, 0, "nenhum dispositivo novo começa durante a pausa");
+  assert.equal(dispositivos[1].ofertas().length, 0, "no new device starts during the pause");
 
   const retomada = await authFetch("/admin/esp32/rollout/retomar", tokenSuper, { method: "POST" });
   assert.equal(retomada.status, 200);
@@ -403,7 +403,7 @@ test("pausing does not abort devices updating and resuming continues with the ne
   assert.equal(
     (await authFetch("/admin/esp32/rollout/retomar", tokenSuper, { method: "POST" })).status,
     200,
-    "retomar desfaz uma pausa ainda pendente, sem esperar o dispositivo em andamento"
+    "resuming undoes a still pending pause, without waiting for the device in progress"
   );
   assert.equal(otaRolloutService.atual().pausaSolicitada, false);
   await gravarEValidar(dispositivos[1]);
@@ -425,7 +425,7 @@ test("pausing when nothing is pending does not prevent completion", async () => 
   await gravarEValidar(canario);
   const fim = await ateRollout((r) => r.estado === "concluido", "distribuição concluída");
   assert.equal(dispositivoDoRollout(fim, "rol-pf2-1").estado, "validado");
-  assert.equal(otaRolloutService.ativo(), false, "uma pausa sem trabalho restante não pode deixar a distribuição presa");
+  assert.equal(otaRolloutService.ativo(), false, "a pause with no remaining work must not leave the rollout stuck");
 
   await fechar(canario);
 });
@@ -444,7 +444,7 @@ test("cancelling ends only work not yet started", async () => {
   const cancelamento = await authFetch("/admin/esp32/rollout/cancelar", tokenSuper, { method: "POST" });
   assert.equal(cancelamento.status, 200);
   const durante = otaRolloutService.atual();
-  assert.equal(dispositivoDoRollout(durante, "rol-ca-1").estado, "atualizando", "o cancelamento não interrompe uma gravação em curso");
+  assert.equal(dispositivoDoRollout(durante, "rol-ca-1").estado, "atualizando", "cancellation does not interrupt a write in progress");
   assert.equal(dispositivoDoRollout(durante, "rol-ca-2").estado, "cancelado");
   assert.equal(dispositivoDoRollout(durante, "rol-ca-3").estado, "cancelado");
 
@@ -501,7 +501,7 @@ test("duplicate or late OTA events do not change an already finished device", as
   canario.ws.send(JSON.stringify({ tipo: "ota_resultado", resultado: "erro", erro: "evento atrasado" }));
   await reportarVersao(canario, "4.0.0");
 
-  assert.equal(JSON.stringify(otaRolloutService.atual()), instantaneo, "a distribuição encerrada não pode ser reaberta por eventos atrasados");
+  assert.equal(JSON.stringify(otaRolloutService.atual()), instantaneo, "a finished rollout cannot be reopened by late events");
   assert.equal(otaService.estadoDaSala("rol-dup-1").fase, "concluido");
   assert.equal(canario.ofertas().length, 1);
 
@@ -544,7 +544,7 @@ test("a server restart reconciles progress without re-offering the firmware", as
   const filho = spawnSync(process.execPath, ["-e", script], { encoding: "utf8" });
   assert.equal(filho.status, 0, filho.stderr || filho.stdout);
 
-  assert.equal(canario.ofertas().length, 1, "o reinício não pode reenviar a oferta para quem já gravou");
+  assert.equal(canario.ofertas().length, 1, "the restart must not resend the offer to devices that already flashed");
   assert.equal(seguinte.ofertas().length, 0);
 
   await reportarVersao(canario, VERSAO_PUBLICADA);
@@ -597,7 +597,7 @@ test("only the superadministrator controls the rollout", async () => {
   for (const caminho of ["", "/pausar", "/retomar", "/cancelar"]) {
     assert.equal((await fetch(`${baseUrl}/admin/esp32/rollout${caminho}`, { method: "POST" })).status, 401);
   }
-  assert.equal(otaRolloutService.ativo(), false, "tentativa não autorizada não pode criar distribuição");
+  assert.equal(otaRolloutService.ativo(), false, "an unauthorized attempt must not create a rollout");
 });
 
 test("an invalid selection and a repeated start are refused", async () => {
@@ -617,7 +617,7 @@ test("an invalid selection and a repeated start are refused", async () => {
 
   const concorrentes = await Promise.all([iniciarRollout({ salas: ["rol-val-1"] }), iniciarRollout({ salas: ["rol-val-1"] })]);
   assert.deepEqual(concorrentes.map(r => r.status).sort(), [200, 409]);
-  assert.equal(canario.ofertas().length, 1, "o pedido repetido não gera uma segunda oferta");
+  assert.equal(canario.ofertas().length, 1, "the repeated request does not produce a second offer");
 
   await gravarEValidar(canario);
   await ateRollout((r) => r.estado === "concluido", "distribuição concluída");
@@ -631,10 +631,10 @@ test("standalone OTA keeps working independently", async () => {
   const resp = await authFetch("/admin/esp32/rol-avulsa-1/ota", tokenSuper, { method: "POST" });
   assert.equal(resp.status, 200);
   assert.equal(dispositivo.ofertas().length, 1);
-  assert.equal(otaRolloutService.ativo(), false, "a OTA avulsa não cria distribuição");
+  assert.equal(otaRolloutService.ativo(), false, "standalone OTA does not create a rollout");
 
   const emRollout = await iniciarRollout({ salas: ["rol-avulsa-1"] });
-  assert.equal(emRollout.status, 409, "a sala já em OTA avulsa não vira canário");
+  assert.equal(emRollout.status, 409, "a room already in standalone OTA does not become the canary");
 
   await gravarEValidar(dispositivo);
   assert.equal(otaService.estadoDaSala("rol-avulsa-1").fase, "concluido");

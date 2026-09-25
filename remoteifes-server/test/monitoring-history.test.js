@@ -91,7 +91,7 @@ test("amostrar() writes a row with gauges and converts cumulative counters into 
 
   monitoramentoService.amostrar();
   const segunda = db.prepare("SELECT * FROM monitoramento_amostras ORDER BY id DESC LIMIT 1").get();
-  assert.equal(segunda.telemetriaFalhas, 0, "sem novas falhas o delta do intervalo é zero, não o acumulado");
+  assert.equal(segunda.telemetriaFalhas, 0, "without new failures the interval delta is zero, not the cumulative value");
   assert.equal(segunda.schedulerFalhas, 0);
 
   monitoramentoService.registrar("telemetriaFalha", { sala: "H-2" });
@@ -128,8 +128,8 @@ test("hourly consolidation summarizes samples (mean, peak, minimum, sums) and ke
   assert.ok(cheia.discoLivreBytesMin <= cheia.discoLivreBytes);
   assert.equal(soma(horas.map((h) => h.telemetriaFalhas)) + soma(db.prepare("SELECT telemetriaFalhas FROM monitoramento_amostras WHERE criadoEm >= strftime('%Y-%m-%d %H:00:00', 'now')").all().map((l) => l.telemetriaFalhas)), 6);
   const horaAtual = db.prepare("SELECT strftime('%Y-%m-%d %H:00:00', 'now') h").get().h;
-  assert.equal(horas.some((h) => h.hora >= horaAtual), false, "a hora corrente nunca é fechada");
-  assert.equal(monitoramentoService.consolidarHoras(), 0, "segunda chamada não reconsolida");
+  assert.equal(horas.some((h) => h.hora >= horaAtual), false, "the current hour is never closed");
+  assert.equal(monitoramentoService.consolidarHoras(), 0, "a second call does not reconsolidate");
 });
 
 test("retention consolidates before deleting, removes old raw samples and hours beyond 30 days", () => {
@@ -143,10 +143,10 @@ test("retention consolidates before deleting, removes old raw samples and hours 
   db.prepare("INSERT INTO monitoramento_horas (hora, amostras, rssMB) VALUES (datetime('now', '-10 days'), 60, 50)").run();
 
   const resumo = retencaoService.executarLimpezaRetencao();
-  assert.equal(resumo.monitoramento_amostras, 30, "as amostras com mais de 48 h saem");
+  assert.equal(resumo.monitoramento_amostras, 30, "samples older than 48 h are removed");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM monitoramento_amostras").get().n, 1);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM monitoramento_horas WHERE hora < datetime('now', '-30 days')").get().n, 0);
-  assert.ok(db.prepare("SELECT COUNT(*) n FROM monitoramento_horas WHERE hora >= datetime('now', '-61 hours') AND hora <= datetime('now', '-59 hours')").get().n >= 1, "a hora antiga foi consolidada antes de as amostras cruas serem apagadas");
+  assert.ok(db.prepare("SELECT COUNT(*) n FROM monitoramento_horas WHERE hora >= datetime('now', '-61 hours') AND hora <= datetime('now', '-59 hours')").get().n >= 1, "the old hour was consolidated before the raw samples were deleted");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM monitoramento_horas WHERE hora >= datetime('now', '-11 days') AND hora <= datetime('now', '-9 days')").get().n, 1);
 });
 
@@ -159,7 +159,7 @@ test("history row limits apply to both tables", () => {
   assert.equal(resumo.monitoramento_horas_excedente, 25);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM monitoramento_horas").get().n, limiteHoras);
   const maisRecente = db.prepare("SELECT MAX(hora) h FROM monitoramento_horas").get().h;
-  assert.ok(maisRecente >= minutosAtras(61), "as horas mais recentes são preservadas");
+  assert.ok(maisRecente >= minutosAtras(61), "the most recent hours are preserved");
 });
 
 test("historico() aggregates on a complete grid, leaves nulls where there is no sample and sums counts per period", () => {
@@ -195,7 +195,7 @@ test("historico() aggregates on a complete grid, leaves nulls where there is no 
   const vazios = h.t.map((_, i) => i).filter((i) => h.n[i] === 0);
   assert.ok(vazios.length > 50);
   for (const i of vazios) {
-    assert.equal(h.medidas.rssMB[i], null, "bucket sem amostra não interpola gauge");
+    assert.equal(h.medidas.rssMB[i], null, "a bucket without samples does not interpolate a gauge");
     assert.equal(h.contagens.credencialFalhas[i], 0);
   }
   const cheios = h.t.map((_, i) => i).filter((i) => h.n[i] > 0);
@@ -213,7 +213,7 @@ test("historico() aggregates on a complete grid, leaves nulls where there is no 
   assert.equal(soma(h.contagens.otaFalhas), 1);
   assert.equal(soma(h.contagens.otaOk), 1);
   assert.equal(h.cobertura.amostras, 90);
-  assert.equal(h.cobertura.completa, false, "histórico parcial: a primeira amostra é posterior ao início da janela");
+  assert.equal(h.cobertura.completa, false, "partial history: the first sample is later than the window start");
   assert.ok(h.cobertura.desde);
   assert.deepEqual(h.faixas.map((f) => f.id), ["3h", "24h", "7d", "30d"]);
   assert.equal(h.amostragemSegundos, 60);
@@ -237,8 +237,8 @@ test("long ranges combine consolidated hours with the current raw hour and never
   assert.ok(h7.medidas.rssMB.slice(0, -1).filter((v) => v !== null).every((v) => v === 80));
   assert.equal(soma(h7.contagens.telemetriaFalhas), 6 + 3);
   assert.equal(h7.reinicios.length, 2);
-  assert.equal(h7.reinicios[0].exato, false, "reinício de hora consolidada é aproximado à hora");
-  assert.equal(h7.reinicios[1].exato, true, "reinício da hora corrente tem instante exato");
+  assert.equal(h7.reinicios[0].exato, false, "a restart in a consolidated hour is approximated to the hour");
+  assert.equal(h7.reinicios[1].exato, true, "a restart in the current hour has the exact instant");
   assert.equal(h7.cobertura.completa, true);
 
   const h30 = monitoramentoService.historico("30d");
@@ -259,7 +259,7 @@ test("long ranges combine consolidated hours with the current raw hour and never
   assert.ok(Date.now() - t0 < 1500, "consultas longas continuam baratas");
   for (const faixa of ["3h", "24h", "7d", "30d"]) {
     monitoramentoService.limparCacheHistorico();
-    assert.ok(monitoramentoService.historico(faixa).t.length <= 200, `${faixa} envia no máximo 200 pontos`);
+    assert.ok(monitoramentoService.historico(faixa).t.length <= 200, `${faixa} sends at most 200 points`);
   }
 });
 
@@ -321,7 +321,7 @@ test("GET /admin/monitoramento stays compatible and gains OTA composition and op
   assert.equal(typeof m.servico.memoriaRssMB, "number");
   assert.equal(typeof m.servico.cargaMedia1min, "number");
   assert.ok(m.servico.nucleos >= 1);
-  assert.equal(m.servico.pm2, null, "sem PM2 o campo é nulo, nunca inventado");
+  assert.equal(m.servico.pm2, null, "without PM2 the field is null, never invented");
   assert.deepEqual(Object.keys(m.esp32.otaPorFase), ["ofertado", "baixando", "gravado", "reiniciando", "validando", "concluido", "falhou"]);
   assert.equal(typeof m.esp32.otaComFalha, "number");
   assert.ok(m.banco.tabelas.monitoramento_amostras);

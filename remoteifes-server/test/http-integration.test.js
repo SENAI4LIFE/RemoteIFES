@@ -63,7 +63,7 @@ test("finding #15: only the superadministrator can change a room's restricted ac
 
   const salaResp = await authFetch("/admin/salas", tokenSuperAdmin);
   const salas = await salaResp.json();
-  assert.ok(Array.isArray(salas) && salas.length > 0, "deve haver ao menos uma sala cadastrada");
+  assert.ok(Array.isArray(salas) && salas.length > 0, "there must be at least one registered room");
   const sala = salas[0].sala;
 
   const tentativaAdmin = await authFetch(`/admin/salas/${encodeURIComponent(sala)}/acesso-restrito`, tokenAdmin, {
@@ -71,14 +71,14 @@ test("finding #15: only the superadministrator can change a room's restricted ac
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ restrito: true }),
   });
-  assert.equal(tentativaAdmin.status, 403, "um admin comum não pode alterar o acesso restrito de uma sala");
+  assert.equal(tentativaAdmin.status, 403, "a regular admin cannot change a room's restricted access");
 
   const tentativaSuperAdmin = await authFetch(`/admin/salas/${encodeURIComponent(sala)}/acesso-restrito`, tokenSuperAdmin, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ restrito: true }),
   });
-  assert.equal(tentativaSuperAdmin.status, 200, "o superadministrador pode alterar o acesso restrito de uma sala");
+  assert.equal(tentativaSuperAdmin.status, 200, "the superadministrator can change a room's restricted access");
 
   await authFetch(`/admin/salas/${encodeURIComponent(sala)}/acesso-restrito`, tokenSuperAdmin, {
     method: "PATCH",
@@ -134,7 +134,7 @@ test("device identification depends on the MAC binding and rejects a mismatched 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mac: macLegitimo }),
   });
-  assert.equal(cadastro.status, 200, "o superadministrador deve conseguir cadastrar o MAC do ESP32 da sala");
+  assert.equal(cadastro.status, 200, "the superadministrator must be able to register the room's ESP32 MAC");
 
   const identificacaoVinculada = await fetch(`${baseUrl}/dispositivo/identificar`, {
     method: "POST",
@@ -149,14 +149,14 @@ test("device identification depends on the MAC binding and rejects a mismatched 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sala, ligado: false, mac: macLegitimo }),
   });
-  assert.equal(heartbeatComMacCorreto.status, 200, "o MAC cadastrado deve continuar autenticando normalmente");
+  assert.equal(heartbeatComMacCorreto.status, 200, "the registered MAC must keep authenticating normally");
 
   const heartbeatComMacForjado = await fetch(`${baseUrl}/dispositivo/heartbeat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sala, ligado: false, mac: macForjado }),
   });
-  assert.equal(heartbeatComMacForjado.status, 403, "um MAC diferente do cadastrado para a sala deve ser rejeitado");
+  assert.equal(heartbeatComMacForjado.status, 403, "a MAC different from the room's registered one must be rejected");
 
   const comandoComMacForjado = await fetch(`${baseUrl}/dispositivo/comando`, {
     method: "POST",

@@ -67,7 +67,7 @@ test("rotation keeps N backups and never removes the one just created", () => {
   assert.equal(restantes.length, 3);
   assert.ok(
     restantes.some((b) => b.arquivo === ultimo.arquivo),
-    "o backup recém-criado não pode ter sido apagado pela rotação"
+    "the backup just created must not have been deleted by rotation"
   );
   assert.ok(restantes.every((b) => /^remoteifes-\d{8}-\d{6}-[0-9a-f]{6}-r\d\.db$/.test(b.nome)), restantes.map((b) => b.nome).join(", "));
 });

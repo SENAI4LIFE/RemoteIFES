@@ -68,7 +68,7 @@ test("a removed schedule leaves the list immediately, without depending on a new
   await expect(page.locator("#agendaList li")).toHaveCount(1, { timeout: 2000 });
   await expect(page.locator("#agendaList")).toContainText("08:00–09:00");
   await expect(page.locator("#agendaList")).not.toContainText("14:00–15:00");
-  expect(listagens, "a remoção não dispara uma releitura da lista inteira").toBe(0);
+  expect(listagens, "removal does not trigger a re-read of the whole list").toBe(0);
   expect(await agendamentosNoServidor(request)).toHaveLength(1);
 });
 
@@ -99,7 +99,7 @@ test("a read issued before the removal does not bring the deleted schedule back"
   await expect(page.locator("#agendaList li")).toHaveCount(1);
   await expect(page.locator("#agendaList")).not.toContainText("14:00–15:00");
   await expect(page.locator("#agendaList .agenda-toggle")).toHaveText("ativar");
-  expect(await agendamentosNoServidor(request), "servidor e tela concordam sobre o que sobrou").toHaveLength(1);
+  expect(await agendamentosNoServidor(request), "server and screen agree on what remained").toHaveLength(1);
 });
 
 test("a schedule stays in the list when the server fails the removal", async ({ page, context, request }) => {

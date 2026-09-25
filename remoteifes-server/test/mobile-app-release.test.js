@@ -68,7 +68,7 @@ test.before(async () => {
     body: JSON.stringify({ usuario: "superadmin", senha: "admin" }),
   });
   token = (await resp.json()).token;
-  assert.ok(token, "não foi possível autenticar para os testes de release");
+  assert.ok(token, "could not authenticate for the release tests");
 });
 
 test.after(async () => {

@@ -3,7 +3,7 @@ const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal, irParaSala
 async function dentroDaViewport(locator) {
   const box = await locator.boundingBox();
   const vp = locator.page().viewportSize();
-  expect(box, "elemento deve ter caixa visível").not.toBeNull();
+  expect(box, "the element must have a visible box").not.toBeNull();
   expect(box.x).toBeGreaterThanOrEqual(-1);
   expect(box.y).toBeGreaterThanOrEqual(-1);
   expect(box.x + box.width).toBeLessThanOrEqual(vp.width + 1);
@@ -21,14 +21,14 @@ async function abrirComoUsuario(page, context, tamanho) {
 for (const [nome, tamanho] of Object.entries(VIEWPORTS)) {
   test(`layout ${nome} (${tamanho.width}x${tamanho.height}): no horizontal scroll and accessible controls`, async ({ page, context }) => {
     await abrirComoUsuario(page, context, tamanho);
-    expect(await semRolagemHorizontal(page), "tela de salas sem rolagem horizontal").toBe(true);
+    expect(await semRolagemHorizontal(page), "rooms screen without horizontal scroll").toBe(true);
 
     const abaSalas = page.locator('.tab-btn[data-tab="salas"]');
     await expect(abaSalas).toBeVisible();
     await dentroDaViewport(abaSalas);
 
     await irParaSala(page, "A-108");
-    expect(await semRolagemHorizontal(page), "painel sem rolagem horizontal").toBe(true);
+    expect(await semRolagemHorizontal(page), "panel without horizontal scroll").toBe(true);
 
     for (const sel of ["#btnPower", "#tempUp", "#tempDown"]) {
       const ctrl = page.locator(sel);
@@ -50,7 +50,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
     await expect(page.locator("#adminSub-macs")).toBeVisible({ timeout: 20_000 });
     await expect(page.locator("#macsFpInner .room.selectable").first()).toBeVisible({ timeout: 10_000 });
 
-    expect(await semRolagemHorizontal(page), "página sem rolagem horizontal").toBe(true);
+    expect(await semRolagemHorizontal(page), "page without horizontal scroll").toBe(true);
 
     // Opening Administration animates the column (#app) width; the plan follows the wrapper through
     // ResizeObserver, delivered only on the next frame. Measure after the animation ends and a
@@ -85,9 +85,9 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
     });
     expect(medida, "planta baixa renderizada").not.toBeNull();
     expect(medida.vazaDireita <= 1 || medida.rolavel, `planta cabe ou rola (${JSON.stringify(medida)})`).toBe(true);
-    expect(medida.fimAlcancavel, `o fim da planta é alcançável rolando o invólucro (${JSON.stringify(medida)})`).toBe(true);
-    expect(medida.involucroVazaDireita, `o invólucro da planta cabe no seletor (${JSON.stringify(medida)})`).toBeLessThanOrEqual(1);
-    expect(medida.seletorEscondeConteudo, `nada fica escondido além da borda do seletor (${JSON.stringify(medida)})`).toBe(false);
+    expect(medida.fimAlcancavel, `the end of the plan is reachable by scrolling the wrapper (${JSON.stringify(medida)})`).toBe(true);
+    expect(medida.involucroVazaDireita, `the plan wrapper fits the picker (${JSON.stringify(medida)})`).toBeLessThanOrEqual(1);
+    expect(medida.seletorEscondeConteudo, `nothing is hidden beyond the picker edge (${JSON.stringify(medida)})`).toBe(false);
   });
 }
 
@@ -100,7 +100,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
       await page.goto("/#/aplicativo");
       const baixar = page.locator(".mobile-app-download-btn");
       await expect(baixar).toBeVisible({ timeout: 20_000 });
-      expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);
+      expect(await semRolagemHorizontal(page), "app page without horizontal scroll").toBe(true);
 
       const medidas = await page.evaluate(() => {
         const vw = document.documentElement.clientWidth;
@@ -114,9 +114,9 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
           hashVaza: Math.round(Math.max(0, ...linhas.map((linha) => linha.right - limite.right))),
         };
       });
-      expect(medidas.botaoVaza, "botão de download cabe na largura").toBeLessThanOrEqual(1);
+      expect(medidas.botaoVaza, "the download button fits the width").toBeLessThanOrEqual(1);
       expect(medidas.hashLinhas, "SHA-256 renderizado").toBeGreaterThan(0);
-      expect(medidas.hashVaza, "o SHA-256 quebra dentro do cartão").toBeLessThanOrEqual(1);
+      expect(medidas.hashVaza, "the SHA-256 wraps inside the card").toBeLessThanOrEqual(1);
     } finally {
       await despublicarApkFixture(request);
     }
@@ -133,7 +133,7 @@ test("portrait -> landscape rotation preserves the screen and the controller sta
   await expect(page.locator("#screen-panel")).toBeVisible();
   await expect(page.locator("#modoValue")).toHaveText("Cool");
   await expect(page.locator("#btnPower")).toBeVisible();
-  expect(await semRolagemHorizontal(page), "paisagem sem rolagem horizontal").toBe(true);
+  expect(await semRolagemHorizontal(page), "landscape without horizontal scroll").toBe(true);
 
   await page.setViewportSize(VIEWPORTS["mobile-portrait"]);
   await expect(page.locator("#screen-panel")).toBeVisible();
@@ -172,11 +172,11 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "tablet
           tituloCortado: t.scrollWidth > t.clientWidth + 1,
         };
       }, [painel, titulo]);
-      expect(medida.painelEsquerda, `${painel} não sai pela esquerda`).toBeGreaterThanOrEqual(-1);
-      expect(medida.painelDireita, `${painel} não sai pela direita`).toBeGreaterThanOrEqual(-1);
-      expect(medida.tituloEsquerda, `título de ${painel} inteiro à esquerda`).toBeGreaterThanOrEqual(-1);
-      expect(medida.tituloDireita, `título de ${painel} inteiro à direita`).toBeGreaterThanOrEqual(-1);
-      expect(medida.tituloCortado, `título de ${painel} não truncado`).toBe(false);
+      expect(medida.painelEsquerda, `${painel} does not leave through the left`).toBeGreaterThanOrEqual(-1);
+      expect(medida.painelDireita, `${painel} does not leave through the right`).toBeGreaterThanOrEqual(-1);
+      expect(medida.tituloEsquerda, `${painel} title fully on the left`).toBeGreaterThanOrEqual(-1);
+      expect(medida.tituloDireita, `${painel} title fully on the right`).toBeGreaterThanOrEqual(-1);
+      expect(medida.tituloCortado, `${painel} title not truncated`).toBe(false);
     }
   });
 }
@@ -212,9 +212,9 @@ for (const nome of ["mobile-compact", "mobile-portrait"]) {
       };
     });
     expect(medida.barraEmDuasLinhas, "a fonte ampliada realmente alarga a barra").toBe(true);
-    expect(medida.painelAbaixoDaBarra, "o painel começa abaixo da barra real, não de uma altura fixa").toBeGreaterThanOrEqual(0);
+    expect(medida.painelAbaixoDaBarra, "the panel starts below the real bar, not at a fixed height").toBeGreaterThanOrEqual(0);
     expect(medida.painelDentroDaTela, "o painel termina dentro da tela").toBeGreaterThanOrEqual(0);
-    expect(medida.botaoRecebeToque, "o botão de relatar problema recebe o toque").toBe(true);
+    expect(medida.botaoRecebeToque, "the report-problem button receives the tap").toBe(true);
 
     await page.locator("#bugReportBtn").click();
     await expect(page.locator("#relatosPanel")).toBeVisible();

@@ -97,9 +97,9 @@ async function abrir(page, context, papel, rota, ajustes, seletor) {
 
 async function esperarContraste(page, raiz, rotulo) {
   const resultado = await page.evaluate(varrerContraste, raiz || null);
-  expect(resultado.textos, `${rotulo}: há texto para medir`).toBeGreaterThan(0);
+  expect(resultado.textos, `${rotulo}: there is text to measure`).toBeGreaterThan(0);
   const lista = resultado.achados.map((a) => `${a.razao}:1 (mín ${a.minimo}) ${a.sel} «${a.texto}» ${a.cor} sobre ${a.fundo}`).join("\n");
-  expect(resultado.achados, `${rotulo}: textos abaixo do contraste mínimo:\n${lista}`).toEqual([]);
+  expect(resultado.achados, `${rotulo}: texts below the minimum contrast:\n${lista}`).toEqual([]);
 }
 
 // Screens and states visited in both modes. `raiz` restricts the measurement to the open layer.
@@ -152,19 +152,19 @@ test("the pairs flagged in audits stay above the minimum in both modes", async (
 
   await abrir(page, context, "user", "/#/salas/lista/A/1", {}, "#roomList li");
   const offline = await medir(".status-badge.off");
-  expect(offline, "há um selo offline na lista").not.toBeNull();
+  expect(offline, "there is an offline badge in the list").not.toBeNull();
   expect(razao(offline.cor, offline.fundo), "selo offline no tema claro").toBeGreaterThanOrEqual(4.5);
 
   await page.goto("/#/salas/planta/a-terreo");
   await expect(page.locator("#fpScaleInner .corridor").first()).toBeVisible();
   const corredor = await medir("#fpScaleInner .fp-section:not(.hidden) .corridor");
-  expect(razao(corredor.cor, corredor.fundo), "rótulo CORREDOR").toBeGreaterThanOrEqual(4.5);
+  expect(razao(corredor.cor, corredor.fundo), "CORREDOR label").toBeGreaterThanOrEqual(4.5);
 
   await page.goto("/#/inicio");
   await page.locator("#bugReportBtn").click();
   await expect(page.locator("#relatosPanel")).toBeVisible();
   const fechar = await medir("#relatosPanel .relatos-fechar-btn");
-  expect(razao(fechar.cor, fechar.fundo), "botão de fechar o painel de relatos").toBeGreaterThanOrEqual(4.5);
+  expect(razao(fechar.cor, fechar.fundo), "reports panel close button").toBeGreaterThanOrEqual(4.5);
 });
 
 test("in high contrast the top bar, floor plan labels and muted badges are legible", async ({ page, context }) => {
@@ -190,11 +190,11 @@ test("in high contrast the top bar, floor plan labels and muted badges are legib
       fabA11y: par(document.getElementById("a11yToggleBtn")),
     };
   });
-  expect(medida.salaOffline, "rótulo de sala offline na planta").toBeGreaterThanOrEqual(4.5);
-  expect(medida.salaDesligada, "rótulo de sala desligada na planta").toBeGreaterThanOrEqual(4.5);
-  expect(medida.titulo, "título da barra superior").toBeGreaterThanOrEqual(4.5);
-  expect(medida.timer, "cronômetro da sessão").toBeGreaterThanOrEqual(4.5);
+  expect(medida.salaOffline, "offline room label on the floor plan").toBeGreaterThanOrEqual(4.5);
+  expect(medida.salaDesligada, "turned-off room label on the floor plan").toBeGreaterThanOrEqual(4.5);
+  expect(medida.titulo, "top bar title").toBeGreaterThanOrEqual(4.5);
+  expect(medida.timer, "session timer").toBeGreaterThanOrEqual(4.5);
   expect(medida.avatar, "iniciais do avatar").toBeGreaterThanOrEqual(4.5);
-  expect(medida.fabAjuda, "botão flutuante de ajuda").toBeGreaterThanOrEqual(4.5);
-  expect(medida.fabA11y, "botão flutuante de acessibilidade (ícone em currentColor)").toBeGreaterThanOrEqual(3);
+  expect(medida.fabAjuda, "floating help button").toBeGreaterThanOrEqual(4.5);
+  expect(medida.fabA11y, "floating accessibility button (currentColor icon)").toBeGreaterThanOrEqual(3);
 });

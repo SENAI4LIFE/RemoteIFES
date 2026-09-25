@@ -168,11 +168,11 @@ for (const [falha, responder] of Object.entries(FALHAS_TRANSITORIAS_ME)) {
     await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
     await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 10_000 });
     await page.waitForTimeout(1000);
-    expect(chamadasLogout, "nenhum logout é enviado por uma falha transitória").toEqual([]);
+    expect(chamadasLogout, "no logout is sent because of a transient failure").toEqual([]);
     expect(await page.evaluate(() => localStorage.getItem("remoteifes_token"))).toBe(token);
 
     const me = await request.get(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } });
-    expect(me.ok(), "a sessão continua válida no servidor").toBe(true);
+    expect(me.ok(), "the session stays valid on the server").toBe(true);
 
     await page.reload();
     await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
@@ -279,7 +279,7 @@ test("a half-open socket is detected on resume and reconnected", async ({ page, 
   await expect.poll(() => page.evaluate(() => window.__e2eConexoes)).toBe(1);
 
   await page.evaluate(() => window.__e2eCongelar());
-  expect(await page.evaluate(() => ServerStatus.estaConectado()), "o socket morto ainda se diz conectado").toBe(true);
+  expect(await page.evaluate(() => ServerStatus.estaConectado()), "the dead socket still reports itself as connected").toBe(true);
 
   const definirVisibilidade = (estado) => {
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => estado });

@@ -59,7 +59,7 @@ function verificar(r, bundle, raiz = autoridade.raiz) {
 }
 
 function recusada(resultado, codigo, padrao) {
-  assert.equal(resultado.ok, false, "o release precisa ser recusado");
+  assert.equal(resultado.ok, false, "the release must be refused");
   if (codigo) assert.equal(resultado.codigo, codigo, resultado.motivo);
   if (padrao) assert.match(resultado.motivo, padrao);
 }
@@ -126,7 +126,7 @@ test("the manifest's artifact names are fixed by version and target", async () =
   m.artefatos[0].arquivo = release.nomeDoPayload("1.1.0", "linux-arm64");
   assert.match(release.validarEstrutura(m).motivo, /deveria se chamar remoteifes-console-1\.1\.0-linux-x64\.tar\.gz/);
   m.artefatos[0].arquivo = release.nomeDoPayload("1.0.0", "linux-x64");
-  assert.equal(release.validarEstrutura(m).ok, false, "nem o payload de outra versão");
+  assert.equal(release.validarEstrutura(m).ok, false, "or another version's payload");
 });
 
 // --- Identity -----------------------------------------------------------------------------------
@@ -252,10 +252,10 @@ test("malformed bundles are refused before any cryptography", async () => {
 
 test("extension values are read only as exact DER UTF8Strings", () => {
   assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x03, 0x61, 0x62, 0x63])), "abc");
-  assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x03, 0x61, 0x62])), null, "valor curto");
-  assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x01, 0x61, 0x62])), null, "bytes sobrando");
-  assert.equal(atestacao.textoDer(Buffer.from([0x13, 0x01, 0x61])), null, "outro tipo de string");
-  assert.equal(atestacao.textoDer(Buffer.from("abc")), null, "valor legado cru");
+  assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x03, 0x61, 0x62])), null, "short value");
+  assert.equal(atestacao.textoDer(Buffer.from([0x0c, 0x01, 0x61, 0x62])), null, "trailing bytes");
+  assert.equal(atestacao.textoDer(Buffer.from([0x13, 0x01, 0x61])), null, "another string type");
+  assert.equal(atestacao.textoDer(Buffer.from("abc")), null, "raw legacy value");
   const longo = "x".repeat(200);
   assert.equal(atestacao.textoDer(Buffer.concat([Buffer.from([0x0c, 0x81, 200]), Buffer.from(longo)])), longo);
 });
@@ -288,12 +288,12 @@ test("without the network, the trusted root is the last verified copy, else the 
   const doCache = await atestacao.raizDeConfianca({ rede: false });
   assert.equal(doCache.origem, "cache");
   const r = novaRelease();
-  assert.equal(verificar(r, await atestada(r), doCache.raiz).ok, true, "a raiz do cache é a usada");
+  assert.equal(verificar(r, await atestada(r), doCache.raiz).ok, true, "the cached root is the one used");
 
   // A damaged cache falls back to the embedded root instead of failing.
   fs.writeFileSync(guardada, "{ corrompido");
   assert.equal((await atestacao.raizDeConfianca({ rede: false })).origem, "embutida");
-  assert.equal(tentativas.length, 0, "nenhum acesso à rede");
+  assert.equal(tentativas.length, 0, "no network access");
 });
 
 test("the Console carries no release key of any kind: its trust is the attestation", () => {

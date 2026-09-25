@@ -66,5 +66,5 @@ test("direct link /inicio and refresh keep the hub, without horizontal scroll on
   await page.reload();
   await expect(page.locator("#screen-inicio")).toBeVisible({ timeout: 20_000 });
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/inicio");
-  expect(await semRolagemHorizontal(page), "hub sem rolagem horizontal no celular").toBe(true);
+  expect(await semRolagemHorizontal(page), "hub without horizontal scroll on a phone").toBe(true);
 });

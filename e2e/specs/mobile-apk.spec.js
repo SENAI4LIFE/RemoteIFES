@@ -42,7 +42,7 @@ test("the published app is announced with version, date, release notes and a dow
   await expect(page.locator(".mobile-app-versao")).toContainText("01/09/2026");
   await expect(page.locator(".mobile-app-notas li")).toHaveText(["Correções de estabilidade no controle das salas."]);
   await expect(page.locator(".mobile-app-instructions h2")).toHaveText(["Como instalar", "Atualizações"]);
-  expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);
+  expect(await semRolagemHorizontal(page), "app page without horizontal scroll").toBe(true);
 });
 
 test("technical details stay out of the main flow but remain available", async ({ page, context, request }) => {
@@ -150,7 +150,7 @@ test("downloading the published app confirms integrity through the announced SHA
 
   const caminho = await download.path();
   const baixado = crypto.createHash("sha256").update(fs.readFileSync(caminho)).digest("hex");
-  expect(baixado, "arquivo salvo é exatamente o artefato anunciado").toBe(meta.sha256);
+  expect(baixado, "the saved file is exactly the announced artifact").toBe(meta.sha256);
 });
 
 async function semCryptoSubtle(context) {
@@ -215,7 +215,7 @@ test("an APK tampered with in transit is refused by the client integrity check",
 
   await expect(page.locator(".mobile-app-verify-erro")).toContainText("verificação de integridade");
   await expect(baixar).toBeEnabled();
-  expect(baixou, "nenhum arquivo é salvo quando o hash diverge").toBe(false);
+  expect(baixou, "no file is saved when the hash differs").toBe(false);
 });
 
 test("the download endpoint delivers exactly the bytes whose hash is announced", async ({ request, tokens }) => {
@@ -245,13 +245,13 @@ for (const nome of ["mobile-compact", "mobile-portrait", "tablet-compact", "note
     await abrirAplicativo(page, context);
     await expect(page.locator(".mobile-app-download-btn")).toBeVisible();
 
-    expect(await semRolagemHorizontal(page), "sem rolagem horizontal").toBe(true);
+    expect(await semRolagemHorizontal(page), "no horizontal scroll").toBe(true);
     const alturaBotao = await page.locator(".mobile-app-download-btn").evaluate((el) => el.getBoundingClientRect().height);
-    expect(alturaBotao, "botão principal tocável").toBeGreaterThanOrEqual(44);
+    expect(alturaBotao, "main button tappable").toBeGreaterThanOrEqual(44);
     const alturaResumo = await page.locator(".mobile-app-detalhes summary").first().evaluate((el) => el.getBoundingClientRect().height);
-    expect(alturaResumo, "resumo dos detalhes tocável").toBeGreaterThanOrEqual(44);
+    expect(alturaResumo, "details summary tappable").toBeGreaterThanOrEqual(44);
     const largura = await page.locator(".mobile-app-status").evaluate((el) => el.getBoundingClientRect().width);
     const viewport = page.viewportSize().width;
-    expect(largura, "cartão de estado dentro da tela").toBeLessThanOrEqual(viewport);
+    expect(largura, "state card inside the screen").toBeLessThanOrEqual(viewport);
   });
 }

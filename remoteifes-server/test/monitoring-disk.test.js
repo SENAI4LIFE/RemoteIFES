@@ -31,7 +31,7 @@ test("the measured storage is the file system that contains the database, not th
   assert.equal(arm.caminho, dirBanco);
   assert.equal(arm.rotulo, "banco de dados");
   assert.equal(typeof arm.totalBytes, "number");
-  assert.equal(arm.backups, undefined, "mesmo dispositivo: não há medição separada de backups");
+  assert.equal(arm.backups, undefined, "same device: there is no separate backup measurement");
 });
 
 test("when backups live on another device, it is measured and labeled separately", (t) => {
@@ -43,7 +43,7 @@ test("when backups live on another device, it is measured and labeled separately
   });
   const arm = monitoramento.coletarArmazenamento();
   assert.equal(arm.caminho, dirBanco);
-  assert.ok(arm.backups, "medição do volume de backups ausente");
+  assert.ok(arm.backups, "backup volume measurement missing");
   assert.equal(arm.backups.caminho, dirBackups);
   assert.equal(arm.backups.rotulo, "backups");
   assert.equal(typeof arm.backups.livreBytes, "number");

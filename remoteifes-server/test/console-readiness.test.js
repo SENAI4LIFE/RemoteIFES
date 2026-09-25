@@ -108,7 +108,7 @@ test("with secret and loopback it returns the readiness snapshot", async () => {
   const router = carregarRota();
   const { res } = await chamar(router, requisicaoFalsa({ autorizacao: "Bearer um-segredo-de-teste-bem-comprido" }));
 
-  assert.equal(res.statusCode, null, "resposta de sucesso usa res.json sem status explícito");
+  assert.equal(res.statusCode, null, "a success response uses res.json without an explicit status");
   assert.equal(res.corpo.ok, true);
   assert.equal(typeof res.corpo.dispositivos.conectados, "number");
   assert.equal(typeof res.corpo.dispositivos.canaisDeComando, "number");
@@ -127,7 +127,7 @@ test("every active OTA phase counts, including validando", async () => {
   // The same phases otaService considers active. If a phase is added there and not here, the
   // Console would interrupt the service during an OTA.
   const otaService = require("../src/services/otaService");
-  assert.ok(otaService.listarEstados, "otaService precisa expor listarEstados para este contrato");
+  assert.ok(otaService.listarEstados, "otaService must expose listarEstados for this contract");
 });
 
 test("the response body includes neither the secret nor device credentials", async () => {

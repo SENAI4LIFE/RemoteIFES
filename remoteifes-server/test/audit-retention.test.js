@@ -153,7 +153,7 @@ test("months of simulated data stay bounded by retention and the row ceiling", (
   retencaoService.executarLimpezaRetencao();
   const restantes = db.prepare("SELECT COUNT(*) n FROM auditoria_eventos WHERE tipo = 'simulacao_meses'").get().n;
   const total = db.prepare("SELECT COUNT(*) n FROM auditoria_eventos").get().n;
-  assert.ok(restantes <= 3200, `restaram ${restantes} eventos sintéticos`);
+  assert.ok(restantes <= 3200, `${restantes} synthetic events remained`);
   assert.ok(total <= retencaoService.LIMITES_LINHAS.auditoria_eventos);
 });
 

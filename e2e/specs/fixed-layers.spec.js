@@ -68,10 +68,10 @@ for (const [papel, nome, tamanho, maximo] of CENARIOS_AJUDA) {
     await abrir(page, context, papel, "/#/inicio", tamanho, maximo);
     await abrirPainelDeAjuda(page);
     const medida = await page.evaluate(medirPainelDeAjuda);
-    expect(medida.topo, "o painel começa dentro da tela").toBeGreaterThanOrEqual(0);
+    expect(medida.topo, "the panel starts inside the screen").toBeGreaterThanOrEqual(0);
     expect(medida.base, "o painel termina dentro da tela").toBeLessThanOrEqual(medida.alturaTela);
-    expect(medida.fecharAlcancavel, "o botão Fechar recebe o toque (nem a faixa de senha nem outra camada por cima)").toBe(true);
-    expect(medida.fimDoUltimoLinkLivre, "o botão de acessibilidade não cobre a ponta dos links de ajuda").toBe(true);
+    expect(medida.fecharAlcancavel, "the Fechar button receives the tap (neither the password banner nor another layer on top)").toBe(true);
+    expect(medida.fimDoUltimoLinkLivre, "the accessibility button does not cover the end of the help links").toBe(true);
     await page.locator("#helpFabCloseBtn").click();
     await expect(page.locator("#helpFabPanel")).toBeHidden();
     await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
@@ -98,9 +98,9 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
     });
     expect(medida.alturaBarra, "a fonte ampliada realmente alarga a barra").toBeGreaterThan(90);
     expect(Math.abs(medida.variavel - medida.alturaBarra), "--tabbar-h reflete a barra medida").toBeLessThanOrEqual(1);
-    expect(medida.folgaAjuda, "o botão de ajuda fica acima da barra").toBeGreaterThan(0);
-    expect(medida.folgaA11y, "o botão de acessibilidade fica acima da barra").toBeGreaterThan(0);
-    for (const aba of medida.abas) expect(aba.recebeToque, `a aba ${aba.rotulo} recebe o toque`).toBe(true);
+    expect(medida.folgaAjuda, "the help button stays above the bar").toBeGreaterThan(0);
+    expect(medida.folgaA11y, "the accessibility button stays above the bar").toBeGreaterThan(0);
+    for (const aba of medida.abas) expect(aba.recebeToque, `the ${aba.rotulo} tab receives the tap`).toBe(true);
   });
 }
 
@@ -117,8 +117,8 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
       const a11y = document.getElementById("a11yToggleBtn").getBoundingClientRect();
       return { livre: pontos.every((no) => el.contains(no)), base: r.bottom, topoDoFab: a11y.top };
     });
-    expect(medida.base, "o fim da página passa do botão de acessibilidade").toBeLessThanOrEqual(medida.topoDoFab);
-    expect(medida.livre, "todos os pontos do botão respondem ao toque").toBe(true);
+    expect(medida.base, "the end of the page clears the accessibility button").toBeLessThanOrEqual(medida.topoDoFab);
+    expect(medida.livre, "every point of the button responds to taps").toBe(true);
   });
 }
 

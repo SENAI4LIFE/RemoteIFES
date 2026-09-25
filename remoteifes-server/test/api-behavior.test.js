@@ -162,7 +162,7 @@ test("device notifications: a regular user receives 403; any admin reads and mar
   const lista = await authFetch("/admin/notificacoes", tokenAdmin);
   assert.equal(lista.status, 200);
   const alvo = (await lista.json()).find((n) => n.sala === "A-999" && n.tipo === "esp32_offline");
-  assert.ok(alvo, "a notificação de ESP32 offline deve aparecer para o admin");
+  assert.ok(alvo, "the ESP32 offline notification must appear for the admin");
 
   const contagemAntes = await (await authFetch("/admin/notificacoes/contagem", tokenAdmin)).json();
   assert.ok(contagemAntes.naoLidas >= 1);

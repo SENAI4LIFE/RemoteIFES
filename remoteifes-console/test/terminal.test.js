@@ -53,7 +53,7 @@ test("without the PTY module the terminal is declared unavailable, with no unsaf
   const d = amb.terminal.disponibilidade();
   assert.equal(d.disponivel, false);
   assert.ok(d.motivo);
-  assert.ok(Array.isArray(d.instalacao) && d.instalacao.length, "precisa dizer como habilitar");
+  assert.ok(Array.isArray(d.instalacao) && d.instalacao.length, "must say how to enable it");
   assert.match(d.explicacao, /pseudoterminal/i);
   // The alternative path is described as what it is, not as fulfilling the request.
   assert.match(d.alternativa, /NÃO substitui/);
@@ -77,7 +77,7 @@ test("a terminal session opens, receives input, resizes and closes", (t) => {
   const pty = registro.abertos[0];
   assert.equal(pty.opcoes.colunas, 100);
   assert.equal(pty.opcoes.env.TERM, "xterm-256color");
-  assert.equal(pty.opcoes.env.SEGREDO, undefined, "ambiente é montado, não herdado");
+  assert.equal(pty.opcoes.env.SEGREDO, undefined, "the environment is built, not inherited");
 
   assert.equal(amb.terminal.escrever(aberta.id, "op", "ls\n").ok, true);
   assert.deepEqual(pty.escrito, ["ls\n"]);
@@ -86,7 +86,7 @@ test("a terminal session opens, receives input, resizes and closes", (t) => {
   assert.deepEqual(pty.tamanhos.at(-1), [120, 40]);
 
   assert.equal(amb.terminal.encerrar(aberta.id, "teste"), true);
-  assert.ok(pty.sinais.includes("SIGHUP"), "o encerramento precisa sinalizar a árvore de processos");
+  assert.ok(pty.sinais.includes("SIGHUP"), "termination must signal the process tree");
   assert.equal(amb.terminal.sessoesAtivas(), 0);
 });
 
@@ -141,7 +141,7 @@ test("a session expires on idle and at the maximum deadline", (t) => {
   const original = Date.now;
   Date.now = () => original() + 61_000;
   try {
-    assert.equal(sessoes.sessoesAtivas(), 0, "sessão ociosa deve ser encerrada");
+    assert.equal(sessoes.sessoesAtivas(), 0, "an idle session must be closed");
   } finally {
     Date.now = original;
   }
@@ -180,8 +180,8 @@ test("scrollback is bounded and reports when content was lost", (t) => {
   rolagem.anexar("b".repeat(5000));
   const depois = rolagem.desde(0);
   assert.ok(depois.texto.length <= 5400);
-  assert.equal(depois.perdeu, true, "quem pediu desde o início precisa saber que houve descarte");
-  assert.equal(rolagem.sequencia, 5400, "a posição continua monotônica mesmo com descarte");
+  assert.equal(depois.perdeu, true, "whoever requested from the start must know content was discarded");
+  assert.equal(rolagem.sequencia, 5400, "the offset stays monotonic even with discards");
 });
 
 test("terminal output reaches the client by offset and is never interpreted", (t) => {
@@ -223,8 +223,8 @@ test("the terminal audit keeps metadata, never the transcript", (t) => {
   assert.ok(eventos.includes("terminal-aberto"));
   assert.ok(eventos.includes("terminal-encerrado"));
   const texto = JSON.stringify(auditoria);
-  assert.ok(!texto.includes("cat /etc/shadow"), "o que foi digitado não pode ir para a auditoria");
-  assert.ok(!texto.includes("segredo-hash"), "a saída não pode ir para a auditoria");
+  assert.ok(!texto.includes("cat /etc/shadow"), "what was typed must not go to the audit");
+  assert.ok(!texto.includes("segredo-hash"), "the output must not go to the audit");
   const fim = auditoria.find((a) => a.evento === "terminal-encerrado");
   assert.equal(typeof fim.bytesEnviados, "number");
   assert.equal(typeof fim.duracaoSegundos, "number");

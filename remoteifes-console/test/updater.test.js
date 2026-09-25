@@ -194,7 +194,7 @@ test("a publication without its attestation installs nothing", async (t) => {
   const r = await amb.atualizador.atualizar("2.0.0", { log: () => {} });
   assert.equal(r.ok, false);
   assert.match(r.erro, /atestação de proveniência/);
-  assert.ok(!servidor.pedidos.some((p) => p.url.endsWith(".tar.gz")), "o artefato nem chega a ser baixado");
+  assert.ok(!servidor.pedidos.some((p) => p.url.endsWith(".tar.gz")), "the artifact is never even downloaded");
   assert.equal(JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8")).versaoAtiva, "1.0.0");
 });
 
@@ -212,7 +212,7 @@ test("an attested release with no artifact for this system and architecture inst
   const r = await amb.atualizador.atualizar("2.0.0", { log: () => {} });
   assert.equal(r.ok, false);
   assert.match(r.erro, new RegExp(`não traz artefato para ${alvoLocal()}`));
-  assert.ok(!servidor.pedidos.some((p) => p.url.endsWith(".tar.gz")), "nada baixado");
+  assert.ok(!servidor.pedidos.some((p) => p.url.endsWith(".tar.gz")), "nothing downloaded");
 });
 
 // --- Extraction -------------------------------------------------------------------------------
@@ -277,9 +277,9 @@ test("complete flow: verifies, installs side by side and swaps the pointer", asy
 
   const estadoFinal = JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8"));
   assert.equal(estadoFinal.versaoAtiva, "2.0.0");
-  assert.equal(estadoFinal.versaoAnterior, "1.0.0", "a anterior fica guardada para reversão");
+  assert.equal(estadoFinal.versaoAnterior, "1.0.0", "the previous version is kept for rollback");
   assert.ok(fs.existsSync(path.join(raiz, "versoes", "2.0.0", "console.js")));
-  assert.ok(fs.existsSync(path.join(raiz, "versoes", "1.0.0", "console.js")), "a anterior não é apagada");
+  assert.ok(fs.existsSync(path.join(raiz, "versoes", "1.0.0", "console.js")), "the previous version is not deleted");
   assert.ok(!fs.existsSync(path.join(raiz, "descargas")) || fs.readdirSync(path.join(raiz, "descargas")).length === 0);
   assert.ok(linhas.some((l) => /SHA-256 confere/.test(l)));
 
@@ -287,7 +287,7 @@ test("complete flow: verifies, installs side by side and swaps the pointer", asy
   const ordem = servidor.pedidos.map((p) => p.url);
   assert.ok(ordem.indexOf("/atestacao.sigstore.json") >= 0 && ordem.indexOf("/atestacao.sigstore.json") < ordem.findIndex((u) => u.endsWith(".tar.gz")));
   // No credential was sent to the release server.
-  assert.ok(servidor.pedidos.every((p) => p.autorizacao === null), "downloads de release não carregam credencial");
+  assert.ok(servidor.pedidos.every((p) => p.autorizacao === null), "release downloads carry no credential");
 });
 
 test("an artifact swapped on the server after attestation aborts before switching the active version", async (t) => {
@@ -307,7 +307,7 @@ test("an artifact swapped on the server after attestation aborts before switchin
   assert.equal(r.ok, false);
   assert.match(r.erro, /download passou do limite|tamanho divergente|SHA-256 divergente/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8")).versaoAtiva, "1.0.0");
-  assert.ok(!fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "nada instalado");
+  assert.ok(!fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "nothing installed");
 
   // Same size, other bytes: the digest itself refuses it.
   const igual = await publicacao({ versao: "2.0.0" });
@@ -321,7 +321,7 @@ test("an artifact swapped on the server after attestation aborts before switchin
   const r2 = await amb.atualizador.atualizar("2.0.0", { log: () => {} });
   assert.equal(r2.ok, false);
   assert.match(r2.erro, /SHA-256 divergente/);
-  assert.ok(!fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "nada instalado");
+  assert.ok(!fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "nothing installed");
 });
 
 test("an artifact whose internal version differs from the target is refused", async (t) => {
@@ -361,8 +361,8 @@ test("an interrupted transaction is reconciled at startup, with no half installa
   const r = atualizador.reconciliar();
   assert.equal(r.reconciliado, true);
   assert.equal(r.etapaInterrompida, "instalando");
-  assert.ok(!fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "a versão incompleta é descartada");
-  assert.ok(!fs.existsSync(path.join(raiz, "descargas")), "o estágio é limpo");
+  assert.ok(!fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "the incomplete version is discarded");
+  assert.ok(!fs.existsSync(path.join(raiz, "descargas")), "staging is cleaned");
   assert.equal(JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8")).versaoAtiva, "1.0.0");
 });
 
@@ -381,7 +381,7 @@ test("a completed transaction is not undone by reconciliation", (t) => {
   );
   const r = atualizador.reconciliar();
   assert.equal(r.etapaInterrompida, null);
-  assert.ok(fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "a versão concluída permanece");
+  assert.ok(fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "the completed version remains");
 });
 
 test("rollback swaps the pointer to the previous version, without network", async (t) => {
@@ -401,7 +401,7 @@ test("rollback swaps the pointer to the previous version, without network", asyn
   assert.equal(r.ok, true, r.erro);
   const estadoFinal = JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8"));
   assert.equal(estadoFinal.versaoAtiva, "1.0.0");
-  assert.equal(estadoFinal.versaoAnterior, "2.0.0", "a que saiu vira a anterior, para poder voltar");
+  assert.equal(estadoFinal.versaoAnterior, "2.0.0", "the one that left becomes the previous version, to allow going back");
 });
 
 test("the bootstrap falls back to the previous version when the active one is broken", (t) => {
@@ -451,7 +451,7 @@ test("a pointer at a version that did not start is reported, not hidden", async 
   );
 
   const s = await atualizador.situacao();
-  assert.ok(s.divergenciaDeVersao, "a divergência precisa ser reportada");
+  assert.ok(s.divergenciaDeVersao, "the divergence must be reported");
   assert.equal(s.divergenciaDeVersao.registrada, "99.0.0");
   assert.equal(s.divergenciaDeVersao.emExecucao, emExecucao);
   assert.match(s.divergenciaDeVersao.motivo, /não subiu/);
@@ -476,7 +476,7 @@ test("without divergence, the status does not invent an alarm", async (t) => {
   );
 
   const s = await atualizador.situacao();
-  assert.equal(s.divergenciaDeVersao, null, "instalação coerente não pode gerar aviso");
+  assert.equal(s.divergenciaDeVersao, null, "a coherent installation must not produce a warning");
 });
 
 test("running from source is not treated as divergence", async (t) => {
@@ -534,10 +534,10 @@ test("the bootstrap falls back to the previous version when the active one EXIST
 
   const r = require("child_process").spawnSync(process.execPath, [bootstrap], { encoding: "utf8", timeout: 30_000 });
   const saida = `${r.stdout || ""}${r.stderr || ""}`;
-  assert.equal(r.status, 0, `o bootstrap deve subir a anterior. Saída:\n${saida}`);
-  assert.match(saida, /SUBIU 1\.0\.0/, "a versão anterior precisa realmente executar");
-  assert.match(saida, /não carregou/, "o motivo da falha da ativa precisa aparecer");
-  assert.match(saida, /payload quebrado de proposito/, "o erro original precisa ser mostrado, não engolido");
+  assert.equal(r.status, 0, `the bootstrap must start the previous version. Output:\n${saida}`);
+  assert.match(saida, /SUBIU 1\.0\.0/, "the previous version must actually run");
+  assert.match(saida, /não carregou/, "the reason the active version failed must appear");
+  assert.match(saida, /payload quebrado de proposito/, "the original error must be shown, not swallowed");
 });
 
 test("when no version loads, the bootstrap fails and says so", (t) => {
@@ -557,7 +557,7 @@ test("when no version loads, the bootstrap fails and says so", (t) => {
 
   const r = require("child_process").spawnSync(process.execPath, [bootstrap], { encoding: "utf8", timeout: 30_000 });
   const saida = `${r.stdout || ""}${r.stderr || ""}`;
-  assert.equal(r.status, 1, "sem nenhuma versão utilizável, o bootstrap tem de falhar");
+  assert.equal(r.status, 1, "without any usable version, the bootstrap must fail");
   assert.match(saida, /nenhuma versão instalada do console conseguiu iniciar/);
   assert.match(saida, /Reinstale o pacote/);
 });
@@ -608,14 +608,14 @@ test("two version operations do not run at the same time", async (t) => {
   );
 
   const primeira = atualizador.adquirirTrava("atualizar 9.9.9");
-  assert.equal(primeira.ok, true, "a primeira operação adquire a trava");
+  assert.equal(primeira.ok, true, "the first operation acquires the lock");
   t.after(() => atualizador.liberarTrava());
 
   // With the lock held by THIS (live) process, rollback must refuse.
   const r = await atualizador.reverter({ log: () => {} });
-  assert.equal(r.ok, false, "a segunda operação não pode prosseguir");
+  assert.equal(r.ok, false, "the second operation must not proceed");
   assert.match(r.erro, /outra operação de versão está em andamento/);
-  assert.match(r.erro, /atualizar 9\.9\.9/, "a recusa precisa dizer qual operação detém a trava");
+  assert.match(r.erro, /atualizar 9\.9\.9/, "the refusal must say which operation holds the lock");
 
   // The pointer did not move.
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "2.0.0");
@@ -637,7 +637,7 @@ test("a dead process's lock is recovered instead of locking the installation for
   );
 
   const r = atualizador.adquirirTrava("reverter");
-  assert.equal(r.ok, true, "a trava residual precisa ser recuperada");
+  assert.equal(r.ok, true, "the leftover lock must be recovered");
   const dono = JSON.parse(fs.readFileSync(path.join(raiz, "operacao-em-andamento.json"), "utf8"));
   assert.equal(dono.pid, process.pid, "a trava passa a ser deste processo");
   atualizador.liberarTrava();
@@ -661,20 +661,20 @@ test("orphan lock recovery does not let two processes in", (t) => {
   fs.writeFileSync(arquivo, `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: 999999, em: new Date().toISOString() })}\n`);
 
   const primeira = atualizador.adquirirTrava("A");
-  assert.equal(primeira.ok, true, "quem recupera a órfã fica com a trava");
+  assert.equal(primeira.ok, true, "whoever recovers the orphan keeps the lock");
   const dono = JSON.parse(fs.readFileSync(arquivo, "utf8"));
   assert.equal(dono.pid, process.pid);
   assert.equal(dono.operacao, "A");
 
   // A second acquisition, now with a LIVE owner (this process), must refuse, not remove.
   const segunda = atualizador.adquirirTrava("B");
-  assert.equal(segunda.ok, false, "com dono vivo, a segunda recusa");
+  assert.equal(segunda.ok, false, "with a live owner, the second one refuses");
   const aindaDono = JSON.parse(fs.readFileSync(arquivo, "utf8"));
-  assert.equal(aindaDono.operacao, "A", "a trava viva não pode ser substituída pela segunda operação");
+  assert.equal(aindaDono.operacao, "A", "the live lock must not be replaced by the second operation");
 
   atualizador.liberarTrava();
   assert.ok(!fs.existsSync(arquivo));
-  assert.ok(!fs.readdirSync(raiz).some((n) => n.includes(".orfa-")), "nenhum resíduo de recuperação fica para trás");
+  assert.ok(!fs.readdirSync(raiz).some((n) => n.includes(".orfa-")), "no recovery leftover remains");
 });
 
 test("reconciliation does not touch versoes/ while a live operation holds the lock", (t) => {
@@ -704,9 +704,9 @@ test("reconciliation does not touch versoes/ while a live operation holds the lo
   );
 
   const r = atualizador.reconciliar();
-  assert.equal(r.adiado, true, `a reconciliação precisa ser adiada. Recebi: ${JSON.stringify(r)}`);
-  assert.ok(fs.existsSync(estagio), "o estágio da operação em andamento não pode ser apagado");
-  assert.ok(atualizador.lerEstadoInstalacao().transacao, "a transação da outra operação continua registrada");
+  assert.equal(r.adiado, true, `reconciliation must be deferred. Got: ${JSON.stringify(r)}`);
+  assert.ok(fs.existsSync(estagio), "the staging of the operation in progress must not be deleted");
+  assert.ok(atualizador.lerEstadoInstalacao().transacao, "the other operation's transaction stays recorded");
 });
 
 test("reconciliation preserves .substituido-*, the only copy during a swap", (t) => {
@@ -731,8 +731,8 @@ test("reconciliation preserves .substituido-*, the only copy during a swap", (t)
   );
 
   atualizador.reconciliar();
-  assert.ok(!fs.existsSync(parcial), "o parcial da transação interrompida sai");
-  assert.ok(fs.existsSync(substituido), "o .substituido-* NÃO pode sair: é a única cópia do payload anterior");
+  assert.ok(!fs.existsSync(parcial), "the interrupted transaction's partial goes");
+  assert.ok(fs.existsSync(substituido), ".substituido-* must NOT go: it is the only copy of the previous payload");
 });
 
 test("the artifact's size is checked before it is read into memory", (t) => {
@@ -750,7 +750,7 @@ test("the artifact's size is checked before it is read into memory", (t) => {
   // Mismatched size: refused without needing the digest.
   const r = release.conferirArtefato(arquivo, { bytes: 999_999, sha256: "0".repeat(64) });
   assert.equal(r.ok, false);
-  assert.match(r.motivo, /bytes no arquivo/, "a recusa vem da conferência por stat, não da leitura");
+  assert.match(r.motivo, /bytes no arquivo/, "the refusal comes from the stat check, not from reading");
 
   // Above the Console ceiling, even with the declared size matching.
   const acima = release.conferirArtefato(arquivo, { bytes: 2048, sha256: "0".repeat(64) }, { limiteBytes: 1024 });
@@ -792,8 +792,8 @@ test("a pending restart is not announced as a version that did not start", async
   );
 
   const pendente = await atualizador.situacao();
-  assert.ok(pendente.divergenciaDeVersao, "a situação ainda precisa relatar o descompasso");
-  assert.equal(pendente.divergenciaDeVersao.reinicioPendente, true, "mas como reinício pendente, não como falha");
+  assert.ok(pendente.divergenciaDeVersao, "the status must still report the mismatch");
+  assert.equal(pendente.divergenciaDeVersao.reinicioPendente, true, "but as a pending restart, not as a failure");
   assert.match(pendente.divergenciaDeVersao.motivo, /reinício está pendente/);
 
   // Old transaction: then it is an activation failure.
@@ -810,7 +810,7 @@ test("a pending restart is not announced as a version that did not start", async
   );
   const falha = await atualizador.situacao();
   assert.ok(falha.divergenciaDeVersao);
-  assert.ok(!falha.divergenciaDeVersao.reinicioPendente, "uma hora depois já não é reinício pendente");
+  assert.ok(!falha.divergenciaDeVersao.reinicioPendente, "one hour later it is no longer a pending restart");
   assert.match(falha.divergenciaDeVersao.motivo, /não subiu/);
 });
 

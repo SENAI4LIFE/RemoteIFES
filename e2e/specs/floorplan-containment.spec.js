@@ -73,10 +73,10 @@ function medirPlanta() {
 for (const [nome, tamanho] of Object.entries(LARGURAS)) {
   test(`the floor plan stays contained without horizontal page scroll at ${nome}`, async ({ page, context }) => {
     await abrirPlanta(page, context, tamanho);
-    expect(await semRolagemHorizontal(page), "página sem rolagem horizontal").toBe(true);
+    expect(await semRolagemHorizontal(page), "page without horizontal scroll").toBe(true);
     const medida = await page.evaluate(medirPlanta);
-    expect(medida.invólucroDentroDaColuna, "o invólucro da planta cabe na coluna da página").toBe(true);
-    expect(medida.vazamentoDaPlanta, "salas e corredores ficam dentro da planta").toBeLessThanOrEqual(0.5);
+    expect(medida.invólucroDentroDaColuna, "the floor plan wrapper fits the page column").toBe(true);
+    expect(medida.vazamentoDaPlanta, "rooms and corridors stay inside the plan").toBeLessThanOrEqual(0.5);
     expect(medida.escala).toBeGreaterThan(0);
     if (medida.rolaDentro) {
       // Below the minimum legible scale the plan scrolls inside the wrapper: it starts inside the
@@ -94,9 +94,9 @@ for (const [nome, tamanho] of Object.entries(LARGURAS)) {
         wrap.scrollTop = 0;
         return rp.right <= rw.right + 1 && rp.bottom <= rw.bottom + 1;
       });
-      expect(fimAlcancavel, "o fim da planta é alcançável rolando o invólucro").toBe(true);
+      expect(fimAlcancavel, "the end of the plan is reachable by scrolling the wrapper").toBe(true);
     } else {
-      expect(medida.plantaDentroDoConteudo, "a planta ajustada não passa por cima do padding do invólucro").toBe(true);
+      expect(medida.plantaDentroDoConteudo, "the fitted plan does not overlap the wrapper's padding").toBe(true);
     }
   });
 }
@@ -122,7 +122,7 @@ test("zooming the plan scrolls inside the wrapper and restoring fits again, with
   expect(ampliada.rolaDentro).toBe(true);
   expect(ampliada.maiorQueOInvolucro).toBe(true);
   expect(ampliada.fimAlcancavel).toBe(true);
-  expect(await semRolagemHorizontal(page), "a página continua sem rolagem horizontal com zoom").toBe(true);
+  expect(await semRolagemHorizontal(page), "the page stays without horizontal scroll when zoomed").toBe(true);
 
   await page.locator("#floorplanZoomResetBtn").click();
   const depois = await page.evaluate(medirPlanta);
@@ -161,10 +161,10 @@ for (const [nome, tamanho] of [["mobile-portrait", VIEWPORTS["mobile-portrait"]]
           encosta,
         };
       }, secao);
-      expect(medida.fonte, `${secao}: o rótulo não é menor que os códigos de sala`).toBeGreaterThanOrEqual(medida.fonteDoCodigo || 12);
-      expect(medida.textoDentroDaFaixa, `${secao}: o texto fica dentro da faixa do corredor`).toBe(true);
-      expect(medida.encosta, `${secao}: o texto não encosta em sala ou legenda`).toEqual([]);
-      expect(await semRolagemHorizontal(page), `${secao}: página sem rolagem horizontal`).toBe(true);
+      expect(medida.fonte, `${secao}: the label is not smaller than the room codes`).toBeGreaterThanOrEqual(medida.fonteDoCodigo || 12);
+      expect(medida.textoDentroDaFaixa, `${secao}: the text stays inside the corridor band`).toBe(true);
+      expect(medida.encosta, `${secao}: the text does not touch a room or legend`).toEqual([]);
+      expect(await semRolagemHorizontal(page), `${secao}: page without horizontal scroll`).toBe(true);
     }
   });
 }

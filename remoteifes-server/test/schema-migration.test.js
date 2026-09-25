@@ -102,7 +102,7 @@ test("migrating the legacy rooms table preserves data and creates fwVersao", () 
 test("the IR protocol library gains the failsafe and origin columns without losing earlier records", () => {
   const colunas = db.prepare("PRAGMA table_info(protocolos_ir)").all().map((c) => c.name);
   for (const coluna of ["failsafeRawJson", "failsafeCarrierHz", "failsafeAtualizadoEm", "origemMac"]) {
-    assert.ok(colunas.includes(coluna), `coluna ${coluna} ausente após a migração`);
+    assert.ok(colunas.includes(coluna), `column ${coluna} missing after the migration`);
   }
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_protocolos_ir_criado'").get());
   const legado = db.prepare("SELECT * FROM protocolos_ir WHERE label = 'Legado IR'").get();

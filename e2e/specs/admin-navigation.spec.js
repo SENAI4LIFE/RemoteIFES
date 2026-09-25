@@ -58,8 +58,8 @@ test("Administration has three groups, with no empty group and no duplicate func
 
   expect(grupos.map((g) => g.rotulo)).toEqual(["Gestão", "Dispositivos", "Sistema"]);
   grupos.forEach((g) => {
-    expect(g.itens.length, `grupo ${g.grupo} não pode estar vazio`).toBeGreaterThan(0);
-    expect(g.itens.every((i) => !i.oculto), `grupo ${g.grupo} completo para superadmin`).toBe(true);
+    expect(g.itens.length, `group ${g.grupo} must not be empty`).toBeGreaterThan(0);
+    expect(g.itens.every((i) => !i.oculto), `group ${g.grupo} complete for superadmin`).toBe(true);
   });
 
   const subs = grupos.flatMap((g) => g.itens.map((i) => i.sub));
@@ -95,10 +95,10 @@ test("moved functions are no longer Administration navigation items", async ({ p
     "Proprietários de sala", "Sessões", "Ativos", "Mapa", "Histórico",
     "Notificações", "Auditoria", "Monitoramento", "ESP32 / MACs", "Saúde do sistema",
   ]) {
-    expect(rotulos, `rótulo obsoleto "${obsoleto}" ainda listado como função`).not.toContain(obsoleto);
+    expect(rotulos, `obsolete label "${obsoleto}" still listed as a function`).not.toContain(obsoleto);
   }
   for (const sub of ["proprietarios", "sessoes", "ativos", "mapa", "dispositivos", "monitoramento", "auditoria", "acessos"]) {
-    await expect(page.locator(`.admin-subtab-btn[data-sub="${sub}"]`), `função ${sub}`).toHaveCount(0);
+    await expect(page.locator(`.admin-subtab-btn[data-sub="${sub}"]`), `function ${sub}`).toHaveCount(0);
     await expect(page.locator(`#adminSub-${sub}`), `painel ${sub}`).toHaveCount(0);
   }
 });
@@ -140,7 +140,7 @@ for (const [sub, definicoes] of Object.entries(ABAS)) {
 test("inner tabs are visually distinct from group and function navigation", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin", "/admin/logs");
   const dentroDaBarra = await page.$$eval(".admin-subtabs .admin-inner-tab-btn", (els) => els.length);
-  expect(dentroDaBarra, "abas internas não podem morar na barra de navegação").toBe(0);
+  expect(dentroDaBarra, "inner tabs must not live in the navigation bar").toBe(0);
 
   const estilos = await page.evaluate(() => {
     const ler = (el) => {
@@ -208,7 +208,7 @@ test("a regular admin sees the three groups with only the functions their level 
 
   for (const grupo of grupos) {
     const visiveis = grupo.itens.filter((i) => !i.oculto).map((i) => i.sub);
-    expect(visiveis.length, `grupo ${grupo.grupo} não pode ficar vazio para o admin`).toBeGreaterThan(0);
+    expect(visiveis.length, `group ${grupo.grupo} must not be empty for the admin`).toBeGreaterThan(0);
     expect(visiveis.filter((sub) => SUPERADMIN_ONLY.includes(sub))).toEqual([]);
   }
 
@@ -229,7 +229,7 @@ test("exclusive inner tabs are hidden from a regular admin", async ({ page, cont
       await expect(page.locator(`#${sub}Aba-${aba}`)).toBeHidden();
     }
     const visiveis = (await abas(page, sub)).filter((a) => !a.oculto).map((a) => a.aba);
-    expect(visiveis.length, `${sub} precisa manter abas para o admin`).toBeGreaterThan(0);
+    expect(visiveis.length, `${sub} must keep tabs for the admin`).toBeGreaterThan(0);
     expect(visiveis.filter((a) => exclusivas.includes(a))).toEqual([]);
   }
 });
@@ -364,7 +364,7 @@ test("a group with no authorized function is not shown", async ({ page, context 
     grupo.querySelectorAll(".admin-subtab-btn").forEach((btn) => btn.classList.add("hidden"));
     return getComputedStyle(grupo).display !== "none";
   });
-  expect(exibido, "grupo sem função visível deve sumir da navegação").toBe(false);
+  expect(exibido, "a group without a visible function must disappear from navigation").toBe(false);
 });
 
 test("a direct link to a function opens the right group and survives a refresh", async ({ page, context }) => {
@@ -393,7 +393,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-landscape", "ta
   test(`the grouped navigation fits and stays reachable at ${nome}`, async ({ page, context }) => {
     test.setTimeout(120_000);
     await abrirAdmin(page, context, "superadmin", "/admin/usuarios", VIEWPORTS[nome]);
-    expect(await semRolagemHorizontal(page), "Administração sem rolagem horizontal").toBe(true);
+    expect(await semRolagemHorizontal(page), "Administration without horizontal scroll").toBe(true);
 
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -411,12 +411,12 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-landscape", "ta
       };
     });
 
-    expect(medidas.cobertaPelaTabbar, "a navegação não pode ficar sob a barra inferior").toBe(false);
+    expect(medidas.cobertaPelaTabbar, "navigation must not be under the bottom bar").toBe(false);
     expect(medidas.grupos.map((g) => g.texto)).toEqual(["Gestão", "Dispositivos", "Sistema"]);
     medidas.grupos.forEach((g) => {
-      expect(g.largura, `${g.texto} com largura`).toBeGreaterThan(0);
-      expect(g.altura, `${g.texto} com altura`).toBeGreaterThan(0);
-      expect(g.cortado, `${g.texto} não pode ficar cortado`).toBe(false);
+      expect(g.largura, `${g.texto} has width`).toBeGreaterThan(0);
+      expect(g.altura, `${g.texto} has height`).toBeGreaterThan(0);
+      expect(g.cortado, `${g.texto} must not be clipped`).toBe(false);
     });
 
     for (const sub of ["logs", "status"]) {
@@ -436,11 +436,11 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-landscape", "ta
         return achados;
       }, sub);
       expect(problemas, `${sub} em ${nome}`).toEqual([]);
-      expect(await semRolagemHorizontal(page), `${sub} sem rolagem horizontal`).toBe(true);
+      expect(await semRolagemHorizontal(page), `${sub} without horizontal scroll`).toBe(true);
     }
 
     await page.locator('#adminSub-status .admin-inner-tab-btn[data-aba="sistema"]').click();
     await expect(page.locator("#statusAba-sistema")).toBeVisible({ timeout: 15_000 });
-    expect(await semRolagemHorizontal(page), "Status > Sistema sem rolagem horizontal").toBe(true);
+    expect(await semRolagemHorizontal(page), "Status > Sistema without horizontal scroll").toBe(true);
   });
 }

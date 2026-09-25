@@ -52,7 +52,7 @@ test("renaming the superadmin and restarting does not recreate the privileged de
   iniciarServidor();
 
   const lista = privilegiadas();
-  assert.equal(lista.length, 1, "não pode existir uma segunda identidade privilegiada");
+  assert.equal(lista.length, 1, "a second privileged identity must not exist");
   assert.equal(lista[0].id, conta.id);
   assert.equal(lista[0].usuario, "coordenacao.ti");
   assert.equal(db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get(), undefined);
@@ -82,7 +82,7 @@ test("an established installation without a superadmin does not receive a silent
   }
   assert.equal(privilegiadas().length, 0);
   assert.equal(db.prepare("SELECT id FROM usuarios WHERE usuario = 'superadmin'").get(), undefined);
-  assert.ok(erros.some((l) => l.includes("seed-superadmin-ausente")), "o operador precisa ser avisado");
+  assert.ok(erros.some((l) => l.includes("seed-superadmin-ausente")), "the operator must be warned");
 });
 
 test("a historical installation with a privileged 'admin' account is migrated without creating a second account", () => {

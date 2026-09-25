@@ -117,7 +117,7 @@ test("avaliar() creates a monitoring notification for an alert and does not dupl
   db.prepare(`INSERT INTO esp_eventos (sala, status) VALUES ('MON-FLAP', 'online')`).run();
   monitoramentoService.avaliar();
   const depois = notificacoesService.listar().filter((n) => n.tipo === "monitoramento").length;
-  assert.equal(depois, meio.length, "mudança no contador não deve duplicar o mesmo alerta");
+  assert.equal(depois, meio.length, "a counter change must not duplicate the same alert");
 });
 
 test("comandoNaoEntregue counts only what the server could not deliver to the ESP32 socket", () => {
@@ -125,10 +125,10 @@ test("comandoNaoEntregue counts only what the server could not deliver to the ES
   db.prepare("INSERT OR IGNORE INTO salas (sala, nome, bloco, andar, irProtocolo, temperaturaAlvo) VALUES ('MON-CMD', 'Mon', 'A', 1, 16, 23)").run();
   const contador = () => monitoramentoService.coletar().falhas.contadores.comandoNaoEntregue;
   assert.equal(typeof contador(), "number");
-  assert.equal("comandoFalha" in monitoramentoService.coletar().falhas.contadores, false, "a métrica antiga, nunca incrementada, deixou de existir");
+  assert.equal("comandoFalha" in monitoramentoService.coletar().falhas.contadores, false, "the old metric, never incremented, no longer exists");
   const antes = contador();
   salasService.aplicarComando("MON-CMD", "ligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true }, origem: "manual" });
-  assert.equal(contador(), antes + 1, "sem dispositivo conectado o comando não foi entregue");
+  assert.equal(contador(), antes + 1, "without a connected device the command was not delivered");
   const deviceHub = require("../src/services/deviceHub");
   const original = deviceHub.enviarComando;
   deviceHub.enviarComando = () => true;
@@ -137,7 +137,7 @@ test("comandoNaoEntregue counts only what the server could not deliver to the ES
   } finally {
     deviceHub.enviarComando = original;
   }
-  assert.equal(contador(), antes + 1, "entrega bem-sucedida não conta, mesmo sem confirmação física");
+  assert.equal(contador(), antes + 1, "a successful delivery does not count, even without physical confirmation");
   const alertas = monitoramentoService.coletar().alertas;
   assert.ok(alertas.some((a) => a.startsWith("comandoNaoEntregue:")));
 });

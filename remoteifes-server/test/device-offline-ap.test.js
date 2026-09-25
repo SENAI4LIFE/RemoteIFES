@@ -81,7 +81,7 @@ test("a clean WebSocket close takes the room offline immediately, without waitin
   const ws = conectar("OFF-1", "AA:BB:CC:00:00:01");
   await aoAbrir(ws);
   await new Promise((r) => setTimeout(r, 50));
-  assert.equal(online("OFF-1"), true, "a sala deveria estar online após o handshake");
+  assert.equal(online("OFF-1"), true, "the room should be online after the handshake");
 
   const mudancas = [];
   const ouvinte = () => mudancas.push(Date.now());
@@ -90,9 +90,9 @@ test("a clean WebSocket close takes the room offline immediately, without waitin
   const decorrido = await esperarOffline("OFF-1", 1000);
   salasService.eventos.removeListener("mudanca", ouvinte);
 
-  assert.ok(decorrido < 500, `esperava transição imediata, levou ${decorrido}ms`);
+  assert.ok(decorrido < 500, `expected an immediate transition, took ${decorrido}ms`);
   assert.deepEqual(eventos("OFF-1"), ["online", "offline"]);
-  assert.ok(mudancas.length >= 1, "a mudança de estado precisa ser difundida ao navegador");
+  assert.ok(mudancas.length >= 1, "the state change must be broadcast to the browser");
 });
 
 test("the device notification follows the authoritative offline transition", async () => {
@@ -104,7 +104,7 @@ test("the device notification follows the authoritative offline transition", asy
 
   ws.close();
   await esperarOffline("OFF-2", 1000);
-  assert.equal(notificacoesOffline("OFF-2"), 1, "a notificação sai junto com o estado offline");
+  assert.equal(notificacoesOffline("OFF-2"), 1, "the notification goes out together with the offline state");
 });
 
 test("a silent loss falls through the heartbeat timeout and produces a single transition", async () => {
@@ -139,12 +139,12 @@ test("reconnection restores the online state and a new drop produces a single no
   const segunda = conectar("OFF-4", "AA:BB:CC:00:00:04");
   await aoAbrir(segunda);
   await new Promise((r) => setTimeout(r, 50));
-  assert.equal(online("OFF-4"), true, "reconectar precisa restaurar o estado online");
+  assert.equal(online("OFF-4"), true, "reconnecting must restore the online state");
 
   segunda.close();
   await esperarOffline("OFF-4", 1000);
   assert.deepEqual(eventos("OFF-4"), ["online", "offline", "online", "offline"]);
-  assert.equal(notificacoesOffline("OFF-4"), 1, "quedas seguidas não podem virar uma enxurrada de avisos");
+  assert.equal(notificacoesOffline("OFF-4"), 1, "repeated drops must not become a flood of warnings");
 });
 
 test("marcarOffline is idempotent: a room already offline produces no event or notification", () => {
@@ -170,12 +170,12 @@ test("the device receives the access point policy in the handshake and when it c
   });
   await aoAbrir(ws);
   await new Promise((r) => setTimeout(r, 100));
-  assert.deepEqual(recebidas, [{ tipo: "config_ap", exigirCredencial: false }], "o AP aberto é anunciado já na conexão");
+  assert.deepEqual(recebidas, [{ tipo: "config_ap", exigirCredencial: false }], "the open AP is announced on connection");
 
   configuracoesService.validarEAtualizar({ espApExigirCredencial: true }, SUPERADMIN);
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(configuracoesService.obter().espApExigirCredencial, true);
-  assert.deepEqual(recebidas.at(-1), { tipo: "config_ap", exigirCredencial: true }, "ligar a exigência avisa quem já está conectado");
+  assert.deepEqual(recebidas.at(-1), { tipo: "config_ap", exigirCredencial: true }, "enabling the requirement notifies whoever is already connected");
 
   configuracoesService.validarEAtualizar({ espApExigirCredencial: false }, SUPERADMIN);
   await new Promise((r) => setTimeout(r, 100));
@@ -187,13 +187,13 @@ test("the AP password does not interfere with device authentication on the serve
   const antes = configuracoesService.obter().espCredenciaisObrigatorias;
   configuracoesService.validarEAtualizar({ espApExigirCredencial: true }, SUPERADMIN);
   assert.equal(configuracoesService.obter().espCredenciaisObrigatorias, antes,
-    "mexer na rede de configuração não pode alterar a exigência de credencial no servidor");
+    "changing the setup network must not change the server credential requirement");
 
   novaSalaComMac("AP-2", "AA:BB:CC:00:00:12");
   const ws = conectar("AP-2", "AA:BB:CC:00:00:12");
   await aoAbrir(ws);
   await new Promise((r) => setTimeout(r, 50));
-  assert.equal(online("AP-2"), true, "a conexão por MAC continua válida com o AP protegido");
+  assert.equal(online("AP-2"), true, "the MAC connection stays valid with the protected AP");
   ws.close();
   configuracoesService.validarEAtualizar({ espApExigirCredencial: false }, SUPERADMIN);
 });
@@ -223,7 +223,7 @@ test("the energy estimate no longer exists: no route, no service and no per-room
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: metodo === "PATCH" ? JSON.stringify({ potenciaWatts: 1200 }) : undefined,
     });
-    assert.equal(resp.status, 404, `${metodo} ${caminho} não deveria existir`);
+    assert.equal(resp.status, 404, `${metodo} ${caminho} should not exist`);
   }
 
   assert.throws(() => require("../src/services/energiaService"), /Cannot find module/);
@@ -233,6 +233,6 @@ test("the energy estimate no longer exists: no route, no service and no per-room
   const monitoramento = await fetch(`${baseUrl}/admin/monitoramento`, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(monitoramento.status, 200);
   const corpo = await monitoramento.json();
-  assert.ok(corpo.ok && corpo.monitoramento && corpo.monitoramento.esp32, "o monitoramento operacional precisa continuar íntegro");
-  assert.ok(!JSON.stringify(corpo).match(/energia/i), "nenhum resíduo de energia pode voltar no monitoramento");
+  assert.ok(corpo.ok && corpo.monitoramento && corpo.monitoramento.esp32, "operational monitoring must stay intact");
+  assert.ok(!JSON.stringify(corpo).match(/energia/i), "no energy residue may return in monitoring");
 });

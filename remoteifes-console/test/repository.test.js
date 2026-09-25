@@ -145,8 +145,8 @@ test("an unreachable remote is classified as offline, not as 'up to date'", asyn
   assert.ok(["offline", "erro", "autenticacao", "remoto-ausente"].includes(consulta.classe), `classe inesperada: ${consulta.classe}`);
 
   const situacao = await amb.repositorio.situacaoDeAtualizacao({ consultarRede: true });
-  assert.ok(situacao.consultaAgora, "a falha de consulta precisa aparecer na situação");
-  assert.equal(situacao.remoto, null, "sem observação prévia, não se inventa uma");
+  assert.ok(situacao.consultaAgora, "the query failure must appear in the status");
+  assert.equal(situacao.remoto, null, "without a previous observation, none is invented");
 });
 
 test("failure classification distinguishes DNS, connection and authentication", (t) => {
@@ -200,7 +200,7 @@ test("ahead, behind and diverged are distinguished", async (t) => {
   git(raiz, ["add", "-A"]);
   git(raiz, ["commit", "--quiet", "-m", "commit local"]);
   cmp = await amb.repositorio.compararCom(commitRemoto);
-  assert.equal(cmp.divergente, true, "um commit de cada lado é divergência, não 'atrasado'");
+  assert.equal(cmp.divergente, true, "one commit on each side is divergence, not 'behind'");
   assert.equal(cmp.commitsSoLocais, 1);
   assert.equal(cmp.commitsSoRemotos, 1);
 });
@@ -226,7 +226,7 @@ test("a shallow clone is flagged in the comparison", async (t) => {
   assert.equal(estado.raso, true);
   const cmp = await amb.repositorio.compararCom(estado.head);
   assert.equal(cmp.historicoRaso, true);
-  assert.ok(cmp.ressalvaRaso, "a ressalva sobre histórico raso precisa acompanhar a comparação");
+  assert.ok(cmp.ressalvaRaso, "the shallow-history caveat must accompany the comparison");
 });
 
 test("a change of the origin URL is recorded and shown", async (t) => {
@@ -247,7 +247,7 @@ test("a change of the origin URL is recorded and shown", async (t) => {
   git(raiz, ["remote", "set-url", "origin", `file://${outro.replace(/\\/g, "/")}`]);
   const segunda = await amb.repositorio.consultarRemoto();
   assert.equal(segunda.ok, true);
-  assert.ok(segunda.urlAnterior, "a troca de remoto precisa ser sinalizada");
+  assert.ok(segunda.urlAnterior, "the remote change must be flagged");
   const auditoria = amb.estado.lerAuditoria(20);
   assert.ok(auditoria.some((a) => a.evento === "remoto-alterado"));
   limpar(outro);

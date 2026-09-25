@@ -91,7 +91,7 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
 
     servidor.filho.send({ encerrar: sinal });
     const codigo = await servidor.encerrado;
-    assert.equal(codigo, 0, `saída limpa após ${sinal}: ${servidor.texto()}`);
+    assert.equal(codigo, 0, `clean exit after ${sinal}: ${servidor.texto()}`);
     assert.ok(
       servidor.texto().includes(`[shutdown] {"sinal":"${sinal}"}`),
       `o encerramento gracioso deveria ser registrado: ${servidor.texto()}`

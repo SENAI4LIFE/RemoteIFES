@@ -14,7 +14,7 @@ const { compararVersoes } = require("../src/services/otaService");
 function bloco(nome) {
   const definicao = new RegExp(`${nome.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\([^;{]*\\)\\s*\\{`);
   const encontrado = definicao.exec(ino);
-  assert.ok(encontrado, `função ${nome} ausente no firmware`);
+  assert.ok(encontrado, `function ${nome} missing from the firmware`);
   const inicio = encontrado.index;
   const corpo = inicio + encontrado[0].length - 1;
   let nivel = 0;
@@ -34,7 +34,7 @@ test("the reference hardware GPIOs are the validated ones: receiver 15, emitter 
   assert.match(ino, /#define ACTION_SWITCH_ACTIVE_LEVEL LOW\b/);
   assert.match(ino, /#define DHTPIN 14\b/);
   for (const pino of ["IR_RECV_PIN", "IR_SEND_PIN", "ACTION_SWITCH_PIN", "BUZZER_PIN", "DHTPIN"]) {
-    assert.equal((ino.match(new RegExp(`#define ${pino} `, "g")) || []).length, 1, `${pino} definido mais de uma vez`);
+    assert.equal((ino.match(new RegExp(`#define ${pino} `, "g")) || []).length, 1, `${pino} defined more than once`);
   }
 });
 
@@ -44,7 +44,7 @@ test("the firmware version advanced from 4.0.0 and is what the server uses to ch
   assert.equal(compararVersoes(versao[1], "4.0.0"), 1);
   const limiar = rotas.match(/FIRMWARE_COM_MODO_CLONE = "(\d+\.\d+\.\d+)"/);
   assert.ok(limiar);
-  assert.ok(compararVersoes(versao[1], limiar[1]) >= 0, "o firmware publicado precisa entender enter_clone");
+  assert.ok(compararVersoes(versao[1], limiar[1]) >= 0, "the published firmware must understand enter_clone");
 });
 
 test("the switch uses the internal pull-up, active low, 40 ms debounce and 5 s for the failsafe", () => {
@@ -54,19 +54,19 @@ test("the switch uses the internal pull-up, active low, 40 ms debounce and 5 s f
   assert.match(ino, /digitalRead\(ACTION_SWITCH_PIN\) == ACTION_SWITCH_ACTIVE_LEVEL/);
   const processar = bloco("void processarSwitchAcao");
   assert.match(processar, /agora - actionSwitchLastChangeMs < ACTION_SWITCH_DEBOUNCE_MS\) return;/);
-  assert.match(processar, /if \(!foiPressaoLonga\) abrirApTemporario\(\);/, "soltar depois do failsafe não pode abrir o AP");
-  assert.match(processar, /actionSwitchLongPressConsumed = true;\s*transmitirFailsafeSalvo\(\);/, "o failsafe dispara uma única vez por pressão");
+  assert.match(processar, /if \(!foiPressaoLonga\) abrirApTemporario\(\);/, "releasing after the failsafe must not open the AP");
+  assert.match(processar, /actionSwitchLongPressConsumed = true;\s*transmitirFailsafeSalvo\(\);/, "the failsafe fires once per press");
   assert.match(processar, /if \(!actionSwitchStableActive \|\| actionSwitchLongPressConsumed \|\| actionSwitchPressedSinceMs == 0\) return;/);
-  assert.match(ino, /void loop\(\) \{\s*processarSwitchAcao\(\);/, "o switch é lido em todo ciclo, inclusive no modo AP");
+  assert.match(ino, /void loop\(\) \{\s*processarSwitchAcao\(\);/, "the switch is read every cycle, including in AP mode");
   const configurar = bloco("void configurarSwitchAcao");
-  assert.match(configurar, /actionSwitchLongPressConsumed = ativo;/, "um botão preso no boot não dispara nem o AP nem o failsafe");
+  assert.match(configurar, /actionSwitchLongPressConsumed = ativo;/, "a button held at boot fires neither the AP nor the failsafe");
 });
 
 test("the failsafe OFF is persisted in NVS, compared before rewriting and transmitted without the server", () => {
   assert.match(ino, /strcmp\(tipo, "failsafe_raw_set"\) == 0/);
   assert.match(ino, /strcmp\(tipo, "failsafe_raw_clear"\) == 0/);
   const salvar = bloco("bool salvarFailsafeRaw");
-  assert.equal((salvar.match(/preferences\.put/g) || []).length, 1, "o failsafe é gravado como um único registro lógico, em uma só escrita na NVS");
+  assert.equal((salvar.match(/preferences\.put/g) || []).length, 1, "the failsafe is written as a single logical record, in one NVS write");
   assert.match(salvar, /preferences\.putBytes\(FAILSAFE_REC_KEY, bruto, total\) == total/);
   assert.match(salvar, /cabecalho\.crc32 = crcRegistroFailsafe\(cabecalho, rawData\)/);
   assert.match(salvar, /if \(!duracaoRawAceitavel\(rawData, length\)\) return false;/);
@@ -75,15 +75,15 @@ test("the failsafe OFF is persisted in NVS, compared before rewriting and transm
   const ler = bloco("bool lerRegistroFailsafe");
   assert.match(ler, /cabecalho\.magic == FAILSAFE_REC_MAGIC && cabecalho\.versao == FAILSAFE_REC_VERSAO/);
   assert.match(ler, /crcRegistroFailsafe\(cabecalho, dados\) == cabecalho\.crc32/);
-  assert.match(ler, /esperado == total/, "comprimento do cabeçalho e do blob precisam bater");
+  assert.match(ler, /esperado == total/, "header and blob lengths must match");
   const migrar = bloco("void migrarFailsafeLegado");
-  assert.match(migrar, /preferences\.getBytesLength\("fsRaw"\) == bytes/, "as quatro chaves antigas são migradas uma vez para o registro único");
+  assert.match(migrar, /preferences\.getBytesLength\("fsRaw"\) == bytes/, "the four old keys are migrated once to the single record");
   for (const chave of ["fsRaw", "fsLen", "fsHz", "fsProto"]) assert.match(ino, new RegExp(`preferences\\.remove\\("${chave}"\\)`));
   assert.match(bloco("void setup"), /migrarFailsafeLegado\(\);\s*carregarFailsafeCache\(\);/);
-  assert.doesNotMatch(ino, /new uint16_t\[/, "toda alocação dinâmica de RAW usa std::nothrow e é verificada");
+  assert.doesNotMatch(ino, /new uint16_t\[/, "every dynamic RAW allocation uses std::nothrow and is checked");
   assert.match(ino, /#define MAX_RAW_IR_DURACAO_US 2000000UL/);
   assert.match(bloco("bool duracaoRawAceitavel"), /if \(total > MAX_RAW_IR_DURACAO_US\) return false;/);
-  assert.match(ino, /if \(failsafeIgualAoSalvo\(rawData, i, carrierHz, protocolRecordId\)\)/, "sincronização repetida não desgasta a NVS");
+  assert.match(ino, /if \(failsafeIgualAoSalvo\(rawData, i, carrierHz, protocolRecordId\)\)/, "repeated synchronization does not wear the NVS");
   assert.match(ino, /rawArr\.size\(\) > MAX_RAW_IR_ENTRIES\s*\|\| carrierHz < FAILSAFE_CARRIER_MIN_HZ \|\| carrierHz > FAILSAFE_CARRIER_MAX_HZ/);
   assert.match(ino, /const uint32_t FAILSAFE_CARRIER_MIN_HZ = 20000;/);
   assert.match(ino, /const uint32_t FAILSAFE_CARRIER_MAX_HZ = 60000;/);
@@ -92,8 +92,8 @@ test("the failsafe OFF is persisted in NVS, compared before rewriting and transm
   const transmitir = bloco("bool transmitirFailsafeSalvo");
   assert.match(transmitir, /sendRawIR\(rawData, length, failsafeCarrierHzSalvo\(\) \/ 1000\)/);
   assert.match(transmitir, /lerRegistroFailsafe\(cabecalho, rawData, length\)/, "o RAW transmitido sai do registro validado por CRC");
-  assert.doesNotMatch(transmitir, /WiFi\.status|estadoWsServidor == WS_ESTADO_CONECTADO \|\|/, "o failsafe local não depende de rede");
-  assert.match(transmitir, /definirFailsafeLatch\(true\)/, "o OFF local fica travado até um comando explícito");
+  assert.doesNotMatch(transmitir, /WiFi\.status|estadoWsServidor == WS_ESTADO_CONECTADO \|\|/, "the local failsafe does not depend on the network");
+  assert.match(transmitir, /definirFailsafeLatch\(true\)/, "the local OFF stays latched until an explicit command");
   assert.match(ino, /doc\["tipo"\] = "failsafe_status"/);
   assert.match(bloco("void enviarInfoDispositivo"), /preencherStatusFailsafe\(doc\)/);
   assert.match(bloco("void enviarTelemetriaWs"), /preencherStatusFailsafe\(doc\)/);
@@ -113,9 +113,9 @@ test("the persisted local OFF is only undone by an explicit server command and n
   assert.match(raw, /rejeitado_memoria/);
   assert.match(raw, /rejeitado_duracao/);
   const claro = processar.slice(processar.indexOf('"failsafe_raw_clear"'), processar.indexOf('"reset_wifi"'));
-  assert.doesNotMatch(claro, /definirFailsafeLatch/, "apagar o RAW de failsafe não é um comando de controle");
+  assert.doesNotMatch(claro, /definirFailsafeLatch/, "erasing the failsafe RAW is not a control command");
   const latch = bloco("void definirFailsafeLatch");
-  assert.match(latch, /if \(failsafeLatched == ativo\) return;/, "sem regravação quando nada muda");
+  assert.match(latch, /if \(failsafeLatched == ativo\) return;/, "no rewrite when nothing changes");
   assert.match(bloco("void enviarInfoDispositivo"), /if \(powerConhecido\) doc\["ligado"\] = lastKnownPower;/);
 });
 
@@ -142,14 +142,14 @@ test("the role comes from the server: only the cloner enters clone or capture mo
 
 test("the access point stays off in operation and only returns without configuration, after reset or through the switch", () => {
   assert.match(bloco("void setup"), /WiFi\.mode\(WIFI_STA\);\s*WiFi\.softAPdisconnect\(true\);/);
-  assert.doesNotMatch(bloco("void setup"), /aplicarPontoDeAcesso\(/, "o boot configurado não sobe o AP");
+  assert.doesNotMatch(bloco("void setup"), /aplicarPontoDeAcesso\(/, "a configured boot does not start the AP");
   assert.match(bloco("void startAPMode"), /aplicarPontoDeAcesso\(false\)/);
-  assert.match(bloco("void abrirApTemporario"), /aplicarPontoDeAcesso\(true\)/, "o AP do switch mantém a estação conectada");
+  assert.match(bloco("void abrirApTemporario"), /aplicarPontoDeAcesso\(true\)/, "the switch AP keeps the station connected");
   assert.match(ino, /const unsigned long AP_TEMPORARIO_TIMEOUT_MS = 600000;/);
   assert.match(bloco("void loop"), /if \(apTemporarioAte != 0 && \(long\)\(millis\(\) - apTemporarioAte\) >= 0\) encerrarApTemporario\(\);/);
   assert.match(bloco("void encerrarApTemporario"), /WiFi\.softAPdisconnect\(true\);\s*WiFi\.mode\(WIFI_STA\);/);
   assert.match(bloco("void loop"), /if \(apIniciado\) \{\s*dnsServer\.processNextRequest\(\);\s*server\.handleClient\(\);/);
-  assert.equal(fs.existsSync(path.join(ESP, "data", "status.html")), false, "não existe mais página local de status");
+  assert.equal(fs.existsSync(path.join(ESP, "data", "status.html")), false, "the local status page no longer exists");
   assert.doesNotMatch(ino, /handleRoot|handleInfo|status\.html|reportAccess/);
   assert.match(ino, /strcmp\(tipo, "reset_wifi"\) == 0/);
 });
@@ -165,37 +165,37 @@ test("the buzzer follows every IR transmission without a blocking delay", () => 
 
 test("the board echoes the desired state version and does not treat automatic restoration as an explicit command", () => {
   const versao = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/);
-  assert.ok(compararVersoes(versao[1], "4.3.0") >= 0, "o eco de versão e a recusa da restauração existem a partir de 4.3.0");
+  assert.ok(compararVersoes(versao[1], "4.3.0") >= 0, "version echo and restoration refusal exist from 4.3.0");
   assert.match(ino, /uint32_t ultimaVersaoEstado = 0;/);
   assert.match(ino, /bool versaoEstadoConhecida = false;/);
   assert.match(bloco("void preencherVersaoEstado"), /if \(versaoEstadoConhecida\) doc\["versao"\] = ultimaVersaoEstado;/);
   for (const fn of ["void enviarInfoDispositivo", "void enviarTelemetriaWs", "void enviarStatusFailsafe"]) {
-    assert.match(bloco(fn), /preencherVersaoEstado\(doc\);/, `${fn} precisa ecoar a versão`);
+    assert.match(bloco(fn), /preencherVersaoEstado\(doc\);/, `${fn} must echo the version`);
   }
   const processar = bloco("void processarComandoServidor");
   const conhecido = processar.slice(processar.indexOf('"send_known_state"'), processar.indexOf('"failsafe_raw_set"'));
   assert.match(conhecido, /bool restauracao = doc\["restauracao"\] \| false;/);
-  assert.match(conhecido, /if \(doc\["versao"\]\.is<uint32_t>\(\)\) \{\s*ultimaVersaoEstado = doc\["versao"\]\.as<uint32_t>\(\);\s*versaoEstadoConhecida = true;\s*\}/, "a versão é registrada mesmo quando a restauração é recusada");
-  assert.match(conhecido, /if \(restauracao && failsafeLatched\) \{\s*reportComando\("controle_nativo", "ignorado_failsafe_latch"\);\s*enviarStatusFailsafe\(\);\s*return;\s*\}/, "uma placa travada em OFF local ignora a restauração e responde com failsafe_status");
-  assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("sendKnownACState("), "a recusa vem antes de qualquer transmissão IR");
-  assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("definirFailsafeLatch(false)"), "a recusa vem antes de limpar a trava");
-  assert.match(conhecido, /lastTelemetryWs = millis\(\);\s*enviarTelemetriaWs\(\);/, "o estado aplicado é confirmado na hora");
+  assert.match(conhecido, /if \(doc\["versao"\]\.is<uint32_t>\(\)\) \{\s*ultimaVersaoEstado = doc\["versao"\]\.as<uint32_t>\(\);\s*versaoEstadoConhecida = true;\s*\}/, "the version is recorded even when the restoration is refused");
+  assert.match(conhecido, /if \(restauracao && failsafeLatched\) \{\s*reportComando\("controle_nativo", "ignorado_failsafe_latch"\);\s*enviarStatusFailsafe\(\);\s*return;\s*\}/, "a board latched in local OFF ignores the restoration and answers with failsafe_status");
+  assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("sendKnownACState("), "the refusal comes before any IR transmission");
+  assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("definirFailsafeLatch(false)"), "the refusal comes before clearing the latch");
+  assert.match(conhecido, /lastTelemetryWs = millis\(\);\s*enviarTelemetriaWs\(\);/, "the applied state is confirmed immediately");
   const raw = processar.slice(processar.indexOf('"send_raw"'), processar.indexOf('"send_known_state"'));
-  assert.doesNotMatch(raw, /restauracao/, "send_raw continua sendo sempre explícito");
+  assert.doesNotMatch(raw, /restauracao/, "send_raw is always explicit");
 });
 
 test("the credential changes only in RAM and reconnects only after being written and reread from NVS; failure keeps the current one", () => {
   const aplicar = bloco("void aplicarCredencial");
   assert.match(aplicar, /bool gravado = gravarChaveNvsVerificada\("devId", novoId\) && gravarChaveNvsVerificada\("devSec", novoSegredo\);/);
-  assert.match(aplicar, /if \(!gravado\) \{\s*restaurarChaveNvs\("devId", idAnterior\);\s*restaurarChaveNvs\("devSec", segredoAnterior\);\s*reportComando\("credencial", "falha_nvs"\);/, "gravação parcial é desfeita e reportada");
-  assert.ok(aplicar.indexOf("if (!gravado)") < aplicar.indexOf("deviceId = novoId;"), "a RAM só muda depois da gravação verificada");
-  assert.ok(aplicar.indexOf("deviceId = novoId;") < aplicar.indexOf("conectarWsServidor();"), "a reconexão com o segredo novo vem depois");
+  assert.match(aplicar, /if \(!gravado\) \{\s*restaurarChaveNvs\("devId", idAnterior\);\s*restaurarChaveNvs\("devSec", segredoAnterior\);\s*reportComando\("credencial", "falha_nvs"\);/, "a partial write is undone and reported");
+  assert.ok(aplicar.indexOf("if (!gravado)") < aplicar.indexOf("deviceId = novoId;"), "RAM only changes after the verified write");
+  assert.ok(aplicar.indexOf("deviceId = novoId;") < aplicar.indexOf("conectarWsServidor();"), "reconnecting with the new secret comes afterwards");
   assert.doesNotMatch(aplicar.slice(0, aplicar.indexOf("bool gravado")), /deviceId = novoId|deviceSecret = novoSegredo/);
   const gravar = bloco("bool gravarChaveNvsVerificada");
   assert.match(gravar, /preferences\.putString\(chave, valor\) != valor\.length\(\)\) return false;/);
-  assert.match(gravar, /return preferences\.getString\(chave, ""\) == valor;/, "a gravação é relida da NVS");
+  assert.match(gravar, /return preferences\.getString\(chave, ""\) == valor;/, "the write is reread from NVS");
   const restaurar = bloco("void restaurarChaveNvs");
-  assert.match(restaurar, /else if \(preferences\.isKey\(chave\)\) preferences\.remove\(chave\);/, "sem valor anterior, a chave é removida em vez de ficar vazia");
+  assert.match(restaurar, /else if \(preferences\.isKey\(chave\)\) preferences\.remove\(chave\);/, "without a previous value the key is removed instead of left empty");
 });
 
 test("the firmware carries no code comments", () => {

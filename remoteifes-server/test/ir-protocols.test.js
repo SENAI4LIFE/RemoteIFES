@@ -120,9 +120,9 @@ test("IR Protocol routes require superadministrator", async () => {
     ["/admin/protocolos-ir/1", "DELETE"],
   ]) {
     const respAdmin = await auth(caminho, admin, { method: metodo, body: corpo ? JSON.stringify(corpo) : undefined });
-    assert.equal(respAdmin.status, 403, `${metodo} ${caminho} para admin comum`);
+    assert.equal(respAdmin.status, 403, `${metodo} ${caminho} for a regular admin`);
     const respComum = await auth(caminho, comum, { method: metodo, body: corpo ? JSON.stringify(corpo) : undefined });
-    assert.equal(respComum.status, 403, `${metodo} ${caminho} para usuário comum`);
+    assert.equal(respComum.status, 403, `${metodo} ${caminho} for a regular user`);
   }
   const anonimo = await fetch(`${baseUrl}/admin/protocolos-ir`);
   assert.equal(anonimo.status, 401);
@@ -138,15 +138,15 @@ test("complete flow: role from the server, captures only from the cloner in clon
 
   const clonador = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C1");
   const tx = await conectar("TX-1", "AA:BB:CC:DD:EE:D1");
-  assert.ok(clonador.mensagens.some((m) => m.tipo === "device_role" && m.role === "transmitter"), "antes da definição toda placa é transmissora");
-  assert.ok(clonador.mensagens.some((m) => m.tipo === "failsafe_raw_clear"), "sem protocolo vinculado o servidor manda limpar o failsafe ao conectar");
+  assert.ok(clonador.mensagens.some((m) => m.tipo === "device_role" && m.role === "transmitter"), "before the definition every board is a transmitter");
+  assert.ok(clonador.mensagens.some((m) => m.tipo === "failsafe_raw_clear"), "without a linked protocol the server tells the board to clear the failsafe on connect");
   assert.equal(deviceHub.estadoPublico("CLONE-1").role, "transmitter");
 
   clonador.ws.send(JSON.stringify({ tipo: "modo_alterado", modo: "config_clone" }));
   await esperar();
   clonador.ws.send(JSON.stringify(CAPTURA_LIGAR));
   await esperar();
-  assert.equal(deviceHub.capturasRecentes("CLONE-1").length, 0, "captura de uma placa que não é a clonadora é descartada");
+  assert.equal(deviceHub.capturasRecentes("CLONE-1").length, 0, "a capture from a board that is not the cloner is discarded");
 
   resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "NAO-EXISTE" }) });
   assert.equal(resp.status, 400);
@@ -169,12 +169,12 @@ test("complete flow: role from the server, captures only from the cloner in clon
   await esperar();
   clonador.ws.send(JSON.stringify(CAPTURA_LIGAR));
   await esperar();
-  assert.equal(deviceHub.capturasRecentes("CLONE-1").length, 0, "fora do modo clone a captura é descartada mesmo vindo da clonadora");
+  assert.equal(deviceHub.capturasRecentes("CLONE-1").length, 0, "outside clone mode a capture is discarded even from the cloner");
 
   clonador.mensagens.length = 0;
   resp = await auth("/admin/protocolos-ir/clonador/modo-clone", token, { method: "POST", body: JSON.stringify({ ativo: true }) });
   assert.equal(resp.status, 200);
-  assert.ok(await ate(() => clonador.mensagens.some((m) => m.tipo === "enter_clone")), "firmware 4.1.0 recebe enter_clone");
+  assert.ok(await ate(() => clonador.mensagens.some((m) => m.tipo === "enter_clone")), "firmware 4.1.0 receives enter_clone");
   assert.ok(!clonador.mensagens.some((m) => m.tipo === "enter_config"));
   clonador.ws.send(JSON.stringify({ tipo: "modo_alterado", modo: "config_clone" }));
   await esperar();
@@ -184,13 +184,13 @@ test("complete flow: role from the server, captures only from the cloner in clon
   await esperar();
   tx.ws.send(JSON.stringify({ ...CAPTURA_LIGAR, hex: "0xBAD" }));
   await esperar();
-  assert.equal(deviceHub.capturasRecentes("TX-1").length, 0, "um transmissor nunca alimenta a biblioteca");
+  assert.equal(deviceHub.capturasRecentes("TX-1").length, 0, "a transmitter never feeds the library");
 
   clonador.ws.send(JSON.stringify({ ...CAPTURA_LIGAR, raw: [] }));
   clonador.ws.send(JSON.stringify(CAPTURA_LIGAR));
   await esperar();
   const recentes = deviceHub.capturasRecentes("CLONE-1");
-  assert.equal(recentes.length, 1, "captura sem RAW válido é descartada");
+  assert.equal(recentes.length, 1, "a capture without a valid RAW is discarded");
   const capturaLigar = recentes[0];
   assert.ok(Number.isInteger(capturaLigar.id));
   assert.equal(capturaLigar.sala, "CLONE-1");
@@ -230,7 +230,7 @@ test("complete flow: role from the server, captures only from the cloner in clon
   assert.equal(corpo.failsafeSincronizado, true);
   assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.protocol === 16)));
   const limpezaInicial = tx.mensagens.find((m) => m.tipo === "failsafe_raw_clear");
-  assert.ok(limpezaInicial && limpezaInicial.protocolRecordId === salvo.id, "aplicar protocolo sem failsafe manda apagar um RAW antigo");
+  assert.ok(limpezaInicial && limpezaInicial.protocolRecordId === salvo.id, "applying a protocol without failsafe tells the board to erase an old RAW");
 
   tx.mensagens.length = 0;
   resp = await auth(`/admin/protocolos-ir/${salvo.id}/failsafe`, token, { method: "PUT", body: JSON.stringify({ capturaId: capturaOff.id }) });
@@ -273,7 +273,7 @@ test("complete flow: role from the server, captures only from the cloner in clon
   const generico = (await resp.json()).protocolo;
   assert.equal(generico.isKnown, false);
   resp = await auth(`/admin/protocolos-ir/${generico.id}/aplicar/TX-2`, token, { method: "POST" });
-  assert.equal(resp.status, 400, "RAW genérico não vira protocolo operacional");
+  assert.equal(resp.status, 400, "a generic RAW does not become an operational protocol");
 
   await fecharEEsperar(tx.ws);
   await ate(() => !deviceHub.estadoPublico("TX-1").conectado);
@@ -296,7 +296,7 @@ test("complete flow: role from the server, captures only from the cloner in clon
   txReconectado.mensagens.length = 0;
   resp = await auth(`/admin/esp32/TX-1/protocolo-ir`, token, { method: "POST", body: JSON.stringify({ protocolo: 16 }) });
   assert.equal(resp.status, 200);
-  assert.ok(await ate(() => txReconectado.mensagens.some((m) => m.tipo === "failsafe_raw_clear")), "trocar o protocolo da sala sem registro apaga o failsafe da placa");
+  assert.ok(await ate(() => txReconectado.mensagens.some((m) => m.tipo === "failsafe_raw_clear")), "changing the room's protocol without a record erases the board's failsafe");
   assert.equal(db.prepare("SELECT irProtocoloRegistroId FROM salas WHERE sala = 'TX-1'").get().irProtocoloRegistroId, null);
 
   resp = await auth(`/admin/protocolos-ir/${salvo.id}/aplicar/TX-1`, token, { method: "POST" });
@@ -308,7 +308,7 @@ test("complete flow: role from the server, captures only from the cloner in clon
   resp = await auth(`/admin/protocolos-ir/${salvo.id}`, token, { method: "DELETE" });
   assert.equal(resp.status, 200);
   assert.deepEqual((await resp.json()).salasAfetadas, ["TX-1"]);
-  assert.ok(await ate(() => txReconectado.mensagens.some((m) => m.tipo === "failsafe_raw_clear")), "excluir o protocolo apaga o failsafe das salas que o usavam");
+  assert.ok(await ate(() => txReconectado.mensagens.some((m) => m.tipo === "failsafe_raw_clear")), "deleting the protocol erases the failsafe of the rooms that used it");
   assert.equal(db.prepare("SELECT irProtocolo, irProtocoloRegistroId FROM salas WHERE sala = 'TX-1'").get().irProtocolo, 16);
   resp = await auth(`/admin/protocolos-ir/${salvo.id}`, token, { method: "DELETE" });
   assert.equal(resp.status, 404);
@@ -323,7 +323,7 @@ test("complete flow: role from the server, captures only from the cloner in clon
     "esp32_clonador_definido", "esp32_clonagem_ativada", "protocolo_ir_criado", "esp32_protocolo_alterado",
     "protocolo_ir_failsafe_definido", "protocolo_ir_transmitido", "protocolo_ir_failsafe_removido",
     "protocolo_ir_renomeado", "protocolo_ir_excluido", "esp32_clonagem_desativada",
-  ]) assert.ok(tipos.includes(esperado), `auditoria sem ${esperado}`);
+  ]) assert.ok(tipos.includes(esperado), `audit without ${esperado}`);
 
   await fecharEEsperar(txReconectado.ws);
   await fecharEEsperar(clonador.ws);
@@ -418,14 +418,14 @@ test("replacing the cloner room's board removes the authorization until a new co
   await fechou;
 
   const nova = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C9");
-  assert.ok(nova.mensagens.some((m) => m.tipo === "device_role" && m.role === "transmitter"), "a placa nova não herda o papel de clonadora");
+  assert.ok(nova.mensagens.some((m) => m.tipo === "device_role" && m.role === "transmitter"), "the new board does not inherit the cloner role");
   assert.equal(deviceHub.estadoPublico("CLONE-1").role, "transmitter");
   nova.ws.send(JSON.stringify({ tipo: "modo_alterado", modo: "config_clone" }));
   await esperar();
   const antes = deviceHub.capturasRecentes("CLONE-1").length;
   nova.ws.send(JSON.stringify(CAPTURA_LIGAR));
   await esperar();
-  assert.equal(deviceHub.capturasRecentes("CLONE-1").length, antes, "a placa substituída não consegue capturar");
+  assert.equal(deviceHub.capturasRecentes("CLONE-1").length, antes, "the replaced board cannot capture");
 
   let resp = await auth("/admin/protocolos-ir/clonador/modo-clone", token, { method: "POST", body: JSON.stringify({ ativo: true }) });
   assert.equal(resp.status, 409);
@@ -446,7 +446,7 @@ test("replacing the cloner room's board removes the authorization until a new co
   await esperar(1200);
   await ate(() => !deviceHub.estadoPublico("CLONE-1").conectado, 2000);
   const comCredencial = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C9", { headers: { "x-device-id": deviceId, "x-device-secret": segredo } });
-  assert.equal(deviceHub.estadoPublico("CLONE-1").role, "cloner", "provisionar credencial na mesma placa mantém o papel");
+  assert.equal(deviceHub.estadoPublico("CLONE-1").role, "cloner", "provisioning a credential on the same board keeps the role");
   resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });
   corpo = await resp.json();
   assert.equal(corpo.clonador.deviceId, deviceId);
@@ -456,7 +456,7 @@ test("replacing the cloner room's board removes the authorization until a new co
   credencialClonadora = substituida;
   await fechouCredencial;
   const trocada = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C9", { headers: { "x-device-id": substituida.deviceId, "x-device-secret": substituida.segredo } });
-  assert.equal(deviceHub.estadoPublico("CLONE-1").role, "transmitter", "credencial substituída invalida o vínculo");
+  assert.equal(deviceHub.estadoPublico("CLONE-1").role, "transmitter", "a replaced credential invalidates the binding");
   resp = await auth("/admin/protocolos-ir", token);
   corpo = await resp.json();
   assert.equal(corpo.clonador.motivo, "credencial-alterada");
@@ -517,7 +517,7 @@ test("malformed or oversized RAW captures are rejected entirely, without filteri
   clonador.ws.send(JSON.stringify({ ...CAPTURA_LIGAR, raw: [9000, 4500, 560, 560], hex: "0xVALIDA" }));
   assert.ok(await ate(() => deviceHub.capturasRecentes("CLONE-1").some((c) => c.hex === "0xVALIDA")));
   const capturas = deviceHub.capturasRecentes("CLONE-1");
-  assert.equal(capturas.length, 1, "nenhuma versão filtrada ou truncada das capturas inválidas pode ter sido aceita");
+  assert.equal(capturas.length, 1, "no filtered or truncated version of the invalid captures may have been accepted");
   assert.deepEqual(capturas[0].raw, [9000, 4500, 560, 560]);
 
   const exato = Array.from({ length: 1024 }, () => 560);
@@ -537,7 +537,7 @@ test("numeric protocol identifiers the firmware does not support are refused bef
     assert.match((await resp.json()).erro, /não é suportado/);
   }
   assert.equal(salasService.buscar("TX-2").irProtocolo, antes.irProtocolo);
-  assert.ok(!tx.mensagens.some((m) => m.tipo === "send_known_state"), "nenhum estado foi enviado à placa");
+  assert.ok(!tx.mensagens.some((m) => m.tipo === "send_known_state"), "no state was sent to the board");
 
   const teste = await auth("/admin/esp32/TX-2/teste/estado", token, { method: "POST", body: JSON.stringify({ protocol: 5, temp: 23, power: true }) });
   assert.equal(teste.status, 400);
@@ -566,12 +566,12 @@ test("a room's administrative IR tests do not confirm the stored intent: confirm
   let resp = await auth("/admin/esp32/TX-2/teste/estado", token, { method: "POST", body: JSON.stringify({ protocol: 16, temp: 24, power: false }) });
   assert.equal(resp.status, 200);
   assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state")));
-  assert.equal(tx.mensagens.find((m) => m.tipo === "send_known_state").versao, undefined, "o teste não carrega versão de intenção");
+  assert.equal(tx.mensagens.find((m) => m.tipo === "send_known_state").versao, undefined, "the test carries no intent version");
   assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false);
-  assert.equal(salasService.buscar("TX-2").ligado, 1, "o teste não altera a intenção");
+  assert.equal(salasService.buscar("TX-2").ligado, 1, "the test does not change the intent");
   tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.1.0", modo: "operation", ligado: false, versao, ultimoComando: { tipo: "known_state", protocol: 16, temp: 24, power: false, turbo: false } }));
   await esperar(80);
-  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "o eco da versão anterior ao teste não confirma a intenção");
+  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "an echo of the version before the test does not confirm the intent");
 
   salasService.aplicarComando("TX-2", "ligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true, nivel: 3 }, origem: "manual" });
   assert.ok(await ate(() => tx.mensagens.filter((m) => m.tipo === "send_known_state").length === 2));
@@ -583,7 +583,7 @@ test("a room's administrative IR tests do not confirm the stored intent: confirm
   resp = await auth("/admin/esp32/TX-2/teste/raw", token, { method: "POST", body: JSON.stringify({ raw: [9000, 4500, 560, 560], carrierHz: 38000 }) });
   assert.equal(resp.status, 200);
   assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_raw")));
-  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "um RAW de teste também invalida a confirmação");
+  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "a test RAW also invalidates confirmation");
 
   resp = await auth("/admin/esp32/dispositivos", token);
   assert.equal((await resp.json()).find((d) => d.sala === "TX-2").dispositivo.estadoConfirmado, false);

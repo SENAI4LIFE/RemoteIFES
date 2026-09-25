@@ -228,7 +228,7 @@ test("accessibility and help stay close together, without overlap, with 44px tar
       return { a: { t: a.top, b: a.bottom, l: a.left, r: a.right, w: a.width, h: a.height }, h: { t: h.top, b: h.bottom, l: h.left, r: h.right, w: h.width, h: h.height } };
     });
     const folga = medida.h.t - medida.a.b;
-    expect(folga, `separação em ${nome}`).toBeGreaterThan(0);
+    expect(folga, `separation at ${nome}`).toBeGreaterThan(0);
     expect(folga, `proximidade em ${nome}`).toBeLessThanOrEqual(40);
     expect(Math.abs(medida.a.r - medida.h.r), `alinhamento horizontal em ${nome}`).toBeLessThanOrEqual(1);
     [medida.a, medida.h].forEach((c) => {
@@ -300,7 +300,7 @@ for (const tamanhoNome of ["mobile-portrait", "mobile-landscape", "tablet-portra
         }
         return achados;
       });
-      expect(semOverflow, `${rota} em ${tamanhoNome} sem rolagem horizontal da página: ${ofensores.join(" | ")}`).toBe(true);
+      expect(semOverflow, `${rota} at ${tamanhoNome} without horizontal page scroll: ${ofensores.join(" | ")}`).toBe(true);
 
       const problemas = await page.evaluate((subAtual) => {
         const achados = [];
@@ -385,8 +385,8 @@ for (const tamanhoNome of PAINEL_DUAS_COLUNAS) {
     expect(m.largo, "o painel largo usa a grade de duas colunas").toBe(true);
     expect(Math.abs(m.turbo - m.down), "Turbo e Temperatura − compartilham a linha de baixo").toBeLessThanOrEqual(1);
     expect(Math.abs(m.power - m.up), "Power e Temperatura + compartilham a linha de cima").toBeLessThanOrEqual(1);
-    expect(m.turbo, "a linha de baixo vem depois da de cima").toBeGreaterThan(m.power);
-    expect(await semRolagemHorizontal(page), "painel sem rolagem horizontal").toBe(true);
+    expect(m.turbo, "the lower row comes after the upper one").toBeGreaterThan(m.power);
+    expect(await semRolagemHorizontal(page), "panel without horizontal scroll").toBe(true);
   });
 }
 
@@ -419,9 +419,9 @@ for (const [ajusteNome, a11yMaximo] of [["ajuste padrão", false], ["texto máxi
         };
       });
 
-      expect(m.larguraCirculo, "o círculo do Power está visível").toBeGreaterThan(0);
-      if (a11yMaximo) expect(m.espaco, "o espaçamento de letras chegou ao rótulo").toBeGreaterThan(0);
-      expect(Math.abs(m.glifos - m.circulo), "centro do texto Power sob o centro do círculo").toBeLessThanOrEqual(1);
+      expect(m.larguraCirculo, "the Power circle is visible").toBeGreaterThan(0);
+      if (a11yMaximo) expect(m.espaco, "the letter spacing reached the label").toBeGreaterThan(0);
+      expect(Math.abs(m.glifos - m.circulo), "center of the Power text under the center of the circle").toBeLessThanOrEqual(1);
     });
   }
 }

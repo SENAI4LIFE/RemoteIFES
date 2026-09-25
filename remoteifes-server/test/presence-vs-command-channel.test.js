@@ -100,19 +100,19 @@ test("seen through an HTTP heartbeat without a socket: online but without a comm
 
   salasService.heartbeatDispositivo("PC-1", { temperatura: 24 }, "AA:BB:CC:F0:00:01", "127.0.0.1");
   const antes = status("PC-1");
-  assert.equal(antes.online, true, "o heartbeat HTTP marca presença");
-  assert.equal(antes.canalComandos, false, "mas não abre canal de comandos");
+  assert.equal(antes.online, true, "the HTTP heartbeat marks presence");
+  assert.equal(antes.canalComandos, false, "but does not open a command channel");
   assert.equal(antes.dispositivoConfirmou, null);
 
   const contagem = naoEntregues();
   const resultado = salasService.aplicarComando("PC-1", "ligar", undefined, ADMIN);
-  assert.equal(resultado.ligado, 1, "o estado desejado é persistido");
+  assert.equal(resultado.ligado, 1, "the desired state is persisted");
   assert.equal(resultado.online, 1);
-  assert.equal(resultado.enviadoAoDispositivo, false, "nada foi submetido à placa");
-  assert.equal(resultado.canalComandos, false, "a resposta diz por quê: não há socket de comandos");
-  assert.equal(resultado.avisoDispositivoOffline, false, "e não é o caso offline");
+  assert.equal(resultado.enviadoAoDispositivo, false, "nothing was submitted to the board");
+  assert.equal(resultado.canalComandos, false, "the response says why: there is no command socket");
+  assert.equal(resultado.avisoDispositivoOffline, false, "and it is not the offline case");
   assert.equal(naoEntregues(), contagem + 1);
-  assert.equal(status("PC-1").dispositivoConfirmou, null, "sem placa no socket não há confirmação a esperar");
+  assert.equal(status("PC-1").dispositivoConfirmou, null, "without a board on the socket there is no confirmation to wait for");
 });
 
 test("the /comando route returns the same distinction to the panel", async () => {
@@ -142,12 +142,12 @@ test("when the socket reconnects, the channel returns, the observing panel is no
 
   const placa = await conectarPlaca("PC-3", "AA:BB:CC:F0:00:03");
   assert.equal(status("PC-3").online, true);
-  assert.equal(status("PC-3").canalComandos, true, "o socket aberto é o canal de comandos");
-  assert.ok(await ate(() => painel.statuses().at(-1).canalComandos === true), "o observador recebe o status sem esperar o rebroadcast periódico");
+  assert.equal(status("PC-3").canalComandos, true, "the open socket is the command channel");
+  assert.ok(await ate(() => painel.statuses().at(-1).canalComandos === true), "the observer receives the status without waiting for the periodic rebroadcast");
 
   placa.enviar({ tipo: "info", fw: "4.3.0", failsafeConfigurado: false, failsafeLatched: false });
   assert.ok(await ate(() => placa.estados().length === 1));
-  assert.equal(placa.estados()[0].power, true, "a reconexão restaura a intenção persistida enquanto não havia canal");
+  assert.equal(placa.estados()[0].power, true, "reconnection restores the intent persisted while there was no channel");
   assert.equal(placa.estados()[0].restauracao, true);
 
   const contagem = naoEntregues();
@@ -157,10 +157,10 @@ test("when the socket reconnects, the channel returns, the observing panel is no
   assert.equal(naoEntregues(), contagem);
   assert.ok(await ate(() => placa.estados().length === 2));
   assert.equal(placa.estados()[1].temp, 25);
-  assert.equal(status("PC-3").dispositivoConfirmou, false, "submetido não é confirmado");
+  assert.equal(status("PC-3").dispositivoConfirmou, false, "submitted is not confirmed");
 
   await placa.fechar();
-  assert.equal(status("PC-3").online, false, "o fechamento do socket é autoritativo");
+  assert.equal(status("PC-3").online, false, "the socket close is authoritative");
   assert.equal(status("PC-3").canalComandos, false);
   assert.ok(await ate(() => painel.statuses().at(-1).canalComandos === false && painel.statuses().at(-1).online === false));
   painel.ws.close();

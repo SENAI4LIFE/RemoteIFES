@@ -25,7 +25,7 @@ test("the mobile page is authenticated, responsive and does not offer an unpubli
   await expect(page.locator(".mobile-app-status")).toHaveClass(/is-indisponivel/);
   await expect(page.locator(".mobile-app-download-btn")).toHaveCount(0);
   await expect(page.locator(".mobile-app-card.is-recommended h3")).toHaveText("Instalar como PWA");
-  expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);
+  expect(await semRolagemHorizontal(page), "app page without horizontal scroll").toBe(true);
 });
 
 test("the account menu offers neither help nor manual, only app and logout", async ({ page, context }) => {
