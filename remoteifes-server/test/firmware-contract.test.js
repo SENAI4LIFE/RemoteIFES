@@ -1,3 +1,6 @@
+process.env.REMOTEIFES_DB_PATH = ":memory:";
+process.env.NODE_ENV = "test";
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");

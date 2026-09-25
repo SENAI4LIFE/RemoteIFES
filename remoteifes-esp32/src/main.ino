@@ -21,6 +21,7 @@
 #include <new>
 
 #include "root_ca.h"
+#include "mesh.h"
 
 #ifndef FW_VERSAO
 #define FW_VERSAO "0.0.0-dev"
@@ -54,6 +55,7 @@ const char SERVER_IDENTIFICACAO_PATH[] = "/dispositivo/identificar";
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
 const char DEVICE_WS_PATH[] = "/ws/dispositivo";
 const char AP_PASSWORD_PADRAO[] = "remoteifes";
+const char MESH_ID_PADRAO[] = "52454d494645";
 
 const unsigned long ACTION_SWITCH_DEBOUNCE_MS = 40;
 const unsigned long FAILSAFE_SWITCH_HOLD_MS = 5000;
@@ -173,6 +175,7 @@ unsigned long wifiDesconectadoDesde = 0;
 unsigned long ultimaIdentificacao = 0;
 unsigned long reinicioAgendadoEm = 0;
 bool wsConfigurado = false;
+bool canalMalhaAnterior = false;
 String salaWsConfigurada;
 bool littleFsOk = false;
 
@@ -219,6 +222,10 @@ void conectarWsServidor();
 void handleWsServidorEvent(WStype_t type, uint8_t* payload, size_t length);
 void processarComandoServidor(uint8_t* payload, size_t length);
 void enviarTelemetriaWs();
+bool canalServidorAberto();
+bool enviarAoServidor(String& payload);
+void configurarMalha();
+void escoarMalhaParaServidor();
 void enviarModoAlterado();
 void enviarInfoDispositivo();
 void preencherVersaoEstado(JsonDocument& doc);
@@ -317,15 +324,35 @@ void setup() {
     Serial.println("Failsafe OFF nao configurado: o servidor envia o RAW ao atribuir um protocolo com failsafe.");
   }
 
-  if (savedSSID.length() > 0 && configuracaoValida()) {
+  configurarMalha();
+
+  String motivoMalha;
+  if (meshNoAtivo()) {
+    apModeActive = false;
+    WiFi.softAPdisconnect(true);
+    WiFi.persistent(false);
+    if (meshIniciar(motivoMalha)) {
+      Serial.println("Modo no da malha: sem Wi-Fi de infraestrutura (clique no switch para abrir o RemoteIFES-Setup).");
+    } else {
+      Serial.println("Malha nao iniciou (" + motivoMalha + "); abrindo o portal de configuracao.");
+      startAPMode();
+    }
+  } else if (savedSSID.length() > 0 && configuracaoValida()) {
     Serial.printf("Conectando a rede salva: %s\n", savedSSID.c_str());
     apModeActive = false;
-    WiFi.mode(WIFI_STA);
-    WiFi.softAPdisconnect(true);
+    if (meshGatewayAtivo()) {
+      WiFi.mode(WIFI_AP_STA);
+    } else {
+      WiFi.mode(WIFI_STA);
+      WiFi.softAPdisconnect(true);
+    }
     WiFi.setAutoReconnect(true);
     WiFi.persistent(false);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
     Serial.println("Modo operacional: ponto de acesso e portal local desligados (clique no switch para abrir o RemoteIFES-Setup).");
+    if (meshGatewayAtivo() && !meshIniciar(motivoMalha)) {
+      Serial.println("Malha nao iniciou no gateway (" + motivoMalha + "); a operacao direta continua.");
+    }
   } else {
     startAPMode();
   }
@@ -347,8 +374,20 @@ void loop() {
 
   if (apTemporarioAte != 0 && (long)(millis() - apTemporarioAte) >= 0) encerrarApTemporario();
 
-  gerenciarConexaoWifi();
-  wsCliente.loop();
+  if (meshNoAtivo()) {
+    meshProcessar();
+    if (meshNoConectado() != canalMalhaAnterior) {
+      canalMalhaAnterior = meshNoConectado();
+      if (canalMalhaAnterior) enviarInfoDispositivo();
+    }
+  } else {
+    gerenciarConexaoWifi();
+    wsCliente.loop();
+    if (meshGatewayAtivo()) {
+      meshProcessar();
+      escoarMalhaParaServidor();
+    }
+  }
 
   if (otaPendenteValidacao) verificarValidacaoOta();
 
@@ -365,27 +404,71 @@ void loop() {
     atualizarLeituraSensores();
   }
 
-  if (agora - lastTelemetryWs >= TELEMETRY_WS_INTERVAL && estadoWsServidor == WS_ESTADO_CONECTADO) {
+  if (agora - lastTelemetryWs >= TELEMETRY_WS_INTERVAL && canalServidorAberto()) {
     lastTelemetryWs = agora;
     enviarTelemetriaWs();
   }
 
-  const unsigned long intervaloIdentificacao = salaId.length() > 0 ? IDENTIFICACAO_INTERVAL_MS : IDENTIFICACAO_PENDENTE_INTERVAL_MS;
-  if (estadoWifi == WIFI_ESTADO_CONECTADO && (ultimaIdentificacao == 0 || agora - ultimaIdentificacao >= intervaloIdentificacao)) {
-    ultimaIdentificacao = agora;
-    identificarSalaNoServidor();
-  }
+  if (!meshNoAtivo()) {
+    const unsigned long intervaloIdentificacao = salaId.length() > 0 ? IDENTIFICACAO_INTERVAL_MS : IDENTIFICACAO_PENDENTE_INTERVAL_MS;
+    if (estadoWifi == WIFI_ESTADO_CONECTADO && (ultimaIdentificacao == 0 || agora - ultimaIdentificacao >= intervaloIdentificacao)) {
+      ultimaIdentificacao = agora;
+      identificarSalaNoServidor();
+    }
 
-  if (agora - lastHeartbeat >= SERVER_HEARTBEAT_INTERVAL && estadoWifi == WIFI_ESTADO_CONECTADO && estadoWsServidor != WS_ESTADO_CONECTADO) {
-    lastHeartbeat = agora;
-    sendHeartbeat();
+    if (agora - lastHeartbeat >= SERVER_HEARTBEAT_INTERVAL && estadoWifi == WIFI_ESTADO_CONECTADO && estadoWsServidor != WS_ESTADO_CONECTADO) {
+      lastHeartbeat = agora;
+      sendHeartbeat();
+    }
   }
 
   if (reinicioAgendadoEm != 0 && (long)(agora - reinicioAgendadoEm) >= 0) ESP.restart();
 }
 
 bool configuracaoValida() {
+  if (meshNoAtivo()) return true;
   return serverHost.length() > 0 && serverPort > 0 && serverPort <= 65535;
+}
+
+bool canalServidorAberto() {
+  if (meshNoAtivo()) return meshNoConectado();
+  return estadoWsServidor == WS_ESTADO_CONECTADO;
+}
+
+bool enviarAoServidor(String& payload) {
+  if (meshNoAtivo()) return meshNoEnviar(payload);
+  if (estadoWsServidor != WS_ESTADO_CONECTADO) return false;
+  wsCliente.sendTXT(payload);
+  return true;
+}
+
+void meshEntregarDoServidor(const uint8_t* dados, size_t tamanho) {
+  processarComandoServidor(const_cast<uint8_t*>(dados), tamanho);
+}
+
+void escoarMalhaParaServidor() {
+  if (!meshGatewayAtivo() || estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  String json;
+  for (uint8_t i = 0; i < 4 && meshGatewayParaServidor(json); i++) wsCliente.sendTXT(json);
+}
+
+void configurarMalha() {
+  MeshConfig malha;
+  malha.modo = meshModoDeTexto(preferences.isKey("meshModo") ? preferences.getString("meshModo", "direto") : String("direto"));
+  malha.meshId = preferences.isKey("meshId") ? preferences.getString("meshId", MESH_ID_PADRAO) : String(MESH_ID_PADRAO);
+  if (malha.meshId.length() == 0) malha.meshId = MESH_ID_PADRAO;
+  malha.senha = preferences.isKey("meshSenha") ? preferences.getString("meshSenha", "") : String("");
+  malha.deviceId = deviceId;
+  malha.segredo = deviceSecret;
+
+  String motivo;
+  if (meshConfigurar(malha, motivo)) {
+    if (malha.modo != MESH_MODO_DIRETO) Serial.printf("Malha configurada no modo %s.\n", meshModoTexto(malha.modo));
+    return;
+  }
+  Serial.println("Malha nao configurada (" + motivo + "); seguindo no modo direto.");
+  MeshConfig direto;
+  meshConfigurar(direto, motivo);
 }
 
 void agendarReinicio(unsigned long esperaMs) {
@@ -466,11 +549,42 @@ void handleSaveSetup() {
   String newTls = server.arg("tls");
   String newDevId = server.arg("devId");
   String newDevSec = server.arg("devSec");
+  String newMeshModo = server.arg("meshModo");
+  String newMeshId = server.arg("meshId");
+  String newMeshSenha = server.arg("meshSenha");
+
+  if (newMeshModo != "gateway" && newMeshModo != "no") newMeshModo = "direto";
+  newMeshId.toLowerCase();
+  if (newMeshId.length() == 0) newMeshId = MESH_ID_PADRAO;
 
   int porta = newPorta.toInt();
-  if (newSSID.length() == 0 || newHost.length() == 0 || porta <= 0 || porta > 65535) {
+  const bool exigeRede = newMeshModo != "no";
+  if (exigeRede && (newSSID.length() == 0 || newHost.length() == 0 || porta <= 0 || porta > 65535)) {
     server.send(400, "text/plain", "Preencha todos os campos obrigatorios.");
     return;
+  }
+
+  if (newMeshModo != "direto") {
+    String segredoAlvo = newDevSec.length() > 0 ? newDevSec : deviceSecret;
+    String idAlvo = newDevId.length() > 0 ? newDevId : deviceId;
+    if (idAlvo.length() < 4 || segredoAlvo.length() < 20) {
+      server.send(400, "text/plain", "Os modos de malha exigem o identificador e o segredo do dispositivo.");
+      return;
+    }
+    if (newMeshSenha.length() == 0) newMeshSenha = preferences.isKey("meshSenha") ? preferences.getString("meshSenha", "") : String("");
+    if (newMeshSenha.length() < 8 || newMeshSenha.length() > 63) {
+      server.send(400, "text/plain", "A senha da malha deve ter de 8 a 63 caracteres.");
+      return;
+    }
+    bool idValido = newMeshId.length() == 12;
+    for (unsigned int i = 0; idValido && i < newMeshId.length(); i++) {
+      const char c = newMeshId[i];
+      idValido = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    }
+    if (!idValido) {
+      server.send(400, "text/plain", "O identificador da malha deve ter 12 digitos hexadecimais.");
+      return;
+    }
   }
 
   if (newTls != "ca" && newTls != "inseguro" && newTls != "off") newTls = "ca";
@@ -481,20 +595,29 @@ void handleSaveSetup() {
     return;
   }
 
-  preferences.putString("ssid", newSSID);
-  preferences.putString("pass", newPASS);
-  preferences.putString("host", newHost);
-  preferences.putInt("porta", porta);
+  if (exigeRede) {
+    preferences.putString("ssid", newSSID);
+    preferences.putString("pass", newPASS);
+    preferences.putString("host", newHost);
+    preferences.putInt("porta", porta);
+  }
   preferences.putString("tls", newTls);
   if (newDevId.length() > 0) {
     preferences.putString("devId", newDevId);
     preferences.putString("devSec", newDevSec);
   }
+  preferences.putString("meshModo", newMeshModo);
+  if (newMeshModo == "direto") {
+    if (preferences.isKey("meshSenha")) preferences.remove("meshSenha");
+  } else {
+    preferences.putString("meshId", newMeshId);
+    preferences.putString("meshSenha", newMeshSenha);
+  }
 
   File f = LittleFS.open("/restart.html", "r");
   String response = f ? f.readString() : String("Credenciais salvas. Reiniciando...");
   if (f) f.close();
-  response.replace("{{ssid}}", escaparHtml(newSSID));
+  response.replace("{{ssid}}", escaparHtml(exigeRede ? newSSID : String("malha RemoteIFES")));
 
   server.send(200, "text/html", response);
   agendarReinicio(1500);
@@ -598,6 +721,12 @@ void encerrarApTemporario() {
   if (!apIniciado || apModeActive) return;
   server.stop();
   dnsServer.stop();
+  if (meshModo() != MESH_MODO_DIRETO) {
+    reportComando("setup_ap", "encerrado");
+    Serial.println("RemoteIFES-Setup encerrado; reiniciando para restabelecer a malha.");
+    agendarReinicio(1000);
+    return;
+  }
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
   apIniciado = false;
@@ -655,6 +784,11 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
   if (erro) return;
 
   const char* tipo = doc["tipo"] | "";
+
+  if (meshGatewayAtivo() && (strcmp(tipo, "mesh") == 0 || strcmp(tipo, "mesh_recusado") == 0)) {
+    meshGatewayDoServidor(doc);
+    return;
+  }
 
   if (strcmp(tipo, "device_role") == 0) {
     aplicarPapelDoServidor(doc);
@@ -850,7 +984,7 @@ void enviarModoAlterado() {
   doc["modo"] = modoAtualTexto();
   String saida;
   serializeJson(doc, saida);
-  wsCliente.sendTXT(saida);
+  enviarAoServidor(saida);
 }
 
 void enviarInfoDispositivo() {
@@ -858,12 +992,14 @@ void enviarInfoDispositivo() {
   doc["tipo"] = "info";
   doc["fw"] = FW_VERSAO;
   doc["otaValidacao"] = true;
+  if (meshGatewayAtivo()) doc["gateway"] = true;
+  meshNoDiagnostico(doc);
   preencherStatusFailsafe(doc);
   preencherVersaoEstado(doc);
   if (powerConhecido) doc["ligado"] = lastKnownPower;
   String saida;
   serializeJson(doc, saida);
-  wsCliente.sendTXT(saida);
+  enviarAoServidor(saida);
   if (!otaPendenteValidacao) reportarOtaValidado();
 }
 
@@ -872,7 +1008,7 @@ void preencherVersaoEstado(JsonDocument& doc) {
 }
 
 void reportarOtaValidado() {
-  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  if (!canalServidorAberto()) return;
   if (!preferences.isKey(OTA_TENTATIVA_KEY)) return;
   if (otaValidadoEnvios >= OTA_VALIDADO_MAX_ENVIOS) return;
   otaValidadoEnvios++;
@@ -883,7 +1019,7 @@ void reportarOtaValidado() {
   doc["versao"] = FW_VERSAO;
   String payload;
   serializeJson(doc, payload);
-  wsCliente.sendTXT(payload);
+  enviarAoServidor(payload);
 }
 
 void concluirEvidenciaOta(JsonDocument& doc) {
@@ -901,6 +1037,7 @@ void enviarTelemetriaWs() {
   doc["rssi"] = WiFi.RSSI();
   doc["modo"] = modoAtualTexto();
   doc["fw"] = FW_VERSAO;
+  meshNoDiagnostico(doc);
   preencherStatusFailsafe(doc);
   preencherVersaoEstado(doc);
   if (powerConhecido) doc["ligado"] = lastKnownPower;
@@ -924,7 +1061,7 @@ void enviarTelemetriaWs() {
 
   String saida;
   serializeJson(doc, saida);
-  wsCliente.sendTXT(saida);
+  enviarAoServidor(saida);
 }
 
 void handleIRCapture() {
@@ -950,7 +1087,7 @@ void handleIRCapture() {
 
   String saida;
   serializeJson(doc, saida);
-  if (estadoWsServidor == WS_ESTADO_CONECTADO) wsCliente.sendTXT(saida);
+  enviarAoServidor(saida);
 
   reportComando("sinal_capturado", "protocolo=" + protocolName + ";nativo=" + String(isKnownAC ? "sim" : "nao") + ";hex=" + hexValue);
   delete[] rawArray;
@@ -1241,14 +1378,14 @@ void preencherStatusFailsafe(JsonDocument& doc) {
 }
 
 void enviarStatusFailsafe() {
-  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  if (!canalServidorAberto()) return;
   JsonDocument doc;
   doc["tipo"] = "failsafe_status";
   preencherStatusFailsafe(doc);
   preencherVersaoEstado(doc);
   String saida;
   serializeJson(doc, saida);
-  wsCliente.sendTXT(saida);
+  enviarAoServidor(saida);
 }
 
 void configurarSwitchAcao() {
@@ -1439,7 +1576,7 @@ void sendHeartbeat() {
 }
 
 void reportComando(const String& cmd, const String& valor) {
-  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  if (!canalServidorAberto()) return;
 
   JsonDocument doc;
   doc["tipo"] = "comando";
@@ -1449,11 +1586,11 @@ void reportComando(const String& cmd, const String& valor) {
   String payload;
   serializeJson(doc, payload);
 
-  wsCliente.sendTXT(payload);
+  enviarAoServidor(payload);
 }
 
 void verificarValidacaoOta() {
-  bool nucleoOk = littleFsOk && WiFi.status() == WL_CONNECTED && estadoWsServidor == WS_ESTADO_CONECTADO;
+  bool nucleoOk = littleFsOk && canalServidorAberto() && (meshNoAtivo() || WiFi.status() == WL_CONNECTED);
   if (nucleoOk) {
     if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
       Serial.println("Autovalidacao OK: novo firmware confirmado.");
@@ -1481,7 +1618,7 @@ void bytesParaHex(const uint8_t* dados, size_t n, char* saida) {
 }
 
 void reportarOtaResultado(bool ok, const String& erro) {
-  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  if (!canalServidorAberto()) return;
   JsonDocument doc;
   doc["tipo"] = "ota_resultado";
   doc["resultado"] = ok ? "ok" : "erro";
@@ -1489,18 +1626,18 @@ void reportarOtaResultado(bool ok, const String& erro) {
   doc["versao"] = FW_VERSAO;
   String payload;
   serializeJson(doc, payload);
-  wsCliente.sendTXT(payload);
+  enviarAoServidor(payload);
 }
 
 void reportarOtaProgresso(size_t recebido, size_t total) {
-  if (estadoWsServidor != WS_ESTADO_CONECTADO) return;
+  if (!canalServidorAberto()) return;
   JsonDocument doc;
   doc["tipo"] = "ota_progresso";
   doc["recebido"] = recebido;
   doc["total"] = total;
   String payload;
   serializeJson(doc, payload);
-  wsCliente.sendTXT(payload);
+  enviarAoServidor(payload);
 }
 
 void iniciarOtaOferta(JsonDocument& doc) {
@@ -1510,6 +1647,10 @@ void iniciarOtaOferta(JsonDocument& doc) {
   }
   if (runtimeMode != RUNTIME_OPERATION) {
     reportarOtaResultado(false, "dispositivo em modo de configuracao");
+    return;
+  }
+  if (meshNoAtivo()) {
+    reportarOtaResultado(false, "atualizacao OTA indisponivel para placas conectadas pela malha");
     return;
   }
   if (WiFi.status() != WL_CONNECTED) {

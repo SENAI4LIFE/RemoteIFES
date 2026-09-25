@@ -45,6 +45,18 @@
       <label for="devSec">Segredo do dispositivo (opcional):</label>
       <input type="password" id="devSec" name="devSec" placeholder="fornecido pelo painel ao provisionar" autocomplete="off">
       <p class="hint">Use a credencial provisionada no painel. A identificacao apenas por MAC fica disponivel somente quando o superadministrador ativa explicitamente o modo de compatibilidade.</p>
+      <label for="meshModo">Rede do modulo:</label>
+      <select id="meshModo" name="meshModo">
+        <option value="direto">Wi-Fi direto (padrao)</option>
+        <option value="gateway">Gateway da malha (tambem usa Wi-Fi direto)</option>
+        <option value="no">No da malha (sem Wi-Fi da instituicao)</option>
+      </select>
+      <p class="hint">Use a malha apenas onde nao ha cobertura de Wi-Fi. O gateway precisa do Wi-Fi da instituicao e do servidor; o no da malha precisa somente do identificador e do segredo do dispositivo, e nao usa o endereco do servidor. Os dois modos exigem a credencial provisionada no painel.</p>
+      <label for="meshId">Identificador da malha:</label>
+      <input type="text" id="meshId" name="meshId" placeholder="52454d494645" autocomplete="off">
+      <label for="meshSenha">Senha da malha:</label>
+      <input type="password" id="meshSenha" name="meshSenha" placeholder="minimo 8 caracteres" autocomplete="off">
+      <p class="hint">O identificador e a senha da malha sao os mesmos em todos os modulos da malha. A senha protege o radio; ela nao identifica nenhum modulo, e cada um continua se autenticando com o proprio segredo.</p>
       <button type="submit">Salvar e Conectar</button>
     </form>
   </div>
