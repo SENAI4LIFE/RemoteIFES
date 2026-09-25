@@ -765,7 +765,7 @@ node instalacao/instalar.js                           # macOS, ou Linux por usu�
 
 No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket`/`.service`. Em qualquer sistema ele cria o atalho de aplicativo e exibe **uma única vez** um segredo de instalação para criar o primeiro operador — que também fica em `bootstrap-token`, no diretório de estado, legível só por quem administra o host. Isso faz a instalação funcionar igual com interface gráfica e por SSH sem terminal interativo.
 
-Para remover: `node instalacao/desinstalar.js --simular` mostra exatamente o que sairia; sem `--apagar-estado`, operadores, auditoria e histórico são preservados. A remoção recusa qualquer caminho que não prove ser uma instalação do console, e nunca toca no checkout do RemoteIFES.
+Para remover: `node instalacao/desinstalar.js --simular` mostra exatamente o que sairia, sem chamar nada que mute; sem `--apagar-estado`, operadores, auditoria e histórico são preservados. A remoção encerra o console em execução antes de apagar o programa — e o que autoriza encerrar é a prova de identidade, não o PID, que é reciclado. Ela recusa qualquer caminho que não prove ser uma instalação do console, e nunca toca no checkout do RemoteIFES. Raiz, estado e escopo são inferidos da instalação, então o comando funciona sem argumentos.
 
 ### Acessar
 
@@ -773,8 +773,12 @@ Abra pelo atalho do sistema, ou pelo lançador:
 
 ```bash
 node <raiz>/launcher-bootstrap.js            # abre o console no navegador padrão
+node <raiz>/launcher-bootstrap.js --iniciar  # sobe o console e sai, sem abrir navegador
 node <raiz>/launcher-bootstrap.js --status   # estado do console, da aplicação e da versão do programa
 ```
+
+`--iniciar` é o que serve um host sem interface gráfica, e é o caminho que a CI exercita para
+provar que o lançador instalado sobe o **console** — não outra cópia de si mesmo.
 
 Antes de abrir o navegador, o lançador **confere a identidade** de quem responde na porta esperada: envia um desafio e exige a resposta HMAC derivada do segredo que só o console em execução conhece. Se outro processo tiver tomado a porta, o navegador não é aberto. Nenhuma credencial reutilizável viaja em URL, argumento de processo ou atalho.
 
