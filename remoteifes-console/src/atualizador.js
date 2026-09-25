@@ -338,9 +338,31 @@ async function verificarPublicacao({ forcar = false } = {}) {
  * Só vale para instalação gerenciada lado a lado: numa execução a partir do código-fonte não há
  * ponteiro com que divergir.
  */
-function divergenciaDeVersao(instaladas, emExecucao) {
+function divergenciaDeVersao(instaladas, emExecucao, info = {}) {
   if (!instaladas.gerenciadoLadoALado || !instaladas.ativa || !emExecucao) return null;
   if (instaladas.ativa === emExecucao) return null;
+
+  // Reinício pendente NÃO é divergência.
+  //
+  // Entre a troca do ponteiro e o reinício, o processo em execução é legitimamente o anterior. Um
+  // alarme aqui diria que a versão "não subiu" no exato instante em que tudo está certo — e um
+  // aviso que grita no caminho normal é um aviso que o operador aprende a ignorar.
+  const concluidaAgora =
+    info.transacao &&
+    info.transacao.etapa === "concluida" &&
+    info.transacao.versao === instaladas.ativa &&
+    Date.parse(info.atualizadoEm || info.transacao.em || 0) > Date.now() - 10 * 60 * 1000;
+  if (concluidaAgora && emExecucao === instaladas.anterior) {
+    return {
+      registrada: instaladas.ativa,
+      emExecucao,
+      reinicioPendente: true,
+      motivo:
+        `a versão ${instaladas.ativa} foi ativada e este processo ainda é o ${emExecucao}: o reinício está ` +
+        "pendente. Feche e reabra o console para carregar a versão nova.",
+    };
+  }
+
   return {
     registrada: instaladas.ativa,
     emExecucao,
@@ -368,7 +390,7 @@ async function situacao({ consultarRede = false } = {}) {
   return {
     versaoEmExecucao: emExecucao,
     versaoAtivaRegistrada: instaladas.ativa,
-    divergenciaDeVersao: divergenciaDeVersao(instaladas, emExecucao),
+    divergenciaDeVersao: divergenciaDeVersao(instaladas, emExecucao, lerEstadoInstalacao()),
     versaoAnterior: instaladas.anterior,
     versoesPresentes: instaladas.presentes,
     gerenciadoLadoALado: instaladas.gerenciadoLadoALado,
@@ -440,6 +462,7 @@ function extrairTarGz(arquivoOuConteudo, destino) {
 
   let posicao = 0;
   let arquivos = 0;
+  let entradas = 0;
   let prefixoLongo = null;
 
   while (posicao + 512 <= bruto.length) {
@@ -482,13 +505,18 @@ function extrairTarGz(arquivoOuConteudo, destino) {
       throw new Error(`artefato contém caminho fora do destino: ${nome}`);
     }
 
+    // O teto conta TODAS as entradas, não só arquivos: um tar só de diretórios passava pelo
+    // limite e ainda esgotava inodes.
+    entradas += 1;
+    if (entradas > LIMITE_ARQUIVOS_PAYLOAD) {
+      throw new Error(`o artefato tem mais de ${LIMITE_ARQUIVOS_PAYLOAD} entradas; extração recusada`);
+    }
+
     if (tipo === "5") {
       fs.mkdirSync(alvo, { recursive: true });
       continue;
     }
-    if (arquivos >= LIMITE_ARQUIVOS_PAYLOAD) {
-      throw new Error(`o artefato tem mais de ${LIMITE_ARQUIVOS_PAYLOAD} arquivos; extração recusada`);
-    }
+
     fs.mkdirSync(path.dirname(alvo), { recursive: true });
     fs.writeFileSync(alvo, conteudo);
     // Preserva apenas o bit de execução; nada de setuid/setgid vindo de um artefato.
@@ -512,6 +540,23 @@ function limparDescargas() {
  * entre o estágio e a troca do ponteiro, o que ficou é lixo em `descargas/` ou um diretório de
  * versão incompleto — nunca uma instalação pela metade, porque a troca é um rename.
  */
+/**
+ * Remove estágios de extração (`versoes/<v>.parcial-<aleatorio>`).
+ *
+ * Nunca toca em `.substituido-*`: durante uma substituição de payload aquele diretório é a única
+ * cópia da versão anterior, e apagá-lo transformaria uma reinstalação interrompida em perda da
+ * versão.
+ */
+function limparParciais(versao) {
+  try {
+    const prefixo = versao ? `${String(versao)}.parcial-` : null;
+    for (const nome of fs.readdirSync(dirVersoes())) {
+      const ehParcial = /^\d+\.\d+\.\d+\.parcial-[0-9a-f]+$/.test(nome) || (prefixo && nome.startsWith(prefixo));
+      if (ehParcial) fs.rmSync(path.join(dirVersoes(), nome), { recursive: true, force: true });
+    }
+  } catch {}
+}
+
 function reconciliar() {
   // Uma operação viva está mexendo em versoes/ agora: reconciliar aqui apagaria o estágio dela.
   // Acontece de verdade quando um segundo console sobe durante uma atualização.
@@ -519,6 +564,11 @@ function reconciliar() {
   if (emAndamento) {
     return { reconciliado: false, adiado: true, motivo: `operação ${emAndamento.operacao || "de versão"} em andamento (pid ${emAndamento.pid})` };
   }
+
+  // Parciais são varridos SEMPRE, não só quando há transação incompleta: um estágio pode sobrar
+  // de um registro perdido, de uma transação já concluída ou de um reparo do instalador, e nesses
+  // casos ninguém limpava. `.substituido-*` continua intocado.
+  limparParciais(null);
 
   const info = lerEstadoInstalacao();
   if (!info.transacao) return { reconciliado: false };
@@ -530,20 +580,7 @@ function reconciliar() {
     try {
       fs.rmSync(destino, { recursive: true, force: true });
     } catch {}
-    // A extração monta `versoes/<v>.parcial-<aleatorio>` e só depois renomeia. Remover apenas
-    // `versoes/<v>` deixava esses parciais para trás, e quedas repetidas enchiam o disco.
-    // O padrão é estrito para não alcançar uma versão legítima.
-    try {
-      const prefixo = `${String(t.versao || "")}.parcial-`;
-      for (const nome of fs.readdirSync(dirVersoes())) {
-        // Só `.parcial-*`: um `.substituido-*` é a ÚNICA cópia do payload anterior enquanto uma
-        // substituição está no meio do caminho, e apagá-lo transformaria uma reinstalação
-        // interrompida em perda da versão.
-        if (nome.startsWith(prefixo) || /^\d+\.\d+\.\d+\.parcial-[0-9a-f]+$/.test(nome)) {
-          fs.rmSync(path.join(dirVersoes(), nome), { recursive: true, force: true });
-        }
-      }
-    } catch {}
+    limparParciais(t.versao);
     limparDescargas();
     estado.auditar("atualizacao-console-reconciliada", { versao: t.versao, etapa: t.etapa });
   }
