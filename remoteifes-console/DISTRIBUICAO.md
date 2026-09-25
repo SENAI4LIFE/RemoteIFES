@@ -145,7 +145,21 @@ governam o arquivo:
    profundidade mínima, pertencer a quem desinstala (uid em POSIX, permissão de escrita no
    Windows) e **não** estar dentro de um checkout do RemoteIFES;
 2. **o estado fica por padrão** — operadores, auditoria e histórico sobrevivem; `--apagar-estado`
-   é explícito, e `--simular` mostra exatamente o que sairia antes de qualquer remoção.
+   é explícito, e `--simular` mostra exatamente o que sairia **sem chamar nada que mute** (nem o
+   registro de inicialização, nem unidades, nem a regra de sudo);
+3. **nada de processo órfão** — o console em execução é encerrado antes de o programa sair. O que
+   autoriza encerrar não é o PID do contrato, que é reciclado, mas a prova de identidade: quem
+   responde na porta demonstra possuir o segredo que só este console publicou. Falhando a prova,
+   nada é encerrado e o operador é avisado.
+
+Raiz, estado e escopo são **inferidos da instalação** de onde o desinstalador saiu, não presumidos
+pelo sistema: uma instalação de usuário no Linux era tratada como de sistema, reclamava que
+`/opt` não existia e deixava `~/.local/...` intacto.
+
+As operações de versão — atualizar, importar offline, reverter — tomam uma **trava exclusiva** na
+raiz da instalação. Sem ela, duas operações simultâneas podiam instalar versões diferentes e uma
+podar a que a outra estava a ponto de ativar, deixando o ponteiro apontando para um diretório
+inexistente. Uma trava de processo morto é recuperada e auditada.
 
 O desinstalador mora dentro do que apaga, então ele se copia para um diretório temporário e
 recomeça de lá. Sem isso, no Windows o arquivo em execução mantém um handle aberto e a raiz
@@ -205,6 +219,13 @@ mínima que pode atualizar para esta. Ele não tem assinatura própria: vale com
 a atestação cobre. A versão do manifesto tem de ser a da etiqueta do certificado, e o nome de cada
 payload é fixo por versão e alvo — um release antigo reapresentado como novo, ou o payload de outro
 alvo, não passa.
+
+**Atestado não é o mesmo que correto.** O console impõe tetos próprios que o manifesto não pode
+ampliar: bytes comprimidos, bytes descomprimidos e quantidade de arquivos. Um erro de publicação
+que declare um tamanho absurdo, ou um artefato pequeno que expanda para centenas de MiB, é
+recusado antes de qualquer escrita — num Raspberry Pi de 1 GiB isso é a diferença entre uma
+atualização recusada e um host derrubado. Um `minimoParaAtualizar` presente mas malformado
+também é recusado, em vez de desligar o portão de compatibilidade em silêncio.
 
 A verificação é **fechada por padrão**, e a ordem garante isso: o payload só é baixado depois de a
 atestação, a identidade e a política de versão conferirem, e só é extraído depois de o SHA-256 dele
