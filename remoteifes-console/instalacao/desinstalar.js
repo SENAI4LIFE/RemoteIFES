@@ -2,6 +2,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const net = require("net");
 
 // Desinstalação do Console de Operações.
 //
@@ -154,7 +155,7 @@ function removerArquivo(caminho, { simular }) {
  * removido — o pior dos dois mundos. Recomeçar de fora resolve de uma vez, sem repetir
  * tentativas nem esperar por um handle.
  */
-function reexecutarForaDaInstalacao(raiz, dirEstado) {
+function reexecutarForaDaInstalacao(raiz, dirEstado, escopoEfetivo) {
   const aqui = path.resolve(__dirname);
   const alvo = path.resolve(raiz);
   if (!aqui.startsWith(alvo + path.sep)) return false;
@@ -169,10 +170,14 @@ function reexecutarForaDaInstalacao(raiz, dirEstado) {
     fs.copyFileSync(__filename, copia);
 
     // Os caminhos vão resolvidos: a cópia não deve recalcular padrões a partir de onde está.
+    // O ESCOPO também vai resolvido. A cópia temporária não mora dentro de uma instalação, então
+    // ela não consegue inferir nada: sem repassar, uma desinstalação de escopo de usuário virava
+    // escopo de sistema no filho, deixava a integração do usuário instalada e podia mexer na
+    // integração de sistema de outra instalação.
     const repassar = process.argv.slice(2).filter((a, i, todos) => {
       const anterior = todos[i - 1];
-      if (a === "--raiz" || a === "--estado") return false;
-      if (anterior === "--raiz" || anterior === "--estado") return false;
+      if (a === "--raiz" || a === "--estado" || a === "--escopo") return false;
+      if (anterior === "--raiz" || anterior === "--estado" || anterior === "--escopo") return false;
       return true;
     });
     // O cwd precisa sair da instalação, no pai e no filho: no Windows um handle de diretório
@@ -182,7 +187,7 @@ function reexecutarForaDaInstalacao(raiz, dirEstado) {
     } catch {}
     const r = require("child_process").spawnSync(
       process.execPath,
-      [copia, ...repassar, "--raiz", alvo, "--estado", path.resolve(dirEstado)],
+      [copia, ...repassar, "--raiz", alvo, "--estado", path.resolve(dirEstado), "--escopo", escopoEfetivo],
       { stdio: "inherit", cwd: temp }
     );
     process.exitCode = r.status === null ? 1 : r.status;
@@ -238,25 +243,64 @@ async function encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log }
     plataforma.encerrarArvore(contrato.pid, "SIGTERM");
   } catch (erro) {
     log(`   não foi possível encerrar: ${erro.message}`);
-    return { encerrado: false };
+    return { encerrado: false, motivo: erro.message };
   }
 
-  // Espera a porta parar de responder. Não é retentativa cega: é confirmar a transição que o
-  // sinal pediu, exatamente como se espera um serviço parar de fato antes de seguir.
-  for (let i = 0; i < 40; i += 1) {
-    const ainda = await identidade.verificarIdentidade(contrato, { timeoutMs: 500 });
-    if (!ainda.ok) {
-      log("   console encerrado.");
-      return { encerrado: true };
-    }
-    await new Promise((resolver) => setTimeout(resolver, 250));
+  // Prazos ajustáveis: um Pi carregado demora mais que um desktop, e um teste não deve gastar
+  // 15 s provando que a espera termina.
+  const prazoNormal = Number(process.env.CONSOLE_PARADA_MS) > 0 ? Number(process.env.CONSOLE_PARADA_MS) : 10_000;
+  const prazoForcado = Math.max(Math.round(prazoNormal / 2), 500);
+
+  if (await esperarPortaFechar(contrato.porta, prazoNormal)) {
+    log("   console encerrado.");
+    return { encerrado: true };
   }
 
   log("   o console não encerrou no prazo; forçando.");
   try {
     plataforma.encerrarArvore(contrato.pid, "SIGKILL");
-  } catch {}
-  return { encerrado: true, forcado: true };
+  } catch (erro) {
+    log(`   não foi possível forçar: ${erro.message}`);
+  }
+  // O resultado do SIGKILL é RECONFERIDO: engolir o erro e declarar encerrado era afirmar sem
+  // prova justamente no caminho em que a parada tinha acabado de falhar.
+  if (await esperarPortaFechar(contrato.porta, prazoForcado)) {
+    log("   console encerrado à força.");
+    return { encerrado: true, forcado: true };
+  }
+  return { encerrado: false, motivo: `a porta ${contrato.porta} continua aceitando conexão depois do encerramento forçado` };
+}
+
+/**
+ * Espera a porta parar de ACEITAR CONEXÃO — não "a identidade parar de conferir".
+ *
+ * Uma requisição de identidade que falhe por tempo esgotado, resposta malformada ou erro de rota
+ * parece exatamente igual a um processo que morreu, e tratar as duas coisas como parada era
+ * declarar sucesso sobre um console possivelmente vivo. A recusa de conexão é a prova de que não
+ * há mais nada escutando ali.
+ */
+function esperarPortaFechar(porta, prazoMs) {
+  const limite = Date.now() + prazoMs;
+  const tentar = () =>
+    new Promise((resolver) => {
+      const socket = net.connect({ host: "127.0.0.1", port: porta });
+      const encerrar = (aceitou) => {
+        socket.destroy();
+        resolver(aceitou);
+      };
+      socket.setTimeout(1000);
+      socket.once("connect", () => encerrar(true));
+      socket.once("timeout", () => encerrar(true)); // aceitou a conexão mas não respondeu: ainda há algo ali
+      socket.once("error", () => encerrar(false));
+    });
+
+  return (async () => {
+    for (;;) {
+      if (!(await tentar())) return true;
+      if (Date.now() >= limite) return false;
+      await new Promise((resolver) => setTimeout(resolver, 250));
+    }
+  })();
 }
 
 async function main() {
@@ -277,7 +321,7 @@ async function main() {
   const raiz = path.resolve(argumento("raiz", pareceInstalacao ? raizDoProprioScript : padroes.raizInstalacao));
   const dirEstado = path.resolve(argumento("estado", registro.estado || padroes.estado));
 
-  if (!temFlag("simular") && reexecutarForaDaInstalacao(raiz, dirEstado)) return;
+  if (!temFlag("simular") && reexecutarForaDaInstalacao(raiz, dirEstado, escopoEfetivo)) return;
 
   log("");
   log("  Console de Operações RemoteIFES — desinstalação");
@@ -308,14 +352,10 @@ async function main() {
     log("");
   }
 
-  // --- Console em execução -----------------------------------------------------------------
-  log("== Encerrando o console, se estiver em execução");
-  const encerramento = await encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log });
-  if (encerramento.impostor && !temFlag("sim")) {
-    falhar("  Desinstalação interrompida: a porta do console está ocupada por outro processo.");
-  }
-
   // --- Integração com a plataforma ------------------------------------------------------------
+  //
+  // A integração sai ANTES do encerramento. Com ativação por socket ainda habilitada, a própria
+  // sondagem da porta reativaria o serviço, e o console voltaria logo depois de ser encerrado.
   log("== Removendo a integração com o sistema");
   if (simular) {
     // `removerInicializacao` é destrutiva: no Linux ela para o console, apaga as unidades do
@@ -329,6 +369,21 @@ async function main() {
     } catch (erro) {
       log(`   não foi possível remover o registro de inicialização: ${erro.message}`);
     }
+  }
+
+  // --- Console em execução -----------------------------------------------------------------
+  log("== Encerrando o console, se estiver em execução");
+  const encerramento = await encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log });
+  if (encerramento.impostor && !temFlag("sim")) {
+    falhar("  Desinstalação interrompida: a porta do console está ocupada por outro processo.");
+  }
+  // Não conseguir provar a parada IMPEDE a remoção: apagar o programa deixando um processo vivo
+  // e autenticado é o pior desfecho possível, e era o que acontecia quando a falha era ignorada.
+  if (encerramento.motivo && !simular) {
+    falhar(
+      `  Desinstalação interrompida: não foi possível confirmar que o console parou (${encerramento.motivo}).\n` +
+        "  Encerre o processo à mão e repita. Nada foi removido."
+    );
   }
 
   // --- Atalhos ---------------------------------------------------------------------------------
