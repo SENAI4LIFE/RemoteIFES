@@ -8,7 +8,7 @@ const raiz = path.join(__dirname, "../../remoteifes-cordova");
 const original = fs.readFileSync(path.join(raiz, "config.xml"), "utf8");
 
 for (const variante of ["ausente", "duplicado", "fora-android", "origem-invalida"]) {
-  test(`endurecimento rejeita configuração ${variante} sem manter alterações`, () => {
+  test(`hardening rejects the ${variante} configuration without keeping changes`, () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-scheme-"));
     try {
       let xml = original;

@@ -68,7 +68,7 @@ async function verificarControleAcessibilidade(page) {
 }
 
 for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
-  test(`Administração centralizada e íntegra em ${nome}`, async ({ page, context }) => {
+  test(`Administration centered and intact at ${nome}`, async ({ page, context }) => {
     await abrir(page, context, "/#/admin/usuarios", tamanho);
     await expect(page.locator("#adminSub-usuarios")).toBeVisible();
     await esperarLayout(page);
@@ -130,7 +130,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     await verificarControleAcessibilidade(page);
   });
 
-  test(`Agendamentos ocupa a largura do conteúdo e permanece íntegro em ${nome}`, async ({ page, context }) => {
+  test(`Agendamentos takes the content width and stays intact at ${nome}`, async ({ page, context }) => {
     await abrir(page, context, "/#/agenda", tamanho);
     await expect(page.locator("#screen-agenda")).toBeVisible();
     await esperarLayout(page);
@@ -167,7 +167,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
     await verificarControleAcessibilidade(page);
   });
 
-  test(`Início e Manual preservam associação e alinhamento em ${nome}`, async ({ page, context }) => {
+  test(`Início and Manual keep association and alignment at ${nome}`, async ({ page, context }) => {
     await abrir(page, context, "/#/inicio", tamanho);
     const relato = page.locator('.hub-card[data-hub-card="relatos"]');
     await expect(relato).toContainText("Relatar problema");
@@ -200,7 +200,7 @@ for (const [nome, tamanho] of Object.entries(TAMANHOS)) {
   });
 }
 
-test("Agendamentos mantém largura integral com acessibilidade máxima", async ({ page, context }) => {
+test("Agendamentos keeps full width with maximum accessibility", async ({ page, context }) => {
   await context.addInitScript(() => {
     localStorage.setItem("remoteifes_font_scale", "2");
     localStorage.setItem("remoteifes_line_height", "3");

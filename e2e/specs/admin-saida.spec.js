@@ -19,7 +19,7 @@ function enviados(page, tipo) {
   return page.evaluate((t) => window.__wsEnviados.filter((m) => m.tipo === t), tipo);
 }
 
-test("sair de Status > Sistema pela navegação principal encerra a sondagem de monitoramento e voltar a reinicia", async ({ page, context }) => {
+test("leaving Status > Sistema through the main navigation stops monitoring polling and returning restarts it", async ({ page, context }) => {
   const consultas = [];
   await page.route("**/admin/monitoramento", (rota) => {
     consultas.push(Date.now());
@@ -41,7 +41,7 @@ test("sair de Status > Sistema pela navegação principal encerra a sondagem de 
   await expect.poll(() => consultas.length, { timeout: 10_000 }).toBeGreaterThan(aoSair);
 });
 
-test("sair de Usuários ativos limpa o cronômetro de sessões e sair de Firmware/OTA e Protocolos IR cancela a observação de dispositivos", async ({ page, context }) => {
+test("leaving Usuários ativos clears the sessions timer, and leaving Firmware/OTA and Protocolos IR cancels device observation", async ({ page, context }) => {
   await abrir(page, context, "/admin/status/ativos");
   await expect(page.locator("#ativosList li").first()).toBeVisible({ timeout: 15_000 });
   expect(await page.evaluate(() => Admin._ativosIntervalId !== null)).toBe(true);
@@ -65,7 +65,7 @@ test("sair de Usuários ativos limpa o cronômetro de sessões e sair de Firmwar
   await expect.poll(async () => (await enviados(page, "observar_dispositivos")).some((m) => m.salas.length === 0)).toBe(true);
 });
 
-test("sair da Administração enquanto Status > Sistema ainda carrega não deixa a sondagem viva", async ({ page, context }) => {
+test("leaving Administration while Status > Sistema is still loading does not leave polling running", async ({ page, context }) => {
   const consultas = [];
   let liberar;
   const segurar = new Promise((resolve) => { liberar = resolve; });

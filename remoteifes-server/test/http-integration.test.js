@@ -47,7 +47,7 @@ function authFetch(path, token, opcoes = {}) {
   });
 }
 
-test("achado #15 — apenas o superadministrador pode alterar o acesso restrito de uma sala (via HTTP)", async () => {
+test("finding #15: only the superadministrator can change a room's restricted access (over HTTP)", async () => {
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'`).run(bcrypt.hashSync("superSenha123", 10));
   const loginSuperAdmin = await login("superadmin", "superSenha123");
   assert.equal(loginSuperAdmin.status, 200);
@@ -87,7 +87,7 @@ test("achado #15 — apenas o superadministrador pode alterar o acesso restrito 
   });
 });
 
-test("um usuário sem privilégio de admin não consegue acessar rotas /admin", async () => {
+test("a user without admin privilege cannot access /admin routes", async () => {
   usuariosService.criar(
     { usuario: "teste-usuario-http-comum", senha: "senhaSegura123", nome: "Usuário Comum", podeControlar: true },
     { nivel: 3 }
@@ -99,18 +99,18 @@ test("um usuário sem privilégio de admin não consegue acessar rotas /admin", 
   assert.equal(resp.status, 403);
 });
 
-test("login com senha incorreta retorna 401 e não vaza detalhes internos", async () => {
+test("login with a wrong password returns 401 and does not leak internal details", async () => {
   const resp = await login("superadmin", "senha-errada-com-certeza");
   assert.equal(resp.status, 401);
   assert.equal(resp.corpo.ok, false);
   assert.doesNotMatch(resp.corpo.erro, /stack|SQLITE|constraint/i);
 });
 
-test("a instalação inicial mantém superadmin/admin", async () => {
+test("the initial installation keeps superadmin/admin", async () => {
   assert.equal(senhaAdminInicialValida, true);
 });
 
-test("identificação de dispositivo depende do vínculo MAC e rejeita MAC divergente", async () => {
+test("device identification depends on the MAC binding and rejects a mismatched MAC", async () => {
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'`).run(bcrypt.hashSync("superSenha123", 10));
   const loginSuperAdmin = await login("superadmin", "superSenha123");
   const tokenSuperAdmin = loginSuperAdmin.corpo.token;
@@ -172,7 +172,7 @@ test("identificação de dispositivo depende do vínculo MAC e rejeita MAC diver
   });
 });
 
-test("corpo JSON malformado retorna 400, não 500", async () => {
+test("a malformed JSON body returns 400, not 500", async () => {
   const resp = await fetch(`${baseUrl}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

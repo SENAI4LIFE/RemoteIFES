@@ -20,7 +20,7 @@ function novaSala(sala) {
   return salasService.buscar(sala);
 }
 
-test("limites efetivos usam cada substituição de sala de forma independente", () => {
+test("effective limits use each room override independently", () => {
   novaSala("teste-limites-independentes");
   salasService.definirLimitesTemperatura("teste-limites-independentes", { minima: 18, maxima: null });
   let sala = salasService.buscar("teste-limites-independentes");
@@ -33,7 +33,7 @@ test("limites efetivos usam cada substituição de sala de forma independente", 
   assert.deepEqual(limites, { minima: 23, maxima: 28 });
 });
 
-test("comandos de temperatura respeitam os limites efetivos da sala", () => {
+test("temperature commands respect the room's effective limits", () => {
   novaSala("teste-limites-comando");
   salasService.definirLimitesTemperatura("teste-limites-comando", { minima: 18, maxima: 28 });
 
@@ -46,7 +46,7 @@ test("comandos de temperatura respeitam os limites efetivos da sala", () => {
   );
 });
 
-test("turbo exige booleano e preserva o estado configurado", () => {
+test("turbo requires a boolean and preserves the configured state", () => {
   novaSala("teste-turbo");
   const configuracoesService = require("../src/services/configuracoesService");
   configuracoesService.validarEAtualizar({ turboFuncaoExtra: "swing" }, { id: 1, nivel: 3 });
@@ -59,7 +59,7 @@ test("turbo exige booleano e preserva o estado configurado", () => {
     /verdadeiro ou falso/
   );
 });
-test("achado #12 — admin comum não consegue excluir outro admin", () => {
+test("finding #12: a regular admin cannot delete another admin", () => {
   const admin1 = usuariosService.criar(
     { usuario: "teste-admin1-12", senha: "senhaSegura123", nome: "Admin Um", isAdmin: true },
     { nivel: 3 }
@@ -77,7 +77,7 @@ test("achado #12 — admin comum não consegue excluir outro admin", () => {
   assert.ok(usuariosService.buscarPorId(admin2.id), "a conta alvo deve continuar existindo após a tentativa bloqueada");
 });
 
-test("achado #12 — superadmin ainda consegue excluir um admin normalmente", () => {
+test("finding #12: a superadmin can still delete an admin normally", () => {
   const admin = usuariosService.criar(
     { usuario: "teste-admin3-12", senha: "senhaSegura123", nome: "Admin Três", isAdmin: true },
     { nivel: 3 }
@@ -87,7 +87,7 @@ test("achado #12 — superadmin ainda consegue excluir um admin normalmente", ()
   assert.equal(usuariosService.buscarPorId(admin.id), undefined, "o superadmin deve conseguir remover o admin");
 });
 
-test("achado #14 — remover um usuário que já fez login não falha por FOREIGN KEY (sessoes)", () => {
+test("finding #14: removing a user who has logged in does not fail on FOREIGN KEY (sessoes)", () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-usuario-14", senha: "senhaSegura123", nome: "Usuário Com Sessão", podeControlar: true },
     { nivel: 3 }
@@ -101,7 +101,7 @@ test("achado #14 — remover um usuário que já fez login não falha por FOREIG
   assert.equal(sessoesRestantes.total, 0, "as sessões do usuário removido não devem sobrar órfãs");
 });
 
-test("achado #16 — o token de sessão não é armazenado em texto puro no banco", () => {
+test("finding #16: the session token is not stored in plain text in the database", () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-usuario-16", senha: "senhaSegura123", nome: "Usuário Token", podeControlar: true },
     { nivel: 3 }
@@ -120,7 +120,7 @@ test("achado #16 — o token de sessão não é armazenado em texto puro no banc
   assert.equal(tokenService.validarToken(token), null, "após logout, o token não deve mais validar");
 });
 
-test("sessao expira pelo limite absoluto mesmo que tenha uso recente", () => {
+test("a session expires at the absolute limit even with recent use", () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-sessao-absoluta", senha: "senhaSegura123", nome: "Sessao Absoluta", podeControlar: true },
     { nivel: 3 }
@@ -130,7 +130,7 @@ test("sessao expira pelo limite absoluto mesmo que tenha uso recente", () => {
   assert.equal(tokenService.validarToken(token), null);
 });
 
-test("prazos padrão são 60 minutos para usuário e 720 para admin e superadmin", () => {
+test("default deadlines are 60 minutes for users and 720 for admin and superadmin", () => {
   assert.equal(configuracoesService.timeoutEfetivoParaUsuario(false), 60);
   assert.equal(configuracoesService.timeoutEfetivoParaUsuario(true), 720);
   const usuario = usuariosService.criar(
@@ -149,7 +149,7 @@ test("prazos padrão são 60 minutos para usuário e 720 para admin e superadmin
   assert.ok(tokenService.validarToken(tokenAdmin, { atualizarUso: false }));
 });
 
-test("uso autenticado renova o prazo retornado pelo servidor", () => {
+test("authenticated use renews the deadline returned by the server", () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-timeout-renova", senha: "senhaSegura123", nome: "Timeout Renova", podeControlar: true },
     { nivel: 3 }
@@ -161,7 +161,7 @@ test("uso autenticado renova o prazo retornado pelo servidor", () => {
   assert.ok(Date.parse(depois.sessaoExpiraEm) - Date.parse(antes.sessaoExpiraEm) > 25 * 60000);
 });
 
-test("configuração legada de timeout migra sem perder a escolha administrativa", () => {
+test("legacy timeout configuration migrates without losing the administrative choice", () => {
   const gravar = db.prepare("INSERT OR REPLACE INTO configuracoes (chave, valor) VALUES (?, ?)");
   gravar.run("timeoutInatividadeMinutos", JSON.stringify(90));
   gravar.run("adminSujeitoTimeout", JSON.stringify(true));

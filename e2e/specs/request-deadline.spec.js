@@ -6,7 +6,7 @@ test.beforeEach(async ({ request }) => {
   await request.post(`${API_URL}/__e2e/resetar-dispositivo`);
 });
 
-test("um comando cuja resposta nunca chega libera o painel após o prazo e reconcilia pelo estado do servidor", async ({ page, sessaoComo }) => {
+test("a command whose response never arrives releases the panel after the deadline and reconciles through the server state", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
   await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
@@ -35,7 +35,7 @@ test("um comando cuja resposta nunca chega libera o painel após o prazo e recon
   await expect(page.locator("#statusValue")).toHaveText("desligado");
 });
 
-test("uma mutação aplicada pelo servidor cuja resposta se perde não é dada como não feita: o estado autoritativo prevalece", async ({ page, sessaoComo }) => {
+test("a mutation the server applied whose response is lost is not treated as not done: the authoritative state prevails", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
   await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
@@ -57,7 +57,7 @@ test("uma mutação aplicada pelo servidor cuja resposta se perde não é dada c
   await expect(page.locator("#statusValue")).toHaveText("desligado");
 });
 
-test("quando nem a consulta de estado responde, o botão volta a ficar utilizável", async ({ page, sessaoComo }) => {
+test("when not even the state query answers, the button becomes usable again", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
   await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
@@ -80,7 +80,7 @@ test("quando nem a consulta de estado responde, o botão volta a ficar utilizáv
   await expect(page.locator("#statusValue")).toHaveText("desligado");
 });
 
-test("uma resposta aceita cujo corpo chega truncado não é dada como não feita: o painel avisa a incerteza e mostra o estado do servidor", async ({ page, sessaoComo }) => {
+test("an accepted response whose body arrives truncated is not treated as not done: the panel reports the uncertainty and shows the server state", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
   await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });

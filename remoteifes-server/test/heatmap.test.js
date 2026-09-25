@@ -79,13 +79,13 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("o mapa de calor é exclusivo do superadministrador", async () => {
+test("the heatmap is superadministrator-only", async () => {
   for (const [token, status] of [[null, 401], [userToken, 403], [adminToken, 403], [superToken, 200]]) {
     assert.equal((await request("/admin/heatmap?metrica=comandos&periodo=24h", { token })).status, status);
   }
 });
 
-test("a agregação por sala usa as janelas de tempo pedidas", async () => {
+test("per-room aggregation uses the requested time windows", async () => {
   const em = (dados, sala) => dados.salas.find((s) => s.sala === sala);
 
   const comandos24h = heatmapService.calcular("comandos", "24h");
@@ -115,7 +115,7 @@ test("a agregação por sala usa as janelas de tempo pedidas", async () => {
   assert.equal(em(pendentes, SALA_COM_ESP).valor, 1);
 });
 
-test("sala sem dispositivo fica sem dados nas métricas de conectividade, e não em zero", async () => {
+test("a room without a device has no data in connectivity metrics, not zero", async () => {
   const disponibilidade = heatmapService.calcular("disponibilidade", "7d");
   const semEsp = disponibilidade.salas.find((s) => s.sala === SALA_SEM_ESP);
   assert.equal(semEsp.valor, null);
@@ -126,7 +126,7 @@ test("sala sem dispositivo fica sem dados nas métricas de conectividade, e não
   assert.equal(comandos.salas.find((s) => s.sala === SALA_SEM_ESP).valor, 1);
 });
 
-test("a resposta é compacta, cobre todas as salas e não vaza histórico bruto", async () => {
+test("the response is compact, covers every room and does not leak raw history", async () => {
   const resp = await request("/admin/heatmap?metrica=disponibilidade&periodo=7d", { token: superToken });
   assert.equal(resp.status, 200);
   const corpo = await resp.json();
@@ -144,14 +144,14 @@ test("a resposta é compacta, cobre todas as salas e não vaza histórico bruto"
   assert.ok(JSON.stringify(corpo.salas).length < 24 * 1024, "payload por sala deveria continuar compacto");
 });
 
-test("métrica e período inválidos caem no padrão em vez de gerar erro", async () => {
+test("invalid metric and period fall back to the default instead of failing", async () => {
   const dados = heatmapService.calcular("nao-existe", "sempre");
   assert.equal(dados.metrica, "disponibilidade");
   assert.equal(dados.periodo, "7d");
   assert.equal(dados.janela.horas, 24 * 7);
 });
 
-test("o cache curto devolve o mesmo objeto sem recalcular e some ao ser limpo", () => {
+test("the short cache returns the same object without recomputing and disappears when cleared", () => {
   heatmapService.limparCache();
   const primeira = heatmapService.obter("comandos", "24h");
   assert.equal(heatmapService.obter("comandos", "24h"), primeira);
@@ -159,7 +159,7 @@ test("o cache curto devolve o mesmo objeto sem recalcular e some ao ser limpo", 
   assert.notEqual(heatmapService.obter("comandos", "24h"), primeira);
 });
 
-test("o aviso de retenção aparece quando o período excede o histórico de conectividade", () => {
+test("the retention warning appears when the period exceeds the connectivity history", () => {
   const curto = heatmapService.calcular("disponibilidade", "24h");
   assert.equal(curto.avisoRetencao, null);
   const longo = heatmapService.calcular("disponibilidade", "30d");

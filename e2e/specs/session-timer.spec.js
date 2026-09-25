@@ -1,6 +1,6 @@
 const { test, expect, API_URL, semRolagemHorizontal } = require("../harness/fixtures");
 
-test("contagem por papel e aviso da senha padrão aparecem no cabeçalho correto", async ({ appPage, loginComo }) => {
+test("the per-role countdown and default-password warning appear in the right header", async ({ appPage, loginComo }) => {
   await loginComo("user");
   await expect(appPage.locator("#accountSessionTimer")).toHaveText(/^\d{2}:\d{2}$/);
   await expect(appPage.locator("#defaultPasswordWarning")).toBeHidden();
@@ -14,7 +14,7 @@ test("contagem por papel e aviso da senha padrão aparecem no cabeçalho correto
   await expect(appPage.locator(".app-dialog-overlay")).toBeVisible();
 });
 
-test("atividade e continuar conectado renovam o prazo usando o ping autenticado", async ({ appPage, loginComo }) => {
+test("activity and staying connected renew the deadline using the authenticated ping", async ({ appPage, loginComo }) => {
   await loginComo("user");
   await appPage.evaluate(() => {
     IdleTimer.prazoServidorMs = IdleTimer._agoraServidor() + 30000;
@@ -34,7 +34,7 @@ test("atividade e continuar conectado renovam o prazo usando o ping autenticado"
   await expect(appPage.locator("#accountSessionTimer")).toHaveText(/^59:\d{2}$/);
 });
 
-test("expiração automática revoga o token e volta ao login", async ({ appPage, loginComo, request }) => {
+test("automatic expiry revokes the token and returns to login", async ({ appPage, loginComo, request }) => {
   await loginComo("user");
   const token = await appPage.evaluate(() => localStorage.getItem("remoteifes_token"));
   let liberar;
@@ -58,7 +58,7 @@ test("expiração automática revoga o token e volta ao login", async ({ appPage
   await expect.poll(async () => (await request.get(`${API_URL}/me`, { headers: { Authorization: `Bearer ${token}` } })).status()).toBe(401);
 });
 
-test("atividade e logout são sincronizados entre abas", async ({ appPage, loginComo, context }) => {
+test("activity and logout are synchronized across tabs", async ({ appPage, loginComo, context }) => {
   await loginComo("admin");
   const segunda = await context.newPage();
   await segunda.goto("/");
@@ -102,7 +102,7 @@ test("atividade e logout são sincronizados entre abas", async ({ appPage, login
   expect(await segunda.evaluate(() => Api.temTokenSalvo())).toBe(false);
 });
 
-test("timer e aviso não criam rolagem horizontal no celular", async ({ appPage, loginComo }) => {
+test("the timer and warning create no horizontal scroll on a phone", async ({ appPage, loginComo }) => {
   await appPage.setViewportSize({ width: 360, height: 800 });
   await loginComo("superadmin");
   await expect(appPage.locator("#accountSessionTimer")).toBeVisible();

@@ -186,7 +186,7 @@ test.after(async () => {
   fs.rmSync(RAIZ_TMP, { recursive: true, force: true });
 });
 
-test("preflight separa aptos de inaptos e escolhe o canário entre os aptos", async () => {
+test("preflight separates eligible from ineligible devices and picks the canary among the eligible", async () => {
   novaSala("rol-pf-atualizado", "AA:BB:CC:F0:00:01");
   novaSala("rol-pf-novo", "AA:BB:CC:F0:00:02");
   novaSala("rol-pf-apto", "AA:BB:CC:F0:00:03");
@@ -224,7 +224,7 @@ test("preflight separa aptos de inaptos e escolhe o canário entre os aptos", as
   await fechar(apto);
 });
 
-test("canário validado libera lotes, respeita o limite de simultâneas e conclui", async () => {
+test("a validated canary releases batches, respects the concurrency limit and completes", async () => {
   const salas = ["rol-ok-1", "rol-ok-2", "rol-ok-3", "rol-ok-4", "rol-ok-5"];
   const dispositivos = [];
   for (let i = 0; i < salas.length; i += 1) {
@@ -275,7 +275,7 @@ test("canário validado libera lotes, respeita o limite de simultâneas e conclu
   await fechar(fora);
 });
 
-test("canário que falha interrompe a distribuição sem ofertar aos demais", async () => {
+test("a failing canary stops the rollout without offering to the others", async () => {
   novaSala("rol-can-1", "AA:BB:CC:F2:00:01");
   novaSala("rol-can-2", "AA:BB:CC:F2:00:02");
   const canario = await abrirDispositivo("rol-can-1", "AA:BB:CC:F2:00:01");
@@ -295,7 +295,7 @@ test("canário que falha interrompe a distribuição sem ofertar aos demais", as
   await fechar(seguinte);
 });
 
-test("queda de conexão durante a transferência falha o dispositivo e interrompe o lote", async () => {
+test("a connection drop during transfer fails the device and stops the batch", async () => {
   const salas = ["rol-tr-1", "rol-tr-2", "rol-tr-3"];
   const dispositivos = [];
   for (let i = 0; i < salas.length; i += 1) {
@@ -325,7 +325,7 @@ test("queda de conexão durante a transferência falha o dispositivo e interromp
   await fechar(dispositivos[2]);
 });
 
-test("versão antiga após reconexão não comprova rollback", async () => {
+test("an old version after reconnection does not prove a rollback", async () => {
   novaSala("rol-rb-1", "AA:BB:CC:F4:00:01");
   novaSala("rol-rb-2", "AA:BB:CC:F4:00:02");
   const canario = await abrirDispositivo("rol-rb-1", "AA:BB:CC:F4:00:01");
@@ -352,7 +352,7 @@ test("versão antiga após reconexão não comprova rollback", async () => {
   await fechar(seguinte);
 });
 
-test("dispositivo que não volta após gravar fica indeterminado, não como sucesso", async () => {
+test("a device that does not return after flashing ends indeterminate, not as success", async () => {
   novaSala("rol-ind-1", "AA:BB:CC:F5:00:01");
   const canario = await abrirDispositivo("rol-ind-1", "AA:BB:CC:F5:00:01");
 
@@ -375,7 +375,7 @@ test("dispositivo que não volta após gravar fica indeterminado, não como suce
   assert.match(alvo.motivo, /não voltou a se conectar/);
 });
 
-test("pausar não aborta quem está atualizando e retomar segue no lote seguinte", async () => {
+test("pausing does not abort devices updating and resuming continues with the next batch", async () => {
   const salas = ["rol-pa-1", "rol-pa-2", "rol-pa-3"];
   const dispositivos = [];
   for (let i = 0; i < salas.length; i += 1) {
@@ -414,7 +414,7 @@ test("pausar não aborta quem está atualizando e retomar segue no lote seguinte
   for (const d of dispositivos) await fechar(d);
 });
 
-test("pausar quando nada mais está pendente não impede a conclusão", async () => {
+test("pausing when nothing is pending does not prevent completion", async () => {
   novaSala("rol-pf2-1", "AA:BB:CC:FE:00:01");
   const canario = await abrirDispositivo("rol-pf2-1", "AA:BB:CC:FE:00:01");
 
@@ -430,7 +430,7 @@ test("pausar quando nada mais está pendente não impede a conclusão", async ()
   await fechar(canario);
 });
 
-test("cancelar encerra apenas o trabalho ainda não iniciado", async () => {
+test("cancelling ends only work not yet started", async () => {
   const salas = ["rol-ca-1", "rol-ca-2", "rol-ca-3"];
   const dispositivos = [];
   for (let i = 0; i < salas.length; i += 1) {
@@ -457,7 +457,7 @@ test("cancelar encerra apenas o trabalho ainda não iniciado", async () => {
   for (const d of dispositivos) await fechar(d);
 });
 
-test("dispositivo offline na sua vez espera e depois é ignorado, nunca dado como atualizado", async () => {
+test("a device offline on its turn waits and is then skipped, never marked as updated", async () => {
   novaSala("rol-off-1", "AA:BB:CC:F8:00:01");
   novaSala("rol-off-2", "AA:BB:CC:F8:00:02");
   const canario = await abrirDispositivo("rol-off-1", "AA:BB:CC:F8:00:01");
@@ -488,7 +488,7 @@ test("dispositivo offline na sua vez espera e depois é ignorado, nunca dado com
   await fechar(canario);
 });
 
-test("eventos de OTA duplicados ou atrasados não alteram um dispositivo já finalizado", async () => {
+test("duplicate or late OTA events do not change an already finished device", async () => {
   novaSala("rol-dup-1", "AA:BB:CC:F9:00:01");
   const canario = await abrirDispositivo("rol-dup-1", "AA:BB:CC:F9:00:01");
 
@@ -508,7 +508,7 @@ test("eventos de OTA duplicados ou atrasados não alteram um dispositivo já fin
   await fechar(canario);
 });
 
-test("reinício do servidor reconcilia o andamento sem reofertar o firmware", async () => {
+test("a server restart reconciles progress without re-offering the firmware", async () => {
   novaSala("rol-rs-1", "AA:BB:CC:FA:00:01");
   novaSala("rol-rs-2", "AA:BB:CC:FA:00:02");
   const canario = await abrirDispositivo("rol-rs-1", "AA:BB:CC:FA:00:01");
@@ -556,7 +556,7 @@ test("reinício do servidor reconcilia o andamento sem reofertar o firmware", as
   await fechar(seguinte);
 });
 
-test("republicar o firmware durante a distribuição interrompe o que ainda não começou", async () => {
+test("republishing the firmware during the rollout stops what has not started", async () => {
   novaSala("rol-fw-1", "AA:BB:CC:FB:00:01");
   novaSala("rol-fw-2", "AA:BB:CC:FB:00:02");
   const canario = await abrirDispositivo("rol-fw-1", "AA:BB:CC:FB:00:01");
@@ -579,7 +579,7 @@ test("republicar o firmware durante a distribuição interrompe o que ainda não
   await fechar(seguinte);
 });
 
-test("apenas o superadministrador comanda a distribuição", async () => {
+test("only the superadministrator controls the rollout", async () => {
   const usuariosService = require("../src/services/usuariosService");
   usuariosService.criar({ usuario: "rol-admin", senha: "senhaSegura123", nome: "Admin", isAdmin: true }, { nivel: 3 });
   usuariosService.criar({ usuario: "rol-user", senha: "senhaSegura123", nome: "Comum" }, { nivel: 3 });
@@ -600,7 +600,7 @@ test("apenas o superadministrador comanda a distribuição", async () => {
   assert.equal(otaRolloutService.ativo(), false, "tentativa não autorizada não pode criar distribuição");
 });
 
-test("seleção inválida e início repetido são recusados", async () => {
+test("an invalid selection and a repeated start are refused", async () => {
   novaSala("rol-val-1", "AA:BB:CC:FC:00:01");
   novaSala("rol-val-sem-mac", null);
   const canario = await abrirDispositivo("rol-val-1", "AA:BB:CC:FC:00:01");
@@ -624,7 +624,7 @@ test("seleção inválida e início repetido são recusados", async () => {
   await fechar(canario);
 });
 
-test("a OTA avulsa continua funcionando de forma independente", async () => {
+test("standalone OTA keeps working independently", async () => {
   novaSala("rol-avulsa-1", "AA:BB:CC:FD:00:01");
   const dispositivo = await abrirDispositivo("rol-avulsa-1", "AA:BB:CC:FD:00:01");
 

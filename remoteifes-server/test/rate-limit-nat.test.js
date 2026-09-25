@@ -59,7 +59,7 @@ test.after(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test("usuários distintos atrás do mesmo IP têm cada um seu orçamento de comandos; um único usuário continua limitado", () => {
+test("distinct users behind the same IP each have their own command budget; a single user stays limited", () => {
   const limitar = criarLimitador({ janelaMs: 60000, maxTentativas: 5, chave: (req) => req.usuario.id });
   for (let usuario = 1; usuario <= 19; usuario += 1) {
     for (let i = 0; i < 5; i += 1) {
@@ -73,7 +73,7 @@ test("usuários distintos atrás do mesmo IP têm cada um seu orçamento de coma
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.1", { usuario: { id: 21 } })).seguiu, true, "outro usuário do mesmo IP segue livre");
 });
 
-test("um único IP que se apresenta como muitos principais esbarra no teto por IP", () => {
+test("a single IP presenting itself as many principals hits the per-IP ceiling", () => {
   const limitar = criarLimitador({ janelaMs: 60000, maxTentativas: 5, tetoPorIp: 30, chave: (req) => req.usuario.id });
   let aceitos = 0;
   for (let usuario = 1; usuario <= 100; usuario += 1) {
@@ -83,7 +83,7 @@ test("um único IP que se apresenta como muitos principais esbarra no teto por I
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.3", { usuario: { id: 1 } })).seguiu, true, "outro IP não é afetado");
 });
 
-test("sem principal identificado o limite recai no IP, como antes", () => {
+test("without an identified principal the limit falls on the IP, as before", () => {
   const limitar = criarLimitador({ janelaMs: 60000, maxTentativas: 3, chave: () => null });
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.4")).seguiu, true);
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.4")).seguiu, true);
@@ -91,7 +91,7 @@ test("sem principal identificado o limite recai no IP, como antes", () => {
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.4")).seguiu, false);
 });
 
-test("o limite de login conta falhas por IP: logins bem-sucedidos de um campus inteiro não esgotam o orçamento, mas 20 falhas bloqueiam", async () => {
+test("the login limit counts failures per IP: successful logins from a whole campus do not exhaust the budget, but 20 failures block", async () => {
   usuariosService.criar({ usuario: "nat-ok", senha: "SenhaNat12345", nome: "Nat", podeControlar: true }, SUPER);
   for (let i = 0; i < 30; i += 1) {
     const resp = await post("/login", { usuario: "nat-ok", senha: "SenhaNat12345" });
@@ -106,7 +106,7 @@ test("o limite de login conta falhas por IP: logins bem-sucedidos de um campus i
   assert.ok(Number(bloqueado.headers.get("retry-after")) > 0);
 });
 
-test("o limite de comandos vale por usuário autenticado: 60 comandos de cada um de dois usuários no mesmo IP passam", async () => {
+test("the command limit applies per authenticated user: 60 commands from each of two users on the same IP pass", async () => {
   const a = usuariosService.criar({ usuario: "nat-cmd-a", senha: "SenhaNat12345", nome: "A", podeControlar: true }, SUPER);
   const b = usuariosService.criar({ usuario: "nat-cmd-b", senha: "SenhaNat12345", nome: "B", podeControlar: true }, SUPER);
   const tokenA = tokenService.gerarToken(a.id);

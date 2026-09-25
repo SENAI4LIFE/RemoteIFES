@@ -42,7 +42,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("Auto-ON vem ligado por padrão em instalações novas, sem nenhuma linha gravada", () => {
+test("Auto-ON is on by default in new installations, with no row written", () => {
   assert.equal(configuracoesService.PADROES.autoLigar, true);
   assert.equal(db.prepare("SELECT 1 FROM configuracoes WHERE chave = 'autoLigar'").get(), undefined);
   assert.equal(configuracoesService.obter().autoLigar, true);
@@ -50,7 +50,7 @@ test("Auto-ON vem ligado por padrão em instalações novas, sem nenhuma linha g
   assert.equal(salas.statusCompleto("AUTO-1", SUPERADMIN).autoLigar, true);
 });
 
-test("com Auto-ON, alterar a temperatura de um aparelho desligado o liga com o novo alvo e registra o acionamento", () => {
+test("with Auto-ON, changing the temperature of an appliance that is off turns it on with the new target and records the trigger", () => {
   reiniciar("AUTO-1");
   db.prepare("DELETE FROM comandos_log WHERE sala = 'AUTO-1'").run();
   const resultado = salas.aplicarComando("AUTO-1", "temperatura", 23, contexto);
@@ -66,7 +66,7 @@ test("com Auto-ON, alterar a temperatura de um aparelho desligado o liga com o n
   assert.deepEqual(logs("AUTO-1"), [{ cmd: "temperatura", valor: "25", origem: "manual" }], "com o aparelho já ligado não há acionamento automático");
 });
 
-test("com Auto-ON, ativar o Turbo em um aparelho desligado o liga; desativar o Turbo nunca liga", () => {
+test("with Auto-ON, enabling Turbo on an appliance that is off turns it on; disabling Turbo never turns it on", () => {
   reiniciar("AUTO-1");
   const ligado = salas.aplicarComando("AUTO-1", "turbo", true, contexto);
   assert.equal(ligado.ligado, 1);
@@ -82,7 +82,7 @@ test("com Auto-ON, ativar o Turbo em um aparelho desligado o liga; desativar o T
   assert.equal(salas.aplicarComando("AUTO-1", "desligar", undefined, contexto).ligado, 0);
 });
 
-test("com Auto-ON desativado, os ajustes são guardados sem ligar o aparelho e o estado IR reflete isso", () => {
+test("with Auto-ON disabled, adjustments are stored without turning the appliance on and the IR state reflects that", () => {
   configuracoesService.validarEAtualizar({ autoLigar: false }, SUPERADMIN);
   assert.equal(configuracoesService.obter().autoLigar, false);
   assert.equal(salas.statusCompleto("AUTO-1", SUPERADMIN).autoLigar, false);
@@ -107,7 +107,7 @@ test("com Auto-ON desativado, os ajustes são guardados sem ligar o aparelho e o
   assert.equal(aindaLigado.temperaturaAlvo, 25);
 });
 
-test("a preferência persiste no banco e volta a valer após uma nova leitura, como em um reinício do servidor", () => {
+test("the preference persists in the database and applies again after a reread, as after a server restart", () => {
   assert.equal(db.prepare("SELECT valor FROM configuracoes WHERE chave = 'autoLigar'").get().valor, "false");
   assert.equal(configuracoesService.obter().autoLigar, false);
   configuracoesService.validarEAtualizar({ autoLigar: true }, SUPERADMIN);
@@ -117,7 +117,7 @@ test("a preferência persiste no banco e volta a valer após uma nova leitura, c
   assert.equal(salas.aplicarComando("AUTO-1", "temperatura", 24, contexto).ligado, 1);
 });
 
-test("mudar Auto-ON avisa os painéis abertos para refletirem a opção sem recarregar", async () => {
+test("changing Auto-ON notifies open panels so they reflect the option without reloading", async () => {
   const bcrypt = require("bcryptjs");
   db.prepare("UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'").run(bcrypt.hashSync("senhaAutoOn123", 10));
   const login = await fetch(`${baseUrl}/login`, {
@@ -167,7 +167,7 @@ test("mudar Auto-ON avisa os painéis abertos para refletirem a opção sem reca
   configuracoesService.validarEAtualizar({ autoLigar: true }, SUPERADMIN);
 });
 
-test("somente o superadministrador altera o Auto-ON", async () => {
+test("only the superadministrator changes Auto-ON", async () => {
   assert.throws(() => configuracoesService.validarEAtualizar({ autoLigar: false }, { id: 2, nivel: 2 }), /superadministrador/);
   assert.equal(configuracoesService.obter().autoLigar, true);
   const usuariosService = require("../src/services/usuariosService");

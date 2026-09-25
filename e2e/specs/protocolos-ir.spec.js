@@ -57,7 +57,7 @@ test.afterAll(async ({ request }) => {
   await resetarProtocolos(request);
 });
 
-test("a função Protocolos IR é exclusiva do superadministrador e fica em Dispositivos", async ({ page, context }) => {
+test("the Protocolos IR function is superadministrator-only and lives in Dispositivos", async ({ page, context }) => {
   await abrirProtocolos(page, context, "admin");
   await expect(page.locator("#screen-admin")).toBeVisible();
   await expect(page.locator('.admin-subtab-btn[data-sub="protocolos"]')).toBeHidden();
@@ -67,7 +67,7 @@ test("a função Protocolos IR é exclusiva do superadministrador e fica em Disp
   expect(resp.status()).toBe(403);
 });
 
-test("superadministrador define a clonadora, entra no modo clone e vê a captura chegar em tempo real", async ({ page, context, request }) => {
+test("the superadministrator sets the cloner, enters clone mode and sees the capture arrive in real time", async ({ page, context, request }) => {
   await abrirProtocolos(page, context);
   await expect(page.locator("#adminSub-protocolos")).toBeVisible();
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/protocolos");
@@ -102,7 +102,7 @@ test("superadministrador define a clonadora, entra no modo clone e vê a captura
   await expect.poll(async () => (await estadoEsp32(request)).modo).toBe("operation");
 });
 
-test("biblioteca: salvar com nome, recusar duplicata, renomear, aplicar com failsafe, remover failsafe e excluir", async ({ page, context, request }) => {
+test("library: save with a name, refuse a duplicate, rename, apply with failsafe, remove failsafe and delete", async ({ page, context, request }) => {
   test.setTimeout(90_000);
   await abrirProtocolos(page, context);
   await definirClonador(page);
@@ -180,7 +180,7 @@ test("biblioteca: salvar com nome, recusar duplicata, renomear, aplicar com fail
   await expect(page.locator("#protocolosIrToggleCloneBtn")).toHaveText("Entrar no modo clone", { timeout: 10_000 });
 });
 
-test("sinal RAW genérico é guardado e transmitido, mas não pode virar protocolo da sala", async ({ page, context, request }) => {
+test("a generic RAW signal is stored and transmitted, but cannot become the room's protocol", async ({ page, context, request }) => {
   await abrirProtocolos(page, context);
   await definirClonador(page);
   await entrarModoClone(page, request);
@@ -199,7 +199,7 @@ test("sinal RAW genérico é guardado e transmitido, mas não pode virar protoco
   await expect(page.locator("#protocolosIrToggleCloneBtn")).toHaveText("Entrar no modo clone", { timeout: 10_000 });
 });
 
-test("sair da tela encerra a observação e o modo clone é encerrado ao remover o clonador", async ({ page, context, request }) => {
+test("leaving the screen ends observation and clone mode ends when the cloner is removed", async ({ page, context, request }) => {
   await abrirProtocolos(page, context);
   await definirClonador(page);
   await entrarModoClone(page, request);
@@ -213,7 +213,7 @@ test("sair da tela encerra a observação e o modo clone é encerrado ao remover
 });
 
 for (const tamanhoNome of ["mobile-compact", "mobile-landscape", "tablet-portrait", "desktop"]) {
-  test(`Protocolos IR permanece utilizável e sem rolagem horizontal em ${tamanhoNome} com acessibilidade máxima`, async ({ page, context, request }) => {
+  test(`Protocolos IR stays usable without horizontal scroll at ${tamanhoNome} with maximum accessibility`, async ({ page, context, request }) => {
     test.setTimeout(90_000);
     await abrirProtocolos(page, context, "superadmin", { tamanho: VIEWPORTS[tamanhoNome], a11yMaximo: true });
     await expect(page.locator("#adminSub-protocolos")).toBeVisible({ timeout: 15_000 });

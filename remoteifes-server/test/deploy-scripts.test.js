@@ -55,7 +55,7 @@ function npmFalso(dir) {
   return `${bin}${path.delimiter}${process.env.PATH}`;
 }
 
-test("deploy.sh segue adiante quando .env não define REMOTEIFES_DATA_DIR e usa o resolvedor canônico", { skip: !disponivel }, () => {
+test("deploy.sh proceeds when .env does not define REMOTEIFES_DATA_DIR and uses the canonical resolver", { skip: !disponivel }, () => {
   const { dir } = prepararRepo();
   const r = sh(dir, "bash deploy.sh --offline --no-restart");
   assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -66,7 +66,7 @@ test("deploy.sh segue adiante quando .env não define REMOTEIFES_DATA_DIR e usa 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("um REMOTEIFES_DATA_DIR relativo no .env é resolvido exatamente como o servidor resolve", { skip: !disponivel }, () => {
+test("a relative REMOTEIFES_DATA_DIR in .env is resolved exactly as the server resolves it", { skip: !disponivel }, () => {
   const { dir } = prepararRepo("PORTA=8080\nREMOTEIFES_DATA_DIR=./dados-personalizados\n");
   const r = sh(dir, "bash deploy.sh --offline --no-restart");
   assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -76,7 +76,7 @@ test("um REMOTEIFES_DATA_DIR relativo no .env é resolvido exatamente como o ser
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("rollback.sh também chega ao fim da preparação sem REMOTEIFES_DATA_DIR", { skip: !disponivel }, () => {
+test("rollback.sh also completes preparation without REMOTEIFES_DATA_DIR", { skip: !disponivel }, () => {
   const { dir, shaA } = prepararRepo();
   const r = sh(dir, `bash rollback.sh ${shaA} --offline --no-restart`);
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -84,7 +84,7 @@ test("rollback.sh também chega ao fim da preparação sem REMOTEIFES_DATA_DIR",
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("deploy.sh não considera a atualização válida quando npm ci falha, mesmo com um node_modules antigo/parcial", { skip: !disponivel }, () => {
+test("deploy.sh does not accept the update when npm ci fails, even with an old/partial node_modules", { skip: !disponivel }, () => {
   const { dir, shaA, shaB } = prepararRepo();
   const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: npmFalso(dir) });
   assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -96,7 +96,7 @@ test("deploy.sh não considera a atualização válida quando npm ci falha, mesm
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("rollback.sh com npm ci falhando sai com erro e não finge que o serviço foi reiniciado", { skip: !disponivel }, () => {
+test("rollback.sh with a failing npm ci exits with an error and does not pretend the service restarted", { skip: !disponivel }, () => {
   const { dir, shaA, shaB } = prepararRepo();
   git(dir, "reset", "-q", "--hard", shaB);
   const r = sh(dir, `bash rollback.sh ${shaA} --offline --no-restart`, { PATH: npmFalso(dir) });
@@ -108,7 +108,7 @@ test("rollback.sh com npm ci falhando sai com erro e não finge que o serviço f
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("deploy.sh com dependências inalteradas não roda npm ci e aplica a nova versão", { skip: !disponivel }, () => {
+test("deploy.sh with unchanged dependencies skips npm ci and applies the new version", { skip: !disponivel }, () => {
   const { dir, shaA } = prepararRepo();
   fs.writeFileSync(path.join(dir, "README.txt"), "nova versão");
   git(dir, "add", "-A");
@@ -209,7 +209,7 @@ function lerDeployLog(dir) {
   return fs.existsSync(arquivo) ? fs.readFileSync(arquivo, "utf8") : "";
 }
 
-test("deploy.sh não conclui quando o restart falha e o processo antigo continua respondendo saudável", { skip: !disponivel }, async () => {
+test("deploy.sh does not complete when the restart fails and the old process keeps answering healthy", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   const servico = await servicoFalso(dir, { commitInicial: shaA });
@@ -231,7 +231,7 @@ test("deploy.sh não conclui quando o restart falha e o processo antigo continua
   }
 });
 
-test("deploy.sh não conclui quando o processo que sobe informa outra versão", { skip: !disponivel }, async () => {
+test("deploy.sh does not complete when the started process reports another version", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   const servico = await servicoFalso(dir, { commitInicial: shaA });
@@ -250,7 +250,7 @@ test("deploy.sh não conclui quando o processo que sobe informa outra versão", 
   }
 });
 
-test("deploy.sh conclui quando o processo em execução confirma exatamente a nova versão", { skip: !disponivel }, async () => {
+test("deploy.sh completes when the running process confirms exactly the new version", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   const servico = await servicoFalso(dir, { commitInicial: shaA });
@@ -270,7 +270,7 @@ test("deploy.sh conclui quando o processo em execução confirma exatamente a no
   }
 });
 
-test("rollback.sh não conclui quando o restart falha e o processo da versão atual continua no ar", { skip: !disponivel }, async () => {
+test("rollback.sh does not complete when the restart fails and the current version's process stays up", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   git(dir, "reset", "-q", "--hard", shaC);
@@ -290,7 +290,7 @@ test("rollback.sh não conclui quando o restart falha e o processo da versão at
   }
 });
 
-test("rollback.sh conclui quando o processo confirma a versão alvo, e aceita com aviso uma versão anterior ao campo de commit", { skip: !disponivel }, async () => {
+test("rollback.sh completes when the process confirms the target version, and accepts with a warning a version older than the commit field", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   git(dir, "reset", "-q", "--hard", shaC);
@@ -322,7 +322,7 @@ test("rollback.sh conclui quando o processo confirma a versão alvo, e aceita co
   }
 });
 
-test("rollback.sh para uma versão sem identidade não conclui quando o processo antigo (também sem identidade) sobreviveu ao restart", { skip: !disponivel }, async () => {
+test("rollback.sh to a version without identity does not complete when the old process (also without identity) survived the restart", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   git(dir, "reset", "-q", "--hard", shaC);
@@ -355,7 +355,7 @@ test("rollback.sh para uma versão sem identidade não conclui quando o processo
   }
 });
 
-test("um processo sem identidade não é aceito como uma versão alvo que informaria o commit", { skip: !disponivel }, async () => {
+test("a process without identity is not accepted as a target version that would report the commit", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   // Version D carries the module that puts the commit in /health: a process that does not report it
   // cannot be D.
@@ -381,7 +381,7 @@ test("um processo sem identidade não é aceito como uma versão alvo que inform
   }
 });
 
-test("deploy.sh com o código já na versão alvo não a dá por concluída: reinicia e confirma o processo, ou não faz nada quando ele já a confirma", { skip: !disponivel }, async () => {
+test("deploy.sh with the code already at the target does not mark it complete: it restarts and confirms the process, or does nothing when the process already confirms it", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   // Interrupted update (or 'deploy --no-restart'): the code is already at C, the service still runs
@@ -417,7 +417,7 @@ test("deploy.sh com o código já na versão alvo não a dá por concluída: rei
   }
 });
 
-test("deploy.sh com o código já na versão alvo e o restart falhando não registra sucesso", { skip: !disponivel }, async () => {
+test("deploy.sh with the code already at the target and a failing restart does not record success", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   git(dir, "reset", "-q", "--hard", shaC);
@@ -437,7 +437,7 @@ test("deploy.sh com o código já na versão alvo e o restart falhando não regi
   }
 });
 
-test("rollback.sh com o código já na versão alvo reinicia e confirma em vez de dar o rollback por feito", { skip: !disponivel }, async () => {
+test("rollback.sh with the code already at the target restarts and confirms instead of marking the rollback done", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
   // Earlier rollback that reverted the code but whose restart was not confirmed: HEAD at A, process

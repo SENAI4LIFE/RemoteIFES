@@ -19,7 +19,7 @@ function checkoutFalso(opcoes = {}) {
 
 // --- Path containment ---------------------------------------------------------------
 
-test("caminhoContidoEm bloqueia travessia, caminho absoluto e byte nulo", (t) => {
+test("caminhoContidoEm blocks traversal, absolute paths and NUL bytes", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -35,7 +35,7 @@ test("caminhoContidoEm bloqueia travessia, caminho absoluto e byte nulo", (t) =>
   fs.rmSync(raiz, { recursive: true, force: true });
 });
 
-test("caminhoContidoEm bloqueia symlink que aponta para fora da pasta", { skip: process.platform === "win32" ? "symlink exige privilégio no Windows" : false }, (t) => {
+test("caminhoContidoEm blocks a symlink pointing outside the folder", { skip: process.platform === "win32" ? "symlink exige privilégio no Windows" : false }, (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -49,7 +49,7 @@ test("caminhoContidoEm bloqueia symlink que aponta para fora da pasta", { skip: 
   fs.rmSync(fora, { recursive: true, force: true });
 });
 
-test("o ambiente entregue aos processos é montado, não herdado", (t) => {
+test("the environment given to processes is built, not inherited", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -63,7 +63,7 @@ test("o ambiente entregue aos processos é montado, não herdado", (t) => {
   assert.throws(() => amb.processos.ambienteLimpo({ "minuscula-invalida": "x" }), /inválida/);
 });
 
-test("o auxiliar privilegiado só aceita verbos da lista", async (t) => {
+test("the privileged helper accepts only listed verbs", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -78,7 +78,7 @@ test("o auxiliar privilegiado só aceita verbos da lista", async (t) => {
   assert.ok(v.indisponivel);
 });
 
-test("a saída limitada preserva começo e fim e marca o que ficou de fora", (t) => {
+test("bounded output keeps the start and end and marks what was left out", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -95,7 +95,7 @@ test("a saída limitada preserva começo e fim e marca o que ficou de fora", (t)
 
 // --- Action argument validation ------------------------------------------------------
 
-test("argumentos de ação são validados por esquema, não por escape", (t) => {
+test("action arguments are validated by schema, not by escaping", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -126,7 +126,7 @@ test("argumentos de ação são validados por esquema, não por escape", (t) => 
   assert.throws(() => amb.acoes.validarArgumentos(aplicar, { commit: "a".repeat(40), offline: "sim" }), /booleano/);
 });
 
-test("não existe ação que receba uma linha de comando", (t) => {
+test("no action accepts a command line", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -141,7 +141,7 @@ test("não existe ação que receba uma linha de comando", (t) => {
   }
 });
 
-test("o catálogo de comandos da documentação não é um registro executável", (t) => {
+test("the documentation command catalog is not an executable registry", (t) => {
   // commands.js has placeholders, pipelines and multi-line examples. This test prevents anyone from
   // ever feeding the action registry with it.
   const commands = require(path.join(ajuda.RAIZ, "..", "remoteifes-server", "src", "services", "documentation", "commands"));
@@ -159,7 +159,7 @@ test("o catálogo de comandos da documentação não é um registro executável"
 
 // --- Maintenance lock ----------------------------------------------------------------------
 
-test("a trava do console usa o mesmo arquivo e formato da CLI", (t) => {
+test("the Console lock uses the same file and format as the CLI", (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -184,7 +184,7 @@ test("a trava do console usa o mesmo arquivo e formato da CLI", (t) => {
   assert.equal(amb.trava.situacao().ocupada, false);
 });
 
-test("uma trava viva nunca é atropelada, por mais antiga que seja", (t) => {
+test("a live lock is never overridden, however old", (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -208,7 +208,7 @@ test("uma trava viva nunca é atropelada, por mais antiga que seja", (t) => {
   assert.match(remocao.erro, /ainda está em execução/);
 });
 
-test("uma trava de processo morto é reconciliada e assumida", (t) => {
+test("a dead process's lock is reconciled and taken over", (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -248,7 +248,7 @@ function esperarFim(execucao, id, timeoutMs = 20_000) {
   });
 }
 
-test("um trabalho grava saída em arquivo e registra o desfecho", async (t) => {
+test("a job writes output to a file and records the outcome", async (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -275,7 +275,7 @@ test("um trabalho grava saída em arquivo e registra o desfecho", async (t) => {
   assert.ok(fs.existsSync(amb.execucao.caminhoSaida(trabalho.id)), "a saída sobrevive fora da requisição HTTP");
 });
 
-test("um trabalho que falha é registrado como falha, com o código de saída", async (t) => {
+test("a failing job is recorded as a failure, with the exit code", async (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -298,7 +298,7 @@ test("um trabalho que falha é registrado como falha, com o código de saída", 
   assert.match(fim.erro, /código de saída 3/);
 });
 
-test("um trabalho cujo efeito não se confirma vira desconhecido, não sucesso", async (t) => {
+test("a job whose effect is not confirmed becomes unknown, not success", async (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -321,7 +321,7 @@ test("um trabalho cujo efeito não se confirma vira desconhecido, não sucesso",
   assert.match(fim.erro, /não confirmou/);
 });
 
-test("a reconciliação marca como desconhecido o trabalho cujo processo sumiu", (t) => {
+test("reconciliation marks as unknown a job whose process disappeared", (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -346,7 +346,7 @@ test("a reconciliação marca como desconhecido o trabalho cujo processo sumiu",
   assert.match(t1.erro, /não pôde ser comprovado/);
 });
 
-test("a reconciliação preserva como em andamento um processo que sobreviveu", (t) => {
+test("reconciliation keeps a surviving process as in progress", (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -366,7 +366,7 @@ test("a reconciliação preserva como em andamento um processo que sobreviveu", 
   assert.equal(amb.execucao.obter("20260101000000-bbbbbbbb").estado, "executando");
 });
 
-test("uma operação que passou do ponto sem retorno recusa cancelamento", async (t) => {
+test("an operation past the point of no return refuses cancellation", async (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -394,7 +394,7 @@ test("uma operação que passou do ponto sem retorno recusa cancelamento", async
   await esperarFim(amb.execucao, trabalho.id);
 });
 
-test("duas operações não rodam ao mesmo tempo", async (t) => {
+test("two operations do not run at the same time", async (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -427,7 +427,7 @@ test("duas operações não rodam ao mesmo tempo", async (t) => {
   await esperarFim(amb.execucao, primeiro.id);
 });
 
-test("o histórico de trabalhos é limitado e as saídas antigas são podadas", async (t) => {
+test("job history is bounded and old outputs are pruned", async (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout, env: { CONSOLE_JOB_HISTORICO_MAX: "3" } });
   t.after(() => {

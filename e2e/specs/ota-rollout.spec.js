@@ -12,7 +12,7 @@ test.afterEach(async ({ request }) => {
   await removerFirmwareFixture(request);
 });
 
-test("sem firmware publicado, a distribuição em etapas explica o pré-requisito e não oferece início", async ({ page, context }) => {
+test("without published firmware, the staged rollout explains the prerequisite and offers no start", async ({ page, context }) => {
   await abrirFirmware(page, context);
 
   const painel = page.locator(PAINEL);
@@ -22,7 +22,7 @@ test("sem firmware publicado, a distribuição em etapas explica o pré-requisit
   await expect(painel.locator(".rollout-iniciar-btn")).toHaveCount(0);
 });
 
-test("um administrador comum não alcança a distribuição em etapas", async ({ page, context }) => {
+test("a regular administrator cannot reach the staged rollout", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/admin/esp32");
   await expect(page.locator("#screen-admin")).toBeVisible();
@@ -31,7 +31,7 @@ test("um administrador comum não alcança a distribuição em etapas", async ({
   await expect(page.locator(PAINEL)).toBeHidden();
 });
 
-test("a distribuição lista o dispositivo apto, roda o canário e conclui com a versão validada", async ({ page, context, request }) => {
+test("the rollout lists the eligible device, runs the canary and completes with the validated version", async ({ page, context, request }) => {
   const manifesto = await publicarFirmwareFixture(request, "4.1.0");
   await abrirFirmware(page, context);
 
@@ -57,7 +57,7 @@ test("a distribuição lista o dispositivo apto, roda o canário e conclui com a
   await expect(page.locator(`.esp32-device-card[data-sala="${SALA_ONLINE}"] .esp32-ota`)).toContainText("4.1.0");
 });
 
-test("canário com versão inesperada interrompe sem alegar rollback", async ({ page, context, request }) => {
+test("a canary with an unexpected version stops without claiming a rollback", async ({ page, context, request }) => {
   await publicarFirmwareFixture(request, "4.1.0");
   await request.post(`${API_URL}/__e2e/comportamento-ota/rollback`);
   await abrirFirmware(page, context);

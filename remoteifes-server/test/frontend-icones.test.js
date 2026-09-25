@@ -22,7 +22,7 @@ function simbolosDoSprite() {
   return new Set([...index.matchAll(/<symbol id="(i-[a-z0-9-]+)"/g)].map((m) => m[1]));
 }
 
-test("o botão Power usa o ícone SVG local, não um glifo Unicode dependente de fonte", () => {
+test("the Power button uses the local SVG icon, not a font-dependent Unicode glyph", () => {
   const botao = index.match(/<button id="btnPower"[\s\S]*?<\/button>/);
   assert.ok(botao, "botão Power não encontrado no index.html");
   const marcacao = botao[0];
@@ -37,7 +37,7 @@ test("o botão Power usa o ícone SVG local, não um glifo Unicode dependente de
   assert.match(marcacao, /<span class="ac-remote-control-label">Power<\/span>/, "o rótulo visível Power precisa continuar");
 });
 
-test("todo ícone referenciado existe no sprite e todo símbolo do sprite é usado", () => {
+test("every referenced icon exists in the sprite and every sprite symbol is used", () => {
   const simbolos = simbolosDoSprite();
   assert.ok(simbolos.size > 0, "sprite de ícones ausente no index.html");
 
@@ -57,7 +57,7 @@ test("todo ícone referenciado existe no sprite e todo símbolo do sprite é usa
   assert.deepEqual(semUso, [], `símbolos do sprite que ninguém usa: ${semUso.join(", ")}`);
 });
 
-test("nenhum emoji ou pictograma volta a ser usado como ícone funcional", () => {
+test("no emoji or pictogram is used as a functional icon again", () => {
   const pictograma = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{25A0}-\u{25FF}\u{2B00}-\u{2BFF}\u{FE0F}]|&#(?:9\d{3}|1\d{4});/u;
   const ofensas = [];
   for (const arquivo of arquivosDoFrontend()) {
@@ -68,7 +68,7 @@ test("nenhum emoji ou pictograma volta a ser usado como ícone funcional", () =>
   assert.deepEqual(ofensas, [], `use o sprite SVG em vez de emoji:\n${ofensas.join("\n")}`);
 });
 
-test("os ícones do sprite são decorativos e não substituem o nome acessível", () => {
+test("sprite icons are decorative and do not replace the accessible name", () => {
   const svgsDeIcone = [...index.matchAll(/<svg class="icone[^"]*"[^>]*>/g)].map((m) => m[0]);
   assert.ok(svgsDeIcone.length > 0, "nenhum ícone do sprite encontrado no index.html");
   svgsDeIcone.forEach((svg) => assert.match(svg, /aria-hidden="true"/, `ícone sem aria-hidden: ${svg}`));
@@ -78,7 +78,7 @@ test("os ícones do sprite são decorativos e não substituem o nome acessível"
   assert.match(sprite[0], /aria-hidden="true"/, "o sprite precisa ficar fora da árvore de acessibilidade");
 });
 
-test("fontes do frontend não contêm controles de texto usados como glifos", () => {
+test("frontend sources contain no text control characters used as glyphs", () => {
   for (const arquivo of arquivosDoFrontend()) {
     assert.doesNotMatch(fs.readFileSync(arquivo, "utf8"), /[\x00-\x08\x0b\x0c\x0e-\x1f]/, path.relative(WEB_ROOT, arquivo));
   }

@@ -9,14 +9,14 @@ async function abrir(page, context, role, hash = "/") {
 const chaves = (page, sel) =>
   page.$$eval(`${sel} .hub-card`, (cs) => cs.map((c) => c.dataset.hubCard));
 
-test("a sessão abre no hub de início com a aba Início ativa", async ({ page, sessaoComo }) => {
+test("the session opens on the home hub with the Início tab active", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await expect(page.locator("#screen-inicio")).toBeVisible();
   await expect(page.locator('.tab-btn[data-tab="inicio"].active')).toBeVisible();
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/inicio");
 });
 
-test("hub do usuário comum: ações operacionais, sem administração nem saúde", async ({ page, context }) => {
+test("regular user hub: operational actions, without administration or health", async ({ page, context }) => {
   await abrir(page, context, "user");
   const cards = await chaves(page, "#hubGridPrincipal");
   expect(cards).toEqual(expect.arrayContaining(["salas", "planta", "relatos", "ajuda", "aplicativo"]));
@@ -26,7 +26,7 @@ test("hub do usuário comum: ações operacionais, sem administração nem saúd
   await expect(page.locator("#hubResumo")).toBeHidden();
 });
 
-test("hub do administrador: agenda/grade/notificações e atalhos de administração sem os de superadmin", async ({ page, context }) => {
+test("administrator hub: schedule/grid/notifications and administration shortcuts without superadmin ones", async ({ page, context }) => {
   await abrir(page, context, "admin");
   const cards = await chaves(page, "#hubGridPrincipal");
   expect(cards).toEqual(expect.arrayContaining(["agenda", "grade", "notificacoes"]));
@@ -38,7 +38,7 @@ test("hub do administrador: agenda/grade/notificações e atalhos de administra�
   await expect(page.locator("#hubResumo")).toBeHidden();
 });
 
-test("hub do superadministrador: atalhos completos e faixa de saúde do sistema", async ({ page, context }) => {
+test("superadministrator hub: complete shortcuts and the system health strip", async ({ page, context }) => {
   await abrir(page, context, "superadmin");
   const adm = await chaves(page, "#hubGridAdmin");
   expect(adm).toEqual(expect.arrayContaining(["adm-macs", "adm-esp32", "adm-protocolos", "adm-config", "adm-status", "adm-relatos"]));
@@ -49,7 +49,7 @@ test("hub do superadministrador: atalhos completos e faixa de saúde do sistema"
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/status/sistema");
 });
 
-test("um card do hub navega para a seção e o voltar retorna ao início", async ({ page, context }) => {
+test("a hub card navigates to the section and back returns to Início", async ({ page, context }) => {
   await abrir(page, context, "user");
   await page.locator('#hubGridPrincipal .hub-card[data-hub-card="salas"]').click();
   await expect(page.locator("#screen-simple")).toBeVisible();
@@ -59,7 +59,7 @@ test("um card do hub navega para a seção e o voltar retorna ao início", async
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/inicio");
 });
 
-test("link direto /inicio e refresh mantêm o hub, sem rolagem horizontal no celular", async ({ page, context }) => {
+test("direct link /inicio and refresh keep the hub, without horizontal scroll on a phone", async ({ page, context }) => {
   await page.setViewportSize(VIEWPORTS["mobile-portrait"]);
   await abrir(page, context, "superadmin", "/inicio");
   await expect(page.locator("#screen-inicio")).toBeVisible({ timeout: 20_000 });

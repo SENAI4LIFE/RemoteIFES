@@ -67,7 +67,7 @@ async function tokenSuperAdmin() {
   return resp.corpo.token;
 }
 
-test("um admin comum (não superadmin) recebe 403 nas rotas /admin/esp32", async () => {
+test("a regular admin (not superadmin) receives 403 on /admin/esp32 routes", async () => {
   usuariosService.criar(
     { usuario: "teste-esp32-admin-comum", senha: "senhaSegura123", nome: "Admin Comum", isAdmin: true },
     { nivel: 3 }
@@ -77,14 +77,14 @@ test("um admin comum (não superadmin) recebe 403 nas rotas /admin/esp32", async
   assert.equal(resp.status, 403);
 });
 
-test("comando para dispositivo desconectado retorna 409", async () => {
+test("a command to a disconnected device returns 409", async () => {
   novaSalaComMac("teste-esp32-offline", "AA:BB:CC:DD:EE:01");
   const token = await tokenSuperAdmin();
   const resp = await authFetch("/admin/esp32/teste-esp32-offline/captura/iniciar", token, { method: "POST" });
   assert.equal(resp.status, 409);
 });
 
-test("dispositivo conecta via WS, envia telemetria, e recebe comandos retransmitidos pelo servidor", async () => {
+test("a device connects over WS, sends telemetry and receives commands relayed by the server", async () => {
   novaSalaComMac("teste-esp32-online", "AA:BB:CC:DD:EE:02");
 
   const ws = new WebSocket(baseWsDispositivoUrl, {
@@ -163,7 +163,7 @@ test("dispositivo conecta via WS, envia telemetria, e recebe comandos retransmit
   await fechouNovamente;
 });
 
-test("telemetria com valores fora de faixa não corrompe estado nem broadcast", async () => {
+test("out-of-range telemetry values do not corrupt state or broadcast", async () => {
   novaSalaComMac("teste-esp32-telemetria-ruim", "AA:BB:CC:DD:EE:07");
   db.prepare(`UPDATE salas SET temperatura = 22 WHERE sala = ?`).run("teste-esp32-telemetria-ruim");
 
@@ -192,7 +192,7 @@ test("telemetria com valores fora de faixa não corrompe estado nem broadcast", 
   ws.close();
 });
 
-test("painel ESP32 observa mais de 20 salas sem acionar o limite de flood", async () => {
+test("the ESP32 panel observes more than 20 rooms without triggering the flood limit", async () => {
   const token = await tokenSuperAdmin();
   const ws = new WebSocket(baseWsUrl, [token]);
   const mensagens = [];
@@ -220,7 +220,7 @@ test("painel ESP32 observa mais de 20 salas sem acionar o limite de flood", asyn
   ws.close();
 });
 
-test("rota de entrar-config não exige senha do dispositivo", async () => {
+test("the entrar-config route does not require the device password", async () => {
   novaSalaComMac("teste-esp32-sem-senha", "AA:BB:CC:DD:EE:03");
 
   const ws = new WebSocket(baseWsDispositivoUrl, {
@@ -243,7 +243,7 @@ test("rota de entrar-config não exige senha do dispositivo", async () => {
   ws.close();
 });
 
-test("início de agendamento envia um único estado IR final", async () => {
+test("schedule start sends a single final IR state", async () => {
   novaSalaComMac("teste-agendamento-ir", "AA:BB:CC:DD:EE:04");
   db.prepare(`UPDATE salas SET irProtocolo = 5 WHERE sala = ?`).run("teste-agendamento-ir");
   const ws = new WebSocket(baseWsDispositivoUrl, {
@@ -271,7 +271,7 @@ test("início de agendamento envia um único estado IR final", async () => {
   ws.close();
 });
 
-test("alterar o vínculo MAC encerra a conexão antiga", async () => {
+test("changing the MAC binding closes the old connection", async () => {
   novaSalaComMac("teste-mac-revogado", "AA:BB:CC:DD:EE:05");
   const ws = new WebSocket(baseWsDispositivoUrl, {
     headers: {
@@ -289,7 +289,7 @@ test("alterar o vínculo MAC encerra a conexão antiga", async () => {
   assert.equal(deviceHub.dispositivoConectado("teste-mac-revogado"), false);
 });
 
-test("flood de mensagens do dispositivo encerra a conexao", async () => {
+test("a device message flood closes the connection", async () => {
   novaSalaComMac("teste-esp32-flood", "AA:BB:CC:DD:EE:08");
   const ws = new WebSocket(baseWsDispositivoUrl, {
     headers: {

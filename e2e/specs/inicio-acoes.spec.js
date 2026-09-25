@@ -21,14 +21,14 @@ const ACOES = {
   aplicativo: { visivel: "#screen-mobile-app" },
 };
 
-test("o Início exibe a saudação sem o rótulo RemoteIFES redundante", async ({ page, context }) => {
+test("Início shows the greeting without the redundant RemoteIFES label", async ({ page, context }) => {
   await abrirInicio(page, context, "superadmin");
   await expect(page.locator("#hubHeroTitulo")).toHaveText("Olá, Superadministrador");
   await expect(page.locator(".hub-hero-eyebrow")).toHaveCount(0);
 });
 
 for (const role of ["user", "admin", "superadmin"]) {
-  test(`todas as ações visíveis de Início funcionam para ${role}`, async ({ page, context }) => {
+  test(`every visible Início action works for ${role}`, async ({ page, context }) => {
     test.setTimeout(150_000);
     await abrirInicio(page, context, role);
     const chaves = await page.$$eval("#hubGridPrincipal .hub-card", (cs) => cs.map((c) => c.dataset.hubCard));
@@ -62,7 +62,7 @@ for (const role of ["user", "admin", "superadmin"]) {
   });
 }
 
-test("Relatar problema abre o painel de relatos pelo teclado e permanece aberto", async ({ page, context }) => {
+test("Relatar problema opens the reports panel by keyboard and stays open", async ({ page, context }) => {
   await abrirInicio(page, context, "user");
   const relato = card(page, "relatos");
   await expect(relato).toContainText("Relatar problema");
@@ -76,7 +76,7 @@ test("Relatar problema abre o painel de relatos pelo teclado e permanece aberto"
   await expect(page.locator("#bugReportBtn")).toHaveAttribute("aria-expanded", "true");
 });
 
-test("Relatar problema pelo menu rápido de ajuda também abre o painel", async ({ page, context }) => {
+test("Relatar problema from the quick help menu also opens the panel", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/#/inicio");
   await expect(page.locator("#screen-inicio")).toBeVisible({ timeout: 20_000 });
@@ -88,7 +88,7 @@ test("Relatar problema pelo menu rápido de ajuda também abre o painel", async 
   await expect(page.locator("#relatosPanel")).toBeVisible();
 });
 
-test("o cartão Notificações abre o painel do sino e mantém a lista visível", async ({ page, context }) => {
+test("the Notificações card opens the bell panel and keeps the list visible", async ({ page, context }) => {
   await abrirInicio(page, context, "admin");
   await card(page, "notificacoes").click();
   await expect(page.locator("#notifPanel")).toBeVisible();
@@ -97,7 +97,7 @@ test("o cartão Notificações abre o painel do sino e mantém a lista visível"
   await expect(page.locator("#notifBellBtn")).toHaveAttribute("aria-expanded", "true");
 });
 
-test("os atalhos de Administração do hub abrem a sub-aba correspondente", async ({ page, context }) => {
+test("hub Administration shortcuts open the matching sub-tab", async ({ page, context }) => {
   test.setTimeout(150_000);
   await abrirInicio(page, context, "superadmin");
   const atalhos = await page.$$eval("#hubGridAdmin .hub-card", (cs) => cs.map((c) => c.dataset.hubCard));
@@ -112,7 +112,7 @@ test("os atalhos de Administração do hub abrem a sub-aba correspondente", asyn
   }
 });
 
-test("as ações de Início continuam clicáveis no celular em retrato", async ({ page, context }) => {
+test("Início actions stay clickable on a phone in portrait", async ({ page, context }) => {
   await abrirInicio(page, context, "user", VIEWPORTS["mobile-portrait"]);
   const relato = card(page, "relatos");
   const caixa = await relato.boundingBox();
@@ -122,7 +122,7 @@ test("as ações de Início continuam clicáveis no celular em retrato", async (
   await expect(page.locator("#relatosPanel")).toBeVisible();
 });
 
-test("nenhuma ação de Início aponta para rota fora do papel do usuário", async ({ page, context }) => {
+test("no Início action points to a route outside the user's role", async ({ page, context }) => {
   await abrirInicio(page, context, "user");
   const chaves = await page.$$eval("#hubGridPrincipal .hub-card", (cs) => cs.map((c) => c.dataset.hubCard));
   expect(chaves).not.toContain("agenda");

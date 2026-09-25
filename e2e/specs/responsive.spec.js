@@ -19,7 +19,7 @@ async function abrirComoUsuario(page, context, tamanho) {
 }
 
 for (const [nome, tamanho] of Object.entries(VIEWPORTS)) {
-  test(`layout ${nome} (${tamanho.width}x${tamanho.height}): sem rolagem horizontal e controles acessíveis`, async ({ page, context }) => {
+  test(`layout ${nome} (${tamanho.width}x${tamanho.height}): no horizontal scroll and accessible controls`, async ({ page, context }) => {
     await abrirComoUsuario(page, context, tamanho);
     expect(await semRolagemHorizontal(page), "tela de salas sem rolagem horizontal").toBe(true);
 
@@ -43,7 +43,7 @@ for (const [nome, tamanho] of Object.entries(VIEWPORTS)) {
 }
 
 for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile-landscape", "tablet-compact", "tablet-portrait", "tablet-large", "notebook"]) {
-  test(`planta baixa do cadastro de ESP32 não vaza da tela (${nome})`, async ({ page, context }) => {
+  test(`the ESP32 registration floor plan does not overflow the screen (${nome})`, async ({ page, context }) => {
     await injetarSessao(context, "superadmin");
     await page.setViewportSize(VIEWPORTS[nome]);
     await page.goto("/#/admin/macs");
@@ -92,7 +92,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
 }
 
 for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile-landscape", "tablet-compact", "tablet-portrait", "tablet-large"]) {
-  test(`a página do aplicativo com APK publicado não vaza da tela (${nome})`, async ({ page, context, request }) => {
+  test(`the app page with a published APK does not overflow the screen (${nome})`, async ({ page, context, request }) => {
     await publicarApkFixture(request);
     try {
       await injetarSessao(context, "user");
@@ -123,7 +123,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
   });
 }
 
-test("rotação retrato -> paisagem preserva a tela e o estado do controlador", async ({ page, context }) => {
+test("portrait -> landscape rotation preserves the screen and the controller state", async ({ page, context }) => {
   await abrirComoUsuario(page, context, VIEWPORTS["mobile-portrait"]);
   await irParaSala(page, "A-108");
   await page.locator("#btnPower").click();
@@ -147,7 +147,7 @@ test("rotação retrato -> paisagem preserva a tela e o estado do controlador", 
 // not at the right edge, so on narrow screens a wide panel would leave through the left without
 // creating horizontal scroll, and therefore without being caught by the measurements above.
 for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "tablet-compact"]) {
-  test(`os painéis da barra superior abrem inteiros dentro da tela (${nome})`, async ({ page, context }) => {
+  test(`top-bar panels open fully inside the screen (${nome})`, async ({ page, context }) => {
     await injetarSessao(context, "admin");
     await page.setViewportSize(VIEWPORTS[nome]);
     await page.goto("/");
@@ -185,7 +185,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "tablet
 // bar height covered the bell and bug buttons and swallowed taps, preventing a switch from
 // Notificações to Relatar problema without first closing the open panel.
 for (const nome of ["mobile-compact", "mobile-portrait"]) {
-  test(`com a barra superior em duas linhas um painel aberto não cobre os outros botões (${nome})`, async ({ page, context }) => {
+  test(`with the top bar on two lines an open panel does not cover the other buttons (${nome})`, async ({ page, context }) => {
     await injetarSessao(context, "admin");
     await context.addInitScript((ajustes) => {
       try {

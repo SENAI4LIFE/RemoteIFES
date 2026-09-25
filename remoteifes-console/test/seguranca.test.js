@@ -6,7 +6,7 @@ const ajuda = require("./ajuda");
 
 // Authentication, authorization, elevation and the Console's transport defenses.
 
-test("a senha é guardada com scrypt e conferida em tempo constante", (t) => {
+test("the password is stored with scrypt and checked in constant time", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -19,7 +19,7 @@ test("a senha é guardada com scrypt e conferida em tempo constante", (t) => {
   assert.equal(amb.auth.conferirSenha("x", "lixo"), false);
 });
 
-test("senhas padrão conhecidas da aplicação são recusadas como credencial do console", (t) => {
+test("the application's known default passwords are refused as Console credentials", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -30,7 +30,7 @@ test("senhas padrão conhecidas da aplicação são recusadas como credencial do
   assert.equal(amb.auth.validarForcaDaSenha("uma-senha-aceitavel-123"), null);
 });
 
-test("o arquivo de operadores fica fora do checkout e sem a senha em claro", (t) => {
+test("the operators file lives outside the checkout and without the plaintext password", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -42,7 +42,7 @@ test("o arquivo de operadores fica fora do checkout e sem a senha em claro", (t)
   assert.ok(!path.resolve(arquivo).startsWith(path.resolve(amb.checkout, "remoteifes-console")));
 });
 
-test("sessão expira por ociosidade e por prazo absoluto", (t) => {
+test("a session expires on idle and at the absolute deadline", (t) => {
   const amb = ajuda.ambiente({ sessaoOciosaS: 60, sessaoMaxS: 300 });
   t.after(() => amb.restaurar());
 
@@ -67,7 +67,7 @@ test("sessão expira por ociosidade e por prazo absoluto", (t) => {
   assert.equal(amb.auth.validarSessao(t2), null, "sessão vencida deve ser invalidada");
 });
 
-test("a troca de senha revoga as demais sessões do operador", (t) => {
+test("changing the password revokes the operator's other sessions", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -83,7 +83,7 @@ test("a troca de senha revoga as demais sessões do operador", (t) => {
   assert.equal(amb.auth.autenticar("operador", "senha-de-teste-12345"), null);
 });
 
-test("a elevação expira sozinha e é revogada ao encerrar", (t) => {
+test("elevation expires by itself and is revoked on logout", (t) => {
   const amb = ajuda.ambiente({ elevacaoS: 60 });
   t.after(() => amb.restaurar());
 
@@ -106,7 +106,7 @@ test("a elevação expira sozinha e é revogada ao encerrar", (t) => {
   assert.equal(amb.auth.validarSessao(token).elevada, false, "elevação vencida não vale mais");
 });
 
-test("tentativas repetidas de login são limitadas por operador", (t) => {
+test("repeated login attempts are limited per operator", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -120,7 +120,7 @@ test("tentativas repetidas de login são limitadas por operador", (t) => {
 
 // --- Transporte ---------------------------------------------------------------------------
 
-test("Host inesperado é recusado com 421 (defesa contra DNS rebinding)", async (t) => {
+test("an unexpected Host is refused with 421 (DNS rebinding defense)", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -134,7 +134,7 @@ test("Host inesperado é recusado com 421 (defesa contra DNS rebinding)", async 
   assert.equal(ok.status, 200);
 });
 
-test("Origin de outra origem é recusado mesmo com sessão válida", async (t) => {
+test("a cross-origin Origin is refused even with a valid session", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -151,7 +151,7 @@ test("Origin de outra origem é recusado mesmo com sessão válida", async (t) =
   assert.match(r.json.erro, /origem/i);
 });
 
-test("método mutante sem o cabeçalho CSRF é recusado", async (t) => {
+test("a mutating method without the CSRF header is refused", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -181,7 +181,7 @@ test("método mutante sem o cabeçalho CSRF é recusado", async (t) => {
   assert.equal(certo.status, 200);
 });
 
-test("o cookie de sessão é HttpOnly, SameSite=Strict e some no logout", async (t) => {
+test("the session cookie is HttpOnly, SameSite=Strict and cleared on logout", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -208,7 +208,7 @@ test("o cookie de sessão é HttpOnly, SameSite=Strict e some no logout", async 
   assert.equal(depois.status, 401, "o cookie revogado não pode mais valer");
 });
 
-test("content-type inesperado num POST é recusado", async (t) => {
+test("an unexpected content-type in a POST is refused", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -228,7 +228,7 @@ test("content-type inesperado num POST é recusado", async (t) => {
   assert.equal(r.status, 415);
 });
 
-test("cabeçalhos de segurança acompanham toda resposta", async (t) => {
+test("security headers accompany every response", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -245,7 +245,7 @@ test("cabeçalhos de segurança acompanham toda resposta", async (t) => {
   assert.equal(r.cabecalhos["cache-control"], "no-store");
 });
 
-test("rota privilegiada sem sessão responde 401 e não vaza estado", async (t) => {
+test("a privileged route without a session answers 401 and does not leak state", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -260,7 +260,7 @@ test("rota privilegiada sem sessão responde 401 e não vaza estado", async (t) 
   }
 });
 
-test("ação sensível exige elevação, não só sessão", async (t) => {
+test("a sensitive action requires elevation, not only a session", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -280,7 +280,7 @@ test("ação sensível exige elevação, não só sessão", async (t) => {
   assert.equal(semElevacao.json.precisaElevacao, true);
 });
 
-test("bootstrap exige o segredo de instalação e só funciona uma vez", async (t) => {
+test("bootstrap requires the installation secret and works only once", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -313,7 +313,7 @@ test("bootstrap exige o segredo de instalação e só funciona uma vez", async (
   assert.equal(denovo.status, 409);
 });
 
-test("a auditoria registra metadados e nunca segredos", (t) => {
+test("the audit records metadata and never secrets", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -328,7 +328,7 @@ test("a auditoria registra metadados e nunca segredos", (t) => {
   assert.ok(!bruto.includes("ghp_secreto"));
 });
 
-test("o token do GitHub nunca volta por API", async (t) => {
+test("the GitHub token never returns through the API", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -345,7 +345,7 @@ test("o token do GitHub nunca volta por API", async (t) => {
   assert.equal(r.json.credencialGitHub.githubToken, undefined);
 });
 
-test("arquivos do console não são servidos fora da pasta web", async (t) => {
+test("Console files are not served outside the web folder", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {

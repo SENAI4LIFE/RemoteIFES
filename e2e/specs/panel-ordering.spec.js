@@ -1,6 +1,6 @@
 const { test, expect, irParaSala, API_URL } = require("../harness/fixtures");
 
-test("resposta atrasada de outra sala nao substitui o painel atual", async ({ page, sessaoComo }) => {
+test("a late response from another room does not replace the current panel", async ({ page, sessaoComo }) => {
   await sessaoComo("admin");
   let liberar;
   const respostaPendente = new Promise((resolve) => { liberar = resolve; });
@@ -23,7 +23,7 @@ test("resposta atrasada de outra sala nao substitui o painel atual", async ({ pa
   await expect(page.locator("#tempTarget")).toHaveText(esperado);
 });
 
-test("HTTP antigo nao sobrescreve estado mais recente recebido por WebSocket", async ({ page, sessaoComo, tokens }) => {
+test("old HTTP does not overwrite newer state received over WebSocket", async ({ page, sessaoComo, tokens }) => {
   await sessaoComo("admin");
   await irParaSala(page, "A-108");
   let liberar;
@@ -50,7 +50,7 @@ test("HTTP antigo nao sobrescreve estado mais recente recebido por WebSocket", a
   await expect(page.locator("#tempTarget")).toHaveText(`${alvo}°C`);
 });
 
-test("sair durante a abertura nao reativa a observacao da sala", async ({ page, sessaoComo }) => {
+test("leaving during opening does not reactivate the room observation", async ({ page, sessaoComo }) => {
   await sessaoComo("admin");
   let liberar;
   const respostaPendente = new Promise((resolve) => { liberar = resolve; });
