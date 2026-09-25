@@ -524,6 +524,9 @@ label { display: block; font-size: calc(13px * var(--a11y-font-scale)); margin: 
   margin: 10px 0;
   min-height: var(--tap-min);
   cursor: pointer;
+  /* `anywhere` lowers the min-content width of the anonymous text item, so a long word breaks
+     instead of widening the page at 320px with maximum text. */
+  overflow-wrap: anywhere;
 }
 .checkbox-label input {
   width: 18px;
@@ -1302,7 +1305,9 @@ button.btn:disabled {
     padding: 10px 12px;
   }
   .admin-subtab-group:last-child .admin-subtab-btn:last-child { border-right: none; }
-  .admin-subtab-label { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+  /* Only the selector label is enlarged on phones: the button font (and the icon sized from it),
+     the group headings and the inner tabs keep their sizes. The row scrolls inside itself. */
+  .admin-subtab-label { white-space: nowrap; overflow-wrap: normal; word-break: normal; font-size: calc(14px * var(--a11y-font-scale)); }
   .admin-content { width: 100%; }
   .admin-subtab-group { display: contents; }
   .admin-group-btn {
