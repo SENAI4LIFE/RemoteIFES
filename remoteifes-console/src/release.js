@@ -219,15 +219,31 @@ function politicaDeVersao(manifesto, versaoInstalada) {
  * caminho que o operador informou (um /tmp compartilhado, um pendrive montado), e ali a troca é
  * plausível. Verificando e extraindo o MESMO buffer, não existe segunda leitura para atacar.
  */
-function conferirArtefato(caminho, artefato) {
-  let conteudo;
+function conferirArtefato(caminho, artefato, { limiteBytes = Infinity } = {}) {
+  // O tamanho é conferido por `stat`, ANTES de ler. Ler primeiro para só então comparar
+  // carregaria um arquivo arbitrariamente grande na memória — num Pi de 1 GiB isso derruba o
+  // host antes de qualquer verificação dizer que o artefato era inválido.
+  let info;
   try {
-    conteudo = fs.readFileSync(caminho);
+    info = fs.statSync(caminho);
   } catch {
     return { ok: false, motivo: "o arquivo baixado não existe" };
   }
+  if (info.size !== artefato.bytes) {
+    return { ok: false, motivo: `tamanho divergente: ${info.size} bytes no arquivo, ${artefato.bytes} declarados no manifesto` };
+  }
+  if (info.size > limiteBytes) {
+    return { ok: false, motivo: `o artefato tem ${info.size} bytes, acima do teto de ${limiteBytes} deste console` };
+  }
+
+  let conteudo;
+  try {
+    conteudo = fs.readFileSync(caminho);
+  } catch (erro) {
+    return { ok: false, motivo: `não foi possível ler o artefato: ${erro.code || erro.message}` };
+  }
   if (conteudo.length !== artefato.bytes) {
-    return { ok: false, motivo: `tamanho divergente: ${conteudo.length} bytes lidos, ${artefato.bytes} declarados no manifesto` };
+    return { ok: false, motivo: `o arquivo mudou de tamanho durante a leitura (${conteudo.length} bytes)` };
   }
   const digest = crypto.createHash("sha256").update(conteudo).digest("hex");
   if (digest !== artefato.sha256) {

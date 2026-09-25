@@ -141,7 +141,16 @@ async function main() {
     if (fs.existsSync(destinoVersao)) {
       const aposentado = `${destinoVersao}.substituido-${crypto.randomBytes(3).toString("hex")}`;
       fs.renameSync(destinoVersao, aposentado);
-      fs.renameSync(parcial, destinoVersao);
+      try {
+        fs.renameSync(parcial, destinoVersao);
+      } catch (erro) {
+        // Entre os dois renames a versão ativa não existe. Se o segundo falhar, a antiga volta
+        // para o lugar: sem isso o payload ficava só sob `.substituido-*`, sem restauração
+        // automática, e o ponteiro apontava para um diretório ausente.
+        fs.renameSync(aposentado, destinoVersao);
+        fs.rmSync(parcial, { recursive: true, force: true });
+        falhar(`não foi possível instalar o payload (${erro.message}); a versão anterior foi restaurada.`);
+      }
       // Só agora a árvore antiga sai — e se ela era a origem, a cópia já está feita.
       fs.rmSync(aposentado, { recursive: true, force: true });
       log(origemEhODestino ? "   payload substituído a partir de si mesmo, com estágio intermediário." : "   payload substituído.");

@@ -83,7 +83,7 @@ function processoVivo(pid) {
   }
 }
 
-function adquirirTrava(operacao) {
+function adquirirTrava(operacao, tentativa = 0) {
   const arquivo = arquivoTrava();
   fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   try {
@@ -104,10 +104,31 @@ function adquirirTrava(operacao) {
         `${dono.em || "?"}). Espere que ela termine.`,
     };
   }
-  // Dono morto: a trava é resíduo. Registrar a recuperação evita que ela pareça normal.
-  estado.auditar("trava-de-operacao-residual", { operacao: dono.operacao || null, pid: dono.pid || null });
-  fs.rmSync(arquivo, { force: true });
-  return adquirirTrava(operacao);
+  if (tentativa >= 3) return { ok: false, motivo: "não foi possível resolver a trava de operação; tente de novo" };
+
+  // Recuperação de trava órfã por RENAME, não por remoção.
+  //
+  // Remover e recriar é uma corrida: dois processos podem ver o mesmo dono morto, o primeiro
+  // recria a trava e o segundo remove justamente essa trava viva e cria a sua. O rename é
+  // atômico e só um dos dois consegue mover aquele caminho, então quem move é quem tem o direito
+  // de recriar. O outro falha no rename, relê e encontra um dono vivo.
+  const aposentada = `${arquivo}.orfa-${process.pid}-${Date.now()}`;
+  try {
+    fs.renameSync(arquivo, aposentada);
+  } catch {
+    // Alguém chegou primeiro: refaz a leitura em vez de assumir qualquer coisa.
+    return adquirirTrava(operacao, tentativa + 1);
+  }
+  const confirmado = estado.lerJson(aposentada, {});
+  fs.rmSync(aposentada, { force: true });
+  estado.auditar("trava-de-operacao-residual", { operacao: confirmado.operacao || null, pid: confirmado.pid || null });
+  return adquirirTrava(operacao, tentativa + 1);
+}
+
+/** Alguma operação de versão está em andamento por um processo vivo? */
+function operacaoEmAndamento() {
+  const dono = estado.lerJson(arquivoTrava(), null);
+  return dono && processoVivo(dono.pid) && dono.pid !== process.pid ? dono : null;
 }
 
 function liberarTrava() {
@@ -492,6 +513,13 @@ function limparDescargas() {
  * versão incompleto — nunca uma instalação pela metade, porque a troca é um rename.
  */
 function reconciliar() {
+  // Uma operação viva está mexendo em versoes/ agora: reconciliar aqui apagaria o estágio dela.
+  // Acontece de verdade quando um segundo console sobe durante uma atualização.
+  const emAndamento = operacaoEmAndamento();
+  if (emAndamento) {
+    return { reconciliado: false, adiado: true, motivo: `operação ${emAndamento.operacao || "de versão"} em andamento (pid ${emAndamento.pid})` };
+  }
+
   const info = lerEstadoInstalacao();
   if (!info.transacao) return { reconciliado: false };
 
@@ -508,7 +536,10 @@ function reconciliar() {
     try {
       const prefixo = `${String(t.versao || "")}.parcial-`;
       for (const nome of fs.readdirSync(dirVersoes())) {
-        if (nome.startsWith(prefixo) || /^\d+\.\d+\.\d+\.(parcial|substituido)-[0-9a-f]+$/.test(nome)) {
+        // Só `.parcial-*`: um `.substituido-*` é a ÚNICA cópia do payload anterior enquanto uma
+        // substituição está no meio do caminho, e apagá-lo transformaria uma reinstalação
+        // interrompida em perda da versão.
+        if (nome.startsWith(prefixo) || /^\d+\.\d+\.\d+\.parcial-[0-9a-f]+$/.test(nome)) {
           fs.rmSync(path.join(dirVersoes(), nome), { recursive: true, force: true });
         }
       }
@@ -662,7 +693,7 @@ async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
   }
 
   log("Verificando integridade contra o manifesto assinado...");
-  const conferencia = release.conferirArtefato(arquivoLocal, artefato);
+  const conferencia = release.conferirArtefato(arquivoLocal, artefato, { limiteBytes: LIMITE_ARTEFATO });
   if (!conferencia.ok) {
     limparDescargas();
     registrarTransacao(versaoAlvo, "falhou-verificacao");
@@ -749,7 +780,7 @@ async function importarOfflineComTrava({ manifesto, assinatura, artefato, log = 
   if (path.basename(artefato) !== escolha.artefato.arquivo) {
     return { ok: false, erro: `o arquivo informado não é o artefato deste alvo (esperado ${escolha.artefato.arquivo}).` };
   }
-  const conferencia = release.conferirArtefato(artefato, escolha.artefato);
+  const conferencia = release.conferirArtefato(artefato, escolha.artefato, { limiteBytes: LIMITE_ARTEFATO });
   if (!conferencia.ok) return { ok: false, erro: conferencia.motivo };
 
   const versaoAlvo = verificacao.manifesto.versao;
@@ -798,5 +829,6 @@ module.exports = {
   importarOffline,
   adquirirTrava,
   liberarTrava,
+  operacaoEmAndamento,
   baixar,
 };
