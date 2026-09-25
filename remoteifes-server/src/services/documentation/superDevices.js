@@ -2,6 +2,25 @@ const C = require("./commands");
 
 module.exports = [
   {
+    id: "topologia",
+    titulo: "Topologia: Wi-Fi direto, gateways e rede mesh",
+    papel: "superadmin",
+    categoria: "super_dispositivos",
+    tags: ["Topologia", "mesh", "malha", "gateway", "RSSI", "saltos", "transporte"],
+    verNoApp: "/admin/topologia",
+    corpo: [
+      { t: "p", texto: "<strong>Administração &gt; Sistema &gt; Status &gt; Topologia</strong> mostra como cada ESP32 chega ao servidor: pelo Wi-Fi direto (o padrão) ou por uma rede mesh, através de uma placa gateway. O diagrama é uma observação em memória do servidor, atualizada a cada 15 s só enquanto a aba está aberta." },
+      { t: "passos", itens: [
+        "Leia o resumo no topo: número de gateways, placas da malha conectadas e placas no Wi-Fi direto. Numa instalação só com Wi-Fi direto aparece <strong>Rede mesh não utilizada</strong>.",
+        "Selecione uma placa no diagrama ou na tabela: o caminho até o servidor fica destacado e o painel mostra transporte, gateway e pai, saltos, sinal, firmware, canal de comandos, mudanças de rota e entregas.",
+        "Use os filtros de transporte e de situação para isolar a malha ou só as placas com problema.",
+      ] },
+      { t: "nota", nivel: "seguranca", texto: "Estar ligado ao gateway não prova que a placa está conectada: só a autenticação da própria placa, com a credencial dela, prova. Se o gateway cair, as placas atrás dele ficam offline. Uma placa só com MAC não pode ser gateway." },
+      { t: "nota", texto: "Atualização OTA pela malha não está disponível: conecte a placa diretamente ao Wi-Fi para atualizar. O firmware das placas ainda não tem o modo mesh; esta tela já mostra o Wi-Fi direto e ficará completa quando o firmware ganhar os modos gateway e nó." },
+      { t: "links", itens: [{ id: "esp32-credenciais", texto: "Credenciais por dispositivo" }, { id: "firmware-ota", texto: "Atualização OTA direta" }] },
+    ],
+  },
+  {
     id: "esp32-cadastro",
     titulo: "Cadastro: detectar e vincular ESP32 às salas",
     papel: "superadmin",
