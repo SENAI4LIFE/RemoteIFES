@@ -9,7 +9,7 @@ const ajuda = require("./helpers");
 
 // Platform adapters, capability model and launcher protection against local phishing.
 
-// --- Adaptadores --------------------------------------------------------------------------
+// --- Adapters --------------------------------------------------------------------------
 
 test("every platform has an adapter and the contract is the same", (t) => {
   const amb = ajuda.ambiente();
@@ -259,7 +259,7 @@ test("on Windows file protection is not claimed through a POSIX mode", (t) => {
   else assert.equal(r.restrito, null);
 });
 
-// --- Identidade do listener ---------------------------------------------------------------
+// --- Listener identity ---------------------------------------------------------------
 
 test("the backend publishes a protected identity contract", async (t) => {
   const amb = ajuda.ambiente();
@@ -315,7 +315,7 @@ test("a malformed challenge is refused", async (t) => {
 
   for (const desafio of ["", "curto", "x".repeat(500), "com espaço", "../../etc"]) {
     const r = await ajuda.pedir(s.porta, `/api/identidade?desafio=${encodeURIComponent(desafio)}`);
-    assert.equal(r.status, 400, `deveria recusar ${JSON.stringify(desafio.slice(0, 12))}`);
+    assert.equal(r.status, 400, `should refuse ${JSON.stringify(desafio.slice(0, 12))}`);
   }
 });
 
@@ -372,7 +372,7 @@ test("the launcher opens only validated HTTP(S) addresses", async (t) => {
 
   for (const ruim of ["file:///etc/passwd", "javascript:alert(1)", "não-é-url", "data:text/html,<script>"]) {
     const r = await launcher.abrir(ruim);
-    assert.equal(r.ok, false, `deveria recusar ${ruim}`);
+    assert.equal(r.ok, false, `should refuse ${ruim}`);
   }
 });
 
@@ -429,7 +429,7 @@ test("idle exit is disarmed when nothing can restart the Console", async (t) => 
   clearInterval(comReativacao);
 });
 
-// --- sc.exe em Windows localizado -------------------------------------------------------------
+// --- sc.exe on localized Windows -------------------------------------------------------------
 
 // Real `sc.exe` output, en-US and pt-BR. `sc.exe` translates LABELS; what does not change is the
 // field order and the numeric code at the start of the value.

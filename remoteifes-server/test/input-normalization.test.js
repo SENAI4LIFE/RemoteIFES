@@ -119,7 +119,7 @@ test("disabling an account with ativo=false revokes the session immediately; amb
   const reativar = await chamar(`/admin/usuarios/${conta.id}`, { method: "PATCH", token: tokenSuper, body: { ativo: true } });
   assert.equal(reativar.status, 200);
   assert.equal((await chamar("/me", { token: sessao })).status, 401, "reactivating does not revive the revoked session");
-  assert.equal((await login("norm-ativo", "senhaSegura123")).status, 200, "mas permite entrar de novo");
+  assert.equal((await login("norm-ativo", "senhaSegura123")).status, 200, "but allows logging in again");
 });
 
 test("the permissions audit lists exactly the fields that changed", async () => {

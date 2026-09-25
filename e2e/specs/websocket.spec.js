@@ -49,7 +49,7 @@ test("the WebSocket connection delivers the room list in real time after the ses
 });
 
 test("a network drop shows the connection notice and the app recovers when it returns", async ({ page, sessaoComo, context, request, browserName }) => {
-  test.skip(browserName === "webkit", "a emulação offline do Playwright não interrompe WebSockets no WebKit, então a queda de rede não é reproduzível nesse motor");
+  test.skip(browserName === "webkit", "Playwright's offline emulation does not interrupt WebSockets in WebKit, so a network drop cannot be reproduced in that engine");
   await sessaoComo("user");
   await expect(page.locator("#screen-server-status")).toBeHidden();
 
@@ -91,7 +91,7 @@ test("a session invalidated during reconnection returns to login without looping
 
 for (const papel of ["admin", "superadmin"]) {
   test(`a temporary drop for ${papel} keeps only the automatic reconnection`, async ({ page, sessaoComo, context, request, browserName }) => {
-    test.skip(browserName === "webkit", "a emulação offline do Playwright não interrompe WebSockets no WebKit, então a queda de rede não é reproduzível nesse motor");
+    test.skip(browserName === "webkit", "Playwright's offline emulation does not interrupt WebSockets in WebKit, so a network drop cannot be reproduced in that engine");
     await sessaoComo(papel);
     await context.setOffline(true);
     const fechado = await request.post(`${API_URL}/__e2e/fechar-status`);
@@ -235,7 +235,7 @@ test("a session bootstrap failure does not leave the connection overlay stuck", 
   await expect(page.locator("#screen-server-status")).toBeVisible({ timeout: 10_000 });
 
   await page.evaluate(() => {
-    window.restaurarSessaoSalva = () => Promise.reject(new Error("falha simulada ao restaurar a sessão"));
+    window.restaurarSessaoSalva = () => Promise.reject(new Error("simulated session restore failure"));
     window.__e2eLiberarWs = true;
   });
 
@@ -255,7 +255,7 @@ test("a half-open socket is detected on resume and reconnected", async ({ page, 
         window.__e2eConexoes += 1;
         const real = Reflect.construct(Alvo, argumentos);
         let congelado = false;
-        // Reproduz o socket meio-aberto: continua reportando OPEN, mas nada entra e nada sai.
+        // Reproduces a half-open socket: it keeps reporting OPEN, but nothing gets in or out.
         const fantasma = new Proxy(real, {
           get(alvo, prop) {
             if (prop === "readyState") return congelado ? WebSocketNativo.OPEN : alvo.readyState;
@@ -318,6 +318,6 @@ test("in the packaged app (Cordova) the PWA service worker is not registered; on
   await expect(empacotada.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
   expect(await empacotada.evaluate(() => window.RemoteIFESConfig.empacotado)).toBe(true);
   await empacotada.waitForTimeout(1500);
-  expect(await empacotada.evaluate(() => window.__swRegistros), "nenhum registro de sw.js no contexto empacotado").toEqual([]);
+  expect(await empacotada.evaluate(() => window.__swRegistros), "no sw.js registration in the packaged context").toEqual([]);
   await empacotada.close();
 });

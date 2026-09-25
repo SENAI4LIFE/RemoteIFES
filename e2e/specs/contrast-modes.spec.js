@@ -135,7 +135,7 @@ for (const [modo, ajustes] of [["tema claro", {}], ["alto contraste", ALTO_CONTR
   }
 }
 
-// Os pares apontados nas auditorias, medidos diretamente.
+// The pairs flagged in audits, measured directly.
 test("the pairs flagged in audits stay above the minimum in both modes", async ({ page, context }) => {
   const medir = (seletor) => page.evaluate((sel) => {
     const el = document.querySelector(sel);
@@ -153,7 +153,7 @@ test("the pairs flagged in audits stay above the minimum in both modes", async (
   await abrir(page, context, "user", "/#/salas/lista/A/1", {}, "#roomList li");
   const offline = await medir(".status-badge.off");
   expect(offline, "there is an offline badge in the list").not.toBeNull();
-  expect(razao(offline.cor, offline.fundo), "selo offline no tema claro").toBeGreaterThanOrEqual(4.5);
+  expect(razao(offline.cor, offline.fundo), "offline badge in the light theme").toBeGreaterThanOrEqual(4.5);
 
   await page.goto("/#/salas/planta/a-terreo");
   await expect(page.locator("#fpScaleInner .corridor").first()).toBeVisible();
@@ -194,7 +194,7 @@ test("in high contrast the top bar, floor plan labels and muted badges are legib
   expect(medida.salaDesligada, "turned-off room label on the floor plan").toBeGreaterThanOrEqual(4.5);
   expect(medida.titulo, "top bar title").toBeGreaterThanOrEqual(4.5);
   expect(medida.timer, "session timer").toBeGreaterThanOrEqual(4.5);
-  expect(medida.avatar, "iniciais do avatar").toBeGreaterThanOrEqual(4.5);
+  expect(medida.avatar, "avatar initials").toBeGreaterThanOrEqual(4.5);
   expect(medida.fabAjuda, "floating help button").toBeGreaterThanOrEqual(4.5);
   expect(medida.fabA11y, "floating accessibility button (currentColor icon)").toBeGreaterThanOrEqual(3);
 });

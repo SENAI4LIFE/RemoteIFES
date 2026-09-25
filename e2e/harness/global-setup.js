@@ -20,7 +20,7 @@ module.exports = async () => {
     } catch (e) {}
     if (!pronto) await new Promise((res) => setTimeout(res, 500));
   }
-  if (!pronto) throw new Error(`servidor de teste não respondeu em ${API_URL}/health`);
+  if (!pronto) throw new Error(`the test server did not answer at ${API_URL}/health`);
 
   const tokens = {};
   for (const [papel, cred] of Object.entries(CREDENCIAIS)) {
@@ -29,9 +29,9 @@ module.exports = async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cred),
     });
-    if (!resp.ok) throw new Error(`login de "${papel}" falhou no global-setup (HTTP ${resp.status})`);
+    if (!resp.ok) throw new Error(`login of "${papel}" failed in global-setup (HTTP ${resp.status})`);
     const corpo = await resp.json();
-    if (!corpo.token) throw new Error(`login de "${papel}" não retornou token`);
+    if (!corpo.token) throw new Error(`login of "${papel}" returned no token`);
     tokens[papel] = corpo.token;
   }
 

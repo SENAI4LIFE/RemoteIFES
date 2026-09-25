@@ -61,7 +61,7 @@ test("at the exact end time: the schedule that turned on turns off; one created 
   relogio(t, "08:59");
   const ligou = criar("JE-2", "08:00", "09:00");
   scheduler.iniciarScheduler();
-  assert.equal(linha("JE-2").ligado, 1, "criado dentro da janela, liga na primeira passagem");
+  assert.equal(linha("JE-2").ligado, 1, "created inside the window, turns on at the first pass");
   t.mock.timers.setTime(instante("09:00").getTime());
   salasService.aplicarComando("JE-3", "ligar", undefined, ADMIN);
   const tardio = criar("JE-3", "08:00", "09:00");

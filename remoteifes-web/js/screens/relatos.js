@@ -98,7 +98,7 @@ const Relatos = {
     else this.abrirPainel();
   },
 
-  // Os dois popovers de rodape sao mutuamente exclusivos: abrir um fecha o outro.
+  // The two footer popovers are mutually exclusive: opening one closes the other.
   abrirPainel() {
     const painel = document.getElementById("relatosPanel");
     if (!painel) return;

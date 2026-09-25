@@ -279,7 +279,7 @@ test("complete flow: role from the server, captures only from the cloner in clon
   await ate(() => !deviceHub.estadoPublico("TX-1").conectado);
   const txReconectado = await conectar("TX-1", "AA:BB:CC:DD:EE:D1");
   const reenviado = txReconectado.mensagens.find((m) => m.tipo === "failsafe_raw_set");
-  assert.ok(reenviado, "ao reconectar o servidor sincroniza o failsafe persistido");
+  assert.ok(reenviado, "on reconnect the server synchronizes the persisted failsafe");
   assert.deepEqual(reenviado.raw, CAPTURA_OFF.raw);
   assert.equal(reenviado.protocolRecordId, salvo.id);
   const ordem = txReconectado.mensagens.map((m) => m.tipo);

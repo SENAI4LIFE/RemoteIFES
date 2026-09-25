@@ -145,12 +145,12 @@ test("the heatmap is responsive and creates no horizontal page scroll", async ({
     await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome]);
     await abrirHeatmap(page);
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    expect(await semRolagemHorizontal(page), `rolagem horizontal em ${nome}`).toBe(true);
+    expect(await semRolagemHorizontal(page), `horizontal scroll at ${nome}`).toBe(true);
     const dentro = await page.locator("#heatmapBloco").evaluate((el) => {
       const p = el.parentElement.getBoundingClientRect();
       return el.getBoundingClientRect().right <= p.right + 2;
     });
-    expect(dentro, `mapa de calor dentro do container em ${nome}`).toBe(true);
+    expect(dentro, `heat map inside the container at ${nome}`).toBe(true);
   }
 });
 

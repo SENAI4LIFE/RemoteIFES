@@ -226,7 +226,7 @@ test("extraction refuses a path that escapes the destination", (t) => {
   const malicioso = path.join(dir, "mal.tar.gz");
   fs.writeFileSync(malicioso, tarGz({ "../fora.txt": "escapou" }));
   assert.throws(() => atualizador.extrairTarGz(malicioso, path.join(dir, "destino")), /escapa do destino|fora do destino/);
-  assert.ok(!fs.existsSync(path.join(dir, "fora.txt")), "nada pode ser gravado fora");
+  assert.ok(!fs.existsSync(path.join(dir, "fora.txt")), "nothing may be written outside");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -657,7 +657,7 @@ test("orphan lock recovery does not let two processes in", (t) => {
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
   const arquivo = path.join(raiz, "operacao-em-andamento.json");
 
-  // Trava de um processo morto.
+  // Lock held by a dead process.
   fs.writeFileSync(arquivo, `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: 999999, em: new Date().toISOString() })}\n`);
 
   const primeira = atualizador.adquirirTrava("A");
@@ -859,6 +859,6 @@ test("a tar of directories only also hits the entry ceiling", (t) => {
   assert.throws(
     () => atualizador.extrairTarGz(arquivo, path.join(dir, "saida")),
     /mais de \d+ entradas/,
-    "um tar só de diretórios tem de ser recusado pelo teto de entradas"
+    "a directory-only tar must be refused by the entry cap"
   );
 });

@@ -159,7 +159,7 @@ async function avaliar(opcoes = {}) {
     }
   }
 
-  // 3. Atividade real de dispositivos e OTA.
+  // 3. Actual device and OTA activity.
   if (!prontidaoApp.disponivel) {
     achados.push(
       achado(

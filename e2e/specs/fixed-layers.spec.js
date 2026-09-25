@@ -69,7 +69,7 @@ for (const [papel, nome, tamanho, maximo] of CENARIOS_AJUDA) {
     await abrirPainelDeAjuda(page);
     const medida = await page.evaluate(medirPainelDeAjuda);
     expect(medida.topo, "the panel starts inside the screen").toBeGreaterThanOrEqual(0);
-    expect(medida.base, "o painel termina dentro da tela").toBeLessThanOrEqual(medida.alturaTela);
+    expect(medida.base, "the panel ends inside the screen").toBeLessThanOrEqual(medida.alturaTela);
     expect(medida.fecharAlcancavel, "the Fechar button receives the tap (neither the password banner nor another layer on top)").toBe(true);
     expect(medida.fimDoUltimoLinkLivre, "the accessibility button does not cover the end of the help links").toBe(true);
     await page.locator("#helpFabCloseBtn").click();
@@ -153,5 +153,5 @@ test("the default-password banner does not paint over the open account menu", as
       return { id, visivel: el.contains(no) };
     })
   );
-  for (const parte of cabecalho) expect(parte.visivel, `${parte.id} aparece por cima da faixa`).toBe(true);
+  for (const parte of cabecalho) expect(parte.visivel, `${parte.id} appears above the strip`).toBe(true);
 });

@@ -95,7 +95,7 @@ test("an update is refused with a dirty checkout, without offering --force", asy
 
   const acao = amb.acoes.obter("atualizacao.aplicar");
   const impedimento = await acao.validacaoExtra({ argumentos: { commit } });
-  assert.ok(impedimento, "deveria impedir");
+  assert.ok(impedimento, "should block");
   assert.match(impedimento, /alterações locais/);
   assert.match(impedimento, /nunca usa --force/);
 });
