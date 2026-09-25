@@ -788,6 +788,8 @@ node instalacao/instalar.js                           # macOS, ou Linux por usu�
 .\instalar.ps1
 ```
 
+O instalador mostra o progresso por etapas reais, com o peso de cada uma (pré-requisitos, programa, estado e primeiro acesso, integração com o sistema, verificação), e termina carregando o lançador instalado pela camada estável: se o programa instalado não carrega, a instalação falha e mostra o comando de reparo. A cada abertura, o lançador confere apenas o que é barato — a versão do Node e a identidade do processo na porta —, sem reinstalar nada.
+
 No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket`/`.service`. Em qualquer sistema ele cria o atalho de aplicativo e gera um segredo de instalação de uso único, gravado em `bootstrap-token` no diretório de estado, legível só por quem administra o host.
 
 **Pelo pacote `.deb`**, informe o checkout que o console administra na própria instalação; o pacote provisiona estado, segredo, unidades, auxiliar e regra de sudo pelo mesmo instalador, com o serviço rodando como o dono do checkout:
