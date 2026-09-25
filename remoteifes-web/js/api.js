@@ -27,8 +27,8 @@ function headersComToken(extra = {}) {
   return authToken ? { ...extra, Authorization: `Bearer ${authToken}` } : extra;
 }
 
-// Prazo de cada chamada, do envio até o corpo da resposta lido. Sem ele, uma conexão que emudece
-// (rede móvel que cai, servidor travado) deixa a tela presa para sempre no estado "enviando".
+// Deadline for each call, from sending until the response body is read. Without it, a connection
+// that goes silent (mobile network drop, hung server) leaves the screen stuck in "sending" forever.
 const TEMPO_LIMITE_MS = 15000;
 const TEMPO_LIMITE_DOWNLOAD_MS = 120000;
 
@@ -36,8 +36,8 @@ function ehMutacao(options) {
   return !!options.method && options.method.toUpperCase() !== "GET";
 }
 
-// Uma mutação sem resposta tem desfecho desconhecido: o servidor pode ter aplicado o pedido. O
-// chamador deve conferir o estado (o painel refaz a consulta) em vez de repetir ou dar como não feito.
+// A mutation without a response has an unknown outcome: the server may have applied it. The caller
+// must check the state (the panel queries again) instead of retrying or treating it as not done.
 function semResposta(options, tempoEsgotado) {
   const mutacao = ehMutacao(options);
   let erro;
@@ -53,9 +53,9 @@ function semResposta(options, tempoEsgotado) {
   return { ok: false, erro, semResposta: true, tempoEsgotado: !!tempoEsgotado, desfechoDesconhecido: mutacao };
 }
 
-// Os cabeçalhos chegaram, mas o corpo se perdeu (conexão caiu no meio) ou não é JSON. Uma mutação
-// aceita pelo servidor (2xx) ou barrada por um intermediário (5xx) pode ter sido aplicada: o
-// desfecho continua desconhecido e não vira "não feito"; um 4xx é uma recusa do próprio servidor.
+// Headers arrived but the body was lost (connection dropped midway) or is not JSON. A mutation the
+// server accepted (2xx) or an intermediary rejected (5xx) may have been applied: the outcome stays
+// unknown and does not become "not done"; a 4xx is a refusal by the server itself.
 function respostaInutilizavel(options, status) {
   const desconhecido = ehMutacao(options) && !(status >= 400 && status < 500);
   return {

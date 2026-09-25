@@ -89,7 +89,7 @@ test("Esc fecha o manual e volta para a tela anterior", async ({ page, context }
   await page.keyboard.press("Escape");
   await expect(page.locator("#screen-manual")).toBeHidden();
   await expect(page.locator("#screen-grade")).toBeVisible();
-  // O item do menu de ajuda que abriu o manual já está escondido: o foco vai ao botão de ajuda.
+  // The help menu item that opened the manual is already hidden: focus goes to the help button.
   await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
 });
 
@@ -216,8 +216,8 @@ test("os ícones de ajuda das abas novas de Administração abrem a orientação
   await expect(page.locator("#helpModalTitle")).toContainText("Auditoria");
 });
 
-// A ajuda de Status > Mapa e a de Logs > Sessões abrem tópicos cujo "Ver no app" volta à mesma
-// aba, e não a um tópico vizinho (proprietários, usuários ativos).
+// The help for Status > Mapa and Logs > Sessões opens topics whose "Ver no app" returns to the same
+// tab, not to a neighboring topic (owners, active users).
 test("a ajuda do Mapa e a do histórico de Sessões levam a tópicos próprios, que voltam à mesma aba", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   for (const [rota, painel, titulo, secao] of [
@@ -344,7 +344,7 @@ test("reabrir o manual depois de uma busca sem resultado começa com o sumário 
   await expect(page.locator("#manualConteudo .manual-secao:not(.hidden)")).toHaveCount(total);
   await expect(page.locator("#manualToc li:not(.hidden) .manual-toc-link")).toHaveCount(total);
 
-  // Abrir um tópico específico também parte limpo, e vai ao tópico.
+  // Opening a specific topic also starts clean, and goes to that topic.
   await page.fill("#manualBusca", "zzzz-nada-disso");
   await page.keyboard.press("Escape");
   await page.evaluate(() => Router.ir("/ajuda/conta-sessao"));
@@ -353,9 +353,9 @@ test("reabrir o manual depois de uma busca sem resultado começa com o sumário 
   await expect(page.locator('#manualToc .manual-toc-link[data-sec="conta-sessao"]')).toHaveClass(/is-active/);
 });
 
-// Sem service worker, para a rede de verdade decidir: um módulo público que não chega é avisado
-// (com as seções que chegaram) e volta na próxima abertura; o registro falhando, nada é
-// registrado duas vezes depois.
+// Without a service worker, so the real network decides: a public module that does not arrive is
+// reported (with the sections that did arrive) and is retried on the next open; when registration
+// fails, nothing is registered twice afterwards.
 test("um módulo público que não carrega é avisado e recarregado na próxima abertura, sem seções duplicadas", async ({ browser }) => {
   const context = await browser.newContext({ serviceWorkers: "block", baseURL: process.env.E2E_WEB_URL });
   await context.addInitScript((apiUrl) => { try { window.localStorage.setItem("remoteifes_server_url", apiUrl); } catch (e) {} }, API_URL);
@@ -398,8 +398,8 @@ test("um módulo público que não carrega é avisado e recarregado na próxima 
 
 test("a documentação privilegiada não sobrevive ao logout, nem quando a resposta chega depois de sair", async ({ page, context }) => {
   await abrirApp(page, context, "superadmin");
-  // O token do superadmin é compartilhado pelos demais testes: a saída é feita só no cliente,
-  // que é onde o conteúdo privilegiado precisa ser descartado.
+  // The superadmin token is shared by the other tests: logout happens on the client only, which is
+  // where privileged content must be discarded.
   await page.route(`${API_URL}/logout`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
   let liberar = null;
   await page.route("**/documentation", async (route) => {
@@ -415,18 +415,18 @@ test("a documentação privilegiada não sobrevive ao logout, nem quando a respo
   await abrindo;
   await expect.poll(() => page.evaluate(() => RoleDocumentation.secoes().length), "a resposta tardia é descartada").toBe(0);
 
-  // Sem sessão, o manual mostra só o conteúdo público.
+  // Without a session, the manual shows public content only.
   await page.evaluate(() => Router.ir("/ajuda"));
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 10_000 });
   await expect(page.locator("#manual-sec-operacao-admin")).toHaveCount(0);
   await expect(page.locator("#manual-sec-inicio")).toHaveCount(1);
 });
 
-// Acima de 760px o sumário fica ao lado e os passos dos fluxos ficam em linha: o texto de cada
-// passo quebra dentro da caixa (inclusive "Superadministrador:" e o texto máximo), sem rolagem
-// horizontal do artigo nem passo saindo da figura. A variante com fonte larga (Verdana, ou
-// DejaVu Sans no Linux) reproduz em qualquer plataforma o que só as fontes do Linux mostravam:
-// o rótulo dos comandos ("Resultado esperado") tomava a largura e o valor vazava do artigo.
+// Above 760px the table of contents sits beside the article and flow steps are inline: each step's
+// text wraps inside its box (including "Superadministrador:" and maximum text), with no horizontal
+// scrolling of the article and no step leaving the figure. The wide-font variant (Verdana, or
+// DejaVu Sans on Linux) reproduces on every platform what only Linux fonts showed: the command
+// label ("Resultado esperado") took the full width and the value overflowed the article.
 for (const [nome, tamanho, ampliado, fonteLarga] of [
   ["761x900", { width: 761, height: 900 }, false, false],
   ["notebook com texto máximo", { width: 1366, height: 768 }, true, false],

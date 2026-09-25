@@ -3,12 +3,12 @@ const path = require("path");
 const fs = require("fs");
 const config = require("./config");
 
-// Execução de processos do console. Regras, sem exceção:
-//  - nunca com shell: sempre executável + vetor de argumentos;
-//  - ambiente montado a partir de uma lista fixa, nunca herdado inteiro;
-//  - diretório de trabalho escolhido pelo console, nunca pela requisição;
-//  - saída limitada em bytes e duração limitada em tempo.
-// Um endpoint genérico de comando não existe: quem chama aqui é o registro de ações.
+// Process execution for the Console. Rules, without exception:
+//  - never through a shell: always executable + argument vector;
+//  - environment built from a fixed list, never inherited wholesale;
+//  - working directory chosen by the Console, never by the request;
+//  - output bounded in bytes and duration bounded in time.
+// There is no generic command endpoint: callers here come from the action registry.
 
 const AMBIENTE_BASE = ["PATH", "LANG", "LC_ALL", "TZ", "HOME", "USER", "LOGNAME", "SHELL", "TERM"];
 
@@ -18,7 +18,8 @@ function ambienteLimpo(extra = {}) {
     if (process.env[chave] !== undefined) env[chave] = process.env[chave];
   }
   if (!env.PATH) env.PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
-  // Evita que o git abra editor, pager ou peça credencial interativa em processo sem terminal.
+  // Keeps git from opening an editor or pager or prompting for credentials in a process without a
+  // terminal.
   env.GIT_TERMINAL_PROMPT = "0";
   env.GIT_PAGER = "cat";
   env.PAGER = "cat";
@@ -33,8 +34,8 @@ function ambienteLimpo(extra = {}) {
   return env;
 }
 
-// Buffer circular por bytes: retém o começo e o fim quando a saída estoura o limite, porque
-// numa falha as duas pontas importam e o meio raramente importa.
+// Byte-based ring buffer: keeps the beginning and the end when output exceeds the limit, because on
+// a failure both ends matter and the middle rarely does.
 class SaidaLimitada {
   constructor(limite) {
     this.limite = limite;
@@ -99,8 +100,8 @@ function validarArgumentos(args) {
 }
 
 /**
- * Executa e devolve a saída completa (limitada). Para trabalhos longos use o motor de execução,
- * que grava em arquivo e sobrevive à queda do navegador.
+ * Runs and returns the full (bounded) output. For long jobs use the execution engine, which writes
+ * to a file and survives the browser going away.
  */
 function executar(executavel, args = [], opcoes = {}) {
   const {
@@ -162,8 +163,8 @@ function executar(executavel, args = [], opcoes = {}) {
   });
 }
 
-// --- Auxiliar privilegiado -------------------------------------------------------------
-// Único caminho para root. Verbos fixos; nada de nome de unidade, caminho ou comando livre.
+// --- Privileged helper -------------------------------------------------------------
+// The only path to root. Fixed verbs; no free unit name, path or command.
 const VERBOS_AUXILIAR = new Set([
   "servico-estado",
   "servico-iniciar",
@@ -189,8 +190,8 @@ function auxiliarDisponivel() {
 }
 
 /**
- * Chama o auxiliar root. O verbo tem de estar na lista e os argumentos são validados pelo
- * chamador antes de chegar aqui; o próprio auxiliar revalida do lado privilegiado.
+ * Calls the root helper. The verb must be on the list and arguments are validated by the caller
+ * before reaching here; the helper revalidates on the privileged side.
  */
 function chamarAuxiliar(verbo, args = [], opcoes = {}) {
   if (!VERBOS_AUXILIAR.has(verbo)) {
@@ -219,9 +220,8 @@ function chamarAuxiliar(verbo, args = [], opcoes = {}) {
 // --- Caminhos --------------------------------------------------------------------------
 
 /**
- * Resolve um caminho garantindo que ele fica dentro de `raiz`, inclusive depois de seguir
- * symlinks. Usado por restauração de backup e leitura de artefato: um nome vindo do navegador
- * nunca pode sair da pasta permitida.
+ * Resolves a path ensuring it stays inside `raiz`, even after following symlinks. Used by backup
+ * restore and artifact reads: a name coming from the browser can never leave the allowed folder.
  */
 function caminhoContidoEm(raiz, nome) {
   if (typeof nome !== "string" || !nome || nome.includes("\0")) throw new Error("nome de arquivo inválido");
@@ -231,8 +231,8 @@ function caminhoContidoEm(raiz, nome) {
   const alvo = path.resolve(raizReal, nome);
   const relativo = path.relative(raizReal, alvo);
   if (relativo.startsWith("..") || path.isAbsolute(relativo)) throw new Error("caminho fora da pasta permitida");
-  // Se o arquivo existe, o caminho real também tem de ficar dentro: bloqueia symlink apontando
-  // para fora (por exemplo backups/x.db -> /etc/shadow).
+  // If the file exists, its real path must also stay inside: blocks symlinks pointing outside (for
+  // example backups/x.db -> /etc/shadow).
   if (fs.existsSync(alvo)) {
     const alvoReal = fs.realpathSync(alvo);
     const relativoReal = path.relative(raizReal, alvoReal);

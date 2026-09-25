@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const ajuda = require("./ajuda");
 
-// Autenticação, autorização, elevação e as defesas de transporte do console.
+// Authentication, authorization, elevation and the Console's transport defenses.
 
 test("a senha é guardada com scrypt e conferida em tempo constante", (t) => {
   const amb = ajuda.ambiente();
@@ -50,7 +50,7 @@ test("sessão expira por ociosidade e por prazo absoluto", (t) => {
   const { token } = amb.auth.criarSessao("operador");
   assert.ok(amb.auth.validarSessao(token));
 
-  // Envelhece a sessão no disco além do limite de ociosidade.
+  // Ages the session on disk beyond the idle limit.
   const arquivo = path.join(amb.estadoDir, "sessoes.json");
   const dados = JSON.parse(fs.readFileSync(arquivo, "utf8"));
   const id = Object.keys(dados.sessoes)[0];

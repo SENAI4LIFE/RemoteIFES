@@ -1,17 +1,16 @@
 const C = require("./commands");
 
-// Infraestrutura, do ponto de vista do Superadministrador.
+// Infrastructure, from the Superadministrator's point of view.
 //
-// Divisão de responsabilidade em vigor desde a entrada do Console de Operações:
-//   - o **console** é o dono dos procedimentos de rotina do host: serviço, atualização,
-//     rollback, backup, restauração, recuperação de conta, diagnóstico de rede e mobile/CI.
-//     Aqui o manual diz onde a função fica, o que ela faz, quem pode executá-la, qual é o
-//     impacto e o que fazer quando dá errado — não repete o tutorial de linha de comando;
-//   - o **README** é o dono da instalação inicial, do modelo de segurança e da referência
-//     única de recuperação por terminal, que precisa funcionar sem console e sem aplicação;
-//   - continuam por terminal, e portanto documentados com comandos aqui, apenas os
-//     procedimentos que o console deliberadamente não executa: proxy/HTTPS, criação de versão
-//     e a primeira instalação.
+// Responsibility split:
+//   - the **Console** owns routine host procedures: service, update, rollback, backup, restore,
+//     account recovery, network diagnostics and mobile/CI. The manual states where each function
+//     lives, what it does, who may run it, its impact and what to do on failure, without repeating
+//     the command-line tutorial;
+//   - the **README** owns first installation, the security model and the single terminal recovery
+//     reference, which must work without the Console and without the application;
+//   - only procedures the Console deliberately does not run stay on the terminal and are therefore
+//     documented with commands here: proxy/HTTPS, release tagging and first installation.
 
 module.exports = [
   {

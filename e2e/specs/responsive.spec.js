@@ -52,9 +52,9 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
 
     expect(await semRolagemHorizontal(page), "página sem rolagem horizontal").toBe(true);
 
-    // Ao abrir a administração a coluna (#app) anima a largura; a planta acompanha o invólucro
-    // pelo ResizeObserver, entregue só no próximo quadro. Mede com a animação terminada e um
-    // quadro pintado, o estado que o usuário vê.
+    // Opening Administration animates the column (#app) width; the plan follows the wrapper through
+    // ResizeObserver, delivered only on the next frame. Measure after the animation ends and a
+    // frame is painted, which is the state the user sees.
     await page.evaluate(() => Promise.all(document.getElementById("app").getAnimations().map((a) => a.finished.catch(() => {}))));
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
@@ -143,9 +143,9 @@ test("rotação retrato -> paisagem preserva a tela e o estado do controlador", 
   await expect(page.locator("#modoValue")).toHaveText("Off");
 });
 
-// Os painéis suspensos da barra superior são ancorados ao botão que os abre. O sino e o
-// inseto não ficam na borda direita, então em telas estreitas um painel largo sairia pela
-// esquerda — sem criar rolagem horizontal e, por isso, sem ser pego pelas medições acima.
+// Top-bar dropdown panels are anchored to the button that opens them. The bell and bug buttons are
+// not at the right edge, so on narrow screens a wide panel would leave through the left without
+// creating horizontal scroll, and therefore without being caught by the measurements above.
 for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "tablet-compact"]) {
   test(`os painéis da barra superior abrem inteiros dentro da tela (${nome})`, async ({ page, context }) => {
     await injetarSessao(context, "admin");
@@ -181,9 +181,9 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "tablet
   });
 }
 
-// A barra superior quebra em mais de uma linha quando a fonte é ampliada. Um painel preso a
-// uma altura constante de barra passava por cima do sino e do inseto e engolia o toque,
-// impedindo trocar de Notificações para Relatar problema sem antes fechar o painel aberto.
+// The top bar wraps to more than one line when the font is enlarged. A panel pinned to a constant
+// bar height covered the bell and bug buttons and swallowed taps, preventing a switch from
+// Notificações to Relatar problema without first closing the open panel.
 for (const nome of ["mobile-compact", "mobile-portrait"]) {
   test(`com a barra superior em duas linhas um painel aberto não cobre os outros botões (${nome})`, async ({ page, context }) => {
     await injetarSessao(context, "admin");

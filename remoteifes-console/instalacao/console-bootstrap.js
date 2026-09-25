@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Camada estável do Console de Operações.
+// Stable layer of the Operations Console.
 //
-// Este arquivo é instalado pelo pacote (deb, zip, bundle) e **nunca é reescrito por uma
-// atualização**. Ele só resolve qual versão está ativa e a carrega. É o que permite que o
-// gerenciador de pacotes continue dono de um conjunto fixo de arquivos enquanto o atualizador
-// troca o payload lado a lado — os dois modelos não se atropelam.
+// This file is installed by the package (deb, zip, bundle) and is **never rewritten by an update**.
+// It only resolves which version is active and loads it. That lets the package manager keep owning
+// a fixed set of files while the updater swaps the payload side by side, without the two models
+// colliding.
 //
-// É também a rede de segurança: se a versão ativa estiver quebrada ou ausente, ele cai para a
-// anterior e diz por quê, em vez de deixar o serviço sem subir.
+// It is also the safety net: if the active version is broken or missing, it falls back to the
+// previous one and says why, instead of leaving the service unable to start.
 
 const fs = require("fs");
 const path = require("path");
@@ -15,10 +15,10 @@ const path = require("path");
 const RAIZ = __dirname;
 const ARQUIVO_ESTADO = path.join(RAIZ, "estado-instalacao.json");
 const DIR_VERSOES = path.join(RAIZ, "versoes");
-// Qual entrada carregar. `launcher-bootstrap.js` marca "launcher"; qualquer outro valor (ou a
-// ausência dele) significa o console. Quem inicia o backend precisa mandar o valor
-// explicitamente, porque herdar "launcher" de um lançador faria este bootstrap carregar outro
-// lançador — e não o console que o lançador estava tentando subir.
+// Which entry to load. `launcher-bootstrap.js` sets "launcher"; any other value (or none) means the
+// Console. Whoever starts the backend must set the value explicitly, because inheriting "launcher"
+// from a launcher would make this bootstrap load another launcher instead of the Console the
+// launcher was trying to start.
 const ALVO = process.env.CONSOLE_BOOTSTRAP_ALVO === "launcher" ? "launcher.js" : "console.js";
 
 function lerEstado() {
@@ -55,14 +55,13 @@ function versoesPresentes() {
 }
 
 /**
- * Candidatas em ordem de preferência: o ponteiro, a anterior, a mais recente presente, e o
- * payload ao lado (instalação de desenvolvimento).
+ * Candidates in order of preference: the pointer, the previous version, the newest present, and the
+ * payload beside this file (development install).
  *
- * São várias porque *existir o arquivo* não é o mesmo que *conseguir carregá-lo*. Um payload
- * assinado pode trazer todos os arquivos exigidos e ainda assim ter um erro de sintaxe ou um
- * require que falha; nesse caso o `require()` lança e, antes, a exceção subia sem que a versão
- * anterior fosse sequer tentada — uma atualização ruim deixava o console sem subir de jeito
- * nenhum, justamente quando ele é a ferramenta usada para consertar as coisas.
+ * There are several because *the file existing* is not the same as *being able to load it*. A
+ * signed payload can carry every required file and still have a syntax error or a failing require;
+ * then `require()` throws and the next candidate is tried, so a bad update does not leave the
+ * Console unable to start precisely when it is the tool needed to fix things.
  */
 function candidatas() {
   const info = lerEstado();
@@ -88,16 +87,16 @@ if (!disponiveis.length) {
   process.exit(1);
 }
 
-// CONSOLE_RAIZ_INSTALACAO fixa a camada estável para o payload, que precisa dela para
-// administrar versoes/ e o ponteiro mesmo quando roda de dentro de versoes/<v>/.
+// CONSOLE_RAIZ_INSTALACAO pins the stable layer for the payload, which needs it to manage versoes/
+// and the pointer even when running from inside versoes/<v>/.
 process.env.CONSOLE_RAIZ_INSTALACAO = RAIZ;
 
-// Onde o estado mora vem do REGISTRO da instalação, não do padrão da plataforma.
+// The state location comes from the installation RECORD, not the platform default.
 //
-// O atalho do sistema roda este bootstrap sem variável de ambiente nenhuma. Sem ler o registro,
-// uma instalação de usuário procurava o estado em `/var/lib/...` (ou `%ProgramData%`) e o
-// primeiro operador não achava o token que o instalador tinha acabado de gravar. Uma variável já
-// posta pelo operador ou pelo serviço continua tendo precedência.
+// The system shortcut runs this bootstrap without any environment variable. Without reading the
+// record, a user-scope installation would look for state in `/var/lib/...` (or `%ProgramData%`) and
+// the first operator would not find the token the installer had just written. A variable already
+// set by the operator or the service still takes precedence.
 {
   const registrado = lerEstado();
   if (!process.env.CONSOLE_ESTADO_DIR && typeof registrado.estado === "string" && registrado.estado) {
@@ -114,8 +113,8 @@ for (const [indice, candidata] of disponiveis.entries()) {
     console.error(`[bootstrap] tentando a versão ${candidata.versao || "local"} (${candidata.origem}).`);
   }
   try {
-    // Chama a entrada exportada em vez de contar com efeito de carregamento: aqui o módulo
-    // principal é este bootstrap, então `require.main === module` seria falso no payload.
+    // Calls the exported entry instead of relying on a load side effect: here the main module is
+    // this bootstrap, so `require.main === module` would be false in the payload.
     const modulo = require(path.join(candidata.dir, ALVO));
     if (typeof modulo.executar !== "function") {
       throw new Error(`${ALVO} não expõe uma entrada "executar"`);

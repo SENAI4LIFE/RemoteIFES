@@ -13,25 +13,25 @@ const config = require(path.join(raiz, "src", "config"));
 const plataforma = require(path.join(raiz, "src", "plataforma"));
 const moduloIdentidade = require(path.join(raiz, "src", "identidade"));
 
-// Lançador do Console de Operações.
+// Operations Console launcher.
 //
-// É o que o atalho do menu Iniciar, o `.desktop` e o bundle `.app` executam. Ele resolve três
-// coisas que abrir um navegador na porta 8099 não resolve:
+// It is what the Start Menu shortcut, the `.desktop` entry and the `.app` bundle run. It solves
+// three things that opening a browser on port 8099 does not:
 //
-//  1. **partida sob demanda** — sobe o backend se ele não estiver no ar e espera ficar pronto;
-//  2. **identidade do listener** — confere que quem atende na porta é o console instalado antes
-//     de mandar o operador digitar a senha ali;
-//  3. **instância única** — se já há console no ar, apenas abre o navegador.
+//  1. **on-demand start**: starts the backend if it is not running and waits until it is ready;
+//  2. **listener identity**: checks that whoever answers on the port is the installed Console
+//     before sending the operator to type a password there;
+//  3. **single instance**: if a Console is already running, it only opens the browser.
 //
-// Nenhuma credencial entra em URL, argumento de processo ou atalho. O que viaja é um desafio
-// aleatório; a prova é um HMAC calculado com um segredo que só existe no arquivo protegido de
-// estado — um impostor que tenha tomado a porta não consegue produzi-lo.
+// No credential goes into a URL, a process argument or a shortcut. What travels is a random
+// challenge; the proof is an HMAC computed with a secret that exists only in the protected state
+// file, which an impostor holding the port cannot produce.
 
-// Prazo para o backend ficar pronto. Ajustável porque um Raspberry Pi frio leva mais tempo que
-// um desktop, e porque um teste não deve gastar 30 s provando que a espera termina.
+// Deadline for the backend to become ready. Adjustable because a cold Raspberry Pi takes longer
+// than a desktop, and a test should not spend 30 s proving the wait ends.
 const ESPERA_MAXIMA_MS = (() => {
-  // Finito e com teto: `Infinity` e `1e309` passavam por "> 0" e transformavam um prazo limitado
-  // numa espera sem fim — exatamente o que o prazo existe para evitar.
+  // Finite and capped: `Infinity` and `1e309` pass "> 0" and would turn a bounded deadline into an
+  // endless wait, which is exactly what the deadline exists to prevent.
   const pedido = Number(process.env.CONSOLE_LANCADOR_ESPERA_MS);
   if (!Number.isFinite(pedido) || pedido <= 0) return 30_000;
   return Math.min(pedido, 10 * 60 * 1000);
@@ -45,9 +45,9 @@ function erro(linha) {
   process.stderr.write(`${linha}\n`);
 }
 
-// A leitura do contrato e a prova de identidade moram em src/identidade.js: o desinstalador faz
-// a mesma pergunta antes de encerrar um processo, e duas implementações da mesma prova é uma a
-// mais do que se pode auditar.
+// Contract reading and identity proof live in src/identidade.js: the uninstaller asks the same
+// question before stopping a process, and two implementations of the same proof is one more than
+// can be audited.
 const lerContrato = (...a) => moduloIdentidade.lerContrato(...a);
 const verificarIdentidade = (...a) => moduloIdentidade.verificarIdentidade(...a);
 
@@ -93,12 +93,12 @@ function pedir(porta, caminho, { metodo = "GET", corpo = null, timeoutMs = 4000 
 }
 
 /**
- * Prova de identidade do listener.
+ * Listener identity proof.
  *
- * Sem isto, o lançador abriria o navegador em qualquer processo que tivesse tomado a porta
- * primeiro — um phishing local com página de login idêntica. O desafio é aleatório a cada
- * verificação, e a resposta é `HMAC-SHA256(segredo, desafio)`; o segredo vive só no arquivo de
- * estado protegido, que o impostor não lê.
+ * Without it, the launcher would open the browser on any process that took the port first: local
+ * phishing with an identical login page. The challenge is random on every check and the answer is
+ * `HMAC-SHA256(secret, challenge)`; the secret lives only in the protected state file, which the
+ * impostor cannot read.
  */
 
 function backendNoAr(contrato) {
@@ -126,12 +126,14 @@ async function esperarPronto({ timeoutMs = ESPERA_MAXIMA_MS } = {}) {
 }
 
 function caminhoDoBackend() {
-  // Camada estável: o bootstrap resolve a versão ativa. Em desenvolvimento, console.js direto.
+  // Stable layer: the bootstrap resolves the active version. In development, console.js directly.
   const bootstrap = path.join(config.RAIZ_INSTALACAO, "console-bootstrap.js");
   return fs.existsSync(bootstrap) ? bootstrap : path.join(raiz, "console.js");
 }
 
-/** A porta aceita conexão? Distingue "ninguém ali" de "reservada por alguém". */
+/**
+ * Does the port accept connections? Distinguishes "nobody there" from "reserved by someone".
+ */
 function portaOcupada(porta) {
   return new Promise((resolver) => {
     const socket = net.connect({ host: "127.0.0.1", port: porta });
@@ -146,7 +148,9 @@ function portaOcupada(porta) {
   });
 }
 
-/** Uma conexão HTTP qualquer, só para que o systemd ative o serviço por trás do socket. */
+/**
+ * Any HTTP connection, only so systemd activates the service behind the socket.
+ */
 function tocarPorta(porta) {
   return new Promise((resolver) => {
     const req = http.request({ host: "127.0.0.1", port: porta, path: "/api/sessao", method: "GET", timeout: 5000 }, (res) => {
@@ -168,19 +172,18 @@ async function garantirBackend() {
     const identidade = await verificarIdentidade(contrato);
     if (identidade.ok) return { ok: true, jaEstava: true, contrato, versao: identidade.versao };
     if (identidade.impostor) return { ok: false, ...identidade };
-    // Contrato velho de um processo que morreu: seguir e subir um novo.
+    // Stale contract of a dead process: continue and start a new one.
     if (backendNoAr(contrato)) {
       return { ok: false, motivo: `o processo ${contrato.pid} está vivo mas não responde; encerre-o antes de tentar de novo` };
     }
   }
 
-  // Se alguém já detém a porta sem haver contrato, o caminho certo é **conectar**, não subir
-  // outro processo.
+  // If someone already holds the port without a contract, the right path is to **connect**, not to
+  // start another process.
   //
-  // É o estado normal de um Linux com ativação por socket depois da saída por ociosidade: o
-  // contrato foi apagado, mas o systemd continua dono da porta. Criar um backend TCP ali recebe
-  // EADDRINUSE, e o lançador reportaria falha exatamente no estado que o desenho pretende.
-  // Uma conexão basta para o systemd subir o serviço; então o contrato novo aparece.
+  // That is the normal state on Linux with socket activation after an idle exit: the contract was
+  // removed, but systemd still owns the port. Creating a TCP backend there gets EADDRINUSE. One
+  // connection is enough for systemd to start the service; then the new contract appears.
   if (await portaOcupada(config.PORTA)) {
     log("A porta já está reservada (ativação por socket); conectando para ativar o serviço...");
     await tocarPorta(config.PORTA);
@@ -205,13 +208,13 @@ async function garantirBackend() {
     env: {
       ...process.env,
       CONSOLE_INICIADO_PELO_LANCADOR: "1",
-      // O alvo do bootstrap vai EXPLÍCITO, nunca herdado.
+      // The bootstrap target is passed EXPLICITLY, never inherited.
       //
-      // Quando o atalho do sistema roda `launcher-bootstrap.js`, ele marca
-      // CONSOLE_BOOTSTRAP_ALVO=launcher no ambiente deste processo. Herdar isso aqui faria o
-      // bootstrap filho carregar `launcher.js` outra vez em vez de `console.js`: um lançador
-      // subindo outro lançador, cada um esperando 30 s e desistindo, em cadeia — e o console
-      // nunca subindo. É o caminho normal de quem abre pelo atalho no Windows e no macOS.
+      // When the system shortcut runs `launcher-bootstrap.js`, it sets
+      // CONSOLE_BOOTSTRAP_ALVO=launcher in this process's environment. Inheriting it would make the
+      // child bootstrap load `launcher.js` again instead of `console.js`: a launcher starting
+      // another launcher in a chain, each waiting 30 s and giving up, and the Console never
+      // starting.
       CONSOLE_BOOTSTRAP_ALVO: "console",
     },
   });
@@ -227,8 +230,8 @@ function urlDoConsole(contrato) {
 }
 
 /**
- * URL da aplicação, a partir da configuração real — não de uma porta fixa nem de um esquema
- * presumido. Atrás de proxy com HTTPS, o endereço do operador é o domínio, não 127.0.0.1:8080.
+ * Application URL from the actual configuration, not from a fixed port or an assumed scheme. Behind
+ * an HTTPS proxy, the operator's address is the domain, not 127.0.0.1:8080.
  */
 const urlDaAplicacao = config.urlDaAplicacao;
 
@@ -386,9 +389,9 @@ async function main() {
   }
 
   if (args.includes("--iniciar")) {
-    // Sobe o console e sai, sem abrir navegador: é o que serve um host sem interface gráfica
-    // (um Pi sem systemd, por exemplo), e é o caminho que a CI exercita para provar que o
-    // lançador instalado realmente inicia o **console**, e não outra cópia de si mesmo.
+    // Starts the Console and exits without opening a browser: serves a host without a graphical
+    // interface (a Pi without systemd, for example), and is the path CI exercises to prove the
+    // installed launcher really starts the **Console** and not another copy of itself.
     const r = await garantirBackend();
     if (!r.ok) {
       erro(r.motivo);
@@ -435,8 +438,8 @@ function executar() {
     });
 }
 
-// Entrada explícita, pelo mesmo motivo de console.js: sob a camada estável de bootstrap, o
-// módulo principal é o bootstrap, e um `require.main === module` faria o lançador não fazer nada.
+// Explicit entry, for the same reason as console.js: under the stable bootstrap layer the main
+// module is the bootstrap, and `require.main === module` would make the launcher do nothing.
 if (require.main === module) executar();
 
 module.exports = { executar, lerContrato, verificarIdentidade, garantirBackend, urlDaAplicacao, urlDoConsole, coletarStatus, abrir };

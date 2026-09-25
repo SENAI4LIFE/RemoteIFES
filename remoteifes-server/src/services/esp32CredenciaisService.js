@@ -6,9 +6,10 @@ const configuracoesService = require("./configuracoesService");
 const RE_DEVICE_ID = /^esp_[0-9a-f]{16}$/;
 const GRACE_ROTACAO_MS = 24 * 60 * 60 * 1000;
 const segredosPendentesEmMemoria = new Map();
-// Segredo já ativado por rotação, guardado só em memória enquanto a geração anterior está na
-// tolerância: uma placa que reconecta com a anterior (a gravação na NVS não durou um reinício)
-// recebe o segredo atual de novo, em vez de ficar inacessível ao fim da tolerância.
+// Secret already activated by rotation, kept in memory only while the previous generation is within
+// its grace period: a board that reconnects with the previous one (the NVS write did not survive a
+// reboot) receives the current secret again instead of becoming unreachable when the grace period
+// ends.
 const segredosAtivadosEmMemoria = new Map();
 
 function gerarDeviceId() {

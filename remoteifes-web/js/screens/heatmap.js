@@ -1,5 +1,5 @@
-// Mapa de calor operacional (superadministrador). Busca sob demanda: nada e
-// calculado enquanto a secao esta fechada e nao existe polling.
+// Operational heatmap (superadministrator). Fetched on demand: nothing is computed while the
+// section is closed and there is no polling.
 const Heatmap = (() => {
   const FAIXAS = [
     { classe: "heatmap-f0", rotulo: "muito baixo" },
@@ -31,8 +31,8 @@ const Heatmap = (() => {
     return d.unidade ? `${texto}${d.unidade === "%" ? "" : " "}${d.unidade}` : texto;
   }
 
-  // Escala fria->quente em cinco faixas. "Quente" e sempre o extremo pior:
-  // para disponibilidade, quem tem menos porcentagem fica quente.
+  // Cold-to-hot scale in five bands. "Hot" is always the worse extreme: for availability, a lower
+  // percentage is hot.
   function faixaDe(valor, d) {
     if (valor === null) return null;
     const min = d.minimo === null ? 0 : d.minimo;

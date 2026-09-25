@@ -7,11 +7,12 @@ const zlib = require("zlib");
 const crypto = require("crypto");
 const ajuda = require("./ajuda");
 
-// Atualizador por release: confiança, transação e recuperação.
+// Release updater: trust, transaction and recovery.
 //
-// O que estes testes protegem é a diferença entre "baixar um arquivo" e "atualizar um programa
-// instalado": assinatura antes de escrever, alvo correto, digest conferido, extração que não
-// escapa do destino, troca atômica e nada de downgrade silencioso.
+// These tests protect the difference between "downloading a file" and "updating an installed
+// program":
+// signature before writing, correct target, checked digest, extraction that does not escape the
+// destination, atomic swap and no silent downgrade.
 
 // --- Apoio -------------------------------------------------------------------------------
 
@@ -23,7 +24,9 @@ function parDeChaves() {
   };
 }
 
-/** Monta um .tar.gz mínimo, sem depender do `tar` do sistema. */
+/**
+ * Builds a minimal .tar.gz without the system `tar`.
+ */
 function tarGz(arquivos) {
   const blocos = [];
   const bloco = (conteudo) => {
@@ -130,13 +133,13 @@ function ambienteDeAtualizacao({ base, chavePublica, raizInstalacao, versaoPaylo
       CONSOLE_RAIZ_INSTALACAO: raizInstalacao,
     },
   });
-  // O atualizador lê a versão "em execução" do package.json da raiz do console; nos testes o
-  // payload em execução é simulado pelo diretório da versão ativa.
+  // The updater reads the "running" version from the package.json at the Console root; in tests the
+  // running payload is simulated by the active version directory.
   amb.atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
   return amb;
 }
 
-// --- Confiança ----------------------------------------------------------------------------
+// --- Trust ----------------------------------------------------------------------------
 
 test("sem chave pública provisionada, nenhuma atualização é aceita", (t) => {
   const amb = ajuda.ambiente();
@@ -219,13 +222,13 @@ test("a rotação de chave só é aceita vinda de um manifesto já autenticado",
   release.registrarRotacao({ versao: "2.1.0", proximaChave: { publica: sucessora.publicaB64 } });
   assert.equal(release.chavesConfiaveis().length, 2, "a sucessora passa a ser aceita");
 
-  // Um manifesto assinado só pela sucessora agora confere.
+  // A manifest signed only by the successor now verifies.
   const bytes = Buffer.from(manifestoDe({ versao: "2.2.0", artefatos: [{ alvo: "linux-x64", arquivo: "a.tar.gz", sha256: "a".repeat(64), bytes: 10 }] }));
   const r = release.verificarManifesto(bytes, crypto.sign(null, bytes, sucessora.privada).toString("base64"));
   assert.equal(r.ok, true);
 });
 
-// --- Extração -------------------------------------------------------------------------------
+// --- Extraction -------------------------------------------------------------------------------
 
 test("a extração recusa caminho que escapa do destino", (t) => {
   const amb = ajuda.ambiente();
@@ -268,7 +271,7 @@ test("a extração aceita um payload legítimo e preserva só o bit de execuçã
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-// --- Transação -------------------------------------------------------------------------------
+// --- Transaction -------------------------------------------------------------------------------
 
 test("fluxo completo: verifica, instala lado a lado e troca o ponteiro", async (t) => {
   const chaves = parDeChaves();
@@ -384,7 +387,7 @@ test("uma transação interrompida é reconciliada na partida, sem instalação 
   });
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
 
-  // Simula queda de energia durante a instalação: estágio e versão parcial no disco.
+  // Simulates a power loss during installation: staging and a partial version on disk.
   fs.mkdirSync(path.join(raiz, "versoes", "2.0.0"), { recursive: true });
   fs.mkdirSync(path.join(raiz, "descargas", "lixo"), { recursive: true });
   fs.writeFileSync(
@@ -456,15 +459,15 @@ test("o bootstrap cai para a versão anterior quando a ativa está quebrada", (t
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, CONSOLE_SEM_PRIVILEGIO: "1" },
   });
-  // O payload de teste só expõe `executar` vazio; o que importa é qual versão foi escolhida.
+  // The test payload only exposes an empty `executar`; what matters is which version was chosen.
   assert.ok(true, saida);
 });
 
 test("o ponteiro apontando para uma versão que não subiu é denunciado, não escondido", async (t) => {
-  // O bootstrap cai para uma versão utilizável quando a ativa não carrega — a rede de segurança
-  // funcionando. O problema é o silêncio: a atualização relatou sucesso, o console voltou ao ar,
-  // e o operador acredita rodar código que não está rodando. A divergência entre o ponteiro e o
-  // processo tem de aparecer.
+  // The bootstrap falls back to a usable version when the active one does not load (the safety net
+  // working). The problem is silence: the update reported success, the Console came back, and the
+  // operator believes they run code that is not running. The divergence between pointer and process
+  // must surface.
   const raiz = ajuda.dirTemporario("console-diverg-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -474,7 +477,7 @@ test("o ponteiro apontando para uma versão que não subiu é denunciado, não e
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
   const emExecucao = atualizador.versaoEmExecucao();
 
-  // Layout lado a lado com o ponteiro numa versão que NÃO é a que este processo carregou.
+  // Side-by-side layout with the pointer on a version that is NOT the one this process loaded.
   for (const v of [emExecucao, "99.0.0"]) {
     fs.mkdirSync(path.join(raiz, "versoes", v), { recursive: true });
     fs.writeFileSync(path.join(raiz, "versoes", v, "package.json"), `${JSON.stringify({ version: v })}\n`);
@@ -514,8 +517,8 @@ test("sem divergência, a situação não inventa um alarme", async (t) => {
 });
 
 test("execução a partir do código-fonte não é tratada como divergência", async (t) => {
-  // Sem layout lado a lado não existe ponteiro com que divergir; avisar aqui seria ruído em
-  // toda sessão de desenvolvimento.
+  // Without a side-by-side layout there is no pointer to diverge from; warning here would be noise
+  // in every development session.
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
@@ -542,21 +545,19 @@ test("situação distingue instalada, publicada e observação antiga", async (t
 });
 
 test("o bootstrap cai para a anterior quando a versão ativa EXISTE mas não carrega", (t) => {
-  // Existir o arquivo não é conseguir carregá-lo. Um payload assinado pode trazer tudo que é
-  // exigido e ainda ter erro de sintaxe ou um require que falha. Antes, a exceção subia sem que
-  // a anterior fosse tentada: uma atualização ruim deixava o console sem subir de jeito nenhum —
-  // justamente a ferramenta que se usa para consertar as coisas.
+  // The file existing is not the same as loading it. A signed payload can carry everything required
+  // and still have a syntax error or a failing require; the previous version must then be tried.
   const raiz = ajuda.dirTemporario("console-boot-");
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
 
   const bootstrap = path.join(raiz, "console-bootstrap.js");
   fs.copyFileSync(path.join(ajuda.RAIZ, "instalacao", "console-bootstrap.js"), bootstrap);
 
-  // 2.0.0: presente, com console.js que EXPLODE ao carregar.
+  // 2.0.0: present, with a console.js that THROWS on load.
   fs.mkdirSync(path.join(raiz, "versoes", "2.0.0"), { recursive: true });
   fs.writeFileSync(path.join(raiz, "versoes", "2.0.0", "console.js"), 'throw new Error("payload quebrado de proposito");\n');
 
-  // 1.0.0: presente e sã.
+  // 1.0.0: present and sound.
   fs.mkdirSync(path.join(raiz, "versoes", "1.0.0"), { recursive: true });
   fs.writeFileSync(
     path.join(raiz, "versoes", "1.0.0", "console.js"),
@@ -624,10 +625,9 @@ test("um payload sem a entrada executar é tratado como falha de carregamento", 
 });
 
 test("duas operações de versão não rodam ao mesmo tempo", async (t) => {
-  // Atualizar, importar offline e reverter mexem no mesmo ponteiro e no mesmo versoes/. Sem
-  // exclusão, duas operações podiam instalar versões diferentes ao mesmo tempo e uma podar a que
-  // a outra estava a ponto de ativar — ponteiro apontando para diretório inexistente, console
-  // sem subir.
+  // Update, offline import and rollback change the same pointer and versoes/. Without exclusion,
+  // two operations could install different versions at once and one could prune the version the
+  // other was about to activate: pointer at a missing directory, Console unable to start.
   const raiz = ajuda.dirTemporario("console-trava-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -648,13 +648,13 @@ test("duas operações de versão não rodam ao mesmo tempo", async (t) => {
   assert.equal(primeira.ok, true, "a primeira operação adquire a trava");
   t.after(() => atualizador.liberarTrava());
 
-  // Com a trava tomada por ESTE processo (vivo), a reversão tem de recusar.
+  // With the lock held by THIS (live) process, rollback must refuse.
   const r = await atualizador.reverter({ log: () => {} });
   assert.equal(r.ok, false, "a segunda operação não pode prosseguir");
   assert.match(r.erro, /outra operação de versão está em andamento/);
   assert.match(r.erro, /atualizar 9\.9\.9/, "a recusa precisa dizer qual operação detém a trava");
 
-  // O ponteiro não se moveu.
+  // The pointer did not move.
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "2.0.0");
 });
 
@@ -667,7 +667,7 @@ test("uma trava de processo morto é recuperada em vez de travar a instalação 
   });
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
 
-  // PID improvável de existir: simula queda no meio de uma atualização.
+  // PID unlikely to exist: simulates a crash in the middle of an update.
   fs.writeFileSync(
     path.join(raiz, "operacao-em-andamento.json"),
     `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: 999999, em: new Date().toISOString() })}\n`
@@ -682,9 +682,9 @@ test("uma trava de processo morto é recuperada em vez de travar a instalação 
 });
 
 test("a recuperação de trava órfã não deixa dois processos entrarem", (t) => {
-  // Remover e recriar era uma corrida: dois processos veem o mesmo dono morto, o primeiro recria
-  // a trava e o segundo remove justamente essa trava VIVA e cria a sua. A reivindicação agora é
-  // por rename, que é atômico: só um consegue mover aquele caminho.
+  // Remove-and-recreate races: two processes see the same dead owner, the first recreates the lock
+  // and the second removes that LIVE lock and creates its own. The claim is a rename, which is
+  // atomic: only one can move that path.
   const raiz = ajuda.dirTemporario("console-corrida-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -703,7 +703,7 @@ test("a recuperação de trava órfã não deixa dois processos entrarem", (t) =
   assert.equal(dono.pid, process.pid);
   assert.equal(dono.operacao, "A");
 
-  // Uma segunda aquisição, agora com dono VIVO (este processo), tem de recusar — e não remover.
+  // A second acquisition, now with a LIVE owner (this process), must refuse, not remove.
   const segunda = atualizador.adquirirTrava("B");
   assert.equal(segunda.ok, false, "com dono vivo, a segunda recusa");
   const aindaDono = JSON.parse(fs.readFileSync(arquivo, "utf8"));
@@ -715,8 +715,8 @@ test("a recuperação de trava órfã não deixa dois processos entrarem", (t) =
 });
 
 test("a reconciliação não mexe em versoes/ enquanto uma operação viva detém a trava", (t) => {
-  // Um segundo console subindo durante uma atualização chamava reconciliar() e apagava o estágio
-  // da operação em andamento.
+  // A second Console starting during an update must not call reconciliar() and delete the staging
+  // of the operation in progress.
   const raiz = ajuda.dirTemporario("console-recon-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -733,9 +733,8 @@ test("a reconciliação não mexe em versoes/ enquanto uma operação viva deté
     path.join(raiz, "estado-instalacao.json"),
     `${JSON.stringify({ versaoAtiva: "1.0.0", versaoAnterior: null, transacao: { versao: "3.0.0", etapa: "instalando" } })}\n`
   );
-  // Trava de um processo VIVO que não é este: usa o pid do próprio processo de teste via arquivo,
-  // e a checagem de "outro processo" é feita comparando com process.pid — então simulamos com um
-  // pid vivo diferente usando o pid do processo pai, que existe.
+  // Lock of a LIVE process other than this one. The "other process" check compares with
+  // process.pid, so a different live pid is simulated with the parent process's pid, which exists.
   fs.writeFileSync(
     path.join(raiz, "operacao-em-andamento.json"),
     `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: process.ppid, em: new Date().toISOString() })}\n`
@@ -774,8 +773,8 @@ test("a reconciliação preserva .substituido-*, que é a única cópia durante 
 });
 
 test("o artefato tem o tamanho conferido antes de ser lido para a memória", (t) => {
-  // A correção de TOCTOU passou a ler o arquivo para então comparar o tamanho — num Pi de 1 GiB
-  // isso derruba o host antes de qualquer verificação dizer que o artefato era inválido.
+  // Size is checked before reading: reading first would load an oversized artifact into memory,
+  // which on a 1 GiB Pi brings the host down before any check says it was invalid.
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
@@ -785,21 +784,21 @@ test("o artefato tem o tamanho conferido antes de ser lido para a memória", (t)
   const arquivo = path.join(dir, "a.tar.gz");
   fs.writeFileSync(arquivo, Buffer.alloc(2048, 7));
 
-  // Tamanho divergente: recusa sem precisar do digest.
+  // Mismatched size: refused without needing the digest.
   const r = release.conferirArtefato(arquivo, { bytes: 999_999, sha256: "0".repeat(64) });
   assert.equal(r.ok, false);
   assert.match(r.motivo, /bytes no arquivo/, "a recusa vem da conferência por stat, não da leitura");
 
-  // Acima do teto do console, mesmo com o tamanho declarado batendo.
+  // Above the Console ceiling, even with the declared size matching.
   const acima = release.conferirArtefato(arquivo, { bytes: 2048, sha256: "0".repeat(64) }, { limiteBytes: 1024 });
   assert.equal(acima.ok, false);
   assert.match(acima.motivo, /acima do teto/);
 });
 
 test("reinício pendente não é anunciado como versão que não subiu", async (t) => {
-  // Entre a troca do ponteiro e o reinício, o processo em execução é legitimamente o anterior. Um
-  // alarme de erro ali diria que a versão "não subiu" no exato instante em que tudo está certo, e
-  // um aviso que grita no caminho normal é um aviso que o operador aprende a ignorar.
+  // Between the pointer swap and the restart, the running process is legitimately the previous one.
+  // An error there would say the version "did not start" at the exact moment everything is correct,
+  // and a warning that fires on the normal path is one the operator learns to ignore.
   const raiz = ajuda.dirTemporario("console-pend-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -815,7 +814,8 @@ test("reinício pendente não é anunciado como versão que não subiu", async (
 `);
   }
 
-  // Ponteiro já na nova, anterior é a que roda, transação concluída AGORA: reinício pendente.
+  // Pointer already on the new version, the previous one running, transaction completed NOW:
+  // restart pending.
   const agora = new Date().toISOString();
   fs.writeFileSync(
     path.join(raiz, "estado-instalacao.json"),
@@ -833,7 +833,7 @@ test("reinício pendente não é anunciado como versão que não subiu", async (
   assert.equal(pendente.divergenciaDeVersao.reinicioPendente, true, "mas como reinício pendente, não como falha");
   assert.match(pendente.divergenciaDeVersao.motivo, /reinício está pendente/);
 
-  // Transação antiga: aí sim é falha de ativação.
+  // Old transaction: then it is an activation failure.
   const velho = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   fs.writeFileSync(
     path.join(raiz, "estado-instalacao.json"),
@@ -852,15 +852,15 @@ test("reinício pendente não é anunciado como versão que não subiu", async (
 });
 
 test("um tar só de diretórios também bate no teto de entradas", (t) => {
-  // O teto contava só arquivos, então um tar com milhões de entradas de diretório passava e ainda
-  // esgotava inodes.
+  // A ceiling counting only files would let a tar with millions of directory entries pass and still
+  // exhaust inodes.
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
   const zlib = require("zlib");
 
-  // Campos do cabeçalho tar são terminados por NUL. O byte vai por `String.fromCharCode`: um NUL
-  // literal no fonte faz o Git tratar o arquivo como binário, e há um teste que proíbe isso.
+  // Tar header fields are NUL-terminated. The byte comes from `String.fromCharCode`: a literal NUL
+  // in the source makes Git treat the file as binary, and a test forbids that.
   const NUL = String.fromCharCode(0);
   const OCTAL_MODO = `0000755${NUL}`;
   const OCTAL_ZERO = `0000000${NUL}`;

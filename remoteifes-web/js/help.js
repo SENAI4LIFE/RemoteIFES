@@ -23,8 +23,8 @@ const RoleDocumentation = (() => {
   let carregando = null;
   let geracao = 0;
   function assinaturaAtual() { return `${state.usuario || ""}|${state.nivel || 1}`; }
-  // O conteúdo em memória pertence a uma sessão (usuário + nível). Outra sessão, ou nenhuma,
-  // começa vazia: uma resposta que chegue depois de sair ou de trocar de conta é descartada.
+  // In-memory content belongs to a session (user + level). Another session, or none, starts empty:
+  // a response arriving after logout or an account switch is discarded.
   async function carregar() {
     if (!state.usuario || !state.isAdmin) { if (assinatura !== null) limpar(); return; }
     const atual = assinaturaAtual();

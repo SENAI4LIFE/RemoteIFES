@@ -49,11 +49,11 @@ test.before(async () => {
   adminToken = await login("heat-admin", "SenhaAdmin123");
   userToken = await login("heat-user", "SenhaUser123");
 
-  // Somente a sala com MAC tem dispositivo: a outra precisa cair em "sem dados".
+  // Only the room with a MAC has a device: the other must fall into "sem dados".
   db.prepare("UPDATE salas SET mac = NULL").run();
   db.prepare("UPDATE salas SET mac = 'AA:BB:CC:DD:EE:01' WHERE sala = ?").run(SALA_COM_ESP);
 
-  // 2 h offline dentro das ultimas 24 h e 1 h offline entre 20 e 25 dias atras.
+  // 2 h offline within the last 24 h and 1 h offline between 20 and 25 days ago.
   const inserir = db.prepare("INSERT INTO esp_indisponibilidades (sala, offlineEm, onlineEm, duracaoSegundos) VALUES (?, ?, ?, ?)");
   inserir.run(SALA_COM_ESP, horasAtras(5), horasAtras(3), 7200);
   inserir.run(SALA_COM_ESP, horasAtras(24 * 20), horasAtras(24 * 20 - 1), 3600);
@@ -92,7 +92,7 @@ test("a agregação por sala usa as janelas de tempo pedidas", async () => {
   assert.equal(em(comandos24h, SALA_COM_ESP).valor, 2);
   assert.equal(em(comandos24h, SALA_SEM_ESP).valor, 1);
 
-  // A janela de 30 dias inclui o comando de 10 dias atras; a de 24 h nao.
+  // The 30-day window includes the command from 10 days ago; the 24 h window does not.
   const comandos30d = heatmapService.calcular("comandos", "30d");
   assert.equal(em(comandos30d, SALA_COM_ESP).valor, 3);
 
@@ -121,7 +121,7 @@ test("sala sem dispositivo fica sem dados nas métricas de conectividade, e não
   assert.equal(semEsp.valor, null);
   assert.equal(semEsp.quedas, undefined);
 
-  // A mesma sala tem valor real numa métrica que não depende do dispositivo.
+  // The same room has a real value in a metric that does not depend on the device.
   const comandos = heatmapService.calcular("comandos", "7d");
   assert.equal(comandos.salas.find((s) => s.sala === SALA_SEM_ESP).valor, 1);
 });
@@ -138,7 +138,7 @@ test("a resposta é compacta, cobre todas as salas e não vaza histórico bruto"
   assert.ok(corpo.metricas.length >= 9);
   assert.deepEqual(corpo.periodos.map((p) => p.id), ["24h", "7d", "30d"]);
 
-  // Um item por sala carrega apenas o resumo, nunca eventos individuais.
+  // One item per room carries only the summary, never individual events.
   const chaves = new Set(corpo.salas.flatMap((s) => Object.keys(s)));
   assert.deepEqual([...chaves].sort(), ["minutosOffline", "nome", "quedas", "sala", "valor"]);
   assert.ok(JSON.stringify(corpo.salas).length < 24 * 1024, "payload por sala deveria continuar compacto");
@@ -164,6 +164,6 @@ test("o aviso de retenção aparece quando o período excede o histórico de con
   assert.equal(curto.avisoRetencao, null);
   const longo = heatmapService.calcular("disponibilidade", "30d");
   assert.match(longo.avisoRetencao, /histórico de conectividade/);
-  // Metrica sem dependencia de conectividade nao carrega o aviso.
+  // A metric without connectivity dependency does not carry the warning.
   assert.equal(heatmapService.calcular("comandos", "30d").avisoRetencao, null);
 });

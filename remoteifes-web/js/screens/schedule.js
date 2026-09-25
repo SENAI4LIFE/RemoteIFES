@@ -9,9 +9,9 @@ const agendaIntervaloRow = document.getElementById("agendaIntervaloRow");
 
 const agendaDataInput = document.getElementById("agendaData");
 
-// Cada leitura da lista recebe um número de ordem e uma remoção confirmada fica anotada
-// com o número da leitura vigente: uma resposta emitida antes da remoção ainda traz o
-// agendamento apagado e não pode repintá-lo na tela como se ele continuasse existindo.
+// Each list read gets a sequence number, and a confirmed removal is tagged with the current read's
+// number: a response issued before the removal still carries the deleted schedule and must not
+// repaint it as if it still existed.
 let agendaLeituraAtual = 0;
 let agendaLeiturasPendentes = 0;
 const agendaRemovidos = new Map();
@@ -104,8 +104,8 @@ const Schedule = {
             Toast.erro((resp && resp.erro) || "não foi possível remover o agendamento");
             return;
           }
-          // A linha sai na hora: aguardar uma releitura completa deixava na tela um
-          // agendamento que o servidor já apagou, e ainda podia trazê-lo de volta.
+          // The row is removed immediately: waiting for a full re-read kept a schedule the server
+          // had already deleted on screen, and could even bring it back.
           agendaRemovidos.set(a.id, agendaLeituraAtual);
           li.remove();
           if (!list.children.length && !agendaLeiturasPendentes) empty.classList.remove("hidden");

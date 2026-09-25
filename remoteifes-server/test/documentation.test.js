@@ -69,9 +69,9 @@ test("catálogo público cobre as funções comuns e não contém links quebrado
   });
 });
 
-// O README é o dono único dos comandos de terminal: a instalação, os procedimentos que o
-// console deliberadamente não executa e a referência de recuperação de emergência. O manual
-// privilegiado não repete esses tutoriais — ele indica o caminho no console.
+// The README is the single owner of terminal commands: installation, the procedures the Console
+// deliberately does not run and the emergency recovery reference. The privileged manual does not
+// repeat those tutorials; it points to the Console path.
 test("comandos críticos continuam com uma única forma canônica no README", () => {
   const grupos = [
     "instalacao", "iniciar", "backupCriar", "backupRestaurar", "deployAtualizar", "deployReverter", "release", "firmwareOta",
@@ -159,8 +159,8 @@ test("os procedimentos de rotina do host apontam para o console em vez de repeti
   const infra = service._superSections.filter((secao) => secao.categoria === "super_infra");
   const porId = Object.fromEntries(infra.map((secao) => [secao.id, JSON.stringify(secao)]));
 
-  // Serviço, backup/restauração, deploy/rollback e recuperação de conta migraram para o
-  // console: o manual diz onde ficam e qual é o impacto, e não reexibe a linha de comando.
+  // Service, backup/restore, deploy/rollback and account recovery moved to the Console: the manual
+  // states where they live and their impact, and does not repeat the command line.
   for (const id of ["servico-systemd", "backup-restauracao", "implantacao-rollback", "recuperacao-superadmin"]) {
     assert.ok(porId[id], `seção ausente: ${id}`);
     assert.match(porId[id], /Console de Opera/, `${id} precisa apontar para o console`);
@@ -171,7 +171,7 @@ test("os procedimentos de rotina do host apontam para o console em vez de repeti
     assert.ok(!/npm run backup/.test(porId[id]), `${id} ainda repete o comando de backup`);
   }
 
-  // O que continua sendo feito por terminal permanece documentado com comandos.
+  // What still runs from a terminal remains documented with commands.
   assert.match(porId["servidor-rede"], /lan-setup\.sh/);
   assert.match(porId["release-servidor"], /release\.sh/);
   assert.match(porId["instalacao-servidor"], /install-service\.sh/);
@@ -189,7 +189,7 @@ test("o console tem seção própria com acesso, fronteira e reparo", () => {
   assert.match(texto, /fora do checkout/, "precisa explicar por que roda fora do checkout");
   assert.match(texto, /Terminal Expert/, "precisa citar o terminal como capacidade à parte");
 
-  // O console não pode ser apresentado como dono da operação do prédio.
+  // The Console must not be presented as the owner of building operation.
   const admin = JSON.stringify(service._adminSections);
   assert.ok(!/Console de Opera\S* &gt; .*Salas/.test(texto), "o console não opera salas");
   assert.ok(!admin.includes("Console de Opera"), "o manual de Administrador não precisa do console");
@@ -199,7 +199,7 @@ test("o README mantém uma referência única de recuperação de emergência", 
   assert.match(README, /^## Recuperação de emergência por terminal$/m, "a seção precisa existir");
   assert.match(README, /^## Console de Operações$/m, "o README documenta o acesso ao console");
 
-  // Uma única seção concentra os comandos de emergência: procuramos cabeçalhos concorrentes.
+  // A single section holds the emergency commands: look for competing headings.
   const cabecalhos = [...README.matchAll(/^#{2,3} (.+)$/gm)].map((m) => m[1]);
   const emergencias = cabecalhos.filter((t) => /recupera(ção|cao) de emerg/i.test(t));
   assert.equal(emergencias.length, 1, `esperava uma seção de emergência, achei: ${emergencias.join(" | ")}`);

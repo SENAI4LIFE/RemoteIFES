@@ -5,10 +5,8 @@ const base = require("./base");
 const config = require("../config");
 const processos = require("../processos");
 
-// Adaptador Linux. Preserva o que já funcionava: ativação por socket do systemd, auxiliar
-// privilegiado com verbos fixos, journal e as leituras de /proc. Acrescenta a distinção entre
-// "systemd não existe neste sistema" e "a unidade não está instalada", que antes se
-// confundiam numa resposta só.
+// Linux adapter: systemd socket activation, privileged helper with fixed verbs, journal and /proc
+// reads. Distinguishes "systemd does not exist on this system" from "the unit is not installed".
 
 const { ESTADO, recurso } = base;
 
@@ -16,7 +14,7 @@ let systemdDetectado = null;
 
 function temSystemd() {
   if (systemdDetectado !== null) return systemdDetectado;
-  // /run/systemd/system só existe quando o systemd é o init em execução.
+  // /run/systemd/system exists only when systemd is the running init.
   systemdDetectado = fs.existsSync("/run/systemd/system");
   return systemdDetectado;
 }
@@ -56,7 +54,7 @@ async function estadoDoServico() {
   if (!r.ok) return recurso(ESTADO.INDISPONIVEL, r.erro || "não foi possível consultar o systemd");
 
   const campos = camposDeShow(r.saida);
-  // LoadState=not-found distingue "unidade nunca instalada" de "instalada e parada".
+  // LoadState=not-found distinguishes "unit never installed" from "installed and stopped".
   if (campos.LoadState === "not-found") {
     return recurso(ESTADO.NAO_INSTALADO, "remoteifes.service não está instalado; rode install-service.sh no servidor");
   }
@@ -161,8 +159,8 @@ async function reiniciarConsole() {
 }
 
 function memoria() {
-  // /proc/meminfo dá "disponível" de verdade; os.freemem() ignora cache recuperável e faz um
-  // Pi saudável parecer sem memória.
+  // /proc/meminfo gives real "available" memory; os.freemem() ignores reclaimable cache and makes a
+  // healthy Pi look out of memory.
   let texto;
   try {
     texto = fs.readFileSync("/proc/meminfo", "utf8");
@@ -283,8 +281,8 @@ async function portasEmEscuta() {
 }
 
 async function abrirNavegador(url) {
-  // xdg-open respeita a sessão gráfica do usuário. Num host headless não há navegador, e isso
-  // é dito em vez de falhar em silêncio.
+  // xdg-open respects the user's graphical session. A headless host has no browser, and this is
+  // stated instead of failing silently.
   if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
     return recurso(ESTADO.NAO_APLICAVEL, "este host não tem sessão gráfica; abra o endereço a partir da sua máquina por túnel SSH", { url });
   }
@@ -316,12 +314,10 @@ function diretoriosPadrao({ escopo = "sistema" } = {}) {
   };
 }
 
-// --- Integração de sistema (systemd + auxiliar privilegiado) ---------------------------------
+// --- System integration (systemd + privileged helper) ---------------------------------
 //
-// Esta é a parte que antes morava em `install-console.sh`. Trazê-la para cá não é organização
-// por gosto: o shell só existia no Linux, guardava o layout antigo (`atual/`) e divergia do que
-// o instalador portátil monta, de modo que uma instalação por pacote e uma por script
-// produziam árvores diferentes. Aqui há uma implementação só, e ela usa o mesmo layout.
+// A single implementation, shared by package and scripted installs, so both produce the same
+// layout.
 
 const UNIDADE_SOCKET = "/etc/systemd/system/remoteifes-console.socket";
 const UNIDADE_SERVICO = "/etc/systemd/system/remoteifes-console.service";
@@ -340,11 +336,11 @@ function renderizar(modelo, valores) {
 }
 
 /**
- * Instala socket, serviço, auxiliar privilegiado e regra de sudo. Chamado pelo instalador em
- * escopo de sistema, já como root.
+ * Installs the socket, service, privileged helper and sudo rule. Called by the installer in system
+ * scope, already as root.
  *
- * A unidade aponta para a camada estável (`console-bootstrap.js`), nunca para uma versão: é o
- * que permite atualizar o console sem reescrever arquivo do systemd.
+ * The unit points at the stable layer (`console-bootstrap.js`), never at a version, which lets the
+ * Console update without rewriting a systemd file.
  */
 async function registrarInicializacao({ origem, raizInstalacao, dirEstado, dirDados, checkout, usuario, node, porta = 8099 }) {
   if (!temSystemd()) return semSystemd("a inicialização automática do console");
@@ -362,8 +358,8 @@ async function registrarInicializacao({ origem, raizInstalacao, dirEstado, dirDa
     PORTA: porta,
   };
 
-  // Auxiliar privilegiado: root:root em diretório root:root. É ele — e não o console — que
-  // detém o acesso a root, e só aceita verbos fixos.
+  // Privileged helper: root:root in a root:root directory. The helper, not the Console, holds root
+  // access, and it accepts only fixed verbs.
   fs.mkdirSync(DIR_AUXILIAR, { recursive: true });
   fs.chmodSync(DIR_AUXILIAR, 0o755);
   fs.copyFileSync(path.join(origem, "helper", "console-helper.sh"), CAMINHO_AUXILIAR);
@@ -373,8 +369,8 @@ async function registrarInicializacao({ origem, raizInstalacao, dirEstado, dirDa
     fs.chownSync(CAMINHO_AUXILIAR, 0, 0);
   } catch {}
 
-  // Regra de sudo validada antes de valer: um sudoers inválido pode trancar o host inteiro,
-  // então o arquivo é escrito num temporário, conferido com visudo e só então movido.
+  // The sudo rule is validated before taking effect: an invalid sudoers can lock the whole host, so
+  // the file is written to a temporary, checked with visudo and only then moved.
   const regraTemp = `${REGRA_SUDO}.novo`;
   fs.writeFileSync(
     regraTemp,

@@ -7,16 +7,16 @@ const coleta = require("./coleta");
 const trava = require("./trava");
 const execucao = require("./execucao");
 
-// Avaliação de impacto antes de interromper o serviço.
+// Impact assessment before interrupting the service.
 //
-// Distinções que o RemoteIFES exige e que um painel ingênuo erra:
-//  - `/admin/sessoes` mostra atividade recente, não a contagem exata de quem está conectado;
-//  - "online" no banco não prova canal de comandos aberto com o ESP32;
-//  - `modoManutencao` barra parte do acesso comum, mas não drena agendamento, ação de
-//    administrador, comando de dispositivo nem OTA;
-//  - `monitoramentoService` conta OTA em andamento sem a fase `validando`; aqui todas as
-//    fases ativas entram, inclusive `validando` e rollout pausado com trabalho pendente;
-//  - telemetria indisponível é **desconhecida**, nunca zero.
+// Distinctions RemoteIFES requires and a naive panel gets wrong:
+//  - `/admin/sessoes` shows recent activity, not the exact count of connected users;
+//  - "online" in the database does not prove an open command channel with the ESP32;
+//  - `modoManutencao` blocks part of regular access but does not drain schedules, administrator
+//    actions, device commands or OTA;
+//  - `monitoramentoService` counts OTA in progress without the `validando` phase; here every active
+//    phase counts, including `validando` and a paused rollout with pending work;
+//  - unavailable telemetry is **unknown**, never zero.
 
 const NIVEL = { BLOQUEIO: "bloqueio", AVISO: "aviso", INFO: "info" };
 const DISCO_MINIMO_BYTES = 200 * 1024 * 1024;
@@ -26,8 +26,8 @@ function caminhoTokenProntidao() {
 }
 
 /**
- * Garante o segredo compartilhado do contrato de prontidão. Criado com 0600 pelo console;
- * a aplicação apenas o lê. Sem ele a rota da aplicação responde 404 e não custa nada.
+ * Ensures the readiness contract's shared secret. Created with 0600 by the Console; the application
+ * only reads it. Without it the application route answers 404 and costs nothing.
  */
 function garantirTokenProntidao() {
   const arquivo = caminhoTokenProntidao();
@@ -51,8 +51,8 @@ function lerTokenProntidao() {
 }
 
 /**
- * Consulta o contrato de prontidão da aplicação. Se a aplicação está parada, o resultado é
- * "não observável" — o que já é a informação relevante para uma parada.
+ * Queries the application's readiness contract. If the application is stopped, the result is "not
+ * observable", which is already the relevant information for a stop.
  */
 function consultarProntidaoDaAplicacao({ timeoutMs = 3000 } = {}) {
   const app = config.caminhosDaAplicacao();
@@ -105,19 +105,19 @@ function achado(nivel, titulo, detalhe, extra = {}) {
 }
 
 /**
- * Avalia se uma operação que interrompe o serviço pode começar.
+ * Assesses whether an operation that interrupts the service may start.
  *
  * @param {object} opcoes
- *  - interrompeServico: a operação reinicia/para a aplicação
- *  - exigeBackup: a operação deve ter backup recente disponível
- *  - exigeRepositorioLimpo: a operação mexe no checkout
- *  - exigeAplicacaoParada: a operação exige que ninguém esteja escrevendo no banco
+ *  - interrompeServico: the operation restarts/stops the application
+ *  - exigeBackup: the operation requires a recent backup
+ *  - exigeRepositorioLimpo: the operation changes the checkout
+ *  - exigeAplicacaoParada: the operation requires that nobody writes to the database
  */
 async function avaliar(opcoes = {}) {
   const achados = [];
   const app = config.caminhosDaAplicacao();
 
-  // 1. Manutenção conflitante (console, CLI ou resíduo).
+  // 1. Conflicting maintenance (Console, CLI or leftover).
   const manutencao = trava.situacao();
   if (manutencao.ocupada) {
     achados.push(achado(NIVEL.BLOQUEIO, "Outra manutenção em andamento", manutencao.descricao));
@@ -131,7 +131,7 @@ async function avaliar(opcoes = {}) {
     achados.push(achado(NIVEL.BLOQUEIO, "Operação do console em andamento", `${trabalho.rotulo} (iniciada em ${trabalho.iniciadoEm})`));
   }
 
-  // 2. Estado do serviço e da aplicação.
+  // 2. Service and application state.
   const [saude, servico, prontidaoApp] = await Promise.all([
     coleta.consultarSaude(),
     coleta.estadoDoServico(),
@@ -196,15 +196,14 @@ async function avaliar(opcoes = {}) {
       );
     }
     const rollout = prontidaoApp.rollout;
-    // Um rollout pausado não é um rollout inofensivo: ele volta a mexer em dispositivos quando
-    // retomado, e pode ter dispositivos AINDA EM VOO no momento da pausa — atualizando,
-    // reiniciando ou validando. Interromper o serviço com um ESP32 no meio de uma gravação é o
-    // caminho para um dispositivo que não volta.
+    // A paused rollout is not harmless: it touches devices again when resumed, and may have devices
+    // STILL IN FLIGHT at pause time (updating, rebooting or validating). Interrupting the service
+    // while an ESP32 is writing flash risks a device that does not come back.
     const emVoo = Number(rollout && rollout.emAndamento) || 0;
     const pendentes = Number(rollout && rollout.pendentes) || 0;
     if (rollout && (rollout.ativo || (rollout.pausado && (pendentes || emVoo)))) {
       const contagens = [pendentes ? `${pendentes} pendente(s)` : null, emVoo ? `${emVoo} em voo` : null].filter(Boolean).join(", ");
-      // Dispositivo em voo bloqueia mesmo com o rollout pausado; só trabalho pendente avisa.
+      // A device in flight blocks even with the rollout paused; pending work only warns.
       const bloqueia = rollout.ativo || emVoo > 0;
       achados.push(
         achado(
@@ -223,7 +222,7 @@ async function avaliar(opcoes = {}) {
     }
   }
 
-  // 4. Sessões de usuário: atividade recente, não contagem exata de conectados.
+  // 4. User sessions: recent activity, not an exact count of connected users.
   if (opcoes.interrompeServico || opcoes.exigeAplicacaoParada) {
     const banco = coleta.espiarBanco({ permitirLeitura: saude.respondeu });
     if (banco.lido && banco.sessoesAbertas !== null) {
@@ -243,7 +242,7 @@ async function avaliar(opcoes = {}) {
     }
   }
 
-  // 5. Backup disponível.
+  // 5. Backup available.
   if (opcoes.exigeBackup) {
     const backups = coleta.listarBackups();
     if (!backups.disponivel || !backups.ultimo) {
@@ -266,7 +265,7 @@ async function avaliar(opcoes = {}) {
     }
   }
 
-  // 6. Espaço em disco.
+  // 6. Disk space.
   const discos = await coleta.lerDisco([...new Set([app.dirDados, config.DIR_CHECKOUT])]);
   for (const disco of discos) {
     if (!disco.suportado) continue;
@@ -284,7 +283,7 @@ async function avaliar(opcoes = {}) {
     }
   }
 
-  // 7. Banco em quarentena de uma recuperação anterior.
+  // 7. Database quarantined by a previous recovery.
   const quarentena = coleta.quarentenaDoBanco();
   if (quarentena.length) {
     achados.push(

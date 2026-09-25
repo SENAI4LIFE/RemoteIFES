@@ -2,14 +2,14 @@
 const fs = require("fs");
 const path = require("path");
 
-// Confere uma instalação já montada, de fora dela.
+// Checks an assembled installation from outside it.
 //
-// O que se prova aqui é a coerência que o resto do desenho pressupõe: o ponteiro da versão
-// ativa aponta para um diretório que existe e que declara aquela mesma versão. Um ponteiro
-// solto é o defeito silencioso do layout lado a lado — tudo parece instalado, e o programa
-// carrega outra coisa (ou não carrega).
+// Proves the coherence the rest of the design assumes: the active version pointer refers to a
+// directory that exists and declares that same version. A dangling pointer is the silent defect of
+// the side-by-side layout: everything looks installed and the program loads something else (or
+// nothing).
 //
-// Uso: node empacotar/conferir-instalacao.js <raiz-da-instalacao>
+// Usage: node empacotar/conferir-instalacao.js <raiz-da-instalacao>
 
 const raiz = process.argv[2];
 if (!raiz) {
@@ -36,13 +36,14 @@ if (pacote.version !== info.versaoAtiva) {
   falhar(`versoes/${info.versaoAtiva} declara ser a versão ${pacote.version}.`);
 }
 
-// A camada estável é o que o pacote e as unidades do sistema conhecem: se ela não estiver aqui,
-// nenhuma atualização futura consegue trocar de versão sem reescrever arquivo do gerenciador.
+// The stable layer is what the package and system units know: without it here, no future update can
+// switch versions without rewriting a package-manager file.
 for (const exigido of ["console-bootstrap.js", "launcher-bootstrap.js"]) {
   if (!fs.existsSync(path.join(raiz, exigido))) falhar(`camada estável incompleta: falta ${exigido}.`);
 }
 
-// O bootstrap precisa conseguir resolver a versão ativa sem executar nada do payload.
+// The bootstrap must be able to resolve the active version without executing anything from the
+// payload.
 const bootstrap = fs.readFileSync(path.join(raiz, "console-bootstrap.js"), "utf8");
 if (!bootstrap.includes("estado-instalacao.json")) {
   falhar("a camada estável instalada não lê o ponteiro de versão; ela não é a desta distribuição.");

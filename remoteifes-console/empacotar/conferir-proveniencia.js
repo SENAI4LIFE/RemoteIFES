@@ -3,13 +3,13 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-// Confere o que a etapa de construção declarou sobre si mesma.
+// Checks what the build step declared about itself.
 //
-// Existe porque a afirmação mais perigosa de um pipeline de distribuição é a que ninguém checa:
-// um artefato de CI que se apresente como assinado passaria a ser aceito como release de
-// produção sem nunca ter visto uma chave. Aqui a declaração é confrontada com o diretório.
+// The most dangerous claim in a distribution pipeline is the one nobody checks: a CI artifact that
+// presented itself as signed would be accepted as a production release without ever seeing a key.
+// The declaration is checked against the directory here.
 //
-// Uso: node empacotar/conferir-proveniencia.js <dir-da-saida>
+// Usage: node empacotar/conferir-proveniencia.js <dir-da-saida>
 
 const dir = process.argv[2];
 if (!dir) {
@@ -39,8 +39,8 @@ if (proveniencia.versao !== manifesto.versao) {
 }
 if (!manifesto.artefatos.length) falhar("o manifesto não lista nenhum artefato.");
 
-// Cada digest declarado é recalculado: um manifesto que descreva outro arquivo é pior do que
-// nenhum manifesto, porque passa confiança.
+// Every declared digest is recomputed: a manifest describing another file is worse than no
+// manifest, because it conveys trust.
 for (const artefato of [...manifesto.artefatos, ...proveniencia.artefatos]) {
   const arquivo = path.join(dir, artefato.arquivo);
   if (!fs.existsSync(arquivo)) falhar(`o manifesto cita ${artefato.arquivo}, que não foi construído.`);

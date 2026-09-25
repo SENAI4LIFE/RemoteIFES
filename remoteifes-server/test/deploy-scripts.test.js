@@ -123,10 +123,10 @@ test("deploy.sh com dependências inalteradas não roda npm ci e aplica a nova v
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-// Serviço simulado: um "processo em execução" que responde ao /health com o commit que carregou (ou
-// sem commit, como as versões anteriores a esse campo) e o tempo de vida do processo, e um systemctl
-// falso cujo "restart" pode aplicar a nova versão, falhar deixando o processo antigo no ar (que
-// continua com o tempo de vida antigo), ou subir um processo de outra versão. sudo falso só repassa.
+// Simulated service: a "running process" that answers /health with the commit it loaded (or without
+// a commit, like versions before that field) and the process uptime, and a fake systemctl whose
+// "restart" can apply the new version, fail while leaving the old process up (with its old uptime),
+// or start a process of another version. The fake sudo only passes through.
 const { spawn } = require("child_process");
 
 async function servicoFalso(dir, { commitInicial, semCommit = false, semUptime = false }) {
@@ -339,7 +339,7 @@ test("rollback.sh para uma versão sem identidade não conclui quando o processo
     legado.parar();
   }
 
-  // Sem commit nem tempo de vida no /health não há como verificar: também não é sucesso.
+  // Without a commit or uptime in /health there is no way to verify: that is not success either.
   fs.rmSync(path.join(dir, "data"), { recursive: true, force: true });
   git(dir, "reset", "-q", "--hard", shaC);
   const opaco = await servicoFalso(dir, { commitInicial: shaC, semCommit: true, semUptime: true });
@@ -357,7 +357,8 @@ test("rollback.sh para uma versão sem identidade não conclui quando o processo
 
 test("um processo sem identidade não é aceito como uma versão alvo que informaria o commit", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
-  // A versão D traz o módulo que põe o commit no /health: um processo que não o informa não pode ser ela.
+  // Version D carries the module that puts the commit in /health: a process that does not report it
+  // cannot be D.
   fs.writeFileSync(path.join(dir, "src", "config", "release.js"), "module.exports = { COMMIT_EM_EXECUCAO: null };\n");
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "D");
@@ -383,7 +384,8 @@ test("um processo sem identidade não é aceito como uma versão alvo que inform
 test("deploy.sh com o código já na versão alvo não a dá por concluída: reinicia e confirma o processo, ou não faz nada quando ele já a confirma", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
-  // Atualização interrompida (ou 'deploy --no-restart'): o código já está em C, o serviço ainda roda A.
+  // Interrupted update (or 'deploy --no-restart'): the code is already at C, the service still runs
+  // A.
   git(dir, "reset", "-q", "--hard", shaC);
   const servico = await servicoFalso(dir, { commitInicial: shaA });
   fs.writeFileSync(path.join(dir, ".env"), `PORTA=${servico.porta}\n`);
@@ -438,7 +440,8 @@ test("deploy.sh com o código já na versão alvo e o restart falhando não regi
 test("rollback.sh com o código já na versão alvo reinicia e confirma em vez de dar o rollback por feito", { skip: !disponivel }, async () => {
   const { dir, shaA } = prepararRepo();
   const shaC = commitC(dir, shaA);
-  // Rollback anterior que reverteu o código mas cujo restart não confirmou: HEAD em A, processo em C.
+  // Earlier rollback that reverted the code but whose restart was not confirmed: HEAD at A, process
+  // at C.
   const servico = await servicoFalso(dir, { commitInicial: shaC });
   fs.writeFileSync(path.join(dir, ".env"), `PORTA=${servico.porta}\n`);
   try {

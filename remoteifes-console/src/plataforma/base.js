@@ -4,16 +4,15 @@ const path = require("path");
 const config = require("../config");
 const processos = require("../processos");
 
-// Adaptador de plataforma: contrato comum e implementações portáteis.
+// Platform adapter: common contract and portable implementations.
 //
-// Só entra aqui o que depende mesmo do sistema operacional. Autenticação, definição de ações,
-// prontidão, desfecho de trabalhos, semântica de implantação, política de backup e a interface
-// continuam portáteis e não conhecem plataforma nenhuma.
+// Only what truly depends on the operating system lives here. Authentication, action definitions,
+// readiness, job outcomes, deploy semantics, backup policy and the interface stay portable and know
+// no platform.
 //
-// Todo recurso responde com um **estado explícito**, nunca um booleano. "Não dá" tem causas
-// diferentes e o operador precisa distinguir: um serviço que não existe neste sistema é outra
-// coisa de um serviço que existe mas não está instalado, e as duas são outra coisa de falta de
-// permissão.
+// Every capability answers with an **explicit state**, never a boolean. "Cannot" has different
+// causes the operator must tell apart: a service that does not exist on this system differs from
+// one that exists but is not installed, and both differ from missing permission.
 
 const ESTADO = Object.freeze({
   SUPORTADO: "suportado",
@@ -32,11 +31,11 @@ const NAO_IMPLEMENTADO = (nome) =>
   recurso(ESTADO.NAO_SUPORTADO, `${nome} não tem implementação para ${process.platform} nesta versão do console`);
 
 /**
- * Classificação de arquitetura. Hardware, kernel, userland, runtime e artefato são coisas
- * diferentes, e confundi-las é o erro clássico do Raspberry Pi 3: hardware de 64 bits, kernel
- * de 64 bits e userland de 32 bits convivem no mesmo aparelho. `uname -m` responde pelo kernel
- * e leva à conclusão errada; o que decide qual artefato serve é o **runtime** (`process.arch`)
- * e, quando existe, a arquitetura do gerenciador de pacotes.
+ * Architecture classification. Hardware, kernel, userland, runtime and artifact are different
+ * things, and conflating them is the classic Raspberry Pi 3 mistake: 64-bit hardware, a 64-bit
+ * kernel and a 32-bit userland coexist on the same device. `uname -m` answers for the kernel and
+ * leads to the wrong conclusion; the **runtime** (`process.arch`) and, when present, the package
+ * manager architecture decide which artifact applies.
  */
 async function classificarArquitetura() {
   const runtime = process.arch;
@@ -79,7 +78,7 @@ async function classificarArquitetura() {
     userland,
     fonteUserland,
     hardware: modelo,
-    // O alvo de artefato segue o runtime: é ele que vai executar o código.
+    // The artifact target follows the runtime: it is what will execute the code.
     alvoDeArtefato: `${process.platform}-${runtime}`,
     armv7,
     ressalva: armv7
@@ -92,7 +91,9 @@ async function classificarArquitetura() {
   };
 }
 
-/** Node que o console usa para lançar seus próprios executores. */
+/**
+ * Node used by the Console to launch its own runners.
+ */
 function runtimeAtual() {
   const bruto = process.versions.node;
   const [maior, menor] = bruto.split(".").map(Number);
@@ -107,7 +108,9 @@ function runtimeAtual() {
   };
 }
 
-/** Ferramentas externas que a implantação administrada precisa no host. */
+/**
+ * External tools the managed deploy needs on the host.
+ */
 async function ferramentas() {
   const saida = {};
   for (const [nome, args] of [
@@ -123,7 +126,7 @@ async function ferramentas() {
   return saida;
 }
 
-// --- Implementações portáteis ----------------------------------------------------------------
+// --- Portable implementations ----------------------------------------------------------------
 
 function memoria() {
   return { totalBytes: os.totalmem(), disponivelBytes: os.freemem(), fonte: "os" };
@@ -138,15 +141,13 @@ async function throttle() {
 }
 
 /**
- * Espaço em disco pelo `statfs` do próprio Node — sem subprocesso, nos três sistemas.
+ * Disk space through Node's own `statfs`, with no subprocess, on all three systems.
  *
- * A implementação anterior do Windows chamava o PowerShell uma vez por caminho. A avaliação de
- * prontidão mede dois caminhos antes de **toda** operação, e cada partida do PowerShell carrega
- * o motor .NET: numa máquina modesta isso sozinho passava de 15 s, e o operador esperava esse
- * tempo só para ver a tela de confirmação. `fs.statfsSync` responde em microssegundos.
+ * Readiness measures two paths before **every** operation; `fs.statfsSync` answers in microseconds,
+ * while a PowerShell start per path loads the .NET engine and took over 15 s on modest hardware.
  *
- * `bavail` (e não `bfree`) é o que se pode realmente usar: em POSIX parte do espaço livre é
- * reservada ao root, e prometer esse espaço a um backup seria prometer o que não existe.
+ * `bavail` (not `bfree`) is what can actually be used: on POSIX part of the free space is reserved
+ * for root, and promising it to a backup would promise what does not exist.
  */
 async function disco(caminhos) {
   return caminhos.map((caminho) => {
@@ -223,8 +224,8 @@ async function reiniciarConsole() {
 }
 
 /**
- * Encerra a árvore de processos. A implementação portátil usa o grupo de processos POSIX;
- * Windows sobrescreve com taskkill, porque lá não existe grupo POSIX.
+ * Ends the process tree. The portable implementation uses the POSIX process group; Windows
+ * overrides it with taskkill, because there is no POSIX group there.
  */
 function encerrarArvore(pid, sinal) {
   if (!pid) return;
@@ -237,20 +238,24 @@ function encerrarArvore(pid, sinal) {
   }
 }
 
-/** Opções de spawn para que o filho fique num grupo próprio e sobreviva ao console. */
+/**
+ * Spawn options so the child gets its own group and survives the Console.
+ */
 function opcoesDeGrupo() {
   return { detached: true };
 }
 
 /**
- * Abre uma URL no navegador da sessão do operador. Nunca recebe credencial: a URL é sempre a
- * do console ou a da aplicação, e a autenticação acontece dentro da página.
+ * Opens a URL in the operator session's browser. Never receives a credential: the URL is always the
+ * Console's or the application's, and authentication happens inside the page.
  */
 async function abrirNavegador(url) {
   return recurso(ESTADO.NAO_SUPORTADO, "abertura de navegador não implementada nesta plataforma", { url });
 }
 
-/** Protege um arquivo para que só o dono leia. POSIX usa modo; Windows sobrescreve com ACL. */
+/**
+ * Protects a file so only its owner reads it. POSIX uses the mode; Windows overrides with an ACL.
+ */
 function protegerArquivo(caminho, { diretorio = false } = {}) {
   try {
     fs.chmodSync(caminho, diretorio ? 0o700 : 0o600);
@@ -260,7 +265,9 @@ function protegerArquivo(caminho, { diretorio = false } = {}) {
   }
 }
 
-/** Confere se um caminho é gravável por alguém além do dono. */
+/**
+ * Checks whether a path is writable by anyone other than its owner.
+ */
 function permissaoRestrita(caminho) {
   try {
     const info = fs.statSync(caminho);
@@ -272,7 +279,9 @@ function permissaoRestrita(caminho) {
   }
 }
 
-/** Diretórios padrão da plataforma. Sobrescrito por cada adaptador. */
+/**
+ * Platform default directories. Overridden by each adapter.
+ */
 function diretoriosPadrao() {
   const base = path.join(os.homedir(), ".remoteifes-console");
   return {
@@ -285,7 +294,9 @@ function diretoriosPadrao() {
   };
 }
 
-/** Registro do console para iniciar em segundo plano. */
+/**
+ * Registers the Console to start in the background.
+ */
 async function registrarInicializacao() {
   return NAO_IMPLEMENTADO("registro de inicialização automática");
 }

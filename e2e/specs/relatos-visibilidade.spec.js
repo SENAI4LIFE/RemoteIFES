@@ -1,7 +1,7 @@
 const { test, expect, API_URL, tokenDe, VIEWPORTS } = require("../harness/fixtures");
 
-// Regressão do relato ilegível: a cor do texto precisa contrastar com a superfície em que ele
-// é realmente desenhado, em qualquer combinação de acessibilidade. Existir no DOM não basta.
+// Regression for the unreadable report: the text color must contrast with the surface it is
+// actually drawn on, under any accessibility combination. Being in the DOM is not enough.
 function contrastes() {
   const canal = (valor) => {
     const c = valor / 255;

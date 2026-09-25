@@ -278,9 +278,9 @@
     if (fontColorInput) fontColorInput.value = corFonte || COR_PADRAO;
     if (textColorInput) textColorInput.value = corTexto || COR_PADRAO;
 
-    // Mesmo ciclo de foco dos outros painéis: ao abrir, o foco entra no painel (no botão
-    // de fechar); Esc fecha; ao fechar, o foco volta a quem abriu — e nunca fica em um
-    // controle que acabou de ser escondido.
+    // Same focus cycle as the other panels: opening moves focus into the panel (onto its close
+    // button); Esc closes; closing returns focus to the opener, and focus never stays on a control
+    // that was just hidden.
     let focoAnterior = null;
 
     function abrirPainel() {
@@ -547,9 +547,9 @@
       document.addEventListener("focusin", (e) => {
         if (!helpFabPanel.classList.contains("hidden") && !helpFabPanel.contains(e.target) && e.target !== helpFabToggle) fecharAjuda();
       });
-      // Como no painel de acessibilidade: Esc fecha com o painel aberto onde quer que o foco
-      // esteja — inclusive no próprio botão flutuante (Shift+Tab a partir do fechar, ou antes
-      // de o foco adiado entrar no painel).
+      // As in the accessibility panel: Esc closes the open panel wherever focus is, including on
+      // the floating button itself (Shift+Tab from the close button, or before deferred focus
+      // enters the panel).
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape" || helpFabPanel.classList.contains("hidden")) return;
         e.preventDefault();

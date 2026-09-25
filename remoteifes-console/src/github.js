@@ -7,20 +7,20 @@ const { URL } = require("url");
 const config = require("./config");
 const estado = require("./estado");
 
-// Cliente GitHub mínimo para o ciclo mobile/CI.
+// Minimal GitHub client for the mobile/CI cycle.
 //
-// Princípios:
-//  - permissões mínimas: o token precisa apenas de `actions:read` e, para disparar,
-//    `actions:write` no repositório permitido. Nada de `repo` completo nem `workflow`;
-//  - alvo fechado: dono/repositório e nomes de workflow vêm de lista fixa neste módulo,
-//    nunca da requisição;
-//  - o segredo nunca volta por API, nunca vai para log e nunca entra em URL;
-//  - limite de taxa respeitado e exposto; atualização é sob demanda, não em polling.
+// Principles:
+//  - least privilege: the token needs only `actions:read` and, to dispatch, `actions:write` on the
+//    allowed repository. No full `repo` and no `workflow`;
+//  - closed target: owner/repository and workflow names come from a fixed list in this module,
+//    never from the request;
+//  - the secret never returns through the API, never goes to a log and never enters a URL;
+//  - rate limit respected and exposed; refresh is on demand, not polling.
 //
-// A versão de API é fixada em `X-GitHub-Api-Version`. O disparo é correlacionado ao run
-// realmente criado — nunca "o run mais recente", que numa CI movimentada pode ser de outra
-// pessoa. Se a resposta do disparo já traz o id (comportamento documentado atualmente), ele é
-// usado; se vier vazia (204), a correlação usa janela de tempo mais identidade do workflow.
+// The API version is pinned in `X-GitHub-Api-Version`. A dispatch is correlated with the run
+// actually created, never "the most recent run", which on a busy CI may be someone else's. If the
+// dispatch response carries the id (currently documented behavior) it is used; if it is empty
+// (204), correlation uses a time window plus workflow identity.
 
 const API = process.env.CONSOLE_GITHUB_API || "https://api.github.com";
 const VERSAO_API = "2022-11-28";
@@ -44,7 +44,7 @@ function token() {
 }
 
 /**
- * Estado do segredo, sem jamais devolvê-lo. Só presença, formato plausível e quando foi gravado.
+ * Secret status, without ever returning it. Only presence, plausible format and when it was stored.
  */
 function estadoDoToken() {
   const segredos = lerSegredos();
@@ -55,7 +55,7 @@ function estadoDoToken() {
     formato: /^gh[pousr]_/.test(valor) ? "token clássico/fine-grained do GitHub" : "formato não reconhecido",
     tamanho: valor.length,
     gravadoEm: segredos.githubTokenEm || null,
-    // Repetir: o valor não é devolvido por nenhuma rota.
+    // Again: the value is not returned by any route.
     observacao: "O valor não é exposto por API, log, auditoria nem diagnóstico.",
   };
 }
@@ -183,12 +183,13 @@ async function obterRun(id) {
 }
 
 /**
- * Dispara um workflow e devolve o run correlacionado.
+ * Dispatches a workflow and returns the correlated run.
  *
- * A resposta do disparo pode trazer o id (comportamento documentado hoje) ou vir vazia. Os dois
- * casos são tratados: com id, ele é confirmado; sem id, a busca é limitada à janela iniciada
- * pouco antes do disparo, ao workflow pedido e ao ramo — e, se mais de um candidato aparecer, o
- * resultado é declarado **ambíguo** em vez de escolher "o mais recente", que pode ser de outra pessoa.
+ * The dispatch response may carry the id (documented behavior today) or be empty. Both cases are
+ * handled: with an id, it is confirmed; without one, the search is limited to the window starting
+ * shortly before the dispatch, the requested workflow and the branch, and if more than one
+ * candidate appears the result is declared **ambiguous** instead of picking "the most recent",
+ * which may be someone else's.
  */
 async function dispararWorkflow(workflow, { ramo = "main", entradas = {} } = {}) {
   const arquivo = WORKFLOWS_PERMITIDOS[workflow];
@@ -219,7 +220,7 @@ async function dispararWorkflow(workflow, { ramo = "main", entradas = {} } = {})
     return { ok: true, correlacao: "id devolvido pelo disparo (ainda não consultável)", run: { id: idDireto } };
   }
 
-  // Sem id na resposta: correlaciona por janela + workflow + ramo + evento.
+  // No id in the response: correlate by window + workflow + branch + event.
   for (let tentativa = 0; tentativa < 6; tentativa += 1) {
     await new Promise((r) => setTimeout(r, 2500));
     const lista = await pedir(
@@ -269,12 +270,12 @@ async function listarArtefatos(runId) {
 }
 
 /**
- * Baixa um artefato para um arquivo local, com limite de tamanho, número fixo de
- * redirecionamentos e cálculo do SHA-256 do que foi realmente gravado.
+ * Downloads an artifact to a local file, with a size limit, a fixed number of redirects and the
+ * SHA-256 of what was actually written.
  *
- * Importante: a extração **não** acontece aqui. Um zip de CI é conteúdo não confiável e a
- * extração segura (travessia, symlink, zip bomb) é um problema à parte; o console entrega o
- * arquivo e o digest para conferência humana ou para uma máquina com SDK.
+ * Extraction does **not** happen here. A CI zip is untrusted content and safe extraction
+ * (traversal, symlink, zip bomb) is a separate problem; the Console delivers the file and the
+ * digest for human verification or for a machine with the SDK.
  */
 async function baixarArtefato(runId, artefatoId, destino) {
   if (!Number.isInteger(artefatoId) || artefatoId <= 0) return { ok: false, erro: "id de artefato inválido" };
@@ -287,8 +288,8 @@ async function baixarArtefato(runId, artefatoId, destino) {
     return { ok: false, erro: `artefato de ${(meta.bytes / 1048576).toFixed(0)} MiB passa do limite de ${LIMITE_ARTEFATO / 1048576} MiB` };
   }
 
-  // A API responde com redirecionamento para um armazenamento assinado. O seguimento é feito
-  // pelo próprio downloader, com número máximo de saltos e sem aceitar destino não seguro.
+  // The API answers with a redirect to signed storage. The downloader follows it itself, with a
+  // maximum number of hops and refusing insecure destinations.
   const alvo = `${API}${base()}/actions/artifacts/${artefatoId}/zip`;
   return baixarParaArquivo(alvo, destino, meta, 0);
 }
@@ -310,7 +311,7 @@ function baixarParaArquivo(url, destino, meta, saltos = 0) {
   } catch {
     return Promise.resolve({ ok: false, erro: "endereço de download inválido" });
   }
-  // Fora de teste, só https: um redirecionamento para http rebaixaria o transporte.
+  // Outside tests, https only: a redirect to http would downgrade the transport.
   if (alvo.protocol !== "https:" && !process.env.CONSOLE_GITHUB_API) {
     return Promise.resolve({ ok: false, erro: "redirecionamento para destino não seguro" });
   }
@@ -331,9 +332,9 @@ function baixarParaArquivo(url, destino, meta, saltos = 0) {
           "User-Agent": "remoteifes-console",
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": VERSAO_API,
-          // A credencial só acompanha o host da própria API. A API responde com
-          // redirecionamento para um armazenamento assinado de outro domínio, e mandar o token
-          // junto o entregaria a um host que não precisa dele — e que pode registrá-lo.
+          // The credential only goes with the API host itself. The API redirects to signed storage
+          // on another domain, and sending the token along would hand it to a host that does not
+          // need it and may log it.
           ...(segredo && mesmoHostDaApi(alvo) ? { Authorization: `Bearer ${segredo}` } : {}),
         },
         timeout: 120_000,
@@ -370,11 +371,10 @@ function baixarParaArquivo(url, destino, meta, saltos = 0) {
           if (abortado) return;
           const sha256 = hash.digest("hex");
           const tamanhoConfere = meta ? bytes === meta.bytes : null;
-          // O digest do artefato de CI vem da mesma origem que o artefato: conferir os dois não
-          // prova autenticidade, só integridade do transporte. Ainda assim uma divergência é
-          // falha — e é reportada como falha, não como um campo informativo que o chamador
-          // poderia ignorar. Autenticidade de artefato executável é responsabilidade do
-          // atualizador por release, com manifesto assinado.
+          // The CI artifact digest comes from the same origin as the artifact: checking both proves
+          // transport integrity, not authenticity. A mismatch is still a failure and is reported as
+          // one, not as an informational field the caller could ignore. Authenticity of executable
+          // artifacts is the release updater's responsibility, with a signed manifest.
           if (tamanhoConfere === false) {
             fs.rmSync(destino, { force: true });
             return resolve({

@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-// Runner de implantação/reversão do console.
+// Deploy/rollback runner for the Console.
 //
-// Ele — e não o console nem `deploy.sh` — é quem segura a trava de manutenção durante toda a
-// operação. Antes, o console adquiria a trava e em seguida chamava `deploy.sh`, que tentava
-// adquirir a MESMA trava com `noclobber`: a implantação gerenciada abortava sempre, no primeiro
-// passo, com "outra atualização/rollback parece estar em andamento". Uma aquisição, um dono.
+// This runner, not the Console and not `deploy.sh`, holds the maintenance lock for the whole
+// operation: one acquisition, one owner. deploy.sh acquires the same lock with `noclobber`, so a
+// second holder would make the managed deploy abort on its first step.
 //
-// Uso:
+// Usage:
 //   node bin/implantar.js aplicar <commit> [--offline] [--sem-reiniciar]
 //   node bin/implantar.js reverter [<ref>]  [--offline] [--sem-reiniciar]
 

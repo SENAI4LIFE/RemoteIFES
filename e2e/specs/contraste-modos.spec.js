@@ -1,11 +1,11 @@
 const { test, expect, VIEWPORTS, injetarSessao, despublicarApkFixture } = require("../harness/fixtures");
 
-// Contraste de texto (WCAG 2.x: 4,5:1; 3:1 para texto grande) medido nas cores computadas
-// de cada texto visível, no tema claro e no alto contraste. As cores de destaque, os tons
-// pastel de aviso/erro e as superfícies neutras vêm de variáveis compartilhadas: no alto
-// contraste elas trocam juntas, sem sobrescrita isolada por tela.
+// Text contrast (WCAG 2.x: 4.5:1; 3:1 for large text) measured on the computed colors of every
+// visible text, in the light theme and in high contrast. Accent colors, pastel warning/error tones
+// and neutral surfaces come from shared variables: in high contrast they switch together, with no
+// per-screen overrides.
 
-// Executa dentro da página: devolve os textos cujo contraste com o fundo fica abaixo do mínimo.
+// Runs inside the page: returns the texts whose contrast with the background is below the minimum.
 function varrerContraste(raizSel) {
   const parse = (s) => {
     const m = String(s).match(/rgba?\(([^)]+)\)/);
@@ -19,7 +19,7 @@ function varrerContraste(raizSel) {
   };
   const razao = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
   const mistura = (topo, base) => ({ r: topo.r * topo.a + base.r * (1 - topo.a), g: topo.g * topo.a + base.g * (1 - topo.a), b: topo.b * topo.a + base.b * (1 - topo.a), a: 1 });
-  // Empilha os fundos até o primeiro opaco; gradientes e imagens invalidam a medida.
+  // Stacks backgrounds up to the first opaque one; gradients and images invalidate the measurement.
   const fundoDe = (el) => {
     const camadas = [];
     let e = el;
@@ -102,7 +102,7 @@ async function esperarContraste(page, raiz, rotulo) {
   expect(resultado.achados, `${rotulo}: textos abaixo do contraste mínimo:\n${lista}`).toEqual([]);
 }
 
-// Telas e estados percorridos nos dois modos. `raiz` restringe a medida à camada aberta.
+// Screens and states visited in both modes. `raiz` restricts the measurement to the open layer.
 const TELAS = [
   { nome: "portal", papel: null, rota: "/", seletor: "#screen-portal" },
   { nome: "login", papel: null, rota: "/", seletor: "#screen-portal", preparar: async (page) => { await page.locator('.portal-option[data-tipo="admin"]').click(); await expect(page.locator("#screen-login")).toBeVisible(); } },

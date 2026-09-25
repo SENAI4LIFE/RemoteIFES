@@ -1,6 +1,6 @@
-// Ensaio de carga do servidor central: sobe uma instância isolada, conecta N ESP32
-// simulados pelo protocolo real (credencial por dispositivo) e mede o custo da operação.
-// Nunca toca no banco de produção — usa um diretório temporário descartado ao final.
+// Central server load test: starts an isolated instance, connects N simulated ESP32 boards over the
+// real protocol (per-device credentials) and measures the operating cost. Never touches the
+// production database: it uses a temporary directory removed at the end.
 const { spawn } = require("child_process");
 const fs = require("fs");
 const os = require("os");

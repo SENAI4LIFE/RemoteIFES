@@ -17,7 +17,7 @@ const scheduler = require("../src/scheduler/schedulerService");
 const { dataAtualBrasiliaISO } = require("../src/utils/tempo");
 
 const ADMIN = { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true, nivel: 3 }, origem: "manual" };
-// 2026-09-06 19:59 em Brasília; o agendamento liga às 20:00 e deveria desligar às 23:30.
+// 2026-09-06 19:59 in Brasília; the schedule turns on at 20:00 and should turn off at 23:30.
 const VESPERA_1959 = new Date("2026-09-06T22:59:00Z");
 const DIA_SEGUINTE_0010 = new Date("2026-09-07T03:10:00Z");
 
@@ -41,15 +41,15 @@ function superadmin() {
   return db.prepare("SELECT * FROM usuarios WHERE nivel = 3").get();
 }
 
-// O relógio do SQLite (datetime('now')) não é simulado pelos mock timers: os registros do dia
-// anterior recebem explicitamente o instante em que teriam sido gravados.
+// The SQLite clock (datetime('now')) is not simulated by mock timers: previous-day records are
+// given the instant they would have been written explicitly.
 function datarRegistrosDaVespera(codigo, instanteUtc = "2026-09-06 23:00:00") {
   db.prepare("UPDATE comandos_log SET criadoEm = ? WHERE sala = ?").run(instanteUtc, codigo);
   db.prepare("UPDATE agendamentos_execucoes SET executadoEm = ? WHERE agendamentoId IN (SELECT id FROM agendamentos WHERE sala = ?)").run(instanteUtc, codigo);
 }
 
-// Liga pelo agendador às 20:00 da véspera e para o servidor antes das 23:30 (queda), voltando à
-// hora indicada do dia seguinte com a passagem inicial do agendador.
+// The scheduler turns the room on at 20:00 the day before and the server stops before 23:30
+// (crash), coming back at the given time the next day with the scheduler's initial pass.
 function simularQuedaAntesDoDesligar(t, codigo, criar, { retorno = DIA_SEGUINTE_0010 } = {}) {
   t.mock.timers.enable({ apis: ["Date", "setInterval", "setTimeout"], now: VESPERA_1959 });
   t.after(() => scheduler.pararScheduler());
@@ -111,10 +111,11 @@ test("a recuperação respeita uma intenção mais nova após a hora devida, mas
     return agendamentos.criar({ sala: "VD-2", usuarioId, data: dataAtualBrasiliaISO(), temperatura: 24, horaInicio: "20:00", horaFim: "22:00", modo: "ligar_intervalo", ligarInicio: "20:00", ligarFim: "21:30" });
   });
   datarRegistrosDaVespera("VD-3");
-  // VD-2: ajuste manual às 21:00 (dentro do intervalo, antes das 21:30 devidas) não conta como intenção nova.
+  // VD-2: a manual adjustment at 21:00 (inside the interval, before the 21:30 due time) does not
+  // count as new intent.
   salasService.aplicarComando("VD-2", "temperatura", 25, ADMIN);
   db.prepare("UPDATE comandos_log SET criadoEm = '2026-09-07 00:00:00' WHERE sala = 'VD-2' AND origem = 'manual'").run();
-  // VD-3: alguém ligou manualmente às 23:45, depois da hora em que o OFF era devido.
+  // VD-3: someone turned the room on manually at 23:45, after the OFF was due.
   salasService.aplicarComando("VD-3", "ligar", undefined, ADMIN);
   db.prepare("UPDATE comandos_log SET criadoEm = '2026-09-07 02:45:00' WHERE sala = 'VD-3' AND origem = 'manual'").run();
 

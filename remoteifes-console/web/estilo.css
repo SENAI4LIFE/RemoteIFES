@@ -1,7 +1,6 @@
-/* Console de Operações RemoteIFES — folha única, sem framework.
-   Paleta e espaçamentos seguem o RemoteIFES para que o operador reconheça o produto, mas o
-   console é deliberadamente mais sóbrio: aqui não há cartão decorativo nem gráfico enfeitando
-   um número que cabe em uma linha. */
+/* RemoteIFES Operations Console: single stylesheet, no framework. Palette and spacing follow
+   RemoteIFES so the operator recognizes the product, but the Console is deliberately more sober: no
+   decorative cards and no charts dressing up a number that fits on one line. */
 
 :root {
   --verde: #1c6b3c;
@@ -113,7 +112,7 @@ body {
   white-space: nowrap;
 }
 
-/* --- Navegação --- */
+/* --- Navigation --- */
 
 .abas {
   display: flex;
@@ -217,7 +216,7 @@ h3 { font-size: 14px; margin: 0 0 8px; font-weight: 700; color: var(--texto-frac
 
 dl { margin: 0; }
 
-/* --- Botões --- */
+/* --- Buttons --- */
 
 .btn {
   appearance: none;
@@ -246,7 +245,7 @@ a.btn { text-decoration: none; }
 
 .motivo-desabilitado { font-size: 13px; color: var(--texto-fraco); margin-top: 4px; }
 
-/* --- Ações --- */
+/* --- Actions --- */
 
 .acao { border: 1px solid var(--borda); border-radius: var(--raio-p); padding: 12px; margin-bottom: 10px; background: var(--superficie); }
 .acao h4 { margin: 0 0 4px; font-size: 15px; }
@@ -267,7 +266,7 @@ details > summary {
 details[open] > summary { border-bottom: 1px solid var(--borda); }
 details > .corpo { padding: 12px; }
 
-/* --- Saída de processo e logs --- */
+/* --- Process output and logs --- */
 
 .saida {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -299,7 +298,7 @@ th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: 
 td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
 .tabela-rolavel { overflow-x: auto; }
 
-/* --- Formulários --- */
+/* --- Forms --- */
 
 label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 input[type="text"], input[type="password"], input[type="number"], select, textarea {
@@ -317,7 +316,7 @@ input[type="text"], input[type="password"], input[type="number"], select, textar
 .checkbox { display: flex; align-items: center; gap: 8px; font-weight: 400; min-height: var(--toque); }
 .checkbox input { width: auto; min-height: auto; }
 
-/* --- Diálogo --- */
+/* --- Dialog --- */
 
 dialog {
   border: 1px solid var(--borda);
@@ -366,7 +365,7 @@ dialog .rodape { padding: 12px 16px; border-top: 1px solid var(--borda); display
   overflow-wrap: anywhere;
 }
 
-/* --- Rodapé --- */
+/* --- Footer --- */
 
 .rodape { padding: 16px; text-align: center; font-size: 12px; color: var(--texto-fraco); }
 

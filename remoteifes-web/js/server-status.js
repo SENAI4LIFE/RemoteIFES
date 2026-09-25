@@ -25,10 +25,10 @@ const ServerStatus = (() => {
   const ouvintesMensagem = new Set();
   const ouvintesConectado = new Set();
   const ATRASO_TELA_CONECTANDO = 300;
-  // Um socket pode continuar em OPEN depois que o aparelho suspende, troca de rede ou
-  // perde o servidor: nada chega, nada falha e o app mostraria estado antigo como atual.
-  // O servidor reenvia o estado a cada 30s para sessões autenticadas e sempre responde a
-  // "observar", então silêncio acima disso (ou logo após retomar) pede prova de vida.
+  // A socket can stay OPEN after the device suspends, switches networks or loses the server:
+  // nothing arrives, nothing fails, and the app would show old state as current. The server resends
+  // state every 30s to authenticated sessions and always answers "observar", so silence beyond that
+  // (or right after resuming) calls for a liveness check.
   const SILENCIO_SUSPEITO_MS = 45000;
   const SILENCIO_RETOMADA_MS = 1000;
   const RESPOSTA_SONDA_MS = 5000;
@@ -310,8 +310,8 @@ const ServerStatus = (() => {
   }
 
   function enviar(obj) {
-    // A sonda de vida reenvia a última observação pedida, mesmo a que não chegou a sair:
-    // assim ela espelha o que a tela espera observar em vez de uma sala já abandonada.
+    // The liveness probe resends the last requested observation, even one that never left: it
+    // mirrors what the screen expects to observe instead of a room already abandoned.
     if (obj && obj.tipo === "observar") ultimaObservacao = obj;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(obj));
@@ -374,8 +374,8 @@ const ServerStatus = (() => {
     if (!acessoManualLiberado) aplicarEstadoManutencao();
   });
 
-  // Reaproveita "observar", que o servidor sempre responde, como prova de vida: se a
-  // resposta não vier, o socket estava morto apesar de OPEN e a conexão é reciclada.
+  // Reuses "observar", which the server always answers, as a liveness check: if the response does
+  // not come, the socket was dead despite OPEN and the connection is recycled.
   function sondarConexao() {
     if (sondaTimeoutId || !estaConectado()) return;
     if (!enviar(ultimaObservacao || { tipo: "observar", sala: null })) return;

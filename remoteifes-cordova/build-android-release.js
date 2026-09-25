@@ -55,8 +55,8 @@ function fixarServidorNoBundle(origem) {
   );
 }
 
-// O aplicativo instalado passa a conhecer a própria versão sem plugin nenhum: ela é gravada
-// no bundle no mesmo build que gera o APK, então não há como os dois discordarem.
+// The installed app knows its own version without any plugin: it is written into the bundle by the
+// same build that produces the APK, so the two cannot disagree.
 function fixarVersaoNoBundle({ versionName, versionCode }) {
   substituirNoBundle("const appAndroidVersao = null;", `const appAndroidVersao = ${JSON.stringify(versionName)};`, "a versão do aplicativo");
   substituirNoBundle("const appAndroidBuild = null;", `const appAndroidBuild = ${JSON.stringify(String(versionCode))};`, "o build do aplicativo");

@@ -37,8 +37,8 @@ function servidorPadraoDoNavegador() {
   return window.location.origin;
 }
 
-// Preenchidos só na cópia gerada para o APK assinado: no site e na PWA não há como saber
-// qual aplicativo está instalado no aparelho, e a página do Aplicativo não deve fingir que sabe.
+// Filled only in the copy generated for the signed APK: on the website and PWA there is no way to
+// know which app is installed on the device, and the App page must not pretend to know.
 const appAndroidVersao = null;
 const appAndroidBuild = null;
 
