@@ -92,7 +92,7 @@ function rodarNode(args, env) {
 
 // --- Lock regression --------------------------------------------------------------------
 
-test("REGRESSÃO: a implantação gerenciada não disputa a trava consigo mesma", (t) => {
+test("REGRESSION: the managed deploy does not compete with itself for the lock", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -112,7 +112,7 @@ test("REGRESSÃO: a implantação gerenciada não disputa a trava consigo mesma"
   }
 });
 
-test("o runner adquire a trava uma vez e a libera ao terminar", async (t) => {
+test("the runner acquires the lock once and releases it when done", async (t) => {
   const checkout = checkoutGit();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -134,7 +134,7 @@ test("o runner adquire a trava uma vez e a libera ao terminar", async (t) => {
   assert.ok(!fs.existsSync(trava), "a trava não pode ficar para trás");
 });
 
-test("o runner recusa começar quando outra manutenção viva detém a trava", async (t) => {
+test("the runner refuses to start while another live maintenance holds the lock", async (t) => {
   const checkout = checkoutGit();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -156,7 +156,7 @@ test("o runner recusa começar quando outra manutenção viva detém a trava", a
 
 // --- Portable deploy --------------------------------------------------------------------
 
-test("a implantação recusa checkout sujo e nunca descarta trabalho local", async (t) => {
+test("deploy refuses a dirty checkout and never discards local work", async (t) => {
   const checkout = checkoutGit();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -175,7 +175,7 @@ test("a implantação recusa checkout sujo e nunca descarta trabalho local", asy
   assert.equal(JSON.parse(fs.readFileSync(path.join(checkout, "remoteifes-server", "package.json"), "utf8")).version, "3.0.1");
 });
 
-test("a implantação não usa bash nem systemctl diretamente", (t) => {
+test("deploy does not use bash or systemctl directly", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -185,7 +185,7 @@ test("a implantação não usa bash nem systemctl diretamente", (t) => {
   assert.match(fonte, /plataforma\.controlarServico/, "o reinício vai pelo adaptador");
 });
 
-test("aguardarVersao exige o commit do processo, e aceita legado só com reinício comprovado", async (t) => {
+test("aguardarVersao requires the process commit, and accepts a legacy version only with a proven restart", async (t) => {
   const checkout = checkoutGit();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -200,7 +200,7 @@ test("aguardarVersao exige o commit do processo, e aceita legado só com reiníc
   assert.match(r.motivo, /não respondeu saudável/);
 });
 
-test("uma versão sem release.js é tratada como legado, não como erro", async (t) => {
+test("a version without release.js is treated as legacy, not as an error", async (t) => {
   const checkout = checkoutGit();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -219,7 +219,7 @@ test("uma versão sem release.js é tratada como legado, não como erro", async 
   assert.equal(await implantacao.versaoInformaCommit(semRelease), false, "versão legada não pode confirmar a própria identidade");
 });
 
-test("a reversão avisa que troca só o código, sem tocar no banco", (t) => {
+test("rollback warns that it swaps only the code, without touching the database", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -244,7 +244,7 @@ function instalar(args, env = {}) {
   });
 }
 
-test("a instalação monta o layout lado a lado com camada estável", async (t) => {
+test("installation assembles the side-by-side layout with a stable layer", async (t) => {
   const raiz = ajuda.dirTemporario("console-inst-raiz-");
   const estadoDir = ajuda.dirTemporario("console-inst-estado-");
   t.after(() => {
@@ -269,7 +269,7 @@ test("a instalação monta o layout lado a lado com camada estável", async (t) 
   assert.match(r.saida, /apagado assim que o operador for criado/);
 });
 
-test("reinstalar preserva credenciais e não gera segredo novo", async (t) => {
+test("reinstalling preserves credentials and does not generate a new secret", async (t) => {
   const raiz = ajuda.dirTemporario("console-inst-raiz-");
   const estadoDir = ajuda.dirTemporario("console-inst-estado-");
   t.after(() => {
@@ -293,7 +293,7 @@ test("reinstalar preserva credenciais e não gera segredo novo", async (t) => {
   assert.equal(operadores.operadores[0].nome, "op", "credencial preservada");
 });
 
-test("a migração do layout Linux antigo move atual/ para versoes/ sem tocar no estado", (t) => {
+test("migrating the old Linux layout moves atual/ to versoes/ without touching state", (t) => {
   const raiz = ajuda.dirTemporario("console-migra-");
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
 
@@ -313,7 +313,7 @@ test("a migração do layout Linux antigo move atual/ para versoes/ sem tocar no
   assert.ok(!fs.existsSync(path.join(raiz, "anterior")), "a cópia antiga de reserva é removida");
 });
 
-test("o instalador recusa um checkout que não é do RemoteIFES", async (t) => {
+test("the installer refuses a checkout that is not RemoteIFES", async (t) => {
   const raiz = ajuda.dirTemporario("console-inst-raiz-");
   const estadoDir = ajuda.dirTemporario("console-inst-estado-");
   const falso = ajuda.dirTemporario("nao-remoteifes-");
@@ -326,7 +326,7 @@ test("o instalador recusa um checkout que não é do RemoteIFES", async (t) => {
   assert.match(r.saida, /não parece um checkout do RemoteIFES/);
 });
 
-test("o bootstrap escolhe a versão ativa e sobrevive a um ponteiro inválido", (t) => {
+test("the bootstrap picks the active version and survives an invalid pointer", (t) => {
   const raiz = ajuda.dirTemporario("console-boot-");
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
 
@@ -358,7 +358,7 @@ test("o bootstrap escolhe a versão ativa e sobrevive a um ponteiro inválido", 
   assert.match(executar(), /versao=1\.1\.0/);
 });
 
-test("os runners têm shebang e são instalados com permissão de execução", (t) => {
+test("the runners have a shebang and are installed with execute permission", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -391,7 +391,7 @@ function instalacaoFalsa(prefixo = "console-des-") {
   return raiz;
 }
 
-test("a desinstalação só remove um diretório que prove ser uma instalação do console", (t) => {
+test("uninstall only removes a directory that proves to be a Console installation", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const { autorizarRemocao } = require(path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"));
@@ -415,7 +415,7 @@ test("a desinstalação só remove um diretório que prove ser uma instalação 
   assert.match(autorizarRemocao(require("os").homedir(), marcas).motivo, /diretório do usuário|raso demais/);
 });
 
-test("a desinstalação nunca remove nada de dentro do checkout do RemoteIFES", (t) => {
+test("uninstall never removes anything inside the RemoteIFES checkout", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const { autorizarRemocao } = require(path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"));
@@ -437,7 +437,7 @@ test("a desinstalação nunca remove nada de dentro do checkout do RemoteIFES", 
   assert.match(r.motivo, /checkout do RemoteIFES/);
 });
 
-test("a desinstalação preserva o estado por padrão e diz onde ele ficou", (t) => {
+test("uninstall preserves state by default and says where it was left", (t) => {
   const amb = ajuda.ambiente();
   const raiz = instalacaoFalsa();
   const estadoDir = ajuda.dirTemporario("console-est-");
@@ -456,7 +456,7 @@ test("a desinstalação preserva o estado por padrão e diz onde ele ficou", (t)
   assert.match(r.saida, /checkout do RemoteIFES, seu banco e seus backups/);
 });
 
-test("a simulação da desinstalação não remove nada", (t) => {
+test("a simulated uninstall removes nothing", (t) => {
   const amb = ajuda.ambiente();
   const raiz = instalacaoFalsa();
   t.after(() => {
@@ -470,7 +470,7 @@ test("a simulação da desinstalação não remove nada", (t) => {
   assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "a simulação não apaga o programa");
 });
 
-test("sem terminal e sem --sim, a desinstalação recusa em vez de assumir consentimento", (t) => {
+test("without a terminal and without --sim, uninstall refuses instead of assuming consent", (t) => {
   const amb = ajuda.ambiente();
   const raiz = instalacaoFalsa();
   t.after(() => {
@@ -484,7 +484,7 @@ test("sem terminal e sem --sim, a desinstalação recusa em vez de assumir conse
   assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")));
 });
 
-test("REGRESSÃO: desinstalar de dentro da própria instalação remove a raiz inteira", async (t) => {
+test("REGRESSION: uninstalling from inside the installation removes the whole root", async (t) => {
   // The uninstaller lives inside what it deletes; that is how the documentation says to run it. On
   // Windows the running file keeps an open handle and its directory stays "not empty", so the root
   // would be left behind with EPERM. The uninstaller restarts from a copy outside the installation
@@ -520,7 +520,7 @@ test("REGRESSÃO: desinstalar de dentro da própria instalação remove a raiz i
   assert.ok(fs.existsSync(path.join(estadoDir, "operadores.json")) || fs.existsSync(path.join(estadoDir, "bootstrap-token")), "o estado fica");
 });
 
-test("desinstalar encerra o console que está no ar, em vez de deixá-lo órfão", async (t) => {
+test("uninstall stops the running Console instead of leaving it orphaned", async (t) => {
   // Uninstall must not leave a live process still serving on loopback, with its identity contract
   // published and able to run privileged operations for a program that no longer exists. On Windows
   // and macOS the launcher starts the Console, so nothing else stops it.
@@ -575,7 +575,7 @@ test("desinstalar encerra o console que está no ar, em vez de deixá-lo órfão
   assert.equal(aindaAtende, false, "o console não pode continuar atendendo depois de desinstalado");
 });
 
-test("a desinstalação não encerra um processo alheio que só ocupa a porta", async (t) => {
+test("uninstall does not stop an unrelated process that merely holds the port", async (t) => {
   // The contract PID does not authorize a kill by itself: PIDs are recycled and the port may have
   // been taken by another program. The identity proof authorizes it. Without it, nothing dies.
   const amb = ajuda.ambiente();
@@ -613,7 +613,7 @@ test("a desinstalação não encerra um processo alheio que só ocupa a porta", 
   assert.equal(intruso.listening, true, "o processo alheio não pode ser encerrado");
 });
 
-test("REGRESSÃO: o atalho instalado sobe o CONSOLE, não outra cópia do lançador", async (t) => {
+test("REGRESSION: the installed shortcut starts the CONSOLE, not another copy of the launcher", async (t) => {
   // The system shortcut runs `launcher-bootstrap.js`, which sets CONSOLE_BOOTSTRAP_ALVO=launcher so
   // the bootstrap loads the launcher. If the launcher's backend inherited that environment, the
   // child bootstrap would load `launcher.js` again: a chain of detached launchers, each waiting 30
@@ -669,7 +669,7 @@ test("REGRESSÃO: o atalho instalado sobe o CONSOLE, não outra cópia do lança
   assert.ok(atende > 0, "o console iniciado pelo atalho tem de atender HTTP");
 });
 
-test("o bootstrap do console ignora um alvo de lançador herdado do ambiente", (t) => {
+test("the Console bootstrap ignores a launcher target inherited from the environment", (t) => {
   // Defense in depth for the same defect: even if someone inherits the variable again, the file
   // must make clear which entry is loaded, and the launcher sends the value.
   const amb = ajuda.ambiente();
@@ -683,7 +683,7 @@ test("o bootstrap do console ignora um alvo de lançador herdado do ambiente", (
   );
 });
 
-test("REGRESSÃO: o reparo documentado reinstala por cima de si mesmo sem destruir o payload", async (t) => {
+test("REGRESSION: the documented repair reinstalls over itself without destroying the payload", async (t) => {
   // The README and manual repair command runs `versoes/<v>/instalacao/instalar.js --forcar`. There
   // the SOURCE **is** the destination: deleting the destination before copying would remove the
   // source itself and end in ENOENT, leaving the installation unusable exactly when the operator
@@ -716,7 +716,7 @@ test("REGRESSÃO: o reparo documentado reinstala por cima de si mesmo sem destru
   assert.ok(!fs.readdirSync(path.join(raiz, "versoes")).some((n) => n.includes("parcial") || n.includes("substituido")), "nenhum estágio fica para trás");
 });
 
-test("--simular não remove a integração com o sistema", async (t) => {
+test("--simular does not remove the system integration", async (t) => {
   // A rehearsal that changes the system is not a rehearsal. `removerInicializacao` stops the
   // Console and deletes the systemd units, the sudo rule and the privileged helper; it must not run
   // in simulation.
@@ -743,7 +743,7 @@ test("--simular não remove a integração com o sistema", async (t) => {
   assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "a simulação não apaga o programa");
 });
 
-test("a autorização de remoção exige TODAS as marcas da instalação, não apenas uma", (t) => {
+test("removal authorization requires ALL installation marks, not just one", (t) => {
   // Accepting "at least one mark" would let an arbitrary directory that happens to contain a
   // `versoes/` be removed recursively. A mistyped `--raiz` is exactly the case this check exists to
   // catch.
@@ -772,7 +772,7 @@ test("a autorização de remoção exige TODAS as marcas da instalação, não a
   assert.equal(autorizarRemocao(completa, { marcas, rotulo: "instalação do console", exigirTodas: true }).ok, true);
 });
 
-test("o atalho do Windows usa extensão .vbs, porque o wscript escolhe o motor pela extensão", (t) => {
+test("the Windows shortcut uses the .vbs extension, because wscript picks the engine by extension", (t) => {
   // VBScript in a .js file is parsed as JScript and fails; with `//B` the error is silent and the
   // Start Menu shortcut opens nothing. wscript.exe exits 1 for .js and 0 for .vbs with the same
   // content.
@@ -786,7 +786,7 @@ test("o atalho do Windows usa extensão .vbs, porque o wscript escolhe o motor p
   assert.match(fonte, /CreateObject\("WScript\.Shell"\)/);
 });
 
-test("a reversão recusa árvore suja e não descarta trabalho local", async (t) => {
+test("rollback refuses a dirty tree and does not discard local work", async (t) => {
   // `reverter()` must consult the checkout state before `reset --hard`/`checkout --force`, as
   // `implantar()` does. Both operations swap code the same way, so "never discards local work" must
   // hold for both.
@@ -816,7 +816,7 @@ test("a reversão recusa árvore suja e não descarta trabalho local", async (t)
   assert.equal(git(checkout, ["rev-parse", "HEAD"]), git(checkout, ["rev-parse", "main"]), "HEAD não se move");
 });
 
-test("arquivo não rastreado também conta como trabalho local", async (t) => {
+test("an untracked file also counts as local work", async (t) => {
   // With `--untracked-files=no` an untracked file was invisible, and a `checkout --force` to a
   // commit that now contains the same path overwrote it without warning.
   const checkout = checkoutGit();
@@ -842,7 +842,7 @@ test("arquivo não rastreado também conta como trabalho local", async (t) => {
   assert.equal(fs.readFileSync(naoRastreado, "utf8"), "medições que eu não quero perder\n");
 });
 
-test("REGRESSÃO: o programa iniciado pelo atalho acha o estado onde o instalador o pôs", async (t) => {
+test("REGRESSION: the program started from the shortcut finds state where the installer put it", async (t) => {
   // The shortcut runs the bootstrap with no environment variable. Without recording where state
   // lives, a user installation (or one with its own --estado) would look in the platform default,
   // and the first operator would not find the token the installer had just written; on Linux the
@@ -897,7 +897,7 @@ test("REGRESSÃO: o programa iniciado pelo atalho acha o estado onde o instalado
   });
 });
 
-test("atualizar e reverter não apagam o escopo nem o estado registrados", (t) => {
+test("update and rollback do not erase the recorded scope or state", (t) => {
   // The record holds more than the pointer. Replacing the whole object on each version switch would
   // erase scope, state, logs and port, and the installation would look for state in the platform
   // default on the next start.
@@ -923,7 +923,7 @@ test("atualizar e reverter não apagam o escopo nem o estado registrados", (t) =
   assert.equal(depois.porta, 8123, "a porta sobrevive");
 });
 
-test("a desinstalação recusa apagar o programa quando não consegue provar que o console parou", async (t) => {
+test("uninstall refuses to delete the program when it cannot prove the Console stopped", async (t) => {
   // A termination exception must not be read as "not stopped" followed by deletion, and a failed
   // identity request during the wait (including a timeout) must not count as "stopped". Deleting
   // the program while an authenticated process stays alive is the worst possible outcome.
@@ -970,7 +970,7 @@ test("a desinstalação recusa apagar o programa quando não consegue provar que
   assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "o programa NÃO pode ser removido sem prova de parada");
 });
 
-test("a reexecução do desinstalador repassa o escopo, não deixa a cópia adivinhar", async (t) => {
+test("the uninstaller re-execution forwards the scope instead of letting the copy guess", async (t) => {
   // The temporary copy does not live inside an installation and cannot infer anything. Without the
   // scope being forwarded, a user uninstall would become system scope in the child: it would leave
   // the user integration installed and could touch another installation's system integration.
@@ -986,7 +986,7 @@ test("a reexecução do desinstalador repassa o escopo, não deixa a cópia adiv
   );
 });
 
-test("a substituição do payload restaura a versão anterior se o segundo rename falhar", (t) => {
+test("payload replacement restores the previous version if the second rename fails", (t) => {
   // Between the two renames the active version does not exist. If the second fails, the payload
   // must not remain only under `.substituido-*` with the pointer at a missing directory.
   const amb = ajuda.ambiente();

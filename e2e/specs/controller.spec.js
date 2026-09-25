@@ -1,6 +1,6 @@
 const { test, expect, irParaSala } = require("../harness/fixtures");
 
-test("liga e desliga o ar-condicionado de uma sala com ESP32 conectado", async ({ page, sessaoComo }) => {
+test("turns the air conditioner of a room with a connected ESP32 on and off", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
 
@@ -19,7 +19,7 @@ test("liga e desliga o ar-condicionado de uma sala com ESP32 conectado", async (
   await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
 });
 
-test("o estado desejado fica marcado como não confirmado enquanto o ESP32 não o ecoa", async ({ page, sessaoComo, request }) => {
+test("the desired state stays marked unconfirmed while the ESP32 does not echo it", async ({ page, sessaoComo, request }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
   await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });
@@ -40,7 +40,7 @@ test("o estado desejado fica marcado como não confirmado enquanto o ESP32 não 
   await expect(page.locator("#statusValue")).toHaveAttribute("data-confirmado", "true");
 });
 
-test("ajuste de temperatura respeita os limites e atualiza o alvo exibido", async ({ page, sessaoComo }) => {
+test("temperature adjustment respects the limits and updates the displayed target", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await irParaSala(page, "A-108");
   await expect(page.locator("#btnPower")).toBeEnabled({ timeout: 15_000 });
@@ -68,7 +68,7 @@ test("ajuste de temperatura respeita os limites e atualiza o alvo exibido", asyn
   }
 });
 
-test("usuário sem permissão de controle vê o painel em modo somente leitura", async ({ page, sessaoComo }) => {
+test("a user without control permission sees the panel in read-only mode", async ({ page, sessaoComo }) => {
   await sessaoComo("readonly");
   await irParaSala(page, "A-108");
 
@@ -80,13 +80,13 @@ test("usuário sem permissão de controle vê o painel em modo somente leitura",
 
 // A board seen only through HTTP heartbeats (the firmware uses that path while the WebSocket is
 // down) counts as present, but the server has no channel to deliver the command.
-test.describe("presença sem canal de comandos", () => {
+test.describe("presence without a command channel", () => {
   test.afterEach(async ({ request }) => {
     await request.post(`${process.env.E2E_API_URL}/__e2e/so-heartbeat/off`);
     await request.post(`${process.env.E2E_API_URL}/__e2e/resetar-dispositivo`);
   });
 
-  test("online só por heartbeat: o painel mostra a falta do canal, avisa que o comando não foi entregue e volta ao normal na reconexão", async ({ page, sessaoComo, request }) => {
+  test("online only through heartbeat: the panel shows the missing channel, warns that the command was not delivered and returns to normal on reconnection", async ({ page, sessaoComo, request }) => {
     await sessaoComo("user");
     await irParaSala(page, "A-108");
     await expect(page.locator("#conexaoValue")).toHaveText("online", { timeout: 15_000 });

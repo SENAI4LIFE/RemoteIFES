@@ -83,7 +83,7 @@ test.after(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test("uma telemetria atrasada não apaga um comando já persistido, e a reconexão restaura a intenção", async () => {
+test("late telemetry does not erase an already persisted command, and reconnection restores the intent", async () => {
   sala("REL-1", "AA:BB:CC:E1:00:01", false);
   const d = await conectar("REL-1", "AA:BB:CC:E1:00:01");
   d.enviar({ tipo: "info", fw: "4.2.0", failsafeConfigurado: false, failsafeLatched: false });
@@ -111,7 +111,7 @@ test("uma telemetria atrasada não apaga um comando já persistido, e a reconex�
   await r.fechar();
 });
 
-test("o heartbeat HTTP também não reescreve a intenção com o eco da placa", async () => {
+test("the HTTP heartbeat does not rewrite the intent with the board's echo either", async () => {
   sala("REL-2", "AA:BB:CC:E1:00:02", true);
   salasService.heartbeatDispositivo("REL-2", { ligado: false, temperatura: 25 }, "AA:BB:CC:E1:00:02", "127.0.0.1");
   const row = db.prepare("SELECT ligado, temperatura, online FROM salas WHERE sala = 'REL-2'").get();
@@ -120,7 +120,7 @@ test("o heartbeat HTTP também não reescreve a intenção com o eco da placa", 
   assert.equal(row.online, 1);
 });
 
-test("a confirmação pela placa é exposta ao painel e avisa só quem observa a sala", async (t) => {
+test("confirmation by the board is exposed to the panel and notifies only room observers", async (t) => {
   sala("REL-3", "AA:BB:CC:E1:00:03", false);
   assert.equal(status("REL-3").dispositivoConfirmou, null, "sem placa conectada não há o que confirmar");
   const mudancas = ouvirMudancasDeSala(t, "REL-3");
@@ -148,7 +148,7 @@ test("a confirmação pela placa é exposta ao painel e avisa só quem observa a
   assert.equal(status("REL-3").dispositivoConfirmou, null);
 });
 
-test("firmware sem eco de versão confirma pelo último comando relatado", async () => {
+test("firmware without version echo confirms through the last reported command", async () => {
   sala("REL-4", "AA:BB:CC:E1:00:04", true);
   const d = await conectar("REL-4", "AA:BB:CC:E1:00:04");
   d.enviar({ tipo: "info", fw: "4.2.0", failsafeConfigurado: false, failsafeLatched: false });
@@ -161,7 +161,7 @@ test("firmware sem eco de versão confirma pelo último comando relatado", async
   await d.fechar();
 });
 
-test("info atrasado: a restauração sai marcada, o info tardio não adota a trava, e o failsafe_status do firmware novo adota", async () => {
+test("late info: restoration is flagged, the late info does not adopt the latch, and new firmware's failsafe_status does", async () => {
   sala("REL-5", "AA:BB:CC:E1:00:05", true);
   const d = await conectar("REL-5", "AA:BB:CC:E1:00:05");
   assert.ok(await ate(() => d.estados().length === 1, 4000), "sem info, o estado sai após a espera de segurança");
@@ -183,7 +183,7 @@ test("info atrasado: a restauração sai marcada, o info tardio não adota a tra
   await d.fechar();
 });
 
-test("um info já recebido no socket é processado antes da sincronização por tempo esgotado, mesmo após uma pausa do event loop", async () => {
+test("an info already received on the socket is processed before the timeout-driven synchronization, even after an event-loop pause", async () => {
   sala("REL-6", "AA:BB:CC:E1:00:06", true);
   const d = await conectar("REL-6", "AA:BB:CC:E1:00:06");
   await esperar(2700);
@@ -203,7 +203,7 @@ test("um info já recebido no socket é processado antes da sincronização por 
   await d.fechar();
 });
 
-test("trava reportada em operação: adotada quando reflete a intenção vigente, ignorada quando é anterior a um comando explícito", async () => {
+test("latch reported during operation: adopted when it reflects the current intent, ignored when it predates an explicit command", async () => {
   sala("REL-7", "AA:BB:CC:E1:00:07", true);
   const d = await conectar("REL-7", "AA:BB:CC:E1:00:07");
   d.enviar({ tipo: "info", fw: "4.3.0", ...FAILSAFE, failsafeLatched: false });
@@ -230,7 +230,7 @@ test("trava reportada em operação: adotada quando reflete a intenção vigente
   await d.fechar();
 });
 
-test("firmware 4.2.0: a trava em operação só é adotada depois que a conexão confirmou a intenção vigente", async () => {
+test("firmware 4.2.0: a latch during operation is adopted only after the connection confirmed the current intent", async () => {
   sala("REL-8", "AA:BB:CC:E1:00:08", true);
   const d = await conectar("REL-8", "AA:BB:CC:E1:00:08");
   d.enviar({ tipo: "info", fw: "4.2.0", ...FAILSAFE, failsafeLatched: false });
@@ -246,7 +246,7 @@ test("firmware 4.2.0: a trava em operação só é adotada depois que a conexão
   await d.fechar();
 });
 
-test("a trava adotada na reconexão é registrada uma única vez e nunca reenvia o estado ligado", async () => {
+test("a latch adopted on reconnection is recorded once and never resends the ON state", async () => {
   sala("REL-9", "AA:BB:CC:E1:00:09", true);
   const d = await conectar("REL-9", "AA:BB:CC:E1:00:09");
   d.enviar({ tipo: "info", fw: "4.3.0", ...FAILSAFE, failsafeLatched: true, ligado: false });
@@ -260,7 +260,7 @@ test("a trava adotada na reconexão é registrada uma única vez e nunca reenvia
   await d.fechar();
 });
 
-test("cada mudança de intenção avança a versão do estado e a reenvia com o comando", () => {
+test("every intent change advances the state version and resends it with the command", () => {
   sala("REL-10", "AA:BB:CC:E1:00:10", false);
   const v0 = linha("REL-10").estadoVersao;
   salasService.aplicarComando("REL-10", "ligar", undefined, ADMIN);
@@ -286,7 +286,7 @@ test("cada mudança de intenção avança a versão do estado e a reenvia com o 
   assert.equal(linha("REL-10").estadoVersao, v0 + 7, "adotar o OFF local não é uma intenção nova");
 });
 
-test("um comando explícito enviado antes do info inicial atrasado não é apagado pela trava antiga, e a placa o confirma", async () => {
+test("an explicit command sent before the late initial info is not erased by the old latch, and the board confirms it", async () => {
   sala("REL-12", "AA:BB:CC:E1:00:12", false);
   const d = await conectar("REL-12", "AA:BB:CC:E1:00:12");
   const resultado = salasService.aplicarComando("REL-12", "ligar", undefined, ADMIN);
@@ -322,7 +322,7 @@ test("um comando explícito enviado antes do info inicial atrasado não é apaga
   await e.fechar();
 });
 
-test("um teste IR administrativo invalida a confirmação até uma intenção mais nova ser enviada", async (t) => {
+test("an administrative IR test invalidates confirmation until newer intent is sent", async (t) => {
   sala("REL-14", "AA:BB:CC:E1:00:14", true);
   const d = await conectar("REL-14", "AA:BB:CC:E1:00:14");
   d.enviar({ tipo: "info", fw: "4.3.0", ...FAILSAFE, failsafeLatched: false });
@@ -360,7 +360,7 @@ test("um teste IR administrativo invalida a confirmação até uma intenção ma
   await d.fechar();
 });
 
-test("uma falha ao gravar limites globais não deixa intenção nem versão pela metade e não envia nada à placa", (t) => {
+test("a failure writing global limits leaves no half intent or version and sends nothing to the board", (t) => {
   sala("REL-15", "AA:BB:CC:E1:00:15", true);
   const configuracoes = require("../src/services/configuracoesService");
   const antesCfg = configuracoes.limitesTemperatura();
@@ -399,7 +399,7 @@ test("uma falha ao gravar limites globais não deixa intenção nem versão pela
   assert.equal(enviados.length, 0);
 });
 
-test("o agendador não repete um comando cujo registro de execução falhou: estado e registro persistem juntos", (t) => {
+test("the scheduler does not repeat a command whose execution record failed: state and record persist together", (t) => {
   t.mock.timers.enable({ apis: ["Date", "setInterval", "setTimeout"], now: new Date("2026-09-06T11:59:00Z") });
   const agendamentos = require("../src/services/agendamentosService");
   const { dataAtualBrasiliaISO } = require("../src/utils/tempo");

@@ -71,7 +71,7 @@ test.before(async () => {
   tokenUsuario = (await login("relato-user", "senhaSegura123")).corpo.token;
 });
 
-test("um usuário comum autenticado cria um relato e recebe id/status", async () => {
+test("an authenticated regular user creates a report and receives id/status", async () => {
   const r = await jsonPost("/relatos", tokenUsuario, {
     titulo: "AC da sala não liga",
     descricao: "Cliquei em ligar várias vezes e o ar-condicionado da sala não responde.",
@@ -83,7 +83,7 @@ test("um usuário comum autenticado cria um relato e recebe id/status", async ()
   assert.equal(r.corpo.relato.status, "novo");
 });
 
-test("relato exige título e descrição com tamanho mínimo", async () => {
+test("a report requires a title and description with minimum length", async () => {
   const semTitulo = await jsonPost("/relatos", tokenUsuario, { titulo: "ab", descricao: "descrição suficientemente longa aqui" });
   assert.equal(semTitulo.status, 400);
   assert.equal(semTitulo.corpo.ok, false);
@@ -92,7 +92,7 @@ test("relato exige título e descrição com tamanho mínimo", async () => {
   assert.equal(semDescricao.status, 400);
 });
 
-test("relato aplica limite de tamanho e remove caracteres de controle", async () => {
+test("a report applies a size limit and removes control characters", async () => {
   const tituloEnorme = "T".repeat(500);
   const descricaoComControle = String.fromCharCode(0, 7) + "linha 1 com bytes de controle\\nlinha 2 " + "x".repeat(6000);
   const r = await jsonPost("/relatos", tokenUsuario, {
@@ -109,7 +109,7 @@ test("relato aplica limite de tamanho e remove caracteres de controle", async ()
   assert.equal(relato.categoria, "outro");
 });
 
-test("relato guarda o conteúdo textual verbatim (o escape acontece na renderização)", async () => {
+test("a report stores the text content verbatim (escaping happens at render time)", async () => {
   const payloadXss = '<img src=x onerror=alert(1)> <script>bad()</script>';
   const r = await jsonPost("/relatos", tokenUsuario, {
     titulo: "Teste de conteudo especial",
@@ -121,7 +121,7 @@ test("relato guarda o conteúdo textual verbatim (o escape acontece na renderiza
   assert.match(relato.descricao, /<script>bad\(\)<\/script>/);
 });
 
-test("cliques repetidos de envio não geram relatos duplicados", async () => {
+test("repeated submit clicks do not create duplicate reports", async () => {
   const corpo = {
     titulo: "Relato duplicado de teste",
     descricao: "Este texto identico foi enviado duas vezes em sequencia por engano.",
@@ -134,7 +134,7 @@ test("cliques repetidos de envio não geram relatos duplicados", async () => {
   assert.equal(primeiro.corpo.relato.id, segundo.corpo.relato.id);
 });
 
-test("um usuário comum não acessa a lista global nem relatos de outros", async () => {
+test("a regular user cannot access the global list or other users' reports", async () => {
   const alheio = await jsonPost("/relatos", tokenAdmin, {
     titulo: "Relato do administrador",
     descricao: "Conteudo que um usuario comum nao pode ler pelo endpoint de superadmin.",
@@ -158,7 +158,7 @@ test("um usuário comum não acessa a lista global nem relatos de outros", async
   assert.equal(patch.status, 403);
 });
 
-test("um administrador comum (nível 2) também não acessa o painel de relatos de superadmin", async () => {
+test("a regular administrator (level 2) cannot access the superadmin reports panel either", async () => {
   const lista = await authFetch("/superadmin/relatos", tokenAdmin);
   assert.equal(lista.status, 403);
   const patch = await authFetch(`/superadmin/relatos/1`, tokenAdmin, {
@@ -169,7 +169,7 @@ test("um administrador comum (nível 2) também não acessa o painel de relatos 
   assert.equal(patch.status, 403);
 });
 
-test("requisições sem autenticação são rejeitadas", async () => {
+test("unauthenticated requests are rejected", async () => {
   const criar = await fetch(`${baseUrl}/relatos`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -180,7 +180,7 @@ test("requisições sem autenticação são rejeitadas", async () => {
   assert.equal(lista.status, 401);
 });
 
-test("o superadmin lista, abre, revisa e resolve relatos; abrir marca como aberto", async () => {
+test("the superadmin lists, opens, reviews and resolves reports; opening marks as opened", async () => {
   const criado = await jsonPost("/relatos", tokenUsuario, {
     titulo: "Fluxo completo de status",
     descricao: "Relato usado para exercitar novo -> aberto -> em_analise -> resolvido.",
@@ -212,7 +212,7 @@ test("o superadmin lista, abre, revisa e resolve relatos; abrir marca como abert
   assert.match(corpoResolvido.resposta, /Reiniciamos o ESP32/);
 });
 
-test("a exclusão de relato é exclusiva do superadministrador", async () => {
+test("deleting a report is superadministrator-only", async () => {
   const criado = await jsonPost("/relatos", tokenUsuario, {
     titulo: "Relato que ninguém sem permissão pode excluir",
     descricao: "Verifica que apenas o superadministrador remove relatos já enviados.",
@@ -232,7 +232,7 @@ test("a exclusão de relato é exclusiva do superadministrador", async () => {
   assert.equal(aindaExiste.status, 200);
 });
 
-test("o superadministrador exclui um relato já enviado, inclusive não resolvido", async () => {
+test("the superadministrator deletes an already submitted report, even unresolved", async () => {
   const criado = await jsonPost("/relatos", tokenUsuario, {
     titulo: "Relato pendente a ser removido",
     descricao: "Relato ainda não resolvido que o superadministrador decide remover manualmente.",
@@ -255,7 +255,7 @@ test("o superadministrador exclui um relato já enviado, inclusive não resolvid
   assert.equal(inexistente.status, 404);
 });
 
-test("status inválido no PATCH é rejeitado", async () => {
+test("an invalid status in PATCH is rejected", async () => {
   const criado = await jsonPost("/relatos", tokenUsuario, {
     titulo: "Relato para status invalido",
     descricao: "Verifica que valores fora do enum de status sao recusados pelo backend.",
@@ -268,7 +268,7 @@ test("status inválido no PATCH é rejeitado", async () => {
   assert.equal(patch.status, 400);
 });
 
-test("o usuário vê apenas os próprios relatos em /relatos/meus", async () => {
+test("a user sees only their own reports in /relatos/meus", async () => {
   const meus = await (await authFetch("/relatos/meus", tokenUsuario)).json();
   assert.ok(Array.isArray(meus));
   assert.ok(meus.length >= 1);
@@ -280,7 +280,7 @@ test("o usuário vê apenas os próprios relatos em /relatos/meus", async () => 
   }
 });
 
-test("troca de senha continua exigindo admin e respeita os limites de tamanho", async () => {
+test("password change still requires admin and respects size limits", async () => {
   const alvo = usuariosService.criar(
     { usuario: "relato-troca-senha", senha: "senhaSegura123", nome: "Alvo Troca Senha", podeControlar: true },
     { nivel: 3 }

@@ -48,7 +48,7 @@ function primeiraSala() {
   return db.prepare("SELECT sala FROM salas ORDER BY sala LIMIT 1").get().sala;
 }
 
-test("ciclo de sessão: login emite token, /me confirma, logout invalida", async () => {
+test("session cycle: login issues a token, /me confirms it, logout invalidates it", async () => {
   usuariosService.criar(
     { usuario: "sessao-user", senha: "senhaSegura123", nome: "Sessão", podeControlar: true },
     { nivel: 3 }
@@ -72,7 +72,7 @@ test("ciclo de sessão: login emite token, /me confirma, logout invalida", async
   assert.equal(depois.status, 401);
 });
 
-test("controlador: usuário com permissão liga a sala e o servidor registra o comando", async () => {
+test("controller: a user with permission turns the room on and the server records the command", async () => {
   usuariosService.criar(
     { usuario: "controlador-ok", senha: "senhaSegura123", nome: "Controlador", podeControlar: true },
     { nivel: 3 }
@@ -103,7 +103,7 @@ test("controlador: usuário com permissão liga a sala e o servidor registra o c
   assert.equal(depois, antes + 2);
 });
 
-test("controlador: temperatura fora dos limites efetivos é rejeitada com 400", async () => {
+test("controller: a temperature outside the effective limits is rejected with 400", async () => {
   usuariosService.criar(
     { usuario: "controlador-temp", senha: "senhaSegura123", nome: "Controlador Temp", podeControlar: true },
     { nivel: 3 }
@@ -118,7 +118,7 @@ test("controlador: temperatura fora dos limites efetivos é rejeitada com 400", 
   assert.match((await resp.json()).erro, /temperatura deve estar entre/);
 });
 
-test("controlador: usuário sem podeControlar recebe 403 em /comando", async () => {
+test("controller: a user without podeControlar receives 403 on /comando", async () => {
   usuariosService.criar(
     { usuario: "sem-controle", senha: "senhaSegura123", nome: "Sem Controle", podeControlar: false },
     { nivel: 3 }
@@ -131,7 +131,7 @@ test("controlador: usuário sem podeControlar recebe 403 em /comando", async () 
   assert.equal(resp.status, 403);
 });
 
-test("comando sem autenticação é rejeitado com 401", async () => {
+test("an unauthenticated command is rejected with 401", async () => {
   const resp = await fetch(`${baseUrl}/comando`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -140,7 +140,7 @@ test("comando sem autenticação é rejeitado com 401", async () => {
   assert.equal(resp.status, 401);
 });
 
-test("notificações de dispositivo: usuário comum recebe 403; qualquer admin lê e marca como lida", async () => {
+test("device notifications: a regular user receives 403; any admin reads and marks them as read", async () => {
   db.prepare("UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'").run(bcrypt.hashSync("superSenha123", 10));
 
   usuariosService.criar(
@@ -174,7 +174,7 @@ test("notificações de dispositivo: usuário comum recebe 403; qualquer admin l
   assert.equal(contagemDepois.naoLidas, contagemAntes.naoLidas - 1);
 });
 
-test("superadmin com senha padrão recebe aviso, mantém acesso e remove o aviso após a troca", async () => {
+test("a superadmin with the default password receives a warning, keeps access and the warning is removed after the change", async () => {
   db.prepare(`
     UPDATE usuarios
     SET senhaHash = ?

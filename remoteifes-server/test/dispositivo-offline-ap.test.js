@@ -76,7 +76,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("fechamento limpo do WebSocket derruba a sala imediatamente, sem esperar o heartbeat vencer", async () => {
+test("a clean WebSocket close takes the room offline immediately, without waiting for the heartbeat to expire", async () => {
   novaSalaComMac("OFF-1", "AA:BB:CC:00:00:01");
   const ws = conectar("OFF-1", "AA:BB:CC:00:00:01");
   await aoAbrir(ws);
@@ -95,7 +95,7 @@ test("fechamento limpo do WebSocket derruba a sala imediatamente, sem esperar o 
   assert.ok(mudancas.length >= 1, "a mudança de estado precisa ser difundida ao navegador");
 });
 
-test("a notificação de dispositivo acompanha a transição autoritativa de offline", async () => {
+test("the device notification follows the authoritative offline transition", async () => {
   novaSalaComMac("OFF-2", "AA:BB:CC:00:00:02");
   const ws = conectar("OFF-2", "AA:BB:CC:00:00:02");
   await aoAbrir(ws);
@@ -107,7 +107,7 @@ test("a notificação de dispositivo acompanha a transição autoritativa de off
   assert.equal(notificacoesOffline("OFF-2"), 1, "a notificação sai junto com o estado offline");
 });
 
-test("perda silenciosa cai pelo timeout de heartbeat e produz uma única transição", async () => {
+test("a silent loss falls through the heartbeat timeout and produces a single transition", async () => {
   novaSalaComMac("OFF-3", "AA:BB:CC:00:00:03");
   const ws = conectar("OFF-3", "AA:BB:CC:00:00:03");
   await aoAbrir(ws);
@@ -127,7 +127,7 @@ test("perda silenciosa cai pelo timeout de heartbeat e produz uma única transi�
   assert.equal(notificacoesOffline("OFF-3"), 1);
 });
 
-test("reconexão restaura o estado online e uma nova queda gera uma única notificação por hora", async () => {
+test("reconnection restores the online state and a new drop produces a single notification per hour", async () => {
   novaSalaComMac("OFF-4", "AA:BB:CC:00:00:04");
   const primeira = conectar("OFF-4", "AA:BB:CC:00:00:04");
   await aoAbrir(primeira);
@@ -147,20 +147,20 @@ test("reconexão restaura o estado online e uma nova queda gera uma única notif
   assert.equal(notificacoesOffline("OFF-4"), 1, "quedas seguidas não podem virar uma enxurrada de avisos");
 });
 
-test("marcarOffline é idempotente: sala já offline não gera evento nem notificação", () => {
+test("marcarOffline is idempotent: a room already offline produces no event or notification", () => {
   novaSalaComMac("OFF-5", "AA:BB:CC:00:00:05");
   assert.equal(salasService.marcarOffline("OFF-5"), false);
   assert.deepEqual(eventos("OFF-5"), []);
   assert.equal(notificacoesOffline("OFF-5"), 0);
 });
 
-test("a política do ponto de acesso vem desligada e o AP fica aberto por padrão", () => {
+test("the access point policy ships disabled and the AP is open by default", () => {
   assert.equal(configuracoesService.PADROES.espApExigirCredencial, false);
   assert.equal(configuracoesService.obter().espApExigirCredencial, false);
   assert.deepEqual(configuracoesService.politicaApDispositivo(), { tipo: "config_ap", exigirCredencial: false });
 });
 
-test("o dispositivo recebe a política do ponto de acesso no handshake e quando ela muda", async () => {
+test("the device receives the access point policy in the handshake and when it changes", async () => {
   novaSalaComMac("AP-1", "AA:BB:CC:00:00:11");
   const ws = conectar("AP-1", "AA:BB:CC:00:00:11");
   const recebidas = [];
@@ -183,7 +183,7 @@ test("o dispositivo recebe a política do ponto de acesso no handshake e quando 
   ws.close();
 });
 
-test("a senha do AP não interfere na autenticação do dispositivo no servidor", async () => {
+test("the AP password does not interfere with device authentication on the server", async () => {
   const antes = configuracoesService.obter().espCredenciaisObrigatorias;
   configuracoesService.validarEAtualizar({ espApExigirCredencial: true }, SUPERADMIN);
   assert.equal(configuracoesService.obter().espCredenciaisObrigatorias, antes,
@@ -198,7 +198,7 @@ test("a senha do AP não interfere na autenticação do dispositivo no servidor"
   configuracoesService.validarEAtualizar({ espApExigirCredencial: false }, SUPERADMIN);
 });
 
-test("somente o superadministrador altera a política do ponto de acesso", () => {
+test("only the superadministrator changes the access point policy", () => {
   assert.throws(
     () => configuracoesService.validarEAtualizar({ espApExigirCredencial: true }, { id: 2, nivel: 2 }),
     /superadministrador/
@@ -206,7 +206,7 @@ test("somente o superadministrador altera a política do ponto de acesso", () =>
   assert.equal(configuracoesService.obter().espApExigirCredencial, false);
 });
 
-test("a estimativa de energia não existe mais: sem rota, sem serviço e sem configuração por sala", async () => {
+test("the energy estimate no longer exists: no route, no service and no per-room configuration", async () => {
   const bcrypt = require("bcryptjs");
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'`).run(bcrypt.hashSync("superSenha123", 10));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;

@@ -67,7 +67,7 @@ function criarClienteComFila(protocolos) {
   return { ws, proximaMensagem, aberta, fechada };
 }
 
-test("conexão anônima recebe apenas status do servidor", async () => {
+test("an anonymous connection receives only server status", async () => {
   const cliente = criarClienteComFila();
   await cliente.aberta();
   const msg = await cliente.proximaMensagem();
@@ -76,7 +76,7 @@ test("conexão anônima recebe apenas status do servidor", async () => {
   cliente.ws.close();
 });
 
-test("conexão autenticada recebe a lista de salas", async () => {
+test("an authenticated connection receives the room list", async () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-ws-usuario", senha: "senhaSegura123", nome: "Usuário WS", podeControlar: true },
     { nivel: 3 }
@@ -93,7 +93,7 @@ test("conexão autenticada recebe a lista de salas", async () => {
   cliente.ws.close();
 });
 
-test("frame acima do limite de payload derruba a conexão sem processar", async () => {
+test("a frame above the payload limit drops the connection without processing", async () => {
   const cliente = criarClienteComFila();
   await cliente.aberta();
   await cliente.proximaMensagem();
@@ -102,7 +102,7 @@ test("frame acima do limite de payload derruba a conexão sem processar", async 
   assert.equal(codigo, 1009);
 });
 
-test("mensagens de observar acima do limite por janela derrubam a conexão", async () => {
+test("observar messages above the per-window limit drop the connection", async () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-ws-flood", senha: "senhaSegura123", nome: "Usuário Flood", podeControlar: true },
     { nivel: 3 }
@@ -121,13 +121,13 @@ test("mensagens de observar acima do limite por janela derrubam a conexão", asy
   assert.equal(codigo, 4008);
 });
 
-test("token invalido no upgrade nao e rebaixado para conexao anonima", async () => {
+test("an invalid token on upgrade is not downgraded to an anonymous connection", async () => {
   const cliente = criarClienteComFila(["0".repeat(48)]);
   const codigo = await cliente.fechada();
   assert.equal(codigo, 4001);
 });
 
-test("logout revoga imediatamente uma conexao WebSocket ja aberta", async () => {
+test("logout immediately revokes an already open WebSocket connection", async () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-ws-revogado", senha: "senhaSegura123", nome: "Usuario WS Revogado", podeControlar: true },
     { nivel: 3 }
@@ -143,7 +143,7 @@ test("logout revoga imediatamente uma conexao WebSocket ja aberta", async () => 
   assert.equal(codigo, 4001);
 });
 
-test("inatividade expirada revoga a conexão WebSocket autenticada", async () => {
+test("expired inactivity revokes the authenticated WebSocket connection", async () => {
   const usuario = usuariosService.criar(
     { usuario: "teste-ws-expirado", senha: "senhaSegura123", nome: "Usuario WS Expirado", podeControlar: true },
     { nivel: 3 }
@@ -188,7 +188,7 @@ async function clienteObservando(sufixo, sala) {
   return cliente;
 }
 
-test("heartbeat sem mudanca de estado nao retransmite a lista de salas", async () => {
+test("a heartbeat without a state change does not rebroadcast the room list", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salasService.listar()[0].sala;
   salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
@@ -200,7 +200,7 @@ test("heartbeat sem mudanca de estado nao retransmite a lista de salas", async (
   cliente.ws.close();
 });
 
-test("heartbeat que muda so a temperatura avisa apenas quem observa a sala", async () => {
+test("a heartbeat that changes only the temperature notifies only room observers", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salasService.listar()[1].sala;
   salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
@@ -222,7 +222,7 @@ test("heartbeat que muda so a temperatura avisa apenas quem observa a sala", asy
   alheio.ws.close();
 });
 
-test("o ligado reportado no heartbeat não altera o estado desejado nem retransmite a lista de salas", async () => {
+test("ligado reported in the heartbeat does not change the desired state or rebroadcast the room list", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salasService.listar()[3].sala;
   salasService.marcarOnline(sala, { ligado: false, temperatura: 24 }, null, "127.0.0.1", { viaCredencial: true });
@@ -257,7 +257,7 @@ function salaSemDispositivo() {
   return sala.sala;
 }
 
-test("cadastrar o MAC de uma sala avisa em tempo real todas as sessões administrativas", async () => {
+test("registering a room's MAC notifies every administrative session in real time", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salaSemDispositivo();
 
@@ -293,7 +293,7 @@ test("cadastrar o MAC de uma sala avisa em tempo real todas as sessões administ
   }
 });
 
-test("cadastro recusado não gera aviso de dispositivo cadastrado", async () => {
+test("a refused registration produces no registered-device notification", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salaSemDispositivo();
   const cliente = await clienteAutenticado("recusa", 3);
@@ -309,7 +309,7 @@ test("cadastro recusado não gera aviso de dispositivo cadastrado", async () => 
   }
 });
 
-test("cadastrar o mesmo MAC de novo não duplica o vínculo nem troca a sala", async () => {
+test("registering the same MAC again neither duplicates the binding nor changes the room", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salaSemDispositivo();
   const mac = "AA:BB:CC:44:55:66";

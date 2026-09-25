@@ -70,7 +70,7 @@ test.afterAll(async ({ request }) => {
   await limparHistorico(request);
 });
 
-test("o histórico de monitoramento é exclusivo do superadministrador e valida a faixa", async ({ page, context, request }) => {
+test("monitoring history is superadministrator-only and validates the range", async ({ page, context, request }) => {
   for (const [papel, status] of [["user", 403], ["admin", 403], ["superadmin", 200]]) {
     const resp = await request.get(`${API_URL}/admin/monitoramento/historico?faixa=24h`, {
       headers: { Authorization: `Bearer ${tokenDe(papel)}` },
@@ -89,7 +89,7 @@ test("o histórico de monitoramento é exclusivo do superadministrador e valida 
   await expect(page.locator("#monGraficosBloco")).toBeHidden();
 });
 
-test("cada gráfico traz título, legenda quando há mais de uma série, resumo textual e tabela de valores", async ({ page, context }) => {
+test("every chart has a title, a legend when there is more than one series, a text summary and a value table", async ({ page, context }) => {
   await abrirMonitoramento(page, context);
   await esperarGraficos(page);
 
@@ -143,7 +143,7 @@ test("cada gráfico traz título, legenda quando há mais de uma série, resumo 
   await expect(linhaComDado).toContainText("MB");
 });
 
-test("a faixa de tempo é um controle único acima dos gráficos: troca consulta uma vez e reflete nos subtítulos", async ({ page, context }) => {
+test("the time range is a single control above the charts: changing it queries once and updates the subtitles", async ({ page, context }) => {
   const chamadas = [];
   await page.route("**/admin/monitoramento/historico*", (rota) => {
     chamadas.push(new URL(rota.request().url()).searchParams.get("faixa"));
@@ -185,7 +185,7 @@ test("a faixa de tempo é um controle único acima dos gráficos: troca consulta
   expect(chamadas[4]).toBe("3h");
 });
 
-test("a atualização de 20 s dos cartões não refaz o histórico nem redesenha os gráficos", async ({ page, context }) => {
+test("the 20 s card refresh neither reloads history nor redraws the charts", async ({ page, context }) => {
   const historico = [];
   const atual = [];
   await page.route("**/admin/monitoramento/historico*", (rota) => {
@@ -212,7 +212,7 @@ test("a atualização de 20 s dos cartões não refaz o histórico nem redesenha
   expect(composicao).toBe(FIGURAS_ATUAIS.length);
 });
 
-test("layouts: coluna única no celular, grade equilibrada no desktop, sem rolagem horizontal e sem texto cortado", async ({ page, context }) => {
+test("layouts: single column on phones, balanced grid on desktop, no horizontal scroll and no clipped text", async ({ page, context }) => {
   for (const nome of ["mobile-compact", "mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
     await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome]);
     await esperarGraficos(page);
@@ -239,7 +239,7 @@ test("layouts: coluna única no celular, grade equilibrada no desktop, sem rolag
   }
 });
 
-test("com a fonte máxima de acessibilidade os gráficos continuam legíveis, sem corte nem rolagem horizontal", async ({ page, context }) => {
+test("with maximum accessibility font the charts stay legible, without clipping or horizontal scroll", async ({ page, context }) => {
   for (const [nome, tipoFonte] of [["mobile-compact", "default"], ["mobile-compact", "dyslexic"], ["mobile-landscape", "serif"], ["notebook", "sans"]]) {
     await abrirMonitoramento(page, context, "superadmin", VIEWPORTS[nome], { ...A11Y_MAXIMA, remoteifes_font_type: tipoFonte });
     await esperarGraficos(page);
@@ -266,7 +266,7 @@ test("com a fonte máxima de acessibilidade os gráficos continuam legíveis, se
   }
 });
 
-test("os valores são alcançáveis por teclado e por toque, não só por hover", async ({ page, context }) => {
+test("values are reachable by keyboard and touch, not only by hover", async ({ page, context }) => {
   await abrirMonitoramento(page, context, "superadmin", VIEWPORTS["mobile-portrait"]);
   await esperarGraficos(page);
 
@@ -302,7 +302,7 @@ test("os valores são alcançáveis por teclado e por toque, não só por hover"
   await expect(page.locator("#grTabelasAtual .gr-leitura")).toContainText("linhas");
 });
 
-test("histórico vazio orienta o superadministrador e mantém a composição atual", async ({ page, context, request }) => {
+test("empty history guides the superadministrator and keeps the current composition", async ({ page, context, request }) => {
   await limparHistorico(request);
   try {
     await abrirMonitoramento(page, context);
@@ -323,7 +323,7 @@ test("histórico vazio orienta o superadministrador e mantém a composição atu
   }
 });
 
-test("alto contraste troca a paleta das séries e mantém bordas e textos visíveis", async ({ page, context }) => {
+test("high contrast switches the series palette and keeps borders and texts visible", async ({ page, context }) => {
   await abrirMonitoramento(page, context, "superadmin", VIEWPORTS.notebook, { remoteifes_high_contrast: "1" });
   await esperarGraficos(page);
   const cores = await page.evaluate(() => {
@@ -348,7 +348,7 @@ test("alto contraste troca a paleta das séries e mantém bordas e textos visív
   if (cores.fatia) expect(cores.fatia).toBe("rgb(0, 210, 106)");
 });
 
-test("a seção recolhida não consulta o histórico, e a preferência é lembrada", async ({ page, context }) => {
+test("the collapsed section does not query history, and the preference is remembered", async ({ page, context }) => {
   const chamadas = [];
   await page.route("**/admin/monitoramento/historico*", (rota) => {
     chamadas.push(rota.request().url());
@@ -378,7 +378,7 @@ test("a seção recolhida não consulta o histórico, e a preferência é lembra
   expect(chamadas.length, "sair da aba não gera consultas").toBe(1);
 });
 
-test("o shell da PWA guarda o módulo de gráficos junto com o restante do frontend", async ({ page }) => {
+test("the PWA shell stores the charts module together with the rest of the frontend", async ({ page }) => {
   const worker = await page.request.get("/sw.js");
   expect(worker.ok()).toBe(true);
   const texto = await worker.text();
@@ -389,7 +389,7 @@ test("o shell da PWA guarda o módulo de gráficos junto com o restante do front
   expect(texto).toContain(`const FRONTEND_VERSION = "${versao}"`);
 });
 
-test("mudar espaçamento de letras ou família da fonte redesenha a geometria dos gráficos sem mudar a largura, preservando foco, seleção e faixa", async ({ page, context }) => {
+test("changing letter spacing or font family redraws chart geometry without changing width, preserving focus, selection and range", async ({ page, context }) => {
   await abrirMonitoramento(page, context, "superadmin", VIEWPORTS.notebook);
   await esperarGraficos(page);
   await page.locator("#monGraficosBloco .gr-faixa[data-faixa='24h']").click();

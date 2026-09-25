@@ -76,7 +76,7 @@ test.after(async () => {
   fs.rmSync(RELEASE_DIR, { recursive: true, force: true });
 });
 
-test("a release publicada é anunciada com versão, build, data e notas", async () => {
+test("the published release is announced with version, build, date and notes", async () => {
   publicar();
   const { status, cacheControl, corpo } = await info();
   assert.equal(status, 200);
@@ -89,7 +89,7 @@ test("a release publicada é anunciada com versão, build, data e notas", async 
   assert.deepEqual(corpo.android.notas, ["Correções de estabilidade.", "Nova página do aplicativo."]);
 });
 
-test("uma release sem data nem notas continua sendo anunciada", async () => {
+test("a release without date or notes is still announced", async () => {
   publicar({ releaseDate: undefined, notes: undefined });
   const { corpo } = await info();
   assert.equal(corpo.android.disponivel, true);
@@ -97,14 +97,14 @@ test("uma release sem data nem notas continua sendo anunciada", async () => {
   assert.deepEqual(corpo.android.notas, []);
 });
 
-test("data ou notas malformadas invalidam a release inteira em vez de serem ignoradas", async () => {
+test("malformed date or notes invalidate the whole release instead of being ignored", async () => {
   publicar({ releaseDate: "02/09/2026" });
   assert.equal((await info()).corpo.android.disponivel, false);
   publicar({ notes: "uma nota só" });
   assert.equal((await info()).corpo.android.disponivel, false);
 });
 
-test("o APK e os metadados não podem divergir: um arquivo trocado deixa de ser anunciado", async () => {
+test("the APK and metadata cannot diverge: a swapped file is no longer announced", async () => {
   publicar({}, Buffer.from("outro-conteudo-qualquer"));
   const { corpo } = await info();
   assert.equal(corpo.android.disponivel, false);
@@ -112,25 +112,25 @@ test("o APK e os metadados não podem divergir: um arquivo trocado deixa de ser 
   assert.equal(download.status, 404);
 });
 
-test("metadados que apontam para um APK inexistente não são anunciados", async () => {
+test("metadata pointing to a nonexistent APK is not announced", async () => {
   publicar();
   fs.rmSync(path.join(RELEASE_DIR, NOME_APK));
   assert.equal((await info()).corpo.android.disponivel, false);
 });
 
-test("uma release publicada para outra origem não é oferecida", async () => {
+test("a release published for another origin is not offered", async () => {
   publicar({ serverOrigin: "https://outro-campus.ifes.edu.br" });
   assert.equal((await info()).corpo.android.disponivel, false);
 });
 
-test("artefatos debug ou sem assinatura nunca são anunciados", async () => {
+test("debug or unsigned artifacts are never announced", async () => {
   publicar({ debuggable: true });
   assert.equal((await info()).corpo.android.disponivel, false);
   publicar({ signed: false });
   assert.equal((await info()).corpo.android.disponivel, false);
 });
 
-test("informações e download da release exigem sessão válida", async () => {
+test("release information and download require a valid session", async () => {
   publicar();
   const semToken = await fetch(`${baseUrl}/mobile-app/info`);
   assert.equal(semToken.status, 401);
@@ -140,7 +140,7 @@ test("informações e download da release exigem sessão válida", async () => {
   assert.equal(download.status, 401);
 });
 
-test("o download entrega exatamente os bytes cujo hash foi anunciado, sem cache", async () => {
+test("the download delivers exactly the bytes whose hash was announced, without caching", async () => {
   publicar();
   const resp = await fetch(`${baseUrl}/mobile-app/android`, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(resp.status, 200);
@@ -150,7 +150,7 @@ test("o download entrega exatamente os bytes cujo hash foi anunciado, sem cache"
   assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), SHA256);
 });
 
-test("sem release publicada o servidor informa que não há aplicativo, sem erro", async () => {
+test("without a published release the server reports that there is no app, without an error", async () => {
   limpar();
   const { status, corpo } = await info();
   assert.equal(status, 200);

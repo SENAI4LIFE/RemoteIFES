@@ -20,7 +20,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("/health responde 200 com o estado do banco e do processo", async () => {
+test("/health answers 200 with the database and process state", async () => {
   const resp = await fetch(`${baseUrl}/health`);
   assert.equal(resp.status, 200);
   assert.equal(resp.headers.get("content-type").split(";")[0], "application/json");
@@ -32,7 +32,7 @@ test("/health responde 200 com o estado do banco e do processo", async () => {
   assert.ok(corpo.uptimeSegundos >= 0);
 });
 
-test("/health não depende de nenhum ESP32 e não exige autenticação", async () => {
+test("/health depends on no ESP32 and requires no authentication", async () => {
   const resp = await fetch(`${baseUrl}/health`, { headers: { Authorization: "" } });
   assert.equal(resp.status, 200);
   const corpo = await resp.json();
@@ -40,7 +40,7 @@ test("/health não depende de nenhum ESP32 e não exige autenticação", async (
   assert.ok(!("esp32" in corpo) && !("dispositivos" in corpo));
 });
 
-test("/health reporta 503 quando o banco está indisponível", async () => {
+test("/health reports 503 when the database is unavailable", async () => {
   const db = require("../src/config/database");
   db.close();
   const resp = await fetch(`${baseUrl}/health`);

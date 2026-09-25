@@ -31,7 +31,7 @@ test.after(() => {
   fs.rmSync(RAIZ_TMP, { recursive: true, force: true });
 });
 
-test("criarBackup gera um snapshot verificado, standalone e sem arquivos -wal", () => {
+test("criarBackup produces a verified, standalone snapshot without -wal files", () => {
   const { arquivo, bytes } = backupService.criarBackup({ rotulo: "primeiro" });
   assert.ok(fs.existsSync(arquivo));
   assert.ok(bytes > 0);
@@ -44,7 +44,7 @@ test("criarBackup gera um snapshot verificado, standalone e sem arquivos -wal", 
   assert.equal(listado[0].arquivo, arquivo);
 });
 
-test("o snapshot reflete o estado já gravado enquanto o banco segue ativo", () => {
+test("the snapshot reflects the already written state while the database stays active", () => {
   db.prepare("INSERT INTO comandos_log (sala, cmd, origem) VALUES ('A-108', 'ligar', 'manual')").run();
   const { arquivo } = backupService.criarBackup({ rotulo: "com-log" });
 
@@ -57,7 +57,7 @@ test("o snapshot reflete o estado já gravado enquanto o banco segue ativo", () 
   }
 });
 
-test("a rotação mantém N backups e nunca remove o recém-criado", () => {
+test("rotation keeps N backups and never removes the one just created", () => {
   const dir = path.join(RAIZ_TMP, "rotacao");
   let ultimo;
   for (let i = 0; i < 6; i += 1) {
@@ -72,20 +72,20 @@ test("a rotação mantém N backups e nunca remove o recém-criado", () => {
   assert.ok(restantes.every((b) => /^remoteifes-\d{8}-\d{6}-[0-9a-f]{6}-r\d\.db$/.test(b.nome)), restantes.map((b) => b.nome).join(", "));
 });
 
-test("verificarArquivoBackup rejeita um arquivo corrompido", () => {
+test("verificarArquivoBackup rejects a corrupted file", () => {
   const ruim = path.join(RAIZ_TMP, "corrompido.db");
   fs.writeFileSync(ruim, Buffer.from("isto definitivamente nao e um banco sqlite valido"));
   assert.throws(() => backupService.verificarArquivoBackup(ruim));
 });
 
-test("restaurarBackup recusa alvo em memória", () => {
+test("restaurarBackup refuses an in-memory target", () => {
   assert.throws(
     () => backupService.restaurarBackup(backupService.listarBackups()[0].arquivo, { destino: ":memory:" }),
     /memória/
   );
 });
 
-test("restaurarBackup verifica, cria cópia de segurança e reverte os dados", () => {
+test("restaurarBackup verifies, creates a safety copy and restores the data", () => {
   const ponto = backupService.criarBackup({ rotulo: "ponto-de-restauracao" });
   const usuariosAntes = db.prepare("SELECT COUNT(*) total FROM usuarios").get().total;
 

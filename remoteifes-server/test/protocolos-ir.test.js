@@ -107,7 +107,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("as rotas de Protocolos IR exigem superadministrador", async () => {
+test("IR Protocol routes require superadministrator", async () => {
   usuariosService.criar({ usuario: "adm-protocolos", senha: "senhaSegura123", nome: "Admin", isAdmin: true }, { nivel: 3 });
   usuariosService.criar({ usuario: "user-protocolos", senha: "senhaSegura123", nome: "Comum", podeControlar: true }, { nivel: 3 });
   const admin = await login("adm-protocolos", "senhaSegura123");
@@ -128,7 +128,7 @@ test("as rotas de Protocolos IR exigem superadministrador", async () => {
   assert.equal(anonimo.status, 401);
 });
 
-test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clone, biblioteca, failsafe e aplicação", async () => {
+test("complete flow: role from the server, captures only from the cloner in clone mode, library, failsafe and application", async () => {
   const token = await tokenSuperAdmin();
 
   let resp = await auth("/admin/protocolos-ir", token);
@@ -329,7 +329,7 @@ test("fluxo completo: papel pelo servidor, capturas só da clonadora em modo clo
   await fecharEEsperar(clonador.ws);
 });
 
-test("o painel do superadministrador recebe a captura em tempo real e um admin comum não", async () => {
+test("the superadministrator panel receives the capture in real time and a regular admin does not", async () => {
   const token = await tokenSuperAdmin();
   const clonador = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C1");
   clonador.ws.send(JSON.stringify({ tipo: "modo_alterado", modo: "config_clone" }));
@@ -363,7 +363,7 @@ test("o painel do superadministrador recebe a captura em tempo real e um admin c
   await fecharEEsperar(clonador.ws);
 });
 
-test("o histórico de capturas é limitado e sobrevive à reconexão da clonadora", async () => {
+test("capture history is bounded and survives the cloner's reconnection", async () => {
   const token = await tokenSuperAdmin();
   const clonador = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C1");
   clonador.ws.send(JSON.stringify({ tipo: "modo_alterado", modo: "config_clone" }));
@@ -381,7 +381,7 @@ test("o histórico de capturas é limitado e sobrevive à reconexão da clonador
   assert.equal(deviceHub.capturaRecente("CLONE-1", "abc"), null);
 });
 
-test("firmware anterior a 4.1.0 recebe a sequência legada para entrar em modo clone", async () => {
+test("firmware older than 4.1.0 receives the legacy sequence to enter clone mode", async () => {
   const token = await tokenSuperAdmin();
   const legado = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C1", { fw: "4.0.0" });
   legado.mensagens.length = 0;
@@ -393,7 +393,7 @@ test("firmware anterior a 4.1.0 recebe a sequência legada para entrar em modo c
   await fecharEEsperar(legado.ws);
 });
 
-test("a rota antiga de captura por sala continua exigindo a clonadora autorizada", async () => {
+test("the old per-room capture route still requires the authorized cloner", async () => {
   const token = await tokenSuperAdmin();
   const tx = await conectar("TX-1", "AA:BB:CC:DD:EE:D1");
   let resp = await auth("/admin/esp32/TX-1/captura/iniciar", token, { method: "POST" });
@@ -410,7 +410,7 @@ test("a rota antiga de captura por sala continua exigindo a clonadora autorizada
   await fecharEEsperar(clonador.ws);
 });
 
-test("substituir a placa da sala clonadora derruba a autorização até nova confirmação", async () => {
+test("replacing the cloner room's board removes the authorization until a new confirmation", async () => {
   const token = await tokenSuperAdmin();
   const antiga = await conectar("CLONE-1", "AA:BB:CC:DD:EE:C1");
   const fechou = new Promise((resolve) => antiga.ws.once("close", resolve));
@@ -464,7 +464,7 @@ test("substituir a placa da sala clonadora derruba a autorização até nova con
   await fecharEEsperar(trocada.ws);
 });
 
-test("trocar a clonadora devolve a antiga à operação e limpa o histórico de capturas dela", async () => {
+test("changing the cloner returns the old one to operation and clears its capture history", async () => {
   const token = await tokenSuperAdmin();
   let resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });
   assert.equal(resp.status, 200);
@@ -497,7 +497,7 @@ test("trocar a clonadora devolve a antiga à operação e limpa o histórico de 
   await fecharEEsperar(nova.ws);
 });
 
-test("capturas RAW malformadas ou grandes demais são rejeitadas por inteiro, sem filtrar nem truncar", async () => {
+test("malformed or oversized RAW captures are rejected entirely, without filtering or truncating", async () => {
   const token = await tokenSuperAdmin();
   const resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });
   assert.equal(resp.status, 200);
@@ -527,7 +527,7 @@ test("capturas RAW malformadas ou grandes demais são rejeitadas por inteiro, se
   await fecharEEsperar(clonador.ws);
 });
 
-test("identificadores numéricos de protocolo fora do suporte do firmware são recusados antes de alterar o estado", async () => {
+test("numeric protocol identifiers the firmware does not support are refused before changing state", async () => {
   const token = await tokenSuperAdmin();
   const tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2");
   const antes = salasService.buscar("TX-2");
@@ -553,7 +553,7 @@ test("identificadores numéricos de protocolo fora do suporte do firmware são r
   await fecharEEsperar(tx.ws);
 });
 
-test("os testes IR administrativos de uma sala não confirmam a intenção guardada: a confirmação só volta com uma intenção nova", async () => {
+test("a room's administrative IR tests do not confirm the stored intent: confirmation returns only with a new intent", async () => {
   const token = await tokenSuperAdmin();
   db.prepare("UPDATE salas SET irProtocolo = 16, ligado = 1, temperaturaAlvo = 23 WHERE sala = 'TX-2'").run();
   const tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2");
@@ -591,7 +591,7 @@ test("os testes IR administrativos de uma sala não confirmam a intenção guard
   db.prepare("UPDATE salas SET irProtocolo = NULL, ligado = 0 WHERE sala = 'TX-2'").run();
 });
 
-test("um protocolo já gravado com identificador antigo continua sendo transmitido como antes", () => {
+test("a protocol already stored with an old identifier is still transmitted as before", () => {
   db.prepare("UPDATE salas SET irProtocolo = 5, irProtocoloRegistroId = NULL WHERE sala = 'TX-2'").run();
   const comando = salasService.comandoEstadoIR(salasService.buscar("TX-2"));
   assert.equal(comando.tipo, "send_known_state");
@@ -599,7 +599,7 @@ test("um protocolo já gravado com identificador antigo continua sendo transmiti
   db.prepare("UPDATE salas SET irProtocolo = NULL WHERE sala = 'TX-2'").run();
 });
 
-test("uma captura reconhecida pela placa com identificador desconhecido do servidor vira sinal RAW genérico, ainda salvável", async () => {
+test("a capture the board recognized with an identifier unknown to the server becomes a generic RAW signal, still savable", async () => {
   const token = await tokenSuperAdmin();
   const resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });
   assert.equal(resp.status, 200);

@@ -52,7 +52,7 @@ function abas(page, sub) {
   );
 }
 
-test("a Administração tem três grupos, sem grupo vazio e sem função duplicada", async ({ page, context }) => {
+test("Administration has three groups, with no empty group and no duplicate function", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin");
   const grupos = await estrutura(page);
 
@@ -67,28 +67,28 @@ test("a Administração tem três grupos, sem grupo vazio e sem função duplica
   expect(new Set(subs).size).toBe(subs.length);
 });
 
-test("Gestão reúne Usuários e Relatos de problemas", async ({ page, context }) => {
+test("Gestão contains Usuários and Relatos de problemas", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin");
   const gestao = (await estrutura(page)).find((g) => g.grupo === "gestao");
   expect(gestao.itens.map((i) => i.rotulo)).toEqual(["Usuários", "Relatos de problemas"]);
   expect(gestao.itens.map((i) => i.sub)).toEqual(["usuarios", "relatos"]);
 });
 
-test("Dispositivos reúne Cadastro, Firmware / OTA, Protocolos IR e Alertas", async ({ page, context }) => {
+test("Dispositivos contains Cadastro, Firmware / OTA, Protocolos IR and Alertas", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin");
   const dispositivos = (await estrutura(page)).find((g) => g.grupo === "dispositivos");
   expect(dispositivos.itens.map((i) => i.rotulo)).toEqual(["Cadastro", "Firmware / OTA", "Protocolos IR", "Alertas"]);
   expect(dispositivos.itens.map((i) => i.sub)).toEqual(["macs", "esp32", "protocolos", "notificacoes"]);
 });
 
-test("Sistema reúne Logs, Status e Configurações", async ({ page, context }) => {
+test("Sistema contains Logs, Status and Configurações", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin");
   const sistema = (await estrutura(page)).find((g) => g.grupo === "sistema");
   expect(sistema.itens.map((i) => i.rotulo)).toEqual(["Logs", "Status", "Configurações"]);
   expect(sistema.itens.map((i) => i.sub)).toEqual(["logs", "status", "config"]);
 });
 
-test("as funções movidas deixaram de ser itens da navegação de Administração", async ({ page, context }) => {
+test("moved functions are no longer Administration navigation items", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin");
   const rotulos = await page.$$eval(".admin-subtab-btn .admin-subtab-label", (els) => els.map((e) => e.textContent.trim()));
   for (const obsoleto of [
@@ -103,7 +103,7 @@ test("as funções movidas deixaram de ser itens da navegação de Administraç�
   }
 });
 
-test("toda função administrativa continua alcançável pela navegação agrupada", async ({ page, context }) => {
+test("every administrative function stays reachable through the grouped navigation", async ({ page, context }) => {
   test.setTimeout(120_000);
   await abrirAdmin(page, context, "superadmin");
   for (const [chave, grupo] of Object.entries(GRUPOS)) {
@@ -120,7 +120,7 @@ test("toda função administrativa continua alcançável pela navegação agrupa
 });
 
 for (const [sub, definicoes] of Object.entries(ABAS)) {
-  test(`as abas internas de ${sub} têm a ordem e os rótulos previstos`, async ({ page, context }) => {
+  test(`the inner tabs of ${sub} have the expected order and labels`, async ({ page, context }) => {
     test.setTimeout(90_000);
     await abrirAdmin(page, context, "superadmin", `/admin/${sub}`);
     expect(await abas(page, sub)).toEqual(definicoes.map(([aba, rotulo]) => ({ aba, rotulo, oculto: false })));
@@ -137,7 +137,7 @@ for (const [sub, definicoes] of Object.entries(ABAS)) {
   });
 }
 
-test("as abas internas são visualmente distintas da navegação de grupo e função", async ({ page, context }) => {
+test("inner tabs are visually distinct from group and function navigation", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin", "/admin/logs");
   const dentroDaBarra = await page.$$eval(".admin-subtabs .admin-inner-tab-btn", (els) => els.length);
   expect(dentroDaBarra, "abas internas não podem morar na barra de navegação").toBe(0);
@@ -158,7 +158,7 @@ test("as abas internas são visualmente distintas da navegação de grupo e fun�
   expect(estilos.aba.raio).not.toBe(estilos.funcao.raio);
 });
 
-test("Contas e Proprietários de sala convivem dentro de Usuários", async ({ page, context }) => {
+test("Contas and Proprietários de sala coexist inside Usuários", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/usuarios");
   await expect(page.locator("#usuariosAba-contas")).toBeVisible();
   await expect(page.locator("#usuariosList")).toBeVisible();
@@ -173,7 +173,7 @@ test("Contas e Proprietários de sala convivem dentro de Usuários", async ({ pa
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/usuarios/proprietarios");
 });
 
-test("Logs mantém filtros e exclusão de cada aba migrada", async ({ page, context }) => {
+test("Logs keeps the filters and deletion of each migrated tab", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/logs/acesso");
   await expect(page.locator("#acessosFiltroData")).toBeVisible();
   await expect(page.locator("#acessosApagarData")).toBeVisible();
@@ -191,7 +191,7 @@ test("Logs mantém filtros e exclusão de cada aba migrada", async ({ page, cont
   await expect(page.locator("#sessoesList li").first()).toBeVisible({ timeout: 15_000 });
 });
 
-test("Status mantém a presença em tempo real e o mapa operacional", async ({ page, context }) => {
+test("Status keeps real-time presence and the operational map", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/status");
   await expect(page.locator("#statusAba-ativos")).toContainText("tempo real");
   await expect(page.locator("#ativosList li").first()).toBeVisible({ timeout: 15_000 });
@@ -202,7 +202,7 @@ test("Status mantém a presença em tempo real e o mapa operacional", async ({ p
   await expect(page.locator("#mapaGrid .mapa-cell").first()).toBeVisible({ timeout: 15_000 });
 });
 
-test("o admin comum vê os três grupos apenas com as funções que seu nível autoriza", async ({ page, context }) => {
+test("a regular admin sees the three groups with only the functions their level allows", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin");
   const grupos = await estrutura(page);
 
@@ -221,7 +221,7 @@ test("o admin comum vê os três grupos apenas com as funções que seu nível a
   await expect(page.locator('.admin-subtab-btn[data-sub="status"]')).toBeVisible();
 });
 
-test("as abas internas exclusivas ficam ocultas para o admin comum", async ({ page, context }) => {
+test("exclusive inner tabs are hidden from a regular admin", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/logs");
   for (const [sub, exclusivas] of Object.entries(ABAS_SUPERADMIN_ONLY)) {
     for (const aba of exclusivas) {
@@ -234,7 +234,7 @@ test("as abas internas exclusivas ficam ocultas para o admin comum", async ({ pa
   }
 });
 
-test("o admin comum não alcança Auditoria por link direto, mas continua em Logs", async ({ page, context }) => {
+test("a regular admin cannot reach Auditoria by direct link, but stays in Logs", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/logs/auditoria");
   await expect(page.locator("#adminSub-logs")).toBeVisible();
   await expect(page.locator("#logsAba-auditoria")).toBeHidden();
@@ -242,7 +242,7 @@ test("o admin comum não alcança Auditoria por link direto, mas continua em Log
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/logs");
 });
 
-test("o admin comum abre o Status sem alcançar a seção técnica do superadministrador", async ({ page, context }) => {
+test("a regular admin opens Status without reaching the superadministrator's technical section", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/status/sistema");
   await expect(page.locator("#adminSub-status")).toBeVisible();
   await expect(page.locator("#statusAba-ativos")).toBeVisible();
@@ -256,7 +256,7 @@ test("o admin comum abre o Status sem alcançar a seção técnica do superadmin
   await expect(page.locator("#statusAba-sistema")).toBeHidden();
 });
 
-test("o superadministrador alcança as abas internas exclusivas", async ({ page, context }) => {
+test("the superadministrator reaches the exclusive inner tabs", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin", "/admin/logs/auditoria");
   await expect(page.locator("#logsAba-auditoria")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#auditFiltroTipo")).toBeVisible();
@@ -280,7 +280,7 @@ for (const [antiga, nova, painel] of [
   ["/admin/ativos", "#/admin/status", "#statusAba-ativos"],
   ["/admin/mapa", "#/admin/status/mapa", "#statusAba-mapa"],
 ]) {
-  test(`o endereço antigo ${antiga} resolve para ${nova}`, async ({ page, context }) => {
+  test(`the old address ${antiga} resolves to ${nova}`, async ({ page, context }) => {
     await abrirAdmin(page, context, "admin", antiga);
     await expect(page.locator(painel)).toBeVisible({ timeout: 20_000 });
     await expect.poll(() => page.evaluate(() => location.hash)).toBe(nova);
@@ -291,14 +291,14 @@ for (const [antiga, nova, painel] of [
   ["/admin/auditoria", "#/admin/logs/auditoria", "#logsAba-auditoria"],
   ["/admin/monitoramento", "#/admin/status/sistema", "#statusAba-sistema"],
 ]) {
-  test(`o endereço antigo ${antiga} resolve para ${nova} no superadministrador`, async ({ page, context }) => {
+  test(`the old address ${antiga} resolves to ${nova} for the superadministrator`, async ({ page, context }) => {
     await abrirAdmin(page, context, "superadmin", antiga);
     await expect(page.locator(painel)).toBeVisible({ timeout: 20_000 });
     await expect.poll(() => page.evaluate(() => location.hash)).toBe(nova);
   });
 }
 
-test("uma aba interna sobrevive ao refresh e ao voltar do navegador", async ({ page, context }) => {
+test("an inner tab survives a refresh and browser back", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/logs/sessoes");
   await expect(page.locator("#logsAba-sessoes")).toBeVisible({ timeout: 20_000 });
 
@@ -317,7 +317,7 @@ test("uma aba interna sobrevive ao refresh e ao voltar do navegador", async ({ p
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/logs");
 });
 
-test("voltar e avançar rápido entre abas internas mantém painel e endereço coerentes", async ({ page, context }) => {
+test("fast back and forward between inner tabs keep panel and address coherent", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin", "/admin/status");
   for (const aba of ["mapa", "ativos", "mapa"]) {
     await page.locator(`#adminSub-status .admin-inner-tab-btn[data-aba="${aba}"]`).click();
@@ -334,7 +334,7 @@ test("voltar e avançar rápido entre abas internas mantém painel e endereço c
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/status/mapa");
 });
 
-test("entrar no grupo Dispositivos abre Cadastro no superadministrador", async ({ page, context }) => {
+test("entering the Dispositivos group opens Cadastro for the superadministrator", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin");
   await page.locator('.admin-group-btn[data-grupo="dispositivos"]').click();
   await expect(page.locator("#adminSub-macs")).toBeVisible({ timeout: 15_000 });
@@ -343,7 +343,7 @@ test("entrar no grupo Dispositivos abre Cadastro no superadministrador", async (
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/macs");
 });
 
-test("entrar no grupo Dispositivos abre Alertas quando Cadastro não é autorizado", async ({ page, context }) => {
+test("entering the Dispositivos group opens Alertas when Cadastro is not authorized", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin");
   await page.locator('.admin-group-btn[data-grupo="dispositivos"]').click();
   await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 15_000 });
@@ -351,13 +351,13 @@ test("entrar no grupo Dispositivos abre Alertas quando Cadastro não é autoriza
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/admin/notificacoes");
 });
 
-test("um usuário comum não alcança a Administração por link direto", async ({ page, context }) => {
+test("a regular user cannot reach Administration by direct link", async ({ page, context }) => {
   await abrirComum(page, context, "/admin/logs/auditoria");
   await expect(page.locator("#screen-admin")).toBeHidden();
   await expect(page.locator("#adminTabBtn")).toBeHidden();
 });
 
-test("um grupo sem nenhuma função autorizada não é exibido", async ({ page, context }) => {
+test("a group with no authorized function is not shown", async ({ page, context }) => {
   await abrirAdmin(page, context, "admin");
   const exibido = await page.evaluate(() => {
     const grupo = document.querySelector('.admin-subtab-group[data-grupo="sistema"]');
@@ -367,7 +367,7 @@ test("um grupo sem nenhuma função autorizada não é exibido", async ({ page, 
   expect(exibido, "grupo sem função visível deve sumir da navegação").toBe(false);
 });
 
-test("link direto para uma função abre o grupo certo e sobrevive ao refresh", async ({ page, context }) => {
+test("a direct link to a function opens the right group and survives a refresh", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin", "/admin/esp32");
   await expect(page.locator("#adminSub-esp32")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.admin-subtab-group[data-grupo="dispositivos"]')).toHaveClass(/is-active/);
@@ -378,7 +378,7 @@ test("link direto para uma função abre o grupo certo e sobrevive ao refresh", 
   await expect(page.locator('.admin-subtab-btn[data-sub="esp32"]')).toHaveAttribute("aria-current", "page");
 });
 
-test("voltar do navegador devolve o grupo anterior", async ({ page, context }) => {
+test("browser back returns to the previous group", async ({ page, context }) => {
   await abrirAdmin(page, context, "superadmin", "/admin/usuarios");
   await page.locator('.admin-subtab-btn[data-sub="macs"]').click();
   await expect(page.locator("#adminSub-macs")).toBeVisible();
@@ -390,7 +390,7 @@ test("voltar do navegador devolve o grupo anterior", async ({ page, context }) =
 });
 
 for (const nome of ["mobile-compact", "mobile-portrait", "mobile-landscape", "tablet-portrait", "notebook", "desktop"]) {
-  test(`a navegação agrupada cabe e permanece alcançável em ${nome}`, async ({ page, context }) => {
+  test(`the grouped navigation fits and stays reachable at ${nome}`, async ({ page, context }) => {
     test.setTimeout(120_000);
     await abrirAdmin(page, context, "superadmin", "/admin/usuarios", VIEWPORTS[nome]);
     expect(await semRolagemHorizontal(page), "Administração sem rolagem horizontal").toBe(true);

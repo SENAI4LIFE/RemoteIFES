@@ -100,7 +100,7 @@ function instalacaoCom(versaoAntiga) {
   return raiz;
 }
 
-test("o construtor produz payload, manifesto e procedência honesta", (t) => {
+test("the builder produces payload, manifest and honest provenance", (t) => {
   const saida = ajuda.dirTemporario("console-dist-");
   t.after(() => fs.rmSync(saida, { recursive: true, force: true }));
 
@@ -123,7 +123,7 @@ test("o construtor produz payload, manifesto e procedência honesta", (t) => {
   assert.ok(proveniencia.artefatos.every((a) => /^[0-9a-f]{64}$/.test(a.sha256)));
 });
 
-test("o payload construído é exatamente o que o extrator do atualizador entende", (t) => {
+test("the built payload is exactly what the updater's extractor understands", (t) => {
   const saida = ajuda.dirTemporario("console-dist-");
   const amb = ajuda.ambiente();
   t.after(() => {
@@ -146,7 +146,7 @@ test("o payload construído é exatamente o que o extrator do atualizador entend
   assert.ok(!fs.existsSync(path.join(destino, "empacotar")), "o empacotador não entra no payload");
 });
 
-test("o tar é bem formado para QUALQUER leitor, não só para o nosso extrator", (t) => {
+test("the tar is well formed for ANY reader, not only our extractor", (t) => {
   // Regression: the typeflag header field is 1 byte and is not NUL-terminated. Writing it through a
   // helper that reserves the last byte for a terminator truncated it to zero (AREGTYPE); readers
   // treat that as a regular file, so a directory became an empty file of the same name, and `dpkg`,
@@ -201,7 +201,7 @@ test("o tar é bem formado para QUALQUER leitor, não só para o nosso extrator"
   assert.ok(membros.every((m) => (m.modo & 0o6000) === 0), "nenhum membro pode carregar setuid/setgid");
 });
 
-test("cadeia completa: construir, assinar, publicar e atualizar de verdade", async (t) => {
+test("complete chain: build, sign, publish and actually update", async (t) => {
   const NOVA = "99.9.0";
   const fonte = arvoreNaVersao(NOVA);
   const saida = ajuda.dirTemporario("console-dist-");
@@ -252,7 +252,7 @@ test("cadeia completa: construir, assinar, publicar e atualizar de verdade", asy
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1");
 });
 
-test("importação offline instala de verdade, sem rede nenhuma", async (t) => {
+test("offline import actually installs, without any network", async (t) => {
   // A Pi without Internet receives manifest, signature and artifact on a USB drive, and offline
   // import must install them without going to the network.
   const NOVA = "99.9.2";
@@ -293,7 +293,7 @@ test("importação offline instala de verdade, sem rede nenhuma", async (t) => {
   assert.equal(info.transacao.etapa, "concluida");
 });
 
-test("trocar o artefato depois da verificação não muda o que é instalado", async (t) => {
+test("swapping the artifact after verification does not change what is installed", async (t) => {
   // Window between verification and installation: if the digest were computed on one read and
   // extraction did another read of the SAME path, whoever could swap the file in between would
   // install content that never went through verification. On the offline path the file sits where
@@ -349,7 +349,7 @@ test("trocar o artefato depois da verificação não muda o que é instalado", a
   assert.equal(pacote.version, NOVA, "o conteúdo instalado é o do artefato original, não o trocado");
 });
 
-test("importação offline recusa artefato adulterado e não instala nada", async (t) => {
+test("offline import refuses a tampered artifact and installs nothing", async (t) => {
   const NOVA = "99.9.3";
   const fonte = arvoreNaVersao(NOVA);
   const saida = ajuda.dirTemporario("console-dist-");
@@ -384,7 +384,7 @@ test("importação offline recusa artefato adulterado e não instala nada", asyn
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "o ponteiro não se move");
 });
 
-test("um manifesto adulterado depois de assinado é recusado", async (t) => {
+test("a manifest tampered with after signing is refused", async (t) => {
   const saida = ajuda.dirTemporario("console-dist-");
   const chaves = ajuda.dirTemporario("console-chave-");
   t.after(() => {
@@ -415,7 +415,7 @@ test("um manifesto adulterado depois de assinado é recusado", async (t) => {
   assert.match(r.motivo, /assinatura/i);
 });
 
-test("um artefato trocado no servidor não passa pelo digest do manifesto assinado", async (t) => {
+test("an artifact swapped on the server does not pass the signed manifest's digest", async (t) => {
   const NOVA = "99.9.1";
   const fonte = arvoreNaVersao(NOVA);
   const saida = ajuda.dirTemporario("console-dist-");
@@ -451,7 +451,7 @@ test("um artefato trocado no servidor não passa pelo digest do manifesto assina
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "o ponteiro não se move");
 });
 
-test("sem chave de publicação provisionada, o console diz isso em vez de aceitar qualquer release", async (t) => {
+test("without a provisioned publishing key, the Console says so instead of accepting any release", async (t) => {
   const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: undefined } });
   t.after(() => amb.restaurar());
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
@@ -465,7 +465,7 @@ test("sem chave de publicação provisionada, o console diz isso em vez de aceit
   assert.match(r.motivo, /chave pública/);
 });
 
-test("a ferramenta de assinatura recusa manifesto que já nasce expirado", (t) => {
+test("the signing tool refuses a manifest that is already expired", (t) => {
   const dir = ajuda.dirTemporario("console-sig-");
   const chaves = ajuda.dirTemporario("console-chave-");
   t.after(() => {
@@ -482,14 +482,14 @@ test("a ferramenta de assinatura recusa manifesto que já nasce expirado", (t) =
   assert.ok(!fs.existsSync(`${manifesto}.sig`), "nada é assinado");
 });
 
-test("a chave privada de publicação nunca vem de argumento de linha de comando", () => {
+test("the private publishing key never comes from a command-line argument", () => {
   const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "empacotar", "assinar-manifesto.js"), "utf8");
   // `--chave` receives a PATH; key material comes from a file or the environment variable.
   assert.match(fonte, /CONSOLE_CHAVE_PRIVADA/);
   assert.ok(!/--chave-conteudo|--chave-privada-conteudo|--segredo/.test(fonte), "não pode existir opção que receba a chave em argv");
 });
 
-test("o .deb é montado no formato ar que o dpkg entende", (t) => {
+test("the .deb is assembled in the ar format dpkg understands", (t) => {
   const saida = ajuda.dirTemporario("console-deb-");
   t.after(() => fs.rmSync(saida, { recursive: true, force: true }));
 
@@ -533,7 +533,7 @@ function servidorQueRegistra(responder) {
 
 const CORPO_ARTEFATO = Buffer.from("conteudo-de-artefato-de-ci-para-teste");
 
-test("o token do GitHub não acompanha o redirecionamento para outro host", async (t) => {
+test("the GitHub token does not follow a redirect to another host", async (t) => {
   // The artifact download answers 302 to signed storage on another domain. Sending `Authorization`
   // along would hand the token to a host that does not need it and may log it. Moving the header
   // out of its host condition must fail this test.
@@ -584,7 +584,7 @@ test("o token do GitHub não acompanha o redirecionamento para outro host", asyn
   assert.equal(fs.readFileSync(destino).toString(), CORPO_ARTEFATO.toString(), "o conteúdo baixado é o do armazenamento");
 });
 
-test("um redirecionamento em laço é cortado em vez de seguir para sempre", async (t) => {
+test("a redirect loop is cut off instead of followed forever", async (t) => {
   let saltos = 0;
   const laco = await servidorQueRegistra((req, res, servidor) => {
     if (req.url.includes("/artifacts?")) {

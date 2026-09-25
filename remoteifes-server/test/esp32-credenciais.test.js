@@ -110,7 +110,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("provisionar entrega id + segredo uma vez; provisionar de novo é rejeitado", async () => {
+test("provisioning delivers id + secret once; provisioning again is rejected", async () => {
   novaSalaComMac("cred-1", "AA:CC:00:00:00:01");
   const token = await tokenSuperAdmin();
   const resp = await authFetch("/admin/esp32/cred-1/credencial", token, { method: "POST" });
@@ -129,7 +129,7 @@ test("provisionar entrega id + segredo uma vez; provisionar de novo é rejeitado
   assert.equal("segredoHash" in cred, false);
 });
 
-test("dispositivo conecta por credencial mesmo sem MAC cadastrado para a sala", async () => {
+test("a device connects by credential even without a MAC registered for the room", async () => {
   db.prepare(`INSERT OR IGNORE INTO salas (sala, nome, bloco, andar) VALUES ('cred-2', 'cred-2', 'A', 1)`).run();
   const { deviceId, segredo } = credenciaisService.provisionar("cred-2");
 
@@ -139,14 +139,14 @@ test("dispositivo conecta por credencial mesmo sem MAC cadastrado para a sala", 
   ws.close();
 });
 
-test("segredo incorreto derruba a conexão", async () => {
+test("a wrong secret drops the connection", async () => {
   db.prepare(`INSERT OR IGNORE INTO salas (sala, nome, bloco, andar) VALUES ('cred-3', 'cred-3', 'A', 1)`).run();
   const { deviceId } = credenciaisService.provisionar("cred-3");
   const ws = abrirWs({ "x-device-id": deviceId, "x-device-secret": "errado-errado-errado-errado-errado" });
   await esperaRecusada(ws);
 });
 
-test("revogar encerra a conexão ativa e recusa a reconexão", async () => {
+test("revoking closes the active connection and refuses reconnection", async () => {
   db.prepare(`INSERT OR IGNORE INTO salas (sala, nome, bloco, andar) VALUES ('cred-4', 'cred-4', 'A', 1)`).run();
   const { deviceId, segredo } = credenciaisService.provisionar("cred-4");
   const ws = abrirWs({ "x-device-id": deviceId, "x-device-secret": segredo });
@@ -161,7 +161,7 @@ test("revogar encerra a conexão ativa e recusa a reconexão", async () => {
   await esperaRecusada(ws2);
 });
 
-test("rotação: segredo antigo continua válido durante o período de tolerância", async () => {
+test("rotation: the old secret stays valid during the grace period", async () => {
   db.prepare(`INSERT OR IGNORE INTO salas (sala, nome, bloco, andar) VALUES ('cred-5', 'cred-5', 'A', 1)`).run();
   const antigo = credenciaisService.provisionar("cred-5");
   const novo = credenciaisService.rotacionar("cred-5");
@@ -173,7 +173,7 @@ test("rotação: segredo antigo continua válido durante o período de tolerânc
   assert.equal(credenciaisService.estado("cred-5").graceRotacaoAtivo, true);
 });
 
-test("revogacao nao permite voltar a autenticar apenas pelo MAC", async () => {
+test("revocation does not allow authenticating by MAC alone again", async () => {
   const sala = "cred-revogada-mac";
   const mac = "AA:CC:00:00:00:20";
   novaSalaComMac(sala, mac);
@@ -195,14 +195,14 @@ test("revogacao nao permite voltar a autenticar apenas pelo MAC", async () => {
   assert.ok(credenciaisService.verificar(nova.deviceId, nova.segredo));
 });
 
-test("modo brando: MAC-only continua funcionando quando não há credencial", async () => {
+test("lenient mode: MAC-only keeps working when there is no credential", async () => {
   novaSalaComMac("cred-6", "AA:CC:00:00:00:06");
   const ws = abrirWs({ "x-device-sala": "cred-6", "x-device-mac": "AA:CC:00:00:00:06" });
   await esperaAceita(ws);
   ws.close();
 });
 
-test("sala com credencial provisionada recusa MAC-only mesmo com a flag global desligada", async () => {
+test("a room with a provisioned credential refuses MAC-only even with the global flag off", async () => {
   novaSalaComMac("cred-7", "AA:CC:00:00:00:07");
   credenciaisService.provisionar("cred-7");
   const ws = abrirWs({ "x-device-sala": "cred-7", "x-device-mac": "AA:CC:00:00:00:07" });
@@ -216,7 +216,7 @@ test("sala com credencial provisionada recusa MAC-only mesmo com a flag global d
   assert.equal(heartbeat.status, 401);
 });
 
-test("flag espCredenciaisObrigatorias recusa MAC-only em qualquer sala", async () => {
+test("the espCredenciaisObrigatorias flag refuses MAC-only in every room", async () => {
   novaSalaComMac("cred-8", "AA:CC:00:00:00:08");
   configuracoesService.validarEAtualizar({ espCredenciaisObrigatorias: true }, { nivel: 3, id: "test" });
   try {
@@ -234,7 +234,7 @@ test("flag espCredenciaisObrigatorias recusa MAC-only em qualquer sala", async (
   }
 });
 
-test("substituir gera novo deviceId e preserva o MAC cadastrado da sala", async () => {
+test("replacing generates a new deviceId and keeps the room's registered MAC", async () => {
   novaSalaComMac("cred-9", "AA:CC:00:00:00:09");
   const original = credenciaisService.provisionar("cred-9");
   const novo = credenciaisService.substituir("cred-9");
@@ -244,7 +244,7 @@ test("substituir gera novo deviceId e preserva o MAC cadastrado da sala", async 
   assert.equal(db.prepare(`SELECT mac FROM salas WHERE sala = 'cred-9'`).get().mac, "AA:CC:00:00:00:09");
 });
 
-test("heartbeat HTTP autentica por credencial e o segredo nunca aparece nos logs", async () => {
+test("the HTTP heartbeat authenticates by credential and the secret never appears in logs", async () => {
   novaSalaComMac("cred-10", "AA:CC:00:00:00:10");
   const { deviceId, segredo } = credenciaisService.provisionar("cred-10");
 
@@ -268,7 +268,7 @@ test("heartbeat HTTP autentica por credencial e o segredo nunca aparece nos logs
   assert.ok(capturado.every((linha) => !linha.includes(segredo)), "nenhuma linha de log pode conter o segredo");
 });
 
-test("provisionar empurra a credencial para um dispositivo já conectado por MAC", async () => {
+test("provisioning pushes the credential to a device already connected by MAC", async () => {
   novaSalaComMac("cred-11", "AA:CC:00:00:00:11");
   const ws = abrirWs({ "x-device-sala": "cred-11", "x-device-mac": "AA:CC:00:00:00:11" });
   const mensagens = [];
@@ -287,7 +287,7 @@ test("provisionar empurra a credencial para um dispositivo já conectado por MAC
   assert.equal(deviceHub.dispositivoConectado("cred-11"), false);
 });
 
-test("substituir não entrega a nova credencial ao dispositivo antigo e encerra sua sessão", async () => {
+test("replacing does not deliver the new credential to the old device and closes its session", async () => {
   novaSalaComMac("cred-13", "AA:CC:00:00:00:13");
   const antiga = credenciaisService.provisionar("cred-13");
   const ws = abrirWs({ "x-device-id": antiga.deviceId, "x-device-secret": antiga.segredo });
@@ -309,7 +309,7 @@ test("substituir não entrega a nova credencial ao dispositivo antigo e encerra 
   novaAceita.close();
 });
 
-test("rotas de credencial exigem superadmin", async () => {
+test("credential routes require superadmin", async () => {
   const usuariosService = require("../src/services/usuariosService");
   usuariosService.criar(
     { usuario: "cred-admin-comum", senha: "senhaSegura123", nome: "Admin Comum", isAdmin: true },

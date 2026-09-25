@@ -57,7 +57,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("a migração cria as tabelas e o índice do histórico de monitoramento e é idempotente", () => {
+test("the migration creates the monitoring history tables and index and is idempotent", () => {
   const { criarSchema } = require("../src/db/schema");
   criarSchema();
   criarSchema();
@@ -72,7 +72,7 @@ test("a migração cria as tabelas e o índice do histórico de monitoramento e 
   assert.ok(retencaoService.LIMITES_LINHAS.monitoramento_horas > 0);
 });
 
-test("amostrar() grava uma linha com gauges e converte contadores acumulados em deltas por intervalo", () => {
+test("amostrar() writes a row with gauges and converts cumulative counters into per-interval deltas", () => {
   limparHistorico();
   monitoramentoService.registrar("telemetriaFalha", { sala: "H-1" });
   monitoramentoService.registrar("telemetriaFalha", { sala: "H-1" });
@@ -100,7 +100,7 @@ test("amostrar() grava uma linha com gauges e converte contadores acumulados em 
   assert.equal(terceira.telemetriaFalhas, 1);
 });
 
-test("a consolidação por hora resume as amostras (média, pico, mínimo, somas) e mantém a hora corrente crua", () => {
+test("hourly consolidation summarizes samples (mean, peak, minimum, sums) and keeps the current hour raw", () => {
   limparHistorico();
   const boot = minutosAtras(500);
   for (let i = 0; i < 180; i += 1) {
@@ -132,7 +132,7 @@ test("a consolidação por hora resume as amostras (média, pico, mínimo, somas
   assert.equal(monitoramentoService.consolidarHoras(), 0, "segunda chamada não reconsolida");
 });
 
-test("a retenção consolida antes de apagar, remove amostras cruas antigas e horas além de 30 dias", () => {
+test("retention consolidates before deleting, removes old raw samples and hours beyond 30 days", () => {
   limparHistorico();
   const bootAntigo = "2026-01-01 00:00:00";
   for (let i = 0; i < 30; i += 1) {
@@ -150,7 +150,7 @@ test("a retenção consolida antes de apagar, remove amostras cruas antigas e ho
   assert.equal(db.prepare("SELECT COUNT(*) n FROM monitoramento_horas WHERE hora >= datetime('now', '-11 days') AND hora <= datetime('now', '-9 days')").get().n, 1);
 });
 
-test("os limites de linhas do histórico valem para as duas tabelas", () => {
+test("history row limits apply to both tables", () => {
   limparHistorico();
   const limiteHoras = retencaoService.LIMITES_LINHAS.monitoramento_horas;
   const inserir = db.prepare("INSERT INTO monitoramento_horas (hora, amostras) VALUES (datetime('now', ?), 1)");
@@ -162,7 +162,7 @@ test("os limites de linhas do histórico valem para as duas tabelas", () => {
   assert.ok(maisRecente >= minutosAtras(61), "as horas mais recentes são preservadas");
 });
 
-test("historico() agrega em grade completa, deixa nulos onde não há amostra e soma contagens por período", () => {
+test("historico() aggregates on a complete grid, leaves nulls where there is no sample and sums counts per period", () => {
   limparHistorico();
   db.prepare("DELETE FROM esp_eventos").run();
   db.prepare("DELETE FROM comandos_log").run();
@@ -220,7 +220,7 @@ test("historico() agrega em grade completa, deixa nulos onde não há amostra e 
   assert.deepEqual(h.retencao, { amostrasHoras: 48, horasDias: 30 });
 });
 
-test("as faixas longas combinam horas consolidadas com a hora corrente crua e nunca mandam milhares de pontos", () => {
+test("long ranges combine consolidated hours with the current raw hour and never send thousands of points", () => {
   limparHistorico();
   const boot = horaCorrenteMais(0);
   const inserir = db.prepare(`INSERT INTO monitoramento_horas (hora, amostras, reinicios, rssMB, rssMBMax, cpuPercent, cpuPercentMax, bancoMs, bancoMsMax, espComMac, espOnline, espOnlineMin, espWs, telemetriaFalhas)
@@ -263,7 +263,7 @@ test("as faixas longas combinam horas consolidadas com a hora corrente crua e nu
   }
 });
 
-test("reinícios ficam visíveis: cada início de processo dentro da janela vira um marcador e deltas nunca ficam negativos", () => {
+test("restarts are visible: each process start within the window becomes a marker and deltas are never negative", () => {
   limparHistorico();
   const bootA = minutosAtras(150);
   const bootB = minutosAtras(60);
@@ -281,7 +281,7 @@ test("reinícios ficam visíveis: cada início de processo dentro da janela vira
   assert.ok(antesDoReinicio > 0 && depoisDoReinicio > 0);
 });
 
-test("histórico vazio responde com a grade completa, sem amostras e sem cobertura", () => {
+test("empty history answers with the complete grid, no samples and no coverage", () => {
   limparHistorico();
   const h = monitoramentoService.historico("3h");
   assert.equal(h.t.length, 60);
@@ -292,7 +292,7 @@ test("histórico vazio responde com a grade completa, sem amostras e sem cobertu
   assert.deepEqual(h.reinicios, []);
 });
 
-test("GET /admin/monitoramento/historico exige superadministrador, valida a faixa e não usa cache HTTP", async () => {
+test("GET /admin/monitoramento/historico requires superadministrator, validates the range and does not use HTTP caching", async () => {
   assert.equal((await authGet("/admin/monitoramento/historico", null)).status, 401);
   assert.equal((await authGet("/admin/monitoramento/historico", await login("hist-comum", "senhaSegura123"))).status, 403);
   assert.equal((await authGet("/admin/monitoramento/historico", await login("hist-admin", "senhaSegura123"))).status, 403);
@@ -314,7 +314,7 @@ test("GET /admin/monitoramento/historico exige superadministrador, valida a faix
   assert.equal((await authGet("/admin/monitoramento/historico?faixa=24h&faixa=7d", token)).status, 400);
 });
 
-test("GET /admin/monitoramento continua compatível e ganha composição de OTA e PM2 opcional", async () => {
+test("GET /admin/monitoramento stays compatible and gains OTA composition and optional PM2 data", async () => {
   const token = await login("superadmin", "admin");
   const m = (await (await authGet("/admin/monitoramento", token)).json()).monitoramento;
   assert.equal(m.banco.ok, true);
@@ -330,7 +330,7 @@ test("GET /admin/monitoramento continua compatível e ganha composição de OTA 
   assert.ok(Array.isArray(m.alertas));
 });
 
-test("com variáveis do PM2 presentes o serviço informa reinícios e modo, ignorando valores malformados", () => {
+test("with PM2 variables present the service reports restarts and mode, ignoring malformed values", () => {
   const originais = { pm_id: process.env.pm_id, name: process.env.name, restart_time: process.env.restart_time, unstable_restarts: process.env.unstable_restarts, pm_uptime: process.env.pm_uptime, exec_mode: process.env.exec_mode };
   try {
     process.env.pm_id = "3";
