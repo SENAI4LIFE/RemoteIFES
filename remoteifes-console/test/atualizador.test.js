@@ -622,3 +622,61 @@ test("um payload sem a entrada executar é tratado como falha de carregamento", 
   assert.match(saida, /SUBIU 1\.0\.0/);
   assert.match(saida, /executar/);
 });
+
+test("duas operações de versão não rodam ao mesmo tempo", async (t) => {
+  // Atualizar, importar offline e reverter mexem no mesmo ponteiro e no mesmo versoes/. Sem
+  // exclusão, duas operações podiam instalar versões diferentes ao mesmo tempo e uma podar a que
+  // a outra estava a ponto de ativar — ponteiro apontando para diretório inexistente, console
+  // sem subir.
+  const raiz = ajuda.dirTemporario("console-trava-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  fs.mkdirSync(path.join(raiz, "versoes", "1.0.0"), { recursive: true });
+  fs.writeFileSync(path.join(raiz, "versoes", "1.0.0", "package.json"), '{"version":"1.0.0"}\n');
+  fs.writeFileSync(path.join(raiz, "versoes", "1.0.0", "console.js"), "module.exports={};\n");
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "2.0.0", versaoAnterior: "1.0.0", transacao: null })}\n`
+  );
+
+  const primeira = atualizador.adquirirTrava("atualizar 9.9.9");
+  assert.equal(primeira.ok, true, "a primeira operação adquire a trava");
+  t.after(() => atualizador.liberarTrava());
+
+  // Com a trava tomada por ESTE processo (vivo), a reversão tem de recusar.
+  const r = await atualizador.reverter({ log: () => {} });
+  assert.equal(r.ok, false, "a segunda operação não pode prosseguir");
+  assert.match(r.erro, /outra operação de versão está em andamento/);
+  assert.match(r.erro, /atualizar 9\.9\.9/, "a recusa precisa dizer qual operação detém a trava");
+
+  // O ponteiro não se moveu.
+  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "2.0.0");
+});
+
+test("uma trava de processo morto é recuperada em vez de travar a instalação para sempre", (t) => {
+  const raiz = ajuda.dirTemporario("console-trava2-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  // PID improvável de existir: simula queda no meio de uma atualização.
+  fs.writeFileSync(
+    path.join(raiz, "operacao-em-andamento.json"),
+    `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: 999999, em: new Date().toISOString() })}\n`
+  );
+
+  const r = atualizador.adquirirTrava("reverter");
+  assert.equal(r.ok, true, "a trava residual precisa ser recuperada");
+  const dono = JSON.parse(fs.readFileSync(path.join(raiz, "operacao-em-andamento.json"), "utf8"));
+  assert.equal(dono.pid, process.pid, "a trava passa a ser deste processo");
+  atualizador.liberarTrava();
+  assert.ok(!fs.existsSync(path.join(raiz, "operacao-em-andamento.json")), "liberar remove a trava");
+});
