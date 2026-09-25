@@ -141,7 +141,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.packages_os != '[]'
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -375,8 +375,10 @@ jobs:
           $mesa = Join-Path ([Environment]::GetFolderPath("Desktop")) "Console de Operações RemoteIFES.lnk"
 
           # /S silent, /ATALHO desktop shortcut, /D destination (must be last and unquoted).
+          Write-Host "Instalando $exe em $raiz"
           $p = Start-Process -FilePath $exe -ArgumentList "/S","/ATALHO","/CHECKOUT=$env:GITHUB_WORKSPACE","/D=$raiz" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "the installer exited with $($p.ExitCode)" }
+          Write-Host "Instalado; conferindo o resultado"
 
           foreach ($exigido in @("console-bootstrap.js", "launcher-bootstrap.js", "estado-instalacao.json",
                                  "abrir-console.vbs", "desinstalar.exe", "desinstalar-console.js",
@@ -402,11 +404,17 @@ jobs:
             if ($alvo -notmatch "wscript\.exe$") { throw "$atalho opens $alvo instead of wscript.exe" }
           }
 
-          # `_?=` keeps the uninstaller in place so this step can wait for it; Programs and Features
-          # runs it without that switch, which lets NSIS copy itself out and delete the directory.
-          $u = Start-Process -FilePath "$raiz\desinstalar.exe" -ArgumentList "/S","_?=$raiz" -Wait -PassThru
-          if ($u.ExitCode -ne 0) { throw "the uninstaller exited with $($u.ExitCode)" }
-          if (Test-Path (Join-Path $raiz "console-bootstrap.js")) { throw "the program was not removed" }
+          # No `_?=`: the Console's own uninstaller removes the whole program tree, and with that
+          # switch the uninstaller would still be running inside it, which Windows refuses to delete.
+          # Without it NSIS re-runs from a copy in the temporary directory and returns immediately,
+          # so the wait is on the observable result rather than on the process.
+          Write-Host "Removendo a instalação"
+          Start-Process -FilePath "$raiz\desinstalar.exe" -ArgumentList "/S"
+          $marca = Join-Path $raiz "console-bootstrap.js"
+          $prazo = (Get-Date).AddMinutes(3)
+          while ((Get-Date) -lt $prazo -and (Test-Path $marca)) { Start-Sleep -Seconds 2 }
+          if (Test-Path $marca) { throw "the uninstaller did not remove the program within 3 minutes" }
+          Write-Host "Removido; conferindo o que deve sobrar"
           if (Test-Path $menu) { throw "the Start Menu shortcut survived the uninstall" }
           if (Test-Path $mesa) { throw "the desktop shortcut survived the uninstall" }
           if (Test-Path $chave) { throw "the Programs and Features entry survived the uninstall" }

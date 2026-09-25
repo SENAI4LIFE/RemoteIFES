@@ -551,6 +551,22 @@ test("the Windows installer script delegates to the portable installer and asks 
   assert.ok(!/File \/r "\$\{PAYLOAD\}\\\*\.\*"/.test(nsi), "the payload glob must not be *.*");
   assert.match(nsi, /File \/r "\$\{PAYLOAD\}\\\*"/);
   assert.match(nsi, /MUI_LANGUAGE "PortugueseBR"/);
+
+  // A silent run must never block on a dialog: /S is what a deployment script uses, and what the
+  // QuietUninstallString in Programs and Features runs. NSIS still shows MessageBox when silent.
+  for (const [indice, linha] of nsi.split("\n").entries()) {
+    if (!/^\s*MessageBox\b/.test(linha)) continue;
+    const anteriores = nsi.split("\n").slice(Math.max(0, indice - 3), indice).join("\n");
+    assert.match(anteriores, /\$\{IfNot\} \$\{Silent\}/, `MessageBox na linha ${indice + 1} não está sob um guarda de modo silencioso`);
+  }
+
+  // The Console's own uninstaller removes the tree this executable lives in, so it must not be
+  // invoked with `_?=`, which keeps it running inside that tree.
+  const instrucoes = nsi
+    .split("\n")
+    .filter((linha) => !/^\s*;/.test(linha))
+    .join("\n");
+  assert.ok(!/_\?=/.test(instrucoes), "o desinstalador não deve depender de _?=");
 });
 
 test("the Windows installer executable is built as a real Windows program", (t) => {
