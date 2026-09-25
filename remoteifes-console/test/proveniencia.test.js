@@ -6,13 +6,13 @@ const crypto = require("crypto");
 const ajuda = require("./ajuda");
 const { criarAutoridade, sha256, MINUTO } = require("./support/atestacoes");
 
-// Proveniência dos releases: o que faz um console instalado aceitar uma publicação.
+// Release provenance: what makes an installed Console accept a publication.
 //
-// Um release só é confiável como bytes que o GitHub Actions atestou ao rodar o workflow de
-// publicação deste repositório para a etiqueta daquela versão. Estes testes seguram cada elo dessa
-// cadeia: a criptografia (delegada ao @sigstore/verify, exercitada aqui com um Sigstore privado
-// cujas chaves só estes testes aceitam), a identidade do certificado, a declaração e o vínculo
-// entre manifesto, etiqueta e commit.
+// A release is trusted only as bytes GitHub Actions attested while running this repository's
+// release workflow for that version's tag. These tests hold each link of that chain: the
+// cryptography (delegated to @sigstore/verify, exercised here with a private Sigstore whose keys
+// only these tests trust), the certificate identity, the statement and the binding between
+// manifest, tag and commit.
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
 const OUTRO_COMMIT = "fedcba9876543210fedcba9876543210fedcba98";
@@ -31,7 +31,7 @@ test.before(async () => {
 
 test.after(() => amb.restaurar());
 
-/** Um release como o build o produz: os bytes do manifesto e um payload por alvo. */
+/** A release as the build produces it: manifest bytes and one payload per target. */
 function novaRelease({ versao = "1.1.0", commit = COMMIT, alvos = ["linux-x64", "linux-arm64", "windows-x64"] } = {}) {
   const artefatos = {};
   const entradas = alvos.map((alvo) => {
@@ -64,7 +64,7 @@ function recusada(resultado, codigo, padrao) {
   if (padrao) assert.match(resultado.motivo, padrao);
 }
 
-// --- Aceito ------------------------------------------------------------------------------------
+// --- Accepted ----------------------------------------------------------------------------------
 
 test("um release atestado pelo workflow oficial para a sua própria etiqueta e o seu commit é aceito", async () => {
   const r = novaRelease();
@@ -90,7 +90,7 @@ test("a política fixa repositório e dono por nome e identificador numérico, o
   });
 });
 
-// --- O artefato e o manifesto ------------------------------------------------------------------
+// --- The artifact and the manifest -------------------------------------------------------------
 
 test("um manifesto que não é byte a byte o atestado é recusado, reformatação inclusive", async () => {
   const r = novaRelease();
@@ -122,14 +122,14 @@ test("todo artefato que o manifesto lista precisa estar atestado com o digest qu
 test("os nomes dos artefatos do manifesto são fixados pela versão e pelo alvo", async () => {
   const r = novaRelease({ alvos: ["linux-x64"] });
   const m = JSON.parse(r.manifesto.toString("utf8"));
-  // Um payload de outro alvo servido na entrada deste alvo.
+  // A payload for another target served under this target's entry.
   m.artefatos[0].arquivo = release.nomeDoPayload("1.1.0", "linux-arm64");
   assert.match(release.validarEstrutura(m).motivo, /deveria se chamar remoteifes-console-1\.1\.0-linux-x64\.tar\.gz/);
   m.artefatos[0].arquivo = release.nomeDoPayload("1.0.0", "linux-x64");
   assert.equal(release.validarEstrutura(m).ok, false, "nem o payload de outra versão");
 });
 
-// --- Identidade ---------------------------------------------------------------------------------
+// --- Identity -----------------------------------------------------------------------------------
 
 test("uma atestação de outro repositório é recusada, mesmo com o mesmo nome de repositório", async () => {
   const r = novaRelease();
@@ -138,7 +138,7 @@ test("uma atestação de outro repositório é recusada, mesmo com o mesmo nome 
     "identidade",
     /outro repositório/
   );
-  // Um repositório recriado com o mesmo nome tem outro id: o nome sozinho não é a confiança.
+  // A repository recreated under the same name has another id: the name alone is not the trust.
   recusada(verificar(r, await atestada(r, { identidade: { repositorioId: "1313157229" } })), "identidade", /identificador diferente/);
 });
 
@@ -153,8 +153,8 @@ test("outro workflow deste mesmo repositório não produz uma atestação aceita
   for (const workflow of [".github/workflows/ci.yml", ".github/workflows/android.yml", ".github/workflows/console-release.yaml"]) {
     recusada(verificar(r, await atestada(r, { identidade: { workflow } })), "identidade", /workflow de publicação/);
   }
-  // Um workflow reutilizável chamado de outro lugar: quem assina é o workflow de publicação, o
-  // workflow de nível mais alto é outro.
+  // A reusable workflow called from elsewhere: the signer is the release workflow, the top-level
+  // workflow is another.
   const chamador = "https://github.com/SENAI4LIFE/RemoteIFES/.github/workflows/ci.yml@refs/tags/console-v1.1.0";
   recusada(verificar(r, await atestada(r, { identidade: { configuracao: chamador } })), "identidade", /workflow de publicação/);
 });
@@ -164,7 +164,7 @@ test("uma atestação feita a partir de um branch ou de outra etiqueta é recusa
   recusada(verificar(r, await atestada(r, { identidade: { ref: "refs/heads/main" } })), "identidade");
   recusada(verificar(r, await atestada(r, { identidade: { ref: "refs/tags/console-v1.0.0" } })), "identidade");
   recusada(verificar(r, await atestada(r, { identidade: { ref: "refs/tags/v1.1.0" } })), "identidade");
-  // Só a extensão mudou, o SAN ainda nomeia a etiqueta certa: todo campo precisa concordar.
+  // Only the extension changed, the SAN still names the right tag: every field must agree.
   const san = "https://github.com/SENAI4LIFE/RemoteIFES/.github/workflows/console-release.yml@refs/tags/console-v1.1.0";
   recusada(verificar(r, await atestada(r, { identidade: { ref: "refs/heads/main", assinante: san, configuracao: san, san } })), "identidade", /outra etiqueta/);
 });
@@ -203,7 +203,7 @@ test("a declaração precisa ser proveniência de build SLSA", async () => {
   recusada(verificar(r, await atestada(r, { tipoPredicado: "https://in-toto.io/attestation/release/v0.1" })), "declaracao", /proveniência SLSA/);
 });
 
-// --- Criptografia ------------------------------------------------------------------------------
+// --- Cryptography ------------------------------------------------------------------------------
 
 test("um certificado de uma CA que a raiz de confiança não conhece é recusado", async () => {
   const r = novaRelease();
@@ -230,7 +230,7 @@ test("uma entrada do log de transparência que não confere é recusada", async 
   const r = novaRelease();
   recusada(verificar(r, await atestada(r, { adulterar: "promessa" })), "criptografia", /TLOG/);
 
-  // Uma raiz de confiança que não lista o log que a entrada alega.
+  // A trusted root that does not list the log the entry claims.
   const outra = await criarAutoridade();
   const semOLog = { ...autoridade.raizJson, tlogs: outra.raizJson.tlogs };
   const { TrustedRoot } = require("@sigstore/protobuf-specs");
@@ -244,7 +244,7 @@ test("pacotes malformados são recusados antes de qualquer criptografia", async 
   recusada(verificar(r, Buffer.from(JSON.stringify({ mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json" }))), "malformada");
   recusada(verificar(r, Buffer.alloc(3 * 1024 * 1024, 0x20)), "malformada", /grande demais/);
 
-  // Um pacote assinado só por uma chave, sem certificado, não tem identidade.
+  // A bundle signed by a bare public key has no identity.
   const bundle = JSON.parse((await atestada(r)).toString("utf8"));
   bundle.verificationMaterial = { publicKey: { hint: "qualquer" }, tlogEntries: bundle.verificationMaterial.tlogEntries, timestampVerificationData: {} };
   recusada(verificar(r, Buffer.from(JSON.stringify(bundle))), "malformada", /certificado/);
@@ -290,15 +290,15 @@ test("sem rede, a raiz de confiança é a última cópia verificada, ou então a
   const r = novaRelease();
   assert.equal(verificar(r, await atestada(r), doCache.raiz).ok, true, "a raiz do cache é a usada");
 
-  // Um cache danificado recai na raiz embutida em vez de falhar.
+  // A damaged cache falls back to the embedded root instead of failing.
   fs.writeFileSync(guardada, "{ corrompido");
   assert.equal((await atestacao.raizDeConfianca({ rede: false })).origem, "embutida");
   assert.equal(tentativas.length, 0, "nenhum acesso à rede");
 });
 
 test("o console não carrega chave de release de tipo nenhum: a confiança dele é a atestação", () => {
-  // Sem chave significa nada a vazar, guardar ou trocar: nenhum material de chave privada no
-  // programa, e nenhuma chave pública embutida no lugar da atestação.
+  // Keyless means nothing to leak, back up or rotate: no private key material anywhere in the
+  // program, and no embedded public key standing in for the attestation either.
   const fontes = [];
   const varrer = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -309,17 +309,17 @@ test("o console não carrega chave de release de tipo nenhum: a confiança dele 
     }
   };
   varrer(ajuda.RAIZ);
-  // Montados em tempo de execução para que este arquivo não case consigo mesmo.
+  // Assembled at run time so this file does not match itself.
   const privada = new RegExp(["-----BEGIN [A-Z ]*", "PRIVATE KEY-----"].join(""));
   const publica = new RegExp(["-----BEGIN ", "PUBLIC KEY-----"].join(""));
-  // Prefixos SPKI DER de chaves públicas Ed25519 e P-256, como texto base64.
+  // SPKI DER prefixes of Ed25519 and P-256 public keys, as base64 text.
   const spki = new RegExp(["MCowBQYDK2VwAyEA", "MFkwEwYHKoZIzj0CAQYI"].join("|"));
   const achados = fontes.filter((f) => {
     const texto = fs.readFileSync(f, "utf8");
     return privada.test(texto) || publica.test(texto) || spki.test(texto);
   });
   assert.deepEqual(achados.map((f) => path.relative(ajuda.RAIZ, f)), []);
-  // Nada no console assina coisa alguma.
+  // Nothing in the Console signs anything.
   const assinaAlgo = fontes.filter((f) => f.endsWith(".js") && /crypto\.sign\(|createSign\(|generateKeyPair/.test(fs.readFileSync(f, "utf8")));
   assert.deepEqual(assinaAlgo.map((f) => path.relative(ajuda.RAIZ, f)), []);
   assert.equal(crypto.getHashes().includes("sha256"), true);

@@ -4,16 +4,16 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// Contrato de prontidão consumido pelo Console de Operações.
+// Readiness contract consumed by the Operations Console.
 //
-// O que precisa valer sempre:
-//  - sem o arquivo de segredo a rota não existe (404), para que quem não instalou o console
-//    não pague nada nem ganhe superfície;
-//  - só responde no loopback, e o IP considerado é o do socket — TRUST_PROXY não pode
-//    transformar um cliente remoto em "local" por cabeçalho;
-//  - exige o segredo, comparado em tempo constante;
-//  - conta OTA em todas as fases ativas, inclusive `validando`, que monitoramentoService
-//    deixa de fora ao calcular otaEmAndamento.
+// Invariants:
+//  - without the secret file the route does not exist (404), so installations without the Console
+//    pay nothing and gain no surface;
+//  - answers only on loopback, using the socket IP: TRUST_PROXY must not turn a remote client into
+//    "local" through a header;
+//  - requires the secret, compared in constant time;
+//  - counts OTA in every active phase, including `validando`, which monitoramentoService leaves out
+//    of otaEmAndamento.
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-prontidao-"));
 process.env.REMOTEIFES_DATA_DIR = DIR;
@@ -64,7 +64,7 @@ function chamar(router, req) {
   const res = respostaFalsa();
   return new Promise((resolve) => {
     router.handle(req, res, () => resolve({ res, seguiu: true }));
-    // As respostas deste router são todas síncronas.
+    // All responses of this router are synchronous.
     setImmediate(() => resolve({ res, seguiu: false }));
   });
 }
@@ -124,8 +124,8 @@ test("todas as fases ativas de OTA entram na contagem, inclusive validando", asy
   const fases = Object.keys(res.corpo.ota.porFase).sort();
   assert.deepEqual(fases, ["baixando", "gravado", "ofertado", "reiniciando", "validando"]);
 
-  // As mesmas fases que otaService considera ativas. Se alguém acrescentar uma fase lá e
-  // esquecer aqui, o console passaria a interromper o serviço durante um OTA.
+  // The same phases otaService considers active. If a phase is added there and not here, the
+  // Console would interrupt the service during an OTA.
   const otaService = require("../src/services/otaService");
   assert.ok(otaService.listarEstados, "otaService precisa expor listarEstados para este contrato");
 });

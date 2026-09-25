@@ -5,26 +5,22 @@ const base = require("./base");
 const config = require("../config");
 const processos = require("../processos");
 
-// Adaptador Windows.
+// Windows adapter.
 //
-// Modelo de segundo plano: **partida sob demanda pelo lançador**, sem serviço permanente.
-// Isso não é paridade capenga com o systemd, é a escolha mais leve: como não existe serviço
-// registrado, não há gerenciador de serviços para interpretar a saída por ociosidade como
-// queda — o problema deixa de existir em vez de ser contornado. Um host de serviço SCM de
-// verdade exigiria componente nativo compilado e validado, que não é entregue aqui; tudo que
-// dependeria dele está isolado neste arquivo.
+// Background model: **on-demand start by the launcher**, with no permanent service. With no
+// registered service there is no service manager to interpret the idle exit as a crash. A real SCM
+// service host would require a compiled, validated native component, which is not shipped; anything
+// depending on it is isolated in this file.
 //
-// O serviço *da aplicação* RemoteIFES, quando existe no Windows, é consultado e controlado por
-// `sc.exe`; quando não existe, o console diz "não instalado" em vez de fingir que parou alguma
-// coisa.
+// The RemoteIFES *application* service, when it exists on Windows, is queried and controlled
+// through `sc.exe`; when it does not, the Console says "not installed" instead of pretending it
+// stopped something.
 //
-// POR QUE `sc.exe` E NÃO `Get-Service`: cada chamada de PowerShell paga a partida de um
-// processo que carrega o motor .NET — algo entre 1 e 5 s numa máquina modesta. A avaliação de
-// prontidão consulta serviço e watchdog antes de **toda** operação, e com PowerShell isso
-// passou de 15 s num runner de dois núcleos: o operador esperaria esse tempo só para ver a tela
-// de confirmação. `sc.exe` é um binário nativo que responde em milissegundos. O PowerShell
-// continua apenas onde não há equivalente nativo e a consulta é sob demanda (log de eventos,
-// portas em escuta, pacotes pendentes), nunca no caminho percorrido antes de cada operação.
+// WHY `sc.exe` AND NOT `Get-Service`: every PowerShell call pays for starting a process that loads
+// the .NET engine (1 to 5 s on modest hardware). Readiness queries the service and the watchdog
+// before **every** operation. `sc.exe` is a native binary that answers in milliseconds. PowerShell
+// remains only where there is no native equivalent and the query is on demand (event log, listening
+// ports, pending packages), never on the path taken before each operation.
 
 const { ESTADO, recurso } = base;
 
@@ -40,13 +36,15 @@ function powershell(script, { timeoutMs = 20_000 } = {}) {
   );
 }
 
-/** `sc.exe` com o nome do serviço passado como argumento, nunca interpolado num script. */
+/**
+ * `sc.exe` with the service name passed as an argument, never interpolated into a script.
+ */
 function sc(args, { timeoutMs = 15_000 } = {}) {
   return processos.executar("sc.exe", args, { timeoutMs });
 }
 
-// 1060 = ERROR_SERVICE_DOES_NOT_EXIST. É o código que distingue "não instalado" de "parado",
-// e a mensagem varia com o idioma do Windows — por isso a decisão é pelo código.
+// 1060 = ERROR_SERVICE_DOES_NOT_EXIST. This code distinguishes "not installed" from "stopped", and
+// the message varies with the Windows language, so the decision uses the code.
 const SERVICO_INEXISTENTE = /1060|does not exist as an installed service|não existe como serviço instalado/i;
 
 function servicoNaoInstalado() {
@@ -58,29 +56,30 @@ function servicoNaoInstalado() {
 }
 
 /**
- * Pares "CHAVE : valor" da saída de `sc.exe`, **na ordem em que aparecem**.
+ * "KEY : value" pairs from `sc.exe` output, **in the order they appear**.
  *
- * O rótulo não serve de chave: num Windows em português o `sc.exe` imprime `ESTADO` em vez de
- * `STATE`, `TIPO_DE_INÍCIO` em vez de `START_TYPE`. Procurar pelo nome inglês faria um serviço
- * em execução ser reportado como parado, e `start`/`stop` esperariam até o prazo e devolveriam
- * falha — num host que é justamente o alvo provável deste projeto.
+ * The label is not a usable key: on Portuguese Windows `sc.exe` prints `ESTADO` instead of `STATE`
+ * and `TIPO_DE_INÍCIO` instead of `START_TYPE`. Looking up the English name would report a running
+ * service as stopped, and `start`/`stop` would wait out the deadline and fail.
  *
- * O que é estável é a **ordem** dos campos, fixada pelo `sc.exe`:
+ * What is stable is the field **order**, fixed by `sc.exe`:
  *   query:    SERVICE_NAME, TYPE, STATE, WIN32_EXIT_CODE, SERVICE_EXIT_CODE, CHECKPOINT, ...
  *   qc:       ..., TYPE, START_TYPE, ERROR_CONTROL, BINARY_PATH_NAME, ...
- * e o **formato** do valor: o estado começa com o código numérico (1..7), o tipo com o seu.
+ * and the value **format**: the state starts with its numeric code (1..7), the type with its own.
  */
 function paresSc(texto) {
   const pares = [];
   for (const linha of String(texto).split(/\r?\n/)) {
-    // A chave pode ter acento e underscore; o valor é o resto da linha.
+    // The key may contain accents and underscores; the value is the rest of the line.
     const m = /^\s*([^\s:][^:]*?)\s*:\s*(.+?)\s*$/.exec(linha);
     if (m) pares.push({ chave: m[1].toUpperCase(), valor: m[2] });
   }
   return pares;
 }
 
-/** Compatibilidade: mapa por rótulo, para quem só precisa do caso inglês. */
+/**
+ * Compatibility: label map, for callers that only need the English case.
+ */
 function camposSc(texto) {
   const campos = {};
   for (const par of paresSc(texto)) campos[par.chave] = par.valor;
@@ -88,11 +87,11 @@ function camposSc(texto) {
 }
 
 /**
- * Código de estado do serviço a partir de `sc query`/`sc queryex`.
+ * Service state code from `sc query`/`sc queryex`.
  *
- * Tenta o rótulo inglês; se ele não existir (Windows localizado), usa a posição: o estado é o
- * terceiro par, depois de SERVICE_NAME e TYPE. Confere também que o valor tem a forma de estado
- * (número de 1 a 7 seguido de um rótulo), para não confundir com o tipo.
+ * Tries the English label; if absent (localized Windows), uses the position: the state is the third
+ * pair, after SERVICE_NAME and TYPE. Also checks the value has the shape of a state (number 1 to 7
+ * followed by a label), so it is not confused with the type.
  */
 function codigoDeEstadoSc(texto) {
   const pares = paresSc(texto);
@@ -111,7 +110,7 @@ function codigoDeEstadoSc(texto) {
     const n = numeroDe(pares[2].valor);
     if (n !== null && n >= 1 && n <= 7) return n;
   }
-  // Último recurso: o primeiro par cujo valor pareça um estado e que não seja o tipo.
+  // Last resort: the first pair whose value looks like a state and is not the type.
   for (let i = 1; i < pares.length; i += 1) {
     const n = numeroDe(pares[i].valor);
     if (n !== null && n >= 1 && n <= 7 && /^[A-Z_ ]+$/.test(String(pares[i].valor).replace(/^\d+\s*/, "").trim())) {
@@ -121,7 +120,9 @@ function codigoDeEstadoSc(texto) {
   return null;
 }
 
-/** Rótulo textual do estado, só para exibição — pode vir localizado, e isso é aceitável. */
+/**
+ * Textual state label, for display only; it may be localized, which is acceptable.
+ */
 function rotuloDeEstadoSc(texto) {
   const pares = paresSc(texto);
   const par = pares.find((p) => p.chave === "STATE") || pares[2];
@@ -129,8 +130,8 @@ function rotuloDeEstadoSc(texto) {
 }
 
 /**
- * Tipo de início a partir de `sc qc`. O valor vem como "2   AUTO_START"; o número é estável
- * (2 = automático, 3 = manual, 4 = desabilitado), o rótulo não.
+ * Start type from `sc qc`. The value comes as "2   AUTO_START"; the number is stable (2 =
+ * automatic, 3 = manual, 4 = disabled), the label is not.
  */
 function inicioAutomaticoSc(texto) {
   const pares = paresSc(texto);
@@ -150,16 +151,16 @@ async function estadoDoServico() {
     return recurso(ESTADO.INDISPONIVEL, (consulta.saida || consulta.erro || "não foi possível consultar o gerenciador de serviços").slice(0, 300));
   }
 
-  // "ESTADO : 4  RUNNING" em pt-BR, "STATE : 4  RUNNING" em en-US: o número é estável, o
-  // rótulo não. 4 = SERVICE_RUNNING.
+  // "ESTADO : 4  RUNNING" on pt-BR, "STATE : 4  RUNNING" on en-US: the number is stable, the label
+  // is not. 4 = SERVICE_RUNNING.
   const codigoEstado = codigoDeEstadoSc(consulta.saida);
   const ativo = codigoEstado === 4;
 
-  // Tipo de início e PID vêm de chamadas separadas e baratas; nenhuma é obrigatória para
-  // responder o essencial, então uma falha ali não derruba a consulta inteira.
+  // Start type and PID come from separate, cheap calls; neither is required for the essential
+  // answer, so a failure there does not break the whole query.
   const [configuracao, detalhe] = await Promise.all([sc(["qc", SERVICO_APP]), sc(["queryex", SERVICO_APP])]);
   const inicio = configuracao.ok ? inicioAutomaticoSc(configuracao.saida) : { automatico: false, rotulo: null };
-  // PID: o rótulo é o mesmo em qualquer idioma, então aqui o mapa por chave basta.
+  // PID: the label is the same in every language, so the key map suffices here.
   const camposDetalhe = detalhe.ok ? camposSc(detalhe.saida) : {};
 
   return {
@@ -185,14 +186,14 @@ async function controlarServico(acao) {
   const existe = await estadoDoServico();
   if (existe.estado === ESTADO.NAO_INSTALADO) return existe;
 
-  // `sc stop`/`sc start` retornam assim que o SCM aceita o pedido, não quando ele termina.
-  // Para reiniciar é preciso esperar a parada de fato, senão o start falha com "serviço já
-  // está sendo parado" — e o console teria relatado sucesso sobre um serviço que não subiu.
+  // `sc stop`/`sc start` return as soon as the SCM accepts the request, not when it finishes. A
+  // restart must wait for the actual stop, otherwise start fails with "service is already being
+  // stopped" and the Console would report success over a service that did not start.
   const negado = (r) => /Access is denied|Acesso negado|5:/i.test(r.saida || r.erro || "");
 
   if (acao === "parar" || acao === "reiniciar") {
     const parada = await sc(["stop", SERVICO_APP], { timeoutMs: 30_000 });
-    // 1062 = o serviço não foi iniciado; parar algo já parado não é falha.
+    // 1062 = the service has not been started; stopping something already stopped is not a failure.
     const jaParado = /1062/.test(parada.saida || parada.erro || "");
     if (!parada.ok && !jaParado) {
       if (negado(parada)) return recurso(ESTADO.SEM_PERMISSAO, "controlar este serviço exige executar o console como Administrador");
@@ -217,9 +218,9 @@ async function controlarServico(acao) {
 }
 
 /**
- * Espera o SCM chegar a um estado. Não é retentativa cega para esconder instabilidade: `sc` é
- * assíncrono por contrato, e confirmar a transição é o que separa "o pedido foi aceito" de "o
- * serviço está no estado pedido" — a diferença entre relatar sucesso e ter sucesso.
+ * Waits for the SCM to reach a state. This is not a blind retry hiding instability: `sc` is
+ * asynchronous by contract, and confirming the transition separates "the request was accepted" from
+ * "the service is in the requested state".
  */
 async function esperarEstado(codigoDesejado, prazoMs) {
   const limite = Date.now() + prazoMs;
@@ -233,8 +234,8 @@ async function esperarEstado(codigoDesejado, prazoMs) {
 
 async function lerRegistros({ unidade = "aplicacao", linhas = 200 } = {}) {
   const n = Math.max(10, Math.min(Number(linhas) || 200, 2000));
-  // O Windows não tem journal por unidade; o mais próximo é o log de Aplicativo filtrado pela
-  // origem do serviço. Quando não há nada registrado, dizemos isso em vez de devolver vazio.
+  // Windows has no per-unit journal; the closest is the Application log filtered by the service
+  // source. When nothing was logged, that is stated instead of returning empty.
   const fontes = {
     aplicacao: SERVICO_APP,
     console: "RemoteIFES-Console",
@@ -244,13 +245,12 @@ async function lerRegistros({ unidade = "aplicacao", linhas = 200 } = {}) {
   const fonte = fontes[unidade];
   if (!fonte) return recurso(ESTADO.NAO_SUPORTADO, "unidade de log não permitida");
 
-  // A origem é conferida ANTES de filtrar o log.
+  // The source is checked BEFORE filtering the log.
   //
-  // `Get-WinEvent -FilterHashtable @{ProviderName='X'}` com uma origem que nunca registrou nada
-  // não retorna rápido: ele varre o log de Aplicativo inteiro antes de concluir que não há
-  // correspondência. Num host onde o RemoteIFES roda manualmente — que é o caso comum, e o da
-  // CI — isso levava a leitura além do prazo e o console reportava indisponibilidade onde a
-  // resposta certa é "esta origem não registra eventos". `-ListProvider` responde na hora.
+  // `Get-WinEvent -FilterHashtable @{ProviderName='X'}` with a source that never logged anything
+  // does not return quickly: it scans the whole Application log before concluding there is no
+  // match. On a host where RemoteIFES runs manually (the common case, and CI) that exceeded the
+  // read deadline. `-ListProvider` answers immediately.
   const r = await powershell(
     `$ErrorActionPreference='SilentlyContinue';` +
       `if ($null -eq (Get-WinEvent -ListProvider '${fonte}' -ErrorAction SilentlyContinue)) { 'SEMPROVEDOR' } else {` +
@@ -305,7 +305,8 @@ async function reiniciarHost() {
 }
 
 async function reiniciarConsole() {
-  // Sem serviço permanente não há o que reiniciar: o console sai e o lançador o reabre.
+  // Without a permanent service there is nothing to restart: the Console exits and the launcher
+  // reopens it.
   return recurso(
     ESTADO.NAO_APLICAVEL,
     "no Windows o console é iniciado sob demanda pelo lançador; encerrá-lo basta, e a próxima abertura sobe a versão nova."
@@ -340,8 +341,8 @@ async function pacotesPendentes() {
 }
 
 /**
- * Encerra a árvore de processos. O Windows não tem grupo de processos POSIX, então matar o PID
- * pai deixaria netos vivos — daí `taskkill /T`.
+ * Ends the process tree. Windows has no POSIX process group, so killing the parent PID would leave
+ * grandchildren alive; hence `taskkill /T`.
  */
 function encerrarArvore(pid, sinal) {
   if (!pid) return;
@@ -357,30 +358,31 @@ function encerrarArvore(pid, sinal) {
 }
 
 function opcoesDeGrupo() {
-  // `detached` no Windows cria um novo grupo de console; combinado com taskkill /T, é o que
-  // permite encerrar a árvore inteira.
+  // `detached` on Windows creates a new console group; combined with taskkill /T it allows ending
+  // the whole tree.
   return { detached: true, windowsHide: true };
 }
 
 async function abrirNavegador(url) {
-  // `start` do cmd resolve o navegador padrão do usuário. O primeiro argumento vazio é o
-  // título da janela: sem ele, uma URL entre aspas viraria título e nada abriria.
+  // cmd's `start` resolves the user's default browser. The empty first argument is the window
+  // title:
+  // without it, a quoted URL would become the title and nothing would open.
   const r = await processos.executar("cmd.exe", ["/d", "/s", "/c", "start", "", url], { timeoutMs: 15_000 });
   return r.ok ? { ...recurso(ESTADO.SUPORTADO), url } : recurso(ESTADO.INDISPONIVEL, r.erro || "não foi possível abrir o navegador", { url });
 }
 
 /**
- * Proteção de arquivo por ACL. `chmod` no Windows só mexe no bit de somente-leitura e não
- * restringe ninguém: afirmar proteção com modo POSIX aqui seria falso.
+ * File protection by ACL. `chmod` on Windows only toggles the read-only bit and restricts nobody:
+ * claiming protection through a POSIX mode here would be false.
  */
 function protegerArquivo(caminho, { diretorio = false } = {}) {
   const usuario = process.env.USERNAME ? `${process.env.USERDOMAIN || os.hostname()}\\${process.env.USERNAME}` : null;
   if (!usuario) return recurso(ESTADO.INDISPONIVEL, "não foi possível identificar o usuário atual para aplicar a ACL");
   try {
     const { execFileSync } = require("child_process");
-    // (OI)(CI) são flags de **herança**, que só fazem sentido em diretório. Aplicá-las a um
-    // arquivo produz uma ACE sem efeito e o arquivo fica sem permissão nenhuma — inclusive
-    // para o próprio dono, que passa a receber EPERM ao lê-lo.
+    // (OI)(CI) are **inheritance** flags, meaningful only on directories. Applied to a file they
+    // produce an ineffective ACE and the file ends up with no permission at all, even for its
+    // owner, who then gets EPERM reading it.
     const heranca = diretorio ? "(OI)(CI)" : "";
     const args = [
       caminho,
@@ -394,10 +396,10 @@ function protegerArquivo(caminho, { diretorio = false } = {}) {
     ];
     execFileSync("icacls.exe", args, { stdio: "ignore", timeout: 30_000 });
     if (diretorio) {
-      // NÃO se usa `/T` junto com a concessão acima: `/T` propagaria a mesma ACE — com flags
-      // de herança, que só valem para diretório — para os arquivos já existentes dentro, e
-      // eles ficariam sem permissão alguma, inclusive para o dono (EPERM ao ler).
-      // O certo é deixar os filhos herdarem do diretório recém-configurado.
+      // `/T` is NOT used with the grant above: `/T` would propagate the same ACE, with
+      // directory-only inheritance flags, to existing files inside, leaving them with no permission
+      // at all, even for the owner (EPERM on read). Children inherit from the freshly configured
+      // directory instead.
       execFileSync("icacls.exe", [caminho, "/reset", "/T", "/C", "/Q"], { stdio: "ignore", timeout: 60_000 });
     }
     return { ...recurso(ESTADO.SUPORTADO), mecanismo: "icacls" };
@@ -410,7 +412,7 @@ function permissaoRestrita(caminho) {
   try {
     const { execFileSync } = require("child_process");
     const saida = execFileSync("icacls.exe", [caminho], { encoding: "utf8", timeout: 20_000 });
-    // Qualquer concessão a Everyone/Todos/Users derruba a restrição.
+    // Any grant to Everyone/Todos/Users defeats the restriction.
     const aberto = /(Everyone|Todos|BUILTIN\\Users|BUILTIN\\Usuários):\([^)]*\)[FMW]/i.test(saida) || /Everyone:\(/i.test(saida);
     return { restrito: !aberto, verificavel: true, mecanismo: "icacls" };
   } catch (erro) {
@@ -445,15 +447,13 @@ function diretoriosPadrao({ escopo = "usuario" } = {}) {
 
 async function registrarInicializacao({ comando, argumentos = [], escopo = "usuario" } = {}) {
   if (!comando) return recurso(ESTADO.NAO_SUPORTADO, "comando de inicialização ausente");
-  // Tarefa agendada em vez de serviço: o console é sob demanda e não precisa residir.
+  // Scheduled task instead of a service: the Console is on demand and does not need to stay
+  // resident.
   //
-  // `schtasks.exe` é chamado direto, com cada argumento no seu lugar. Passando por um script de
-  // PowerShell era preciso escapar aspas na mão, e o alvo é justamente um caminho com espaço
-  // ("...\RemoteIFES Console\console-bootstrap.js"): a citação dupla — a do PowerShell e a do
-  // schtasks — é onde esse tipo de comando quebra em silêncio e registra uma tarefa que não roda.
-  //
-  // Os `argumentos` também eram descartados aqui, então a tarefa chamava `node.exe` sem script
-  // nenhum: ela era criada com sucesso e não abria coisa alguma.
+  // `schtasks.exe` is called directly, each argument in place. The target is a path with a space
+  // ("...\RemoteIFES Console\console-bootstrap.js"), and double quoting through a PowerShell script
+  // is where this kind of command breaks silently and registers a task that does not run.
+  // `argumentos` must be passed, otherwise the task starts `node.exe` with no script.
   const alvo = [comando, ...argumentos].map((parte) => `"${parte}"`).join(" ");
   const args = ["/Create", "/F", "/TN", TAREFA, "/TR", alvo, "/SC", "ONLOGON"];
   if (escopo === "sistema") args.push("/RU", "SYSTEM");
@@ -468,7 +468,8 @@ async function registrarInicializacao({ comando, argumentos = [], escopo = "usua
 
 async function removerInicializacao() {
   const r = await processos.executar("schtasks.exe", ["/Delete", "/F", "/TN", TAREFA], { timeoutMs: 20_000 });
-  // Apagar uma tarefa que não existe não é falha: o resultado pedido já é o estado atual.
+  // Deleting a task that does not exist is not a failure: the requested result is already the
+  // current state.
   if (!r.ok && /cannot find|não foi possível encontrar|does not exist/i.test(r.saida || r.erro || "")) {
     return { ...recurso(ESTADO.SUPORTADO), mecanismo: "não havia tarefa agendada registrada" };
   }

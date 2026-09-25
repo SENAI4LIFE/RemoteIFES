@@ -18,8 +18,8 @@ const PADROES = {
   redesAutorizadas: [],
   modoManutencao: false,
   espCredenciaisObrigatorias: process.env.NODE_ENV !== "test",
-  // Política do ponto de acesso local do ESP32 (RemoteIFES-Setup). Não tem relação com a
-  // autenticação do dispositivo no servidor, que continua em espCredenciaisObrigatorias.
+  // Policy for the ESP32 local access point (RemoteIFES-Setup). Unrelated to device authentication
+  // on the server, which remains in espCredenciaisObrigatorias.
   espApExigirCredencial: false,
 };
 
@@ -199,8 +199,8 @@ function validarEAtualizar(patch, requisitante) {
         )
       )
     `).run(proximo.temperaturaMinima, proximo.temperaturaMaxima);
-    // O estado desejado das salas muda junto com estes limites/funções: a versão avança na mesma
-    // transação, para que um eco da versão anterior nunca passe por confirmação do novo estado.
+    // The rooms' desired state changes together with these limits/functions: the version advances
+    // in the same transaction, so an echo of the previous version never confirms the new state.
     if (estadoIRAlterado) db.prepare(`UPDATE salas SET estadoVersao = estadoVersao + 1 WHERE irProtocolo IS NOT NULL`).run();
     db.exec("COMMIT");
   } catch (erro) {

@@ -5,30 +5,28 @@ const config = require("./config");
 const estado = require("./estado");
 const release = require("./release");
 
-// Proveniência dos releases do console: atestações de artefato do GitHub, sem chave.
+// Provenance of Console releases: GitHub artifact attestations, keyless.
 //
-// Um release é confiável porque o GitHub Actions, rodando o workflow de publicação dedicado deste
-// repositório para uma etiqueta de release, atestou os seus bytes exatos. Não existe chave de
-// assinatura do RemoteIFES em lugar nenhum: o token OIDC de curta duração do workflow é trocado por
-// um certificado do Sigstore (Fulcio) válido por dez minutos, a assinatura fica registrada no log
-// público de transparência (Rekor), e o pacote da atestação leva o certificado, a entrada do log e
-// a declaração in-toto assinada.
+// A release is trusted because GitHub Actions, running this repository's dedicated release
+// workflow for a release tag, attested its exact bytes. No RemoteIFES signing key exists anywhere:
+// the workflow's short-lived GitHub OIDC token is exchanged for a Sigstore (Fulcio) certificate
+// valid for ten minutes, the signature is recorded in the public transparency log (Rekor), and the
+// attestation bundle carries the certificate, the log entry and the signed in-toto statement.
 //
-// O que é conferido, nesta ordem, antes de qualquer artefato ser gravado:
-//   1. o pacote é bem formado e traz um envelope DSSE com uma declaração in-toto;
-//   2. a criptografia, pelo @sigstore/verify contra a raiz de confiança do Sigstore: cadeia do
-//      certificado até o Fulcio no momento da assinatura, transparência de certificados, inclusão
-//      no log de transparência e a assinatura do envelope. Nada disso é implementado aqui;
-//   3. a identidade, SÓ pelo CERTIFICADO: emissor, repositório e dono (por nome e por identificador
-//      numérico, para que um repositório renomeado ou recriado não herde a confiança), o workflow
-//      de publicação na etiqueta do release, o gatilho push, um executor hospedado pelo GitHub e o
-//      ambiente de publicação;
-//   4. a declaração: proveniência SLSA, cujos sujeitos incluem o digest exato do manifesto e cada
-//      artefato que o manifesto lista, com o digest que o manifesto declara;
-//   5. o manifesto: a sua versão é a etiqueta do certificado e o seu commit é o commit que o
-//      certificado diz ter sido construído.
-// O predicado da declaração é assinado, mas composto dentro da execução do workflow, então nunca
-// decide a identidade; só se exige que concorde com o certificado.
+// What is checked, in this order, before any artifact is written:
+//   1. the bundle is well formed and holds a DSSE envelope with an in-toto statement;
+//   2. cryptography, by @sigstore/verify against the Sigstore trusted root: certificate chain to
+//      Fulcio at the signing time, certificate transparency, transparency log inclusion and the
+//      envelope signature. Nothing of this is implemented here;
+//   3. identity, from the CERTIFICATE only: issuer, repository and owner (by name and by numeric
+//      id, so a renamed or recreated repository does not inherit the trust), the release workflow
+//      at the release tag, the push trigger, a GitHub-hosted runner and the release environment;
+//   4. the statement: SLSA provenance, whose subjects include the manifest's exact digest and every
+//      artifact the manifest lists, with the digest the manifest declares;
+//   5. the manifest: its version is the tag in the certificate and its commit is the commit the
+//      certificate says was built.
+// The statement's predicate is signed but composed inside the workflow run, so it never decides
+// identity; it is only required to agree with the certificate.
 
 const IDENTIDADE_OFICIAL = Object.freeze({
   emissor: "https://token.actions.githubusercontent.com",
@@ -46,16 +44,15 @@ const TIPO_PAYLOAD = "application/vnd.in-toto+json";
 const TIPO_DECLARACAO = "https://in-toto.io/Statement/v1";
 const TIPO_PREDICADO = "https://slsa.dev/provenance/v1";
 
-// Nomes dos arquivos do release. O manifesto descreve o release; o pacote atesta o manifesto e
-// todos os artefatos de uma vez.
+// Release file names. The manifest describes the release; the bundle attests the manifest and
+// every artifact at once.
 const ARQUIVO_MANIFESTO = "manifesto.json";
 const ARQUIVO_ATESTACAO = "atestacao.sigstore.json";
 
 const LIMITE_ATESTACAO = 2 * 1024 * 1024;
 const MAX_SUJEITOS = 500;
 
-// Extensões do certificado do Fulcio
-// (https://github.com/sigstore/fulcio/blob/main/docs/oid-info.md).
+// Fulcio certificate extensions (https://github.com/sigstore/fulcio/blob/main/docs/oid-info.md).
 const OID = Object.freeze({
   emissor: "1.3.6.1.4.1.57264.1.8",
   assinante: "1.3.6.1.4.1.57264.1.9",
@@ -73,9 +70,9 @@ const OID = Object.freeze({
   ambiente: "1.3.6.1.4.1.57264.1.23",
 });
 
-// Repositório TUF público do Sigstore, que distribui a raiz de confiança (chaves do Fulcio, do
-// Rekor, do CT e de carimbo de tempo). O prazo vale por requisição e não há nova tentativa: uma
-// atualização que falha significa só "agora não", e a próxima consulta tenta de novo.
+// Sigstore's public TUF repository, which distributes the trusted root (Fulcio, Rekor, CT and
+// timestamp keys). Timeouts are per request and there is no retry: a failed refresh simply means
+// "not now", and the next check tries again.
 const ESPELHO_TUF = "https://tuf-repo-cdn.sigstore.dev";
 const TEMPO_TUF_MS = 10_000;
 
@@ -83,8 +80,8 @@ function dirSigstore() {
   return path.join(config.DIR_ESTADO, "sigstore");
 }
 
-// A raiz que a última atualização bem-sucedida produziu, guardada fora do cache do próprio cliente
-// TUF para que o caminho offline nunca dependa de como aquela biblioteca organiza os arquivos.
+// The root the last successful refresh produced, kept apart from the TUF client's own cache so
+// the offline path never depends on how that library lays out its files.
 function arquivoRaizVerificada() {
   return path.join(dirSigstore(), "trusted_root.json");
 }
@@ -101,23 +98,23 @@ function recusa(motivo, codigo) {
   return { ok: false, motivo, codigo };
 }
 
-// --- Raiz de confiança -------------------------------------------------------------------------
+// --- Trusted root ------------------------------------------------------------------------------
 
 let atualizacaoEmCurso = null;
 
 /**
- * A raiz de confiança do Sigstore.
+ * The Sigstore trusted root.
  *
- * `rede: true` a atualiza por TUF: metadados assinados pelas chaves-raiz do Sigstore, conferidos
- * contra a raiz embutida no @sigstore/tuf e depois contra cada rotação desde então. É assim que uma
- * chave que o Sigstore aposentou deixa de ser confiável aqui. O cache TUF e a raiz resultante ficam
- * no diretório de estado (cerca de 60 KB; os arquivos são sobrescritos, versões não se acumulam).
+ * `rede: true` refreshes it through TUF: metadata signed by Sigstore's root keys, checked against
+ * the root embedded in @sigstore/tuf and then against every rotation since. It is how a key
+ * Sigstore retired stops being trusted here. The TUF cache and the resulting root stay in the
+ * state directory (about 60 KB; files are overwritten, versions do not accumulate).
  *
- * `rede: false` nunca toca a rede: a última raiz que uma atualização verificou, ou então a embutida
- * no @sigstore/tuf. Serve à importação offline, onde nenhuma atualização é possível; o que ela não
- * tem como saber é uma chave que o Sigstore revogou depois daquela cópia.
+ * `rede: false` never touches the network: the last root a refresh verified, or else the one
+ * embedded in @sigstore/tuf. It serves the offline import, where no refresh is possible; what
+ * it cannot know is a key Sigstore revoked after that copy was made.
  *
- * Atualizações concorrentes neste processo compartilham uma única requisição.
+ * Concurrent refreshes in this process share one request.
  */
 async function raizDeConfianca({ rede = false } = {}) {
   const { TrustedRoot } = require("@sigstore/protobuf-specs");
@@ -134,7 +131,7 @@ async function raizDeConfianca({ rede = false } = {}) {
           try {
             estado.gravarJson(arquivoRaizVerificada(), TrustedRoot.toJSON(raiz), 0o600);
           } catch {
-            // Sem a cópia, a importação offline só perde uma raiz mais recente.
+            // Not keeping a copy costs only the offline import a fresher root.
           }
           return raiz;
         })
@@ -148,7 +145,7 @@ async function raizDeConfianca({ rede = false } = {}) {
   try {
     return { raiz: TrustedRoot.fromJSON(JSON.parse(fs.readFileSync(arquivoRaizVerificada(), "utf8"))), origem: "cache" };
   } catch {
-    // Ausente ou ilegível: a cópia embutida está sempre lá.
+    // Absent or unreadable: the embedded copy is always there.
   }
   const sementes = require("@sigstore/tuf/seeds.json");
   const semente = sementes[ESPELHO_TUF] && sementes[ESPELHO_TUF].targets && sementes[ESPELHO_TUF].targets["trusted_root.json"];
@@ -156,11 +153,11 @@ async function raizDeConfianca({ rede = false } = {}) {
   return { raiz: TrustedRoot.fromJSON(JSON.parse(Buffer.from(semente, "base64").toString("utf8"))), origem: "embutida" };
 }
 
-// --- Identidade do certificado ---------------------------------------------------------------
+// --- Certificate identity --------------------------------------------------------------------
 
 /**
- * Valor de uma extensão v2 do Fulcio: uma UTF8String DER. Qualquer outra coisa (outra tag, um
- * tamanho que não fecha o valor, bytes sobrando) é ilegível e conta como ausente.
+ * Value of a Fulcio v2 extension: a DER UTF8String. Anything else (another tag, a length that does
+ * not close the value, trailing bytes) is unreadable and counts as absent.
  */
 function textoDer(valor) {
   const b = Buffer.from(valor || []);
@@ -178,9 +175,8 @@ function textoDer(valor) {
 }
 
 /**
- * A identidade que o certificado declara, a partir do assinante que o @sigstore/verify devolveu.
- * `certificado` é o DER da folha, lido de novo pelo próprio leitor X.509 do Node como segunda
- * opinião sobre o SAN.
+ * The identity the certificate states, from the signer @sigstore/verify returned. `certificado` is
+ * the leaf DER, read again with Node's own X.509 parser as a second opinion on the SAN.
  */
 function identidadeDoCertificado(assinante, certificado) {
   const identidade = assinante && assinante.identity;
@@ -190,7 +186,7 @@ function identidadeDoCertificado(assinante, certificado) {
   for (const par of identidade.oids || []) {
     const id = par && par.oid && Array.isArray(par.oid.id) ? par.oid.id.join(".") : null;
     if (!id) continue;
-    // O X.509 proíbe repetir uma extensão; um certificado que repete é ambíguo.
+    // X.509 forbids repeating an extension; a certificate that does it is ambiguous.
     if (vistas.has(id)) return { duplicada: id };
     vistas.add(id);
     valores[id] = par.value;
@@ -211,7 +207,7 @@ function identidadeDoCertificado(assinante, certificado) {
 }
 
 /**
- * A política de identidade. Toda comparação é exata: nada de padrão, nada de prefixo.
+ * The identity policy. Every comparison is exact: no pattern, no prefix.
  */
 function conferirIdentidade(id, { versao, commit }, oficial = IDENTIDADE_OFICIAL) {
   if (!id) return recusa("a atestação não traz a identidade de quem a emitiu", "identidade");
@@ -248,7 +244,7 @@ function conferirIdentidade(id, { versao, commit }, oficial = IDENTIDADE_OFICIAL
   return { ok: true };
 }
 
-// --- Declaração --------------------------------------------------------------------------------
+// --- Statement ---------------------------------------------------------------------------------
 
 function lerDeclaracao(bundle) {
   const envelope = bundle.content && bundle.content.$case === "dsseEnvelope" ? bundle.content.dsseEnvelope : null;
@@ -273,7 +269,7 @@ function lerDeclaracao(bundle) {
     if (!s || typeof s.name !== "string" || !/^[0-9a-f]{64}$/.test(String(sha || ""))) {
       return recusa("a atestação lista um arquivo sem nome ou sem SHA-256", "declaracao");
     }
-    // Um nome com dois digests faria a resposta depender da ordem.
+    // One name with two digests would make the answer depend on the order.
     if (sujeitos.has(s.name) && sujeitos.get(s.name) !== sha) return recusa(`a atestação lista ${s.name} duas vezes`, "declaracao");
     sujeitos.set(s.name, sha);
   }
@@ -281,8 +277,8 @@ function lerDeclaracao(bundle) {
 }
 
 /**
- * O predicado é assinado, mas os seus valores são compostos pela execução do workflow. Ele precisa
- * concordar com o certificado; nunca o substitui.
+ * The predicate is signed, but its values are composed by the workflow run. It must agree with the
+ * certificate; it never replaces it.
  */
 function conferirPredicado(declaracao, { versao, commit }, oficial = IDENTIDADE_OFICIAL) {
   const definicao = declaracao.predicate && declaracao.predicate.buildDefinition;
@@ -297,11 +293,11 @@ function conferirPredicado(declaracao, { versao, commit }, oficial = IDENTIDADE_
   return coincide ? { ok: true } : recusa("a descrição do build na atestação não confere com o certificado", "declaracao");
 }
 
-// --- Verificação -------------------------------------------------------------------------------
+// --- Verification ------------------------------------------------------------------------------
 
 /**
- * Lê e verifica criptograficamente um pacote. Devolve a identidade e a declaração; a política é
- * aplicada por quem chama, que sabe o que o release alega ser.
+ * Parses and cryptographically verifies a bundle. Returns the identity and the statement; the
+ * policy is applied by the caller, which knows what the release claims to be.
  */
 function verificarAssinatura(bytesAtestacao, raiz) {
   if (!Buffer.isBuffer(bytesAtestacao) || !bytesAtestacao.length) return recusa("a atestação está vazia", "malformada");
@@ -315,8 +311,8 @@ function verificarAssinatura(bytesAtestacao, raiz) {
   } catch {
     return recusa("a atestação está malformada", "malformada");
   }
-  // Só um certificado do Fulcio carrega identidade. Um pacote assinado só por uma chave, sem
-  // certificado, não tem nenhuma, e a raiz de confiança não lista chave assim de qualquer forma.
+  // Only a Fulcio certificate carries an identity. A bundle signed by a bare public key has none,
+  // and the trusted root lists no such key anyway.
   const material = bundle.verificationMaterial && bundle.verificationMaterial.content;
   if (!material || material.$case !== "certificate") return recusa("a atestação não traz um certificado de identidade", "malformada");
 
@@ -327,7 +323,7 @@ function verificarAssinatura(bytesAtestacao, raiz) {
   } catch (erro) {
     return recusa(`a atestação não confere criptograficamente (${(erro && erro.code) || "erro"})`, "criptografia");
   }
-  // Só agora o conteúdo do envelope é autêntico o bastante para ser lido.
+  // Only now is the envelope's content authentic enough to be read.
   const declaracao = lerDeclaracao(bundle);
   if (!declaracao.ok) return declaracao;
   return {
@@ -339,8 +335,8 @@ function verificarAssinatura(bytesAtestacao, raiz) {
 }
 
 /**
- * Verifica um release: bytes do manifesto mais o pacote da atestação. Devolve o manifesto só quando
- * a cadeia inteira se sustenta; nada do release é confiável antes disso.
+ * Verifies a release: manifest bytes plus attestation bundle. Returns the manifest only when the
+ * whole chain holds; nothing about the release is trusted before that.
  */
 function verificarPublicacao({ manifesto: bytesManifesto, atestacao: bytesAtestacao, raiz }) {
   if (!Buffer.isBuffer(bytesManifesto) || !bytesManifesto.length) return recusa("manifesto vazio", "manifesto");
@@ -348,7 +344,7 @@ function verificarPublicacao({ manifesto: bytesManifesto, atestacao: bytesAtesta
   const assinatura = verificarAssinatura(bytesAtestacao, raiz);
   if (!assinatura.ok) return assinatura;
 
-  // O manifesto só é confiável como os bytes exatos que o workflow atestou.
+  // The manifest is trusted only as the exact bytes the workflow attested.
   const shaManifesto = crypto.createHash("sha256").update(bytesManifesto).digest("hex");
   if (assinatura.sujeitos.get(ARQUIVO_MANIFESTO) !== shaManifesto) {
     return recusa("o manifesto não é o arquivo que a atestação cobre", "sujeito");
@@ -368,8 +364,8 @@ function verificarPublicacao({ manifesto: bytesManifesto, atestacao: bytesAtesta
   const predicado = conferirPredicado(assinatura.declaracao, alegado);
   if (!predicado.ok) return predicado;
 
-  // Todo artefato que o manifesto lista está atestado com o digest que ele declara, não só o que
-  // este console vai baixar: um manifesto que descreve bytes não atestados é recusado inteiro.
+  // Every artifact the manifest lists is attested with the digest it declares, not only the one
+  // this console will download: a manifest that describes bytes nobody attested is refused whole.
   for (const artefato of manifesto.artefatos) {
     if (assinatura.sujeitos.get(artefato.arquivo) !== artefato.sha256) {
       return recusa(`o artefato ${artefato.arquivo} não está coberto pela atestação com o digest do manifesto`, "sujeito");

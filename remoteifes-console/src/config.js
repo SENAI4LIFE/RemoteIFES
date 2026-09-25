@@ -2,9 +2,9 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// Raiz do payload em execução. Instalado, é <raiz>/versoes/<versao>; em desenvolvimento, o
-// próprio checkout. Os dois casos resolvem igual porque o módulo está sempre dois níveis abaixo
-// da raiz do payload.
+// Root of the running payload. Installed, it is <raiz>/versoes/<versao>; in development, the
+// checkout itself. Both resolve the same way because the module is always two levels below the
+// payload root.
 const RAIZ_CONSOLE = path.join(__dirname, "..");
 
 function inteiro(valor, padrao, min, max) {
@@ -19,12 +19,12 @@ function booleano(valor, padrao) {
   return ["1", "true", "sim", "yes", "on"].includes(String(valor).trim().toLowerCase());
 }
 
-// Diretório de estado do console: fora do checkout (uma atualização não pode apagá-lo) e fora
-// do data/ da aplicação (uma restauração de banco não pode confundi-lo com dado da aplicação).
+// Console state directory: outside the checkout (an update cannot delete it) and outside the
+// application's data/ (a database restore cannot mistake it for application data).
 //
-// Cada sistema tem convenção própria, e trocar todas por um dotfolder no home seria errado em
-// dois deles. O escopo (sistema x usuário) é decidido na instalação e gravado; aqui só se
-// resolve o padrão de quem ainda não instalou.
+// Each system has its own convention, and replacing them all with a dotfolder in home would be
+// wrong on two of them. The scope (system vs user) is decided at installation and recorded; here
+// only the default for a not-yet-installed program is resolved.
 function estadoPadrao() {
   if (process.platform === "linux") return "/var/lib/remoteifes-console";
   if (process.platform === "win32") {
@@ -38,8 +38,8 @@ function estadoPadrao() {
 
 const DIR_ESTADO = process.env.CONSOLE_ESTADO_DIR ? path.resolve(process.env.CONSOLE_ESTADO_DIR) : estadoPadrao();
 
-// Checkout do RemoteIFES que o console administra. Detectado a partir da instalação quando o
-// console roda de dentro do repositório; caso contrário vem do arquivo gravado na instalação.
+// RemoteIFES checkout managed by the Console. Detected from the installation when the Console runs
+// from inside the repository; otherwise read from the file recorded at installation.
 function detectarCheckout() {
   if (process.env.CONSOLE_CHECKOUT_DIR) return path.resolve(process.env.CONSOLE_CHECKOUT_DIR);
   const gravado = path.join(DIR_ESTADO, "checkout-dir");
@@ -47,17 +47,17 @@ function detectarCheckout() {
     const conteudo = fs.readFileSync(gravado, "utf8").trim();
     if (conteudo) return path.resolve(conteudo);
   } catch {}
-  // Instalação sem checkout associado ainda: o console sobe e diz que precisa ser apontado.
-  // Console rodando de dentro do próprio checkout (desenvolvimento).
+  // Installation without an associated checkout yet: the Console starts and says it needs to be
+  // pointed at one. Console running from inside its own checkout (development).
   const candidato = path.join(RAIZ_CONSOLE, "..");
   if (fs.existsSync(path.join(candidato, "remoteifes-server", "package.json"))) return path.resolve(candidato);
   return path.resolve(candidato);
 }
 
-// Raiz da instalação (camada estável): contém `versoes/<v>/`, o ponteiro da versão ativa e a
-// área de estágio. RAIZ_CONSOLE é o payload em execução; RAIZ_INSTALACAO é o que o pacote
-// instala e o que o atualizador administra. Em desenvolvimento, rodando do checkout, as duas
-// coincidem e o layout lado a lado simplesmente não existe.
+// Installation root (stable layer): contains `versoes/<v>/`, the active version pointer and the
+// staging area. RAIZ_CONSOLE is the running payload; RAIZ_INSTALACAO is what the package installs
+// and the updater manages. In development, running from the checkout, both coincide and the
+// side-by-side layout does not exist.
 function detectarRaizInstalacao() {
   if (process.env.CONSOLE_RAIZ_INSTALACAO) return path.resolve(process.env.CONSOLE_RAIZ_INSTALACAO);
   // .../<raiz>/versoes/<versao>/  ->  <raiz>
@@ -73,8 +73,8 @@ const DIR_SERVIDOR = path.join(DIR_CHECKOUT, "remoteifes-server");
 const DIR_WEB = path.join(DIR_CHECKOUT, "remoteifes-web");
 const DIR_CORDOVA = path.join(DIR_CHECKOUT, "remoteifes-cordova");
 
-// Diretório de dados da aplicação. Espelha src/config/paths.js do servidor sem carregá-lo: o
-// módulo do servidor arrastaria o banco junto e criaria arquivos num processo que só observa.
+// Application data directory. Mirrors the server's src/config/paths.js without loading it: the
+// server module would pull the database along and create files in a process that only observes.
 function lerEnvServidor() {
   const arquivo = path.join(DIR_SERVIDOR, ".env");
   const valores = {};
@@ -97,9 +97,9 @@ function lerEnvServidor() {
 }
 
 /**
- * Endereço em que a aplicação é realmente alcançável por um navegador. A origem configurada em
- * CORS_ORIGIN é a que os usuários usam; só quando não há nenhuma é que se cai no loopback com a
- * porta configurada. Nunca uma porta fixa presumida.
+ * Address at which a browser can actually reach the application. The origin configured in
+ * CORS_ORIGIN is the one users use; only when there is none does it fall back to loopback with the
+ * configured port. Never an assumed fixed port.
  */
 function urlDaAplicacao() {
   const env = lerEnvServidor();
@@ -125,9 +125,9 @@ function caminhosDaAplicacao() {
     ? path.resolve(DIR_SERVIDOR, env.REMOTEIFES_DB_PATH)
     : path.join(dirDados, "remoteifes.db");
   const backups = env.BACKUP_DIR ? path.resolve(DIR_SERVIDOR, env.BACKUP_DIR) : path.join(dirDados, "backups");
-  // publish-android-release.js grava em REMOTEIFES_MOBILE_RELEASE_DIR e mobileAppRoutes.js lê de
-  // MOBILE_APP_RELEASE_DIR: nomes diferentes para o mesmo destino. O que vale é o que o servidor
-  // serve, então a leitura segue MOBILE_APP_RELEASE_DIR e o console mostra os dois.
+  // publish-android-release.js writes to REMOTEIFES_MOBILE_RELEASE_DIR and mobileAppRoutes.js reads
+  // from MOBILE_APP_RELEASE_DIR: different names for the same destination. What counts is what the
+  // server serves, so the read follows MOBILE_APP_RELEASE_DIR and the Console shows both.
   const releasesMobile = env.MOBILE_APP_RELEASE_DIR
     ? path.resolve(DIR_SERVIDOR, env.MOBILE_APP_RELEASE_DIR)
     : path.join(dirDados, "releases", "mobile");
@@ -160,22 +160,22 @@ const config = {
   DIR_CORDOVA,
   DIR_WEB_CONSOLE: path.join(RAIZ_CONSOLE, "web"),
 
-  // Rede: loopback por padrão. A porta só é usada quando não há ativação por socket.
+  // Network: loopback by default. The port is used only without socket activation.
   ENDERECO: process.env.CONSOLE_BIND || "127.0.0.1",
   PORTA: inteiro(process.env.CONSOLE_PORTA, 8099, 1, 65535),
-  // Hosts aceitos no cabeçalho Host. Fecha DNS rebinding: um nome que resolva para 127.0.0.1
-  // não serve se não estiver aqui.
+  // Hosts accepted in the Host header. Closes DNS rebinding: a name resolving to 127.0.0.1 is not
+  // accepted unless listed here.
   HOSTS_ACEITOS: (process.env.CONSOLE_HOSTS || "")
     .split(",")
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean),
   ATRAS_DE_TLS: booleano(process.env.CONSOLE_ATRAS_DE_TLS, false),
 
-  // Ciclo de vida: sai sozinho depois de ficar ocioso, porque o socket do systemd reabre o
-  // serviço na próxima conexão. Zero desliga a saída automática.
+  // Lifecycle: exits by itself after being idle, because the systemd socket reopens the service on
+  // the next connection. Zero disables automatic exit.
   OCIOSIDADE_S: inteiro(process.env.CONSOLE_OCIOSIDADE_S, 900, 0, 86400),
 
-  // Sessão e elevação.
+  // Session and elevation.
   SESSAO_MAX_S: inteiro(process.env.CONSOLE_SESSAO_MAX_S, 8 * 3600, 300, 7 * 86400),
   SESSAO_OCIOSA_S: inteiro(process.env.CONSOLE_SESSAO_OCIOSA_S, 30 * 60, 60, 86400),
   ELEVACAO_S: inteiro(process.env.CONSOLE_ELEVACAO_S, 5 * 60, 60, 3600),
@@ -183,12 +183,12 @@ const config = {
   TERMINAL_MAX_S: inteiro(process.env.CONSOLE_TERMINAL_MAX_S, 60 * 60, 300, 12 * 3600),
   TERMINAL_MAX_SESSOES: inteiro(process.env.CONSOLE_TERMINAL_MAX_SESSOES, 2, 1, 8),
 
-  // Limites de execução e de saída retida.
+  // Execution limits and retained output.
   JOB_SAIDA_MAX_BYTES: inteiro(process.env.CONSOLE_JOB_SAIDA_MAX, 256 * 1024, 4096, 8 * 1024 * 1024),
   JOB_HISTORICO_MAX: inteiro(process.env.CONSOLE_JOB_HISTORICO_MAX, 20, 3, 200),
   JOB_TIMEOUT_PADRAO_MS: inteiro(process.env.CONSOLE_JOB_TIMEOUT_MS, 20 * 60 * 1000, 5000, 6 * 3600 * 1000),
 
-  // Auxiliar privilegiado. Caminho fixo; nunca vem de requisição.
+  // Privileged helper. Fixed path; never taken from a request.
   AUXILIAR: process.env.CONSOLE_AUXILIAR || "/usr/local/lib/remoteifes/console-helper.sh",
   SUDO: process.env.CONSOLE_SUDO || "sudo",
   // Desliga o uso de sudo/auxiliar (desenvolvimento e teste).
@@ -209,8 +209,8 @@ config.ARQUIVO_AUDITORIA = path.join(DIR_ESTADO, "auditoria.log");
 config.ARQUIVO_OBSERVACAO_REMOTA = path.join(DIR_ESTADO, "observacao-remota.json");
 config.ARQUIVO_SEGREDOS = path.join(DIR_ESTADO, "segredos.json");
 config.DIR_SAIDAS = path.join(DIR_ESTADO, "saidas");
-// Contrato do lançador: endereço em que o backend atende e prova de identidade do processo.
-// Fica no estado (protegido), nunca em URL, argumento de processo ou atalho.
+// Launcher contract: address where the backend answers and the process identity proof. Kept in
+// (protected) state, never in a URL, process argument or shortcut.
 config.ARQUIVO_ENDERECO = path.join(DIR_ESTADO, "endereco.json");
 config.ARQUIVO_BOOTSTRAP = path.join(DIR_ESTADO, "bootstrap-token");
 

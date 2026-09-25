@@ -26,16 +26,16 @@ const BACKUP_AUTOMATICO = String(
 ).toLowerCase() === "true";
 const BACKUP_INTERVALO_MS = normalizarInteiro(process.env.BACKUP_INTERVALO_HORAS, 24, 1, 8760) * 60 * 60 * 1000;
 
-// aoIniciar: primeira passagem, feita antes de qualquer placa reconectar — o estado desejado é só
-// persistido (a reconexão o entrega), para que um OFF agendado pendente vença a restauração.
+// aoIniciar: first pass, run before any board reconnects. The desired state is only persisted
+// (reconnection delivers it), so a pending scheduled OFF wins over restoration.
 function verificarAgendamentos({ aoIniciar = false } = {}) {
   const hora = horaAtualBrasilia();
   const dataISO = dataAtualBrasiliaISO();
   const enviarAoDispositivo = !aoIniciar;
 
-  // Um desligamento agendado que ficou pendente na virada do dia é aplicado uma única vez, a menos
-  // que uma intenção mais nova (comando manual, outro agendamento, OFF local) tenha surgido depois
-  // da hora em que ele era devido; sem isso o ar-condicionado ficaria ligado até alguém notar.
+  // A scheduled shutdown left pending across midnight is applied exactly once, unless newer intent
+  // (manual command, another schedule, local OFF) appeared after the time it was due; otherwise the
+  // air conditioner would stay on until someone noticed.
   for (const ag of listarDesligamentosPendentesDeOntem(dataISO)) {
     try {
       const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
@@ -61,13 +61,15 @@ function verificarAgendamentos({ aoIniciar = false } = {}) {
       const inicioLigar = ag.modo === "ligar_intervalo" ? ag.ligarInicio : ag.horaInicio;
       const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
 
-      // O registro da execução entra na mesma transação da mudança de estado: ou os dois persistem
-      // ou nenhum, para que uma falha (ou queda do servidor) entre eles não repita o comando no tick seguinte.
+      // The execution record is written in the same transaction as the state change: both persist
+      // or neither does, so a failure (or server crash) between them does not repeat the command on
+      // the next tick.
       if (estaNaJanelaDeLigar(hora, inicioLigar, fimLigar) && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
         aplicarInicioAgendamento(ag.sala, ag.temperatura, { registrarNaTransacao: () => registrarExecucao(ag.id, "ligar", dataISO), enviarAoDispositivo });
       }
-      // O OFF só pertence a um agendamento que de fato ligou hoje: criado ou reativado depois da
-      // janela (ou perdido inteiro numa queda), ele não tem intenção própria a encerrar.
+      // The OFF belongs only to a schedule that actually turned the room on today: created or
+      // re-enabled after the window (or missed entirely during an outage), it has no intent of its
+      // own to end.
       if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO) && jaExecutadoHoje(ag.id, "ligar", dataISO)) {
         aplicarComando(ag.sala, "desligar", undefined, {
           usuario: null,

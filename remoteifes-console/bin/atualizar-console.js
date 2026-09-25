@@ -1,13 +1,11 @@
 #!/usr/bin/env node
-// Runner de atualização e reversão do próprio console.
+// Update and rollback runner for the Console itself.
 //
-// Substitui `bin/atualizar-console.sh`, que copiava o console do checkout do RemoteIFES. Aquilo
-// não era um atualizador: pegava a árvore de trabalho que estivesse lá, sem verificação, sem
-// identidade de versão e sem transação — e sumia junto num rollback para revisão anterior ao
-// console. Aqui a origem é um **release atestado pelo GitHub Actions** (src/atestacao.js), e o
-// checkout do RemoteIFES não participa.
+// The source is a **release attested by GitHub Actions** (src/atestacao.js); the RemoteIFES checkout
+// does not participate, so a rollback of the checkout to a revision that predates the Console
+// cannot remove it.
 //
-// Uso:
+// Usage:
 //   node bin/atualizar-console.js <versao>
 //   node bin/atualizar-console.js --reverter
 //   node bin/atualizar-console.js --importar <manifesto.json> <atestacao.sigstore.json> <artefato>

@@ -1,8 +1,8 @@
 const { test, expect, VIEWPORTS, injetarSessao, API_URL, tokenDe } = require("../harness/fixtures");
 
-// Valores que a operação normal produz nas métricas de texto do cartão (confirmação do estado,
-// último comando de ligar/desligar e failsafe gravado): todos cabem nas três linhas reservadas,
-// mesmo com as fontes mais largas dos sistemas sem Segoe UI/Roboto.
+// Values normal operation produces in the card's text metrics (state confirmation, last on/off
+// command and stored failsafe): all fit in the three reserved lines, even with the wider fonts of
+// systems without Segoe UI/Roboto.
 const VALORES_RELATADOS = [
   "—",
   "nenhum ainda",
@@ -55,8 +55,8 @@ for (const [nome, tamanho] of [["celular", VIEWPORTS["mobile-portrait"]], ["note
     await page.waitForTimeout(400);
     const antes = await medir(page);
 
-    // Comando sem resposta da placa: o texto fica mais longo (consulta periódica e WebSocket). Se a
-    // consulta periódica de 20 s estiver em andamento, a chamada direta é ignorada e vale a próxima.
+    // Command without a board response: the text gets longer (periodic poll and WebSocket). If the
+    // 20 s periodic poll is in flight, the direct call is ignored and the next one applies.
     await request.post(`${API_URL}/__e2e/silenciar-dispositivo/on`);
     await comando(request, "A-108", "ligar");
     await page.evaluate(() => Esp32Admin.aoAbrir());
@@ -71,7 +71,7 @@ for (const [nome, tamanho] of [["celular", VIEWPORTS["mobile-portrait"]], ["note
     await expect(estadoDesejado).toHaveText("confirmado pela placa");
     expect(await medir(page)).toEqual(antes);
 
-    // Qualquer valor da operação normal cabe no espaço já reservado.
+    // Any value from normal operation fits in the space already reserved.
     for (const metrica of ["Último comando IR", "Failsafe OFF na NVS", "Estado desejado"]) {
       const valor = cartao.locator(".esp32-metric").filter({ hasText: metrica }).locator(".esp32-metric-value");
       for (const texto of VALORES_RELATADOS) {

@@ -64,8 +64,8 @@ function identificarDispositivo(mac, ip) {
   return salaRow || null;
 }
 
-// Só os mais recentes: uma placa ainda sem sala se reapresenta a cada 15 s, então ela está sempre
-// entre os primeiros, e a lista não cresce com identidades espúrias acumuladas na retenção.
+// Most recent only: a board without a room re-announces itself every 15 s, so it is always among
+// the first, and the list does not grow with spurious identities kept by retention.
 function listarDetectados() {
   return db.prepare(`
     SELECT d.* FROM esp_detectados d
@@ -113,9 +113,9 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null, opcoes 
     logger.warn("esp32-indisponibilidade-fechamento-falhou", { sala, mensagem: erro.message });
   }
 
-  // "ligado" reportado pela placa é o eco do último comando que ela processou, nunca a intenção:
-  // um relato atrasado não pode desfazer um comando já persistido (a trava do OFF local é adotada
-  // explicitamente em adotarDesligamentoLocal, só a partir de relatos comprovadamente atuais).
+  // "ligado" reported by the board echoes the last command it processed, never the intent: a late
+  // report cannot undo a command already persisted (the local OFF latch is adopted explicitly in
+  // adotarDesligamentoLocal, only from provably current reports).
   const temTemperatura = Object.prototype.hasOwnProperty.call(estadoReportado, "temperatura");
 
   db.prepare(`
@@ -500,8 +500,8 @@ function comandoEstadoIR(salaAtualizada) {
   };
 }
 
-// Reenvia o estado desejado vigente a todas as placas; a versão já foi avançada na transação que
-// alterou a intenção (ver configuracoesService.validarEAtualizar).
+// Resends the current desired state to every board; the version was already advanced in the
+// transaction that changed the intent (see configuracoesService.validarEAtualizar).
 function reenviarEstadoIRParaTodas() {
   const deviceHub = require("./deviceHub");
   for (const salaRow of listar()) {
@@ -661,8 +661,10 @@ function apagarLogs({ data } = {}) {
   }
 }
 
-// O OFF local travado na placa passa a ser a intenção do servidor. A versão do estado não avança:
-// a placa já está no estado adotado, e só um comando explícito (que avança a versão) limpa a trava.
+// The local OFF latched on the board becomes the server's intent. The state version does not
+// advance:
+// the board is already in the adopted state, and only an explicit command (which advances the
+// version) clears the latch.
 function adotarDesligamentoLocal(sala, { naReconexao = true } = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
@@ -764,8 +766,8 @@ function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = nu
   return atualizada;
 }
 
-// Houve alguma mudança de intenção na sala (comando manual ou de agendamento, OFF local adotado)
-// depois do instante dado (UTC no formato do datetime('now') do SQLite)?
+// Did the room's intent change (manual or scheduled command, adopted local OFF) after the given
+// instant (UTC in SQLite datetime('now') format)?
 function intencaoAlteradaDesde(sala, instanteUtcSqlite) {
   return !!db.prepare(`
     SELECT 1 FROM comandos_log

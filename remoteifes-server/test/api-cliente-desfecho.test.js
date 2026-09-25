@@ -6,8 +6,8 @@ const vm = require("vm");
 
 const API_JS = fs.readFileSync(path.join(__dirname, "..", "..", "remoteifes-web", "js", "api.js"), "utf8");
 
-// Carrega o api.js compartilhado (PWA e Cordova) num contexto isolado com um fetch controlado:
-// cada caso descreve o que o navegador vê — cabeçalhos que chegam e um corpo que falha depois.
+// Loads the shared api.js (PWA and Cordova) in an isolated context with a controlled fetch: each
+// case describes what the browser sees, headers that arrive and a body that fails afterwards.
 function carregarApi(fetchFalso) {
   const contexto = vm.createContext({
     window: { RemoteIFESConfig: { serverUrl: "http://servidor.teste" }, location: { origin: "http://servidor.teste" }, addEventListener() {}, dispatchEvent() {} },
@@ -30,7 +30,7 @@ test("uma mutação cujo corpo se perde depois dos cabeçalhos fica com desfecho
   const chamadas = [];
   const api = carregarApi(async (url, opcoes) => {
     chamadas.push({ url, method: opcoes.method || "GET" });
-    // O servidor aceitou (200) e a conexão caiu durante a leitura do corpo.
+    // The server accepted (200) and the connection dropped while reading the body.
     return respostaCom(200, () => Promise.reject(new TypeError("network error")));
   });
   const resultado = await api.enviarComando("A-101", "ligar");

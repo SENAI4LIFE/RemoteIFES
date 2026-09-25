@@ -6,16 +6,16 @@ const config = require("./config");
 const estado = require("./estado");
 const plataforma = require("./plataforma");
 
-// Contrato de identidade entre o backend e o lançador.
+// Identity contract between the backend and the launcher.
 //
-// O problema que isto resolve: qualquer processo local pode ocupar 127.0.0.1:8099 antes do
-// console e servir uma tela de login idêntica. Um lançador que apenas abrisse o navegador na
-// porta esperada entregaria a senha do operador a quem chegou primeiro.
+// The problem it solves: any local process can take 127.0.0.1:8099 before the Console and serve an
+// identical login page. A launcher that simply opened the browser on the expected port would hand
+// the operator's password to whoever arrived first.
 //
-// A prova não é o conteúdo do arquivo (isso seria só "quem lê o arquivo"), e sim um HMAC sobre
-// um desafio aleatório escolhido pelo lançador a cada verificação. O segredo fica apenas no
-// arquivo protegido de estado; o impostor não o lê e por isso não produz a resposta. Nada disso
-// aparece em URL, argumento de processo ou atalho.
+// The proof is not the file content (that would only mean "whoever reads the file") but an HMAC
+// over a random challenge chosen by the launcher on every check. The secret stays only in the
+// protected state file; the impostor cannot read it and therefore cannot produce the answer. None
+// of it appears in a URL, process argument or shortcut.
 
 let segredoEmMemoria = null;
 
@@ -32,8 +32,8 @@ function segredoAtual() {
 }
 
 /**
- * Publica o contrato do processo em execução: porta, pid e o segredo de verificação.
- * O arquivo é recriado a cada partida — um contrato antigo nunca valida um processo novo.
+ * Publishes the running process's contract: port, pid and verification secret. The file is
+ * recreated on every start: an old contract never validates a new process.
  */
 function publicarContrato({ porta, modo }) {
   estado.garantirDiretorio();
@@ -47,7 +47,7 @@ function publicarContrato({ porta, modo }) {
     segredo: segredoEmMemoria,
   };
   estado.gravarJson(config.ARQUIVO_ENDERECO, contrato, 0o600);
-  // No Windows o modo POSIX não restringe ninguém; a proteção real é a ACL.
+  // On Windows the POSIX mode restricts nobody; the real protection is the ACL.
   plataforma.protegerArquivo(config.ARQUIVO_ENDERECO);
   return { porta, pid: process.pid };
 }
@@ -56,14 +56,15 @@ function limparContrato() {
   segredoEmMemoria = null;
   try {
     const atual = estado.lerJson(config.ARQUIVO_ENDERECO, null);
-    // Só remove se o contrato for deste processo: outro console pode ter assumido no intervalo.
+    // Removes only if the contract belongs to this process: another Console may have taken over
+    // meanwhile.
     if (atual && atual.pid === process.pid) fs.rmSync(config.ARQUIVO_ENDERECO, { force: true });
   } catch {}
 }
 
 /**
- * Estado da proteção do contrato, para o painel. Um arquivo de identidade legível por outros
- * é um problema real: quem o lê consegue se passar pelo console para o lançador.
+ * Contract protection status, for the panel. An identity file readable by others is a real problem:
+ * whoever reads it can impersonate the Console to the launcher.
  */
 function protecaoDoContrato() {
   if (!fs.existsSync(config.ARQUIVO_ENDERECO)) return { presente: false };
@@ -79,12 +80,12 @@ function protecaoDoContrato() {
 }
 
 /**
- * Lê o contrato publicado pelo console em execução. Só devolve algo que sirva para verificar:
- * sem porta inteira e sem segredo não há prova possível.
+ * Reads the contract published by the running Console. Returns only something usable for
+ * verification: without an integer port and a secret no proof is possible.
  *
- * O caminho é parametrizável porque o desinstalador recebe o diretório de estado por argumento
- * e roda de uma cópia temporária: ali `config` já foi carregado apontando para o padrão da
- * plataforma, e ler o contrato errado faria o desinstalador concluir que não há console no ar.
+ * The path is a parameter because the uninstaller receives the state directory as an argument and
+ * runs from a temporary copy: there `config` was already loaded pointing at the platform default,
+ * and reading the wrong contract would make the uninstaller conclude no Console is running.
  */
 function lerContrato(arquivo = config.ARQUIVO_ENDERECO) {
   try {
@@ -133,13 +134,14 @@ function pedirProva(porta, desafio, timeoutMs) {
 }
 
 /**
- * Prova que quem responde na porta do contrato é ESTE console, por desafio/resposta HMAC sobre
- * um segredo que só o processo em execução conhece.
+ * Proves that whoever answers on the contract port is THIS Console, by HMAC challenge/response over
+ * a secret only the running process knows.
  *
- * Vive aqui, e não no lançador, porque há dois consumidores com a mesma pergunta e consequências
- * opostas se ela for respondida errado: o lançador decide se abre o navegador (e entregaria a
- * senha do operador a um impostor), e o desinstalador decide se encerra um processo (e mataria
- * um processo alheio que só calhou de estar naquela porta). Uma implementação só.
+ * It lives here, not in the launcher, because two consumers ask the same question with opposite
+ * consequences if it is answered wrong: the launcher decides whether to open the browser (and would
+ * hand the operator's password to an impostor), and the uninstaller decides whether to stop a
+ * process (and would kill an unrelated process that happened to hold that port). One implementation
+ * only.
  */
 async function verificarIdentidade(contrato, { timeoutMs = 4000 } = {}) {
   const desafio = crypto.randomBytes(32).toString("base64url");

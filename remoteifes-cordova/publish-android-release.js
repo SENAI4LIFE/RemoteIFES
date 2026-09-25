@@ -9,8 +9,8 @@ function exigir(nome) {
   return valor;
 }
 
-// Cada novo artefato publicado deve avançar o versionCode. A reinstalação Android
-// da mesma versão é permitida, mas não identifica uma release nova para os clientes.
+// Each newly published artifact must advance the versionCode. Reinstalling the same version on
+// Android is allowed, but does not identify a new release for clients.
 function conferirAvanco(destino, build, sha256) {
   const metadados = path.join(destino, "release.json");
   if (!fs.existsSync(metadados)) return;
@@ -72,8 +72,8 @@ function main() {
   fs.mkdirSync(destino, { recursive: true });
   conferirAvanco(destino, build, sha256);
 
-  // O arquivo entra inteiro antes dos metadados: até a troca atômica do release.json o
-  // servidor continua anunciando a publicação anterior, nunca uma release pela metade.
+  // The file is written in full before the metadata: until release.json is atomically replaced, the
+  // server keeps announcing the previous publication, never a half-written release.
   const apkTemporario = path.join(destino, `.${nome}.tmp`);
   const metaTemporario = path.join(destino, ".release.json.tmp");
   fs.copyFileSync(apk, apkTemporario);

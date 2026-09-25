@@ -4,15 +4,15 @@ const path = require("path");
 const crypto = require("crypto");
 const release = require("../src/release");
 
-// Confere o que a etapa de construção declarou sobre si mesma, contra o diretório que ela gravou.
+// Checks what the build step declared about itself, against the directory it wrote.
 //
-// Um manifesto que descreva outros arquivos é pior do que nenhum manifesto: a publicação o
-// atesta, e um console instalado confia no que um manifesto atestado diz sobre digests. Por isso,
-// antes de qualquer atestação, cada digest e tamanho declarados são recalculados aqui, o manifesto
-// precisa ter a forma que o console aceita, e a procedência precisa dizer, em texto, o que falta
-// aos executáveis (assinatura de código da plataforma).
+// A manifest describing other files is worse than no manifest: the release workflow attests it,
+// and an installed Console trusts whatever an attested manifest says about digests. So before
+// anything is attested, every declared digest and size is recomputed here, the manifest must have
+// the shape the Console accepts, and the provenance file must say, in text, what the executables
+// lack (a platform code signature).
 //
-// Uso: node empacotar/conferir-proveniencia.js <dir-da-saida>
+// Usage: node empacotar/conferir-proveniencia.js <dir-da-saida>
 
 const dir = process.argv[2];
 if (!dir) {
@@ -40,7 +40,7 @@ if (proveniencia.commit !== manifesto.commit) {
   falhar(`procedência diz commit ${proveniencia.commit} e o manifesto diz ${manifesto.commit}.`);
 }
 
-// Cada digest declarado é recalculado.
+// Every declared digest is recomputed.
 for (const artefato of [...manifesto.artefatos, ...proveniencia.artefatos]) {
   const arquivo = path.join(dir, artefato.arquivo);
   if (!fs.existsSync(arquivo)) falhar(`o manifesto cita ${artefato.arquivo}, que não foi construído.`);

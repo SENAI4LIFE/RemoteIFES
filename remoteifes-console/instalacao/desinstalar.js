@@ -4,27 +4,26 @@ const os = require("os");
 const path = require("path");
 const net = require("net");
 
-// Desinstalação do Console de Operações.
+// Operations Console uninstaller.
 //
-// Três regras governam este arquivo, e valem mais do que qualquer conveniência:
+// Three rules govern this file and outweigh any convenience:
 //
-//   1. **Nada é apagado sem prova de que é nosso.** Antes de qualquer remoção recursiva, o
-//      diretório precisa exibir a assinatura de uma instalação do console (camada estável +
-//      versoes/), estar contido num lugar plausível, não ser raiz de disco nem home, e
-//      pertencer a quem está desinstalando. Um `--raiz` digitado errado não pode virar um
-//      `rm -rf` no lugar errado.
-//   2. **O estado fica, por padrão.** Operadores, auditoria e backups sobrevivem à remoção do
-//      programa; quem quiser apagá-los pede explicitamente. Reinstalar e descobrir que a conta
-//      sumiu é pior do que deixar um diretório para trás.
-//   3. **Nada de processo órfão.** O console em execução é encerrado antes de o programa sair;
-//      caso contrário a desinstalação "dá certo" e deixa um processo atendendo no loopback,
-//      ainda capaz de operações privilegiadas de um programa que já não existe. E o que autoriza
-//      encerrar não é o PID do contrato — PID é reciclado —, é a prova de identidade.
+//   1. **Nothing is deleted without proof that it is ours.** Before any recursive removal the
+//      directory must show the signature of a Console installation (stable layer + versoes/), be in
+//      a plausible location, not be a disk root or home, and belong to whoever is uninstalling. A
+//      mistyped `--raiz` must not become an `rm -rf` in the wrong place.
+//   2. **State stays by default.** Operators, audit and backups survive program removal; deleting
+//      them must be requested explicitly. Reinstalling and finding the account gone is worse than
+//      leaving a directory behind.
+//   3. **No orphan process.** The running Console is stopped before the program is removed;
+//      otherwise the uninstall "succeeds" and leaves a process serving on loopback, still able to
+//      run privileged operations for a program that no longer exists. What authorizes the stop is
+//      not the PID in the contract (PIDs are recycled) but the identity proof.
 //
-// O checkout do RemoteIFES (código e banco da aplicação) **nunca** é tocado: o console o
-// administra, não é dono dele.
+// The RemoteIFES checkout (application code and database) is **never** touched: the Console manages
+// it and does not own it.
 //
-// Uso:
+// Usage:
 //   node instalacao/desinstalar.js [--escopo usuario|sistema] [--raiz <dir>] [--estado <dir>]
 //                                 [--apagar-estado] [--simular] [--sim]
 
@@ -47,12 +46,13 @@ function falhar(mensagem) {
 }
 
 /**
- * Autoriza (ou recusa) uma remoção recursiva. Devolve sempre um motivo legível: uma recusa que
- * não explica o que faltou leva o operador a apagar na mão, que é exatamente o risco.
+ * Authorizes (or refuses) a recursive removal. Always returns a readable reason: a refusal that
+ * does not explain what was missing leads the operator to delete by hand, which is exactly the
+ * risk.
  *
- * @param {string} caminho  diretório candidato
- * @param {object} exigido  `marcas`: nomes que identificam o diretório; `rotulo`: o que é;
- *                          `exigirTodas`: quando verdadeiro, a ausência de qualquer marca recusa.
+ * @param {string} caminho  candidate directory
+ * @param {object} exigido  `marcas`: names that identify the directory; `rotulo`: what it is;
+ *   `exigirTodas`: when true, a missing mark refuses.
  */
 function autorizarRemocao(caminho, { marcas, rotulo, exigirTodas = false }) {
   const alvo = path.resolve(caminho);
@@ -67,18 +67,18 @@ function autorizarRemocao(caminho, { marcas, rotulo, exigirTodas = false }) {
   if (info.isSymbolicLink()) return { ok: false, motivo: `${alvo} é um link simbólico; remova-o à mão para não seguir o alvo` };
   if (!info.isDirectory()) return { ok: false, motivo: `${alvo} não é um diretório` };
 
-  // Contenção: nunca a raiz de um disco, nunca a home, nunca um caminho raso demais.
+  // Containment: never a disk root, never home, never a path that is too shallow.
   const raizDoDisco = path.parse(alvo).root;
   if (alvo === raizDoDisco) return { ok: false, motivo: "recusado: o caminho é a raiz do sistema de arquivos" };
   if (alvo === path.resolve(os.homedir())) return { ok: false, motivo: "recusado: o caminho é o diretório do usuário" };
   const profundidade = alvo.slice(raizDoDisco.length).split(path.sep).filter(Boolean).length;
   if (profundidade < 2) return { ok: false, motivo: `recusado: ${alvo} é raso demais para ser removido recursivamente` };
 
-  // Identidade: o diretório tem de parecer o que dizemos que é.
+  // Identity: the directory must look like what we claim it is.
   //
-  // Para a raiz do programa, TODAS as marcas são exigidas. Aceitar "pelo menos uma" deixava um
-  // diretório qualquer que por acaso tivesse um `versoes/` dentro ser apagado recursivamente —
-  // e um `--raiz` digitado errado é justamente o caso que estas verificações existem para pegar.
+  // For the program root ALL marks are required. Accepting "at least one" would let an arbitrary
+  // directory that happens to contain a `versoes/` be removed recursively, and a mistyped `--raiz`
+  // is exactly the case these checks exist to catch.
   const faltando = marcas.filter((m) => !fs.existsSync(path.join(alvo, m)));
   if (exigirTodas ? faltando.length > 0 : faltando.length === marcas.length) {
     return {
@@ -89,7 +89,7 @@ function autorizarRemocao(caminho, { marcas, rotulo, exigirTodas = false }) {
     };
   }
 
-  // Nunca dentro de um checkout do RemoteIFES: ali moram o código e o banco da aplicação.
+  // Never inside a RemoteIFES checkout: the application code and database live there.
   for (let dir = alvo; ; ) {
     if (fs.existsSync(path.join(dir, "remoteifes-server", "package.json"))) {
       return { ok: false, motivo: `recusado: ${alvo} está dentro do checkout do RemoteIFES (${dir}), que o console não é dono` };
@@ -99,8 +99,8 @@ function autorizarRemocao(caminho, { marcas, rotulo, exigirTodas = false }) {
     dir = pai;
   }
 
-  // Propriedade: em POSIX, de quem está desinstalando (ou root). No Windows, a prova prática é
-  // conseguir escrever: o modelo de ACL não se reduz a um uid.
+  // Ownership: on POSIX, the uninstalling user (or root). On Windows the practical proof is being
+  // able to write: the ACL model does not reduce to a uid.
   if (process.platform !== "win32" && typeof process.getuid === "function") {
     const eu = process.getuid();
     if (eu !== 0 && info.uid !== eu) {
@@ -146,14 +146,13 @@ function removerArquivo(caminho, { simular }) {
 }
 
 /**
- * Se o desinstalador estiver rodando de DENTRO da instalação que vai apagar, ele se copia para
- * um diretório temporário e recomeça de lá.
+ * If the uninstaller runs from INSIDE the installation it will delete, it copies itself to a
+ * temporary directory and restarts from there.
  *
- * Não é preciosismo: no Windows, um arquivo com handle aberto só é removido quando o handle
- * fecha, e o diretório que o contém fica "não vazio" até lá. Apagar a instalação a partir de um
- * script que mora dentro dela deixava a raiz para trás com EPERM, com todo o conteúdo já
- * removido — o pior dos dois mundos. Recomeçar de fora resolve de uma vez, sem repetir
- * tentativas nem esperar por um handle.
+ * On Windows a file with an open handle is removed only when the handle closes, and its directory
+ * stays "not empty" until then. Deleting the installation from a script living inside it would
+ * leave the root behind with EPERM after removing all content. Restarting from outside avoids
+ * retries and handle waits.
  */
 function reexecutarForaDaInstalacao(raiz, dirEstado, escopoEfetivo) {
   const aqui = path.resolve(__dirname);
@@ -169,19 +168,19 @@ function reexecutarForaDaInstalacao(raiz, dirEstado, escopoEfetivo) {
     const copia = path.join(temp, "instalacao", "desinstalar.js");
     fs.copyFileSync(__filename, copia);
 
-    // Os caminhos vão resolvidos: a cópia não deve recalcular padrões a partir de onde está.
-    // O ESCOPO também vai resolvido. A cópia temporária não mora dentro de uma instalação, então
-    // ela não consegue inferir nada: sem repassar, uma desinstalação de escopo de usuário virava
-    // escopo de sistema no filho, deixava a integração do usuário instalada e podia mexer na
-    // integração de sistema de outra instalação.
+    // Paths are passed resolved: the copy must not recompute defaults from where it lives. The
+    // SCOPE is passed resolved too. The temporary copy does not live inside an installation and
+    // cannot infer anything: without it, a user-scope uninstall would become system scope in the
+    // child, leave the user integration installed and possibly touch another installation's system
+    // integration.
     const repassar = process.argv.slice(2).filter((a, i, todos) => {
       const anterior = todos[i - 1];
       if (a === "--raiz" || a === "--estado" || a === "--escopo") return false;
       if (anterior === "--raiz" || anterior === "--estado" || anterior === "--escopo") return false;
       return true;
     });
-    // O cwd precisa sair da instalação, no pai e no filho: no Windows um handle de diretório
-    // aberto também impede a remoção da raiz, e o processo pai continua vivo durante o spawnSync.
+    // The cwd must leave the installation in both parent and child: on Windows an open directory
+    // handle also prevents removing the root, and the parent stays alive during spawnSync.
     try {
       if (path.resolve(process.cwd()).startsWith(alvo)) process.chdir(os.tmpdir());
     } catch {}
@@ -200,19 +199,18 @@ function reexecutarForaDaInstalacao(raiz, dirEstado, escopoEfetivo) {
 }
 
 /**
- * Encerra o console em execução antes de apagar o programa.
+ * Stops the running Console before deleting the program.
  *
- * Sem isto, a desinstalação "dá certo" e deixa um processo vivo: ele continua atendendo no
- * loopback, continua com o contrato de identidade publicado e continua capaz de executar
- * operações privilegiadas de um programa que, para o operador, já não existe. No Linux o
- * `systemctl disable --now` resolvia por acidente; no Windows e no macOS, onde quem sobe o
- * console é o lançador, nada parava o processo.
+ * Without this the uninstall "succeeds" and leaves a live process: it keeps serving on loopback,
+ * keeps its identity contract published and keeps the ability to run privileged operations for a
+ * program that, to the operator, no longer exists. On Windows and macOS the launcher starts the
+ * Console, so nothing else stops it.
  *
- * O PID sozinho não autoriza um kill — PID é reciclado. O que autoriza é a **prova de
- * identidade**: quem responde naquela porta demonstra possuir o segredo que só este console
- * publicou. Se a prova falhar, nada é encerrado e o operador é avisado, porque aí ou o contrato
- * está velho ou há outro processo na porta — e matar um processo alheio é pior do que deixar o
- * nosso vivo.
+ * The PID alone does not authorize a kill: PIDs are recycled. What authorizes it is the **identity
+ * proof**: whoever answers on that port demonstrates possession of the secret only this Console
+ * published. If the proof fails, nothing is terminated and the operator is told, because either the
+ * contract is stale or another process holds the port, and killing someone else's process is worse
+ * than leaving ours alive.
  */
 async function encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log }) {
   const identidade = require(path.join(__dirname, "..", "src", "identidade"));
@@ -246,8 +244,8 @@ async function encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log }
     return { encerrado: false, motivo: erro.message };
   }
 
-  // Prazos ajustáveis: um Pi carregado demora mais que um desktop, e um teste não deve gastar
-  // 15 s provando que a espera termina.
+  // Adjustable deadlines: a loaded Pi takes longer than a desktop, and a test should not spend 15 s
+  // proving the wait ends.
   const prazoPedido = Number(process.env.CONSOLE_PARADA_MS);
   const prazoNormal = Number.isFinite(prazoPedido) && prazoPedido > 0 ? Math.min(prazoPedido, 5 * 60 * 1000) : 10_000;
   const prazoForcado = Math.max(Math.round(prazoNormal / 2), 500);
@@ -263,8 +261,8 @@ async function encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log }
   } catch (erro) {
     log(`   não foi possível forçar: ${erro.message}`);
   }
-  // O resultado do SIGKILL é RECONFERIDO: engolir o erro e declarar encerrado era afirmar sem
-  // prova justamente no caminho em que a parada tinha acabado de falhar.
+  // The SIGKILL result is RECHECKED: swallowing the error and declaring the process stopped would
+  // claim success without proof on the very path where stopping had just failed.
   if (await esperarPortaFechar(contrato.porta, prazoForcado)) {
     log("   console encerrado à força.");
     return { encerrado: true, forcado: true };
@@ -273,12 +271,11 @@ async function encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log }
 }
 
 /**
- * Espera a porta parar de ACEITAR CONEXÃO — não "a identidade parar de conferir".
+ * Waits for the port to stop ACCEPTING CONNECTIONS, not for "identity to stop matching".
  *
- * Uma requisição de identidade que falhe por tempo esgotado, resposta malformada ou erro de rota
- * parece exatamente igual a um processo que morreu, e tratar as duas coisas como parada era
- * declarar sucesso sobre um console possivelmente vivo. A recusa de conexão é a prova de que não
- * há mais nada escutando ali.
+ * An identity request failing on timeout, malformed response or routing error looks exactly like a
+ * dead process, and treating both as stopped would declare success over a possibly live Console.
+ * Connection refusal is the proof that nothing is listening there anymore.
  */
 function esperarPortaFechar(porta, prazoMs) {
   const limite = Date.now() + prazoMs;
@@ -291,7 +288,7 @@ function esperarPortaFechar(porta, prazoMs) {
       };
       socket.setTimeout(1000);
       socket.once("connect", () => encerrar(true));
-      socket.once("timeout", () => encerrar(true)); // aceitou a conexão mas não respondeu: ainda há algo ali
+      socket.once("timeout", () => encerrar(true));  // accepted the connection but did not respond: something is still there
       socket.once("error", () => encerrar(false));
     });
 
@@ -310,10 +307,10 @@ async function main() {
   const escopo = argumento("escopo", process.platform === "linux" ? "sistema" : "usuario");
   if (!["usuario", "sistema"].includes(escopo)) falhar("--escopo aceita apenas 'usuario' ou 'sistema'");
 
-  // A instalação que contém ESTE script é a referência: o desinstalador viaja dentro do payload,
-  // então `../..` é a raiz instalada. Presumir o escopo pelo sistema fazia uma instalação de
-  // usuário no Linux ser tratada como de sistema, reclamar que `/opt` não existe e deixar
-  // `~/.local/...` intacto — e é exatamente o comando que a interface manda executar.
+  // The installation containing THIS script is the reference: the uninstaller travels inside the
+  // payload, so `../..` is the installed root. Presuming the scope from the system would treat a
+  // Linux user-scope installation as system scope, complain that `/opt` is missing and leave
+  // `~/.local/...` intact, and that is exactly the command the interface tells the operator to run.
   const raizDoProprioScript = path.resolve(path.join(__dirname, "..", "..", ".."));
   const pareceInstalacao = fs.existsSync(path.join(raizDoProprioScript, "estado-instalacao.json"));
   const registro = pareceInstalacao ? lerJsonSeguro(path.join(raizDoProprioScript, "estado-instalacao.json")) : {};
@@ -353,15 +350,14 @@ async function main() {
     log("");
   }
 
-  // --- Integração com a plataforma ------------------------------------------------------------
+  // --- Platform integration --------------------------------------------------------------------
   //
-  // A integração sai ANTES do encerramento. Com ativação por socket ainda habilitada, a própria
-  // sondagem da porta reativaria o serviço, e o console voltaria logo depois de ser encerrado.
+  // Integration is removed BEFORE stopping. With socket activation still enabled, probing the port
+  // would reactivate the service and the Console would come back right after being stopped.
   log("== Removendo a integração com o sistema");
   if (simular) {
-    // `removerInicializacao` é destrutiva: no Linux ela para o console, apaga as unidades do
-    // systemd, a regra de sudo e o auxiliar privilegiado. Chamá-la em modo de simulação fazia o
-    // "ensaio" desmontar de verdade a instalação que o operador só queria inspecionar.
+    // `removerInicializacao` is destructive: on Linux it stops the Console and deletes the systemd
+    // units, the sudo rule and the privileged helper. It must never run in simulation mode.
     log("   [simulação] removeria o registro de inicialização e, no Linux, unidades, regra de sudo e auxiliar.");
   } else {
     try {
@@ -372,14 +368,14 @@ async function main() {
     }
   }
 
-  // --- Console em execução -----------------------------------------------------------------
+  // --- Running Console -----------------------------------------------------------------------
   log("== Encerrando o console, se estiver em execução");
   const encerramento = await encerrarConsoleEmExecucao({ plataforma, dirEstado, simular, log });
   if (encerramento.impostor && !temFlag("sim")) {
     falhar("  Desinstalação interrompida: a porta do console está ocupada por outro processo.");
   }
-  // Não conseguir provar a parada IMPEDE a remoção: apagar o programa deixando um processo vivo
-  // e autenticado é o pior desfecho possível, e era o que acontecia quando a falha era ignorada.
+  // Failing to prove the stop PREVENTS removal: deleting the program while an authenticated process
+  // stays alive is the worst possible outcome.
   if (encerramento.motivo && !simular) {
     falhar(
       `  Desinstalação interrompida: não foi possível confirmar que o console parou (${encerramento.motivo}).\n` +
@@ -398,7 +394,7 @@ async function main() {
     removeuAtalho = removerArquivo(path.join(atalhos, "Console de Operações RemoteIFES.lnk"), { simular }) || removeuAtalho;
   }
   if (plataforma.nome === "macos") {
-    // No macOS o bundle **é** o programa: ele sai junto com a raiz, logo abaixo.
+    // On macOS the bundle **is** the program: it goes with the root, just below.
     removeuAtalho = true;
   }
   if (!removeuAtalho) log("   nenhum atalho encontrado.");
@@ -442,7 +438,7 @@ async function main() {
     else log(`   mantido: ${autEstado.motivo}`);
   }
 
-  // --- O que continua no host -----------------------------------------------------------------
+  // --- What stays on the host -----------------------------------------------------------------
   log("");
   log("  O que NÃO foi tocado:");
   log("   • o checkout do RemoteIFES, seu banco e seus backups;");

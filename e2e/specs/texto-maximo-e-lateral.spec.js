@@ -1,10 +1,9 @@
 const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
-// Ajustes de texto no máximo (2×, entrelinha 3, espaçamento 0,25em): o Início não ganha
-// rolagem horizontal e o selo dos cartões fica dentro do cartão. A barra lateral da
-// Administração termina acima da barra inferior em qualquer posição de rolagem, com o
-// último item alcançável. Os botões da paginação da auditoria mantêm o rótulo inteiro
-// em vez de quebrá-lo letra a letra.
+// Text settings at maximum (2x, line height 3, spacing 0.25em): Início gains no horizontal scroll
+// and the card badge stays inside the card. The Administration sidebar ends above the bottom bar at
+// any scroll position, with the last item reachable. Audit pagination buttons keep their label
+// whole instead of breaking it letter by letter.
 
 const MAXIMO_A11Y = {
   remoteifes_font_scale: "2",
@@ -88,8 +87,8 @@ function medirLateral() {
     caixaBase: Math.round(caixa.bottom),
     topoDaBarra: Math.round(barra.top),
     alturaDaBarra: Math.round(barra.height),
-    // Em repouso a caixa pode começar abaixo da barra inferior (texto máximo em celular
-    // deitado): aí o último item está fora da tela, não sob a barra, e só a rolagem conta.
+    // At rest the box may start below the bottom bar (maximum text on a phone in landscape): then
+    // the last item is off screen, not under the bar, and only scrolling counts.
     comecaAbaixoDaBarra: caixa.top >= barra.top,
     ultimoAlcancavel: ultimo.contains(noFim),
     ultimoSobABarra: Math.round(Math.max(0, ru.bottom - barra.top)),
@@ -125,21 +124,22 @@ for (const [nome, tamanho, ajustes] of CENARIOS_LATERAL) {
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     const rolada = await page.evaluate(medirLateral);
-    // A folga é medida contra a barra inferior real (com texto máximo ela passa de 100px).
+    // The clearance is measured against the real bottom bar (with maximum text it exceeds 100px).
     expect(rolada.topoDaBarra - rolada.caixaBase, "rolada: folga até a barra inferior real").toBeGreaterThanOrEqual(20);
     expect(rolada.ultimoSobABarra, "rolada: o último item não fica sob a barra").toBe(0);
     expect(rolada.ultimoAlcancavel, "rolada: o último item recebe o toque").toBe(true);
   });
 }
 
-// Paginação da auditoria: os botões «← Anterior» e «Próxima →» são itens de um flex; o
-// `overflow-wrap: anywhere` global dos botões deixava o mínimo deles em um caractere e, com
-// texto máximo, o contador ficava com a largura toda e cada botão virava uma coluna de letras.
+// Audit pagination: the «← Anterior» and «Próxima →» buttons are flex items; the global
+// `overflow-wrap: anywhere` on buttons reduced their minimum to one character and, with maximum
+// text, the counter took the full width and each button became a column of letters.
 function medirPaginacao() {
   const caixa = document.querySelector("#adminSub-logs .audit-pagination");
   const rc = caixa.getBoundingClientRect();
   const limite = document.documentElement.clientWidth;
-  // Geometria de todos na mesma posição de rolagem; o teste de toque rola cada botão depois.
+  // Geometry of all of them at the same scroll position; the tap test scrolls each button
+  // afterwards.
   const medir = (id) => {
     const el = document.getElementById(id);
     const faixa = document.createRange();
@@ -187,7 +187,7 @@ for (const [nome, tamanho] of CENARIOS_PAGINACAO) {
       }
       expect(medida.contador.dentroDaCaixa, "o contador fica dentro da paginação").toBe(true);
       if (!ajustes.remoteifes_font_scale) {
-        // Com texto padrão os dois botões continuam na mesma linha (o contador quebra antes deles).
+        // With default text both buttons stay on the same line (the counter wraps before them).
         expect(medida.anterior.topo < medida.proxima.base && medida.proxima.topo < medida.anterior.base, "os botões dividem a linha").toBe(true);
       }
     });

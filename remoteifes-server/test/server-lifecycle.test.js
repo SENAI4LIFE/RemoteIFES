@@ -1,6 +1,6 @@
-// Ciclo de vida do processo do servidor: startup, encerramento gracioso por sinal e porta ocupada.
-// A entrega de sinais POSIX não existe no Windows, então o teste dispara o mesmo handler
-// dentro do processo filho (process.emit) — o caminho de encerramento exercitado é o real.
+// Server process lifecycle: startup, graceful shutdown on signal and port in use. POSIX signal
+// delivery does not exist on Windows, so the test triggers the same handler inside the child
+// process (process.emit); the shutdown path exercised is the real one.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
@@ -21,7 +21,7 @@ test.after(() => {
   try {
     fs.rmSync(PRELOAD, { force: true });
   } catch (erro) {
-    /* arquivo temporário já removido */
+    /* temporary file already removed */
   }
 });
 
@@ -98,7 +98,7 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
     );
     assert.doesNotMatch(servidor.texto(), /uncaught-exception/);
 
-    // A porta precisa estar realmente liberada para um novo startup imediato.
+    // The port must actually be released for an immediate new startup.
     const liberada = await ocupar(porta);
     await new Promise((r) => liberada.close(r));
 

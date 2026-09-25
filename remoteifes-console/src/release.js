@@ -1,19 +1,18 @@
 const crypto = require("crypto");
 const fs = require("fs");
 
-// Manifesto de release, alvo e política de versão das atualizações do console.
+// Release manifest, target and version policy for Console updates.
 //
-// O manifesto é o que um release diz de si: versão, commit e um payload por alvo. Ele só é
-// confiável depois que src/atestacao.js provou que é exatamente o arquivo que o GitHub Actions
-// atestou para a etiqueta daquela versão. Então, nesta ordem e antes de qualquer escrita no
-// diretório ativo:
-//   1. existência de um artefato para este alvo (SO + arquitetura do runtime);
-//   2. política de versão (mínimo para atualizar, e sem downgrade pela rede);
-//   3. SHA-256 e tamanho do arquivo realmente gravado, contra o manifesto atestado.
+// The manifest is what a release says about itself: version, commit and one payload per target.
+// It is trusted only after src/atestacao.js proved it is the exact file GitHub Actions attested for
+// that version's tag. Then, in this order and before any write to the active directory:
+//   1. existence of an artifact for this target (OS + runtime architecture);
+//   2. version policy (minimum to update, and no downgrade over the network);
+//   3. SHA-256 and size of the file actually written, against the attested manifest.
 //
-// Um SHA-256 vindo da mesma origem não confiável do artefato não prova nada por si só: ele só tem
-// valor porque o manifesto que o declara é atestado, e a atestação lista o mesmo digest. Por isso
-// o digest nunca é conferido isoladamente.
+// A SHA-256 from the same untrusted origin as the artifact proves nothing by itself: it only has
+// value because the manifest that declares it is attested, and the attestation lists the same
+// digest. That is why the digest is never checked in isolation.
 
 const ESQUEMA_SUPORTADO = 1;
 
@@ -32,21 +31,21 @@ function compararVersoes(a, b) {
   return 0;
 }
 
-/** Nome do payload de uma versão para um alvo. Fixo, para que um nome não aponte outro alvo. */
+/** Payload file name of a version for a target. Fixed, so a name cannot point at another target. */
 function nomeDoPayload(versao, alvo) {
   return `remoteifes-console-${versao}-${alvo}.tar.gz`;
 }
 
 /**
- * Forma de um manifesto. Compartilhada pelo console e pela construção, para que um manifesto que a
- * publicação produz seja um que o console aceita.
+ * Shape of a manifest. Shared by the Console and by the build, so a manifest the release workflow
+ * produces is one the Console accepts.
  */
 function validarEstrutura(manifesto) {
   if (manifesto.esquema !== ESQUEMA_SUPORTADO) {
     return { ok: false, motivo: `esquema de manifesto ${manifesto.esquema} não é suportado por esta versão do console` };
   }
   if (!RE_VERSAO.test(String(manifesto.versao || ""))) return { ok: false, motivo: "versão do manifesto inválida" };
-  // O commit liga o manifesto ao certificado: a atestação diz qual commit foi construído.
+  // The commit ties the manifest to the certificate: the attestation says which commit was built.
   if (!RE_COMMIT.test(String(manifesto.commit || ""))) return { ok: false, motivo: "manifesto sem o commit construído" };
   if (!Array.isArray(manifesto.artefatos) || !manifesto.artefatos.length) {
     return { ok: false, motivo: "manifesto sem artefatos" };
@@ -62,7 +61,9 @@ function validarEstrutura(manifesto) {
   return { ok: true };
 }
 
-/** Alvo deste console: SO + arquitetura do runtime, que é quem vai executar o código. */
+/**
+ * This Console's target: OS + runtime architecture, which is what will execute the code.
+ */
 function alvoAtual() {
   const so = { win32: "windows", darwin: "macos", linux: "linux" }[process.platform] || process.platform;
   return `${so}-${process.arch}`;
@@ -82,8 +83,8 @@ function escolherArtefato(manifesto, alvo = alvoAtual()) {
 }
 
 /**
- * Política de versão. Downgrade pela rede é recusado: voltar atrás usa a cópia local já
- * verificada, por ação explícita de reversão.
+ * Version policy. Downgrade over the network is refused: going back uses the already verified local
+ * copy, through an explicit rollback action.
  */
 function politicaDeVersao(manifesto, versaoInstalada) {
   if (compararVersoes(manifesto.versao, versaoInstalada) === 0) {
@@ -98,9 +99,8 @@ function politicaDeVersao(manifesto, versaoInstalada) {
     };
   }
   const minimo = manifesto.minimoParaAtualizar;
-  // Um mínimo presente mas malformado desligava o portão de compatibilidade em silêncio: a
-  // condição exigia que ele fosse válido para valer. Recusar é a leitura certa — o publicador
-  // declarou um requisito e ele não pôde ser avaliado.
+  // A present but malformed minimum is refused rather than ignored: the publisher declared a
+  // requirement and it could not be evaluated.
   if (minimo !== null && minimo !== undefined && !RE_VERSAO.test(String(minimo))) {
     return {
       ok: false,
@@ -120,19 +120,17 @@ function politicaDeVersao(manifesto, versaoInstalada) {
 
 /** Confere o arquivo realmente gravado contra o manifesto autenticado. */
 /**
- * Confere um artefato contra o manifesto atestado e **devolve os bytes conferidos**.
+ * Checks an artifact against the attested manifest and **returns the checked bytes**.
  *
- * Devolver o conteúdo não é conveniência: é o que fecha a janela entre verificar e instalar.
- * Antes, o digest era calculado numa leitura e a extração fazia outra leitura do mesmo caminho —
- * quem pudesse trocar o arquivo entre as duas instalaria conteúdo que nunca passou pela
- * verificação. No caminho online o arquivo está numa área nossa, mas no caminho offline ele é um
- * caminho que o operador informou (um /tmp compartilhado, um pendrive montado), e ali a troca é
- * plausível. Verificando e extraindo o MESMO buffer, não existe segunda leitura para atacar.
+ * Returning the content closes the window between verification and installation: verifying and
+ * extracting the SAME buffer leaves no second read to attack. This matters on the offline path,
+ * where the artifact is a path the operator supplied (a shared /tmp, a mounted USB drive) and a
+ * swap is plausible.
  */
 function conferirArtefato(caminho, artefato, { limiteBytes = Infinity } = {}) {
-  // O tamanho é conferido por `stat`, ANTES de ler. Ler primeiro para só então comparar
-  // carregaria um arquivo arbitrariamente grande na memória — num Pi de 1 GiB isso derruba o
-  // host antes de qualquer verificação dizer que o artefato era inválido.
+  // Size is checked with `stat` BEFORE reading. Reading first and comparing afterwards would load
+  // an arbitrarily large file into memory; on a 1 GiB Pi that brings the host down before any check
+  // says the artifact was invalid.
   let info;
   try {
     info = fs.statSync(caminho);

@@ -4,15 +4,14 @@ const config = require("./config");
 const coleta = require("./coleta");
 const github = require("./github");
 
-// Ciclo de vida mobile: identidades de versão, artefato publicado e estado da CI.
+// Mobile lifecycle: version identities, published artifact and CI status.
 //
-// Identidades distintas que **não** são a mesma coisa nesta revisão e não devem ser
-// apresentadas como "a versão":
-//   servidor (package.json)  ·  frontend/PWA (version.json)  ·  pacote Cordova (package.json)
-//   Android versionName/versionCode (config.xml)  ·  commit de origem do build  ·  APK publicado
+// Distinct identities that are **not** the same thing and must not be presented as "the version":
+//   server (package.json)  ·  frontend/PWA (version.json)  ·  Cordova package (package.json)
+//   Android versionName/versionCode (config.xml)  ·  build source commit  ·  published APK
 //
-// Também: `validate-config.js` reescreve config.xml temporariamente e regenera `www/`, e
-// `sync-www.js` recria arquivos. Eles não são coletores de status e não são chamados aqui.
+// Also: `validate-config.js` temporarily rewrites config.xml and regenerates `www/`, and
+// `sync-www.js` recreates files. They are not status collectors and are not called here.
 
 function lerJson(arquivo) {
   try {
@@ -23,9 +22,9 @@ function lerJson(arquivo) {
 }
 
 /**
- * Onde o APK realmente é servido. O publicador grava em REMOTEIFES_MOBILE_RELEASE_DIR e o
- * servidor lê de MOBILE_APP_RELEASE_DIR: dois nomes para o mesmo destino, e é por isso que uma
- * publicação "bem-sucedida" pode não aparecer na página Aplicativo.
+ * Where the APK is actually served. The publisher writes to REMOTEIFES_MOBILE_RELEASE_DIR and the
+ * server reads from MOBILE_APP_RELEASE_DIR: two names for the same destination, which is why a
+ * "successful" publication may not appear on the App page.
  */
 function destinoDeRelease() {
   const app = config.caminhosDaAplicacao();
@@ -64,9 +63,9 @@ function releasePublicado() {
     apkPresente: !!existe,
     bytes: existe ? fs.statSync(apk).size : null,
     publicadoEm: meta.publishedAt || meta.publicadoEm || null,
-    // `signed: true` no manifesto é uma afirmação do publicador, não prova. A prova é a
-    // verificação com apksigner/apkanalyzer feita por publish-android-release.js na máquina
-    // que tem o SDK. O console mostra o campo e diz exatamente o que ele significa.
+    // `signed: true` in the manifest is the publisher's claim, not proof. The proof is the
+    // apksigner/apkanalyzer verification done by publish-android-release.js on the machine with the
+    // SDK. The Console shows the field and states exactly what it means.
     assinadoDeclarado: meta.signed === true,
     ressalvaAssinatura:
       "O campo `signed` do release.json é uma declaração de quem publicou. A verificação real de " +

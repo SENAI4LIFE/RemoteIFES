@@ -41,8 +41,8 @@ const Floorplan = {
           return;
         }
 
-        // A planta cabe na caixa de conteúdo do invólucro: clientWidth/Height incluem o
-        // padding, e uma planta ajustada a eles passava por cima dele e era cortada.
+        // The plan fits the wrapper's content box: clientWidth/Height include the padding, and a
+        // plan fitted to them overlapped it and was clipped.
         const estiloWrap = getComputedStyle(wrap);
         const availableWidth = wrap.clientWidth - (parseFloat(estiloWrap.paddingLeft) || 0) - (parseFloat(estiloWrap.paddingRight) || 0);
         const availableHeight = wrap.clientHeight - (parseFloat(estiloWrap.paddingTop) || 0) - (parseFloat(estiloWrap.paddingBottom) || 0);
@@ -181,9 +181,9 @@ const Floorplan = {
 
     instancia.fitToWidth();
     window.addEventListener("resize", () => instancia.fitToWidth());
-    // O contêiner pode não ter tamanho ainda quando o mapa é montado (aba oculta,
-    // barra lateral reposicionando). Sem isto, o ajuste de escala era descartado e
-    // a planta ficava sem escala nem rolagem até um resize da janela.
+    // The container may have no size yet when the map mounts (hidden tab, sidebar repositioning).
+    // Without this, the scale fit was discarded and the plan had neither scale nor scroll until a
+    // window resize.
     if (typeof ResizeObserver !== "undefined") {
       new ResizeObserver(() => instancia.fitToWidth()).observe(rootEl);
     }

@@ -11,34 +11,33 @@ const release = require("./release");
 const atestacao = require("./atestacao");
 const plataforma = require("./plataforma");
 
-// Atualizador do console instalado.
+// Updater of the installed Console.
 //
-// Modelo: **payload versionado lado a lado com camada estável de bootstrap**.
+// Model: **side-by-side versioned payloads with a stable bootstrap layer**.
 //
-//   <raiz>/console-bootstrap.js      camada estável — instalada pelo pacote, nunca reescrita
-//   <raiz>/estado-instalacao.json    ponteiro da versão ativa + transação em andamento
-//   <raiz>/versoes/2.0.0/            payload imutável
+//   <raiz>/console-bootstrap.js      stable layer, installed by the package, never rewritten
+//   <raiz>/estado-instalacao.json    active version pointer + transaction in progress
+//   <raiz>/versoes/2.0.0/            immutable payload
 //   <raiz>/versoes/2.1.0/
-//   <raiz>/descargas/                área de estágio
+//   <raiz>/descargas/                staging area
 //
-// Consequências que valem a complexidade:
-//   - o `.deb` (ou o instalador) é dono só da camada estável; as atualizações seguintes não
-//     sobrescrevem arquivo registrado pelo gerenciador de pacotes, então ele nunca fica
-//     inconsistente;
-//   - reverter é trocar um ponteiro, não reinstalar;
-//   - no Windows não é preciso substituir um executável em uso.
+// Consequences that justify the complexity:
+//   - the `.deb` (or installer) owns only the stable layer; later updates never overwrite files
+//     registered by the package manager, so it never becomes inconsistent;
+//   - rollback is a pointer swap, not a reinstall;
+//   - on Windows there is no need to replace an executable in use.
 //
-// A troca do ponteiro é a única etapa irreversível, e é um `rename` — atômico o bastante para
-// que uma queda de energia deixe a versão antiga ou a nova, nunca um meio-termo.
+// The pointer swap is the only irreversible step, and it is a `rename`: atomic enough that a power
+// loss leaves either the old or the new version, never something in between.
 
 const RE_VERSAO = /^\d+\.\d+\.\d+$/;
 const LIMITE_ARTEFATO = 120 * 1024 * 1024;
-// Tetos ABSOLUTOS, independentes do que o manifesto declara.
+// ABSOLUTE ceilings, independent of what the manifest declares.
 //
-// O manifesto é atestado, mas atestado não é o mesmo que correto: um erro de publicação pode
-// declarar um tamanho absurdo, e o console rodaria num Raspberry Pi de 1 GiB. O comprimido tem
-// teto próprio, o descomprimido também, e a contagem de arquivos limita o caso do arquivo
-// pequeno que expande para milhões de entradas.
+// The manifest is attested, but attested is not the same as correct: a publishing mistake can
+// declare an absurd size, and the Console runs on a 1 GiB Raspberry Pi. Compressed and decompressed sizes
+// have their own ceilings, and the file count limits a small archive that expands into millions of
+// entries.
 const LIMITE_DESCOMPRIMIDO = 400 * 1024 * 1024;
 const LIMITE_ARQUIVOS_PAYLOAD = 5000;
 
@@ -59,16 +58,15 @@ function dirDescargas() {
 }
 
 /**
- * Trava exclusiva das operações de versão na raiz de instalação.
+ * Exclusive lock for version operations on the installation root.
  *
- * Atualizar, importar offline e reverter mexem no mesmo ponteiro e no mesmo `versoes/`. Sem
- * exclusão, duas operações simultâneas podem instalar v2 e v3 ao mesmo tempo e uma podar a
- * versão que a outra está a ponto de ativar — o ponteiro fica apontando para um diretório que
- * não existe, e o console não sobe. O campo `transacao` é único e também seria sobrescrito.
+ * Update, offline import and rollback change the same pointer and the same `versoes/`. Without
+ * exclusion, two concurrent operations could install v2 and v3 at once and one could prune the
+ * version the other is about to activate, leaving the pointer at a missing directory and the
+ * Console unable to start. The single `transacao` field would also be overwritten.
  *
- * `wx` falha se o arquivo existir, então a criação é a própria prova de exclusividade. Uma trava
- * de processo morto é recuperada: sem isso, uma queda no meio de uma atualização deixaria a
- * instalação travada para sempre.
+ * `wx` fails if the file exists, so creation itself proves exclusivity. A lock left by a dead
+ * process is recovered: otherwise a crash mid-update would lock the installation forever.
  */
 function arquivoTrava() {
   return path.join(raizInstalacao(), "operacao-em-andamento.json");
@@ -107,17 +105,17 @@ function adquirirTrava(operacao, tentativa = 0) {
   }
   if (tentativa >= 3) return { ok: false, motivo: "não foi possível resolver a trava de operação; tente de novo" };
 
-  // Recuperação de trava órfã por RENAME, não por remoção.
+  // Orphan lock recovery by RENAME, not by removal.
   //
-  // Remover e recriar é uma corrida: dois processos podem ver o mesmo dono morto, o primeiro
-  // recria a trava e o segundo remove justamente essa trava viva e cria a sua. O rename é
-  // atômico e só um dos dois consegue mover aquele caminho, então quem move é quem tem o direito
-  // de recriar. O outro falha no rename, relê e encontra um dono vivo.
+  // Remove-and-recreate races: two processes can see the same dead owner, the first recreates the
+  // lock and the second removes that live lock and creates its own. Rename is atomic and only one
+  // of them can move that path, so whoever moves it has the right to recreate. The other fails the
+  // rename, re-reads and finds a live owner.
   const aposentada = `${arquivo}.orfa-${process.pid}-${Date.now()}`;
   try {
     fs.renameSync(arquivo, aposentada);
   } catch {
-    // Alguém chegou primeiro: refaz a leitura em vez de assumir qualquer coisa.
+    // Someone got there first: re-read instead of assuming anything.
     return adquirirTrava(operacao, tentativa + 1);
   }
   const confirmado = estado.lerJson(aposentada, {});
@@ -126,7 +124,9 @@ function adquirirTrava(operacao, tentativa = 0) {
   return adquirirTrava(operacao, tentativa + 1);
 }
 
-/** Alguma operação de versão está em andamento por um processo vivo? */
+/**
+ * Is a version operation in progress by a live process?
+ */
 function operacaoEmAndamento() {
   const dono = estado.lerJson(arquivoTrava(), null);
   return dono && processoVivo(dono.pid) && dono.pid !== process.pid ? dono : null;
@@ -144,18 +144,20 @@ function lerEstadoInstalacao() {
 }
 
 /**
- * Grava o registro da instalação **mesclando** com o que já está lá.
+ * Writes the installation record **merging** with what is already there.
  *
- * O registro guarda mais do que o ponteiro: escopo, diretório de estado, logs e porta, escritos
- * pelo instalador. Substituir o objeto inteiro a cada atualização ou reversão apagava esses
- * campos, e a instalação passava a procurar o estado no padrão da plataforma na partida seguinte.
+ * The record holds more than the pointer: scope, state directory, logs and port, written by the
+ * installer. Replacing the whole object on each update or rollback would erase those fields, and
+ * the installation would look for state in the platform default on the next start.
  */
 function gravarEstadoInstalacao(valor) {
   const atual = lerEstadoInstalacao();
   estado.gravarJson(arquivoEstado(), { ...atual, ...valor }, 0o644);
 }
 
-/** Versões presentes no disco, mais o ponteiro ativo. */
+/**
+ * Versions present on disk, plus the active pointer.
+ */
 function versoesInstaladas() {
   const info = lerEstadoInstalacao();
   let presentes = [];
@@ -175,7 +177,9 @@ function versoesInstaladas() {
   };
 }
 
-/** Versão em execução neste processo (o payload de onde o console foi carregado). */
+/**
+ * Version running in this process (the payload the Console was loaded from).
+ */
 function versaoEmExecucao() {
   try {
     return require(path.join(config.RAIZ_CONSOLE, "package.json")).version;
@@ -193,8 +197,8 @@ function baixar(url, { destino = null, limiteBytes = LIMITE_ARTEFATO, saltos = 0
   } catch {
     return Promise.resolve({ ok: false, erro: "endereço inválido" });
   }
-  // Releases públicos: nenhuma credencial é enviada, em nenhum salto. Um redirecionamento para
-  // armazenamento nunca deve carregar cabeçalho de autorização junto.
+  // Public releases: no credential is sent, on any hop. A redirect to storage must never carry an
+  // authorization header along.
   const transporte = alvo.protocol === "http:" ? http : https;
   if (alvo.protocol !== "https:" && !process.env.CONSOLE_RELEASE_BASE) {
     return Promise.resolve({ ok: false, erro: "download só é aceito por HTTPS" });
@@ -278,8 +282,8 @@ function arquivoObservacao() {
 }
 
 /**
- * Consulta a publicação atual. Guarda a última observação com a hora, para que a interface
- * mostre dado antigo como antigo em vez de como atual.
+ * Queries the current publication. Keeps the last observation with its time, so the interface shows
+ * old data as old instead of as current.
  */
 async function verificarPublicacao({ forcar = false } = {}) {
   const anterior = estado.lerJson(arquivoObservacao(), null);
@@ -333,26 +337,26 @@ async function verificarPublicacao({ forcar = false } = {}) {
 }
 
 /**
- * O ponteiro diz uma versão e o processo carregou outra.
+ * The pointer names one version and the process loaded another.
  *
- * Isso acontece quando a troca de ponteiro dá certo mas o payload novo não sobe: o bootstrap cai
- * para a versão anterior — o que é a rede de segurança funcionando — e só avisa por stderr. Numa
- * unidade systemd isso vai para o journal; num atalho do Windows aberto por wscript não aparece
- * em lugar nenhum. O resultado silencioso é o pior possível: a atualização relata sucesso, o
- * console volta a funcionar, e o operador acredita estar rodando código que não está rodando.
+ * This happens when the pointer swap succeeds but the new payload does not start: the bootstrap
+ * falls back to the previous version (the safety net working) and only reports it on stderr. Under
+ * a systemd unit that goes to the journal; behind a Windows shortcut opened by wscript it appears
+ * nowhere. The silent result is the worst one: the update reports success, the Console works again,
+ * and the operator believes they run code that is not running.
  *
- * Só vale para instalação gerenciada lado a lado: numa execução a partir do código-fonte não há
- * ponteiro com que divergir.
+ * Applies only to a managed side-by-side installation: a run from source has no pointer to diverge
+ * from.
  */
 function divergenciaDeVersao(instaladas, emExecucao, info = {}) {
   if (!instaladas.gerenciadoLadoALado || !instaladas.ativa || !emExecucao) return null;
   if (instaladas.ativa === emExecucao) return null;
 
-  // Reinício pendente NÃO é divergência.
+  // A pending restart is NOT divergence.
   //
-  // Entre a troca do ponteiro e o reinício, o processo em execução é legitimamente o anterior. Um
-  // alarme aqui diria que a versão "não subiu" no exato instante em que tudo está certo — e um
-  // aviso que grita no caminho normal é um aviso que o operador aprende a ignorar.
+  // Between the pointer swap and the restart, the running process is legitimately the previous
+  // version. Alarming here would say the version "did not start" at the exact moment everything is
+  // correct, and a warning that fires on the normal path is one operators learn to ignore.
   const concluidaAgora =
     info.transacao &&
     info.transacao.etapa === "concluida" &&
@@ -379,7 +383,9 @@ function divergenciaDeVersao(instaladas, emExecucao, info = {}) {
   };
 }
 
-/** Situação para a interface: instalado, disponível, alvo, prontidão e ressalvas. */
+/**
+ * Status for the interface: installed, available, target, readiness and caveats.
+ */
 async function situacao({ consultarRede = false } = {}) {
   const instaladas = versoesInstaladas();
   const emExecucao = versaoEmExecucao();
@@ -420,7 +426,9 @@ async function situacao({ consultarRede = false } = {}) {
   };
 }
 
-/** Validação usada pela ação antes de confirmar. */
+/**
+ * Validation used by the action before confirmation.
+ */
 async function validarAlvo(versao) {
   if (!RE_VERSAO.test(String(versao || ""))) return "versão alvo inválida";
   const instaladas = versoesInstaladas();
@@ -433,18 +441,18 @@ async function validarAlvo(versao) {
   return null;
 }
 
-// --- Extração segura ---------------------------------------------------------------------------
+// --- Safe extraction ---------------------------------------------------------------------------
 
 /**
- * Extrai um `.tar.gz` sem depender do `tar` do sistema (que não existe em todo Windows) e sem
- * aceitar caminho que escape do destino. Suporta apenas arquivo comum e diretório: link
- * simbólico, hardlink e dispositivo são **recusados**, porque um artefato é conteúdo remoto.
+ * Extracts a `.tar.gz` without the system `tar` (missing on some Windows) and without accepting
+ * paths that escape the destination. Supports only regular files and directories: symlinks,
+ * hardlinks and devices are **refused**, because an artifact is remote content.
  */
 function extrairTarGz(arquivoOuConteudo, destino) {
-  // Aceita um Buffer para que a instalação extraia exatamente os bytes que passaram pelo digest,
-  // sem reler o caminho — reler seria reabrir a janela entre verificar e instalar.
-  // `maxOutputLength` corta a expansão no próprio gunzip: sem isso um artefato pequeno e muito
-  // comprimido derruba o host por memória antes de qualquer verificação de conteúdo.
+  // Accepts a Buffer so installation extracts exactly the bytes that went through the digest,
+  // without re-reading the path (a re-read would reopen the window between verification and
+  // installation). `maxOutputLength` stops expansion inside gunzip itself: without it a small,
+  // highly compressed artifact exhausts host memory before any content check.
   let bruto;
   try {
     bruto = zlib.gunzipSync(Buffer.isBuffer(arquivoOuConteudo) ? arquivoOuConteudo : fs.readFileSync(arquivoOuConteudo), {
@@ -482,7 +490,7 @@ function extrairTarGz(arquivoOuConteudo, destino) {
     posicao += 512 + blocos * 512;
 
     if (tipo === "L") {
-      // GNU long name: o nome do próximo item vem no corpo deste registro.
+      // GNU long name: the next item's name comes in this record's body.
       prefixoLongo = conteudo.toString("utf8").replace(/\0.*$/, "");
       continue;
     }
@@ -504,8 +512,8 @@ function extrairTarGz(arquivoOuConteudo, destino) {
       throw new Error(`artefato contém caminho fora do destino: ${nome}`);
     }
 
-    // O teto conta TODAS as entradas, não só arquivos: um tar só de diretórios passava pelo
-    // limite e ainda esgotava inodes.
+    // The ceiling counts ALL entries, not only files: a tar of directories only would pass the
+    // limit and still exhaust inodes.
     entradas += 1;
     if (entradas > LIMITE_ARQUIVOS_PAYLOAD) {
       throw new Error(`o artefato tem mais de ${LIMITE_ARQUIVOS_PAYLOAD} entradas; extração recusada`);
@@ -518,7 +526,7 @@ function extrairTarGz(arquivoOuConteudo, destino) {
 
     fs.mkdirSync(path.dirname(alvo), { recursive: true });
     fs.writeFileSync(alvo, conteudo);
-    // Preserva apenas o bit de execução; nada de setuid/setgid vindo de um artefato.
+    // Preserves only the executable bit; no setuid/setgid from an artifact.
     if (process.platform !== "win32") fs.chmodSync(alvo, modo & 0o755);
     arquivos += 1;
   }
@@ -526,7 +534,7 @@ function extrairTarGz(arquivoOuConteudo, destino) {
   return { arquivos };
 }
 
-// --- Transação de atualização --------------------------------------------------------------------
+// --- Update transaction ------------------------------------------------------------------------
 
 function limparDescargas() {
   try {
@@ -535,16 +543,15 @@ function limparDescargas() {
 }
 
 /**
- * Reconciliação de transação interrompida. Chamada na partida do console: se a energia caiu
- * entre o estágio e a troca do ponteiro, o que ficou é lixo em `descargas/` ou um diretório de
- * versão incompleto — nunca uma instalação pela metade, porque a troca é um rename.
+ * Reconciles an interrupted transaction. Called at Console start: if power failed between staging
+ * and the pointer swap, what remains is garbage in `descargas/` or an incomplete version directory,
+ * never a half installation, because the swap is a rename.
  */
 /**
- * Remove estágios de extração (`versoes/<v>.parcial-<aleatorio>`).
+ * Removes extraction staging directories (`versoes/<v>.parcial-<aleatorio>`).
  *
- * Nunca toca em `.substituido-*`: durante uma substituição de payload aquele diretório é a única
- * cópia da versão anterior, e apagá-lo transformaria uma reinstalação interrompida em perda da
- * versão.
+ * Never touches `.substituido-*`: during a payload replacement that directory is the only copy of
+ * the previous version, and deleting it would turn an interrupted reinstall into a lost version.
  */
 function limparParciais(versao) {
   try {
@@ -557,16 +564,16 @@ function limparParciais(versao) {
 }
 
 function reconciliar() {
-  // Uma operação viva está mexendo em versoes/ agora: reconciliar aqui apagaria o estágio dela.
-  // Acontece de verdade quando um segundo console sobe durante uma atualização.
+  // A live operation is changing versoes/ right now: reconciling here would delete its staging.
+  // This happens when a second Console starts during an update.
   const emAndamento = operacaoEmAndamento();
   if (emAndamento) {
     return { reconciliado: false, adiado: true, motivo: `operação ${emAndamento.operacao || "de versão"} em andamento (pid ${emAndamento.pid})` };
   }
 
-  // Parciais são varridos SEMPRE, não só quando há transação incompleta: um estágio pode sobrar
-  // de um registro perdido, de uma transação já concluída ou de um reparo do instalador, e nesses
-  // casos ninguém limpava. `.substituido-*` continua intocado.
+  // Partial directories are ALWAYS swept, not only when a transaction is incomplete: staging can be
+  // left by a lost record, an already completed transaction or an installer repair.
+  // `.substituido-*` stays untouched.
   limparParciais(null);
 
   const info = lerEstadoInstalacao();
@@ -595,13 +602,13 @@ function registrarTransacao(versao, etapa) {
 }
 
 /**
- * Instala um artefato **já verificado** (atestação do manifesto e digest conferidos) e troca o
- * ponteiro da versão ativa.
+ * Installs an **already verified** artifact (manifest attestation and digest checked) and swaps
+ * the active version pointer.
  *
- * Fica separada porque há duas origens legítimas para o mesmo artefato: o release baixado pela
- * rede e o arquivo trazido à mão para um host sem Internet. O que não pode variar entre elas é
- * justamente esta parte — extração recusada para caminho que escape, conteúdo conferido, versão
- * interna batendo com a pedida, e só então o rename. Duplicar isso seria duplicar o risco.
+ * Kept separate because there are two legitimate sources for the same artifact: the release
+ * downloaded over the network and the file carried by hand to a host without Internet. What must
+ * not differ between them is exactly this part: extraction refused for escaping paths, contents
+ * checked, internal version matching the requested one, and only then the rename.
  */
 async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, log = () => {} }) {
   const destino = path.join(dirVersoes(), versaoAlvo);
@@ -622,7 +629,8 @@ async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, 
     return abortar("falhou-extracao", `extração recusada: ${erro.message}`);
   }
 
-  // O payload precisa ter o que o bootstrap vai carregar, senão a troca deixaria o console sem subir.
+  // The payload must contain what the bootstrap will load, otherwise the swap would leave the
+  // Console unable to start.
   for (const exigido of ["console.js", "package.json", path.join("src", "servidor.js")]) {
     if (!fs.existsSync(path.join(parcial, exigido))) {
       fs.rmSync(parcial, { recursive: true, force: true });
@@ -666,8 +674,8 @@ async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, 
 }
 
 /**
- * Instala uma versão publicada e troca o ponteiro. Só escreve no diretório ativo depois de
- * atestação, política de versão e digest conferirem.
+ * Installs a published version and swaps the pointer. Writes to the active directory only after
+ * attestation, version policy and digest check out.
  */
 async function atualizar(versaoAlvo, { log = () => {} } = {}) {
   const impedimento = await validarAlvo(versaoAlvo);
@@ -691,7 +699,8 @@ async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
   const publicacao = await verificarPublicacao({ forcar: true });
   if (!publicacao.ok) return { ok: false, erro: publicacao.motivo };
   if (publicacao.versao !== versaoAlvo) {
-    // O alvo foi fixado na confirmação: uma publicação que apareça depois não entra sozinha.
+    // The target was fixed at confirmation: a publication appearing afterwards does not get in by
+    // itself.
     return {
       ok: false,
       erro: `a publicação atual é ${publicacao.versao}, e a operação foi confirmada para ${versaoAlvo}. Reveja e confirme de novo.`,
@@ -717,8 +726,8 @@ async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
   const arquivoLocal = path.join(staging, artefato.arquivo);
 
   log("Baixando o artefato...");
-  // O teto do download é o MENOR entre o declarado e o absoluto: um manifesto que declare
-  // 100 GiB não pode ampliar o limite do console.
+  // The download ceiling is the SMALLER of the declared and the absolute: a manifest declaring 100
+  // GiB cannot raise the Console's limit.
   const tetoDownload = Math.min(Math.max(artefato.bytes + 4096, 1024), LIMITE_ARTEFATO);
   const download = await baixar(`${baseDeRelease()}/${artefato.arquivo}`, { destino: arquivoLocal, limiteBytes: tetoDownload });
   if (!download.ok) {
@@ -742,7 +751,9 @@ async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
   return instalarArtefatoVerificado({ versaoAlvo, conteudo: conferencia.conteudo, alvo: artefato.alvo, origem: "release", log });
 }
 
-/** Reversão: troca o ponteiro para a versão anterior já instalada e verificada. Sem rede. */
+/**
+ * Rollback: swaps the pointer to the previous version, already installed and verified. No network.
+ */
 async function reverter({ log = () => {} } = {}) {
   const trava = adquirirTrava("reverter");
   if (!trava.ok) return { ok: false, erro: trava.motivo };
@@ -772,7 +783,9 @@ async function reverterComTrava({ log = () => {} } = {}) {
   return { ok: true, versao: instaladas.anterior, reinicio: reinicio.disponivel ? "solicitado" : reinicio.motivo };
 }
 
-/** Mantém no disco só a versão ativa e a anterior. */
+/**
+ * Keeps only the active and the previous version on disk.
+ */
 function podarVersoes({ manter = [] } = {}) {
   const preservar = new Set(manter);
   let presentes = [];
@@ -792,7 +805,9 @@ function podarVersoes({ manter = [] } = {}) {
   return removidas;
 }
 
-/** Importação offline: mesmo caminho de verificação, a partir de arquivos locais. */
+/**
+ * Offline import: the same verification path, from local files.
+ */
 async function importarOffline({ manifesto, atestacao: arquivoAtestacao, artefato, log = () => {} }) {
   if (!fs.existsSync(manifesto) || !fs.existsSync(arquivoAtestacao) || !fs.existsSync(artefato)) {
     return { ok: false, erro: "informe manifesto, atestação e artefato existentes" };
@@ -807,8 +822,8 @@ async function importarOffline({ manifesto, atestacao: arquivoAtestacao, artefat
 }
 
 async function importarOfflineComTrava({ manifesto, arquivoAtestacao, artefato, log = () => {} }) {
-  // Sem rede aqui: a raiz de confiança do Sigstore é a última que uma atualização conferiu, ou a
-  // que o console traz.
+  // No network here: the Sigstore trusted root is the last one a refresh verified, or the one the
+  // Console carries.
   let raiz;
   try {
     ({ raiz } = await atestacao.raizDeConfianca({ rede: false }));

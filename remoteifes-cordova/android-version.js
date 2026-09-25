@@ -16,9 +16,9 @@ function ler() {
   return dados;
 }
 
-// O versionCode nasce da própria versão (1.2.3 -> 10203), o que o torna previsível e
-// legível; recompilar a mesma versão apenas avança em um, porque o Android recusa
-// instalar por cima um pacote cujo versionCode não cresceu.
+// The versionCode is derived from the version itself (1.2.3 -> 10203), which makes it predictable
+// and readable; rebuilding the same version only advances it by one, because Android refuses to
+// install over a package whose versionCode did not increase.
 function codigoDerivado(versionName) {
   const [, maior, menor, correcao] = versionName.match(RE_VERSAO).map(Number);
   if (menor > 99 || correcao > 99) throw new Error("menor e correção precisam ficar entre 0 e 99 para gerar o versionCode.");

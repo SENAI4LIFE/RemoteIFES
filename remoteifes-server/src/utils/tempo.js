@@ -58,8 +58,8 @@ function formatarParaBrasilia(datetimeUtcSqlite) {
   }).format(data);
 }
 
-// Instante UTC, no formato do datetime('now') do SQLite, de um horário de Brasília (UTC-3 fixo,
-// sem horário de verão desde 2019 — o mesmo '-3 hours' usado nas consultas).
+// UTC instant, in SQLite datetime('now') format, of a Brasília time (fixed UTC-3, no daylight
+// saving since 2019; the same '-3 hours' used in queries).
 function brasiliaParaUtcSqlite(dataISO, horaMinuto) {
   return new Date(`${dataISO}T${horaMinuto}:00-03:00`).toISOString().slice(0, 19).replace("T", " ");
 }

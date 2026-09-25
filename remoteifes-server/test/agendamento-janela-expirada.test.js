@@ -14,7 +14,7 @@ const { dataAtualBrasiliaISO, horaAtualBrasilia } = require("../src/utils/tempo"
 
 const superadmin = db.prepare("SELECT * FROM usuarios WHERE nivel = 3").get();
 const ADMIN = { usuario: { ...superadmin, isAdmin: true, podeControlar: true }, origem: "manual" };
-// 2026-09-06 em Brasília (UTC-3): 07:59 local = 10:59Z.
+// 2026-09-06 in Brasília (UTC-3): 07:59 local = 10:59Z.
 const instante = (hhmm) => new Date(`2026-09-06T${hhmm}:00-03:00`);
 
 function sala(codigo) {

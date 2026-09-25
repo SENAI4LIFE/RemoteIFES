@@ -61,9 +61,9 @@ const MobileApp = (() => {
     return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
-  // Só o aplicativo empacotado sabe qual versão está instalada: ela é gravada no bundle no
-  // mesmo build que gera o APK. No site e na PWA esse dado não existe, e a página diz isso
-  // em vez de adivinhar o que está instalado no aparelho de quem está lendo.
+  // Only the packaged app knows which version is installed: it is written into the bundle by the
+  // same build that produces the APK. On the website and PWA that data does not exist, and the page
+  // says so instead of guessing what is installed on the reader's device.
   function versaoInstalada() {
     const cfg = window.RemoteIFESConfig || {};
     if (!cfg.empacotado) return null;
@@ -266,8 +266,8 @@ const MobileApp = (() => {
     }
   });
 
-  // Sem sondagem periódica: a versão publicada é relida só ao abrir a página e quando o
-  // aparelho volta ao primeiro plano com ela aberta, que é quando o dado pode ter mudado.
+  // No periodic polling: the published version is re-read only when the page opens and when the
+  // device returns to the foreground with it open, which is when the data may have changed.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
     if (overlay.classList.contains("hidden")) return;

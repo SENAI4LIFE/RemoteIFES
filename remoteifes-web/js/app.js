@@ -5,9 +5,9 @@ _tabInicial.setAttribute("aria-current", "page");
 if ("serviceWorker" in navigator && !(window.RemoteIFESConfig && window.RemoteIFESConfig.empacotado)) {
   window.addEventListener("load", () => {
     const versao = window.REMOTEIFES_FRONTEND_VERSION || "unknown";
-    // A recarga da aba após uma atualização é feita pelo próprio worker (clients.navigate),
-    // que também alcança abas abertas por versões antigas do frontend. Duplicá-la aqui
-    // causaria duas navegações para a mesma atualização.
+    // The tab reload after an update is done by the worker itself (clients.navigate), which also
+    // reaches tabs opened by older frontend versions. Duplicating it here would cause two
+    // navigations for the same update.
     navigator.serviceWorker.register(`sw.js?v=${encodeURIComponent(versao)}`, { updateViaCache: "none" })
       .then((registro) => registro.update())
       .catch(() => {});
@@ -28,16 +28,16 @@ ServerStatus.aoFicarPronto(() => {
 });
 ServerStatus.conectar();
 
-// A faixa de senha padrão é sticky logo abaixo da barra superior. Outros elementos
-// sticky (as sub-abas de Administração) precisam da altura real dela, que muda com
-// a ampliação de texto e com a largura da tela.
+// The default-password banner is sticky just below the top bar. Other sticky elements (the
+// Administration sub-tabs) need its real height, which changes with text enlargement and screen
+// width.
 (function () {
   const aviso = document.getElementById("defaultPasswordWarning");
   if (!aviso) return;
   const medir = () => {
     const estilo = getComputedStyle(aviso);
     const fixa = !aviso.classList.contains("hidden") && estilo.position === "sticky";
-    // Onde a faixa termina quando encostada: o proprio deslocamento sticky mais a altura.
+    // Where the banner ends when stuck: its own sticky offset plus its height.
     const fim = fixa ? (parseFloat(estilo.top) || 0) + aviso.getBoundingClientRect().height : 0;
     document.documentElement.style.setProperty("--aviso-seguranca-fim", `${Math.round(fim)}px`);
   };
@@ -47,9 +47,8 @@ ServerStatus.conectar();
   window.addEventListener("resize", medir);
 })();
 
-// A barra inferior cresce com a ampliação de texto. Os botões flutuantes e a folga no fim
-// da página partem da altura real dela (sem a área segura, que o CSS soma por conta
-// própria), não de um valor fixo.
+// The bottom bar grows with text enlargement. The floating buttons and the page-end clearance use
+// its real height (without the safe area, which CSS adds itself), not a fixed value.
 (function () {
   const barra = document.querySelector(".tabbar");
   if (!barra) return;
@@ -67,9 +66,9 @@ ServerStatus.conectar();
   window.addEventListener("resize", medir);
 })();
 
-// A barra lateral da Administração é sticky: enquanto a página não rola, ela fica abaixo
-// do deslocamento sticky, e uma altura máxima calculada para a posição encostada passava
-// por baixo da barra inferior. A posição real no viewport vai para --admin-nav-atual.
+// The Administration sidebar is sticky: while the page has not scrolled it sits below the sticky
+// offset, and a max height computed for the stuck position ran under the bottom bar. The real
+// viewport position goes to --admin-nav-atual.
 (function () {
   const nav = document.querySelector(".admin-subtabs");
   if (!nav) return;
@@ -92,8 +91,8 @@ ServerStatus.conectar();
   };
   medir();
   if (typeof ResizeObserver !== "undefined") {
-    // A posição da barra muda com o que fica acima dela: barra superior, faixa de senha
-    // padrão e o cabeçalho da tela, além da própria barra aparecer ou sumir.
+    // The bar position changes with what sits above it: top bar, default-password banner and the
+    // screen header, and the bar itself appearing or disappearing.
     const observador = new ResizeObserver(agendar);
     const acima = document.querySelector("#screen-admin .screen-head");
     [nav, document.querySelector(".topbar"), document.getElementById("defaultPasswordWarning"), acima].forEach((el) => { if (el) observador.observe(el); });

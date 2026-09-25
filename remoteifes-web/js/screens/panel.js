@@ -7,14 +7,15 @@ const _panelAplicarAvisoOfflineToast = Toast.criarAvisoDeEstado(
   "panelAvisoOffline",
   "O dispositivo está offline: o estado foi salvo e será aplicado quando o ESP32 reconectar."
 );
-// O servidor guarda o estado desejado; o ESP32 confirma quando o aplica (imediatamente no firmware
-// atual, em até um ciclo de telemetria no anterior). Só avisamos se a confirmação demorar demais.
+// The server stores the desired state; the ESP32 confirms when it applies it (immediately on
+// current firmware, within one telemetry cycle on the previous one). Warn only if confirmation
+// takes too long.
 const _panelAplicarAvisoSemConfirmacaoToast = Toast.criarAvisoDeEstado(
   "panelAvisoSemConfirmacao",
   "O ESP32 ainda não confirmou o último comando: o estado foi salvo e continua valendo até a placa aplicá-lo."
 );
-// "online" é presença (a placa foi vista há pouco, mesmo só por heartbeat HTTP); comandos só são
-// entregues pelo socket de comandos, que o servidor informa em canalComandos.
+// "online" is presence (the board was seen recently, possibly only through an HTTP heartbeat);
+// commands are delivered only over the command socket, which the server reports in canalComandos.
 const PANEL_AVISO_SEM_CANAL = "O comando não foi entregue ao ESP32: a placa foi vista há pouco, mas está sem canal de comandos agora. O estado foi salvo e será aplicado quando ela reconectar.";
 const PANEL_ESPERA_CONFIRMACAO_MS = 12000;
 let _panelTimerConfirmacao = null;
@@ -136,7 +137,7 @@ function aplicarStatusNoPainel(status) {
   aplicarBloqueio(status);
 }
 
-// Devolve true quando o painel foi atualizado com o estado autoritativo do servidor.
+// Returns true when the panel was updated with the server's authoritative state.
 async function refreshStatus() {
   const sala = state.salaAtual;
   const geracao = _panelGeracao;
@@ -162,8 +163,9 @@ async function enviarComandoPainel(botao, cmd, valor) {
   const resp = await Api.enviarComando(state.salaAtual, cmd, valor);
   if (!resp.ok) Toast.erro(resp.erro || "não foi possível enviar o comando");
   else if (resp.sala && resp.sala.online && resp.sala.canalComandos === false && resp.sala.enviadoAoDispositivo === false) Toast.aviso(PANEL_AVISO_SEM_CANAL);
-  // Sem resposta (prazo esgotado ou conexão perdida) o desfecho é desconhecido: só o estado que o
-  // servidor devolver diz se o comando valeu. Se nem isso chegar, o botão volta a ficar utilizável.
+  // Without a response (deadline expired or connection lost) the outcome is unknown: only the state
+  // the server returns tells whether the command took effect. If not even that arrives, the button
+  // becomes usable again.
   const atualizado = await refreshStatus();
   if (!atualizado && state.salaAtual && botao.isConnected) botao.disabled = false;
 }

@@ -3,20 +3,20 @@ const path = require("path");
 const config = require("./config");
 const estado = require("./estado");
 
-// Coordenação de manutenção entre console, CLI (deploy.sh/rollback.sh) e watchdog.
+// Maintenance coordination between the Console, the CLI (deploy.sh/rollback.sh) and the watchdog.
 //
-// O arquivo `.deploy-lock` continua sendo o mesmo que os scripts usam, no mesmo formato
-// ("<pid> <data>"), para que `bash deploy.sh` rodado à mão continue enxergando a trava do
-// console e vice-versa. Duas correções importantes em cima do comportamento original:
+// The `.deploy-lock` file is the same one the scripts use, in the same format ("<pid> <data>"), so
+// a hand-run `bash deploy.sh` still sees the Console's lock and vice versa. Two corrections on top
+// of the scripts' behavior:
 //
-//  1. Os scripts removem a trava por idade (>= 30 min). Uma atualização longa e legítima
-//     passava a ser tratada como resíduo. Aqui a trava do console recebe um *heartbeat*
-//     (mtime atualizado) enquanto a operação está viva, então ela nunca "envelhece" sozinha.
-//  2. Idade não é dono. Antes de assumir uma trava existente o console confere se o PID
-//     registrado ainda está vivo; uma operação viva nunca é atropelada, por mais antiga que seja.
+//  1. The scripts remove the lock by age (>= 30 min), which would treat a long, legitimate update
+//     as leftover. The Console's lock gets a *heartbeat* (mtime updated) while the operation is
+//     alive, so it never ages by itself.
+//  2. Age is not ownership. Before taking over an existing lock the Console checks whether the
+//     recorded PID is still alive; a live operation is never overridden, however old.
 //
-// O sidecar .deploy-lock.console.json guarda a posse (quem, qual ação, desde quando). Ele é
-// informativo: os scripts não precisam conhecê-lo.
+// The .deploy-lock.console.json sidecar records ownership (who, which action, since when). It is
+// informational: the scripts do not need to know about it.
 
 const HEARTBEAT_MS = 60_000;
 const IDADE_RESIDUO_MS = 30 * 60 * 1000;
@@ -32,7 +32,7 @@ function processoVivo(pid) {
     process.kill(pid, 0);
     return true;
   } catch (erro) {
-    // EPERM significa que o processo existe mas pertence a outro usuário.
+    // EPERM means the process exists but belongs to another user.
     return erro.code === "EPERM";
   }
 }
@@ -62,7 +62,7 @@ function lerTrava() {
 }
 
 /**
- * Situação da manutenção para exibir e para decidir se uma ação pode começar.
+ * Maintenance status, for display and for deciding whether an action may start.
  */
 function situacao() {
   const atual = lerTrava();
@@ -98,7 +98,8 @@ class Trava {
         const agora = new Date();
         fs.utimesSync(this.arquivo, agora, agora);
       } catch {
-        // Se a trava sumiu (alguém a removeu à mão), o heartbeat para de fazer sentido.
+        // If the lock disappeared (someone removed it by hand), the heartbeat no longer makes
+        // sense.
       }
     }, HEARTBEAT_MS);
     if (typeof this.relogio.unref === "function") this.relogio.unref();
@@ -109,7 +110,7 @@ class Trava {
     this.liberada = true;
     if (this.relogio) clearInterval(this.relogio);
     try {
-      // Só remove se ainda for nossa: evita apagar a trava de outro processo que a assumiu.
+      // Removes only if still ours: avoids deleting a lock another process took over.
       const conteudo = fs.readFileSync(this.arquivo, "utf8").trim();
       if (Number.parseInt(conteudo.split(/\s+/)[0], 10) === process.pid) {
         fs.rmSync(this.arquivo, { force: true });
@@ -123,8 +124,8 @@ class Trava {
 }
 
 /**
- * Adquire a trava de manutenção. Nunca remove a trava de um processo vivo, nem mesmo antiga.
- * Uma trava de processo morto é reconciliada (registrada na auditoria) e assumida.
+ * Acquires the maintenance lock. Never removes the lock of a live process, not even an old one. A
+ * dead process's lock is reconciled (recorded in the audit) and taken over.
  */
 function adquirir({ acao, trabalhoId, operador }) {
   const { trava, sidecar, dirDados } = caminhos();
@@ -149,8 +150,8 @@ function adquirir({ acao, trabalhoId, operador }) {
 
   let fd;
   try {
-    // wx reproduz o `set -o noclobber` dos scripts: se alguém criou a trava entre a checagem
-    // e agora, a criação falha em vez de sobrescrever.
+    // wx reproduces the scripts' `set -o noclobber`: if someone created the lock between the check
+    // and now, creation fails instead of overwriting.
     fd = fs.openSync(trava, "wx", 0o644);
     fs.writeFileSync(fd, `${process.pid} ${new Date().toISOString()}\n`, "utf8");
   } catch (erro) {
@@ -177,7 +178,7 @@ function adquirir({ acao, trabalhoId, operador }) {
 }
 
 /**
- * Remoção explícita de trava residual, pedida pelo operador. Recusa trava de processo vivo.
+ * Explicit removal of a leftover lock, requested by the operator. Refuses a live process's lock.
  */
 function removerResiduo(operador) {
   const atual = lerTrava();

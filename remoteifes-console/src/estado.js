@@ -3,9 +3,9 @@ const path = require("path");
 const crypto = require("crypto");
 const config = require("./config");
 
-// Estado persistente do console: poucos arquivos JSON pequenos, gravados de forma atômica e
-// só quando algo realmente muda. Num Pi com cartão SD, escrita por requisição é custo puro;
-// por isso nada aqui é chamado em leitura de status.
+// Persistent Console state: a few small JSON files, written atomically and only when something
+// actually changes. On a Pi with an SD card, per-request writes are pure cost, so nothing here is
+// called from status reads.
 
 function garantirDiretorio(dir = config.DIR_ESTADO, modo = 0o700) {
   fs.mkdirSync(dir, { recursive: true, mode: modo });
@@ -50,8 +50,8 @@ function fsyncDiretorio(dir) {
     fd = fs.openSync(dir, "r");
     fs.fsyncSync(fd);
   } catch {
-    // Diretórios não são sincronizáveis em todo sistema de arquivos (e nunca no Windows);
-    // a troca por rename já é atômica, o fsync é reforço.
+    // Directories cannot be synced on every file system (never on Windows); the rename swap is
+    // already atomic and fsync is reinforcement.
   } finally {
     if (fd !== undefined) {
       try {
@@ -61,8 +61,8 @@ function fsyncDiretorio(dir) {
   }
 }
 
-// Registro de auditoria: uma linha JSON por evento, com rotação simples por tamanho. Nunca
-// recebe segredo, senha, token nem transcrição de terminal — só metadado do que foi feito.
+// Audit log: one JSON line per event, with simple size-based rotation. Never receives secrets,
+// passwords, tokens or terminal transcripts, only metadata about what was done.
 const AUDITORIA_MAX_BYTES = 512 * 1024;
 const CAMPOS_PROIBIDOS = /(senha|password|token|secret|segredo|keystore|passphrase|authorization)/i;
 
@@ -98,7 +98,7 @@ function auditar(evento, detalhe = {}) {
     }
     fs.appendFileSync(config.ARQUIVO_AUDITORIA, `${linha}\n`, { mode: 0o600 });
   } catch {
-    // Auditoria nunca pode derrubar a operação que a originou.
+    // Auditing must never break the operation that produced it.
   }
 }
 

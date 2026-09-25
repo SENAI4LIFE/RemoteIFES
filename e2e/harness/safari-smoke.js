@@ -1,5 +1,5 @@
-// Smoke do frontend no Safari nativo (macOS) ou no Safari do iOS Simulator, via safaridriver (WebDriver).
-// Usa os mesmos servidores do harness Playwright; não depende de pacote npm.
+// Frontend smoke test on native Safari (macOS) or Safari on the iOS Simulator, through safaridriver
+// (WebDriver). Uses the same servers as the Playwright harness; no npm package dependency.
 const { spawn, execFileSync } = require("child_process");
 const path = require("path");
 
@@ -48,7 +48,8 @@ async function subirServidores() {
   await esperarHttp(`${WEB_URL}/`);
 }
 
-// O safaridriver não espera um simulador frio inicializar e fala com o Safari do iPhone pelo Simulator.app.
+// safaridriver does not wait for a cold simulator to boot and reaches iPhone Safari through
+// Simulator.app.
 function prepararSimulador() {
   const simctl = (...args) => execFileSync("xcrun", ["simctl", ...args], { encoding: "utf8" });
   const nomeDesejado = process.env.SAFARI_IOS_DEVICE;
@@ -103,8 +104,9 @@ function sessao(id) {
       relatorio.ultimoClique = await executar(`const el = document.querySelector(${JSON.stringify(seletor)}); const r = el.getBoundingClientRect(); const alvo = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { seletor: ${JSON.stringify(seletor)}, retangulo: [r.left, r.top, r.width, r.height].map(Math.round), sobreposto: alvo && alvo !== el && !el.contains(alvo) ? alvo.tagName + "#" + alvo.id + "." + alvo.className : null };`);
       const el = await elemento(seletor);
       if (!IOS) return wd("POST", `${raiz}/element/${el}/click`, {});
-      // No iOS Simulator o "Element Click" do safaridriver não gera o clique; um toque pela Actions API gera,
-      // desde que o teclado (fora do DOM) não cubra o alvo — por isso o campo ativo é desfocado antes.
+      // On the iOS Simulator, safaridriver's "Element Click" does not produce a click; an Actions
+      // API tap does, as long as the keyboard (outside the DOM) does not cover the target, so the
+      // active field is blurred first.
       const origem = { "element-6066-11e4-a52e-4f735466cecf": el };
       await wd("POST", `${raiz}/actions`, { actions: [{ type: "pointer", id: "dedo", parameters: { pointerType: "touch" }, actions: [
         { type: "pointerMove", duration: 0, origin: origem, x: 0, y: 0 }, { type: "pointerDown", button: 0 }, { type: "pause", duration: 60 }, { type: "pointerUp", button: 0 }] }] });
@@ -112,7 +114,8 @@ function sessao(id) {
     },
     digitar: async (seletor, texto) => {
       if (!IOS) return wd("POST", `${raiz}/element/${await elemento(seletor)}/value`, { text: texto });
-      // No iOS Simulator o "Element Send Keys" do safaridriver não digita; o valor é definido no DOM com os eventos de entrada.
+      // On the iOS Simulator, safaridriver's "Element Send Keys" does not type; the value is set in
+      // the DOM with input events.
       return executar(`const el = document.querySelector(${JSON.stringify(seletor)}); el.focus(); el.value = ${JSON.stringify(texto)}; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true }));`);
     },
     async esperar(descricao, script, tempoMs = 15000) {

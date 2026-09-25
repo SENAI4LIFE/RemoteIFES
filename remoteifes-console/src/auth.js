@@ -2,10 +2,10 @@ const crypto = require("crypto");
 const config = require("./config");
 const estado = require("./estado");
 
-// Identidade própria do console. Não reaproveita o superadministrador da aplicação: aquela
-// autenticação vive no SQLite, é invalidada a cada reinício gerenciado
-// (encerrarSessoesAtivasNoInicio) e some quando o banco quebra — exatamente quando o console
-// precisa funcionar. Administrar a aplicação também não pode conceder root no host.
+// The Console's own identity. It does not reuse the application's superadministrator: that
+// authentication lives in SQLite, is invalidated on every managed restart
+// (encerrarSessoesAtivasNoInicio) and disappears when the database breaks, exactly when the Console
+// must work. Administering the application must also not grant root on the host.
 
 const SCRYPT = { N: 16384, r: 8, p: 1, chaveBytes: 32, saltBytes: 16 };
 const MIN_SENHA = 12;
@@ -51,7 +51,7 @@ function validarForcaDaSenha(senha) {
   if (typeof senha !== "string") return "senha ausente";
   if (senha.length < MIN_SENHA) return `a senha precisa de ao menos ${MIN_SENHA} caracteres`;
   if (senha.length > MAX_SENHA) return `a senha passa de ${MAX_SENHA} caracteres`;
-  // Senhas de bootstrap conhecidas da aplicação nunca valem como credencial do console.
+  // The application's known bootstrap passwords are never valid Console credentials.
   if (["admin", "superadmin", "remoteifes", "senha", "password"].includes(senha.trim().toLowerCase())) {
     return "essa senha é um valor padrão conhecido; escolha outra";
   }
@@ -114,14 +114,14 @@ function trocarSenha(nome, senhaAtual, novaSenha) {
   operador.trocaObrigatoria = false;
   gravarOperadores(dados);
   estado.auditar("operador-senha-trocada", { nome });
-  // Trocar a senha encerra as outras sessões do mesmo operador: elevação e terminal incluídos.
+  // Changing the password ends the operator's other sessions, elevation and terminal included.
   revogarSessoesDoOperador(nome);
 }
 
 function autenticar(nome, senha) {
   const dados = lerOperadores();
   const operador = dados.operadores.find((o) => o.nome === nome);
-  // Deriva mesmo sem operador para não vazar existência de conta pelo tempo de resposta.
+  // Derives even without an operator so response time does not reveal whether an account exists.
   const referencia = operador ? operador.senhaHash : hashDeSenha(crypto.randomBytes(16).toString("hex"));
   const ok = conferirSenha(senha, referencia);
   if (!operador || !ok) return null;
@@ -130,10 +130,10 @@ function autenticar(nome, senha) {
   return { nome: operador.nome, trocaObrigatoria: !!operador.trocaObrigatoria };
 }
 
-// --- Sessões ----------------------------------------------------------------------------
-// Persistidas porque o serviço sai por ociosidade e volta pela ativação de socket: um operador
-// não pode perder a sessão só porque o processo hibernou. A gravação acontece em login, logout,
-// elevação e expurgo — nunca a cada requisição.
+// --- Sessions ----------------------------------------------------------------------------
+// Persisted because the service exits on idle and returns through socket activation: an operator
+// must not lose the session because the process hibernated. Writes happen on login, logout,
+// elevation and purge, never on every request.
 
 const COOKIE = "remoteifes_console";
 
@@ -192,8 +192,8 @@ function criarSessao(nome, { origem = null } = {}) {
   return { token, csrf };
 }
 
-// Marcação de atividade mantida só em memória: gravar "vistaEm" a cada requisição gastaria o
-// cartão SD sem ganho. O disco fica com o valor do último evento relevante.
+// Activity tracking kept in memory only: writing "vistaEm" on every request would wear the SD card
+// for no gain. The disk keeps the value of the last relevant event.
 const vistaEmMemoria = new Map();
 
 function validarSessao(token) {
@@ -293,9 +293,9 @@ function sessoesAtivas() {
     }));
 }
 
-// --- Limite de tentativas ----------------------------------------------------------------
-// Em memória de propósito: o processo é efêmero e um atacante que reinicie o serviço para zerar
-// o contador precisaria já ter acesso ao host. Conta por operador e por origem.
+// --- Attempt limiting ----------------------------------------------------------------
+// In memory on purpose: the process is ephemeral, and an attacker who restarts the service to reset
+// the counter would already need host access. Counts per operator and per origin.
 
 const tentativas = new Map();
 const JANELA_MS = 15 * 60 * 1000;

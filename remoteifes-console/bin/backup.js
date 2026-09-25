@@ -1,15 +1,14 @@
 #!/usr/bin/env node
-// Cria um backup verificado do banco da aplicação.
+// Creates a verified backup of the application database.
 //
-// Reusa `src/services/backupService.js` do servidor de propósito: ele já garante snapshot
-// consistente com `VACUUM INTO` (sem copiar arquivo SQLite ativo), integrity_check,
-// foreign_key_check, presença das tabelas essenciais, permissão 0600, fsync, instalação
-// atômica por rename, rotação e limpeza de temporários órfãos. Reimplementar aqui seria
-// perder essas garantias.
+// Reuses the server's `src/services/backupService.js` on purpose: it already guarantees a
+// consistent snapshot with `VACUUM INTO` (no copy of a live SQLite file), integrity_check,
+// foreign_key_check, presence of the essential tables, mode 0600, fsync, atomic install by rename,
+// rotation and cleanup of orphaned temporaries. Reimplementing it here would lose those guarantees.
 //
-// A conexão é aberta por este processo e passada ao serviço, para não acionar
-// `conexaoAtiva()` — que carregaria `src/config/database.js` e, com ele, criação de
-// diretório e PRAGMAs de escrita num processo que só deveria ler.
+// The connection is opened by this process and passed to the service, so `conexaoAtiva()` is not
+// triggered: it would load `src/config/database.js` and with it directory creation and write
+// PRAGMAs in a process that should only read.
 
 const fs = require("fs");
 const path = require("path");

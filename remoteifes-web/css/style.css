@@ -13,11 +13,10 @@
   --warn-soft: #fbf3d9;
   --success: #15803d;
   --warning: #b45309;
-  /* Superfície neutra discreta: selos apagados, código, botões secundários. */
+  /* Subtle neutral surface: muted badges, code, secondary buttons. */
   --surface-muted: #f0f2f0;
-  /* Texto (e ícones em currentColor) sobre as superfícies de destaque — verde do
-     campus, vermelho e âmbar. No alto contraste essas cores ficam claras e o texto
-     sobre elas passa a preto. */
+  /* Text (and currentColor icons) on accent surfaces: campus green, red and amber. In high contrast
+     these colors become light and the text on them turns black. */
   --texto-sobre-destaque: #ffffff;
   --radius: 10px;
   --radius-sm: 8px;
@@ -46,8 +45,8 @@
 
   --topbar-h: 72px;
   --aviso-seguranca-fim: 0px;
-  /* Altura da barra inferior sem a área segura. O valor inicial é o padrão; app.js mede a
-     barra real (ela cresce com a ampliação de texto) e atualiza a variável. */
+  /* Bottom bar height without the safe area. The initial value is the default; app.js measures the
+     real bar (it grows with text enlargement) and updates the variable. */
   --tabbar-h: 54px;
 
   --fab-tamanho: 48px;
@@ -58,11 +57,10 @@
   --a11y-font-scale: 1;
   --a11y-letter-spacing: 0em;
 
-  /* Tons semânticos dos ícones: a cor diz a função do ícone, não decora.
-     operação = verde (salas, controles, mapas, saúde); info = azul (ajuda, referência,
-     aplicativo); atenção = âmbar (agenda, alertas, manutenção); crítico = vermelho
-     (problemas, ações destrutivas); admin = roxo (gestão, sistema, configuração);
-     dispositivo = azul-petróleo (cadastro, firmware e IR dos ESP32). */
+  /* Semantic icon tones: color states the icon's function, not decoration. operation = green
+     (rooms, controls, maps, health); info = blue (help, reference, app); attention = amber
+     (schedule, alerts, maintenance); critical = red (problems, destructive actions); admin = purple
+     (management, system, configuration); device = teal (ESP32 registration, firmware and IR). */
   --icone-operacao-claro: #1c6b3c;
   --icone-info-claro: #1a5fb4;
   --icone-atencao-claro: #8a5a06;
@@ -112,7 +110,7 @@
 .icone-inline { vertical-align: -0.15em; }
 .icone-topbar { width: 20px; height: 20px; }
 
-/* Vai no próprio <svg class="icone ...">, porque o glifo usa fill: currentColor. */
+/* Set on the <svg class="icone ..."> itself, because the glyph uses fill: currentColor. */
 .tom-operacao { color: var(--icone-operacao); }
 .tom-info { color: var(--icone-info); }
 .tom-atencao { color: var(--icone-atencao); }
@@ -120,7 +118,7 @@
 .tom-admin { color: var(--icone-admin); }
 .tom-dispositivo { color: var(--icone-dispositivo); }
 
-/* Quem escolheu uma cor de fonte na acessibilidade continua mandando no glifo. */
+/* A font color chosen in accessibility settings still governs the glyph. */
 body.a11y-font-color-on :is(.tom-operacao, .tom-info, .tom-atencao, .tom-critico, .tom-admin, .tom-dispositivo) {
   color: inherit;
 }
@@ -163,12 +161,11 @@ body {
 body, p, li, label, .room-sub, .help-list li, .hint {
   letter-spacing: var(--a11y-letter-spacing);
 }
-/* O espaçamento acima, já resolvido em px na fonte do body e herdado como comprimento:
-   quem precisa compensar o espaço que o navegador põe depois do último glifo usa este
-   valor, o mesmo que herda em letter-spacing, e não um em relativo à própria fonte.
-   Fica em #app, que não define fonte própria, porque o Gecko resolve o em de uma
-   propriedade registrada na fonte do pai e Blink/WebKit na do próprio elemento — em
-   ambos dá a fonte do body. */
+/* The spacing above, already resolved in px against the body font and inherited as a length:
+   anything compensating for the space the browser adds after the last glyph uses this value, the
+   same one inherited in letter-spacing, not an em relative to its own font. It lives on #app, which
+   defines no font of its own, because Gecko resolves a registered property's em against the parent
+   font and Blink/WebKit against the element's own font; both yield the body font. */
 @property --a11y-letter-spacing-resolvido {
   syntax: "<length>";
   inherits: true;
@@ -230,8 +227,8 @@ body.a11y-high-contrast {
   --ifes-green: #00d26a;
   --ifes-green-dark: #00b85e;
   --ifes-green-soft: #062a15;
-  /* Aviso e erro: texto claro (os mesmos tons dos ícones) sobre fundos escuros
-     tingidos, em vez dos tons pastel do tema claro, que ficavam sob texto branco. */
+  /* Warning and error: light text (the icon tones) on dark tinted backgrounds, instead of the light
+     theme's pastel tones, which sat under white text. */
   --danger: #ff9d9d;
   --danger-soft: #2b0a08;
   --warn: #ffe000;
@@ -246,8 +243,8 @@ body.a11y-high-contrast {
   --icone-admin: #d8b4fe;
   --icone-dispositivo: #5ce1e6;
 }
-/* Estas superfícies seguem claras mesmo em alto contraste (as opções do portal e os
-   selos brancos das dicas do login): mantêm os tons escuros dos ícones. */
+/* These surfaces stay light even in high contrast (portal options and the white login hint badges):
+   they keep the dark icon tones. */
 body.a11y-high-contrast :is(.portal-options, .login-info-tips) {
   --icone-operacao: var(--icone-operacao-claro);
   --icone-info: var(--icone-info-claro);
@@ -256,7 +253,7 @@ body.a11y-high-contrast :is(.portal-options, .login-info-tips) {
   --icone-admin: var(--icone-admin-claro);
   --icone-dispositivo: var(--icone-dispositivo-claro);
 }
-/* No alto contraste, o badge claro deixaria glifo claro sobre fundo claro. */
+/* In high contrast the light badge would leave a light glyph on a light background. */
 body.a11y-high-contrast .admin-subtab-btn.active .admin-subtab-icon,
 body.a11y-high-contrast .hub-card:hover .hub-card-icon {
   background: var(--bg);
@@ -272,8 +269,8 @@ body.a11y-high-contrast .simple-tile-sala.is-ligado { background: #00d26a; borde
 body.a11y-high-contrast .floorplan-scope .room.fp-offline { background: #444444; border: 2px dashed #ffffff; color: #ffffff; }
 body.a11y-high-contrast .floorplan-scope .room.fp-online-desligado { background: #0057b8; border: 2px solid #ffffff; color: #ffffff; }
 body.a11y-high-contrast .floorplan-scope .room.fp-online-ligado { background: #00d26a; border: 2px solid #000000; color: #000000; }
-/* O avatar é um círculo branco no tema claro; no alto contraste vira preto com iniciais
-   brancas, em vez de verde-claro sobre branco. */
+/* The avatar is a white circle in the light theme; in high contrast it becomes black with white
+   initials, instead of light green on white. */
 body.a11y-high-contrast .account-avatar { background: var(--surface); color: var(--text); }
 body.a11y-high-contrast .floorplan-scope .room.fp-reservada { box-shadow: 0 0 0 3px #ffbe0b inset; }
 
@@ -296,9 +293,9 @@ body {
   top: 0;
   z-index: 10;
 }
-/* A barra é um contexto de empilhamento próprio: com um painel aberto (menu da conta,
-   notificações, relatos) ela sobe acima da faixa de senha padrão (500) e dos botões
-   flutuantes (950), ficando ainda abaixo dos toasts (1000). */
+/* The bar is its own stacking context: with a panel open (account menu, notifications, reports) it
+   rises above the default-password banner (500) and the floating buttons (950), staying below the
+   toasts (1000). */
 .topbar:has(.account-menu:not(.hidden)),
 .topbar:has(.notif-panel:not(.hidden)),
 .topbar:has(.relatos-panel:not(.hidden)) { z-index: 960; }
@@ -827,7 +824,7 @@ button.btn:disabled {
 .btn-on { background: var(--ifes-green); color: var(--texto-sobre-destaque); }
 .btn-on:hover { background: var(--ifes-green-dark); }
 .btn-off { background: var(--surface-muted); color: var(--text); }
-/* Escurece a superfície que estiver em uso (clara ou escura) em vez de fixar um cinza claro. */
+/* Darkens whichever surface is in use (light or dark) instead of fixing a light gray. */
 .btn-off:hover { filter: brightness(0.95); }
 .btn-block { width: 100%; margin-top: 18px; }
 
@@ -1204,7 +1201,7 @@ button.btn:disabled {
 }
 .admin-subtabs {
   --admin-nav-topo: max(74px, var(--aviso-seguranca-fim));
-  /* Folga até a barra inferior real (medida em --tabbar-h), não a um valor fixo. */
+  /* Clearance to the real bottom bar (measured in --tabbar-h), not to a fixed value. */
   --admin-nav-rodape: calc(var(--tabbar-h) + 20px + var(--safe-bottom));
   display: flex;
   flex-direction: column;
@@ -1217,10 +1214,10 @@ button.btn:disabled {
   overflow: hidden;
   position: sticky;
   top: var(--admin-nav-topo);
-  /* A altura cabe entre a posição real da barra (antes de encostar ela fica abaixo do
-     deslocamento sticky; app.js mede em --admin-nav-atual) e a barra inferior. O piso é de
-     dois alvos de toque: maior que isso, em repouso num celular deitado a caixa passava por
-     baixo da barra inferior e o último item ficava fora de alcance até a página rolar. */
+  /* The height fits between the bar's real position (before sticking it sits below the sticky
+     offset; app.js measures it in --admin-nav-atual) and the bottom bar. The floor is two tap
+     targets: with more, a phone in landscape at rest put the box under the bottom bar and the last
+     item out of reach until the page scrolled. */
   max-height: max(calc(2 * var(--tap-min)), calc(100dvh - var(--admin-nav-atual, var(--admin-nav-topo)) - var(--admin-nav-rodape) - 8px));
   overflow-y: auto;
 }
@@ -1616,8 +1613,8 @@ button.btn:disabled {
 .floorplan-scope .red { color: #c0392b; font-weight: 700; }
 .floorplan-scope .blue { color: #1d4ed8; }
 .floorplan-scope .tiny { font-size: 6.5px !important; }
-/* O rótulo do corredor tem o tamanho dos códigos de sala (`.room.code`): a 9px ele era o
-   menor texto da planta e sumia antes de todos ao reduzir a escala. */
+/* The corridor label has the room code size (`.room.code`); at 9px it was the smallest text on the
+   plan and disappeared first when scaling down. */
 .floorplan-scope .corridor { position: absolute; background: transparent; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #5f6b78; letter-spacing: 2px; }
 .floorplan-scope .ext { position: absolute; font-size: 10px; color: #333; white-space: nowrap; }
 .floorplan-scope .vert { writing-mode: vertical-rl; }
@@ -1944,7 +1941,7 @@ button.btn:disabled {
   background: linear-gradient(135deg, var(--ifes-green-dark), var(--ifes-green));
   color: var(--texto-sobre-destaque);
 }
-/* Um nome longo com o texto ampliado não alarga o bloco além do herói: quebra dentro dele. */
+/* A long name with enlarged text does not widen the block beyond the hero: it wraps inside it. */
 .hub-hero-texto { min-width: 0; max-width: 100%; }
 .hub-hero-texto h1 {
   margin: 0;
@@ -2071,8 +2068,8 @@ button.btn:disabled {
 }
 .hub-card-badge.is-alerta { background: var(--danger); color: var(--texto-sobre-destaque); }
 .hub-card-badge.hidden { display: none; }
-/* Sem `anywhere` (herdado do botão) para a coluna não encolher a uma letra por linha; a
-   quebra dentro da palavra só acontece quando ela não cabe no cartão. */
+/* No `anywhere` (inherited from the button), so the column does not shrink to one letter per line;
+   breaking inside a word only happens when it does not fit the card. */
 .hub-card-compacto .hub-card-title { overflow-wrap: break-word; word-break: normal; hyphens: none; }
 
 @media (max-width: 560px) {
@@ -2089,9 +2086,9 @@ button.btn:disabled {
     padding: 14px;
   }
   .hub-card-desc { display: none; }
-  /* O selo não encolhe (o `min-width` explícito deixava o flex esmagá-lo e o texto, em
-     nowrap, vazava do cartão): quando não cabe ao lado do título, passa para a linha de
-     baixo, ainda encostado à direita. */
+  /* The badge does not shrink (an explicit `min-width` let flex squash it and the nowrap text
+     overflowed the card): when it does not fit beside the title it moves to the next line, still
+     aligned right. */
   .hub-card-badge { position: static; margin-left: auto; flex-shrink: 0; }
   .hub-resumo { justify-content: flex-start; }
 }
@@ -2176,9 +2173,9 @@ button.btn:disabled {
 .audit-connectivity-heading { margin-top: 1.5rem; }
 .audit-list .room-sub { overflow-wrap: anywhere; }
 .audit-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; min-height: 2.75rem; }
-/* O rótulo dos botões não quebra dentro da palavra: o mínimo do item volta a ser a palavra
-   mais longa (o `overflow-wrap: anywhere` global dos botões deixaria o mínimo em um
-   caractere) e, quando a linha não comporta os três, o contador e os botões descem. */
+/* Button labels do not break inside words: the item's minimum is the longest word again (the global
+   `overflow-wrap: anywhere` on buttons would make it one character) and, when the line cannot hold
+   all three, the counter and the buttons wrap. */
 .audit-pagination .link-btn { min-width: auto; overflow-wrap: break-word; }
 .audit-pagination .link-btn:disabled { opacity: .45; cursor: default; }
 @media (max-width: 1100px) {
@@ -2187,8 +2184,8 @@ button.btn:disabled {
 @media (max-width: 720px) {
   .audit-filters, .audit-filters-connectivity { grid-template-columns: 1fr; }
   .audit-pagination { justify-content: space-between; gap: .5rem; }
-  /* O contador ocupa o que sobra entre os botões (base 0, para os botões terem prioridade na
-     linha) e quebra em linhas; só desce quando nem a palavra mais longa cabe ao lado. */
+  /* The counter takes what is left between the buttons (basis 0, so the buttons have priority on
+     the line) and wraps; it only moves down when not even the longest word fits beside them. */
   .audit-pagination .hint { flex: 1; text-align: center; }
   .audit-pagination .link-btn:last-child { margin-left: auto; }
 }
@@ -2458,12 +2455,11 @@ button.btn:disabled {
   right: calc(16px + var(--safe-right));
   top: auto;
   bottom: calc(var(--fab-base) + var(--fab-tamanho) + var(--fab-separacao));
-  /* Acima do manual e da página do aplicativo (900), abaixo dos toasts (1000) e dos
-     painéis abertos na barra superior (960). */
+  /* Above the manual and the app page (900), below toasts (1000) and top-bar panels (960). */
   z-index: 950;
 }
 
-/* Com a sessão aberta os botões flutuantes ficam logo acima da barra inferior real. */
+/* With a session open the floating buttons sit just above the real bottom bar. */
 body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(--safe-bottom)); }
 .a11y-toggle-btn {
   width: var(--fab-tamanho);
@@ -2732,8 +2728,8 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(
 @supports not selector(:has(*)) {
   body { --fab-base: calc(var(--tabbar-h) + 12px + var(--safe-bottom)); }
 }
-/* O painel de ajuda aberto passa por cima do botão de acessibilidade e da faixa de senha
-   padrão; fica na mesma camada que o botão de acessibilidade e vem depois dele no DOM. */
+/* The open help panel covers the accessibility button and the default-password banner; it shares
+   the accessibility button's layer and comes after it in the DOM. */
 .help-fab-widget:has(.help-fab-panel:not(.hidden)) { z-index: 950; }
 .help-fab-btn {
   width: var(--fab-tamanho);
@@ -2760,8 +2756,8 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(
   padding: 18px 20px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   width: min(340px, calc(100vw - 32px));
-  /* O painel abre para cima a partir do botão (base do botão + 58px); o que sobra até o
-     topo da tela, menos uma margem, é a altura máxima — o resto rola dentro dele. */
+  /* The panel opens upward from the button (button bottom + 58px); the remaining space to the top
+     of the screen, minus a margin, is the maximum height, and the rest scrolls inside it. */
   max-height: calc(100dvh - var(--safe-top) - var(--fab-base) - 58px - 16px);
   overflow: auto;
 }
@@ -3570,9 +3566,9 @@ textarea {
   text-align: center;
 }
 
-/* O letter-spacing da acessibilidade também entra depois do último glifo, e o "Power"
-   centrado ficava meio espaço à esquerda do círculo; o recuo inicial de igual tamanho
-   devolve a simetria sem mexer no espaçamento em si. */
+/* Accessibility letter-spacing is also added after the last glyph, so the centered "Power" sat half
+   a spacing left of the circle; an equal leading indent restores symmetry without changing the
+   spacing itself. */
 .ac-remote-power-btn .ac-remote-control-label { text-indent: var(--a11y-letter-spacing-resolvido); }
 
 .ac-remote-temp-btn, .ac-remote-turbo-btn {
@@ -3678,8 +3674,8 @@ textarea {
   .tab-btn { font-size: calc(12.5px * var(--a11y-font-scale)); padding: 13px 4px; }
 }
 
-/* O fim da página precisa passar da pilha de botões flutuantes (barra inferior, ajuda e
-   acessibilidade) para que o último controle não fique embaixo deles. */
+/* The end of the page must clear the floating button stack (bottom bar, help and accessibility) so
+   the last control is not underneath it. */
 #app:has(#mainApp:not(.hidden)) {
   padding-bottom: calc(var(--fab-base) + 2 * var(--fab-tamanho) + var(--fab-separacao) + 16px);
 }
@@ -3938,8 +3934,8 @@ textarea {
   margin-bottom: 10px;
 }
 .relatos-panel-head h3 { margin: 0; font-size: calc(14px * var(--a11y-font-scale)); }
-/* O painel fica dentro da barra superior, onde `.topbar .link-btn` pinta os links com a
-   cor do texto sobre o verde; aqui a superfície é a do painel. */
+/* The panel lives inside the top bar, where `.topbar .link-btn` paints links in the on-green text
+   color; here the surface is the panel's. */
 .relatos-panel .link-btn { color: var(--ifes-green); }
 .relatos-panel .relatos-fechar-btn {
   font-size: calc(18px * var(--a11y-font-scale));
@@ -4217,8 +4213,8 @@ textarea {
 .mon-skel-line:nth-child(3) { width: 60%; }
 @keyframes mon-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 
-/* max-width: sem ele, min-height atravessa o aspect-ratio e vira uma largura mínima (447px),
-   e o invólucro passa da coluna estreita do cadastro em vez de rolar a planta por dentro. */
+/* max-width: without it, min-height crosses the aspect-ratio and becomes a minimum width (447px),
+   and the wrapper exceeds the narrow registration column instead of scrolling the plan inside. */
 .admin-fp-picker .floorplan-scope .plan-wrap {
   height: auto;
   max-width: 100%;
@@ -4403,8 +4399,8 @@ body.mobile-app-open { overflow: hidden; }
   background: var(--surface);
 }
 .manual-flow-item:not(:last-child)::after { content: "→"; position: absolute; right: -16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: 800; }
-/* O texto do passo quebra dentro da caixa em qualquer largura: sem isto, uma palavra longa
-   ("Superadministrador:") ou o texto máximo empurrava o passo para fora do artigo acima de 760px. */
+/* The step text wraps inside its box at any width: otherwise a long word ("Superadministrador:") or
+   maximum text pushed the step out of the article above 760px. */
 .manual-flow-item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .manual-flow-num { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: var(--ifes-green-soft); color: var(--ifes-green-dark); font-size: .78em; font-weight: 800; }
 .manual-flow-screen { border-top: 3px solid var(--ifes-green); }
@@ -4424,8 +4420,8 @@ body.mobile-app-open { overflow: hidden; }
 .manual-command h4 { margin: 0 0 8px; font-size: calc(14px * var(--a11y-font-scale)); }
 .manual-command pre { max-width: 100%; margin: 6px 0; padding: 10px; overflow-x: auto; border-radius: var(--radius-sm); background: #17221d; color: #f2f7f4; white-space: pre; }
 .manual-command pre code { padding: 0; background: none; color: inherit; font-size: calc(12px * var(--a11y-font-scale)); }
-/* fit-content: com texto máximo e fonte larga, "Resultado esperado" em auto tomava o máximo
-   do conteúdo e deixava à coluna do valor menos que um glifo, que vazava do artigo. */
+/* fit-content: with maximum text and a wide font, "Resultado esperado" in an auto track took its
+   max-content width and left the value column less than a glyph, which overflowed the article. */
 .manual-command dl { display: grid; grid-template-columns: fit-content(35%) minmax(0, 1fr); gap: 5px 10px; margin: 10px 0 0; }
 .manual-command dt { font-weight: 700; }
 .manual-command dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }

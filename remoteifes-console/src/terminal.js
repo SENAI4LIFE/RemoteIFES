@@ -3,27 +3,23 @@ const os = require("os");
 const config = require("./config");
 const estado = require("./estado");
 
-// Terminal Expert: capacidade separada e de alto risco.
+// Expert Terminal: a separate, high-risk capability.
 //
-// ESTADO DESTA PASSAGEM
-// ---------------------
-// O envelope completo está implementado e testado: destravamento explícito, operador
-// autenticado, reautenticação adicional, autorização de curta duração, estado destravado
-// visível, relock automático, limites de sessão, ciclo de vida, revogação, limpeza da árvore
-// de processos, contrapressão e auditoria sem transcrição.
+// The full envelope is implemented and tested: explicit unlock, authenticated operator, additional
+// re-authentication, short-lived authorization, visible unlocked state, automatic relock, session
+// limits, lifecycle, revocation, process-tree cleanup, backpressure and transcript-free auditing.
 //
-// O que **não** está entregue é o PTY em si. Node não tem PTY nativo, e um terminal correto
-// (tamanho de janela via ioctl TIOCSWINSZ, sinais, eco, job control) exige um módulo nativo —
-// `node-pty` — que no Raspberry Pi precisa de compilador e cabeçalhos para armv7/aarch64. Não
-// foi possível validar essa compilação no alvo nesta passagem, e as alternativas sem módulo
-// nativo (por exemplo `script -qfc`) não permitem redimensionar a janela a partir do servidor:
-// entregariam um terminal que parece funcionar e quebra em `vim`, `less`, `htop` e em qualquer
-// programa que leia o tamanho da tela.
+// The PTY itself is **not** shipped. Node has no native PTY, and a correct terminal (window size
+// via ioctl TIOCSWINSZ, signals, echo, job control) requires a native module, `node-pty`, which on
+// the Raspberry Pi needs a compiler and headers for armv7/aarch64. That build has not been
+// validated on the target, and module-free alternatives (for example `script -qfc`) cannot resize
+// the window from the server: they would ship a terminal that looks functional and breaks in `vim`,
+// `less`, `htop` and any program that reads the screen size.
 //
-// Por isso a fábrica de PTY é injetável e detectada em tempo de execução. Sem o módulo, o
-// terminal responde `disponivel: false` com o motivo exato e as instruções de instalação.
-// **Nenhum substituto é oferecido**: não há caminho que mande texto livre para um `/exec`, e um
-// link para SSH não é apresentado como se cumprisse o pedido de terminal.
+// The PTY factory is therefore injectable and detected at runtime. Without the module, the terminal
+// answers `disponivel: false` with the exact reason and installation instructions. **No substitute
+// is offered**: there is no path that sends free text to an `/exec`, and an SSH link is not
+// presented as fulfilling the terminal request.
 
 const SESSOES = new Map();
 const SCROLLBACK_MAX_BYTES = 128 * 1024;
@@ -36,7 +32,7 @@ function detectarPty() {
   if (fabricaPty) return fabricaPty;
   if (motivoIndisponivel) return null;
   try {
-    // Resolvido a partir da instalação do console, nunca do checkout.
+    // Resolved from the Console installation, never from the checkout.
     const nodePty = require("node-pty");
     fabricaPty = {
       nome: "node-pty",
@@ -59,23 +55,25 @@ function detectarPty() {
   }
 }
 
-/** Injeção usada pelos testes: exercita todo o ciclo de vida sem módulo nativo. */
+/**
+ * Injection used by tests: exercises the whole lifecycle without the native module.
+ */
 function definirFabricaParaTeste(fabrica) {
   fabricaPty = fabrica;
   motivoIndisponivel = fabrica ? null : "fábrica de PTY removida para teste";
 }
 
 /**
- * O que falta, em cada sistema, para o terminal existir — com o comando exato daquela
- * plataforma. Uma instrução de `apt-get` num Windows não é ajuda: é ruído que faz o operador
- * concluir que o recurso simplesmente não funciona.
+ * What each system is missing for the terminal to exist, with that platform's exact command. An
+ * `apt-get` instruction on Windows is not help: it is noise that makes the operator conclude the
+ * feature does not work.
  */
 function comoInstalarPty() {
   const raiz = config.RAIZ_INSTALACAO;
   if (process.platform === "win32") {
     return {
-      // node-pty no Windows usa ConPTY (Windows 10 1809+) e vem com binário pré-compilado para
-      // x64; em arm64 costuma exigir as Build Tools.
+      // node-pty on Windows uses ConPTY (Windows 10 1809+) and ships a prebuilt binary for x64; on
+      // arm64 it usually requires the Build Tools.
       requisitos: "Windows 10 1809 ou mais novo (ConPTY). Em x64 o node-pty traz binário pronto; em arm64 exige Visual Studio Build Tools.",
       comandos: [`cd "${raiz}"`, "npm install node-pty --omit=dev", "Feche e reabra o console pelo lançador."],
     };
@@ -157,7 +155,7 @@ class Rolagem {
   }
 }
 
-// --- Sessões ---------------------------------------------------------------------------------
+// --- Sessions ---------------------------------------------------------------------------------
 
 function limparExpiradas() {
   const agora = Date.now();
@@ -177,7 +175,7 @@ function encerrar(id, motivo) {
   try {
     sessao.pty.encerrar("SIGHUP");
   } catch {}
-  // Um SIGKILL de reforço evita processo órfão quando o shell ignora SIGHUP.
+  // A reinforcing SIGKILL prevents an orphan process when the shell ignores SIGHUP.
   setTimeout(() => {
     try {
       sessao.pty.encerrar("SIGKILL");
@@ -189,7 +187,7 @@ function encerrar(id, motivo) {
     } catch {}
   }
   sessao.ouvintes.clear();
-  // Auditoria guarda metadado, nunca o que foi digitado ou exibido.
+  // Auditing keeps metadata, never what was typed or displayed.
   estado.auditar("terminal-encerrado", {
     id: id.slice(0, 12),
     operador: sessao.operador,
@@ -217,8 +215,9 @@ function abrir({ operador, colunas = 80, linhas = 24 }) {
     pty = fabrica.abrir({
       shell: shellPadrao(),
       cwd: config.DIR_CHECKOUT,
-      // Ambiente enxuto e previsível. O shell roda com a identidade e os grupos do usuário do
-      // serviço do console: o terminal não eleva por si só.
+      // Lean, predictable environment. The shell runs with the Console service user's identity and
+      // groups:
+      // the terminal does not elevate by itself.
       env: {
         PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
         HOME: process.env.HOME || os.homedir(),
@@ -270,7 +269,7 @@ function obter(id, operador) {
   limparExpiradas();
   const sessao = SESSOES.get(id);
   if (!sessao) return null;
-  // Uma sessão de terminal pertence ao operador que a abriu.
+  // A terminal session belongs to the operator who opened it.
   if (sessao.operador !== operador) return null;
   return sessao;
 }
@@ -317,7 +316,9 @@ function encerrarSessoesDoOperador(operador) {
   return n;
 }
 
-/** Fim da elevação derruba o terminal: a autorização que o abriu deixou de existir. */
+/**
+ * The end of elevation closes the terminal: the authorization that opened it no longer exists.
+ */
 function relockDoOperador(operador) {
   return encerrarSessoesDoOperador(operador);
 }
@@ -384,7 +385,7 @@ async function rotear({ req, res, caminho, metodo, params, sessao, lerCorpo, res
       return responderJson(res, 200, { ok: true });
     }
 
-    // Toda interação exige elevação ainda válida: o relock derruba a sessão.
+    // Every interaction requires still-valid elevation: relock ends the session.
     if (!exigirElevacao(res, sessao)) return undefined;
 
     if (sub === "/entrada" && metodo === "POST") {

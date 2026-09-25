@@ -64,9 +64,9 @@ const { codigoDerivado, proximoCodigo } = require("./android-version");
 checar(codigoDerivado("1.0.0") === 10000 && codigoDerivado("1.2.3") === 10203 && codigoDerivado("2.0.0") === 20000, "versionCode derivado da versão é previsível (1.2.3 -> 10203)");
 checar(proximoCodigo("1.0.1", 10000) === 10001 && proximoCodigo("1.1.0", 10005) === 10100, "uma versão nova adota o código derivado dela");
 checar(proximoCodigo("1.0.0", 10000) === 10001 && proximoCodigo("1.0.1", 10050) === 10051, "recompilar a mesma versão avança o versionCode em vez de repeti-lo");
-// Um versionCode repetido faz o Android recusar a atualização, então o invariante não é
-// "cresce sobre o último" e sim "supera todos os já publicados". O passo de risco é 1.2.3
-// recompilado, que ocupa 10204 — exatamente o código que 1.2.4 deriva.
+// A repeated versionCode makes Android refuse the update, so the invariant is not "greater than the
+// last one" but "greater than every published one". The risky step is 1.2.3 rebuilt, which takes
+// 10204, exactly the code 1.2.4 derives.
 function percorrerVersoes(passos, inicio) {
   let versao = null;
   let codigo = inicio;

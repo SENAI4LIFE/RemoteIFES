@@ -8,15 +8,15 @@ const config = require("./config");
 const processos = require("./processos");
 const coleta = require("./coleta");
 
-// Diagnóstico de rede, domínio e TLS.
+// Network, domain and TLS diagnostics.
 //
-// Dois cuidados que mudam o valor do que é mostrado:
-//  1. **Ponto de vista.** Uma requisição do Pi para o próprio domínio público pode passar por
-//     /etc/hosts, DNS interno ou loopback e não prova nada sobre alcance externo. Toda sonda
-//     declara de onde foi feita.
-//  2. **Destino limitado.** Uma sonda com destino livre transforma o console em encaminhador
-//     de requisições (SSRF). Só o domínio configurado da aplicação e o loopback são sondáveis,
-//     sem seguir redirecionamento.
+// Two precautions that change the value of what is shown:
+//  1. **Vantage point.** A request from the Pi to its own public domain may go through /etc/hosts,
+//     internal DNS or loopback and proves nothing about external reachability. Every probe states
+//     where it was made from.
+//  2. **Restricted destination.** A probe with a free destination turns the Console into a request
+//     forwarder (SSRF). Only the application's configured domain and loopback can be probed,
+//     without following redirects.
 
 const PORTAS_INTERESSE = [80, 443];
 
@@ -59,7 +59,7 @@ function resolvedor() {
 async function escutas() {
   const r = await processos.chamarAuxiliar("portas", [], { timeoutMs: 10_000 });
   if (!r.ok) {
-    // Sem privilégio ainda dá para ver as portas, só não o processo dono.
+    // Without privilege the ports are still visible, just not the owning process.
     const semPrivilegio = await processos.executar("ss", ["-ltn"], { timeoutMs: 8000 });
     if (!semPrivilegio.ok) return { suportado: false, motivo: r.erro };
     return { suportado: true, comProcesso: false, linhas: semPrivilegio.saida.split("\n").filter(Boolean).slice(0, 40) };
@@ -68,8 +68,8 @@ async function escutas() {
 }
 
 /**
- * Configuração de exposição da aplicação, lida do .env e do banco (somente leitura).
- * Separada de propósito da exposição do console: são políticas diferentes com donos diferentes.
+ * Application exposure configuration, read from .env and the database (read-only). Kept separate
+ * from the Console's own exposure on purpose: different policies with different owners.
  */
 function exposicaoDaAplicacao() {
   const env = config.lerEnvServidor();
@@ -87,7 +87,8 @@ function exposicaoDaAplicacao() {
       "Use exatamente o número de proxies confiáveis à frente.",
   };
 
-  // Faixas autorizadas: quem edita é a aplicação (Configurações). O console só mostra e explica.
+  // Authorized ranges: the application edits them (Configurações). The Console only shows and
+  // explains.
   const banco = coleta.espiarBanco();
   resultado.redesAutorizadas = { dono: "aplicação (Administração > Sistema > Configurações)", valores: null, lido: false };
   if (banco.existe && banco.lido) {
@@ -286,8 +287,8 @@ function sondarLocal(porta, caminho = "/") {
 
 async function diagnostico({ alvo = null } = {}) {
   const dominio = dominioConfigurado();
-  // Destino limitado: só o domínio detectado na configuração. Um alvo livre vindo do navegador
-  // transformaria este diagnóstico em encaminhador de requisições.
+  // Restricted destination: only the domain detected in the configuration. A free target from the
+  // browser would turn this diagnostic into a request forwarder.
   const dominioSondado = alvo && alvo === dominio ? alvo : dominio;
 
   const app = config.caminhosDaAplicacao();

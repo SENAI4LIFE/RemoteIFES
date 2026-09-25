@@ -72,8 +72,8 @@ test("agendamento removido sai da lista na hora, sem depender de uma nova leitur
   expect(await agendamentosNoServidor(request)).toHaveLength(1);
 });
 
-// Uma leitura emitida antes da remoção ainda enxerga o agendamento apagado. Chegando
-// depois, ela repintava a lista inteira e trazia de volta um item que o servidor já não tinha.
+// A read issued before the removal still sees the deleted schedule. Arriving afterwards, it used to
+// repaint the whole list and bring back an item the server no longer had.
 test("leitura anterior à remoção não traz o agendamento apagado de volta", async ({ page, context, request }) => {
   const { tarde } = await abrirAgendaComDois(page, context, request);
 

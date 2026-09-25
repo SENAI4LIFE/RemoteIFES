@@ -12,8 +12,8 @@ async function abrirAplicativo(page, context) {
   await expect(page.locator("#screen-mobile-app")).toBeVisible();
 }
 
-// Simula o app empacotado: o build instalado é gravado no bundle no mesmo build do APK,
-// então só a versão empacotada consegue afirmar o que está instalado no aparelho.
+// Simulates the packaged app: the installed build is written into the bundle by the same build that
+// produces the APK, so only the packaged version can state what is installed on the device.
 async function comoAplicativoInstalado(page, build, versao = "1.0.0") {
   await page.evaluate(({ build, versao }) => {
     window.RemoteIFESConfig.empacotado = true;
