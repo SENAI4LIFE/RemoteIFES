@@ -1,6 +1,7 @@
 const EventEmitter = require("events");
 const db = require("../config/database");
 const logger = require("../utils/logger");
+const { utcSqlite } = require("../utils/tempo");
 
 const eventos = new EventEmitter();
 
@@ -21,7 +22,69 @@ const PADROES = {
   // Policy for the ESP32 local access point (RemoteIFES-Setup). Unrelated to device authentication
   // on the server, which remains in espCredenciaisObrigatorias.
   espApExigirCredencial: false,
+  desligamentoDiario: { ativo: false, hora: "00:00", escopo: "todas", salas: [], vigenteDesde: null },
 };
+
+const ESCOPOS_DESLIGAMENTO_DIARIO = ["todas", "selecionadas"];
+const HORA_HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function normalizarDesligamentoDiario(valor) {
+  const padrao = PADROES.desligamentoDiario;
+  const v = valor && typeof valor === "object" && !Array.isArray(valor) ? valor : {};
+  return {
+    ativo: v.ativo === true,
+    hora: typeof v.hora === "string" && HORA_HHMM.test(v.hora) ? v.hora : padrao.hora,
+    escopo: ESCOPOS_DESLIGAMENTO_DIARIO.includes(v.escopo) ? v.escopo : padrao.escopo,
+    salas: Array.isArray(v.salas) ? v.salas.filter((sala) => typeof sala === "string" && sala) : [],
+    vigenteDesde: typeof v.vigenteDesde === "string" ? v.vigenteDesde : null,
+  };
+}
+
+// The effective-since instant is set by the server whenever the shutdown is enabled or its time or
+// scope changes, so a change never applies retroactively to an occurrence already due.
+function validarDesligamentoDiario(entrada, atual) {
+  if (!entrada || typeof entrada !== "object" || Array.isArray(entrada)) {
+    throw new Error("desligamentoDiario deve ser um objeto");
+  }
+  const proximo = { ...atual };
+  if (Object.prototype.hasOwnProperty.call(entrada, "ativo")) {
+    if (typeof entrada.ativo !== "boolean") throw new Error("desligamentoDiario.ativo deve ser verdadeiro ou falso");
+    proximo.ativo = entrada.ativo;
+  }
+  if (Object.prototype.hasOwnProperty.call(entrada, "hora")) {
+    if (typeof entrada.hora !== "string" || !HORA_HHMM.test(entrada.hora)) {
+      throw new Error("desligamentoDiario.hora deve estar no formato HH:MM (00:00 a 23:59)");
+    }
+    proximo.hora = entrada.hora;
+  }
+  if (Object.prototype.hasOwnProperty.call(entrada, "escopo")) {
+    if (!ESCOPOS_DESLIGAMENTO_DIARIO.includes(entrada.escopo)) {
+      throw new Error(`desligamentoDiario.escopo deve ser um de: ${ESCOPOS_DESLIGAMENTO_DIARIO.join(", ")}`);
+    }
+    proximo.escopo = entrada.escopo;
+  }
+  if (Object.prototype.hasOwnProperty.call(entrada, "salas")) {
+    const lista = entrada.salas;
+    if (!Array.isArray(lista) || !lista.every((sala) => typeof sala === "string" && sala.trim())) {
+      throw new Error("desligamentoDiario.salas deve ser uma lista de salas");
+    }
+    const unicas = [...new Set(lista.map((sala) => sala.trim()))];
+    const existentes = new Set(db.prepare("SELECT sala FROM salas").all().map((r) => r.sala));
+    const desconhecida = unicas.find((sala) => !existentes.has(sala));
+    if (desconhecida) throw new Error(`sala desconhecida no desligamento diário: ${desconhecida}`);
+    proximo.salas = unicas.sort();
+  }
+  if (proximo.ativo && proximo.escopo === "selecionadas" && proximo.salas.length === 0) {
+    throw new Error("selecione ao menos uma sala para o desligamento diário");
+  }
+  const mudou = proximo.ativo !== atual.ativo
+    || proximo.hora !== atual.hora
+    || proximo.escopo !== atual.escopo
+    || JSON.stringify(proximo.salas) !== JSON.stringify(atual.salas);
+  if (!proximo.ativo) proximo.vigenteDesde = null;
+  else if (mudou || !proximo.vigenteDesde) proximo.vigenteDesde = utcSqlite();
+  return proximo;
+}
 
 const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
 
@@ -30,6 +93,7 @@ const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciai
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
 const CHAVES_TEXTO_CRITICAS = ["turboFuncaoExtra"];
+const CHAVES_OBJETO = ["desligamentoDiario"];
 
 function obter() {
   const linhas = db.prepare(`SELECT chave, valor FROM configuracoes`).all();
@@ -46,6 +110,7 @@ function obter() {
     }
   }
   const configuracoes = { ...PADROES, ...armazenado };
+  configuracoes.desligamentoDiario = normalizarDesligamentoDiario(configuracoes.desligamentoDiario);
   if (!(Number(configuracoes.timeoutInatividadeMinutos) > 0)) {
     configuracoes.timeoutInatividadeMinutos = PADROES.timeoutInatividadeMinutos;
   }
@@ -147,6 +212,10 @@ function validarEAtualizar(patch, requisitante) {
     proximo.redesAutorizadas = lista.map((v) => v.trim());
   }
 
+  if (Object.prototype.hasOwnProperty.call(patch, "desligamentoDiario")) {
+    proximo.desligamentoDiario = validarDesligamentoDiario(patch.desligamentoDiario, atual.desligamentoDiario);
+  }
+
   if (Object.prototype.hasOwnProperty.call(patch, "turboFuncaoExtra")) {
     if (!TURBO_FUNCOES_EXTRAS_VALIDAS.includes(patch.turboFuncaoExtra)) {
       throw new Error(`turboFuncaoExtra deve ser um de: ${TURBO_FUNCOES_EXTRAS_VALIDAS.join(", ")}`);
@@ -173,6 +242,7 @@ function validarEAtualizar(patch, requisitante) {
     ...CHAVES_NUMERICAS_CRITICAS,
     ...CHAVES_LISTA_CRITICAS,
     ...CHAVES_TEXTO_CRITICAS,
+    ...CHAVES_OBJETO,
   ];
   const estadoIRAlterado = proximo.temperaturaMinima !== atual.temperaturaMinima
     || proximo.temperaturaMaxima !== atual.temperaturaMaxima
@@ -222,6 +292,9 @@ function validarEAtualizar(patch, requisitante) {
   } else if (proximo.autoLigar !== atual.autoLigar) {
     require("./salasService").eventos.emit("mudanca");
   }
+  if (JSON.stringify(proximo.desligamentoDiario) !== JSON.stringify(atual.desligamentoDiario)) {
+    eventos.emit("mudanca-desligamento-diario", configuracoes.desligamentoDiario);
+  }
   logger.info("configuracoes-alteradas", { chaves: Object.keys(patch), por: requisitante.id });
   return configuracoes;
 }
@@ -237,6 +310,7 @@ module.exports = {
   politicaApDispositivo,
   acessoRestritoAtivo,
   modoManutencaoAtivo,
+  normalizarDesligamentoDiario,
   eventos,
   PADROES,
 };

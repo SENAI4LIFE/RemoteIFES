@@ -329,6 +329,10 @@ router.get("/admin/configuracoes", exigirSuperAdmin, (req, res) => {
   res.json({ ok: true, configuracoes: configuracoesService.obter() });
 });
 
+router.get("/admin/desligamento-diario", exigirSuperAdmin, (req, res) => {
+  res.json({ ok: true, ...require("../services/desligamentoDiarioService").situacao() });
+});
+
 router.patch("/admin/configuracoes", exigirSuperAdmin, (req, res) => {
   try {
     const anteriores = configuracoesService.obter();

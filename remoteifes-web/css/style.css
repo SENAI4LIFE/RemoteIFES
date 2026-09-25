@@ -2239,6 +2239,18 @@ button.btn:disabled {
 .config-list-body select { max-width: 22rem; }
 .config-list-body textarea { max-width: 24rem; }
 .config-list-body .two-col > * { flex-basis: 7rem; }
+.config-list-body input[type="time"] { max-width: 9rem; }
+.desligamento-salas { margin: 12px 0 0; padding: 8px 10px 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
+.desligamento-salas legend { padding: 0 4px; font-size: calc(13px * var(--a11y-font-scale)); color: var(--text-muted); }
+.desligamento-salas-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+  column-gap: 12px;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+.desligamento-salas-bloco { grid-column: 1 / -1; margin: 8px 0 0; font-size: calc(12px * var(--a11y-font-scale)); font-weight: 700; color: var(--text-muted); }
+.desligamento-salas-lista .checkbox-label { margin: 2px 0; }
 
 .fp-tabs {
   display: flex;

@@ -2,6 +2,34 @@ function escapeHtmlAdmin(texto) {
   return escapeHtml(texto);
 }
 
+const ROTULOS_ORIGEM_COMANDO = { desligamento_diario: "desligamento diário" };
+
+function rotuloOrigemComando(origem) {
+  return ROTULOS_ORIGEM_COMANDO[origem] || origem;
+}
+
+function dataIsoParaBr(dataISO) {
+  const [ano, mes, dia] = String(dataISO || "").split("-");
+  return ano && mes && dia ? `${dia}/${mes}/${ano}` : "—";
+}
+
+function textoSituacaoDesligamento(situacao) {
+  if (!situacao || !situacao.configuracao) return "";
+  if (!situacao.configuracao.ativo) return "Desligamento diário desativado.";
+  const partes = [];
+  if (situacao.proxima) partes.push(`Próximo desligamento: ${dataIsoParaBr(situacao.proxima.data)} às ${situacao.proxima.hora}.`);
+  const ultima = situacao.ultima;
+  if (ultima) {
+    const c = ultima.contagens || {};
+    partes.push(
+      `Última execução (${dataIsoParaBr(ultima.data)} às ${ultima.hora}): ${c.desligado || 0} desligada(s), ` +
+      `${c.ja_desligado || 0} já desligada(s), ${c.intencao_mais_nova || 0} mantida(s) por comando posterior, ` +
+      `${c.agendamento_ativo || 0} mantida(s) por agendamento.`
+    );
+  }
+  return partes.join(" ");
+}
+
 const Admin = {
   _auditPage: 1,
   _auditPages: 1,
@@ -274,7 +302,7 @@ const Admin = {
       li.innerHTML = `
         <div>
           <div class="room-name">${escapeHtmlAdmin(RoomsData.rotulo(l.sala))} · ${escapeHtmlAdmin(l.cmd)}${l.valor !== null ? ` (${escapeHtmlAdmin(l.valor)})` : ""}</div>
-          <div class="room-sub">${escapeHtmlAdmin(l.usuario) || "sistema"} · ${escapeHtmlAdmin(l.origem)} · ${Tempo.formatarDataHora(l.criadoEm)}</div>
+          <div class="room-sub">${escapeHtmlAdmin(l.usuario) || "sistema"} · ${escapeHtmlAdmin(rotuloOrigemComando(l.origem))} · ${Tempo.formatarDataHora(l.criadoEm)}</div>
         </div>
       `;
       list.appendChild(li);
@@ -443,6 +471,60 @@ const Admin = {
     document.getElementById("cfgEspCredenciaisObrigatorias").checked = !!cfg.espCredenciaisObrigatorias;
     document.getElementById("cfgEspApExigirCredencial").checked = !!cfg.espApExigirCredencial;
     document.getElementById("cfgRetencaoAuditoria").value = cfg.retencaoAuditoriaDias ?? 7;
+    this._salasDesligamento = null;
+    await this.carregarDesligamentoDiario(cfg.desligamentoDiario);
+  },
+
+  async carregarDesligamentoDiario(cfg) {
+    const dd = cfg || { ativo: false, hora: "00:00", escopo: "todas", salas: [] };
+    document.getElementById("cfgDesligamentoAtivo").checked = !!dd.ativo;
+    document.getElementById("cfgDesligamentoHora").value = dd.hora || "00:00";
+    document.getElementById("cfgDesligamentoEscopo").value = dd.escopo === "selecionadas" ? "selecionadas" : "todas";
+
+    const lista = document.getElementById("cfgDesligamentoSalasLista");
+    if (!this._salasDesligamento) {
+      const salas = await Api.listarSalasAdmin();
+      this._salasDesligamento = Array.isArray(salas) ? salas : [];
+      lista.replaceChildren();
+      let blocoAtual = null;
+      for (const sala of [...this._salasDesligamento].sort((a, b) => String(a.sala).localeCompare(String(b.sala), "pt-BR"))) {
+        if (sala.bloco !== blocoAtual) {
+          blocoAtual = sala.bloco;
+          const titulo = document.createElement("p");
+          titulo.className = "desligamento-salas-bloco";
+          titulo.textContent = `Bloco ${blocoAtual}`;
+          lista.appendChild(titulo);
+        }
+        const rotulo = document.createElement("label");
+        rotulo.className = "checkbox-label";
+        const caixa = document.createElement("input");
+        caixa.type = "checkbox";
+        caixa.value = sala.sala;
+        rotulo.appendChild(caixa);
+        rotulo.appendChild(document.createTextNode(` ${RoomsData.rotulo(sala.sala)}${sala.nome && sala.nome !== sala.sala ? ` · ${sala.nome}` : ""}`));
+        lista.appendChild(rotulo);
+      }
+    }
+    const selecionadas = new Set(dd.salas || []);
+    lista.querySelectorAll('input[type="checkbox"]').forEach((caixa) => { caixa.checked = selecionadas.has(caixa.value); });
+    this.atualizarEscopoDesligamento();
+
+    const situacao = await Api.obterDesligamentoDiario();
+    document.getElementById("cfgDesligamentoSituacao").textContent = situacao && situacao.ok ? textoSituacaoDesligamento(situacao) : "";
+  },
+
+  atualizarEscopoDesligamento() {
+    const selecionadas = document.getElementById("cfgDesligamentoEscopo").value === "selecionadas";
+    document.getElementById("cfgDesligamentoSalas").classList.toggle("hidden", !selecionadas);
+  },
+
+  dadosDesligamentoDiario() {
+    return {
+      ativo: document.getElementById("cfgDesligamentoAtivo").checked,
+      hora: document.getElementById("cfgDesligamentoHora").value,
+      escopo: document.getElementById("cfgDesligamentoEscopo").value,
+      salas: Array.from(document.querySelectorAll('#cfgDesligamentoSalasLista input[type="checkbox"]:checked')).map((caixa) => caixa.value),
+    };
   },
 
   async carregarAuditoria() {
@@ -1142,6 +1224,8 @@ document.querySelectorAll(".admin-inner-tab-btn").forEach((btn) => {
   });
 });
 
+document.getElementById("cfgDesligamentoEscopo").addEventListener("change", () => Admin.atualizarEscopoDesligamento());
+
 document.getElementById("salvarConfigBtn").addEventListener("click", async () => {
   if (!state.isSuperAdmin) return;
   const savedEl = document.getElementById("configSavedHint");
@@ -1165,6 +1249,7 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     espCredenciaisObrigatorias: document.getElementById("cfgEspCredenciaisObrigatorias").checked,
     espApExigirCredencial: document.getElementById("cfgEspApExigirCredencial").checked,
     retencaoAuditoriaDias: Number(document.getElementById("cfgRetencaoAuditoria").value),
+    desligamentoDiario: Admin.dadosDesligamentoDiario(),
   };
 
   const resp = await Api.atualizarConfiguracoes(dados);
@@ -1174,6 +1259,7 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
   }
 
   savedEl.classList.remove("hidden");
+  Admin.carregarDesligamentoDiario(resp.configuracoes && resp.configuracoes.desligamentoDiario);
 
   const ping = await Api.ping();
   if (ping.ok) IdleTimer.sincronizar(ping);

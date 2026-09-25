@@ -285,6 +285,15 @@ function criarSchema() {
       schedulerFalhas INTEGER NOT NULL DEFAULT 0,
       bancoFalhas INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS desligamento_diario_execucoes (
+      data TEXT NOT NULL,
+      hora TEXT NOT NULL,
+      sala TEXT NOT NULL,
+      resultado TEXT NOT NULL CHECK (resultado IN ('desligado', 'ja_desligado', 'intencao_mais_nova', 'agendamento_ativo')),
+      executadoEm TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (data, hora, sala)
+    );
   `);
 
   migrarColunasUsuarios();
@@ -350,6 +359,7 @@ function criarIndices() {
     CREATE INDEX IF NOT EXISTS idx_energia_resumos_data ON energia_resumos_diarios(data);
     CREATE INDEX IF NOT EXISTS idx_protocolos_ir_criado ON protocolos_ir(criadoEm DESC);
     CREATE INDEX IF NOT EXISTS idx_mon_amostras_criado ON monitoramento_amostras(criadoEm);
+    CREATE INDEX IF NOT EXISTS idx_desligamento_diario_executado ON desligamento_diario_execucoes(executadoEm);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_salas_mac ON salas(mac) WHERE mac IS NOT NULL;
   `);
 }

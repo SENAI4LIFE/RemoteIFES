@@ -4,7 +4,7 @@ module.exports = [
     titulo: "Configurações globais",
     papel: "superadmin",
     categoria: "super_seguranca",
-    tags: ["Configurações", "sessão", "temperatura", "Turbo", "Auto-ON", "modo de teste", "manutenção", "retenção", "RemoteIFES-Setup"],
+    tags: ["Configurações", "sessão", "temperatura", "Turbo", "Auto-ON", "desligamento diário", "modo de teste", "manutenção", "retenção", "RemoteIFES-Setup"],
     verNoApp: "/admin/config",
     corpo: [
       { t: "p", texto: "<strong>Administração &gt; Sistema &gt; Configurações</strong> aplica política global. Leia todos os campos e registre os valores anteriores antes de salvar." },
@@ -14,6 +14,7 @@ module.exports = [
         ["Limite de temperatura", "faixa global 16–30 °C; alvos e agendas fora da nova faixa são ajustados"],
         ["Função adicional do Turbo", "nenhuma ou Oscilação vertical (Swing), aplicada junto do Turbo"],
         ["Auto-ON", "ligado por padrão: ajustar a temperatura ou ativar o Turbo em um aparelho desligado o liga e aplica o ajuste; desligado, a temperatura só é guardada e o Turbo exige aparelho ligado"],
+        ["Desligamento diário automático", "desativado por padrão: no horário escolhido (Brasília), desliga uma vez por dia as salas do escopo que estiverem ligadas; religar depois vale até o dia seguinte, um horário perdido com o servidor parado é aplicado uma vez ao voltar e salas com agendamento em curso são poupadas"],
         ["Modo de teste", "desativa temporariamente a restrição de rede em produção"],
         ["Redes autorizadas", "uma faixa CIDR por linha para acesso normal em produção"],
         ["Modo de manutenção", "bloqueia login e uso de usuários comuns; administradores continuam"],
