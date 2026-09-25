@@ -32,6 +32,14 @@ const plataforma = require("./plataforma");
 
 const RE_VERSAO = /^\d+\.\d+\.\d+$/;
 const LIMITE_ARTEFATO = 120 * 1024 * 1024;
+// Tetos ABSOLUTOS, independentes do que o manifesto declara.
+//
+// O manifesto é assinado, mas assinado não é o mesmo que correto: um erro de publicação pode
+// declarar um tamanho absurdo, e o console rodaria num Raspberry Pi de 1 GiB. O comprimido tem
+// teto próprio, o descomprimido também, e a contagem de arquivos limita o caso do arquivo
+// pequeno que expande para milhões de entradas.
+const LIMITE_DESCOMPRIMIDO = 400 * 1024 * 1024;
+const LIMITE_ARQUIVOS_PAYLOAD = 5000;
 
 function raizInstalacao() {
   return config.RAIZ_INSTALACAO;
@@ -53,8 +61,16 @@ function lerEstadoInstalacao() {
   return estado.lerJson(arquivoEstado(), { versaoAtiva: null, versaoAnterior: null, transacao: null, atualizadoEm: null });
 }
 
+/**
+ * Grava o registro da instalação **mesclando** com o que já está lá.
+ *
+ * O registro guarda mais do que o ponteiro: escopo, diretório de estado, logs e porta, escritos
+ * pelo instalador. Substituir o objeto inteiro a cada atualização ou reversão apagava esses
+ * campos, e a instalação passava a procurar o estado no padrão da plataforma na partida seguinte.
+ */
 function gravarEstadoInstalacao(valor) {
-  estado.gravarJson(arquivoEstado(), valor, 0o644);
+  const atual = lerEstadoInstalacao();
+  estado.gravarJson(arquivoEstado(), { ...atual, ...valor }, 0o644);
 }
 
 /** Versões presentes no disco, mais o ponteiro ativo. */
@@ -325,7 +341,19 @@ async function validarAlvo(versao) {
 function extrairTarGz(arquivoOuConteudo, destino) {
   // Aceita um Buffer para que a instalação extraia exatamente os bytes que passaram pelo digest,
   // sem reler o caminho — reler seria reabrir a janela entre verificar e instalar.
-  const bruto = zlib.gunzipSync(Buffer.isBuffer(arquivoOuConteudo) ? arquivoOuConteudo : fs.readFileSync(arquivoOuConteudo));
+  // `maxOutputLength` corta a expansão no próprio gunzip: sem isso um artefato pequeno e muito
+  // comprimido derruba o host por memória antes de qualquer verificação de conteúdo.
+  let bruto;
+  try {
+    bruto = zlib.gunzipSync(Buffer.isBuffer(arquivoOuConteudo) ? arquivoOuConteudo : fs.readFileSync(arquivoOuConteudo), {
+      maxOutputLength: LIMITE_DESCOMPRIMIDO,
+    });
+  } catch (erro) {
+    if (erro && (erro.code === "ERR_BUFFER_TOO_LARGE" || /maxOutputLength|too large/i.test(erro.message || ""))) {
+      throw new Error(`o artefato expande além do limite de ${LIMITE_DESCOMPRIMIDO / 1048576} MiB; extração recusada`);
+    }
+    throw erro;
+  }
   const raizReal = path.resolve(destino);
   fs.mkdirSync(raizReal, { recursive: true });
 
@@ -377,6 +405,9 @@ function extrairTarGz(arquivoOuConteudo, destino) {
       fs.mkdirSync(alvo, { recursive: true });
       continue;
     }
+    if (arquivos >= LIMITE_ARQUIVOS_PAYLOAD) {
+      throw new Error(`o artefato tem mais de ${LIMITE_ARQUIVOS_PAYLOAD} arquivos; extração recusada`);
+    }
     fs.mkdirSync(path.dirname(alvo), { recursive: true });
     fs.writeFileSync(alvo, conteudo);
     // Preserva apenas o bit de execução; nada de setuid/setgid vindo de um artefato.
@@ -410,6 +441,17 @@ function reconciliar() {
   if (!completa) {
     try {
       fs.rmSync(destino, { recursive: true, force: true });
+    } catch {}
+    // A extração monta `versoes/<v>.parcial-<aleatorio>` e só depois renomeia. Remover apenas
+    // `versoes/<v>` deixava esses parciais para trás, e quedas repetidas enchiam o disco.
+    // O padrão é estrito para não alcançar uma versão legítima.
+    try {
+      const prefixo = `${String(t.versao || "")}.parcial-`;
+      for (const nome of fs.readdirSync(dirVersoes())) {
+        if (nome.startsWith(prefixo) || /^\d+\.\d+\.\d+\.(parcial|substituido)-[0-9a-f]+$/.test(nome)) {
+          fs.rmSync(path.join(dirVersoes(), nome), { recursive: true, force: true });
+        }
+      }
     } catch {}
     limparDescargas();
     estado.auditar("atualizacao-console-reconciliada", { versao: t.versao, etapa: t.etapa });
@@ -538,7 +580,10 @@ async function atualizar(versaoAlvo, { log = () => {} } = {}) {
   const arquivoLocal = path.join(staging, artefato.arquivo);
 
   log("Baixando o artefato...");
-  const download = await baixar(`${baseDeRelease()}/${artefato.arquivo}`, { destino: arquivoLocal, limiteBytes: Math.max(artefato.bytes + 4096, 1024) });
+  // O teto do download é o MENOR entre o declarado e o absoluto: um manifesto que declare
+  // 100 GiB não pode ampliar o limite do console.
+  const tetoDownload = Math.min(Math.max(artefato.bytes + 4096, 1024), LIMITE_ARTEFATO);
+  const download = await baixar(`${baseDeRelease()}/${artefato.arquivo}`, { destino: arquivoLocal, limiteBytes: tetoDownload });
   if (!download.ok) {
     limparDescargas();
     registrarTransacao(versaoAlvo, "falhou-download");

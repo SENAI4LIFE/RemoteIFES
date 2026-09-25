@@ -177,6 +177,13 @@ async function main() {
       return null;
     }
   })();
+  // Onde o estado mora é REGISTRADO aqui.
+  //
+  // Sem isso, o instalador gravava o token em `~/.local/state/...` (ou `%APPDATA%`) e o programa,
+  // iniciado pelo atalho sem variável de ambiente nenhuma, voltava ao padrão da plataforma
+  // (`/var/lib/...`, `%ProgramData%`). O primeiro operador não encontrava o token, e no Linux o
+  // processo tomava EACCES. Um `--estado` personalizado era esquecido do mesmo jeito. A CI
+  // escondia o problema porque sempre definia CONSOLE_ESTADO_DIR.
   fs.writeFileSync(
     estadoInstalacao,
     `${JSON.stringify(
@@ -186,6 +193,9 @@ async function main() {
         transacao: null,
         atualizadoEm: new Date().toISOString(),
         escopo: escopoPedido,
+        estado: dirEstado,
+        logs: dirLogs,
+        porta: Number(argumento("porta", "8099")),
       },
       null,
       2

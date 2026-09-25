@@ -188,7 +188,16 @@ function politicaDeVersao(manifesto, versaoInstalada) {
     };
   }
   const minimo = manifesto.minimoParaAtualizar;
-  if (minimo && RE_VERSAO.test(minimo) && compararVersoes(versaoInstalada, minimo) < 0) {
+  // Um mínimo presente mas malformado desligava o portão de compatibilidade em silêncio: a
+  // condição exigia que ele fosse válido para valer. Recusar é a leitura certa — o publicador
+  // declarou um requisito e ele não pôde ser avaliado.
+  if (minimo !== null && minimo !== undefined && !RE_VERSAO.test(String(minimo))) {
+    return {
+      ok: false,
+      motivo: `o manifesto declara minimoParaAtualizar inválido (${JSON.stringify(minimo)}); atualização recusada por não ser possível avaliar a compatibilidade.`,
+    };
+  }
+  if (minimo && compararVersoes(versaoInstalada, minimo) < 0) {
     return {
       ok: false,
       motivo:

@@ -841,3 +841,85 @@ test("arquivo não rastreado também conta como trabalho local", async (t) => {
   assert.equal(r.ok, false);
   assert.equal(fs.readFileSync(naoRastreado, "utf8"), "medições que eu não quero perder\n");
 });
+
+test("REGRESSÃO: o programa iniciado pelo atalho acha o estado onde o instalador o pôs", async (t) => {
+  // O atalho roda o bootstrap sem variável de ambiente nenhuma. Sem registrar onde o estado
+  // mora, uma instalação de usuário (ou com --estado próprio) procurava no padrão da plataforma,
+  // e o primeiro operador não encontrava o token que o instalador tinha acabado de gravar — no
+  // Linux o processo ainda tomava EACCES. A CI escondia isso porque sempre definia
+  // CONSOLE_ESTADO_DIR.
+  const amb = ajuda.ambiente();
+  const raiz = ajuda.dirTemporario("console-pers-");
+  const estadoDir = ajuda.dirTemporario("console-pers-est-");
+  t.after(() => {
+    amb.restaurar();
+    for (const d of [raiz, estadoDir]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  const porta = 8573;
+  const inst = await instalar([
+    "--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir,
+    "--porta", String(porta), "--sem-servico", "--checkout", path.join(ajuda.RAIZ, ".."),
+  ]);
+  assert.equal(inst.codigo, 0, inst.saida);
+
+  // O registro tem de dizer onde tudo está.
+  const registro = JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8"));
+  assert.equal(registro.escopo, "usuario");
+  assert.equal(path.resolve(registro.estado), path.resolve(estadoDir), "o diretório de estado precisa ficar registrado");
+  assert.equal(registro.porta, porta, "a porta escolhida precisa ficar registrada");
+  assert.ok(fs.existsSync(path.join(estadoDir, "bootstrap-token")), "o token do primeiro operador está no estado registrado");
+
+  // Partida como o atalho faz: SEM CONSOLE_ESTADO_DIR e SEM CONSOLE_PORTA.
+  // `undefined` REMOVE a variável no filho; `delete` num objeto que depois é espalhado sobre
+  // `process.env` não removeria nada, e o teste passaria a medir o ambiente do processo de teste
+  // em vez da descoberta registrada.
+  const limpo = {
+    CONSOLE_SEM_PRIVILEGIO: "1",
+    CONSOLE_OCIOSIDADE_S: "120",
+    CONSOLE_ESTADO_DIR: undefined,
+    CONSOLE_PORTA: undefined,
+    CONSOLE_RAIZ_INSTALACAO: undefined,
+    CONSOLE_CHECKOUT_DIR: undefined,
+  };
+
+  const r = await rodarNodeAsync([path.join(raiz, "launcher-bootstrap.js"), "--iniciar"], limpo);
+  assert.equal(r.codigo, 0, `o atalho precisa subir o console sem ambiente injetado. Saída:\n${r.saida}`);
+
+  // A prova: o contrato aparece no estado REGISTRADO, e na porta registrada.
+  const contrato = path.join(estadoDir, "endereco.json");
+  assert.ok(fs.existsSync(contrato), "o contrato precisa aparecer no diretório de estado registrado");
+  const dados = JSON.parse(fs.readFileSync(contrato, "utf8"));
+  assert.equal(dados.porta, porta, "a porta registrada precisa ser a usada");
+  t.after(() => {
+    try {
+      require(path.join(ajuda.RAIZ, "src", "plataforma")).encerrarArvore(dados.pid, "SIGKILL");
+    } catch {}
+  });
+});
+
+test("atualizar e reverter não apagam o escopo nem o estado registrados", (t) => {
+  // O registro guarda mais que o ponteiro. Substituir o objeto inteiro a cada troca de versão
+  // apagava escopo, estado, logs e porta, e a instalação voltava a procurar o estado no padrão
+  // da plataforma na partida seguinte.
+  const raiz = ajuda.dirTemporario("console-merge-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "1.0.0", versaoAnterior: null, transacao: null, escopo: "usuario", estado: "/caminho/registrado", porta: 8123 })}\n`
+  );
+
+  atualizador.gravarEstadoInstalacao({ versaoAtiva: "2.0.0", versaoAnterior: "1.0.0", transacao: null });
+
+  const depois = atualizador.lerEstadoInstalacao();
+  assert.equal(depois.versaoAtiva, "2.0.0", "o ponteiro muda");
+  assert.equal(depois.escopo, "usuario", "o escopo sobrevive");
+  assert.equal(depois.estado, "/caminho/registrado", "o diretório de estado sobrevive");
+  assert.equal(depois.porta, 8123, "a porta sobrevive");
+});
