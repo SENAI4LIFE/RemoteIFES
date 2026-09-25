@@ -172,6 +172,41 @@ async function estadoDoCheckout() {
   };
 }
 
+/**
+ * Caminhos que o commit alvo rastreia e que HOJE existem como conteúdo IGNORADO.
+ *
+ * `git status` não lista ignorados, e `checkout --force`/`reset --hard` sobrescrevem qualquer
+ * caminho que o commit alvo contenha. Se alguém tiver commitado um arquivo sob um diretório que
+ * o projeto ignora — e `remoteifes-server/data/` é ignorado, é onde vive o banco —, a troca de
+ * código apagaria dados operacionais sem que nenhuma verificação anterior tivesse visto nada.
+ *
+ * A conferência é a interseção entre a árvore do commit alvo e os ignorados presentes no disco:
+ * exatamente o conjunto perigoso, em duas chamadas ao git, sem stdin e sem passar milhares de
+ * caminhos por linha de comando.
+ */
+async function ignoradosQueOAlvoSobrescreveria(commitAlvo) {
+  const [arvore, ignorados] = await Promise.all([
+    git(["ls-tree", "-r", "--name-only", commitAlvo]),
+    git(["ls-files", "--others", "--ignored", "--exclude-standard"]),
+  ]);
+  if (!arvore.ok) return { ok: false, motivo: "não foi possível listar a árvore do commit alvo" };
+  if (!ignorados.ok) return { ok: false, motivo: "não foi possível listar os arquivos ignorados do checkout" };
+
+  const doAlvo = new Set(
+    arvore.saida
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+  );
+  const colidem = ignorados.saida
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter((caminho) => doAlvo.has(caminho));
+
+  return { ok: true, caminhos: colidem };
+}
+
 async function criarBackup(rotulo, log) {
   const app = config.caminhosDaAplicacao();
   if (!fs.existsSync(app.banco)) {
@@ -242,6 +277,19 @@ async function implantar({ alvo, offline = false, semReiniciar = false, log = ()
     log(`O código já está em ${commitAlvo}, mas o processo em execução ${saude.commit ? `está em ${saude.commit.slice(0, 12)}` : "não a confirma"}; reiniciando para aplicá-la.`);
   } else {
     log(`Nova versão: ${commitAlvo}`);
+    // Mesma guarda da reversão: o alvo não pode sobrescrever conteúdo que o Git ignora, porque é
+    // ali que moram os dados operacionais.
+    const colisao = await ignoradosQueOAlvoSobrescreveria(commitAlvo);
+    if (!colisao.ok) return { ok: false, erro: colisao.motivo };
+    if (colisao.caminhos.length) {
+      return {
+        ok: false,
+        erro:
+          "a versão de destino rastreia caminhos que hoje existem como conteúdo IGNORADO neste checkout; " +
+          "aplicá-la os sobrescreveria, e dados operacionais moram em caminhos ignorados. " +
+          `Resolva à mão antes de atualizar:\n${colisao.caminhos.slice(0, 50).join("\n")}`,
+      };
+    }
     const destacado = inicial.ramo !== "main";
     const aplicar = destacado
       ? await git(["checkout", "--force", "--quiet", commitAlvo])
@@ -373,6 +421,18 @@ async function reverter({ alvo = null, offline = false, semReiniciar = false, lo
   if (!resolvido.ok || !resolvido.saida.trim()) return { ok: false, erro: `não foi possível resolver o ref "${ref}".` };
   const commitAlvo = resolvido.saida.trim();
   const antes = inicial.head;
+
+  const colisao = await ignoradosQueOAlvoSobrescreveria(commitAlvo);
+  if (!colisao.ok) return { ok: false, erro: colisao.motivo };
+  if (colisao.caminhos.length) {
+    return {
+      ok: false,
+      erro:
+        "a versão de destino rastreia caminhos que hoje existem como conteúdo IGNORADO neste checkout; " +
+        "trocar o código os sobrescreveria, e dados operacionais moram em caminhos ignorados. " +
+        `Resolva à mão antes de voltar a versão:\n${colisao.caminhos.slice(0, 50).join("\n")}`,
+    };
+  }
 
   const backup = await criarBackup("pre-rollback", log);
   if (!backup.ok) return { ok: false, erro: "backup pré-rollback falhou; nada foi alterado." };
