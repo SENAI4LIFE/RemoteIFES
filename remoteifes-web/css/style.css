@@ -2252,6 +2252,15 @@ button.btn:disabled {
 .desligamento-salas-bloco { grid-column: 1 / -1; margin: 8px 0 0; font-size: calc(12px * var(--a11y-font-scale)); font-weight: 700; color: var(--text-muted); }
 .desligamento-salas-lista .checkbox-label { margin: 2px 0; }
 
+/* Settings owned by the Operations Console: displayed, never edited here. */
+.config-somente-leitura { margin: 12px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
+.config-somente-leitura-titulo { margin: 0 0 6px; font-weight: 700; }
+.config-somente-leitura-titulo .hint { font-weight: 400; margin: 0; }
+.config-somente-leitura-lista { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 4px 12px; margin: 0 0 8px; }
+.config-somente-leitura-lista dt { color: var(--text-muted); }
+.config-somente-leitura-lista dd { margin: 0; overflow-wrap: anywhere; }
+.config-somente-leitura .hint:last-child { margin-bottom: 0; }
+
 .fp-tabs {
   display: flex;
   gap: 6px;
