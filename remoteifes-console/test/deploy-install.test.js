@@ -996,3 +996,17 @@ test("payload replacement restores the previous version if the second rename fai
   assert.match(fonte, /fs\.renameSync\(aposentado, destinoVersao\)/, "a failure of the second rename must restore the previous tree");
   assert.match(fonte, /a versão anterior foi restaurada/);
 });
+
+test("the system-scope Console service never runs as root", (t) => {
+  const { usuarioDoConsole } = require(path.join(ajuda.RAIZ, "instalacao", "instalar.js"));
+  const checkout = ajuda.dirTemporario("console-dono-");
+  t.after(() => fs.rmSync(checkout, { recursive: true, force: true }));
+
+  assert.equal(usuarioDoConsole(checkout, { pedido: "root" }), null, "--usuario root is refused");
+  assert.equal(usuarioDoConsole(checkout, { pedido: "pi" }), "pi");
+  assert.equal(usuarioDoConsole(checkout, { sudoUser: "pi" }), "pi", "whoever invoked sudo");
+  for (const sudoUser of ["root", undefined]) {
+    const escolhido = usuarioDoConsole(checkout, { sudoUser });
+    assert.notEqual(escolhido, "root", `SUDO_USER=${sudoUser} must not select root`);
+  }
+});

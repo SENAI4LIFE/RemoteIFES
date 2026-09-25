@@ -505,23 +505,25 @@ function criarAtalho({ plataforma, raiz, log }) {
  * The Console service user, never root: the one named with --usuario, the one who invoked sudo, or
  * the owner of the managed checkout (the user that runs git and deploy.sh there).
  */
-function usuarioDoConsole(checkout) {
-  const pedido = argumento("usuario", null);
-  if (pedido) return pedido;
-  if (process.env.SUDO_USER && process.env.SUDO_USER !== "root") return process.env.SUDO_USER;
-  if (!MODO_PACOTE) return process.env.SUDO_USER || os.userInfo().username;
-  if (!checkout) return null;
-  try {
-    const uid = fs.statSync(checkout).uid;
-    if (uid === 0) return null;
-    const linha = fs
-      .readFileSync("/etc/passwd", "utf8")
-      .split("\n")
-      .find((l) => l.split(":")[2] === String(uid));
-    return linha ? linha.split(":")[0] : null;
-  } catch {
-    return null;
+function usuarioDoConsole(checkout, { pedido = argumento("usuario", null), sudoUser = process.env.SUDO_USER } = {}) {
+  // Running the Console service as root would give every Console operation root privilege; the only
+  // privileged path must be the fixed-verb helper.
+  if (pedido) return pedido === "root" ? null : pedido;
+  if (sudoUser && sudoUser !== "root") return sudoUser;
+  if (checkout) {
+    try {
+      const uid = fs.statSync(checkout).uid;
+      if (uid !== 0) {
+        const linha = fs
+          .readFileSync("/etc/passwd", "utf8")
+          .split("\n")
+          .find((l) => l.split(":")[2] === String(uid));
+        if (linha) return linha.split(":")[0];
+      }
+    } catch {}
   }
+  const atual = os.userInfo().username;
+  return atual && atual !== "root" ? atual : null;
 }
 
 async function integrarLinux({ plataforma, raiz, dirEstado, escopo, admin, log }) {
@@ -551,6 +553,11 @@ async function integrarLinux({ plataforma, raiz, dirEstado, escopo, admin, log }
   const checkoutRegistrado = lerCheckoutAssociado(dirEstado);
   const checkout = checkoutRegistrado || (MODO_PACOTE ? null : path.resolve(path.join(ORIGEM, "..")));
   const usuario = usuarioDoConsole(checkout);
+  if (!usuario && !MODO_PACOTE) {
+    log("== Unidades systemd não instaladas: o serviço do console não roda como root.");
+    log("   Repita com sudo a partir da conta dona do checkout, ou informe --usuario <dono-do-checkout>.");
+    return { atalho, observacao: "Nenhum usuário não-root foi identificado para o serviço do console." };
+  }
   if (MODO_PACOTE && (!checkout || !usuario)) {
     const falta = !checkout ? "o checkout do RemoteIFES que o console administra" : "um usuário não-root dono do checkout";
     log(`== Unidades systemd não instaladas: falta ${falta}.`);
@@ -629,4 +636,4 @@ if (require.main === module) {
   main().catch((erro) => falhar(`falha na instalação: ${erro && erro.stack ? erro.stack : erro}`));
 }
 
-module.exports = { migrarLayoutAntigo, copiarArvore, comandoDoLancador, compararVersoes };
+module.exports = { migrarLayoutAntigo, copiarArvore, comandoDoLancador, compararVersoes, usuarioDoConsole };
