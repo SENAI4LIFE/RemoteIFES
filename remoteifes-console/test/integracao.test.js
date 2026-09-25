@@ -4,8 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const ajuda = require("./ajuda");
 
-// Fluxo completo de uma operação gerenciada pela API, e as garantias de isolamento do console
-// em relação às superfícies públicas do projeto.
+// Complete flow of a managed operation through the API, and the Console's isolation guarantees with
+// respect to the project's public surfaces.
 
 function checkoutMinimo() {
   const raiz = ajuda.dirTemporario("console-int-");
@@ -81,7 +81,7 @@ test("fluxo completo: elevar, executar, acompanhar a saída e ler o desfecho", a
 
   const sessao = await ajuda.autenticar(amb, s.porta);
 
-  // A ação imediata de leitura não exige elevação.
+  // The immediate read action does not require elevation.
   const saude = await ajuda.pedir(s.porta, "/api/acoes/saude.verificar/executar", {
     metodo: "POST",
     corpo: { argumentos: {} },
@@ -93,8 +93,8 @@ test("fluxo completo: elevar, executar, acompanhar a saída e ler o desfecho", a
   assert.equal(saude.json.imediata, true);
   assert.equal(saude.json.resultado.saude.respondeu, false, "sem aplicação no ar, o /health não responde");
 
-  // Um trabalho de verdade: backup sem banco falha com mensagem útil, e o ciclo completo do
-  // motor (registro, saída em arquivo, desfecho) é exercitado pela API.
+  // A real job: a backup without a database fails with a useful message, and the engine's full
+  // cycle (record, output to file, outcome) is exercised through the API.
   const elev = await ajuda.elevar(amb, s.porta, sessao);
   assert.equal(elev.status, 200);
 
@@ -197,7 +197,7 @@ test("uma ação desconhecida ou com argumento a mais é recusada", async (t) =>
   assert.match(extra.json.erro, /não reconhecido/);
 });
 
-// --- Isolamento do console frente às superfícies públicas ------------------------------------
+// --- Console isolation from public surfaces ------------------------------------
 
 test("o console não é publicado pelo GitHub Pages nem entra no pacote Cordova", () => {
   const raiz = path.join(ajuda.RAIZ, "..");
@@ -210,7 +210,7 @@ test("o console não é publicado pelo GitHub Pages nem entra no pacote Cordova"
   assert.match(sync, /remoteifes-web/, "o Cordova empacota apenas o frontend");
   assert.ok(!sync.includes("remoteifes-console"), "o console não pode entrar no www do Cordova");
 
-  // A aplicação serve o frontend a partir de remoteifes-web; o console fica fora dessa raiz.
+  // The application serves the frontend from remoteifes-web; the Console stays outside that root.
   const app = fs.readFileSync(path.join(raiz, "remoteifes-server", "src", "app.js"), "utf8");
   assert.match(app, /"remoteifes-web"/);
   assert.ok(!app.includes("remoteifes-console"), "o servidor da aplicação não serve arquivos do console");
@@ -224,8 +224,7 @@ test("o console não tem dependências npm", () => {
 });
 
 test("nenhum arquivo de código do console contém byte nulo", () => {
-  // Um NUL perdido num comentário faz o Git tratar o arquivo como binário: o diff deixa de ser
-  // revisável e a revisão passa a ser uma fé. Aconteceu de verdade numa edição automatizada.
+  // A stray NUL makes Git treat the file as binary: the diff stops being reviewable.
   const ignorar = new Set(["node_modules", ".git"]);
   const varrer = (dir) => {
     for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -244,10 +243,9 @@ test("nenhum arquivo de código do console contém byte nulo", () => {
 });
 
 test("nenhum segredo fica versionado no diretório do console", () => {
-  // Os padrões descrevem segredos **reais**, não qualquer coisa parecida. Um hash scrypt de
-  // verdade traz N de quatro dígitos ou mais e sal/chave em base64 longos; `scrypt$1$1$1$a$b`
-  // é fixture de teste e não é credencial de ninguém. Afrouxar aqui seria perder a proteção;
-  // ser específico a mantém sem alarme falso.
+  // The patterns describe **real** secrets, not anything similar. A real scrypt hash has an N of
+  // four or more digits and long base64 salt/key; `scrypt$1$1$1$a$b` is a test fixture and nobody's
+  // credential. Loosening here would lose protection; being specific keeps it without false alarms.
   const proibidos = [
     /-----BEGIN [A-Z ]*PRIVATE KEY/,
     /gh[pousr]_[A-Za-z0-9]{30,}/,
@@ -267,7 +265,7 @@ test("nenhum segredo fica versionado no diretório do console", () => {
       if (!/\.(js|json|md|sh|ps1|css|html|modelo|socket|plist|yml)$/.test(entrada.name)) continue;
       const texto = fs.readFileSync(completo, "utf8");
       for (const padrao of proibidos) {
-        // O teste de segurança usa tokens sintéticos de propósito; eles são reconhecíveis.
+        // The security test uses synthetic tokens on purpose; they are recognizable.
         const achado = padrao.exec(texto);
         if (achado && !/tokenfalso|umtokenfalso|teste/i.test(achado[0])) {
           assert.fail(`possível segredo em ${path.relative(ajuda.RAIZ, completo)}: ${achado[0].slice(0, 20)}…`);

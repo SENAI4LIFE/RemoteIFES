@@ -5,29 +5,28 @@ const path = require("path");
 const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 
-// Instalador do Console de Operações, portátil.
+// Portable Operations Console installer.
 //
-// O que ele monta é sempre o mesmo layout, em qualquer sistema:
+// It always assembles the same layout, on every system:
 //
-//   <raiz>/console-bootstrap.js      camada estável (o pacote é dono dela)
+//   <raiz>/console-bootstrap.js      stable layer (owned by the package)
 //   <raiz>/launcher-bootstrap.js
-//   <raiz>/estado-instalacao.json    ponteiro da versão ativa
-//   <raiz>/versoes/<versao>/         payload, imutável
+//   <raiz>/estado-instalacao.json    active version pointer
+//   <raiz>/versoes/<versao>/         payload, immutable
 //
-// A separação existe para que o gerenciador de pacotes continue dono de um conjunto fixo de
-// arquivos enquanto o atualizador troca o payload lado a lado. Sem ela, um `.deb` e um
-// autoatualizador acabariam sobrescrevendo os arquivos um do outro e deixando o dpkg
-// inconsistente.
+// The split lets the package manager keep owning a fixed set of files while the updater swaps the
+// payload side by side. Without it, a `.deb` and a self-updater would overwrite each other's files
+// and leave dpkg inconsistent.
 //
-// Uso:
+// Usage:
 //   node instalacao/instalar.js [--escopo usuario|sistema] [--raiz <dir>] [--estado <dir>]
 //                              [--checkout <dir>] [--porta <n>] [--sem-servico] [--forcar]
 
 const ORIGEM = path.resolve(path.join(__dirname, ".."));
 
-// O que nunca entra no payload instalado. `.signing/`, chaves e assinaturas ficam de fora
-// porque instalar não é publicar: copiar uma chave privada de publicação para dentro de uma
-// instalação a espalharia, possivelmente com permissão mais frouxa que a do original.
+// What never goes into the installed payload. `.signing/`, keys and signatures stay out because
+// installing is not publishing: copying a private publishing key into an installation would spread
+// it, possibly with looser permissions than the original.
 const IGNORAR_NA_COPIA = new Set(["node_modules", ".git", "test", "empacotar", ".signing", "dist"]);
 
 function argumento(nome, padrao = null) {
@@ -64,15 +63,15 @@ function copiarArvore(origem, destino, { ignorar = new Set() } = {}) {
     if (ignorar.has(entrada.name)) continue;
     const de = path.join(origem, entrada.name);
     const para = path.join(destino, entrada.name);
-    if (entrada.isSymbolicLink()) continue; // um payload não distribui links
+    if (entrada.isSymbolicLink()) continue;  // a payload does not distribute links
     if (entrada.isDirectory()) {
       copiarArvore(de, para, { ignorar });
       continue;
     }
     fs.copyFileSync(de, para);
     if (process.platform !== "win32" && /\.(sh|js)$/.test(entrada.name) && /^#!/.test(fs.readFileSync(de, "utf8").slice(0, 2))) {
-      // Preserva o bit de execução de quem tem shebang: o índice do Git não o carrega, e um
-      // runner sem +x falha com EACCES na primeira operação.
+      // Preserves the executable bit for files with a shebang: the Git index does not carry it, and
+      // a runner without +x fails with EACCES on the first operation.
       fs.chmodSync(para, 0o755);
     }
   }
@@ -82,7 +81,7 @@ async function main() {
   const pacote = JSON.parse(fs.readFileSync(path.join(ORIGEM, "package.json"), "utf8"));
   const versao = pacote.version;
 
-  // Carrega o adaptador com o escopo pedido, antes de qualquer decisão de caminho.
+  // Loads the adapter with the requested scope, before any path decision.
   const plataforma = require(path.join(ORIGEM, "src", "plataforma"));
   const admin = ehAdministrador();
   const escopoPedido = argumento("escopo", admin ? (process.platform === "linux" ? "sistema" : "usuario") : "usuario");
@@ -96,7 +95,7 @@ async function main() {
   const dirEstado = path.resolve(argumento("estado", padroes.estado));
   const dirLogs = path.resolve(argumento("logs", padroes.logs));
 
-  // Node é pré-requisito do que o console administra: sem ele o RemoteIFES não roda.
+  // Node is a prerequisite of what the Console manages: RemoteIFES does not run without it.
   const runtime = plataforma.runtimeAtual();
   if (!runtime.atende && !temFlag("forcar")) {
     falhar(
@@ -116,16 +115,16 @@ async function main() {
   log(`  Node       : ${runtime.versao}`);
   log("");
 
-  // --- Migração do layout Linux anterior (atual/anterior) ---------------------------------
+  // --- Migration from the previous Linux layout (atual/anterior) ----------------------------
   const migrado = migrarLayoutAntigo(raiz, log);
 
   // --- Payload lado a lado ------------------------------------------------------------------
   const destinoVersao = path.join(raiz, "versoes", versao);
   log(`== Instalando o payload em versoes/${versao}`);
-  // Reinstalar por cima de si mesmo é o comando de reparo documentado: ele roda
-  // `versoes/<v>/instalacao/instalar.js --forcar`, e ali ORIGEM **é** o destino. Apagar o destino
-  // antes de copiar destruía o payload ativo e terminava em ENOENT com a instalação inutilizada.
-  // A cópia vai sempre para um estágio ao lado e entra por rename; a origem só é removida depois.
+  // Reinstalling over itself is the documented repair command: it runs
+  // `versoes/<v>/instalacao/instalar.js --forcar`, where SOURCE **is** the destination. The copy
+  // always goes to a staging directory beside the target and enters by rename; the old tree is
+  // removed only afterwards.
   const origemEhODestino = ORIGEM === destinoVersao || ORIGEM.startsWith(destinoVersao + path.sep);
   if (fs.existsSync(destinoVersao) && !temFlag("forcar")) {
     log("   já presente; mantendo (use --forcar para reescrever).");
@@ -144,14 +143,14 @@ async function main() {
       try {
         fs.renameSync(parcial, destinoVersao);
       } catch (erro) {
-        // Entre os dois renames a versão ativa não existe. Se o segundo falhar, a antiga volta
-        // para o lugar: sem isso o payload ficava só sob `.substituido-*`, sem restauração
-        // automática, e o ponteiro apontava para um diretório ausente.
+        // Between the two renames the active version does not exist. If the second fails, the old
+        // one is put back: otherwise the payload would exist only under `.substituido-*` with no
+        // automatic restoration, and the pointer would reference a missing directory.
         fs.renameSync(aposentado, destinoVersao);
         fs.rmSync(parcial, { recursive: true, force: true });
         falhar(`não foi possível instalar o payload (${erro.message}); a versão anterior foi restaurada.`);
       }
-      // Só agora a árvore antiga sai — e se ela era a origem, a cópia já está feita.
+      // Only now does the old tree go; if it was the source, the copy is already done.
       fs.rmSync(aposentado, { recursive: true, force: true });
       log(origemEhODestino ? "   payload substituído a partir de si mesmo, com estágio intermediário." : "   payload substituído.");
     } else {
@@ -159,14 +158,15 @@ async function main() {
     }
   }
 
-  // node_modules é preservado entre versões: o terminal opcional (node-pty) é instalado ali
-  // pelo operador, e apagá-lo a cada atualização faria o terminal sumir sem explicação.
+  // node_modules is preserved across versions: the operator installs the optional terminal
+  // (node-pty) there, and deleting it on every update would make the terminal disappear without
+  // explanation.
   const modulosCompartilhados = path.join(raiz, "node_modules");
   if (fs.existsSync(modulosCompartilhados)) {
     log("   node_modules compartilhado preservado (dependências opcionais, como o PTY).");
   }
 
-  // --- Camada estável ------------------------------------------------------------------------
+  // --- Stable layer ----------------------------------------------------------------------------
   log("== Instalando a camada estável");
   fs.copyFileSync(path.join(ORIGEM, "instalacao", "console-bootstrap.js"), path.join(raiz, "console-bootstrap.js"));
   fs.writeFileSync(
@@ -186,13 +186,12 @@ async function main() {
       return null;
     }
   })();
-  // Onde o estado mora é REGISTRADO aqui.
+  // The state location is RECORDED here.
   //
-  // Sem isso, o instalador gravava o token em `~/.local/state/...` (ou `%APPDATA%`) e o programa,
-  // iniciado pelo atalho sem variável de ambiente nenhuma, voltava ao padrão da plataforma
-  // (`/var/lib/...`, `%ProgramData%`). O primeiro operador não encontrava o token, e no Linux o
-  // processo tomava EACCES. Um `--estado` personalizado era esquecido do mesmo jeito. A CI
-  // escondia o problema porque sempre definia CONSOLE_ESTADO_DIR.
+  // The program started from a shortcut has no environment variables, so without this record it
+  // would fall back to the platform default (`/var/lib/...`, `%ProgramData%`) instead of the chosen
+  // state directory, and the first operator would not find the token. A custom `--estado` is kept
+  // the same way.
   fs.writeFileSync(
     estadoInstalacao,
     `${JSON.stringify(
@@ -257,7 +256,7 @@ async function main() {
     plataforma.protegerArquivo(arquivoSegredo);
   }
 
-  // --- Integração com a plataforma -------------------------------------------------------------
+  // --- Platform integration --------------------------------------------------------------------
   const resultadoPlataforma = temFlag("sem-servico")
     ? { pulado: true }
     : await integrarComPlataforma({ plataforma, raiz, dirEstado, dirLogs, escopo: escopoPedido, admin, log });
@@ -295,8 +294,8 @@ function comandoDoLancador(raiz) {
 }
 
 /**
- * Migração do layout Linux anterior (`<raiz>/atual` e `<raiz>/anterior`) para `versoes/`.
- * Não move estado, não regenera credencial e não toca no checkout: só reposiciona o programa.
+ * Migrates the previous Linux layout (`<raiz>/atual` and `<raiz>/anterior`) to `versoes/`. Does not
+ * move state, regenerate credentials or touch the checkout: it only relocates the program.
  */
 function migrarLayoutAntigo(raiz, log) {
   const antigoAtual = path.join(raiz, "atual");
@@ -356,7 +355,7 @@ function criarAtalho({ plataforma, raiz, log }) {
 
   if (plataforma.nome === "linux") {
     const arquivo = path.join(padroes.atalhos, "remoteifes-console.desktop");
-    // Entrada de desktop é um arquivo de configuração, não um script: sem shebang, sem +x.
+    // A desktop entry is a configuration file, not a script: no shebang, no +x.
     fs.writeFileSync(
       arquivo,
       [
@@ -377,11 +376,10 @@ function criarAtalho({ plataforma, raiz, log }) {
   }
 
   if (plataforma.nome === "windows") {
-    // O atalho aponta para wscript.exe, que é subsistema GUI: sem isso, abrir o console piscaria
-    // uma janela de console preta a cada execução.
-    // Extensão .vbs, não .js: o `wscript.exe` escolhe o motor de script pela EXTENSÃO, então
-    // VBScript num arquivo .js é interpretado como JScript e falha. Com `//B` o erro é silencioso
-    // e o atalho simplesmente não abre nada.
+    // The shortcut targets wscript.exe, a GUI-subsystem program: otherwise opening the Console
+    // would flash a black console window on every run. Extension .vbs, not .js: `wscript.exe` picks
+    // the script engine by EXTENSION, so VBScript in a .js file is parsed as JScript and fails.
+    // With `//B` the error is silent and the shortcut opens nothing.
     const oculto = path.join(raiz, "abrir-console.vbs");
     fs.writeFileSync(
       oculto,
@@ -416,10 +414,11 @@ function criarAtalho({ plataforma, raiz, log }) {
   }
 
   if (plataforma.nome === "macos") {
-    // Bundle .app cujo executável é um script com shebang: o Finder aceita, e não exige
-    // compilar nada. O lançador roda na sessão do usuário, que é onde o navegador abre.
-    // A raiz já está dentro do bundle (Contents/Resources); o bundle é o avô dela. Se alguém
-    // instalou com --raiz fora de um bundle, cria-se um em Aplicativos apontando para lá.
+    // A .app bundle whose executable is a script with a shebang: Finder accepts it and nothing
+    // needs to be compiled. The launcher runs in the user session, where the browser opens. The
+    // root is already inside the bundle (Contents/Resources); the bundle is its grandparent. If
+    // someone installed with --raiz outside a bundle, one is created in Applications pointing
+    // there.
     const bundle = plataforma.bundleDaRaiz(raiz) || path.join(padroes.atalhos, "RemoteIFES Console.app");
     const macos = path.join(bundle, "Contents", "MacOS");
     fs.mkdirSync(macos, { recursive: true });
@@ -475,8 +474,8 @@ async function integrarLinux({ plataforma, raiz, dirEstado, escopo, admin, log }
     };
   }
 
-  // Usuário dono do console: quem chamou o sudo, não o root. O serviço roda como ele; o que dá
-  // acesso a root é o auxiliar, que é root:root e só aceita verbos fixos.
+  // Console owner user: whoever invoked sudo, not root. The service runs as that user; root access
+  // goes through the helper, which is root:root and accepts only fixed verbs.
   const usuario = process.env.SUDO_USER || os.userInfo().username;
   const checkout = lerCheckoutAssociado(dirEstado) || path.resolve(path.join(ORIGEM, ".."));
   const dirDados = dirDadosDaAplicacao(checkout);
@@ -501,9 +500,9 @@ async function integrarLinux({ plataforma, raiz, dirEstado, escopo, admin, log }
   log(`   ${r.mecanismo}`);
   log(`   auxiliar privilegiado: ${r.auxiliar} (root:root, verbos fixos)`);
 
-  // A raiz da instalação e o estado pertencem ao usuário do console: a troca de versão é um
-  // rename dentro da raiz, e um diretório root-only impediria a autoatualização sem trazer
-  // segurança nenhuma — o privilégio real está no auxiliar, não no dono dos arquivos.
+  // The installation root and state belong to the Console user: version switching is a rename
+  // inside the root, and a root-only directory would prevent self-update without adding security;
+  // the real privilege lives in the helper, not in file ownership.
   ajustarDono(raiz, usuario, log);
   ajustarDono(dirEstado, usuario, log);
 
@@ -524,7 +523,9 @@ function lerCheckoutAssociado(dirEstado) {
   }
 }
 
-/** Diretório de dados da aplicação, perguntando ao próprio servidor onde ele fica. */
+/**
+ * Application data directory, asking the server itself where it is.
+ */
 function dirDadosDaAplicacao(checkout) {
   try {
     const caminhos = require(path.join(checkout, "remoteifes-server", "src", "config", "paths.js"));

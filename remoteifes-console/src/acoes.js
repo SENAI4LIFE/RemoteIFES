@@ -9,15 +9,14 @@ const prontidaoMod = require("./prontidao");
 const repositorio = require("./repositorio");
 const trava = require("./trava");
 
-// Registro de ações gerenciadas.
+// Managed action registry.
 //
-// Toda operação do console passa por aqui, identificada por um id fixo e com argumentos
-// estruturados e validados. Não existe endpoint que receba uma linha de comando.
+// Every Console operation goes through here, identified by a fixed id with structured, validated
+// arguments. No endpoint accepts a command line.
 //
-// Observação importante: `src/services/documentation/commands.js`, do servidor, é um catálogo
-// de **texto de documentação** — tem espaços reservados (`<dominio>`, `<arquivo>`),
-// alternativas, pipelines e exemplos de várias linhas. Ele nunca é avaliado como ação; as duas
-// listas são independentes de propósito.
+// Note: the server's `src/services/documentation/commands.js` is a catalog of **documentation
+// text**, with placeholders (`<dominio>`, `<arquivo>`), alternatives, pipelines and multi-line
+// examples. It is never evaluated as an action; the two lists are independent on purpose.
 
 const RE_COMMIT = /^[0-9a-f]{7,40}$/;
 const RE_REF = /^[A-Za-z0-9._\/-]{1,120}$/;
@@ -37,7 +36,7 @@ function caminhoBin(nome) {
   return path.join(config.RAIZ_CONSOLE, "bin", nome);
 }
 
-// --- Definição das ações -------------------------------------------------------------------
+// --- Action definitions --------------------------------------------------------------------
 
 const ACOES = [
   {
@@ -215,8 +214,8 @@ const ACOES = [
           if (texto.includes("Restabelecendo o ciclo")) return "restabelecendo o serviço";
           return null;
         },
-        // A partir da instalação do arquivo não há como voltar atrás por cancelamento: o
-        // rollback interno do backupService é a rede de proteção, não um SIGTERM nosso.
+        // Once the file is being installed there is no way back through cancellation:
+        // backupService's internal rollback is the safety net, not a SIGTERM from here.
         faseIrreversivel: (texto) => texto.includes("Instalando o backup"),
         verificar: () => verificarAplicacaoSaudavel(),
       };
@@ -249,7 +248,7 @@ const ACOES = [
           "reverta ou salve essas alterações antes. O console nunca usa --force."
         );
       }
-      // O alvo tem de existir localmente: só se implanta o que foi revisado e buscado.
+      // The target must exist locally: only what was reviewed and fetched is deployed.
       const existe = await repositorio.git(["cat-file", "-e", `${argumentos.commit}^{commit}`]);
       if (!existe.ok) {
         return "este commit não está no checkout. Use 'Verificar atualizações' para buscar os objetos de origin antes de aplicar.";
@@ -267,9 +266,9 @@ const ACOES = [
         executavel: nodeExecutavel(),
         argumentos: args,
         cwd: config.RAIZ_CONSOLE,
-        // A trava de manutenção é adquirida pelo **runner**, não aqui. Quando o console a
-        // adquiria e em seguida chamava deploy.sh, o script tentava adquirir a mesma trava com
-        // noclobber e abortava sempre. A prontidão já detecta conflito antes de confirmar.
+        // The maintenance lock is acquired by the **runner**, not here: deploy.sh takes the same
+        // lock with noclobber and would abort if the Console already held it. Readiness detects
+        // conflicts before confirmation.
         exigeTrava: false,
         env: { CONSOLE_OPERADOR: operador },
         timeoutMs: 45 * 60 * 1000,
@@ -327,7 +326,7 @@ const ACOES = [
         executavel: nodeExecutavel(),
         argumentos: args,
         cwd: config.RAIZ_CONSOLE,
-        // Mesma razão da atualização: quem segura a trava é o runner.
+        // Same reason as the update: the runner holds the lock.
         exigeTrava: false,
         env: { CONSOLE_OPERADOR: operador },
         timeoutMs: 45 * 60 * 1000,
@@ -497,7 +496,7 @@ const ACOES = [
 
 const PORID = new Map(ACOES.map((a) => [a.id, a]));
 
-// --- Verificações de efeito -------------------------------------------------------------------
+// --- Effect verification ----------------------------------------------------------------------
 
 async function verificarAplicacaoSaudavel() {
   for (let i = 0; i < 15; i += 1) {
@@ -523,8 +522,8 @@ async function verificarCommitEmExecucao(esperado) {
           resumo: `o processo em execução informa ${saude.commit.slice(0, 8)}, não ${esperado.slice(0, 8)}: o reinício não aplicou a nova versão`,
         };
       }
-      // Versões anteriores ao campo de commit não conseguem confirmar a própria identidade;
-      // deploy.sh já trata esse caso e a distinção é preservada aqui.
+      // Versions older than the commit field cannot confirm their own identity; deploy.sh already
+      // handles that case and the distinction is preserved here.
       return {
         ok: true,
         resumo: "identidade não confirmada: a versão alvo não informa commit no /health; aceito um processo saudável reiniciado",
@@ -536,7 +535,7 @@ async function verificarCommitEmExecucao(esperado) {
   return { ok: false, resumo: "o /health não respondeu saudável depois da atualização" };
 }
 
-// --- Validação de argumentos ---------------------------------------------------------------
+// --- Argument validation --------------------------------------------------------------------
 
 function validarArgumentos(acao, brutos) {
   const esquema = acao.esquema || {};
@@ -594,8 +593,8 @@ function obter(id) {
 }
 
 /**
- * Prepara uma ação: valida argumentos e reavalia a prontidão. Chamado tanto pela tela de
- * confirmação quanto de novo no momento da execução — o estado pode ter mudado no intervalo.
+ * Prepares an action: validates arguments and re-evaluates readiness. Called by the confirmation
+ * screen and again at execution time, since the state may have changed in between.
  */
 async function preparar(id, brutos) {
   const acao = obter(id);
@@ -610,9 +609,9 @@ async function preparar(id, brutos) {
 }
 
 /**
- * Executa uma ação. Revalida prontidão imediatamente antes de começar: entre a confirmação do
- * operador e este instante pode ter começado um OTA, uma atualização pelo terminal ou o disco
- * pode ter enchido.
+ * Runs an action. Revalidates readiness immediately before starting: between the operator's
+ * confirmation and this instant an OTA or a terminal update may have started, or the disk may have
+ * filled up.
  */
 async function executar(id, brutos, { operador, forcarAvisos = false } = {}) {
   const { acao, argumentos, impedimento, prontidao } = await preparar(id, brutos);

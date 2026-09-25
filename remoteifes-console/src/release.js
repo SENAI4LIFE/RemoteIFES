@@ -4,28 +4,28 @@ const path = require("path");
 const config = require("./config");
 const estado = require("./estado");
 
-// Raiz de confiança das atualizações do console.
+// Trust root for Console updates.
 //
-// O que é verificado, nesta ordem, **antes** de qualquer escrita no diretório ativo:
-//   1. assinatura Ed25519 do manifesto por uma chave confiável;
-//   2. validade do manifesto (`expiraEm`), contra replay e congelamento de versão;
-//   3. existência de um artefato para este alvo (SO + arquitetura do runtime);
-//   4. política de versão (mínimo para atualizar, e sem downgrade pela rede);
-//   5. SHA-256 e tamanho do arquivo realmente gravado.
+// Verified, in this order, **before** any write to the active directory:
+//   1. Ed25519 signature of the manifest by a trusted key;
+//   2. manifest validity (`expiraEm`), against replay and version freezing;
+//   3. existence of an artifact for this target (OS + runtime architecture);
+//   4. version policy (minimum to update, and no downgrade over the network);
+//   5. SHA-256 and size of the file actually written.
 //
-// Um SHA-256 vindo da mesma origem não confiável do artefato não prova nada: ele só ganha
-// valor **depois** que a assinatura do manifesto confere. Por isso o digest nunca é conferido
-// isoladamente.
+// A SHA-256 from the same untrusted origin as the artifact proves nothing: it only has value
+// **after** the manifest signature checks out. That is why the digest is never checked in
+// isolation.
 //
-// CHAVE DE PUBLICAÇÃO: a chave privada correspondente não existe neste repositório. Enquanto
-// nenhuma chave de produção for provisionada, `CHAVE_PUBLICA_OFICIAL` fica nula e a atualização
-// por release se declara **não configurada** em vez de aceitar qualquer manifesto. Configurar é
-// publicar a chave pública aqui (ou em CONSOLE_CHAVE_RELEASE para ambientes de teste) e assinar
-// com `empacotar/assinar-manifesto.js`.
+// PUBLISHING KEY: the matching private key does not exist in this repository. Until a production
+// key is provisioned, `CHAVE_PUBLICA_OFICIAL` stays null and release updates report themselves as
+// **not configured** instead of accepting any manifest. Configuring means publishing the public key
+// here (or in CONSOLE_CHAVE_RELEASE for test environments) and signing with
+// `empacotar/assinar-manifesto.js`.
 
 const ESQUEMA_SUPORTADO = 1;
 
-// Chave pública Ed25519 em base64 (SPKI DER). Nula até haver chave de produção publicada.
+// Ed25519 public key in base64 (SPKI DER). Null until a production key is published.
 const CHAVE_PUBLICA_OFICIAL = null;
 
 const RE_VERSAO = /^\d+\.\d+\.\d+$/;
@@ -36,7 +36,10 @@ function chaveDeBase64(base64) {
   return crypto.createPublicKey({ key: Buffer.from(base64, "base64"), format: "der", type: "spki" });
 }
 
-/** Chaves aceitas: a embutida, a de ambiente (teste) e as rotacionadas já autenticadas. */
+/**
+ * Accepted keys: the embedded one, the environment one (tests) and already authenticated rotated
+ * keys.
+ */
 function chavesConfiaveis() {
   const chaves = [];
   const adicionar = (base64, origem) => {
@@ -67,8 +70,8 @@ function compararVersoes(a, b) {
 }
 
 /**
- * Verifica assinatura e forma do manifesto. Recebe os **bytes exatos** do arquivo, porque a
- * assinatura cobre bytes, não um objeto reserializado.
+ * Verifies the manifest's signature and shape. Receives the file's **exact bytes**, because the
+ * signature covers bytes, not a reserialized object.
  */
 function verificarManifesto(bytesManifesto, assinatura, { agora = new Date() } = {}) {
   const chaves = chavesConfiaveis();
@@ -114,7 +117,7 @@ function verificarManifesto(bytesManifesto, assinatura, { agora = new Date() } =
   if (!manifesto.expiraEm || Number.isNaN(Date.parse(manifesto.expiraEm))) {
     return { ok: false, motivo: "manifesto sem validade declarada" };
   }
-  // Validade fecha replay e congelamento: um manifesto antigo reapresentado não passa.
+  // Validity closes replay and freezing: a re-presented old manifest does not pass.
   if (Date.parse(manifesto.expiraEm) < agora.getTime()) {
     return { ok: false, motivo: `manifesto expirado em ${manifesto.expiraEm}; obtenha a publicação atual` };
   }
@@ -132,8 +135,8 @@ function verificarManifesto(bytesManifesto, assinatura, { agora = new Date() } =
 }
 
 /**
- * Aceita a chave sucessora declarada dentro de um manifesto já autenticado. Como ela vem
- * assinada pela chave atual, a rotação não abre nova superfície.
+ * Accepts the successor key declared inside an already authenticated manifest. Since it comes
+ * signed by the current key, rotation opens no new surface.
  */
 function registrarRotacao(manifesto) {
   const proxima = manifesto && manifesto.proximaChave;
@@ -152,7 +155,9 @@ function registrarRotacao(manifesto) {
   return { rotacionada: true };
 }
 
-/** Alvo deste console: SO + arquitetura do runtime, que é quem vai executar o código. */
+/**
+ * This Console's target: OS + runtime architecture, which is what will execute the code.
+ */
 function alvoAtual() {
   const so = { win32: "windows", darwin: "macos", linux: "linux" }[process.platform] || process.platform;
   return `${so}-${process.arch}`;
@@ -172,8 +177,8 @@ function escolherArtefato(manifesto, alvo = alvoAtual()) {
 }
 
 /**
- * Política de versão. Downgrade pela rede é recusado: voltar atrás usa a cópia local já
- * verificada, por ação explícita de reversão.
+ * Version policy. Downgrade over the network is refused: going back uses the already verified local
+ * copy, through an explicit rollback action.
  */
 function politicaDeVersao(manifesto, versaoInstalada) {
   if (compararVersoes(manifesto.versao, versaoInstalada) === 0) {
@@ -188,9 +193,8 @@ function politicaDeVersao(manifesto, versaoInstalada) {
     };
   }
   const minimo = manifesto.minimoParaAtualizar;
-  // Um mínimo presente mas malformado desligava o portão de compatibilidade em silêncio: a
-  // condição exigia que ele fosse válido para valer. Recusar é a leitura certa — o publicador
-  // declarou um requisito e ele não pôde ser avaliado.
+  // A present but malformed minimum is refused rather than ignored: the publisher declared a
+  // requirement and it could not be evaluated.
   if (minimo !== null && minimo !== undefined && !RE_VERSAO.test(String(minimo))) {
     return {
       ok: false,
@@ -210,19 +214,17 @@ function politicaDeVersao(manifesto, versaoInstalada) {
 
 /** Confere o arquivo realmente gravado contra o manifesto autenticado. */
 /**
- * Confere um artefato contra o manifesto assinado e **devolve os bytes conferidos**.
+ * Checks an artifact against the signed manifest and **returns the checked bytes**.
  *
- * Devolver o conteúdo não é conveniência: é o que fecha a janela entre verificar e instalar.
- * Antes, o digest era calculado numa leitura e a extração fazia outra leitura do mesmo caminho —
- * quem pudesse trocar o arquivo entre as duas instalaria conteúdo que nunca passou pela
- * verificação. No caminho online o arquivo está numa área nossa, mas no caminho offline ele é um
- * caminho que o operador informou (um /tmp compartilhado, um pendrive montado), e ali a troca é
- * plausível. Verificando e extraindo o MESMO buffer, não existe segunda leitura para atacar.
+ * Returning the content closes the window between verification and installation: verifying and
+ * extracting the SAME buffer leaves no second read to attack. This matters on the offline path,
+ * where the artifact is a path the operator supplied (a shared /tmp, a mounted USB drive) and a
+ * swap is plausible.
  */
 function conferirArtefato(caminho, artefato, { limiteBytes = Infinity } = {}) {
-  // O tamanho é conferido por `stat`, ANTES de ler. Ler primeiro para só então comparar
-  // carregaria um arquivo arbitrariamente grande na memória — num Pi de 1 GiB isso derruba o
-  // host antes de qualquer verificação dizer que o artefato era inválido.
+  // Size is checked with `stat` BEFORE reading. Reading first and comparing afterwards would load
+  // an arbitrarily large file into memory; on a 1 GiB Pi that brings the host down before any check
+  // says the artifact was invalid.
   let info;
   try {
     info = fs.statSync(caminho);

@@ -23,7 +23,8 @@ fs.rmSync(DEST, { recursive: true, force: true });
 copyDir(SRC, DEST);
 const indexPath = path.join(DEST, "index.html");
 const index = fs.readFileSync(indexPath, "utf8");
-// O primeiro script da aplicação declara a versão do frontend e traz o sufixo "?v=" dessa versão.
+// The application's first script declares the frontend version and carries that version's "?v="
+// suffix.
 const marcador = /^([ \t]*)<script src="js\/version\.js(?:\?[^"]*)?"><\/script>$/m;
 const encontrado = index.match(marcador);
 if (!encontrado) throw new Error("marcador de scripts não encontrado no index.html");

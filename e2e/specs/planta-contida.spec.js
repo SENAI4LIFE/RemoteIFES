@@ -1,8 +1,8 @@
 const { test, expect, VIEWPORTS, injetarSessao, semRolagemHorizontal } = require("../harness/fixtures");
 
-// A tela Plantas baixas: a planta ajustada cabe na caixa de conteúdo do invólucro (sem
-// passar por cima do padding nem ser cortada), o invólucro cabe na coluna da página e
-// a página não ganha rolagem horizontal. O zoom continua rolando dentro do invólucro.
+// The floor plan screen: the fitted plan fits the wrapper's content box (not over the padding and
+// not clipped), the wrapper fits the page column, and the page gains no horizontal scroll. Zoom
+// still scrolls inside the wrapper.
 
 const LARGURAS = {
   "mobile-compact": VIEWPORTS["mobile-compact"],
@@ -28,8 +28,8 @@ async function abrirPlanta(page, context, tamanho) {
     const plan = document.querySelector("#fpScaleInner .fp-section:not(.hidden) .plan");
     return !!(plan && plan.style.transform);
   });
-  // A coluna da página anima a largura ao trocar de tela; a planta é reajustada durante a
-  // animação, então espera a escala ficar estável antes de medir.
+  // The page column animates its width when switching screens; the plan is refitted during the
+  // animation, so wait for the scale to settle before measuring.
   await page.waitForFunction(() => new Promise((resolve) => {
     const plan = document.querySelector("#fpScaleInner .fp-section:not(.hidden) .plan");
     const antes = plan.style.transform;
@@ -79,8 +79,8 @@ for (const [nome, tamanho] of Object.entries(LARGURAS)) {
     expect(medida.vazamentoDaPlanta, "salas e corredores ficam dentro da planta").toBeLessThanOrEqual(0.5);
     expect(medida.escala).toBeGreaterThan(0);
     if (medida.rolaDentro) {
-      // Abaixo da escala mínima legível a planta rola dentro do invólucro: começa dentro
-      // da caixa de conteúdo e o fim é alcançável pela rolagem interna.
+      // Below the minimum legible scale the plan scrolls inside the wrapper: it starts inside the
+      // content box and its end is reachable by inner scrolling.
       expect(medida.plantaComecaDentro).toBe(true);
       const fimAlcancavel = await page.evaluate(() => {
         const secao = document.querySelector("#fpScaleInner .fp-section:not(.hidden)");
@@ -131,8 +131,8 @@ test("aproximar a planta rola dentro do invólucro e restaurar volta a caber, se
   expect(depois.plantaDentroDoConteudo).toBe(true);
 });
 
-// O rótulo CORREDOR tem o tamanho dos códigos de sala e continua dentro da faixa do
-// corredor, sem encostar em sala ou legenda, em todas as plantas.
+// The CORREDOR label has the size of the room codes and stays inside the corridor band, without
+// touching a room or legend, on every floor plan.
 for (const [nome, tamanho] of [["mobile-portrait", VIEWPORTS["mobile-portrait"]], ["mobile-landscape", VIEWPORTS["mobile-landscape"]], ["notebook", VIEWPORTS.notebook]]) {
   test(`o rótulo CORREDOR é legível e fica dentro da faixa do corredor em ${nome}`, async ({ page, context }) => {
     await abrirPlanta(page, context, tamanho);

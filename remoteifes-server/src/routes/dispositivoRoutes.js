@@ -115,7 +115,8 @@ router.post("/dispositivo/heartbeat", autenticarDispositivo, (req, res) => {
   }
 
   try {
-    // "ligado" é aceito por compatibilidade, mas é só o eco do último comando: não altera a intenção.
+    // "ligado" is accepted for compatibility, but it only echoes the last command: it does not
+    // change intent.
     const estadoReportado = {};
     if (temperatura !== undefined) estadoReportado.temperatura = temperatura;
 

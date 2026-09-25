@@ -3,16 +3,16 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-// Assinatura do manifesto de release.
+// Release manifest signing.
 //
-// Produz `manifesto.json` (bytes exatos) e `manifesto.json.sig` (Ed25519, base64). A assinatura
-// cobre os **bytes do arquivo**, não um objeto reserializado: qualquer reformatação depois de
-// assinar invalida a assinatura, que é exatamente o que se quer.
+// Produces `manifesto.json` (exact bytes) and `manifesto.json.sig` (Ed25519, base64). The signature
+// covers the **file bytes**, not a reserialized object: any reformatting after signing invalidates
+// the signature, which is intended.
 //
-// A chave privada nunca é lida de argumento de linha de comando — só de arquivo ou da variável
-// CONSOLE_CHAVE_PRIVADA. Argumento de processo aparece em `ps` e em logs de CI.
+// The private key is never read from a command-line argument, only from a file or the
+// CONSOLE_CHAVE_PRIVADA variable. Process arguments appear in `ps` and in CI logs.
 //
-// Uso:
+// Usage:
 //   node empacotar/assinar-manifesto.js --gerar-chave <dir>
 //   node empacotar/assinar-manifesto.js --manifesto <arquivo> --chave <arquivo-privado>
 //   node empacotar/assinar-manifesto.js --verificar <manifesto> <assinatura> <chave-publica>
@@ -55,8 +55,8 @@ function assinar() {
     return 2;
   }
   const bytes = fs.readFileSync(caminho);
-  // Conferência de forma antes de assinar: assinar um manifesto inválido só adiaria a falha
-  // para o console do operador.
+  // Shape check before signing: signing an invalid manifest would only defer the failure to the
+  // operator's Console.
   const manifesto = JSON.parse(bytes.toString("utf8"));
   for (const campo of ["esquema", "versao", "expiraEm", "artefatos"]) {
     if (manifesto[campo] === undefined) {

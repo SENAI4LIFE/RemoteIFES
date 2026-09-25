@@ -96,14 +96,15 @@ function estadoPublico(sala) {
   };
 }
 
-// Há um socket de comandos aberto para a sala (só o estado em memória: "online" por heartbeat HTTP
-// não basta para entregar um comando).
+// A command socket is open for the room (in-memory state only: "online" through an HTTP heartbeat
+// is not enough to deliver a command).
 function canalDeComandos(sala) {
   const entrada = conexoes.get(sala);
   return !!entrada && entrada.ws.readyState === entrada.ws.OPEN;
 }
 
-// true/false: a placa conectada já reportou (ou não) o estado desejado vigente; null: sem placa ou sem IR.
+// true/false: the connected board has (or has not) reported the current desired state; null: no
+// board or no IR.
 function estadoConfirmado(salaRow, entrada = conexoes.get(salaRow?.sala)) {
   if (!salaRow || !entrada || !Number.isInteger(salaRow.irProtocolo)) return null;
   return entrada.versaoConfirmada === salaRow.estadoVersao;
@@ -179,10 +180,10 @@ function enviarComando(sala, payload) {
   return true;
 }
 
-// Um teste IR administrativo (send_raw, send_known_state sem versão) muda o estado do aparelho sem
-// passar pela intenção: a versão que a placa vier a ecoar deixa de provar que ela está no estado
-// desejado, até uma intenção mais nova ser enviada. O firmware ≤ 4.3.0 continua ecoando a última
-// versão recebida depois de um teste, por isso a invalidação fica no servidor.
+// An administrative IR test (send_raw, send_known_state without version) changes the appliance
+// state without going through intent: a version the board echoes afterwards no longer proves it is
+// in the desired state until newer intent is sent. Firmware <= 4.3.0 keeps echoing the last
+// received version after a test, so the invalidation lives on the server.
 function enviarTesteIR(sala, payload) {
   if (!enviarComando(sala, payload)) return false;
   const entrada = conexoes.get(sala);
@@ -258,7 +259,8 @@ function atualizarFailsafeReportado(entrada, msg) {
   return true;
 }
 
-// Firmware sem eco de versão (≤ 4.2.0): o último comando IR relatado bate com a intenção vigente.
+// Firmware without version echo (<= 4.2.0): the last reported IR command matches the current
+// intent.
 function relatoCondizComIntencao(salaRow, ultimoComando) {
   if (!ultimoComando || typeof ultimoComando !== "object" || ultimoComando.tipo !== "known_state") return false;
   return ultimoComando.protocol === salaRow.irProtocolo
@@ -267,12 +269,13 @@ function relatoCondizComIntencao(salaRow, ultimoComando) {
     && !!ultimoComando.turbo === !!salaRow.turboAtivo;
 }
 
-// Reconcilia um relato da placa (info, telemetria ou failsafe_status) com a intenção persistida.
-// Um relato só influencia a intenção quando comprovadamente reflete a versão vigente dela: pela
-// versão ecoada (firmware ≥ 4.3.0) ou, sem eco, quando esta conexão já confirmou a versão vigente
-// (a ordem das mensagens no socket garante que o relato é posterior). A trava do OFF local reportada
-// no info da conexão é adotada sempre, como antes, salvo quando um comando explícito já saiu nesta
-// conexão antes dele (ver sincronizarEstadoInicial). Devolve true quando a confirmação mudou.
+// Reconciles a board report (info, telemetry or failsafe_status) with the persisted intent. A
+// report only affects intent when it provably reflects the current version: through the echoed
+// version (firmware >= 4.3.0) or, without echo, when this connection has already confirmed the
+// current version (message order on the socket guarantees the report is later). The local OFF latch
+// reported in the connection's info is always adopted, as before, unless an explicit command
+// already left on this connection before it (see sincronizarEstadoInicial). Returns true when
+// confirmation changed.
 function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
   let salaRow = salasService.buscar(sala);
   if (!salaRow) return false;
@@ -306,9 +309,10 @@ function sincronizarEstadoInicial(sala, entrada, info) {
   }
   if (entrada.estadoInicialSincronizado || conexoes.get(sala) !== entrada || entrada.ws.readyState !== entrada.ws.OPEN) return;
   entrada.estadoInicialSincronizado = true;
-  // Um comando explícito já saiu nesta conexão antes do info (ou da espera): o info descreve a placa
-  // de antes desse comando, então não pode adotar uma trava nem apagar a intenção mais nova, e a
-  // restauração seria redundante — a intenção vigente já foi enviada com a sua versão.
+  // An explicit command already left on this connection before the info (or the wait): the info
+  // describes the board before that command, so it must not adopt a latch or erase the newer
+  // intent, and restoration would be redundant because the current intent was already sent with its
+  // version.
   if (entrada.versaoEnviada !== null) {
     if (info && reconciliarRelato(sala, entrada, info)) salasService.eventos.emit("mudanca-sala", { sala });
     return;
@@ -317,8 +321,8 @@ function sincronizarEstadoInicial(sala, entrada, info) {
     reconciliarRelato(sala, entrada, info, { inicial: true });
     if (info.failsafeLatched === true) return;
   }
-  // A restauração automática é marcada para que o firmware não a trate como comando explícito
-  // (uma placa travada em OFF local a ignora e responde com failsafe_status).
+  // Automatic restoration is flagged so the firmware does not treat it as an explicit command (a
+  // board latched in local OFF ignores it and answers with failsafe_status).
   const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
   if (comandoInicial) {
     try {
@@ -484,8 +488,8 @@ function iniciar(server) {
     } catch (erro) {
       logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
     }
-    // setImmediate: depois de uma pausa longa do event loop, um info já recebido no socket é
-    // processado (fase de I/O) antes desta sincronização por tempo esgotado.
+    // setImmediate: after a long event-loop pause, an info already received on the socket is
+    // processed (I/O phase) before this timeout-driven synchronization.
     entrada.sincronizacaoInicial = setTimeout(() => setImmediate(() => sincronizarEstadoInicial(sala, entrada, null)), ESPERA_INFO_INICIAL_MS);
     entrada.sincronizacaoInicial.unref();
     if (viaCredencial) {

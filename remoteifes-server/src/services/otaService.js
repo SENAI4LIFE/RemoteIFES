@@ -180,8 +180,8 @@ function publicarFirmware({ origem, versao, notas } = {}) {
   fs.copyFileSync(origem, temporario);
   fs.chmodSync(temporario, 0o600);
   const sha256 = sha256Arquivo(temporario);
-  // Uma oferta em andamento tem de continuar baixando exatamente o que lhe foi ofertado: o mesmo
-  // nome de versão com outros bytes sobrescreveria o artefato dela.
+  // An offer in progress must keep downloading exactly what it was offered: the same version name
+  // with different bytes would overwrite its artifact.
   const emVoo = artefatosReferenciados().get(nomeBin);
   if (emVoo && emVoo !== sha256) {
     fs.rmSync(temporario, { force: true });
@@ -207,7 +207,7 @@ function publicarFirmware({ origem, versao, notas } = {}) {
   return manifesto;
 }
 
-// Artefatos que ofertas ainda em transferência esperam encontrar no disco (nome → sha256).
+// Artifacts that offers still transferring expect to find on disk (name -> sha256).
 function artefatosReferenciados() {
   const referencias = new Map();
   estados.forEach((estado) => {
@@ -218,8 +218,8 @@ function artefatosReferenciados() {
   return referencias;
 }
 
-// Mantém no disco só o binário publicado e os que ainda estão sendo baixados por uma oferta ativa;
-// o conjunto é limitado pelo teto de atualizações simultâneas e pelo prazo de transferência.
+// Keeps on disk only the published binary and those still being downloaded by an active offer; the
+// set is bounded by the concurrent update cap and the transfer deadline.
 function limparArtefatosObsoletos(nomePublicado) {
   let publicado = nomePublicado;
   if (!publicado) {
@@ -246,9 +246,9 @@ function limparArtefatosObsoletos(nomePublicado) {
   }
 }
 
-// O que a sala deve baixar: o artefato da sua oferta em andamento (mesmo que outro firmware tenha
-// sido publicado depois) ou, sem oferta ativa, o firmware publicado. `indisponivel` sinaliza uma
-// oferta cujo artefato não está mais íntegro no disco.
+// What the room must download: the artifact of its offer in progress (even if other firmware was
+// published afterwards) or, without an active offer, the published firmware. `indisponivel` flags
+// an offer whose artifact is no longer intact on disk.
 function artefatoParaDownload(sala) {
   const estado = estados.get(sala);
   if (estado && (estado.fase === "ofertado" || estado.fase === "baixando") && typeof estado.versao === "string" && typeof estado.sha256 === "string") {

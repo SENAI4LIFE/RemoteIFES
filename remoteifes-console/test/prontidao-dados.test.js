@@ -6,9 +6,9 @@ const http = require("http");
 const { execFileSync, spawn } = require("child_process");
 
 /**
- * Roda um runner do console sem bloquear o laço de eventos. `execFileSync` travaria o processo
- * de teste e, com ele, a aplicação falsa — o runner veria um /health mudo por artefato do
- * harness, e não porque a aplicação parou de verdade.
+ * Runs a Console runner without blocking the event loop. `execFileSync` would freeze the test
+ * process and the fake application with it, and the runner would see a silent /health as a harness
+ * artifact rather than because the application actually stopped.
  */
 function rodarRunner(script, args, env) {
   return new Promise((resolve) => {
@@ -24,7 +24,7 @@ function rodarRunner(script, args, env) {
 }
 const ajuda = require("./ajuda");
 
-// Avaliação de impacto antes de interromper, e segurança da restauração de banco.
+// Impact assessment before interrupting, and database restore safety.
 
 function checkoutComDados({ porta }) {
   const raiz = ajuda.dirTemporario("console-dados-");
@@ -34,9 +34,9 @@ function checkoutComDados({ porta }) {
   fs.writeFileSync(path.join(servidor, ".env"), `PORTA=${porta}
 `);
 
-  // O runner de restauração reusa o backupService real do checkout, de propósito: é ele que
-  // garante snapshot consistente, integrity_check, cópia pré-restauração e rollback. O checkout
-  // de teste recebe exatamente esses arquivos, sem o resto do servidor.
+  // The restore runner reuses the checkout's real backupService on purpose: it guarantees a
+  // consistent snapshot, integrity_check, pre-restore copy and rollback. The test checkout receives
+  // exactly those files, without the rest of the server.
   const origem = path.join(ajuda.RAIZ, "..", "remoteifes-server");
   for (const relativo of [
     ["src", "config", "paths.js"],
@@ -50,7 +50,9 @@ function checkoutComDados({ porta }) {
   return raiz;
 }
 
-/** Aplicação falsa: responde /health e /manutencao/prontidao como a real. */
+/**
+ * Fake application: answers /health and /manutencao/prontidao like the real one.
+ */
 function aplicacaoFalsa(prontidao, { saudavel = true } = {}) {
   let token = null;
   const servidor = http.createServer((req, res) => {
@@ -102,7 +104,8 @@ test("o segredo do contrato de prontidão é criado com permissão restrita", as
   const arquivo = amb.prontidao.caminhoTokenProntidao();
   assert.ok(fs.existsSync(arquivo));
   assert.ok(!path.resolve(arquivo).includes("remoteifes-console"), "o segredo fica no data/ da aplicação, que é quem o lê");
-  // Chamar de novo não troca o segredo (trocar invalidaria a leitura da aplicação em voo).
+  // Calling again does not change the secret (changing it would invalidate the application's
+  // in-flight read).
   assert.equal(amb.prontidao.garantirTokenProntidao(), token);
 });
 
@@ -127,8 +130,8 @@ test("aplicação sem o contrato de prontidão gera 'desconhecido', nunca zero",
 test("OTA na fase validando bloqueia a interrupção", async (t) => {
   const app = await aplicacaoFalsa({
     dispositivos: { conectados: 3, canaisDeComando: 2, salas: [] },
-    // `validando` é exatamente a fase que monitoramentoService deixa de fora ao contar
-    // otaEmAndamento; aqui ela precisa contar.
+    // `validando` is exactly the phase monitoramentoService leaves out when counting
+    // otaEmAndamento; here it must count.
     ota: { ativos: 1, porFase: { ofertado: 0, baixando: 0, gravado: 0, reiniciando: 0, validando: 1 }, salas: ["A-101"] },
     rollout: null,
   });
@@ -171,9 +174,9 @@ test("rollout pausado com pendências vira aviso; ativo vira bloqueio", async (t
 });
 
 test("rollout pausado com dispositivo ainda em voo bloqueia, não apenas avisa", async (t) => {
-  // Pausar o rollout não recolhe quem já está gravando: um ESP32 em "atualizando",
-  // "reiniciando" ou "validando" continua em voo. Reiniciar o serviço nesse instante é o
-  // caminho para um dispositivo que não volta, então isso bloqueia.
+  // Pausing the rollout does not recall devices already writing: an ESP32 in "atualizando",
+  // "reiniciando" or "validando" stays in flight. Restarting the service at that instant risks a
+  // device that does not come back, so this blocks.
   const pausado = await aplicacaoFalsa({
     dispositivos: { conectados: 0, canaisDeComando: 0, salas: [] },
     ota: { ativos: 0, porFase: {}, salas: [] },
@@ -253,7 +256,7 @@ test("sessões de usuário são descritas como atividade recente, não contagem 
   assert.match(sessoes.detalhe, /desconhecid|não a contagem exata/i);
 });
 
-// --- Backup e restauração -------------------------------------------------------------------
+// --- Backup and restore -------------------------------------------------------------------
 
 function criarBancoDeTeste(caminho, { usuarios = 1 } = {}) {
   const { DatabaseSync } = require("node:sqlite");
@@ -355,8 +358,8 @@ test("a restauração exige quiescência: com a aplicação no ar ela não insta
 
   assert.equal(codigo, 1, `sem conseguir parar a aplicação, a restauração tem de falhar. Saída:
 ${saida}`);
-  // Sem controle de ciclo de vida nesta plataforma e com a aplicação respondendo, a restauração
-  // recusa em vez de presumir que o silêncio do /health prova ausência de escritor.
+  // Without lifecycle control on this platform and with the application answering, restore refuses
+  // instead of assuming that /health silence proves there is no writer.
   assert.match(saida, /continua respondendo e o console não tem como pará-la/);
   assert.ok(!/Instalando o backup/.test(saida), "nada pode ser instalado sem quiescência comprovada");
   assert.deepEqual(fs.readFileSync(banco), antes, "o banco atual não pode ser tocado quando a quiescência falha");
@@ -373,17 +376,17 @@ test("observar o banco não cria nem altera arquivo no diretório de dados", (t)
 
   const dados = path.join(checkout, "remoteifes-server", "data");
 
-  // Sem banco: observar não pode criá-lo.
+  // No database: observing must not create it.
   const semBanco = amb.coleta.espiarBanco();
   assert.equal(semBanco.existe, false);
   assert.ok(!fs.existsSync(path.join(dados, "remoteifes.db")), "observar não pode criar o banco");
 
   criarBancoDeTeste(path.join(dados, "remoteifes.db"), { usuarios: 3 });
-  // O criador fechou a conexão; -shm e -wal não ficam para trás.
+  // The creator closed the connection; -shm and -wal are not left behind.
   const antes = fs.readdirSync(dados).sort();
 
-  // Com a aplicação parada (padrão), a leitura de conteúdo é recusada de propósito: abrir um
-  // banco WAL criaria -shm/-wal a partir de um processo que só deveria observar.
+  // With the application stopped (default), content reads are refused on purpose: opening a WAL
+  // database would create -shm/-wal from a process that should only observe.
   const espiada = amb.coleta.espiarBanco();
   assert.equal(espiada.existe, true);
   assert.equal(espiada.lido, false);
@@ -391,7 +394,8 @@ test("observar o banco não cria nem altera arquivo no diretório de dados", (t)
   assert.equal(espiada.bytes > 0, true, "os metadados do arquivo continuam disponíveis");
   assert.deepEqual(fs.readdirSync(dados).sort(), antes, "nenhum arquivo novo pode aparecer");
 
-  // Com a aplicação no ar o console lê o conteúdo: aí o banco já está aberto por outro processo.
+  // With the application running the Console reads content: the database is already open by another
+  // process.
   const comPermissao = amb.coleta.espiarBanco({ permitirLeitura: true });
   assert.equal(comPermissao.lido, true);
   assert.equal(comPermissao.usuarios, 3);

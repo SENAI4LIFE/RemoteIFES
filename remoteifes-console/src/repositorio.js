@@ -5,16 +5,16 @@ const estado = require("./estado");
 const processos = require("./processos");
 const coleta = require("./coleta");
 
-// Observação do repositório. O ponto central é nunca confundir cinco coisas diferentes:
+// Repository observation. The central point is never to confuse five different things:
 //
-//   1. commit do processo em execução      -> /health (release.js captura na partida)
-//   2. HEAD do checkout + sujeira           -> git no diretório de trabalho
-//   3. ramo local e seu upstream            -> git
-//   4. último origin/main observado         -> memória persistida, com hora da observação
-//   5. última implantação verificada        -> data/deploy.log e current-version
+//   1. commit of the running process       -> /health (release.js captures it at start)
+//   2. checkout HEAD + dirtiness            -> git in the working directory
+//   3. local branch and its upstream        -> git
+//   4. last observed origin/main            -> persisted memory, with observation time
+//   5. last verified deployment             -> data/deploy.log and current-version
 //
-// Um deploy interrompido, um `git pull` manual ou um `deploy.sh --no-restart` deixam (1) e (2)
-// diferentes. Mostrar "versão" como um número só é a origem de meia dúzia de enganos.
+// An interrupted deploy, a manual `git pull` or a `deploy.sh --no-restart` leave (1) and (2)
+// different. Showing "version" as a single number is the source of many mistakes.
 
 const RE_COMMIT = /^[0-9a-f]{40}$/;
 
@@ -79,7 +79,7 @@ async function estadoLocal() {
   };
 }
 
-// --- Observação do remoto -----------------------------------------------------------------
+// --- Remote observation -----------------------------------------------------------------
 
 function lerObservacao() {
   return estado.lerJson(config.ARQUIVO_OBSERVACAO_REMOTA, null);
@@ -107,8 +107,8 @@ function classificarFalhaDeRede(saida) {
 }
 
 /**
- * Consulta o remoto sem alterar o checkout. Usa `git ls-remote`, que não escreve refs nem
- * objetos: consultar não pode ser um efeito colateral.
+ * Queries the remote without changing the checkout. Uses `git ls-remote`, which writes no refs or
+ * objects: querying must not have side effects.
  */
 async function consultarRemoto({ ref = "refs/heads/main", timeoutMs = 20_000 } = {}) {
   const local = await estadoLocal();
@@ -143,8 +143,8 @@ async function consultarRemoto({ ref = "refs/heads/main", timeoutMs = 20_000 } =
 }
 
 /**
- * Posição do checkout em relação ao alvo remoto, usando só objetos locais. Um commit remoto
- * que o checkout nunca buscou não pode ser comparado: isso é dito, não adivinhado.
+ * Checkout position relative to the remote target, using only local objects. A remote commit the
+ * checkout never fetched cannot be compared: this is stated, not guessed.
  */
 async function compararCom(commitAlvo) {
   if (!RE_COMMIT.test(String(commitAlvo || ""))) return { conhecido: false, motivo: "commit alvo inválido" };
@@ -173,7 +173,7 @@ async function compararCom(commitAlvo) {
   };
 }
 
-// --- Resumo de mudanças por componente ------------------------------------------------------
+// --- Change summary per component ------------------------------------------------------
 
 const COMPONENTES = [
   { chave: "servidor", rotulo: "Servidor (API e banco)", teste: (f) => f.startsWith("remoteifes-server/") && !f.startsWith("remoteifes-server/test/") },
@@ -199,7 +199,7 @@ function classificarArquivos(arquivos) {
 }
 
 /**
- * Resumo limitado do que muda entre a versão em execução e o alvo.
+ * Bounded summary of what changes between the running version and the target.
  */
 async function resumoDeMudancas(de, para, { maxCommits = 30 } = {}) {
   if (!RE_COMMIT.test(String(de || "")) || !RE_COMMIT.test(String(para || ""))) {
@@ -231,7 +231,7 @@ async function resumoDeMudancas(de, para, { maxCommits = 30 } = {}) {
   };
 }
 
-// --- Visão consolidada -----------------------------------------------------------------------
+// --- Consolidated view -----------------------------------------------------------------------
 
 async function situacaoDeAtualizacao({ consultarRede = false } = {}) {
   const [local, saude] = await Promise.all([estadoLocal(), coleta.consultarSaude()]);
@@ -249,7 +249,7 @@ async function situacaoDeAtualizacao({ consultarRede = false } = {}) {
   const idadeObservacaoS = observacao ? Math.round((Date.now() - Date.parse(observacao.observadoEm)) / 1000) : null;
   const comparacao = observacao ? await compararCom(observacao.commit) : null;
 
-  // O processo em execução é a única fonte do que está realmente no ar. HEAD do checkout não é.
+  // The running process is the only source of what is actually live. The checkout HEAD is not.
   const commitEmExecucao = saude.respondeu ? saude.commit : null;
   const divergenciaProcessoCheckout =
     commitEmExecucao && local.head && commitEmExecucao !== local.head

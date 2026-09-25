@@ -390,9 +390,9 @@ for (const tamanhoNome of PAINEL_DUAS_COLUNAS) {
   });
 }
 
-// O letter-spacing da acessibilidade também é aplicado depois do último glifo: um rótulo
-// centrado pela caixa de texto fica meio espaço à esquerda do que se vê. O centro dos glifos
-// de "Power" deve coincidir com o centro do círculo em qualquer layout e ajuste de texto.
+// Accessibility letter-spacing is also applied after the last glyph: a label centered by its text
+// box sits half a spacing left of what is seen. The center of the "Power" glyphs must match the
+// center of the circle in every layout and text setting.
 const LAYOUTS_POWER = ["mobile-portrait", "mobile-landscape", "tablet-compact", "notebook", "desktop"];
 
 for (const [ajusteNome, a11yMaximo] of [["ajuste padrão", false], ["texto máximo", true]]) {
@@ -409,7 +409,7 @@ for (const [ajusteNome, a11yMaximo] of [["ajuste padrão", false], ["texto máxi
         const faixa = document.createRange();
         faixa.selectNodeContents(rotulo);
         const texto = faixa.getBoundingClientRect();
-        // A caixa do texto inclui o espaço que o navegador põe depois do último glifo.
+        // The text box includes the space the browser adds after the last glyph.
         const espaco = parseFloat(getComputedStyle(rotulo).letterSpacing) || 0;
         return {
           circulo: (circulo.left + circulo.right) / 2,

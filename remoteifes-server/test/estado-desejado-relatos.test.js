@@ -49,7 +49,7 @@ async function conectar(codigo, mac) {
     mensagens,
     enviar: (m) => ws.send(JSON.stringify(m)),
     estados: () => mensagens.filter((m) => m.tipo === "send_known_state"),
-    // Espera o close do lado do servidor (entrada removida), não só o socket em CLOSING.
+    // Waits for the server-side close (entry removed), not only for the socket in CLOSING.
     fechar: async () => { ws.close(); await ate(() => !deviceHub.estadoPublico(codigo).conectado); },
   };
 }

@@ -3,14 +3,13 @@ const os = require("os");
 const path = require("path");
 const http = require("http");
 
-// Apoio aos testes: estado isolado por teste, módulos recarregados e um cliente HTTP pequeno.
-// Nada aqui toca no estado real do console nem no banco da aplicação.
+// Test support: isolated state per test, reloaded modules and a small HTTP client. Nothing here
+// touches the real Console state or the application database.
 
 const RAIZ = path.join(__dirname, "..");
 
-// Módulos expostos por conveniência em `ambiente()`. A limpeza de cache, porém, varre **todo**
-// o src/: uma lista fixa deixava módulos novos presos à configuração do primeiro teste que os
-// carregou, e o vazamento só aparecia como falha aparentemente aleatória num teste posterior.
+// Modules exposed for convenience in `ambiente()`. Cache clearing sweeps **all** of src/: a fixed
+// list would leave new modules bound to the configuration of the first test that loaded them.
 const MODULOS = ["config", "estado", "auth", "processos", "execucao", "trava", "coleta", "acoes", "prontidao", "repositorio", "servidor", "rede", "mobile", "github", "terminal", "plataforma", "release", "atualizador", "implantacao", "identidade"];
 
 function arquivosDoConsole() {
@@ -43,8 +42,8 @@ function dirTemporario(prefixo = "console-teste-") {
 }
 
 /**
- * Prepara um ambiente isolado e devolve os módulos recém-carregados. `config.js` lê o ambiente
- * no require, então as variáveis precisam estar postas antes de recarregar.
+ * Prepares an isolated environment and returns freshly loaded modules. `config.js` reads the
+ * environment on require, so variables must be set before reloading.
  */
 function ambiente(opcoes = {}) {
   const estadoDir = opcoes.estadoDir || dirTemporario();
@@ -97,7 +96,9 @@ function ambiente(opcoes = {}) {
   };
 }
 
-/** Sobe o servidor do console numa porta efêmera. */
+/**
+ * Starts the Console server on an ephemeral port.
+ */
 function subir(mods) {
   return new Promise((resolve) => {
     const servidor = mods.servidor.criarServidor();
@@ -118,7 +119,9 @@ function subir(mods) {
   });
 }
 
-/** Cliente HTTP cru: permite forjar Host, Origin, Content-Type e cabeçalho CSRF. */
+/**
+ * Raw HTTP client: allows forging Host, Origin, Content-Type and the CSRF header.
+ */
 function pedir(porta, caminho, opcoes = {}) {
   const corpo = opcoes.corpo === undefined ? null : JSON.stringify(opcoes.corpo);
   const cabecalhos = Object.assign(
@@ -166,7 +169,9 @@ function cookieDe(resposta) {
   return bruto[0].split(";")[0];
 }
 
-/** Cria operador e devolve sessão pronta para uso. */
+/**
+ * Creates an operator and returns a ready-to-use session.
+ */
 async function autenticar(mods, porta, { nome = "operador", senha = "senha-de-teste-12345" } = {}) {
   mods.auth.criarOperador(nome, senha);
   const r = await pedir(porta, "/api/sessao", { metodo: "POST", corpo: { nome, senha }, origem: `http://127.0.0.1:${porta}` });

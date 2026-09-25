@@ -1,14 +1,12 @@
 #!/usr/bin/env node
-// Ciclo de vida da aplicação, portátil.
+// Portable application lifecycle.
 //
-// Substitui `bin/servico.sh`, que dependia de bash e do auxiliar systemd. A sequência continua
-// a mesma e pelo mesmo motivo: parar a aplicação sem desligar o watchdog não é uma parada
-// durável (no Linux ele reinicia em até ~6 min, após 3 falhas do /health em intervalos de
-// 2 min), e iniciar sem religá-lo deixa o host sem recuperação automática. Onde não há
-// watchdog — Windows e macOS —, o passo é declarado "não aplicável" em vez de silenciosamente
-// pulado.
+// Stopping the application without disabling the watchdog is not a durable stop (on Linux it
+// restarts within ~6 min, after 3 /health failures at 2 min intervals), and starting without
+// re-enabling it leaves the host without automatic recovery. Where there is no watchdog (Windows
+// and macOS) the step is reported as "not applicable" instead of silently skipped.
 //
-// Uso: node bin/servico.js {reiniciar|parar|iniciar|reiniciar-host}
+// Usage: node bin/servico.js {reiniciar|parar|iniciar|reiniciar-host}
 
 const path = require("path");
 

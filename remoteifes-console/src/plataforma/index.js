@@ -1,11 +1,10 @@
 const base = require("./base");
 
-// Seleção do adaptador de plataforma. Um único ponto de escolha; o resto do console fala com
-// a interface, nunca com `process.platform`.
+// Platform adapter selection. A single choice point; the rest of the Console talks to the
+// interface, never to `process.platform`.
 //
-// CONSOLE_PLATAFORMA força um adaptador nos testes — é o que permite exercitar o caminho do
-// Windows e do macOS a partir de qualquer máquina, sem fingir que isso substitui execução real
-// naqueles sistemas.
+// CONSOLE_PLATAFORMA forces an adapter in tests, which exercises the Windows and macOS paths from
+// any machine without pretending it replaces real execution on those systems.
 
 function escolher() {
   const forcada = (process.env.CONSOLE_PLATAFORMA || "").trim().toLowerCase();
@@ -27,8 +26,8 @@ function escolher() {
 const adaptador = escolher();
 
 /**
- * Retrato das capacidades desta plataforma. Serve à interface (para desabilitar com motivo) e
- * ao backend (que recusa de verdade — botão desabilitado não é controle de acesso).
+ * Snapshot of this platform's capabilities. Serves the interface (to disable with a reason) and the
+ * backend (which actually refuses: a disabled button is not access control).
  */
 async function capacidades() {
   const [servico, watchdog, registros, inicializacao, arquitetura, ferramentas] = await Promise.all([

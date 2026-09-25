@@ -105,8 +105,8 @@ app.get("/health", (req, res) => {
 
 app.use(require("./routes/dispositivoRoutes"));
 
-// Prontidão para o Console de Operações: loopback + segredo compartilhado, antes da
-// restrição de rede porque não é acesso de usuário. Sem o arquivo de segredo responde 404.
+// Operations Console readiness: loopback plus shared secret, mounted before the network restriction
+// because it is not user access. Without the secret file it answers 404.
 app.use(require("./routes/prontidaoRoutes"));
 
 if (frontendDisponivel) {
@@ -153,8 +153,9 @@ app.use((err, req, res, next) => {
   if (err && err.message === "origem não permitida pelo CORS") {
     return res.status(403).json({ ok: false, erro: "origem não permitida" });
   }
-  // Demais erros do parser de corpo (charset/encoding não suportados, corpo abortado) já vêm com
-  // status 4xx: são erros do cliente e não merecem 500 nem log de erro interno.
+  // Other body-parser errors (unsupported charset/encoding, aborted body) already carry a 4xx
+  // status:
+  // they are client errors and warrant neither a 500 nor an internal error log.
   if (err && typeof err.type === "string" && Number.isInteger(err.status) && err.status >= 400 && err.status < 500) {
     return res.status(err.status).json({ ok: false, erro: "requisição inválida" });
   }

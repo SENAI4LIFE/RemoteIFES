@@ -49,7 +49,7 @@ function notificacoesOffline(sala) {
   return db.prepare(`SELECT COUNT(*) n FROM notificacoes WHERE tipo = 'esp32_offline' AND sala = ?`).get(sala).n;
 }
 
-// Espera a sala sair do ar, medindo quanto tempo a transição autoritativa levou.
+// Waits for the room to go offline, measuring how long the authoritative transition took.
 async function esperarOffline(sala, limiteMs) {
   const inicio = Date.now();
   while (Date.now() - inicio < limiteMs) {
@@ -113,7 +113,7 @@ test("perda silenciosa cai pelo timeout de heartbeat e produz uma única transi�
   await aoAbrir(ws);
   await new Promise((r) => setTimeout(r, 50));
 
-  // Simula um aparelho que sumiu sem fechar: o socket segue aberto, mas nada mais chega.
+  // Simulates a device that vanished without closing: the socket stays open but nothing arrives.
   db.prepare(`UPDATE salas SET ultimoHeartbeat = datetime('now', '-10 minutes') WHERE sala = ?`).run("OFF-3");
   salasService.verificarTimeouts();
 
@@ -121,7 +121,7 @@ test("perda silenciosa cai pelo timeout de heartbeat e produz uma única transi�
   assert.deepEqual(eventos("OFF-3"), ["online", "offline"]);
   assert.equal(notificacoesOffline("OFF-3"), 1);
 
-  // Uma segunda varredura não pode repetir evento nem notificação.
+  // A second sweep must not repeat the event or the notification.
   salasService.verificarTimeouts();
   assert.deepEqual(eventos("OFF-3"), ["online", "offline"]);
   assert.equal(notificacoesOffline("OFF-3"), 1);
@@ -229,7 +229,7 @@ test("a estimativa de energia não existe mais: sem rota, sem serviço e sem con
   assert.throws(() => require("../src/services/energiaService"), /Cannot find module/);
   assert.ok(!Object.keys(configuracoesService.PADROES).some((c) => /energia/i.test(c)));
 
-  // Monitoramento, que é independente, continua respondendo.
+  // Monitoring, which is independent, keeps answering.
   const monitoramento = await fetch(`${baseUrl}/admin/monitoramento`, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(monitoramento.status, 200);
   const corpo = await monitoramento.json();

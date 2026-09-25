@@ -1,8 +1,9 @@
-/* Console de Operações RemoteIFES — interface.
+/*
+ * RemoteIFES Operations Console: interface.
  *
- * Regra de renderização: nada vindo do servidor, do Git, do journal ou do sistema de arquivos
- * entra por innerHTML. Tudo é inserido com textContent ou por nós criados aqui. Mensagem de
- * commit, nome de arquivo e linha de log são conteúdo hostil por definição.
+ * Rendering rule: nothing from the server, Git, the journal or the file system goes through
+ * innerHTML. Everything is inserted with textContent or through nodes created here. Commit
+ * messages, file names and log lines are hostile content by definition.
  */
 (function () {
   "use strict";
@@ -129,8 +130,8 @@
   }
 
   /**
-   * O atalho para o RemoteIFES sai do endereço que a aplicação realmente publica, não de uma
-   * porta presumida. Abre em outra aba: o console não enquadra a aplicação nem é enquadrado.
+   * The link to RemoteIFES uses the address the application actually publishes, not an assumed
+   * port. It opens in another tab: the Console neither frames the application nor is framed.
    */
   function mostrarLinkDaAplicacao() {
     api("/api/programa").then(function (r) {
@@ -198,7 +199,7 @@
     var atencao = $("visaoAtencao");
     limpar(atencao);
 
-    // Problemas primeiro: o operador abre o console porque algo pode estar errado.
+    // Problems first: the operator opens the Console because something may be wrong.
     if (p.manutencao && p.manutencao.ocupada) {
       aviso(atencao, "info", "Manutenção em andamento", p.manutencao.descricao);
     } else if (p.manutencao && p.manutencao.residuo) {
@@ -278,7 +279,7 @@
     faixa.appendChild(caixa);
   }
 
-  // --- ações ----------------------------------------------------------------------------------
+  // --- actions ----------------------------------------------------------------------------------
 
   var ACOES = [];
 
@@ -421,7 +422,7 @@
     });
   }
 
-  // --- elevação ---------------------------------------------------------------------------------
+  // --- elevation ---------------------------------------------------------------------------------
 
   function pedirElevacao(aoConseguir) {
     var dlg = $("dlgElevacao");
@@ -551,7 +552,8 @@
     });
   }
 
-  // --- serviço -------------------------------------------------------------------------------------
+  // --- service
+  // -------------------------------------------------------------------------------------
 
   function carregarServico() {
     if (estadoApp.painel) renderServico(estadoApp.painel);
@@ -589,12 +591,12 @@
     var saida = $("logSaida");
     saida.textContent = "carregando…";
     api("/api/logs?unidade=" + encodeURIComponent($("logUnidade").value) + "&linhas=" + encodeURIComponent($("logLinhas").value)).then(function (r) {
-      // textContent: uma linha de journal é conteúdo não confiável e pode conter qualquer coisa.
+      // textContent: a journal line is untrusted content and may contain anything.
       saida.textContent = r.ok && r.corpo.ok ? (r.corpo.texto || "(sem linhas)") : (r.corpo.erro || "não foi possível ler o registro");
     });
   }
 
-  // --- atualizações -----------------------------------------------------------------------------------
+  // --- updates -----------------------------------------------------------------------------------
 
   function carregarAtualizacao(consultando) {
     return api("/api/atualizacao").then(function (r) {
@@ -743,7 +745,7 @@
       m.commits.forEach(function (c) {
         var tr = document.createElement("tr");
         tr.appendChild(el("td", c.curto, "mono"));
-        // Assunto de commit é texto de terceiros: textContent, nunca innerHTML.
+        // Commit subjects are third-party text: textContent, never innerHTML.
         tr.appendChild(el("td", c.assunto));
         tr.appendChild(el("td", c.autor, "fraco"));
         tb.appendChild(tr);
@@ -1010,7 +1012,8 @@
     });
   }
 
-  // --- avançado ---------------------------------------------------------------------------------------
+  // --- advanced
+  // ---------------------------------------------------------------------------------------
 
   function carregarAvancado() {
     var s = $("avancadoSessao");
@@ -1038,8 +1041,9 @@
 
     var acoes = $("avancadoAcoes");
     limpar(acoes);
-    // A atualização e a reversão do próprio console vivem na aba Programa, onde a versão alvo
-    // está à vista: a ação exige a versão publicada, e um botão sem ela só produziria recusa.
+    // Updating and rolling back the Console itself live in the Programa tab, where the target
+    // version is visible: the action requires the published version, and a button without it would
+    // only produce a refusal.
     botaoDeAcao(acoes, "manutencao.remover-trava", function () { return {}; });
     botaoDeAcao(acoes, "host.reiniciar", function () { return {}; }, "perigo");
 
@@ -1101,8 +1105,8 @@
         "a reconciliação limpa o resto na próxima partida.");
     }
     if (p.console.divergenciaDeVersao) {
-      // Reinício pendente é o caminho normal entre ativar e reabrir; só o descompasso persistente
-      // é erro. Gritar nos dois casos ensina o operador a ignorar o aviso.
+      // A pending restart is the normal path between activation and reopening; only a persistent
+      // mismatch is an error. Alarming in both cases teaches the operator to ignore the warning.
       var d = p.console.divergenciaDeVersao;
       if (d.reinicioPendente) {
         aviso(avisos, "info", "Reinício pendente", d.motivo);
@@ -1119,7 +1123,7 @@
       aviso(avisos, "erro", "Node abaixo do exigido", p.plataforma.runtime.motivo || "");
     }
 
-    // --- versão do console ---------------------------------------------------------------
+    // --- Console version ---------------------------------------------------------------
     var dl = $("programaConsole");
     limpar(dl);
     dado(dl, "Versão em execução", p.console.versaoEmExecucao, "mono");
@@ -1190,7 +1194,7 @@
       tbody.appendChild(tr);
     });
 
-    // --- instalação -------------------------------------------------------------------------
+    // --- installation -------------------------------------------------------------------------
     var di = $("programaInstalacao");
     limpar(di);
     dado(di, "Programa", p.instalacao.raiz, "mono");
@@ -1300,7 +1304,8 @@
       if (!r.ok) return;
       if (r.corpo.texto) {
         var tela = $("terminalTela");
-        // A saída do terminal é texto não confiável: entra por textContent e nunca é interpretada.
+        // Terminal output is untrusted text: it goes in through textContent and is never
+        // interpreted.
         tela.textContent += r.corpo.texto;
         tela.scrollTop = tela.scrollHeight;
       }
@@ -1327,7 +1332,8 @@
     setTimeout(function () { if (estadoApp.painel) renderFaixaTrabalho(estadoApp.painel.trabalhoAtivo); }, 8000);
   }
 
-  // --- inicialização ---------------------------------------------------------------------------------------
+  // --- initialization
+  // ---------------------------------------------------------------------------------------
 
   function ligarEventos() {
     AREAS.forEach(function (a) {

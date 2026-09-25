@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Verificação da versão em execução, compartilhada por deploy.sh e rollback.sh (carregada com ".").
-# Espera SYSTEMCTL, ESPERA_SAUDE_TENTATIVAS e ESPERA_SAUDE_INTERVALO definidos pelo chamador.
+# Running-version verification shared by deploy.sh and rollback.sh (sourced with "."). Expects
+# SYSTEMCTL, ESPERA_SAUDE_TENTATIVAS and ESPERA_SAUDE_INTERVALO set by the caller.
 
-# Descrição, para as mensagens, do que o processo em execução informa depois de ler_saude.
+# Description, for messages, of what the running process reports after ler_saude.
 descrever_em_execucao() {
   if [ -n "$VERSAO_EM_EXECUCAO" ]; then
     echo "está em ${VERSAO_EM_EXECUCAO}"
@@ -11,8 +11,9 @@ descrever_em_execucao() {
   fi
 }
 
-# Lê o /health do processo em execução: SAUDE_CORPO recebe o corpo e VERSAO_EM_EXECUCAO o commit que
-# ele informa (vazio se essa versão não o informa). Falha se o /health não responde saudável.
+# Reads the running process's /health: SAUDE_CORPO receives the body and VERSAO_EM_EXECUCAO the
+# commit it reports (empty when that version does not report it). Fails when /health does not answer
+# healthy.
 SAUDE_CORPO=""
 VERSAO_EM_EXECUCAO=""
 ler_saude() {
@@ -22,13 +23,14 @@ ler_saude() {
   return 0
 }
 
-# Segundos de vida do processo reportados pelo último /health lido (vazio se ele não informa).
+# Process uptime in seconds reported by the last /health read (empty when not reported).
 uptime_em_execucao() {
   printf '%s' "$SAUDE_CORPO" | sed -n 's/.*"uptimeSegundos":\([0-9]\{1,\}\).*/\1/p'
 }
 
-# A árvore do commit dado tem o módulo que põe o commit no /health? Uma versão sem ele nunca poderá
-# confirmar a própria identidade; uma versão com ele, se não a informa, é outro processo.
+# Does the given commit's tree contain the module that puts the commit in /health? A version without
+# it can never confirm its own identity; a version with it that does not report it is another
+# process.
 versao_informa_commit() {
   git cat-file -e "${1}:./src/config/release.js" 2>/dev/null
 }
@@ -40,13 +42,13 @@ reiniciar_servico() {
   $SYSTEMCTL restart remoteifes.service || echo "aviso: 'systemctl restart' retornou erro; verificando qual versão está em execução mesmo assim."
 }
 
-# Um /health saudável não basta: um processo antigo que sobreviveu a um 'restart' que falhou responde
-# igual. Só é sucesso quando o processo em execução informa exatamente o commit esperado. Se a versão
-# esperada é anterior ao campo de commit no /health, a identidade não pode ser confirmada; nesse caso
-# só se aceita um processo que comprovadamente subiu depois do reinício (uptimeSegundos menor que o
-# tempo decorrido desde o 'restart'), e o registro diz que a identidade não foi confirmada.
-# Resultado em VERSAO_EM_EXECUCAO, VERSAO_CONFIRMACAO/VERSAO_RESUMO (sucesso: para o registro e para a
-# tela) e VERSAO_MOTIVO (falha). ROTULO_VERSAO nomeia a operação nas mensagens ("a nova versão", "a reversão").
+# A healthy /health is not enough: an old process that survived a failed 'restart' answers the same.
+# Success requires the running process to report exactly the expected commit. When the expected
+# version predates the commit field in /health, identity cannot be confirmed; then only a process
+# that provably started after the restart (uptimeSegundos lower than the time since 'restart') is
+# accepted, and the record states that identity was not confirmed. Result in VERSAO_EM_EXECUCAO,
+# VERSAO_CONFIRMACAO/VERSAO_RESUMO (success: for the record and the screen) and VERSAO_MOTIVO
+# (failure). ROTULO_VERSAO names the operation in messages ("a nova versão", "a reversão").
 aguardar_versao() {
   local esperado="$1" uptime decorrido legado=0
   VERSAO_EM_EXECUCAO=""
