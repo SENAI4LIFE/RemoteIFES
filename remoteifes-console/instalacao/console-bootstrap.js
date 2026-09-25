@@ -8,6 +8,11 @@
 //
 // It is also the safety net: if the active version is broken or missing, it falls back to the
 // previous one and says why, instead of leaving the service unable to start.
+//
+// A version can also fail after it loaded (a crash once listening). For a self-update the updater
+// records a pending activation; this bootstrap counts the starts of that version until the version
+// confirms itself (src/ativacao.js in the payload) and, after LIMITE_PARTIDAS starts without
+// confirmation, points back to the previous version and records why.
 
 const fs = require("fs");
 const path = require("path");
@@ -26,6 +31,48 @@ function lerEstado() {
     return JSON.parse(fs.readFileSync(ARQUIVO_ESTADO, "utf8"));
   } catch {
     return {};
+  }
+}
+
+const LIMITE_PARTIDAS = 2;
+
+function gravarEstado(valor) {
+  const temporario = `${ARQUIVO_ESTADO}.${process.pid}.tmp`;
+  fs.writeFileSync(temporario, `${JSON.stringify(valor, null, 2)}\n`, { mode: 0o644 });
+  fs.renameSync(temporario, ARQUIVO_ESTADO);
+}
+
+/**
+ * Counts one start of a pending (unconfirmed) activation, or reverts it. Only the Console entry
+ * counts: opening the launcher is not a start of the service.
+ */
+function registrarPartida() {
+  if (ALVO !== "console.js") return;
+  const info = lerEstado();
+  const a = info.ativacao;
+  if (!a || a.confirmada || a.versao !== info.versaoAtiva) return;
+  const partidas = Number(a.partidas) || 0;
+  try {
+    if (partidas >= LIMITE_PARTIDAS && versaoUtilizavel(a.anterior)) {
+      gravarEstado({
+        ...info,
+        versaoAtiva: a.anterior,
+        versaoAnterior: a.versao,
+        ativacao: null,
+        reversaoAutomatica: {
+          de: a.versao,
+          para: a.anterior,
+          partidas,
+          em: new Date().toISOString(),
+          motivo: `a versão ${a.versao} iniciou ${partidas} vezes sem confirmar que se mantém no ar`,
+        },
+      });
+      console.error(`[bootstrap] a versão ${a.versao} não se manteve no ar em ${partidas} partidas; voltando para ${a.anterior}.`);
+      return;
+    }
+    gravarEstado({ ...info, ativacao: { ...a, partidas: partidas + 1 } });
+  } catch (erro) {
+    console.error(`[bootstrap] não foi possível registrar a partida da versão ${a.versao}: ${erro.message}`);
   }
 }
 
@@ -78,6 +125,7 @@ function candidatas() {
   return lista;
 }
 
+registrarPartida();
 const disponiveis = candidatas();
 if (!disponiveis.length) {
   console.error(

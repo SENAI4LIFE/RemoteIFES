@@ -1159,6 +1159,17 @@
         aviso(avisos, "erro", "A versão em execução não é a versão ativa", d.motivo);
       }
     }
+    if (p.console.reversaoAutomatica) {
+      var rv = p.console.reversaoAutomatica;
+      aviso(avisos, "erro", "Atualização revertida automaticamente",
+        "A versão " + rv.de + " não se manteve no ar em " + rv.partidas + " partidas seguidas e o console voltou para " + rv.para +
+        " (" + quando(rv.em) + "). Consulte os registros do sistema antes de tentar de novo.");
+    }
+    if (p.console.ativacaoPendente) {
+      aviso(avisos, "info", "Versão nova em observação",
+        "A versão " + p.console.ativacaoPendente.versao + " ainda não confirmou que se mantém no ar. Se ela falhar repetidamente ao iniciar, " +
+        "o console volta sozinho para " + p.console.ativacaoPendente.anterior + ".");
+    }
     if (!p.console.confiancaConfigurada) {
       aviso(avisos, "info", "Atualização por release não configurada",
         "Nenhuma chave pública de publicação foi provisionada neste console, então nenhum release é aceito. " +

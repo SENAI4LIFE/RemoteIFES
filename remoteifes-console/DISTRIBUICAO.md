@@ -129,6 +129,13 @@ Razões:
   e apaga só o que o dpkg não possui (versões de autoatualização, o ponteiro); o estado sai
   apenas no `purge`;
 * reverter é trocar o ponteiro, não reinstalar;
+* uma versão ativada por autoatualização fica pendente até confirmar que se manteve no ar
+  (`src/ativacao.js`, 20 s depois de escutar); a camada estável conta as partidas dela e, após
+  duas sem confirmação, aponta de volta para a anterior e registra `reversaoAutomatica`. É uma
+  verificação limitada, não uma ativação em duas fases: interrupções repetidas antes da
+  confirmação também revertem, e falhas depois dela são só relatadas. Como a camada estável não
+  é reescrita pela autoatualização, essa proteção chega a instalações antigas pela reinstalação
+  ou pela atualização do pacote;
 * no Windows, o executável em uso não precisa ser substituído no lugar;
 * a unidade do systemd aponta para `console-bootstrap.js`, **nunca** para uma versão: atualizar
   o console não reescreve arquivo do systemd nem exige `daemon-reload`.

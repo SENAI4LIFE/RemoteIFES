@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const fs = require("fs");
+const path = require("path");
 const config = require("./src/config");
 const estado = require("./src/estado");
 const execucao = require("./src/execucao");
@@ -136,6 +137,21 @@ function iniciar() {
   }
 
   servidor.armarSaidaPorOciosidade(app, () => encerrar(0), { reativavel });
+
+  // A self-updated version confirms itself once it has listened and stayed up; until then the
+  // stable bootstrap counts its starts and reverts it after repeated failures (src/ativacao.js).
+  app.once("listening", () => {
+    let versao = null;
+    try {
+      versao = require(path.join(config.RAIZ_CONSOLE, "package.json")).version;
+    } catch {}
+    if (!versao) return;
+    require("./src/ativacao").agendarConfirmacao({
+      raiz: config.RAIZ_INSTALACAO,
+      versao,
+      aoConfirmar: () => estado.auditar("atualizacao-console-confirmada", { versao }),
+    });
+  });
 
   process.on("SIGTERM", () => encerrar(0));
   process.on("SIGINT", () => encerrar(0));
