@@ -23,7 +23,7 @@ const horaA = bucketAnterior + 1 * 3600 * 1000;
 const horaB = bucketAnterior + 2 * 3600 * 1000;
 const bucketLegado = bucketAnterior - 2 * SEIS_HORAS;
 
-test("a consolidação por hora guarda quantas amostras válidas cada medida teve", () => {
+test("hourly consolidation keeps how many valid samples each measure had", () => {
   limpar();
   const boot = sql(bucketAnterior - 3600 * 1000);
   for (let i = 0; i < 60; i += 1) {
@@ -43,7 +43,7 @@ test("a consolidação por hora guarda quantas amostras válidas cada medida tev
   assert.equal(b.rssMBAmostras, 60);
 });
 
-test("faixas longas ponderam cada medida pela sua própria quantidade de amostras válidas", () => {
+test("long ranges weight each measure by its own number of valid samples", () => {
   const h30 = monitoramentoService.historico("30d");
   const indice = h30.t.indexOf(bucketAnterior);
   assert.ok(indice >= 0, "o bucket de 6 h anterior precisa estar na grade");
@@ -53,7 +53,7 @@ test("faixas longas ponderam cada medida pela sua própria quantidade de amostra
   assert.equal(h30.n[indice], 120);
 });
 
-test("horas consolidadas antes da migração, sem contagem por medida, continuam agregando pelo total de amostras", () => {
+test("hours consolidated before the migration, without a per-measure count, still aggregate by the total sample count", () => {
   db.prepare("INSERT INTO monitoramento_horas (hora, amostras, bancoMs, rssMB) VALUES (?, 60, 4, 30)").run(sql(bucketLegado + 3600 * 1000));
   db.prepare("INSERT INTO monitoramento_horas (hora, amostras, bancoMs, rssMB) VALUES (?, 30, 8, 30)").run(sql(bucketLegado + 2 * 3600 * 1000));
   monitoramentoService.limparCacheHistorico();
@@ -65,7 +65,7 @@ test("horas consolidadas antes da migração, sem contagem por medida, continuam
   assert.equal(h30.medidas.rssMB[indice], 30);
 });
 
-test("um bucket em que nenhuma hora tem a medida fica nulo, sem divisão por zero", () => {
+test("a bucket where no hour has the measure stays null, without division by zero", () => {
   db.prepare("INSERT INTO monitoramento_horas (hora, amostras, rssMB, rssMBAmostras, bancoMs, bancoMsAmostras) VALUES (?, 60, 30, 60, NULL, 0)").run(sql(bucketLegado - SEIS_HORAS + 3600 * 1000));
   monitoramentoService.limparCacheHistorico();
   const h30 = monitoramentoService.historico("30d");

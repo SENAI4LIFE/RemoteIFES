@@ -64,7 +64,7 @@ const CENARIOS_AJUDA = [
 ];
 
 for (const [papel, nome, tamanho, maximo] of CENARIOS_AJUDA) {
-  test(`o painel de ajuda cabe na tela e seu fechar é alcançável (${papel}, ${nome})`, async ({ page, context }) => {
+  test(`the help panel fits on screen and its close button is reachable (${papel}, ${nome})`, async ({ page, context }) => {
     await abrir(page, context, papel, "/#/inicio", tamanho, maximo);
     await abrirPainelDeAjuda(page);
     const medida = await page.evaluate(medirPainelDeAjuda);
@@ -79,7 +79,7 @@ for (const [papel, nome, tamanho, maximo] of CENARIOS_AJUDA) {
 }
 
 for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], ["mobile-portrait", VIEWPORTS["mobile-portrait"]], ["mobile-large", VIEWPORTS["mobile-large"]], ["mobile-landscape", VIEWPORTS["mobile-landscape"]]]) {
-  test(`com texto máximo os botões flutuantes acompanham a altura real da barra inferior (${nome})`, async ({ page, context }) => {
+  test(`with maximum text the floating buttons follow the real bottom bar height (${nome})`, async ({ page, context }) => {
     await abrir(page, context, "admin", "/#/inicio", tamanho, true);
     const medida = await page.evaluate(() => {
       const barra = document.querySelector(".tabbar").getBoundingClientRect();
@@ -105,7 +105,7 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
 }
 
 for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], ["mobile-large", VIEWPORTS["mobile-large"]], ["paisagem 667x375", { width: 667, height: 375 }]]) {
-  test(`o último controle de uma página longa não fica embaixo dos botões flutuantes (${nome})`, async ({ page, context }) => {
+  test(`the last control of a long page is not under the floating buttons (${nome})`, async ({ page, context }) => {
     await abrir(page, context, "superadmin", "/#/admin/logs/auditoria", tamanho);
     await expect(page.locator("#logsAba-auditoria")).toBeVisible({ timeout: 15_000 });
     const botao = page.locator("#connectNextBtn");
@@ -123,7 +123,7 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
 }
 
 for (const [nome, tamanho] of [["mobile-landscape", VIEWPORTS["mobile-landscape"]], ["paisagem 740x360", { width: 740, height: 360 }], ["paisagem 667x375", { width: 667, height: 375 }]]) {
-  test(`em paisagem baixa o menu da conta fica acima dos botões flutuantes (${nome})`, async ({ page, context }) => {
+  test(`in short landscape the account menu stays above the floating buttons (${nome})`, async ({ page, context }) => {
     await abrir(page, context, "superadmin", "/#/inicio", tamanho);
     await page.locator("#accountMenuBtn").click();
     await expect(page.locator("#accountMenu")).toBeVisible();
@@ -140,7 +140,7 @@ for (const [nome, tamanho] of [["mobile-landscape", VIEWPORTS["mobile-landscape"
   });
 }
 
-test("a faixa de senha padrão não pinta por cima do menu da conta aberto", async ({ page, context }) => {
+test("the default-password banner does not paint over the open account menu", async ({ page, context }) => {
   await abrir(page, context, "superadmin", "/#/inicio", VIEWPORTS.notebook);
   await expect(page.locator("#defaultPasswordWarning")).toBeVisible();
   await page.locator("#accountMenuBtn").click();

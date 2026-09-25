@@ -28,7 +28,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("WebSocket rejeita origem de outro site quando CORS_ORIGIN não foi configurado", async () => {
+test("WebSocket rejects an origin from another site when CORS_ORIGIN is not configured", async () => {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: "https://origem-nao-autorizada.example" });
   const codigo = await new Promise((resolve, reject) => {
     ws.once("error", reject);
@@ -37,7 +37,7 @@ test("WebSocket rejeita origem de outro site quando CORS_ORIGIN não foi configu
   assert.equal(codigo, 4003);
 });
 
-test("WebSocket aceita conexão da mesma origem sem CORS_ORIGIN (operação same-origin)", async () => {
+test("WebSocket accepts a same-origin connection without CORS_ORIGIN (same-origin operation)", async () => {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: `http://127.0.0.1:${port}` });
   const resultado = await new Promise((resolve) => {
     ws.once("open", () => resolve("open"));
@@ -48,7 +48,7 @@ test("WebSocket aceita conexão da mesma origem sem CORS_ORIGIN (operação same
   assert.equal(resultado, "open");
 });
 
-test("WebSocket rejeita origem com o mesmo host, mas outro protocolo", async () => {
+test("WebSocket rejects an origin with the same host but another protocol", async () => {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: `https://127.0.0.1:${port}` });
   const codigo = await new Promise((resolve, reject) => {
     ws.once("error", reject);

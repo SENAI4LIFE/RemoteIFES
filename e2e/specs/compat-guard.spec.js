@@ -27,7 +27,7 @@ async function esperarAvisoSemApp(page, erros) {
   expect(erros).toEqual([]);
 }
 
-test("um motor sem :has() vê o aviso de navegador desatualizado em vez de um app pela metade", async ({ page, context }) => {
+test("an engine without :has() sees the outdated-browser notice instead of a half-working app", async ({ page, context }) => {
   const erros = await carregarSimulandoMotor(page, context, () => {
     const original = CSS.supports.bind(CSS);
     CSS.supports = (...args) => (String(args[0]).includes(":has(") ? false : original(...args));
@@ -35,7 +35,7 @@ test("um motor sem :has() vê o aviso de navegador desatualizado em vez de um ap
   await esperarAvisoSemApp(page, erros);
 });
 
-test("um motor sem unidades dvh vê o aviso de navegador desatualizado", async ({ page, context }) => {
+test("an engine without dvh units sees the outdated-browser notice", async ({ page, context }) => {
   const erros = await carregarSimulandoMotor(page, context, () => {
     const original = CSS.supports.bind(CSS);
     CSS.supports = (...args) => (String(args[1]).includes("dvh") ? false : original(...args));
@@ -43,7 +43,7 @@ test("um motor sem unidades dvh vê o aviso de navegador desatualizado", async (
   await esperarAvisoSemApp(page, erros);
 });
 
-test("um motor que não interpreta a sintaxe ES2020 vê o aviso, sem erros de sintaxe soltos", async ({ page, context }) => {
+test("an engine that does not parse ES2020 syntax sees the notice, without stray syntax errors", async ({ page, context }) => {
   const erros = await carregarSimulandoMotor(page, context, () => {
     const Original = Function;
     window.Function = function () {
@@ -54,14 +54,14 @@ test("um motor que não interpreta a sintaxe ES2020 vê o aviso, sem erros de si
   await esperarAvisoSemApp(page, erros);
 });
 
-test("um motor sem Element.replaceChildren vê o aviso de navegador desatualizado", async ({ page, context }) => {
+test("an engine without Element.replaceChildren sees the outdated-browser notice", async ({ page, context }) => {
   const erros = await carregarSimulandoMotor(page, context, () => {
     delete Element.prototype.replaceChildren;
   });
   await esperarAvisoSemApp(page, erros);
 });
 
-test("em um motor com os recursos exigidos o aviso não existe e o app carrega inteiro", async ({ appPage }) => {
+test("in an engine with the required features the notice does not exist and the app loads fully", async ({ appPage }) => {
   await expect(appPage.locator("#navegador-incompativel")).toHaveCount(0);
   const estado = await estadoDaPagina(appPage);
   expect(estado.scripts).toBeGreaterThan(1);

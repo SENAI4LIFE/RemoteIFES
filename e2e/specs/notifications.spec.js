@@ -1,12 +1,12 @@
 const { test, expect, API_URL, tokenDe, injetarSessao } = require("../harness/fixtures");
 
-test("API de notificações exige autorização administrativa", async ({ request }) => {
+test("the notifications API requires administrative authorization", async ({ request }) => {
   expect((await request.get(`${API_URL}/admin/notificacoes`)).status()).toBe(401);
   expect((await request.get(`${API_URL}/admin/notificacoes`, { headers: { Authorization: `Bearer ${tokenDe("user")}` } })).status()).toBe(403);
   expect((await request.get(`${API_URL}/admin/notificacoes`, { headers: { Authorization: `Bearer ${tokenDe("admin")}` } })).status()).toBe(200);
 });
 
-test("Dispositivos > Alertas mostra a mesma fila do sino sem duplicar dados", async ({ page, context }) => {
+test("Dispositivos > Alertas shows the same queue as the bell without duplicating data", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/admin/notificacoes");
   await expect(page.locator('.admin-subtab-btn[data-sub="notificacoes"]')).toContainText("Alertas");
@@ -15,7 +15,7 @@ test("Dispositivos > Alertas mostra a mesma fila do sino sem duplicar dados", as
   await expect(page.locator("#adminNotifList .notif-item").first()).toContainText("offline");
 });
 
-test("administrador abre o sino e vê a notificação de ESP32 offline", async ({ page, sessaoComo }) => {
+test("an administrator opens the bell and sees the ESP32 offline notification", async ({ page, sessaoComo }) => {
   await sessaoComo("admin");
   await expect(page.locator("#notifWrap")).toBeVisible();
 
@@ -24,7 +24,7 @@ test("administrador abre o sino e vê a notificação de ESP32 offline", async (
   await expect(page.locator("#notifList li").first()).toContainText("offline");
 });
 
-test("marcar todas como lidas remove o indicador do sino", async ({ page, sessaoComo }) => {
+test("marking all as read removes the bell indicator", async ({ page, sessaoComo }) => {
   await sessaoComo("admin");
   await page.locator("#notifBellBtn").click();
   await expect(page.locator("#notifPanel")).toBeVisible();
@@ -32,7 +32,7 @@ test("marcar todas como lidas remove o indicador do sino", async ({ page, sessao
   await expect(page.locator("#notifDot")).toBeHidden();
 });
 
-test("o sino e o ícone de inseto são indicadores distintos", async ({ page, sessaoComo }) => {
+test("the bell and the bug icon are distinct indicators", async ({ page, sessaoComo }) => {
   await sessaoComo("admin");
   await expect(page.locator("#notifBellBtn")).toBeVisible();
   await expect(page.locator("#bugReportBtn")).toBeVisible();

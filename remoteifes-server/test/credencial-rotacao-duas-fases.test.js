@@ -79,7 +79,7 @@ test.after(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test("rotacionar cria uma geração pendente: a antiga segue válida até a placa provar a nova, e só então a antiga entra na tolerância", async () => {
+test("rotation creates a pending generation: the old one stays valid until the board proves the new one, and only then enters the grace period", async () => {
   sala("ROT-1", "AA:CC:11:00:00:01");
   const atual = credenciais.provisionar("ROT-1");
   const nova = credenciais.rotacionar("ROT-1");
@@ -105,7 +105,7 @@ test("rotacionar cria uma geração pendente: a antiga segue válida até a plac
   assert.ok(new Date(emTolerancia.expiraEm).getTime() - Date.now() <= 24 * 3600 * 1000 + 5000);
 });
 
-test("uma placa que estava offline durante a rotação não fica inacessível: reconecta com a antiga, recebe a pendente e a ativa", async () => {
+test("a board that was offline during rotation does not become unreachable: it reconnects with the old one, receives the pending one and activates it", async () => {
   sala("ROT-2", "AA:CC:11:00:00:02");
   const atual = credenciais.provisionar("ROT-2");
   const nova = credenciais.rotacionar("ROT-2");
@@ -127,7 +127,7 @@ test("uma placa que estava offline durante a rotação não fica inacessível: r
   reconectada.ws.close();
 });
 
-test("um heartbeat HTTP com a geração pendente também a ativa", async () => {
+test("an HTTP heartbeat with the pending generation also activates it", async () => {
   sala("ROT-3", "AA:CC:11:00:00:03");
   credenciais.provisionar("ROT-3");
   const nova = credenciais.rotacionar("ROT-3");
@@ -137,7 +137,7 @@ test("um heartbeat HTTP com a geração pendente também a ativa", async () => {
   assert.equal(credenciais.estado("ROT-3").graceRotacaoAtivo, true);
 });
 
-test("depois de um reinício do servidor a pendente não é reentregável, mas a antiga continua valendo e uma nova rotação a substitui", async () => {
+test("after a server restart the pending generation cannot be redelivered, but the old one stays valid and a new rotation replaces it", async () => {
   sala("ROT-4", "AA:CC:11:00:00:04");
   const atual = credenciais.provisionar("ROT-4");
   const perdida = credenciais.rotacionar("ROT-4");
@@ -169,7 +169,7 @@ test("depois de um reinício do servidor a pendente não é reentregável, mas a
   assert.ok(credenciais.verificar(outra.deviceId, outra.segredo).grace);
 });
 
-test("um socket autenticado com a geração anterior é encerrado quando a tolerância termina, sem afetar a geração atual", async () => {
+test("a socket authenticated with the previous generation is closed when the grace period ends, without affecting the current generation", async () => {
   sala("ROT-5", "AA:CC:11:00:00:05");
   const antiga = credenciais.provisionar("ROT-5");
   const nova = credenciais.rotacionar("ROT-5");
@@ -192,7 +192,7 @@ test("um socket autenticado com a geração anterior é encerrado quando a toler
   atual.ws.close();
 });
 
-test("substituir e revogar descartam a geração pendente", async () => {
+test("replace and revoke discard the pending generation", async () => {
   sala("ROT-6", "AA:CC:11:00:00:06");
   credenciais.provisionar("ROT-6");
   const pendente = credenciais.rotacionar("ROT-6");
@@ -206,7 +206,7 @@ test("substituir e revogar descartam a geração pendente", async () => {
   assert.equal(linha("ROT-6").segredoHashPendente, null);
 });
 
-test("uma placa que volta com a geração anterior depois da ativação (gravação na NVS não durou) recebe o segredo atual de novo, enquanto a tolerância vale", async () => {
+test("a board returning with the previous generation after activation (the NVS write did not survive) receives the current secret again while the grace period lasts", async () => {
   sala("ROT-7", "AA:CC:11:00:00:07");
   const antiga = credenciais.provisionar("ROT-7");
   const nova = credenciais.rotacionar("ROT-7");
@@ -234,7 +234,7 @@ test("uma placa que volta com a geração anterior depois da ativação (gravaç
   assert.equal(credenciais.reentregarAtual("ROT-7"), false);
 });
 
-test("substituir, revogar e uma nova rotação ativada descartam o segredo ativado guardado para reentrega", () => {
+test("replace, revoke and a new activated rotation discard the activated secret kept for redelivery", () => {
   sala("ROT-8", "AA:CC:11:00:00:08");
   credenciais.provisionar("ROT-8");
   const primeira = credenciais.rotacionar("ROT-8");

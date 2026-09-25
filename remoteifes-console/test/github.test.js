@@ -47,7 +47,7 @@ function json(res, status, corpo, cabecalhos = {}) {
 
 const BASE_REPO = "/repos/SENAI4LIFE/RemoteIFES";
 
-test("sem credencial o console não consulta o GitHub e diz por quê", async (t) => {
+test("without a credential the Console does not query GitHub and says why", async (t) => {
   const falso = await servidorFalso({});
   const amb = ajuda.ambiente({ githubApi: falso.base });
   t.after(async () => {
@@ -65,7 +65,7 @@ test("sem credencial o console não consulta o GitHub e diz por quê", async (t)
   assert.match(ci.orientacao, /não depende do GitHub/);
 });
 
-test("o token é guardado fora da API e enviado só no cabeçalho", async (t) => {
+test("the token is stored outside the API and sent only in the header", async (t) => {
   const falso = await servidorFalso({
     [`GET ${BASE_REPO}/actions/workflows/ci.yml/runs`]: (req, res) => json(res, 200, { workflow_runs: [] }),
   });
@@ -91,7 +91,7 @@ test("o token é guardado fora da API e enviado só no cabeçalho", async (t) =>
   assert.equal((fs.statSync(arquivo).mode & 0o777).toString(8).padStart(3, "0").slice(-3) <= "600" || process.platform === "win32", true);
 });
 
-test("workflow e repositório fora da lista são recusados antes de qualquer requisição", async (t) => {
+test("workflows and repositories outside the list are refused before any request", async (t) => {
   const falso = await servidorFalso({});
   const amb = ajuda.ambiente({ githubApi: falso.base });
   t.after(async () => {
@@ -105,7 +105,7 @@ test("workflow e repositório fora da lista são recusados antes de qualquer req
   assert.equal(falso.chamadas.length, 0);
 });
 
-test("entradas de disparo são validadas", async (t) => {
+test("dispatch inputs are validated", async (t) => {
   const falso = await servidorFalso({});
   const amb = ajuda.ambiente({ githubApi: falso.base });
   t.after(async () => {
@@ -120,7 +120,7 @@ test("entradas de disparo são validadas", async (t) => {
   assert.equal(falso.chamadas.length, 0);
 });
 
-test("limite de taxa é reportado como tal, não como falha genérica", async (t) => {
+test("a rate limit is reported as such, not as a generic failure", async (t) => {
   const falso = await servidorFalso({
     [`GET ${BASE_REPO}/actions/workflows/ci.yml/runs`]: (req, res) =>
       json(res, 403, { message: "API rate limit exceeded" }, {
@@ -141,7 +141,7 @@ test("limite de taxa é reportado como tal, não como falha genérica", async (t
   assert.ok(r.limite.reiniciaEm);
 });
 
-test("credencial inválida e permissão insuficiente têm mensagens distintas", async (t) => {
+test("an invalid credential and insufficient permission have distinct messages", async (t) => {
   let status = 401;
   const falso = await servidorFalso({
     [`GET ${BASE_REPO}/actions/workflows/ci.yml/runs`]: (req, res) => json(res, status, { message: "Bad credentials" }),
@@ -160,7 +160,7 @@ test("credencial inválida e permissão insuficiente têm mensagens distintas", 
   assert.match((await amb.github.listarRuns({ workflow: "ci" })).erro, /não encontrado/);
 });
 
-test("disparo que devolve o id do run usa esse id, sem adivinhar", async (t) => {
+test("a dispatch that returns the run id uses that id, without guessing", async (t) => {
   const falso = await servidorFalso({
     [`POST ${BASE_REPO}/actions/workflows/android.yml/dispatches`]: (req, res) => json(res, 201, { id: 99001 }),
     [`GET ${BASE_REPO}/actions/runs/99001`]: (req, res) =>
@@ -179,7 +179,7 @@ test("disparo que devolve o id do run usa esse id, sem adivinhar", async (t) => 
   assert.match(r.correlacao, /id devolvido/);
 });
 
-test("disparo sem corpo (204) é correlacionado por janela, e não por 'o mais recente'", async (t) => {
+test("a dispatch without a body (204) is correlated by time window, not by 'the most recent'", async (t) => {
   const criado = new Date().toISOString();
   const falso = await servidorFalso({
     [`POST ${BASE_REPO}/actions/workflows/ci.yml/dispatches`]: (req, res) => {
@@ -206,7 +206,7 @@ test("disparo sem corpo (204) é correlacionado por janela, e não por 'o mais r
   assert.match(r.correlacao, /janela de tempo/);
 });
 
-test("vários disparos na mesma janela são declarados ambíguos em vez de escolhidos no chute", async (t) => {
+test("several dispatches in the same window are declared ambiguous instead of guessed", async (t) => {
   const criado = new Date().toISOString();
   const run = (id) => ({ id, name: "CI", path: ".github/workflows/ci.yml", status: "queued", conclusion: null, head_sha: "c".repeat(40), head_branch: "main", run_number: id, run_attempt: 1, created_at: criado, updated_at: criado, html_url: "https://exemplo", event: "workflow_dispatch" });
   const falso = await servidorFalso({
@@ -229,7 +229,7 @@ test("vários disparos na mesma janela são declarados ambíguos em vez de escol
   assert.equal(r.candidatos.length, 2);
 });
 
-test("artefato expirado não é baixado", async (t) => {
+test("an expired artifact is not downloaded", async (t) => {
   const falso = await servidorFalso({
     [`GET ${BASE_REPO}/actions/runs/7/artifacts`]: (req, res) =>
       json(res, 200, { artifacts: [{ id: 55, name: "apks", size_in_bytes: 10, expired: true, expires_at: "2026-01-01T00:00:00Z", created_at: "2025-12-01T00:00:00Z" }] }),
@@ -246,7 +246,7 @@ test("artefato expirado não é baixado", async (t) => {
   assert.match(r.erro, /expirou/);
 });
 
-test("um artefato que não pertence à execução é recusado", async (t) => {
+test("an artifact that does not belong to the run is refused", async (t) => {
   const falso = await servidorFalso({
     [`GET ${BASE_REPO}/actions/runs/7/artifacts`]: (req, res) => json(res, 200, { artifacts: [{ id: 55, name: "apks", size_in_bytes: 10, expired: false }] }),
   });
@@ -262,7 +262,7 @@ test("um artefato que não pertence à execução é recusado", async (t) => {
   assert.match(r.erro, /não pertence a esta execução/);
 });
 
-test("o download confere tamanho e calcula o digest do que foi gravado", async (t) => {
+test("the download checks the size and computes the digest of what was written", async (t) => {
   const conteudo = Buffer.from("PK-conteudo-de-teste-do-artefato");
   const falso = await servidorFalso({
     [`GET ${BASE_REPO}/actions/runs/7/artifacts`]: (req, res) =>
@@ -291,7 +291,7 @@ test("o download confere tamanho e calcula o digest do que foi gravado", async (
   // The Console delivers file + digest.
 });
 
-test("o token com formato implausível é recusado na gravação", (t) => {
+test("a token with an implausible format is refused on save", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -303,7 +303,7 @@ test("o token com formato implausível é recusado na gravação", (t) => {
   assert.equal(amb.github.temToken(), false);
 });
 
-test("o painel mobile distingue sucesso de workflow, artefato e publicação", async (t) => {
+test("the mobile panel distinguishes workflow success, artifact and publication", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 

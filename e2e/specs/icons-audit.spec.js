@@ -1,7 +1,7 @@
 const { test, expect, injetarSessao, irParaSala } = require("../harness/fixtures");
 
 for (const largura of [360, 1280]) {
-  test(`sprite resolve no navegador em ${largura}px e mantém nomes e contraste`, async ({ page, context }) => {
+  test(`the sprite resolves in the browser at ${largura}px and keeps names and contrast`, async ({ page, context }) => {
     await injetarSessao(context, "superadmin");
     await page.setViewportSize({ width: largura, height: 800 });
     await page.goto("/#/inicio");
@@ -77,7 +77,7 @@ async function auditarTons(page) {
   }, TONS);
 }
 
-test("os tons semânticos pintam o glifo com contraste, no modo normal e no alto contraste", async ({ page, context }) => {
+test("semantic tones paint the glyph with contrast, in normal and high-contrast modes", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   const vistos = new Set();
 
@@ -97,7 +97,7 @@ test("os tons semânticos pintam o glifo com contraste, no modo normal e no alto
   expect([...vistos].sort()).toEqual([...TONS].sort());
 });
 
-test("tela pública: os tons dos ícones sobrevivem ao alto contraste nas superfícies claras", async ({ appPage }) => {
+test("public screen: icon tones survive high contrast on light surfaces", async ({ appPage }) => {
   for (const contraste of [false, true]) {
     if (contraste) await appPage.evaluate(() => document.body.classList.add("a11y-high-contrast"));
     expect((await auditarTons(appPage)).problemas, `portal (alto contraste: ${contraste})`).toEqual([]);
@@ -112,7 +112,7 @@ test("tela pública: os tons dos ícones sobrevivem ao alto contraste nas superf
   expect((await auditarTons(appPage)).problemas, "login em alto contraste").toEqual([]);
 });
 
-test("barra superior e chips de status ficam fora do sistema de tons", async ({ page, context }) => {
+test("the top bar and status chips stay outside the tone system", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/inicio");
   await expect(page.locator("#screen-inicio")).toBeVisible({ timeout: 20_000 });

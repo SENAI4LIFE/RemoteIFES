@@ -1,5 +1,5 @@
 const { test, expect, API_URL } = require("../harness/fixtures");
-test("primeiro carregamento com servidor disponível libera o login sem overlay persistente", async ({ page }) => {
+test("first load with the server available enables login without a persistent overlay", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("#screen-server-status")).toBeHidden();
@@ -10,7 +10,7 @@ test("primeiro carregamento com servidor disponível libera o login sem overlay 
   await expect(page.locator("#screen-server-status")).toBeHidden();
 });
 
-test("falha de rede na primeira conexão recupera o login sem recarregar", async ({ page, context }) => {
+test("a network failure on the first connection recovers login without reloading", async ({ page, context }) => {
   await context.addInitScript(() => {
     const WebSocketNativo = window.WebSocket;
     window.__e2eTentativasWebSocket = 0;
@@ -32,7 +32,7 @@ test("falha de rede na primeira conexão recupera o login sem recarregar", async
   expect(await page.evaluate(() => performance.getEntriesByType("navigation").length)).toBe(1);
 });
 
-test("a conexão WebSocket entrega a lista de salas em tempo real após a sessão", async ({ page, context }) => {
+test("the WebSocket connection delivers the room list in real time after the session", async ({ page, context }) => {
   const framesSalas = [];
   page.on("websocket", (ws) => {
     ws.on("framereceived", (data) => {
@@ -48,7 +48,7 @@ test("a conexão WebSocket entrega a lista de salas em tempo real após a sessã
   await expect.poll(() => framesSalas.length, { timeout: 15_000 }).toBeGreaterThan(0);
 });
 
-test("queda de rede mostra o aviso de conexão e o app se recupera ao voltar", async ({ page, sessaoComo, context, request, browserName }) => {
+test("a network drop shows the connection notice and the app recovers when it returns", async ({ page, sessaoComo, context, request, browserName }) => {
   test.skip(browserName === "webkit", "a emulação offline do Playwright não interrompe WebSockets no WebKit, então a queda de rede não é reproduzível nesse motor");
   await sessaoComo("user");
   await expect(page.locator("#screen-server-status")).toBeHidden();
@@ -67,7 +67,7 @@ test("queda de rede mostra o aviso de conexão e o app se recupera ao voltar", a
   await expect(page.locator('.tab-btn[data-tab="salas"]')).toBeVisible();
 });
 
-test("sessão invalidada durante reconexão volta ao login sem loop", async ({ page, context, request }) => {
+test("a session invalidated during reconnection returns to login without looping", async ({ page, context, request }) => {
   const login = await request.post(`${API_URL}/login`, { data: { usuario: "e2e_user", senha: "e2e-user-pass-123" } });
   expect(login.ok()).toBe(true);
   const token = (await login.json()).token;
@@ -90,7 +90,7 @@ test("sessão invalidada durante reconexão volta ao login sem loop", async ({ p
 });
 
 for (const papel of ["admin", "superadmin"]) {
-  test(`queda temporária para ${papel} mantém somente a reconexão automática`, async ({ page, sessaoComo, context, request, browserName }) => {
+  test(`a temporary drop for ${papel} keeps only the automatic reconnection`, async ({ page, sessaoComo, context, request, browserName }) => {
     test.skip(browserName === "webkit", "a emulação offline do Playwright não interrompe WebSockets no WebKit, então a queda de rede não é reproduzível nesse motor");
     await sessaoComo(papel);
     await context.setOffline(true);
@@ -114,7 +114,7 @@ async function tokenInvalidado(request) {
   return token;
 }
 
-test("token salvo que o servidor já não aceita leva ao portal com a conexão ativa, sem ficar preso no aviso", async ({ page, context, request }) => {
+test("a saved token the server no longer accepts leads to the portal with the connection active, without getting stuck on the notice", async ({ page, context, request }) => {
   const token = await tokenInvalidado(request);
   await context.addInitScript((t) => {
     try {
@@ -142,7 +142,7 @@ const FALHAS_TRANSITORIAS_ME = {
 };
 
 for (const [falha, responder] of Object.entries(FALHAS_TRANSITORIAS_ME)) {
-  test(`${falha} ao restaurar a sessão não encerra a sessão no servidor nem descarta o token`, async ({ page, context, request }) => {
+  test(`${falha} while restoring the session neither ends the server session nor discards the token`, async ({ page, context, request }) => {
     const login = await request.post(`${API_URL}/login`, { data: { usuario: "e2e_user", senha: "e2e-user-pass-123" } });
     expect(login.ok()).toBe(true);
     const token = (await login.json()).token;
@@ -180,7 +180,7 @@ for (const [falha, responder] of Object.entries(FALHAS_TRANSITORIAS_ME)) {
   });
 }
 
-test("falha HTTP isolada não oferece reconfiguração de infraestrutura", async ({ page, sessaoComo }) => {
+test("an isolated HTTP failure does not offer infrastructure reconfiguration", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await page.route(`${API_URL}/salas`, (route) => route.abort("failed"));
   const resultado = await page.evaluate(async () => Api.listarSalas());
@@ -190,7 +190,7 @@ test("falha HTTP isolada não oferece reconfiguração de infraestrutura", async
   await expect(page.getByText("Configurar endereço do servidor", { exact: true })).toHaveCount(0);
 });
 
-test("Cordova sem origem usa configuração inicial dedicada e funcional", async ({ page, context }) => {
+test("Cordova without an origin uses a dedicated, working initial configuration", async ({ page, context }) => {
   await context.addInitScript(() => {
     window.cordova = {};
     if (!window.sessionStorage.getItem("e2e_cordova_config_iniciado")) {
@@ -210,7 +210,7 @@ test("Cordova sem origem usa configuração inicial dedicada e funcional", async
   await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
 });
 
-test("recarregar a página restaura a sessão sem novo login", async ({ page, sessaoComo }) => {
+test("reloading the page restores the session without a new login", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await page.reload();
   await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
@@ -218,7 +218,7 @@ test("recarregar a página restaura a sessão sem novo login", async ({ page, se
   await expect(page.locator("#userTag")).toContainText("Usuário E2E");
 });
 
-test("falha no bootstrap da sessão não deixa o overlay de conexão preso", async ({ page, context }) => {
+test("a session bootstrap failure does not leave the connection overlay stuck", async ({ page, context }) => {
   const { injetarSessao } = require("../harness/fixtures");
   await injetarSessao(context, "user");
   await context.addInitScript(() => {
@@ -245,7 +245,7 @@ test("falha no bootstrap da sessão não deixa o overlay de conexão preso", asy
 // A device that suspends, switches networks or loses the server can leave the socket OPEN with
 // nothing arriving and no close event. Without a liveness check on resume, the app would keep
 // showing old rooms and telemetry as if they were current.
-test("socket que ficou meio-aberto é detectado ao retomar e reconectado", async ({ page, context, sessaoComo }) => {
+test("a half-open socket is detected on resume and reconnected", async ({ page, context, sessaoComo }) => {
   await context.addInitScript(() => {
     const WebSocketNativo = window.WebSocket;
     window.__e2eConexoes = 0;
@@ -294,7 +294,7 @@ test("socket que ficou meio-aberto é detectado ao retomar e reconectado", async
   await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 20_000 });
 });
 
-test("no aplicativo empacotado (Cordova) o service worker da PWA não é registrado; no site continua sendo", async ({ page, context }) => {
+test("in the packaged app (Cordova) the PWA service worker is not registered; on the website it still is", async ({ page, context }) => {
   await context.addInitScript(() => {
     window.__swRegistros = [];
     if (navigator.serviceWorker) {

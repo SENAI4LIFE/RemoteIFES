@@ -1,6 +1,6 @@
 const { test, expect, API_URL } = require("../harness/fixtures");
 
-test("usuário comum não vê Admin, Agenda, Grade nem o sino de dispositivos", async ({ page, sessaoComo }) => {
+test("a regular user sees neither Admin, Agenda, Grade nor the device bell", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await expect(page.locator('.tab-btn[data-tab="salas"]')).toBeVisible();
   await expect(page.locator("#adminTabBtn")).toBeHidden();
@@ -10,7 +10,7 @@ test("usuário comum não vê Admin, Agenda, Grade nem o sino de dispositivos", 
   await expect(page.locator("#bugWrap")).toBeVisible();
 });
 
-test("administrador vê Admin, Agenda, Grade e o sino, mas não as sub-abas de superadmin", async ({ page, sessaoComo }) => {
+test("an administrator sees Admin, Agenda, Grade and the bell, but not the superadmin sub-tabs", async ({ page, sessaoComo }) => {
   await sessaoComo("admin");
   await expect(page.locator("#adminTabBtn")).toBeVisible();
   await expect(page.locator("#agendaTabBtn")).toBeVisible();
@@ -26,7 +26,7 @@ test("administrador vê Admin, Agenda, Grade e o sino, mas não as sub-abas de s
   await expect(page.locator('.admin-subtab-btn[data-sub="protocolos"]')).toBeHidden();
 });
 
-test("superadministrador vê as sub-abas exclusivas (Configurações, Cadastro, Firmware / OTA, Protocolos IR)", async ({ page, sessaoComo }) => {
+test("the superadministrator sees the exclusive sub-tabs (Configurações, Cadastro, Firmware / OTA, Protocolos IR)", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
   await expect(page.locator("#screen-admin")).toBeVisible();
@@ -36,7 +36,7 @@ test("superadministrador vê as sub-abas exclusivas (Configurações, Cadastro, 
   await expect(page.locator('.admin-subtab-btn[data-sub="protocolos"]')).toBeVisible();
 });
 
-test("o Monitoramento é exclusivo do superadministrador (interface e API)", async ({ page, sessaoComo, request, tokens }) => {
+test("Monitoramento is superadministrator-only (interface and API)", async ({ page, sessaoComo, request, tokens }) => {
   await sessaoComo("admin");
   await page.locator("#adminTabBtn").click();
   await expect(page.locator("#screen-admin")).toBeVisible();
@@ -52,7 +52,7 @@ test("o Monitoramento é exclusivo do superadministrador (interface e API)", asy
   expect(comSuper.status()).toBe(200);
 });
 
-test("o superadministrador abre o Monitoramento com selos de estado", async ({ page, sessaoComo }) => {
+test("the superadministrator opens Monitoramento with status badges", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
   await page.locator('.admin-subtab-btn[data-sub="status"]').click();
@@ -62,7 +62,7 @@ test("o superadministrador abre o Monitoramento com selos de estado", async ({ p
   await expect(page.locator("#monGrid .status-chip").first()).toBeVisible({ timeout: 10_000 });
 });
 
-test("a API administrativa exige token e nível de admin", async ({ request, tokens }) => {
+test("the administrative API requires a token and admin level", async ({ request, tokens }) => {
   const semToken = await request.get(`${API_URL}/admin/usuarios`);
   expect(semToken.status()).toBe(401);
 

@@ -1,6 +1,6 @@
 const { test, expect, API_URL, USERS, tokenDe } = require("../harness/fixtures");
 
-test("diálogo de troca de senha é estilizado (não é prompt do navegador) e valida o tamanho", async ({ page, sessaoComo }) => {
+test("the password change dialog is styled (not a browser prompt) and validates length", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#adminTabBtn").click();
   await page.locator('.admin-subtab-btn[data-sub="usuarios"]').click();
@@ -37,7 +37,7 @@ test("diálogo de troca de senha é estilizado (não é prompt do navegador) e v
   expect(senhaNova.status()).toBe(200);
 });
 
-test("relato de problema: envia um relato válido e ele aparece em 'meus relatos'", async ({ page, sessaoComo }) => {
+test("problem report: submits a valid report and it appears in 'meus relatos'", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
 
   await page.locator("#bugReportBtn").click();
@@ -63,14 +63,14 @@ test("relato de problema: envia um relato válido e ele aparece em 'meus relatos
   await expect(page.locator(`#relatosPanel .relato-lista li`).filter({ hasText: titulo })).toBeVisible();
 });
 
-test("usuário comum vê apenas os próprios relatos", async ({ page, sessaoComo }) => {
+test("a regular user sees only their own reports", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await page.locator("#bugReportBtn").click();
   await expect(page.locator("#relatosPanel")).toContainText("Seus relatos enviados");
   await expect(page.locator("#relatosPanel .relato-filtros")).toHaveCount(0);
 });
 
-test("o painel de envio do superadmin não contém a gestão de relatos", async ({ page, sessaoComo }) => {
+test("the superadmin submission panel does not contain report management", async ({ page, sessaoComo }) => {
   await sessaoComo("superadmin");
   await page.locator("#bugReportBtn").click();
   await expect(page.locator("#relatosPanel")).toContainText("Seus relatos enviados");
@@ -78,7 +78,7 @@ test("o painel de envio do superadmin não contém a gestão de relatos", async 
   await expect(page.locator("#relatosPanel .relatos-gestao-btn")).toBeVisible();
 });
 
-test("superadmin gerencia relatos na aba Administração › Relatos de problemas (sem formulário de envio)", async ({ page, sessaoComo, request }) => {
+test("the superadmin manages reports in the Administração › Relatos de problemas tab (without a submission form)", async ({ page, sessaoComo, request }) => {
   const criado = await request.post(`${API_URL}/relatos`, {
     headers: { Authorization: `Bearer ${tokenDe("user")}` },
     data: { titulo: "Relato para gestão superadmin", descricao: "Descrição longa o suficiente para passar na validação.", categoria: "interface" },
@@ -104,7 +104,7 @@ test("superadmin gerencia relatos na aba Administração › Relatos de problema
   await expect(page.locator("#adminRelatosLista li").filter({ hasText: "Relato para gestão superadmin" })).toBeVisible();
 });
 
-test("superadmin exclui um relato enviado, com confirmação explícita", async ({ page, sessaoComo, request }) => {
+test("the superadmin deletes a submitted report with explicit confirmation", async ({ page, sessaoComo, request }) => {
   const titulo = `Relato para exclusão E2E ${Date.now()}`;
   const criado = await request.post(`${API_URL}/relatos`, {
     headers: { Authorization: `Bearer ${tokenDe("user")}` },
@@ -136,7 +136,7 @@ test("superadmin exclui um relato enviado, com confirmação explícita", async 
   expect(depois.status()).toBe(404);
 });
 
-test("a exclusão de relato é barrada no backend para quem não é superadmin", async ({ request }) => {
+test("report deletion is blocked in the backend for non-superadmins", async ({ request }) => {
   const anon = await request.delete(`${API_URL}/superadmin/relatos/1`);
   expect(anon.status()).toBe(401);
   const comum = await request.delete(`${API_URL}/superadmin/relatos/1`, {

@@ -22,7 +22,7 @@ async function estadoVisual(slider) {
   });
 }
 
-test("sliders restauram valor e preenchimento e respondem imediatamente ao teclado", async ({ page, context }) => {
+test("sliders restore value and fill and respond immediately to the keyboard", async ({ page, context }) => {
   await context.addInitScript(() => {
     if (localStorage.getItem("remoteifes_font_scale") === null) localStorage.setItem("remoteifes_font_scale", "1.5");
     if (localStorage.getItem("remoteifes_letter_spacing") === null) localStorage.setItem("remoteifes_letter_spacing", "0.12");
@@ -66,7 +66,7 @@ test("sliders restauram valor e preenchimento e respondem imediatamente ao tecla
   expect((await estadoVisual(page.locator("#a11yFontSlider"))).preenchimento).toBeCloseTo(88, 1);
 });
 
-test("slider mantém percurso e atualização visual por toque no mobile", async ({ browser }) => {
+test("a slider keeps its travel and visual update on touch on mobile", async ({ browser }) => {
   const context = await browser.newContext({
     baseURL: WEB_URL,
     hasTouch: true,

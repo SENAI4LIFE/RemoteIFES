@@ -20,7 +20,7 @@ for (const [nome, preparar] of [
   ["no portal, deslogado", async () => {}],
   ["com sessão aberta", async (context) => injetarSessao(context, "user")],
 ]) {
-  test(`abrir leva o foco ao painel, Esc fecha e devolve o foco ao botão (${nome})`, async ({ page, context }) => {
+  test(`opening moves focus into the panel, Esc closes it and returns focus to the button (${nome})`, async ({ page, context }) => {
     await preparar(context);
     await page.setViewportSize(VIEWPORTS["mobile-portrait"]);
     await page.goto("/");
@@ -38,7 +38,7 @@ for (const [nome, preparar] of [
   });
 }
 
-test("Esc fecha o painel a partir de qualquer controle interno e o foco volta ao botão", async ({ page, context }) => {
+test("Esc closes the panel from any inner control and focus returns to the button", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.setViewportSize(VIEWPORTS.notebook);
   await page.goto("/#/inicio");
@@ -59,7 +59,7 @@ test("Esc fecha o painel a partir de qualquer controle interno e o foco volta ao
   await expect(page.locator("#a11yToggleBtn")).toBeFocused();
 });
 
-test("fechar pelo botão × não deixa o foco em um controle escondido", async ({ page, context }) => {
+test("closing with the × button does not leave focus on a hidden control", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.setViewportSize(VIEWPORTS.notebook);
   await page.goto("/#/inicio");
@@ -75,7 +75,7 @@ test("fechar pelo botão × não deixa o foco em um controle escondido", async (
   await expect(page.locator("#a11yToggleBtn")).toBeFocused();
 });
 
-test("clicar fora fecha o painel sem prender o foco nele nem roubar o foco do que foi clicado", async ({ page, context }) => {
+test("clicking outside closes the panel without trapping focus or stealing it from what was clicked", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.setViewportSize(VIEWPORTS.notebook);
   await page.goto("/#/inicio");
@@ -103,7 +103,7 @@ test("clicar fora fecha o painel sem prender o foco nele nem roubar o foco do qu
   expect((await focoAtual(page)).dentroDoPainel).toBe(false);
 });
 
-test("abrir o painel de ajuda fecha o de acessibilidade e vice-versa, com foco coerente", async ({ page, context }) => {
+test("opening the help panel closes the accessibility panel and vice versa, with coherent focus", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.setViewportSize(VIEWPORTS.notebook);
   await page.goto("/#/inicio");
@@ -133,7 +133,7 @@ test("abrir o painel de ajuda fecha o de acessibilidade e vice-versa, com foco c
 // Focus can return to the floating button while the panel is still open (Shift+Tab from the close
 // button; in Firefox after passing through the scrollable panel itself). Esc must also close it
 // from there.
-test("com o painel de ajuda aberto, Esc fecha mesmo com o foco no botão flutuante", async ({ page, context }) => {
+test("with the help panel open, Esc closes it even with focus on the floating button", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.setViewportSize(VIEWPORTS.notebook);
   await page.goto("/#/inicio");

@@ -26,7 +26,7 @@ function respostaCom(status, lerCorpo) {
   return { status, ok: status >= 200 && status < 300, json: lerCorpo };
 }
 
-test("uma mutação cujo corpo se perde depois dos cabeçalhos fica com desfecho desconhecido, sem ser dada como não feita", async () => {
+test("a mutation whose body is lost after the headers has an unknown outcome and is not treated as not done", async () => {
   const chamadas = [];
   const api = carregarApi(async (url, opcoes) => {
     chamadas.push({ url, method: opcoes.method || "GET" });
@@ -41,7 +41,7 @@ test("uma mutação cujo corpo se perde depois dos cabeçalhos fica com desfecho
   assert.equal(chamadas.length, 1, "nenhuma repetição automática");
 });
 
-test("um corpo inutilizável (JSON truncado) numa mutação aceita também preserva a incerteza; um 4xx é recusa", async () => {
+test("an unusable body (truncated JSON) on an accepted mutation also preserves the uncertainty; a 4xx is a refusal", async () => {
   const truncado = carregarApi(async () => respostaCom(200, () => Promise.reject(new SyntaxError("Unexpected end of JSON input"))));
   const r1 = await truncado.criarAgendamento({ sala: "A-101" });
   assert.equal(r1.desfechoDesconhecido, true);
@@ -58,7 +58,7 @@ test("um corpo inutilizável (JSON truncado) numa mutação aceita também prese
   assert.equal(r3.desfechoDesconhecido, true, "um 5xx de intermediário não prova que o servidor não aplicou");
 });
 
-test("uma consulta com corpo inválido continua sendo apenas uma resposta inválida", async () => {
+test("a query with an invalid body remains just an invalid response", async () => {
   const api = carregarApi(async () => respostaCom(200, () => Promise.reject(new SyntaxError("Unexpected token <"))));
   const resultado = await api.statusSala("A-101");
   assert.equal(resultado.ok, false);
@@ -66,7 +66,7 @@ test("uma consulta com corpo inválido continua sendo apenas uma resposta invál
   assert.equal(resultado.erro, "resposta inválida do servidor (status 200)");
 });
 
-test("o prazo da chamada cobre a leitura do corpo, e uma resposta íntegra passa intacta", async () => {
+test("the call deadline covers reading the body, and an intact response passes unchanged", async () => {
   const lenta = carregarApi(async (url, opcoes) => respostaCom(200, () => new Promise((resolve, reject) => {
     opcoes.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
   })));

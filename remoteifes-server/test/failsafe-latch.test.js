@@ -60,7 +60,7 @@ test.after(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test("um OFF local travado na placa não é desfeito pelo estado ligado que o servidor ainda guardava", async () => {
+test("a local OFF latched on the board is not undone by the ON state the server still held", async () => {
   sala("LATCH-1", "AA:BB:CC:F5:00:01", true);
   let mudancas = 0;
   const ouvinte = () => { mudancas += 1; };
@@ -92,7 +92,7 @@ test("um OFF local travado na placa não é desfeito pelo estado ligado que o se
   d.ws.close();
 });
 
-test("firmware 4.1.0 (sem latch) recebe o estado do servidor logo depois do info, como antes", async () => {
+test("firmware 4.1.0 (no latch) receives the server state right after info, as before", async () => {
   sala("LATCH-2", "AA:BB:CC:F5:00:02", true);
   const d = await conectar("LATCH-2", "AA:BB:CC:F5:00:02");
   await ate(() => d.mensagens.some((m) => m.tipo === "device_role"));
@@ -106,7 +106,7 @@ test("firmware 4.1.0 (sem latch) recebe o estado do servidor logo depois do info
   d.ws.close();
 });
 
-test("firmware que nunca envia info recebe o estado após a espera de segurança", async () => {
+test("firmware that never sends info receives the state after the safety wait", async () => {
   sala("LATCH-3", "AA:BB:CC:F5:00:03", true);
   const d = await conectar("LATCH-3", "AA:BB:CC:F5:00:03");
   await esperar(1500);
@@ -116,7 +116,7 @@ test("firmware que nunca envia info recebe o estado após a espera de segurança
   d.ws.close();
 });
 
-test("a desconexão durante a espera cancela a sincronização pendente", async () => {
+test("disconnecting during the wait cancels the pending synchronization", async () => {
   sala("LATCH-4", "AA:BB:CC:F5:00:04", true);
   const d = await conectar("LATCH-4", "AA:BB:CC:F5:00:04");
   await ate(() => d.mensagens.some((m) => m.tipo === "device_role"));
@@ -126,7 +126,7 @@ test("a desconexão durante a espera cancela a sincronização pendente", async 
   assert.equal(d.estados().length, 0);
 });
 
-test("um RAW cuja duração total passa de 2 s é recusado no servidor e nos testes de transmissão", () => {
+test("a RAW whose total duration exceeds 2 s is refused by the server and in transmission tests", () => {
   const longo = Array.from({ length: 40 }, () => 60000);
   assert.throws(() => protocolos.validarRaw(longo), /duração máxima/);
   assert.doesNotThrow(() => protocolos.validarRaw(Array.from({ length: 1024 }, () => 1900)));
