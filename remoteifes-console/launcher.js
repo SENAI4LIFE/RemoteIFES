@@ -169,6 +169,15 @@ function tocarPorta(porta) {
 }
 
 async function garantirBackend() {
+  // Quick prerequisite check on every launch (no network, no reinstall): a Node below the minimum
+  // would start a Console that fails in obscure ways.
+  const runtime = plataforma.runtimeAtual();
+  if (!runtime.atende) {
+    return {
+      ok: false,
+      motivo: `${runtime.motivo}. O console e o RemoteIFES exigem Node ${runtime.minimoExigido} ou mais novo; atualize o Node e abra o console de novo.`,
+    };
+  }
   const contrato = lerContrato();
   if (contrato) {
     const identidade = await verificarIdentidade(contrato);
