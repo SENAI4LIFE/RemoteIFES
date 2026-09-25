@@ -286,23 +286,48 @@ jobs:
           if ($saida -notmatch "no ar") { throw "the launcher did not recognize the installed Console" }
 
       # On Linux the .deb is the real installation path; installing it is the only proof the
-      # package is well formed. --force-depends because the runner provides Node outside the
-      # distribution's nodejs package.
-      - name: Install and remove the .deb package
+      # package is well formed and that its postinst provisions a working Console (state, setup
+      # secret, systemd units, helper, sudo rule). --force-depends because the runner provides Node
+      # outside the distribution's nodejs package; PATH is passed so the maintainer scripts use the
+      # Node 22 set up above instead of the image's older default.
+      - name: Install, verify, remove and purge the .deb package
         if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
           VERSAO=$(CONSOLE_PKG="$GITHUB_WORKSPACE/remoteifes-console/package.json" node -p "require(process.env.CONSOLE_PKG).version")
-          sudo dpkg --force-depends -i "$RUNNER_TEMP/dist/remoteifes-console_${VERSAO}_all.deb"
+          DEB="$RUNNER_TEMP/dist/remoteifes-console_${VERSAO}_all.deb"
+          sudo env PATH="$PATH" CONSOLE_CHECKOUT_DIR="$GITHUB_WORKSPACE" dpkg --force-depends -i "$DEB" | tee "$RUNNER_TEMP/deb-install.log"
           test -f /opt/remoteifes-console/console-bootstrap.js
           test -f /opt/remoteifes-console/launcher-bootstrap.js
           test -f /opt/remoteifes-console/estado-instalacao.json
           test -f "/opt/remoteifes-console/versoes/$VERSAO/console.js"
           test -f /usr/share/applications/remoteifes-console.desktop
-          dpkg -L remoteifes-console | head -20
+          sudo dpkg --verify remoteifes-console
+          sudo test -s /var/lib/remoteifes-console/bootstrap-token
+          if sudo grep -qF "$(sudo cat /var/lib/remoteifes-console/bootstrap-token)" "$RUNNER_TEMP/deb-install.log"; then
+            echo "the setup secret was printed by the package installation"; exit 1
+          fi
+          systemctl is-enabled remoteifes-console.socket
+          sudo test -x /usr/local/lib/remoteifes/console-helper.sh
+          sudo visudo -cf /etc/sudoers.d/remoteifes-console
+          codigo=""
+          for _ in $(seq 1 30); do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/ || true)
+            [ "$codigo" = "200" ] && break
+            sleep 1
+          done
+          if [ "$codigo" != "200" ]; then
+            sudo journalctl -u remoteifes-console.service --no-pager | tail -50
+            echo "the socket-activated Console did not answer (HTTP $codigo)"; exit 1
+          fi
           sudo dpkg -r remoteifes-console
-          test ! -e /opt/remoteifes-console/console-bootstrap.js
+          test ! -e /opt/remoteifes-console
+          test ! -e /etc/systemd/system/remoteifes-console.socket
+          sudo test ! -e /etc/sudoers.d/remoteifes-console
+          sudo test -s /var/lib/remoteifes-console/bootstrap-token
+          sudo dpkg -P remoteifes-console
+          sudo test ! -e /var/lib/remoteifes-console
 
       - name: Uninstall and check that state survives
         shell: bash

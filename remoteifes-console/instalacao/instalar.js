@@ -21,6 +21,15 @@ const { execFileSync } = require("child_process");
 // Usage:
 //   node instalacao/instalar.js [--escopo usuario|sistema] [--raiz <dir>] [--estado <dir>]
 //                              [--checkout <dir>] [--porta <n>] [--sem-servico] [--forcar]
+//                              [--usuario <nome>] [--pacote]
+//
+// `--pacote` is the provisioning step of the Linux package (the .deb postinst runs it). dpkg has
+// already placed the stable layer and the package's payload, so nothing dpkg owns is written; the
+// installer provisions what dpkg does not: the version pointer, the state directory, the one-time
+// setup secret, the systemd units, the privileged helper and the sudo rule. The checkout comes from
+// --checkout, from CONSOLE_CHECKOUT_DIR or from the one already recorded; without it, units are not
+// installed and the single follow-up command is printed. The setup secret is never printed in this
+// mode: apt copies terminal output into /var/log/apt/term.log.
 
 const ORIGEM = path.resolve(path.join(__dirname, ".."));
 
@@ -77,14 +86,27 @@ function copiarArvore(origem, destino, { ignorar = new Set() } = {}) {
   }
 }
 
+/** Numeric comparison of x.y.z versions; non-numeric parts compare as 0. */
+function compararVersoes(a, b) {
+  const pa = String(a).split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const pb = String(b).split(".").map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i += 1) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+  }
+  return 0;
+}
+
+const MODO_PACOTE = temFlag("pacote");
+
 async function main() {
   const pacote = JSON.parse(fs.readFileSync(path.join(ORIGEM, "package.json"), "utf8"));
   const versao = pacote.version;
+  if (MODO_PACOTE && process.platform !== "linux") falhar("--pacote existe apenas para o pacote Linux (.deb).");
 
   // Loads the adapter with the requested scope, before any path decision.
   const plataforma = require(path.join(ORIGEM, "src", "plataforma"));
   const admin = ehAdministrador();
-  const escopoPedido = argumento("escopo", admin ? (process.platform === "linux" ? "sistema" : "usuario") : "usuario");
+  const escopoPedido = MODO_PACOTE ? "sistema" : argumento("escopo", admin ? (process.platform === "linux" ? "sistema" : "usuario") : "usuario");
   if (!["usuario", "sistema"].includes(escopoPedido)) falhar("--escopo aceita apenas 'usuario' ou 'sistema'");
   if (escopoPedido === "sistema" && !admin) {
     falhar("instalação de escopo 'sistema' exige privilégio de administrador/root.");
@@ -167,16 +189,20 @@ async function main() {
   }
 
   // --- Stable layer ----------------------------------------------------------------------------
-  log("== Instalando a camada estável");
-  fs.copyFileSync(path.join(ORIGEM, "instalacao", "console-bootstrap.js"), path.join(raiz, "console-bootstrap.js"));
-  fs.writeFileSync(
-    path.join(raiz, "launcher-bootstrap.js"),
-    "#!/usr/bin/env node\n" +
-      "// Camada estável do lançador: resolve a versão ativa e a carrega.\n" +
-      'process.env.CONSOLE_BOOTSTRAP_ALVO = "launcher";\n' +
-      'require(require("path").join(__dirname, "console-bootstrap.js"));\n',
-    { mode: 0o755 }
-  );
+  if (MODO_PACOTE) {
+    log("== Camada estável: instalada pelo pacote (dpkg é o dono desses arquivos)");
+  } else {
+    log("== Instalando a camada estável");
+    fs.copyFileSync(path.join(ORIGEM, "instalacao", "console-bootstrap.js"), path.join(raiz, "console-bootstrap.js"));
+    fs.writeFileSync(
+      path.join(raiz, "launcher-bootstrap.js"),
+      "#!/usr/bin/env node\n" +
+        "// Camada estável do lançador: resolve a versão ativa e a carrega.\n" +
+        'process.env.CONSOLE_BOOTSTRAP_ALVO = "launcher";\n' +
+        'require(require("path").join(__dirname, "console-bootstrap.js"));\n',
+      { mode: 0o755 }
+    );
+  }
 
   const estadoInstalacao = path.join(raiz, "estado-instalacao.json");
   const anteriorRegistrada = (() => {
@@ -186,6 +212,20 @@ async function main() {
       return null;
     }
   })();
+  // A package upgrade never moves the pointer backwards: a Console that updated itself to a newer
+  // verified version keeps running it, and the package's payload stays available as the fallback.
+  let versaoAtiva = versao;
+  let versaoAnterior = anteriorRegistrada && anteriorRegistrada !== versao ? anteriorRegistrada : null;
+  if (
+    MODO_PACOTE &&
+    anteriorRegistrada &&
+    compararVersoes(anteriorRegistrada, versao) > 0 &&
+    fs.existsSync(path.join(raiz, "versoes", anteriorRegistrada, "console.js"))
+  ) {
+    versaoAtiva = anteriorRegistrada;
+    versaoAnterior = versao;
+    log(`   versão ativa mantida em ${anteriorRegistrada}, mais nova que a do pacote (${versao}).`);
+  }
   // The state location is RECORDED here.
   //
   // The program started from a shortcut has no environment variables, so without this record it
@@ -196,8 +236,8 @@ async function main() {
     estadoInstalacao,
     `${JSON.stringify(
       {
-        versaoAtiva: versao,
-        versaoAnterior: anteriorRegistrada && anteriorRegistrada !== versao ? anteriorRegistrada : null,
+        versaoAtiva,
+        versaoAnterior,
         transacao: null,
         atualizadoEm: new Date().toISOString(),
         escopo: escopoPedido,
@@ -218,7 +258,7 @@ async function main() {
   const protecao = plataforma.protegerArquivo(dirEstado, { diretorio: true });
   log(`   proteção do estado: ${protecao.disponivel ? protecao.mecanismo || "modo POSIX" : `não aplicada (${protecao.motivo})`}`);
 
-  const checkout = argumento("checkout", null);
+  const checkout = argumento("checkout", null) || (MODO_PACOTE ? process.env.CONSOLE_CHECKOUT_DIR || null : null);
   if (checkout) {
     const resolvido = path.resolve(checkout);
     if (!fs.existsSync(path.join(resolvido, "remoteifes-server", "package.json"))) {
@@ -226,7 +266,7 @@ async function main() {
     }
     fs.writeFileSync(path.join(dirEstado, "checkout-dir"), `${resolvido}\n`, { mode: 0o600 });
     log(`   checkout administrado: ${resolvido}`);
-  } else if (!fs.existsSync(path.join(dirEstado, "checkout-dir"))) {
+  } else if (!MODO_PACOTE && !fs.existsSync(path.join(dirEstado, "checkout-dir"))) {
     const palpite = path.resolve(path.join(ORIGEM, ".."));
     if (fs.existsSync(path.join(palpite, "remoteifes-server", "package.json"))) {
       fs.writeFileSync(path.join(dirEstado, "checkout-dir"), `${palpite}\n`, { mode: 0o600 });
@@ -269,7 +309,15 @@ async function main() {
     log(`  Layout anterior migrado: ${migrado.detalhe}`);
     log("");
   }
-  if (segredo) {
+  if (segredo && MODO_PACOTE) {
+    // apt records the terminal output of maintainer scripts in /var/log/apt/term.log: the secret is
+    // never printed here, only its location.
+    log("  Primeiro operador: o segredo de instalação de uso único foi gravado em");
+    log(`      ${path.join(dirEstado, "bootstrap-token")}`);
+    log("  (legível só por root). Abra o console pelo menu do sistema ou crie o operador pelo terminal:");
+    log(`      sudo ${comandoDoLancador(raiz)} --criar-operador`);
+    log("");
+  } else if (segredo) {
     log("  ================================================================");
     log("   Segredo de instalação (uso único, exibido apenas agora):");
     log("");
@@ -453,8 +501,32 @@ function criarAtalho({ plataforma, raiz, log }) {
   return null;
 }
 
+/**
+ * The Console service user, never root: the one named with --usuario, the one who invoked sudo, or
+ * the owner of the managed checkout (the user that runs git and deploy.sh there).
+ */
+function usuarioDoConsole(checkout) {
+  const pedido = argumento("usuario", null);
+  if (pedido) return pedido;
+  if (process.env.SUDO_USER && process.env.SUDO_USER !== "root") return process.env.SUDO_USER;
+  if (!MODO_PACOTE) return process.env.SUDO_USER || os.userInfo().username;
+  if (!checkout) return null;
+  try {
+    const uid = fs.statSync(checkout).uid;
+    if (uid === 0) return null;
+    const linha = fs
+      .readFileSync("/etc/passwd", "utf8")
+      .split("\n")
+      .find((l) => l.split(":")[2] === String(uid));
+    return linha ? linha.split(":")[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 async function integrarLinux({ plataforma, raiz, dirEstado, escopo, admin, log }) {
-  const atalho = criarAtalho({ plataforma, raiz, log });
+  // The package ships /usr/share/applications/remoteifes-console.desktop itself.
+  const atalho = MODO_PACOTE ? "/usr/share/applications/remoteifes-console.desktop" : criarAtalho({ plataforma, raiz, log });
   if (!plataforma.temSystemd()) {
     log("== systemd não é o gerenciador deste sistema; nenhuma unidade instalada.");
     return {
@@ -474,10 +546,21 @@ async function integrarLinux({ plataforma, raiz, dirEstado, escopo, admin, log }
     };
   }
 
-  // Console owner user: whoever invoked sudo, not root. The service runs as that user; root access
-  // goes through the helper, which is root:root and accepts only fixed verbs.
-  const usuario = process.env.SUDO_USER || os.userInfo().username;
-  const checkout = lerCheckoutAssociado(dirEstado) || path.resolve(path.join(ORIGEM, ".."));
+  // Console owner user: not root. The service runs as that user; root access goes through the
+  // helper, which is root:root and accepts only fixed verbs.
+  const checkoutRegistrado = lerCheckoutAssociado(dirEstado);
+  const checkout = checkoutRegistrado || (MODO_PACOTE ? null : path.resolve(path.join(ORIGEM, "..")));
+  const usuario = usuarioDoConsole(checkout);
+  if (MODO_PACOTE && (!checkout || !usuario)) {
+    const falta = !checkout ? "o checkout do RemoteIFES que o console administra" : "um usuário não-root dono do checkout";
+    log(`== Unidades systemd não instaladas: falta ${falta}.`);
+    log("   Conclua o provisionamento com um único comando:");
+    log(`      sudo ${process.execPath} ${path.join(ORIGEM, "instalacao", "instalar.js")} --pacote --checkout <dir-do-checkout> [--usuario <dono>]`);
+    return {
+      atalho,
+      observacao: "O estado e o segredo de instalação já estão prontos; falta apenas associar o checkout.",
+    };
+  }
   const dirDados = dirDadosDaAplicacao(checkout);
   const porta = Number(argumento("porta", "8099"));
   if (!Number.isInteger(porta) || porta < 1 || porta > 65535) falhar("--porta precisa ser um número de porta válido");
@@ -546,4 +629,4 @@ if (require.main === module) {
   main().catch((erro) => falhar(`falha na instalação: ${erro && erro.stack ? erro.stack : erro}`));
 }
 
-module.exports = { migrarLayoutAntigo, copiarArvore, comandoDoLancador };
+module.exports = { migrarLayoutAntigo, copiarArvore, comandoDoLancador, compararVersoes };

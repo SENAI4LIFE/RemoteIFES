@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
+const zlib = require("zlib");
 const { execFileSync } = require("child_process");
 const ajuda = require("./helpers");
 
@@ -503,7 +504,52 @@ test("the .deb is assembled in the ar format dpkg understands", (t) => {
   for (const membro of ["debian-binary", "control.tar.gz", "data.tar.gz"]) {
     assert.ok(conteudo.includes(Buffer.from(membro)), `membro ${membro} ausente`);
   }
+
+  // Provisioning is delegated to the same installer and uninstaller as a manual installation.
+  const membros = membrosAr(conteudo);
+  const controle = entradasTar(zlib.gunzipSync(membros["control.tar.gz"]));
+  for (const script of ["postinst", "prerm", "postrm"]) {
+    assert.ok(controle[script], `maintainer script ${script} missing`);
+    assert.equal(controle[script].modo & 0o111, 0o111, `${script} must be executable`);
+    assert.match(controle[script].texto, /^#!\/bin\/sh\nset -e\n/);
+  }
+  assert.match(controle.postinst.texto, new RegExp(`versoes/${versao}/instalacao/instalar\\.js" --pacote`));
+  assert.match(controle.prerm.texto, new RegExp(`versoes/${versao}/instalacao/desinstalar\\.js" --pacote --sim`));
+  assert.match(controle.postrm.texto, /"\$1" = "purge"[\s\S]*rm -rf \/var\/lib\/remoteifes-console/);
+  assert.ok(!/purge/.test(controle.prerm.texto), "a plain remove never deletes the state");
+
+  const dados = entradasTar(zlib.gunzipSync(membros["data.tar.gz"]));
+  assert.ok(dados["opt/remoteifes-console/console-bootstrap.js"], "the stable layer belongs to the package");
+  assert.ok(!dados["opt/remoteifes-console/estado-instalacao.json"], "the version pointer is rewritten by the updater, so dpkg must not own it");
 });
+
+function membrosAr(buffer) {
+  const membros = {};
+  let pos = 8;
+  while (pos + 60 <= buffer.length) {
+    const nome = buffer.subarray(pos, pos + 16).toString().trim().replace(/\/$/, "");
+    const tamanho = Number.parseInt(buffer.subarray(pos + 48, pos + 58).toString().trim(), 10);
+    membros[nome] = buffer.subarray(pos + 60, pos + 60 + tamanho);
+    pos += 60 + tamanho + (tamanho % 2);
+  }
+  return membros;
+}
+
+function entradasTar(buffer) {
+  const entradas = {};
+  for (let pos = 0; pos + 512 <= buffer.length; ) {
+    const cabecalho = buffer.subarray(pos, pos + 512);
+    const nome = cabecalho.subarray(0, 100).toString().replace(/\0.*$/s, "");
+    if (!nome) break;
+    const prefixo = cabecalho.subarray(345, 500).toString().replace(/\0.*$/s, "");
+    const tamanho = Number.parseInt(cabecalho.subarray(124, 136).toString().replace(/\0.*$/s, "").trim() || "0", 8);
+    const modo = Number.parseInt(cabecalho.subarray(100, 108).toString().replace(/\0.*$/s, "").trim() || "0", 8);
+    const completo = (prefixo ? `${prefixo}/${nome}` : nome).replace(/^\.\//, "");
+    entradas[completo] = { modo, texto: buffer.subarray(pos + 512, pos + 512 + tamanho).toString("utf8") };
+    pos += 512 + Math.ceil(tamanho / 512) * 512;
+  }
+  return entradas;
+}
 
 // --- Credential on redirect -----------------------------------------------------------
 
