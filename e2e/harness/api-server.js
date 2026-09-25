@@ -102,8 +102,10 @@ app.post("/__e2e/silenciar-dispositivo/:valor", (req, res) => {
   res.json({ ok: true });
 });
 
-// Placa vista só por heartbeat HTTP (o firmware usa esse caminho quando o WebSocket está caído):
-// "on" derruba o socket do ESP32 simulado sem reconectar e marca presença; "off" o reconecta.
+// Board seen only through HTTP heartbeats (the firmware uses that path while the WebSocket is
+// down):
+// "on" drops the simulated ESP32 socket without reconnecting and marks presence; "off" reconnects
+// it.
 app.post("/__e2e/so-heartbeat/:valor", async (req, res) => {
   if (req.params.valor === "on") {
     if (fake) fake.parar();

@@ -5,13 +5,12 @@ const { initializeCA, initializeCTLog, initializeTLog } = require("@sigstore/moc
 const { TrustedRoot } = require("@sigstore/protobuf-specs");
 const atestacao = require("../../src/atestacao");
 
-// Atestações de teste: um Sigstore privado feito de peças do @sigstore/mock (uma CA no estilo do
-// Fulcio com o seu log de transparência de certificados, e um log de transparência no estilo do
-// Rekor) mais a raiz de confiança que os nomeia. Emite pacotes com exatamente a forma dos que o
-// actions/attest-build-provenance produz (bundle v0.3, envelope DSSE, declaração in-toto, entrada
-// dsse 0.0.1 do Rekor com promessa e prova de inclusão), para qualquer identidade que um teste
-// queira alegar. Só a raiz de confiança de um teste conhece estas chaves, então nada emitido aqui
-// confere contra a raiz real do Sigstore.
+// Test attestations: a private Sigstore made of @sigstore/mock parts (a Fulcio-like CA with its
+// certificate transparency log, and a Rekor-like transparency log) plus the trusted root that
+// names them. It issues bundles shaped exactly like the ones actions/attest-build-provenance
+// produces (bundle v0.3, DSSE envelope, in-toto statement, Rekor dsse 0.0.1 entry with inclusion
+// promise and proof), for any identity a test wants to claim. Only a test's trusted root knows these
+// keys, so nothing issued here verifies against the real Sigstore root.
 
 const TIPO_PAYLOAD = "application/vnd.in-toto+json";
 const OFICIAL = atestacao.IDENTIDADE_OFICIAL;
@@ -22,9 +21,8 @@ const sha256 = (dados) => crypto.createHash("sha256").update(dados).digest("hex"
 const pae = (tipo, corpo) => Buffer.concat([Buffer.from(`DSSEv1 ${Buffer.byteLength(tipo)} ${tipo} ${corpo.length} `), corpo]);
 
 /**
- * As extensões de certificado que o token OIDC do GitHub dá a uma execução de workflow, para o
- * repositório oficial, a menos que `identidade` diga outra coisa. `omitir` descarta extensões pelo
- * nome.
+ * The certificate extensions GitHub's OIDC token gives a workflow run, for the official
+ * repository unless `identidade` says otherwise. `omitir` drops extensions by name.
  */
 function extensoesDe({ versao, commit, identidade = {}, omitir = [] }) {
   const base = { ...OFICIAL, ...identidade };
@@ -72,8 +70,7 @@ function declaracaoDe({ sujeitos, ref, repositorio, workflow, commit, tipoPredic
 }
 
 /**
- * Um Sigstore privado. `relogio` é o momento da assinatura; os certificados valem dez minutos a
- * partir dele.
+ * A private Sigstore. `relogio` is the signing time; certificates live ten minutes from it.
  */
 async function criarAutoridade({ relogio = new Date(Date.now() + 2000) } = {}) {
   const chavesCt = par();
@@ -114,15 +111,14 @@ async function criarAutoridade({ relogio = new Date(Date.now() + 2000) } = {}) {
   };
 
   /**
-   * Um pacote de atestação (Buffer) sobre `sujeitos` ([{ name, sha256 }]).
+   * An attestation bundle (Buffer) over `sujeitos` ([{ name, sha256 }]).
    *
-   *   identidade    campos do certificado a alegar no lugar dos oficiais (veja extensoesDe)
-   *   omitir        extensões do certificado a deixar de fora
-   *   tipoPredicado outro tipo de predicado
-   *   atrasoDoLogMs registra a entrada esse tempo depois de o certificado ser emitido
-   *   adulterar     "assinatura" (uma assinatura sobre outros bytes, registrada assim mesmo),
-   *                 "promessa" (uma promessa de inclusão corrompida) ou "payload" (o envelope
-   *                 alterado depois do registro)
+   *   identidade    certificate fields to claim instead of the official ones (see extensoesDe)
+   *   omitir        certificate extensions to leave out
+   *   tipoPredicado another predicate type
+   *   atrasoDoLogMs log the entry that long after the certificate was issued
+   *   adulterar     "assinatura" (a signature over other bytes, logged as is), "promessa" (a
+   *                 corrupted inclusion promise) or "payload" (the envelope changed after logging)
    */
   async function atestar({ sujeitos, versao, commit, identidade, omitir, tipoPredicado, atrasoDoLogMs = 0, adulterar = null }) {
     const assinante = par();
@@ -198,8 +194,8 @@ async function criarAutoridade({ relogio = new Date(Date.now() + 2000) } = {}) {
 }
 
 /**
- * O que a publicação de um release faz com um diretório de build: uma atestação sobre todos os
- * arquivos dele, gravada ao lado deles como atestacao.sigstore.json. Devolve o manifesto.
+ * What publishing a release does to a build directory: one attestation over every file in it,
+ * written next to them as atestacao.sigstore.json. Returns the manifest.
  */
 async function atestarDiretorio(autoridade, dir, opcoes = {}) {
   const manifesto = JSON.parse(fs.readFileSync(path.join(dir, atestacao.ARQUIVO_MANIFESTO), "utf8"));
@@ -214,8 +210,8 @@ async function atestarDiretorio(autoridade, dir, opcoes = {}) {
 }
 
 /**
- * Faz os módulos do console carregados por `mods` confiarem em `autoridade` no lugar do Sigstore,
- * só neste processo. Devolve uma função que desfaz isso.
+ * Makes the Console modules loaded by `mods` trust `autoridade` instead of Sigstore, in this
+ * process only. Returns a function that undoes it.
  */
 function confiarEm(mods, autoridade) {
   const modulo = mods.atestacao || require(path.join(__dirname, "..", "..", "src", "atestacao.js"));

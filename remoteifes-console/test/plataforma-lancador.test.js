@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const { spawn } = require("child_process");
 const ajuda = require("./ajuda");
 
-// Adaptadores de plataforma, modelo de capacidades e proteção do lançador contra phishing local.
+// Platform adapters, capability model and launcher protection against local phishing.
 
 // --- Adaptadores --------------------------------------------------------------------------
 
@@ -46,7 +46,7 @@ test("capacidades indisponíveis têm causa distinta, não um booleano", async (
   assert.ok(estados.has("sem-permissao"));
   assert.ok(estados.has("nao-suportado"));
 
-  // O watchdog não existe fora do Linux: isso é "não aplicável", não "indisponível".
+  // The watchdog does not exist outside Linux: that is "not applicable", not "unavailable".
   process.env.CONSOLE_PLATAFORMA = "win32";
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
   const w = await windows.estadoDoWatchdog();
@@ -69,7 +69,7 @@ test("a arquitetura distingue hardware, kernel, userland e runtime", async (t) =
   assert.ok("kernel" in a && "userland" in a && "hardware" in a, "as quatro camadas são separadas");
   assert.match(a.alvoDeArtefato, new RegExp(process.arch));
   assert.match(a.observacao, /Raspberry Pi 3/);
-  // A ressalva de ARMv7 só aparece quando o userland/runtime é de 32 bits.
+  // The ARMv7 caveat appears only when the userland/runtime is 32-bit.
   if (a.armv7) assert.match(a.ressalva, /2027-04-30/);
   else assert.equal(a.ressalva, null);
 });
@@ -129,13 +129,12 @@ test("o Windows encerra a árvore por taskkill, e não por grupo POSIX", (t) => 
 });
 
 test("a tarefa agendada do Windows recebe o script, e o caminho com espaço sobrevive", async (t) => {
-  // Dois defeitos moravam aqui. O primeiro: `argumentos` era descartado, então a tarefa era
-  // criada com sucesso chamando `node.exe` sem script nenhum — nada abria e nada reclamava. O
-  // segundo: o comando ia dentro de um script de PowerShell, com aspas escapadas na mão, e o
-  // alvo real é um caminho com espaço ("...\RemoteIFES Console\console-bootstrap.js").
+  // `argumentos` must reach the task (otherwise it runs `node.exe` without a script), and the
+  // command must not go through a PowerShell script with hand-escaped quotes, since the real target
+  // is a path with a space ("...\RemoteIFES Console\console-bootstrap.js").
   //
-  // O teste olha o argv entregue ao schtasks, não o resultado: criar tarefa de verdade exige
-  // privilégio que um runner pode não ter, e pular a verificação nesse caso não provaria nada.
+  // The test inspects the argv handed to schtasks, not the result: creating a real task requires
+  // privilege a runner may not have, and skipping the check in that case would prove nothing.
   const amb = ajuda.ambiente();
   const processos = require(path.join(ajuda.RAIZ, "src", "processos.js"));
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -167,7 +166,7 @@ test("a tarefa agendada do Windows recebe o script, e o caminho com espaço sobr
   assert.ok(alvo.includes(raiz), "o caminho da instalação precisa chegar inteiro");
   assert.equal(alvo, '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\op\\AppData\\Local\\Programs\\RemoteIFES Console\\console-bootstrap.js"');
 
-  // O nome da tarefa vai como argumento próprio: sem aspas embutidas para o shell desfazer.
+  // The task name goes as its own argument: no embedded quotes for a shell to undo.
   assert.equal(criacao.args[criacao.args.indexOf("/TN") + 1], "RemoteIFES Console");
   assert.ok(!criacao.args.includes("/RU"), "escopo de usuário não pede execução como SYSTEM");
 
@@ -192,20 +191,19 @@ test("remover uma inicialização que não existe é sucesso, não falha", async
     amb.restaurar();
   });
 
-  // Desinstalar dá o resultado pedido: não haver tarefa É não haver tarefa. Tratar isso como
-  // erro faria a desinstalação parecer quebrada toda vez que fosse repetida.
+  // Uninstall yields the requested result: no task IS no task. Treating that as an error would make
+  // every repeated uninstall look broken.
   const r = await windows.removerInicializacao();
   assert.equal(r.disponivel, true);
   assert.match(r.mecanismo, /não havia tarefa/);
 });
 
 test("no Windows o disco é medido sem abrir processo nenhum", async (t) => {
-  // O adaptador do Windows chamava o PowerShell uma vez por caminho. A prontidão mede dois
-  // caminhos antes de cada operação, e só isso levava a avaliação a mais de 15 s num runner de
-  // dois núcleos — o operador esperando por uma tela de confirmação.
+  // Readiness measures two paths before every operation, so disk measurement must not start a
+  // process per path on Windows.
   //
-  // O teste olha o adaptador do Windows diretamente, e por isso vale rodando em qualquer
-  // sistema: a medição dele é a herdada do adaptador base, que usa `fs.statfsSync`.
+  // The test inspects the Windows adapter directly and is therefore valid on any system: its
+  // measurement is inherited from the base adapter, which uses `fs.statfsSync`.
   const amb = ajuda.ambiente();
   const processos = require(path.join(ajuda.RAIZ, "src", "processos.js"));
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -232,9 +230,9 @@ test("no Windows o disco é medido sem abrir processo nenhum", async (t) => {
 });
 
 test("cada sistema mede o disco e diz qual dispositivo mediu", async (t) => {
-  // Linux e macOS mantêm o `df`: ele nomeia o dispositivo e o ponto de montagem reais, que o
-  // statfs não dá. Num Pi com /var em outro dispositivo, essa distinção é a diferença entre
-  // medir o disco certo e o errado antes de um backup.
+  // Linux and macOS keep `df`: it names the real device and mount point, which statfs does not. On
+  // a Pi with /var on another device, that is the difference between measuring the right and the
+  // wrong disk before a backup.
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
@@ -254,8 +252,8 @@ test("no Windows a proteção de arquivo não é afirmada por modo POSIX", (t) =
   const alvo = path.join(amb.estadoDir, "protegido.json");
   fs.writeFileSync(alvo, "{}");
   const r = windows.permissaoRestrita(alvo);
-  // Onde icacls existe, a resposta é verificável; onde não existe, ela diz que não é verificável
-  // em vez de devolver um "restrito" falso.
+  // Where icacls exists the answer is verifiable; where it does not, it says it is not verifiable
+  // instead of returning a false "restricted".
   assert.ok(r.verificavel === true || r.verificavel === false);
   if (r.verificavel) assert.equal(typeof r.restrito, "boolean");
   else assert.equal(r.restrito, null);
@@ -301,7 +299,7 @@ test("a prova de identidade confere e não revela o segredo", async (t) => {
   assert.equal(r.json.prova, esperado);
   assert.ok(!r.texto.includes(contrato.segredo), "o segredo nunca vai na resposta");
 
-  // Desafio diferente, prova diferente: não há resposta fixa reutilizável.
+  // Different challenge, different proof: there is no reusable fixed answer.
   const outro = await ajuda.pedir(s.porta, `/api/identidade?desafio=${encodeURIComponent(crypto.randomBytes(32).toString("base64url"))}`);
   assert.notEqual(outro.json.prova, r.json.prova);
 });
@@ -326,7 +324,7 @@ test("o lançador recusa abrir o navegador num impostor que tomou a porta", asyn
   t.after(() => amb.restaurar());
   const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
 
-  // Impostor: responde /api/identidade com uma prova qualquer, como faria uma página falsa.
+  // Impostor: answers /api/identidade with an arbitrary proof, as a fake page would.
   const impostor = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ prova: "prova-inventada-pelo-impostor", versao: "9.9.9" }));
@@ -335,7 +333,7 @@ test("o lançador recusa abrir o navegador num impostor que tomou a porta", asyn
   const porta = impostor.address().port;
   t.after(() => new Promise((r) => impostor.close(() => r())));
 
-  // Contrato legítimo, com um segredo que o impostor não conhece.
+  // Legitimate contract, with a secret the impostor does not know.
   fs.writeFileSync(
     path.join(amb.estadoDir, "endereco.json"),
     JSON.stringify({ porta, pid: process.pid, segredo: crypto.randomBytes(32).toString("base64url"), versao: "1.0.0" })
@@ -411,7 +409,7 @@ test("o status do lançador separa console, aplicação e versão do programa", 
   assert.ok(s.plataforma);
 });
 
-// --- Saída por ociosidade -------------------------------------------------------------------
+// --- Idle exit -------------------------------------------------------------------
 
 test("a saída por ociosidade fica desarmada quando ninguém sabe religar o console", async (t) => {
   const amb = ajuda.ambiente({ ociosidadeS: 1 });
@@ -421,7 +419,8 @@ test("a saída por ociosidade fica desarmada quando ninguém sabe religar o cons
     amb.restaurar();
   });
 
-  // Sem socket do systemd e sem lançador, sair deixaria o operador sem console.
+  // Without the systemd socket and without the launcher, exiting would leave the operator without a
+  // Console.
   const semReativacao = amb.servidor.armarSaidaPorOciosidade(s.servidor, () => {}, { reativavel: false });
   assert.equal(semReativacao, null, "não arma quando não há como reativar");
 
@@ -432,8 +431,8 @@ test("a saída por ociosidade fica desarmada quando ninguém sabe religar o cons
 
 // --- sc.exe em Windows localizado -------------------------------------------------------------
 
-// Saídas reais de `sc.exe`, en-US e pt-BR. O `sc.exe` traduz os RÓTULOS; o que não muda é a
-// ordem dos campos e o código numérico no início do valor.
+// Real `sc.exe` output, en-US and pt-BR. `sc.exe` translates LABELS; what does not change is the
+// field order and the numeric code at the start of the value.
 const SC_QUERY_EN = [
   "SERVICE_NAME: RemoteIFES",
   "        TYPE               : 10  WIN32_OWN_PROCESS",
@@ -472,9 +471,8 @@ const SC_QC_PT = [
 const SC_QC_PT_MANUAL = SC_QC_PT.replace("TIPO_DE_INÍCIO      : 2   AUTO_START", "TIPO_DE_INÍCIO      : 3   DEMAND_START");
 
 test("o estado do serviço é lido por código, não pelo rótulo em inglês", (t) => {
-  // Num Windows em português o `sc.exe` imprime ESTADO em vez de STATE. Procurar pelo nome
-  // inglês fazia um serviço em execução ser reportado como parado, e start/stop esperava até o
-  // prazo e devolvia falha — num host que é justamente o alvo provável deste projeto.
+  // On Portuguese Windows `sc.exe` prints ESTADO instead of STATE. Looking up the English name
+  // would report a running service as stopped, and start/stop would wait out the deadline and fail.
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -483,7 +481,7 @@ test("o estado do serviço é lido por código, não pelo rótulo em inglês", (
   assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT), 4, "pt-BR: em execução");
   assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT_PARADO), 1, "pt-BR: parado");
 
-  // O tipo (10) nunca pode ser confundido com um estado.
+  // The type (10) must never be confused with a state.
   assert.notEqual(windows.codigoDeEstadoSc(SC_QUERY_PT), 10);
 });
 
@@ -502,22 +500,21 @@ test("estados de transição são distinguidos de parado e em execução", (t) =
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
 
-  // 2 = START_PENDING, 3 = STOP_PENDING. Tratá-los como 1 ou 4 faria a espera pela transição
-  // concluir cedo e relatar sucesso sobre um serviço que ainda estava mudando de estado.
+  // 2 = START_PENDING, 3 = STOP_PENDING. Treating them as 1 or 4 would end the transition wait
+  // early and report success over a service still changing state.
   assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT.replace("4  RUNNING", "2  START_PENDING")), 2);
   assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT.replace("4  RUNNING", "3  STOP_PENDING")), 3);
 });
 
 test("com a porta já reservada, o lançador conecta em vez de disputar o endereço", async (t) => {
-  // Estado normal de um Linux com ativação por socket depois da saída por ociosidade: o contrato
-  // foi apagado, mas o systemd continua dono da porta. Subir um backend TCP ali recebe
-  // EADDRINUSE, e o lançador reportaria falha exatamente no estado que o desenho pretende.
-  // Uma conexão basta para ativar o serviço; então o contrato novo aparece.
+  // Normal Linux state with socket activation after an idle exit: the contract was removed, but
+  // systemd still owns the port. Starting a TCP backend there gets EADDRINUSE. One connection is
+  // enough to activate the service; then the new contract appears.
   const amb = ajuda.ambiente();
   const crypto = require("crypto");
 
-  // Faz o papel do socket do systemd: detém a porta e, na primeira conexão, publica o contrato
-  // como o console faria ao subir.
+  // Plays the systemd socket: holds the port and, on the first connection, publishes the contract
+  // as the Console would on startup.
   const segredo = crypto.randomBytes(32).toString("base64url");
   let conexoes = 0;
   const detentor = require("http").createServer((req, res) => {
@@ -546,12 +543,12 @@ test("com a porta já reservada, o lançador conecta em vez de disputar o endere
     amb.restaurar();
   });
 
-  // O lançador precisa ver essa porta como a sua.
+  // The launcher must see this port as its own.
   const amb2 = ajuda.ambiente({ estadoDir: amb.estadoDir, porta });
   t.after(() => amb2.restaurar());
   const lancador = require(path.join(ajuda.RAIZ, "launcher.js"));
 
-  // Sem contrato no início: é o estado após a saída por ociosidade.
+  // No contract at the start: the state after an idle exit.
   const arquivoContrato = require(path.join(ajuda.RAIZ, "src", "config")).ARQUIVO_ENDERECO;
   try {
     require("fs").rmSync(arquivoContrato, { force: true });
@@ -564,8 +561,9 @@ test("com a porta já reservada, o lançador conecta em vez de disputar o endere
 });
 
 test("porta ocupada por um impostor não é aceita só porque respondeu", async (t) => {
-  // Conectar ativa o serviço, mas não prova identidade: se quem atende não souber o segredo, o
-  // lançador tem de recusar em vez de tratar a porta ocupada como console no ar.
+  // Connecting activates the service but does not prove identity: if whoever answers does not know
+  // the secret, the launcher must refuse instead of treating the occupied port as a running
+  // Console.
   const amb = ajuda.ambiente();
   const intruso = require("http").createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });

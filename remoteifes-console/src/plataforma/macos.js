@@ -5,17 +5,17 @@ const base = require("./base");
 const config = require("../config");
 const processos = require("../processos");
 
-// Adaptador macOS.
+// macOS adapter.
 //
-// Ativação: **LaunchAgent por usuário**, acionado sob demanda pelo lançador, com
-// `RunAtLoad=false`. A ativação por socket do launchd existe, mas a semântica de herança de
-// descritor é diferente da do systemd (o launchd entrega o socket por `launch_activate_socket`,
-// uma API C, não como `LISTEN_FDS`) e exigiria um componente nativo. Como o console já sai por
-// ociosidade, partida sob demanda dá o mesmo custo ocioso zero sem código nativo.
+// Activation: **per-user LaunchAgent**, started on demand by the launcher, with `RunAtLoad=false`.
+// launchd socket activation exists, but its descriptor inheritance differs from systemd's (launchd
+// hands the socket through `launch_activate_socket`, a C API, not `LISTEN_FDS`) and would require a
+// native component. Since the Console already exits on idle, on-demand start gives the same zero
+// idle cost without native code.
 //
-// Escopo: LaunchAgent (por usuário, sessão gráfica) é o padrão. LaunchDaemon (máquina inteira,
-// root) é deliberadamente **não** usado: o console não precisa rodar como root, e um daemon
-// root acionado por um lançador de usuário seria elevação de privilégio disfarçada.
+// Scope: a LaunchAgent (per user, graphical session) is the default. A LaunchDaemon (whole machine,
+// root) is deliberately **not** used: the Console does not need root, and a root daemon triggered
+// by a user launcher would be disguised privilege escalation.
 
 const { ESTADO, recurso } = base;
 
@@ -38,7 +38,7 @@ async function estadoDoServico() {
   const uid = uidAtual();
   if (uid === null) return recurso(ESTADO.INDISPONIVEL, "não foi possível determinar o uid atual");
 
-  // `launchctl print` distingue com precisão "não carregado" de "carregado e parado".
+  // `launchctl print` precisely distinguishes "not loaded" from "loaded and stopped".
   const r = await launchctl(["print", `gui/${uid}/${SERVICO_APP}`]);
   if (!r.ok) {
     const sistema = await launchctl(["print", `system/${SERVICO_APP}`]);
@@ -137,7 +137,7 @@ async function lerRegistros({ unidade = "aplicacao", linhas = 200 } = {}) {
 }
 
 async function reiniciarHost() {
-  // `shutdown -r` exige root; sem sudo configurado, a recusa é explícita em vez de silenciosa.
+  // `shutdown -r` requires root; without sudo configured the refusal is explicit instead of silent.
   const r = await processos.executar("shutdown", ["-r", "now"], { timeoutMs: 20_000 });
   if (r.ok) return recurso(ESTADO.SUPORTADO);
   if (/not permitted|must be root|Operation not permitted/i.test(r.saida || "")) {
@@ -160,7 +160,7 @@ async function reiniciarConsole() {
 }
 
 function memoria() {
-  // vm_stat daria o detalhe, mas o total/livre do os já é suficiente e não custa um processo.
+  // vm_stat would give detail, but os total/free is enough and costs no process.
   return { totalBytes: os.totalmem(), disponivelBytes: os.freemem(), fonte: "os (macOS)" };
 }
 
@@ -225,14 +225,14 @@ async function abrirNavegador(url) {
   return r.ok ? { ...recurso(ESTADO.SUPORTADO), url } : recurso(ESTADO.INDISPONIVEL, r.erro || "open falhou", { url });
 }
 
-// O programa mora dentro do bundle, em Contents/Resources — é onde o macOS espera encontrar o
-// conteúdo de um .app. Deixá-lo na raiz do bundle funcionaria, mas quebra a convenção e
-// atrapalharia uma futura assinatura/notarização, que assina a estrutura, não uma pasta solta.
+// The program lives inside the bundle, in Contents/Resources, where macOS expects a .app's content.
+// Keeping it at the bundle root would work but breaks convention and would hinder future
+// signing/notarization, which signs the structure, not a loose folder.
 const BUNDLE = "RemoteIFES Console.app";
 
-// Caminhos do macOS são POSIX por definição. Montá-los com `path.posix` mantém a forma certa
-// mesmo quando o adaptador é carregado fora do macOS (CONSOLE_PLATAFORMA, nos testes), em vez
-// de produzir barras invertidas que nenhum macOS entenderia.
+// macOS paths are POSIX by definition. Building them with `path.posix` keeps the right form even
+// when the adapter is loaded outside macOS (CONSOLE_PLATAFORMA in tests), instead of producing
+// backslashes no macOS would understand.
 const unir = (...partes) => path.posix.join(...partes.map((parte) => String(parte).split("\\").join("/")));
 
 function diretoriosPadrao({ escopo = "usuario" } = {}) {
@@ -259,7 +259,9 @@ function diretoriosPadrao({ escopo = "usuario" } = {}) {
   };
 }
 
-/** Bundle que contém esta raiz de instalação, se ela estiver dentro de um. */
+/**
+ * Bundle containing this installation root, if it is inside one.
+ */
 function bundleDaRaiz(raiz) {
   const partes = String(raiz).split("\\").join("/").split("/");
   const i = partes.lastIndexOf(BUNDLE);

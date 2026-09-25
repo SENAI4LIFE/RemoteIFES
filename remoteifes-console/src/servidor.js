@@ -16,8 +16,8 @@ const terminal = require("./terminal");
 const identidade = require("./identidade");
 const plataforma = require("./plataforma");
 
-// Servidor HTTP do console. Sem framework: o roteamento aqui é pequeno e explícito, e um
-// framework a mais seria dependência, RAM e superfície num host de 1 GiB sem ganho real.
+// Console HTTP server. No framework: routing here is small and explicit, and a framework would add
+// a dependency, RAM and surface on a 1 GiB host with no real gain.
 
 const TIPOS = {
   ".html": "text/html; charset=utf-8",
@@ -28,9 +28,9 @@ const TIPOS = {
   ".webmanifest": "application/manifest+json; charset=utf-8",
 };
 
-// `frame-ancestors 'none'` e `form-action 'none'` fecham enquadramento e POST para fora;
-// `connect-src 'self'` impede que a página fale com outra origem. Nada de inline: os scripts
-// e estilos do console são arquivos próprios.
+// `frame-ancestors 'none'` and `form-action 'none'` close framing and outbound POST; `connect-src
+// 'self'` keeps the page from talking to another origin. Nothing inline: the Console's scripts and
+// styles are separate files.
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
   "font-src 'self'; connect-src 'self'; base-uri 'none'; object-src 'none'; " +
@@ -55,8 +55,8 @@ function cabecalhosBase(res) {
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("Permissions-Policy", "geolocation=(), camera=(), microphone=(), payment=(), usb=()");
   res.setHeader("Cache-Control", "no-store");
-  // O console nunca é o dono de um service worker; isso impede que um SW registrado por
-  // engano nesta origem assuma navegações.
+  // The Console never owns a service worker; this prevents an SW registered on this origin by
+  // mistake from taking over navigations.
   res.setHeader("Service-Worker-Allowed", "");
 }
 
@@ -71,10 +71,10 @@ function responderErro(res, status, erro, extra = {}) {
   responderJson(res, status, { ok: false, erro, ...extra });
 }
 
-// --- Validação de origem -------------------------------------------------------------------
+// --- Origin validation -------------------------------------------------------------------
 
-// Porta realmente em escuta. Com ativação por socket quem abre a porta é o systemd, então o
-// valor de configuração não serve para validar Host: o processo precisa perguntar ao socket.
+// Port actually listening. With socket activation systemd opens the port, so the configuration
+// value cannot validate Host: the process must ask the socket.
 let portaEfetiva = null;
 
 function definirPortaEfetiva(porta) {
@@ -88,8 +88,8 @@ function hostsAceitos() {
 }
 
 /**
- * Host exato. Fecha DNS rebinding: um nome controlado pelo atacante que resolva para 127.0.0.1
- * chega aqui com outro Host e é recusado antes de qualquer lógica.
+ * Exact Host. Closes DNS rebinding: an attacker-controlled name resolving to 127.0.0.1 arrives with
+ * another Host and is refused before any logic.
  */
 function hostValido(req) {
   const host = String(req.headers.host || "").toLowerCase();
@@ -97,14 +97,14 @@ function hostValido(req) {
 }
 
 /**
- * Origin exato para métodos mutantes. Vale junto com o cookie SameSite=Strict e com o token
- * CSRF em cabeçalho — CORS sozinho não protege nada aqui, porque não é o navegador do atacante
- * que precisa ler a resposta, e sim o efeito colateral que precisa ser impedido.
+ * Exact Origin for mutating methods. Works together with the SameSite=Strict cookie and the CSRF
+ * token header; CORS alone protects nothing here, because the attacker's browser does not need to
+ * read the response, and the side effect is what must be prevented.
  */
 function origemValida(req) {
   const origin = req.headers.origin;
   if (!origin) {
-    // Sem Origin só passa requisição segura; fetch de outra página sempre manda Origin.
+    // Without Origin only safe requests pass; a fetch from another page always sends Origin.
     return METODOS_SEGUROS.has(req.method);
   }
   const host = String(req.headers.host || "").toLowerCase();
@@ -141,7 +141,7 @@ function definirCookieSessao(res, token) {
 function limparCookieSessao(res) {
   const atributos = [`${auth.COOKIE}=`, "Path=/", "HttpOnly", "SameSite=Strict", "Max-Age=0"];
   if (config.ATRAS_DE_TLS) atributos.push("Secure");
-  // Clear-Site-Data remove o que a origem guardou no navegador ao sair.
+  // Clear-Site-Data removes what the origin stored in the browser on logout.
   res.setHeader("Clear-Site-Data", '"cache", "storage"');
   res.setHeader("Set-Cookie", atributos.join("; "));
 }
@@ -166,7 +166,7 @@ function lerCorpo(req, limite = 64 * 1024) {
       if (!texto) return resolve({});
       const tipo = String(req.headers["content-type"] || "");
       if (!tipo.startsWith("application/json")) {
-        // Um tipo inesperado normalmente é envio cross-site disfarçado de formulário.
+        // An unexpected type is usually a cross-site submission disguised as a form.
         return reject(Object.assign(new Error("content-type precisa ser application/json"), { status: 415 }));
       }
       try {
@@ -180,7 +180,8 @@ function lerCorpo(req, limite = 64 * 1024) {
   });
 }
 
-// --- Estáticos ---------------------------------------------------------------------------------
+// --- Static files
+// ---------------------------------------------------------------------------------
 
 function servirEstatico(req, res, url) {
   const relativo = url === "/" ? "index.html" : url.replace(/^\/+/, "");
@@ -204,7 +205,7 @@ function servirEstatico(req, res, url) {
   fs.createReadStream(arquivo).pipe(res);
 }
 
-// --- Sessão ------------------------------------------------------------------------------------
+// --- Session ------------------------------------------------------------------------------------
 
 function sessaoDaRequisicao(req) {
   const cookies = lerCookies(req);
@@ -242,16 +243,15 @@ async function rotear(req, res, url, params) {
   const metodo = req.method;
   const caminho = url;
 
-  // Prova de identidade do listener. Sem sessão de propósito: o lançador não tem como logar,
-  // e precisa saber, ANTES de abrir o navegador, se quem atende na porta é este console. A
-  // resposta é HMAC(segredo, desafio) com um segredo que só existe no arquivo protegido de
-  // estado; um processo que tenha tomado a porta não consegue produzi-la, e quem chama não
-  // aprende nada sobre o segredo.
+  // Listener identity proof. Sessionless on purpose: the launcher cannot log in and needs to know,
+  // BEFORE opening the browser, whether whoever answers on the port is this Console. The answer is
+  // HMAC(secret, challenge) with a secret that exists only in the protected state file; a process
+  // that took the port cannot produce it, and the caller learns nothing about the secret.
   //
-  // É **GET** de propósito. O lançador não é um navegador e não envia `Origin`; exigir Origin
-  // num POST o bloquearia, e abrir exceção na regra de origem para uma rota enfraqueceria a
-  // defesa de CSRF para todas. Como a rota não muda nada e não revela o segredo, um método
-  // seguro é a escolha correta: a regra de origem continua intacta.
+  // It is **GET** on purpose. The launcher is not a browser and sends no `Origin`; requiring Origin
+  // on a POST would block it, and exempting one route from the origin rule would weaken CSRF
+  // defense for all. Since the route changes nothing and does not reveal the secret, a safe method
+  // is correct and the origin rule stays intact.
   if (caminho === "/api/identidade" && metodo === "GET") {
     const desafio = String(params.get("desafio") || "");
     if (!/^[A-Za-z0-9_-]{16,128}$/.test(desafio)) return responderErro(res, 400, "desafio inválido");
@@ -263,8 +263,8 @@ async function rotear(req, res, url, params) {
     });
   }
 
-  // Bootstrap: só quando ainda não há operador. O segredo de instalação é exibido uma vez pelo
-  // instalador e fica num arquivo que só o usuário do console lê.
+  // Bootstrap: only while there is no operator yet. The installation secret is shown once by the
+  // installer and kept in a file only the Console user reads.
   if (caminho === "/api/bootstrap" && metodo === "POST") {
     if (auth.existeOperador()) return responderErro(res, 409, "o console já tem um operador");
     const corpo = await lerCorpo(req);
@@ -369,7 +369,7 @@ async function rotear(req, res, url, params) {
     return responderJson(res, 200, { ok: true, reautenticar: true });
   }
 
-  // --- Observação -----------------------------------------------------------------------------
+  // --- Observation -----------------------------------------------------------------------------
 
   if (caminho === "/api/painel" && metodo === "GET") {
     marcarAtividade();
@@ -386,16 +386,16 @@ async function rotear(req, res, url, params) {
     const saude = await coleta.consultarSaude();
     return responderJson(res, 200, {
       host: await coleta.coletarHost({ completo: true }),
-      // A leitura do conteúdo do banco só é liberada com a aplicação no ar: com ela parada,
-      // abrir o SQLite criaria -shm/-wal no diretório de dados a partir de um processo que
-      // deveria apenas observar.
+      // Reading database content is allowed only with the application running: with it stopped,
+      // opening SQLite would create -shm/-wal in the data directory from a process that should only
+      // observe.
       banco: coleta.espiarBanco({ permitirLeitura: saude.respondeu }),
       prontidaoAplicacao: await prontidao.consultarProntidaoDaAplicacao(),
     });
   }
 
-  // Programa instalado: **não** é o mesmo assunto que /api/atualizacao, que trata do commit do
-  // RemoteIFES implantado. Aqui é a versão do console, a plataforma e onde as coisas moram.
+  // Installed program: **not** the same subject as /api/atualizacao, which is about the deployed
+  // RemoteIFES commit. This is the Console version, the platform and where things live.
   if (caminho === "/api/programa" && metodo === "GET") {
     const atualizador = require("./atualizador");
     const consultarRede = params.get("rede") === "1";
@@ -434,8 +434,8 @@ async function rotear(req, res, url, params) {
   }
 
   if (caminho === "/api/atualizacao/buscar" && metodo === "POST") {
-    // git fetch traz os objetos para que o alvo possa ser revisado e implantado. Só busca;
-    // não mexe no checkout nem no ramo local.
+    // git fetch brings the objects so the target can be reviewed and deployed. Fetch only; it does
+    // not touch the checkout or the local branch.
     const r = await repositorio.git(["fetch", "--tags", "--prune", "origin"], { timeoutMs: 180_000 });
     estado.auditar("objetos-buscados", { operador: sessao.operador, ok: r.ok });
     if (!r.ok) {
@@ -486,7 +486,7 @@ async function rotear(req, res, url, params) {
     return responderJson(res, 200, await mobile.estadoCI());
   }
 
-  // --- Ações -----------------------------------------------------------------------------------
+  // --- Actions -----------------------------------------------------------------------------------
 
   if (caminho === "/api/acoes" && metodo === "GET") {
     return responderJson(res, 200, { acoes: acoes.listar() });
@@ -507,7 +507,7 @@ async function rotear(req, res, url, params) {
           exigeElevacao: !!acao.exigeElevacao,
           confirmacao: acao.confirmacao || null,
         },
-        // Segredos nunca voltam: o eco dos argumentos omite campos do tipo segredo.
+        // Secrets never come back: the argument echo omits secret-type fields.
         argumentos: Object.fromEntries(
           Object.entries(argumentos).filter(([k]) => !acao.esquema || !acao.esquema[k] || acao.esquema[k].tipo !== "segredo")
         ),
@@ -628,8 +628,8 @@ function fluxoDeEventos(req, res, id) {
   execucao.eventos.on("saida", aoSair);
   execucao.eventos.on("fim", aoFim);
 
-  // Sondagem lenta de reforço: cobre o caso em que o processo foi iniciado por outra instância
-  // do console (saída no arquivo, sem evento em memória).
+  // Slow reinforcement poll: covers a process started by another Console instance (output in the
+  // file, no in-memory event).
   const relogio = setInterval(empurrar, 2000);
   const batida = setInterval(() => fluxo.ativo && res.write(": batida\n\n"), 25_000);
 
@@ -659,7 +659,7 @@ function criarServidor() {
     marcarAtividade();
     try {
       if (!hostValido(req)) {
-        // 421 é a resposta correta para "este servidor não atende esse Host".
+        // 421 is the correct answer for "this server does not serve that Host".
         return responderErro(res, 421, "host não reconhecido por este console");
       }
       if (!origemValida(req)) {
@@ -703,13 +703,14 @@ function criarServidor() {
 }
 
 /**
- * Saída por ociosidade. Só faz sentido com ativação por socket: o systemd guarda o socket e
- * reabre o serviço na próxima conexão, então ficar residente seria RAM parada num host de 1 GiB.
+ * Idle exit. Only meaningful with socket activation: systemd holds the socket and reopens the
+ * service on the next connection, so staying resident would be idle RAM on a 1 GiB host.
  */
 function armarSaidaPorOciosidade(servidor, aoSair, { reativavel = false } = {}) {
   if (!config.OCIOSIDADE_S) return null;
-  // Sair por ociosidade só é seguro quando alguém sabe religar: o socket do systemd ou o
-  // lançador. Num `node console.js` avulso, sair deixaria o operador sem console e sem aviso.
+  // Idle exit is safe only when something can restart it: the systemd socket or the launcher. In a
+  // standalone `node console.js`, exiting would leave the operator without a Console and without
+  // warning.
   if (!reativavel) return null;
   const relogio = setInterval(() => {
     const ocioso = Date.now() - ultimaAtividade > config.OCIOSIDADE_S * 1000;

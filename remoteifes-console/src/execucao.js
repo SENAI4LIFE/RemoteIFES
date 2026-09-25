@@ -8,27 +8,26 @@ const estado = require("./estado");
 const trava = require("./trava");
 const processos = require("./processos");
 
-// Motor de trabalhos longos (atualização, rollback, backup, restauração...).
+// Long-running job engine (update, rollback, backup, restore...).
 //
-// O que o desenho garante, com precisão — e o que ele **não** garante:
+// What the design guarantees, precisely, and what it does **not**:
 //
-//  - **Fechar o navegador não interrompe nada.** A saída vai para arquivo e o trabalho não
-//    depende da requisição HTTP que o iniciou. Isto é garantido.
+//  - **Closing the browser interrupts nothing.** Output goes to a file and the job does not depend
+//    on the HTTP request that started it. This is guaranteed.
 //
-//  - **O console reiniciar não mata o trabalho em todos os casos, mas pode matar em um.**
-//    O filho roda em grupo de processos próprio (`detached`), o que o solta do terminal e do
-//    grupo do pai. Num serviço systemd, porém, o filho continua no **cgroup da unidade**: um
-//    `systemctl restart remoteifes-console.service` com `KillMode` padrão encerra o cgroup
-//    inteiro, filho incluído. Ou seja: sobrevive a uma saída por ociosidade e a uma queda do
-//    processo do console, mas não necessariamente a um restart da unidade.
+//  - **A Console restart does not kill the job in all cases, but can in one.** The child runs in
+//    its own process group (`detached`), detaching it from the terminal and the parent's group.
+//    Under a systemd service, however, the child stays in the **unit's cgroup**: a `systemctl
+//    restart remoteifes-console.service` with the default `KillMode` ends the whole cgroup, child
+//    included. It survives an idle exit and a Console crash, but not necessarily a unit restart.
 //
-//  - **Por isso o desfecho desconhecido existe.** Quando o console volta e encontra um
-//    trabalho "executando" cujo processo não está mais vivo, ele não presume nada: registra
-//    desfecho **desconhecido**. A reconciliação confere PID e, quando o sistema oferece,
-//    a identidade do processo (hora de início), porque PID é reaproveitado.
+//  - **That is why the unknown outcome exists.** When the Console returns and finds a "running" job
+//    whose process is gone, it assumes nothing: it records an **unknown** outcome. Reconciliation
+//    checks the PID and, where the system offers it, the process identity (start time), because
+//    PIDs are reused.
 //
-//  - **Nenhum filho fica solto para sempre:** há prazo máximo por ação, e o que passa dele é
-//    encerrado e marcado como desconhecido — nunca como sucesso.
+//  - **No child is left loose forever:** each action has a maximum duration, and whatever exceeds
+//    it is terminated and marked unknown, never success.
 
 const ESTADOS = Object.freeze({
   EXECUTANDO: "executando",
@@ -143,19 +142,20 @@ function trabalhoAtivo() {
 }
 
 /**
- * Reconciliação na partida. O console pode ter saído por ociosidade, caído ou sido reiniciado
- * por uma auto-atualização enquanto um trabalho corria.
+ * Reconciliation at start. The Console may have exited on idle, crashed or been restarted by a
+ * self-update while a job was running.
  */
 /**
- * O processo registrado é mesmo aquele, e não outro que herdou o PID? Em Linux, `/proc/<pid>`
- * tem a hora de início; onde isso não existe, a checagem devolve `true` e a conferência fica
- * limitada ao PID — o que é dito no registro em vez de presumido.
+ * Is the recorded process really that one, and not another that inherited the PID? On Linux,
+ * `/proc/<pid>` has the start time; where that does not exist the check returns `true` and
+ * verification is limited to the PID, which is stated in the record instead of assumed.
  */
 function identidadeDeProcessoConfere(trabalho) {
   if (!trabalho.iniciadoProcessoEm) return true;
   try {
     const stat = fs.statSync(`/proc/${trabalho.pid}`);
-    // O diretório do processo nasce com ele; uma diferença grande denuncia outro processo.
+    // The process directory is created with the process; a large difference reveals another
+    // process.
     return Math.abs(stat.ctimeMs - Date.parse(trabalho.iniciadoProcessoEm)) < 60_000;
   } catch {
     return true;
@@ -167,9 +167,9 @@ function reconciliar() {
   let mudou = false;
   for (const t of dados.trabalhos) {
     if (t.estado !== ESTADOS.EXECUTANDO) continue;
-    // PID vivo não basta: o número é reaproveitado, e um processo qualquer que tenha herdado
-    // o PID faria um trabalho morto parecer vivo. Quando o sistema permite, a identidade é
-    // confirmada pela hora de início registrada junto com o PID.
+    // A live PID is not enough: the number is reused, and any process that inherited the PID would
+    // make a dead job look alive. Where the system allows, identity is confirmed by the start time
+    // recorded together with the PID.
     if (t.pid && trava.processoVivo(t.pid) && identidadeDeProcessoConfere(t)) {
       t.resumo = t.resumo || "operação iniciada antes deste processo do console ainda em andamento";
       mudou = true;
@@ -188,14 +188,15 @@ function reconciliar() {
 }
 
 /**
- * Inicia um trabalho.
+ * Starts a job.
  *
  * @param {object} spec
  *  - acao, rotulo, operador
  *  - executavel, argumentos, cwd, env
- *  - exigeTrava: adquire a trava de manutenção compartilhada com deploy.sh/rollback.sh
- *  - timeoutMs, cancelavel, faseIrreversivel: função(texto) que marca que não dá mais para cancelar
- *  - verificar: função assíncrona chamada ao fim, devolve { ok, resumo } para confirmar o efeito
+ *  - exigeTrava: acquires the maintenance lock shared with deploy.sh/rollback.sh
+ *  - timeoutMs, cancelavel, faseIrreversivel: function(text) marking that cancellation is no longer
+ *    possible
+ *  - verificar: async function called at the end, returns { ok, resumo } to confirm the effect
  */
 function iniciar(spec) {
   const ativo = trabalhoAtivo();
@@ -232,10 +233,9 @@ function iniciar(spec) {
   try {
     filho = spawn(spec.executavel, spec.argumentos || [], {
       cwd: spec.cwd || config.DIR_SERVIDOR,
-      // A configuração resolvida do console é passada explicitamente: `ambienteLimpo` monta o
-      // ambiente a partir de uma lista fixa, então um runner filho não herdaria qual checkout
-      // e qual diretório de estado este console administra — e cairia nos padrões, mexendo no
-      // lugar errado.
+      // The Console's resolved configuration is passed explicitly: `ambienteLimpo` builds the
+      // environment from a fixed list, so a child runner would not inherit which checkout and state
+      // directory this Console manages and would fall back to defaults, acting on the wrong place.
       env: processos.ambienteLimpo({
         CONSOLE_ESTADO_DIR: config.DIR_ESTADO,
         CONSOLE_CHECKOUT_DIR: config.DIR_CHECKOUT,
@@ -245,8 +245,8 @@ function iniciar(spec) {
       }),
       stdio: [spec.entrada === undefined ? "ignore" : "pipe", "pipe", "pipe"],
       shell: false,
-      // Grupo próprio: solta o filho do terminal e do grupo do console, e faz o cancelamento
-      // alcançar a árvore inteira em vez de só o processo direto.
+      // Own group: detaches the child from the terminal and the Console's group, and makes
+      // cancellation reach the whole tree instead of only the direct process.
       ...require("./plataforma").opcoesDeGrupo(),
       windowsHide: true,
     });
@@ -357,8 +357,8 @@ async function finalizar(contexto, { estadoFinal, erro, codigo = null, sinal = n
   trabalho.erro = erro || null;
   trabalho.fase = estadoFinal === ESTADOS.CONCLUIDO ? "concluída" : trabalho.fase;
 
-  // Verificação do efeito real: um código de saída 0 não é prova de que o serviço subiu na
-  // versão certa nem de que o backup ficou íntegro. Cada ação diz como se confere.
+  // Verification of the real effect: exit code 0 does not prove the service started on the right
+  // version or that the backup is intact. Each action states how it is checked.
   if (typeof spec.verificar === "function") {
     try {
       const resultado = await spec.verificar({ estadoFinal, codigo, saida: () => lerSaida(trabalho.id).texto });
@@ -371,8 +371,8 @@ async function finalizar(contexto, { estadoFinal, erro, codigo = null, sinal = n
         if (resultado.resumo) trabalho.resumo = resultado.resumo;
       }
     } catch (e) {
-      // Uma verificação que lança não pode virar "concluída": não saber se o efeito aconteceu
-      // é exatamente o desfecho desconhecido, e é assim que precisa ser registrado.
+      // A verification that throws must not become "completed": not knowing whether the effect
+      // happened is exactly the unknown outcome, and it is recorded that way.
       trabalho.verificacao = { ok: false, resumo: `verificação falhou: ${e.message}` };
       if (trabalho.estado === ESTADOS.CONCLUIDO) {
         trabalho.estado = ESTADOS.DESCONHECIDO;
@@ -400,8 +400,8 @@ async function finalizar(contexto, { estadoFinal, erro, codigo = null, sinal = n
 }
 
 function encerrarArvore(pid, sinal) {
-  // Delegado ao adaptador: no POSIX é o grupo de processos; no Windows, `taskkill /T`, porque
-  // lá não existe grupo POSIX e matar só o pai deixaria netos vivos.
+  // Delegated to the adapter: on POSIX the process group; on Windows `taskkill /T`, because there
+  // is no POSIX group there and killing only the parent would leave grandchildren alive.
   require("./plataforma").encerrarArvore(pid, sinal);
 }
 

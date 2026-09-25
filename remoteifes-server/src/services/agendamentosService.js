@@ -201,8 +201,8 @@ function jaExecutadoHoje(agendamentoId, tipo, dataISO) {
   return !!linha;
 }
 
-// Agendamentos do dia anterior que ligaram o ar-condicionado e cujo desligamento nunca foi executado
-// (o servidor parou antes do fim do intervalo e só voltou depois da virada do dia).
+// Previous-day schedules that turned the air conditioner on and whose shutdown never ran (the
+// server stopped before the interval ended and only came back after midnight).
 function listarDesligamentosPendentesDeOntem(dataISO = dataAtualBrasiliaISO()) {
   return db.prepare(`
     SELECT a.*

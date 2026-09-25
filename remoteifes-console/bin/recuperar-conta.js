@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// Recuperação da conta de superadministrador da aplicação.
+// Recovery of the application's superadministrator account.
 //
-// Diferenças deliberadas em relação a `reset-admin-senha.js`:
-//   - a senha chega por **stdin**, nunca por argv. Argumento de processo aparece em `ps`,
-//     em `/proc/<pid>/cmdline` e em qualquer captura de linha de comando;
-//   - não existe fallback para "admin": uma recuperação que instala uma senha padrão
-//     conhecida troca um problema de acesso por um problema de segurança;
-//   - diz com precisão o que foi invalidado: apenas as sessões **daquela conta**.
+// Deliberate differences from `reset-admin-senha.js`:
+//   - the password arrives on **stdin**, never in argv. Process arguments appear in `ps`, in
+//     `/proc/<pid>/cmdline` and in any command-line capture;
+//   - there is no fallback to "admin": a recovery that installs a known default password trades an
+//     access problem for a security problem;
+//   - it states exactly what was invalidated: only the sessions of **that account**.
 //
-// O caminho de emergência continua sendo `npm run reset-admin` no servidor, que funciona sem
-// console, sem autenticação e com a aplicação parada. Este runner é a versão gerenciada.
+// The emergency path remains `npm run reset-admin` on the server, which works without the Console,
+// without authentication and with the application stopped. This runner is the managed version.
 
 const fs = require("fs");
 const path = require("path");
@@ -75,8 +75,8 @@ async function main() {
   }
 
   try {
-    // A conta é escolhida pelo nível, não pelo nome de login: o login padrão mudou de "admin"
-    // para "superadmin" e pode ter sido renomeado pelo operador.
+    // The account is chosen by level, not by login name: the default login may have been renamed by
+    // the operator.
     const conta =
       db.prepare("SELECT id, usuario FROM usuarios WHERE nivel = 3 ORDER BY id LIMIT 1").get() ||
       db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'superadmin'").get() ||

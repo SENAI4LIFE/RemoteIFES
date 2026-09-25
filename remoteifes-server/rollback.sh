@@ -72,8 +72,9 @@ registrar_rollback_ok() {
   echo "Se a versão revertida usa um esquema de banco mais antigo e incompatível, restaure também o backup pré-atualização: npm run restore"
 }
 
-# HEAD já é o alvo (rollback interrompido, reversão anterior que não confirmou o reinício, ou
-# --no-restart): só é "nada a fazer" quando o processo em execução confirma a versão.
+# HEAD is already the target (interrupted rollback, earlier rollback whose restart was not
+# confirmed, or --no-restart): it is only "nothing to do" when the running process confirms the
+# version.
 if [ "$ALVO" = "$ANTES" ]; then
   if [ "$RESTART" -eq 0 ]; then
     echo "Já está em $ALVO. Serviço não reiniciado nem verificado (--no-restart)."

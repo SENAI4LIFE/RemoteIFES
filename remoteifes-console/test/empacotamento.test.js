@@ -8,12 +8,13 @@ const ajuda = require("./ajuda");
 const { criarAutoridade, atestarDiretorio, confiarEm } = require("./support/atestacoes");
 const { listarDependencias } = require("../instalacao/dependencias");
 
-// Cadeia completa de distribuição: construir → atestar → publicar → atualizar → verificar.
+// Complete distribution chain: build -> attest -> publish -> update -> verify.
 //
-// É o teste que impede a falha clássica de empacotamento: o artefato existe, o manifesto existe,
-// e mesmo assim a atualização não funciona porque o formato do pacote não casa com o extrator,
-// ou porque a atestação nunca foi realmente conferida contra o conteúdo baixado. As atestações
-// vêm de um Sigstore privado de teste, no lugar do GitHub Actions (test/support/atestacoes.js).
+// This test prevents the classic packaging failure: the artifact exists, the manifest exists, and
+// the update still does not work because the package format does not match the extractor, or
+// because the attestation was never actually checked against the downloaded content. The
+// attestations come from a private test Sigstore standing in for GitHub Actions
+// (test/support/atestacoes.js).
 
 const ARVORE = ["console.js", "launcher.js", "package.json", "package-lock.json", "ARQUITETURA.md", "DISTRIBUICAO.md", "src", "bin", "web", "instalacao", "helper", "systemd", "empacotar"];
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
@@ -24,8 +25,8 @@ test.before(async () => {
 });
 
 /**
- * Cópia do console numa versão escolhida, para que a publicação seja mais nova que a instalada. Leva
- * as dependências de produção, como um checkout depois de `npm ci --omit=dev`.
+ * Copy of the Console at a chosen version, so the publication is newer than the installed one. It
+ * carries the production dependencies, as a checkout after `npm ci --omit=dev` would.
  */
 function arvoreNaVersao(versao) {
   const raiz = ajuda.dirTemporario("console-fonte-");
@@ -39,7 +40,7 @@ function arvoreNaVersao(versao) {
   return raiz;
 }
 
-/** Uma cópia fora do Git informa o seu commit; o próprio checkout o obtém do Git. */
+/** A copy outside Git names its commit; the checkout itself gets it from Git. */
 function construir(raizFonte, saida, extra = []) {
   const commit = raizFonte === ajuda.RAIZ ? [] : ["--commit", COMMIT];
   execFileSync(process.execPath, [path.join(raizFonte, "empacotar", "construir.js"), "--saida", saida, ...commit, ...extra], {
@@ -48,13 +49,13 @@ function construir(raizFonte, saida, extra = []) {
   });
 }
 
-/** Construir e atestar, como a publicação de um release faz. */
+/** Build and attest, as a release publication does. */
 async function release(raizFonte, saida, extra = []) {
   construir(raizFonte, saida, extra);
   return atestarDiretorio(autoridade, saida);
 }
 
-/** Um ambiente do console que confia no Sigstore de teste. */
+/** A Console environment that trusts the test Sigstore. */
 function ambienteConfiando(t, env) {
   const amb = ajuda.ambiente({ env });
   const desfazer = confiarEm(amb, autoridade);
@@ -65,7 +66,9 @@ function ambienteConfiando(t, env) {
   return amb;
 }
 
-/** Serve um diretório de release por HTTP em 127.0.0.1, sem nenhum requisito de credencial. */
+/**
+ * Serves a release directory over HTTP on 127.0.0.1, with no credential requirement.
+ */
 function servirDiretorio(dir) {
   const servidor = http.createServer((req, res) => {
     const nome = decodeURIComponent(req.url.replace(/^\//, "").split("?")[0]);
@@ -92,7 +95,9 @@ function servirDiretorio(dir) {
   );
 }
 
-/** Instalação lado a lado com uma versão antiga já presente. */
+/**
+ * Side-by-side installation with an old version already present.
+ */
 function instalacaoCom(versaoAntiga) {
   const raiz = ajuda.dirTemporario("console-inst-");
   const dir = path.join(raiz, "versoes", versaoAntiga);
@@ -121,7 +126,7 @@ test("o construtor produz payload, manifesto e procedência honesta", (t) => {
   assert.equal(manifesto.commit, head, "o manifesto nomeia o commit construído; a atestação precisa nomear o mesmo");
   assert.equal(require(path.join(ajuda.RAIZ, "src", "release.js")).validarEstrutura(manifesto).ok, true, "um manifesto que o console aceita");
 
-  // O build não atesta nada e não tem identidade: isso é feito depois, na publicação do release.
+  // The build attests nothing and holds no identity: the release publication does that afterwards.
   assert.ok(!fs.existsSync(path.join(saida, "atestacao.sigstore.json")));
 
   const proveniencia = JSON.parse(fs.readFileSync(path.join(saida, "proveniencia.json"), "utf8"));
@@ -150,10 +155,10 @@ test("o payload construído é exatamente o que o extrator do atualizador entend
   for (const exigido of ["console.js", "launcher.js", "package.json", path.join("src", "servidor.js"), path.join("web", "index.html"), path.join("instalacao", "console-bootstrap.js")]) {
     assert.ok(fs.existsSync(path.join(destino, exigido)), `payload sem ${exigido}`);
   }
-  // Testes e material de empacotamento não viajam no programa instalado.
+  // Tests and packaging material are not part of the installed program.
   assert.ok(!fs.existsSync(path.join(destino, "test")), "testes não entram no payload");
   assert.ok(!fs.existsSync(path.join(destino, "empacotar")), "o empacotador não entra no payload");
-  // O verificador de releases entra, e o mock do Sigstore, só de teste, não.
+  // The release verifier does, and the test-only Sigstore mock does not.
   assert.ok(fs.existsSync(path.join(destino, "node_modules", "@sigstore", "verify", "package.json")));
   assert.ok(fs.existsSync(path.join(destino, "node_modules", "@sigstore", "tuf", "seeds.json")), "a raiz do Sigstore de que ele parte");
   assert.ok(!fs.existsSync(path.join(destino, "node_modules", "@sigstore", "mock")), "pacotes só de teste ficam de fora");
@@ -161,13 +166,11 @@ test("o payload construído é exatamente o que o extrator do atualizador entend
 });
 
 test("o tar é bem formado para QUALQUER leitor, não só para o nosso extrator", (t) => {
-  // Regressão de um defeito que passou despercebido porque o único leitor era o extrator do
-  // próprio console, que cria diretórios sozinho. O campo typeflag do cabeçalho tem 1 byte e
-  // não é terminado por NUL; ele era escrito por um helper que reservava o último byte para o
-  // terminador, o que com tamanho 1 truncava o campo para vazio. Todo membro saía com \0
-  // (AREGTYPE), que leitores tratam como arquivo comum — então os arquivos funcionavam e um
-  // diretório virava um arquivo vazio de mesmo nome. O `dpkg`, que extrai membro a membro e
-  // não inventa caminho, recusava o pacote inteiro.
+  // Regression: the typeflag header field is 1 byte and is not NUL-terminated. Writing it through a
+  // helper that reserves the last byte for a terminator truncated it to zero (AREGTYPE); readers
+  // treat that as a regular file, so a directory became an empty file of the same name, and `dpkg`,
+  // which extracts member by member and does not create missing paths, refused the whole package.
+  // The Console's own extractor creates directories itself and did not notice.
   const saida = ajuda.dirTemporario("console-tar-");
   t.after(() => fs.rmSync(saida, { recursive: true, force: true }));
 
@@ -194,7 +197,7 @@ test("o tar é bem formado para QUALQUER leitor, não só para o nosso extrator"
     assert.equal(m.ustar, "ustar", `${m.nome} não declara o formato ustar`);
   }
 
-  // Todo diretório aparece como membro próprio, ANTES de qualquer coisa que more nele.
+  // Every directory appears as its own member, BEFORE anything that lives in it.
   const vistos = new Set();
   for (const m of membros) {
     if (m.tipo === "5") {
@@ -211,7 +214,7 @@ test("o tar é bem formado para QUALQUER leitor, não só para o nosso extrator"
   }
   assert.ok(vistos.has("src/") && vistos.has("src/plataforma/"), "diretórios aninhados também têm entrada própria");
 
-  // O bit de execução vem do shebang; nada de setuid/setgid saindo daqui.
+  // The executable bit comes from the shebang; no setuid/setgid comes out of here.
   const runner = membros.find((m) => m.nome === "bin/backup.js");
   assert.ok(runner, "os runners viajam no payload");
   assert.equal(runner.modo, 0o755, "um runner com shebang precisa sair executável");
@@ -244,8 +247,8 @@ test("cadeia completa: construir, atestar, publicar e atualizar de verdade", asy
     "o digest precisa ser conferido contra o manifesto atestado"
   );
 
-  // A versão nova está no disco com o seu verificador, o ponteiro apontando para ela, e a anterior
-  // guardada.
+  // The new version is on disk with its verifier, the pointer references it, and the previous one
+  // is kept.
   const instaladoEm = path.join(instalacao, "versoes", NOVA);
   assert.ok(fs.existsSync(path.join(instaladoEm, "console.js")));
   assert.ok(fs.existsSync(path.join(instaladoEm, "src", "servidor.js")));
@@ -256,7 +259,7 @@ test("cadeia completa: construir, atestar, publicar e atualizar de verdade", asy
   assert.equal(info.transacao.etapa, "concluida", "nenhuma transação fica pendente depois do sucesso");
   assert.ok(!fs.existsSync(path.join(instalacao, "descargas", NOVA)), "a área de estágio é limpa");
 
-  // E a reversão volta o ponteiro sem rede nenhuma: o servidor de release já está fechado.
+  // And rollback moves the pointer back without any network: the release server is already closed.
   await servidor.fechar();
   const volta = await atualizador.reverter();
   assert.equal(volta.ok, true, volta.erro);
@@ -264,9 +267,8 @@ test("cadeia completa: construir, atestar, publicar e atualizar de verdade", asy
 });
 
 test("importação offline instala de verdade, sem rede nenhuma", async (t) => {
-  // Um Pi sem Internet recebe manifesto, atestação e artefato em pendrive. Antes isto apenas
-  // verificava e mandava "usar a ação de atualização" — que vai à rede: um beco sem saída
-  // exatamente no caso que a função existe para atender.
+  // A Pi without Internet receives manifest, attestation and artifact on a USB drive, and offline
+  // import must install them without going to the network.
   const NOVA = "99.9.2";
   const fonte = arvoreNaVersao(NOVA);
   const saida = ajuda.dirTemporario("console-dist-");
@@ -301,12 +303,12 @@ test("importação offline instala de verdade, sem rede nenhuma", async (t) => {
 });
 
 test("trocar o artefato depois da verificação não muda o que é instalado", async (t) => {
-  // Janela entre verificar e instalar: o digest era calculado numa leitura e a extração fazia
-  // outra leitura do MESMO caminho. Quem pudesse trocar o arquivo no intervalo instalaria
-  // conteúdo que nunca passou pela verificação. No caminho offline o arquivo fica onde o
-  // operador apontou — um /tmp compartilhado, um pendrive —, onde a troca é plausível.
+  // Window between verification and installation: if the digest were computed on one read and
+  // extraction did another read of the SAME path, whoever could swap the file in between would
+  // install content that never went through verification. On the offline path the file sits where
+  // the operator pointed (a shared /tmp, a USB drive), where a swap is plausible.
   //
-  // O teste troca o arquivo exatamente nesse intervalo, interceptando a conferência.
+  // The test swaps the file exactly in that interval by intercepting the check.
   const NOVA = "99.9.4";
   const fonte = arvoreNaVersao(NOVA);
   const saida = ajuda.dirTemporario("console-dist-");
@@ -324,8 +326,8 @@ test("trocar o artefato depois da verificação não muda o que é instalado", a
   const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
   const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
 
-  // Assim que a conferência passa, o arquivo em disco vira lixo. Se a instalação reler o
-  // caminho, ela extrai o lixo (ou falha); se extrair o buffer conferido, nada muda.
+  // As soon as the check passes, the file on disk becomes garbage. If installation re-reads the
+  // path, it extracts garbage (or fails); if it extracts the checked buffer, nothing changes.
   const originalConferir = release_.conferirArtefato;
   release_.conferirArtefato = (caminho, meta) => {
     const r = originalConferir(caminho, meta);
@@ -388,8 +390,7 @@ test("importação offline de um release que a raiz do Sigstore não reconhece n
     for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
   });
   const manifesto = await release(fonte, saida);
-  // Sem confiança de teste aqui: a raiz do próprio console (a do Sigstore real) não conhece a CA de
-  // teste.
+  // No test trust here: the Console's own root (the real Sigstore's) does not know the test CA.
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: instalacao } });
   t.after(() => amb.restaurar());
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
@@ -411,8 +412,8 @@ test("um manifesto alterado depois da atestação é recusado", async (t) => {
 
   await release(ajuda.RAIZ, saida);
 
-  // Trocar um digest mantendo a atestação é exatamente o ataque que a atestação existe para
-  // impedir: apontar um release legítimo para outro conteúdo.
+  // Changing a digest while keeping the attestation is exactly the attack the attestation exists to
+  // prevent: pointing a legitimate release at other content.
   const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
   manifesto.artefatos[0].sha256 = "c".repeat(64);
   fs.writeFileSync(path.join(saida, "manifesto.json"), `${JSON.stringify(manifesto, null, 2)}\n`);
@@ -439,7 +440,7 @@ test("um artefato trocado no servidor não passa pelo digest do manifesto atesta
 
   await release(fonte, saida);
 
-  // O manifesto e a atestação continuam íntegros; quem foi trocado foi o arquivo servido.
+  // Manifest and attestation remain intact; the served file is what was swapped.
   const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
   const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
   const original = fs.readFileSync(artefato);
@@ -457,8 +458,8 @@ test("um artefato trocado no servidor não passa pelo digest do manifesto atesta
 });
 
 test("um console instalado verifica releases sem nenhuma etapa de configuração", (t) => {
-  // Nada a provisionar na instalação, no bootstrap ou no primeiro acesso: a política de identidade é
-  // código, e a raiz do Sigstore de que o console parte viaja nas suas próprias dependências.
+  // Nothing to provision at installation, bootstrap or first access: the identity policy is code,
+  // and the Sigstore root the Console starts from travels in its own dependencies.
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const atestacao = amb.atestacao;
@@ -488,7 +489,9 @@ test("o .deb é montado no formato ar que o dpkg entende", (t) => {
 
 // --- Credencial em redirecionamento -----------------------------------------------------------
 
-/** Servidor HTTP que registra os cabeçalhos de cada requisição recebida. */
+/**
+ * HTTP server that records the headers of every request received.
+ */
 function servidorQueRegistra(responder) {
   const recebidas = [];
   const servidor = http.createServer((req, res) => {
@@ -513,10 +516,9 @@ function servidorQueRegistra(responder) {
 const CORPO_ARTEFATO = Buffer.from("conteudo-de-artefato-de-ci-para-teste");
 
 test("o token do GitHub não acompanha o redirecionamento para outro host", async (t) => {
-  // O download de artefato responde 302 para um armazenamento assinado em outro domínio. Mandar
-  // o `Authorization` junto entregaria o token a um host que não precisa dele e que pode
-  // registrá-lo. A regra existia no código e NADA a provava: mover o cabeçalho para fora da
-  // condição passaria em todos os testes da suíte.
+  // The artifact download answers 302 to signed storage on another domain. Sending `Authorization`
+  // along would hand the token to a host that does not need it and may log it. Moving the header
+  // out of its host condition must fail this test.
   const cdn = await servidorQueRegistra((req, res) => {
     res.writeHead(200, { "Content-Length": CORPO_ARTEFATO.length });
     res.end(CORPO_ARTEFATO);

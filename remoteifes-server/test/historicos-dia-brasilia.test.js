@@ -12,8 +12,8 @@ const auditoriaService = require("../src/services/auditoriaService");
 
 const superadmin = db.prepare("SELECT * FROM usuarios WHERE nivel = 3").get();
 
-// Instantes UTC (formato do datetime('now') do SQLite) em torno da meia-noite de Brasília (UTC-3):
-// os três primeiros pertencem ao dia 20/09 local, os dois últimos ao dia 21/09.
+// UTC instants (SQLite datetime('now') format) around Brasília midnight (UTC-3): the first three
+// belong to local 20/09, the last two to 21/09.
 const INSTANTES = {
   "00:00 do dia 20": "2026-09-20 03:00:00",
   "22:30 do dia 20": "2026-09-21 01:30:00",

@@ -2,9 +2,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const ajuda = require("./ajuda");
 
-// Terminal Expert: todo o envelope de autorização e ciclo de vida é exercitado com um PTY
-// falso injetado. O módulo nativo (node-pty) não é exigido para testar o que é crítico —
-// destravamento, prazo, revogação, limpeza de processo e contrapressão da rolagem.
+// Expert Terminal: the whole authorization and lifecycle envelope is exercised with an injected
+// fake PTY. The native module (node-pty) is not required to test what is critical: unlock,
+// deadline, revocation, process cleanup and scrollback backpressure.
 
 function ptyFalso(registro = {}) {
   registro.abertos = registro.abertos || [];
@@ -55,7 +55,7 @@ test("sem o módulo de PTY o terminal é declarado indisponível, sem substituto
   assert.ok(d.motivo);
   assert.ok(Array.isArray(d.instalacao) && d.instalacao.length, "precisa dizer como habilitar");
   assert.match(d.explicacao, /pseudoterminal/i);
-  // O caminho alternativo é descrito como o que é, e não como se cumprisse o pedido.
+  // The alternative path is described as what it is, not as fulfilling the request.
   assert.match(d.alternativa, /NÃO substitui/);
 
   const r = amb.terminal.abrir({ operador: "op" });
@@ -132,12 +132,12 @@ test("a sessão expira por ociosidade e pelo prazo máximo", (t) => {
   const aberta = amb.terminal.abrir({ operador: "op" });
   assert.equal(amb.terminal.sessoesAtivas(), 1);
 
-  // Envelhece a atividade além do limite de ociosidade.
+  // Ages activity beyond the idle limit.
   const interna = amb.terminal.listar("op");
   assert.equal(interna.length, 1);
   amb.terminal.escrever(aberta.id, "op", "x");
   const sessoes = require(require.resolve(`${ajuda.RAIZ}/src/terminal.js`));
-  // Sem acesso direto ao Map, o efeito é observado pelo comportamento: forçamos o relógio.
+  // Without direct access to the Map, the effect is observed through behavior: the clock is forced.
   const original = Date.now;
   Date.now = () => original() + 61_000;
   try {
@@ -197,8 +197,8 @@ test("a saída do terminal chega ao cliente pela posição e nunca é interpreta
   registro.abertos[0].emitir("\u001b]0;titulo malicioso\u0007<script>alert(1)</script>");
   const lista = amb.terminal.listar("op");
   assert.equal(lista.length, 1);
-  // O módulo entrega bytes crus; a interface insere por textContent (ver web/app.js), então
-  // sequências de controle e HTML nunca viram marcação nem título de janela do navegador.
+  // The module delivers raw bytes; the interface inserts them through textContent (see web/app.js),
+  // so control sequences and HTML never become markup or a browser window title.
   const rolagem = new amb.terminal.Rolagem(4096);
   rolagem.anexar("\u001b]0;x\u0007");
   assert.ok(rolagem.desde(0).texto.includes("\u001b"));
@@ -270,7 +270,7 @@ test("as rotas do terminal exigem sessão e elevação", async (t) => {
   assert.equal(comElevacao.status, 201);
   assert.ok(comElevacao.json.id);
 
-  // Encerrar a elevação derruba o terminal na mesma hora.
+  // Ending elevation closes the terminal immediately.
   await ajuda.pedir(s.porta, "/api/sessao/elevar", { metodo: "DELETE", cookie: sessao.cookie, csrf: sessao.csrf, origem: s.base });
   const depois = await ajuda.pedir(s.porta, `/api/terminal/sessoes/${comElevacao.json.id}/entrada`, {
     metodo: "POST",

@@ -5,28 +5,25 @@ const processos = require("./processos");
 const coleta = require("./coleta");
 const plataforma = require("./plataforma");
 
-// Implantação e reversão portáteis.
+// Portable deploy and rollback.
 //
-// Por que existe, já que `deploy.sh` funciona: o console precisa implantar em Linux, Windows e
-// macOS, e `deploy.sh` depende de bash, systemd e coreutils. Esta é a implementação que o
-// console usa em toda plataforma; `deploy.sh` e `rollback.sh` continuam no servidor como
-// **caminho independente de emergência**, que tem de funcionar sem console, sem Node do console
-// e sem rede — os dois papéis são diferentes de propósito.
+// The Console must deploy on Linux, Windows and macOS, and `deploy.sh` depends on bash, systemd and
+// coreutils. This is the implementation the Console uses on every platform; `deploy.sh` and
+// `rollback.sh` remain on the server as the **independent emergency path**, which must work without
+// the Console, without the Console's Node and without network. The two roles differ on purpose.
 //
-// As garantias abaixo são as mesmas dos scripts, e o teste de contrato confere que continuam
-// iguais:
-//   - recusa com árvore suja (o console nunca usa --force);
-//   - backup verificado antes de tocar no código;
-//   - `npm ci --omit=dev` só quando as dependências mudaram;
-//   - sucesso exige que o **processo em execução** informe exatamente o commit alvo;
-//   - versão anterior ao campo `commit` só passa com processo comprovadamente reiniciado, e o
-//     registro diz "identidade não confirmada";
-//   - HEAD igual ao alvo não é conclusão;
-//   - falha reverte sozinha e reinstala as dependências da versão anterior.
+// The guarantees are the same as the scripts', and the contract test checks they stay equal:
+//   - refuses a dirty tree (the Console never uses --force);
+//   - verified backup before touching code;
+//   - `npm ci --omit=dev` only when dependencies changed;
+//   - success requires the **running process** to report exactly the target commit;
+//   - a version older than the `commit` field passes only with a provably restarted process, and
+//     the record says "identidade não confirmada";
+//   - HEAD equal to the target is not completion;
+//   - failure reverts by itself and reinstalls the previous version's dependencies.
 //
-// A trava de manutenção NÃO é adquirida aqui: quem chama (bin/implantar.js ou bin/reverter.js)
-// a segura durante toda a operação. Foi exatamente a dupla aquisição — console e script — que
-// deixava a implantação gerenciada impossível de concluir.
+// The maintenance lock is NOT acquired here: the caller (bin/implantar.js or bin/reverter.js) holds
+// it for the whole operation.
 
 const RE_COMMIT = /^[0-9a-f]{7,40}$/;
 
@@ -62,13 +59,13 @@ function registrar(app, linha) {
 }
 
 /**
- * A árvore do commit tem `src/config/release.js`? Uma versão sem ele nunca poderá informar o
- * próprio commit no /health, e por isso a identidade dela não pode ser exigida.
+ * Does the commit's tree contain `src/config/release.js`? A version without it can never report its
+ * own commit in /health, so its identity cannot be required.
  */
 async function versaoInformaCommit(commit) {
   const r = await git(["cat-file", "-e", `${commit}:remoteifes-server/src/config/release.js`], { timeoutMs: 15_000 });
   if (r.ok) return true;
-  // Checkouts antigos podem ter o servidor na raiz; tenta o caminho relativo também.
+  // Old checkouts may have the server at the root; try the relative path too.
   const alternativo = await processos.executar("git", ["cat-file", "-e", `${commit}:src/config/release.js`], {
     cwd: config.DIR_SERVIDOR,
     timeoutMs: 15_000,
@@ -77,10 +74,10 @@ async function versaoInformaCommit(commit) {
 }
 
 /**
- * Espera o processo em execução confirmar a versão esperada.
+ * Waits for the running process to confirm the expected version.
  *
- * Um /health saudável não basta: um processo antigo que sobreviveu a um restart que falhou
- * responde igual a um saudável. Só é sucesso quando o processo informa exatamente o commit.
+ * A healthy /health is not enough: an old process that survived a failed restart answers like a
+ * healthy one. Success only when the process reports exactly the commit.
  */
 async function aguardarVersao(esperado, { reinicioEm, tentativas = 20, intervaloMs = 2000, rotulo = "a nova versão" }) {
   const legado = !(await versaoInformaCommit(esperado));
@@ -146,12 +143,11 @@ async function reiniciarServico(log) {
 }
 
 /**
- * Estado do checkout antes de qualquer operação que troque código.
+ * Checkout state before any operation that swaps code.
  *
- * Inclui arquivos **não rastreados**. Com `--untracked-files=no` eles eram invisíveis, e um
- * `git checkout --force` para um commit que passou a conter aquele mesmo caminho sobrescreve o
- * arquivo do operador sem aviso. "Nunca descarta trabalho local" só vale se o trabalho local
- * ainda não commitado também contar.
+ * Includes **untracked** files: `git checkout --force` to a commit that now contains the same path
+ * overwrites the operator's file without warning. "Never discards local work" only holds if
+ * uncommitted local work counts too.
  */
 async function estadoDoCheckout() {
   const [head, sujo, ramo] = await Promise.all([
@@ -173,16 +169,16 @@ async function estadoDoCheckout() {
 }
 
 /**
- * Caminhos que o commit alvo rastreia e que HOJE existem como conteúdo IGNORADO.
+ * Paths the target commit tracks that currently exist as IGNORED content.
  *
- * `git status` não lista ignorados, e `checkout --force`/`reset --hard` sobrescrevem qualquer
- * caminho que o commit alvo contenha. Se alguém tiver commitado um arquivo sob um diretório que
- * o projeto ignora — e `remoteifes-server/data/` é ignorado, é onde vive o banco —, a troca de
- * código apagaria dados operacionais sem que nenhuma verificação anterior tivesse visto nada.
+ * `git status` does not list ignored files, and `checkout --force`/`reset --hard` overwrite any
+ * path the target commit contains. If someone committed a file under a directory the project
+ * ignores (`remoteifes-server/data/` is ignored and holds the database), the code swap would delete
+ * operational data without any earlier check seeing it.
  *
- * A conferência é a interseção entre a árvore do commit alvo e os ignorados presentes no disco:
- * exatamente o conjunto perigoso, em duas chamadas ao git, sem stdin e sem passar milhares de
- * caminhos por linha de comando.
+ * The check is the intersection between the target commit's tree and the ignored files present on
+ * disk: exactly the dangerous set, in two git calls, without stdin and without passing thousands of
+ * paths on the command line.
  */
 async function ignoradosQueOAlvoSobrescreveria(commitAlvo) {
   const [arvore, ignorados] = await Promise.all([
@@ -224,13 +220,13 @@ async function criarBackup(rotulo, log) {
 }
 
 /**
- * Aplica um alvo já revisado.
+ * Applies an already reviewed target.
  *
  * @param {object} opcoes
- *  - alvo: commit ou ref (o console sempre passa um commit exato)
- *  - offline: não acessar a rede
- *  - semReiniciar: troca o código e não reinicia nem verifica
- *  - log: função(linha) para progresso
+ *  - alvo: commit or ref (the Console always passes an exact commit)
+ *  - offline: do not access the network
+ *  - semReiniciar: swap the code without restarting or verifying
+ *  - log: function(line) for progress
  */
 async function implantar({ alvo, offline = false, semReiniciar = false, log = () => {} }) {
   const app = config.caminhosDaAplicacao();
@@ -267,7 +263,7 @@ async function implantar({ alvo, offline = false, semReiniciar = false, log = ()
   }
   const commitAlvo = resolvido.saida.trim();
 
-  // HEAD igual ao alvo não é conclusão: o processo em execução pode estar noutra versão.
+  // HEAD equal to the target is not completion: the running process may be on another version.
   if (commitAlvo === antes) {
     if (semReiniciar) return { ok: true, resumo: `já está em ${commitAlvo}; serviço não reiniciado (--sem-reiniciar).`, commit: commitAlvo };
     const saude = await coleta.consultarSaude({ timeoutMs: 4000 });
@@ -277,8 +273,8 @@ async function implantar({ alvo, offline = false, semReiniciar = false, log = ()
     log(`O código já está em ${commitAlvo}, mas o processo em execução ${saude.commit ? `está em ${saude.commit.slice(0, 12)}` : "não a confirma"}; reiniciando para aplicá-la.`);
   } else {
     log(`Nova versão: ${commitAlvo}`);
-    // Mesma guarda da reversão: o alvo não pode sobrescrever conteúdo que o Git ignora, porque é
-    // ali que moram os dados operacionais.
+    // Same guard as rollback: the target must not overwrite content Git ignores, because
+    // operational data lives there.
     const colisao = await ignoradosQueOAlvoSobrescreveria(commitAlvo);
     if (!colisao.ok) return { ok: false, erro: colisao.motivo };
     if (colisao.caminhos.length) {
@@ -298,13 +294,11 @@ async function implantar({ alvo, offline = false, semReiniciar = false, log = ()
 
     const deps = await instalarDependencias(antes, commitAlvo, { offline, log });
     if (!deps.ok) {
-      // A recuperação é CONFERIDA antes de ser anunciada.
+      // Recovery is VERIFIED before being announced.
       //
-      // Antes, o resultado da volta do código e da reinstalação das dependências era descartado e
-      // a resposta afirmava que a atualização tinha sido desfeita. Se a própria volta falhasse —
-      // npm ausente, módulo em uso, rede fora —, o operador recebia "código voltou para a versão
-      // anterior" com um checkout possivelmente em HEAD novo e `node_modules` pela metade. Um
-      // desfecho desconhecido precisa se apresentar como desconhecido.
+      // If reverting the code or reinstalling dependencies fails (npm missing, module in use,
+      // network down), the checkout may be at the new HEAD with a half-installed `node_modules`. An
+      // unknown outcome must be presented as unknown.
       log("npm ci falhou; revertendo o código para a versão anterior.");
       const voltaCodigo = await reverterCodigo(antes, inicial.ramo, log);
       const voltaDeps = voltaCodigo.ok ? await instalarDependencias(commitAlvo, antes, { offline, log }) : { ok: false };
@@ -386,7 +380,7 @@ async function reverterCodigo(destino, ramoOriginal, log) {
 }
 
 /**
- * Volta para uma versão anterior. Troca **apenas o código**: nunca mexe no banco.
+ * Goes back to a previous version. Swaps **only the code**: never touches the database.
  */
 async function reverter({ alvo = null, offline = false, semReiniciar = false, log = () => {} }) {
   const app = config.caminhosDaAplicacao();
@@ -404,9 +398,9 @@ async function reverter({ alvo = null, offline = false, semReiniciar = false, lo
 
   const inicial = await estadoDoCheckout();
   if (!inicial.head) return { ok: false, erro: `${config.DIR_CHECKOUT} não é um repositório git utilizável` };
-  // A reversão faz `reset --hard`/`checkout --force`: sem esta recusa ela descartava exatamente
-  // o trabalho local que a implantação se nega a tocar. As duas operações trocam código da mesma
-  // forma; a garantia tem de ser a mesma.
+  // Rollback runs `reset --hard`/`checkout --force`: without this refusal it would discard exactly
+  // the local work deploy refuses to touch. Both operations swap code the same way; the guarantee
+  // must be the same.
   if (!inicial.limpo) {
     return {
       ok: false,

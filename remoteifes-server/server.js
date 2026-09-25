@@ -73,8 +73,8 @@ function encerrarComGraciosidade(sinal) {
     }
     process.exit(0);
   });
-  // Descarta conexões keep-alive/WebSocket remanescentes para que a porta seja
-  // liberada de imediato, sem depender do timeout de segurança abaixo.
+  // Drops remaining keep-alive/WebSocket connections so the port is released immediately, without
+  // waiting for the safety timeout below.
   if (typeof server.closeAllConnections === "function") server.closeAllConnections();
   setTimeout(() => process.exit(0), 5000).unref();
 }

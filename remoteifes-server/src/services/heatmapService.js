@@ -1,6 +1,6 @@
-// Mapas de calor operacionais: agregacoes por sala calculadas sob demanda.
-// Nada roda em segundo plano; cada consulta e uma unica query indexada sobre
-// historicos que ja existem e ja tem retencao limitada.
+// Operational heatmaps: per-room aggregations computed on demand. Nothing runs in the background;
+// each request is a single indexed query over histories that already exist and already have bounded
+// retention.
 const db = require("../config/database");
 
 const PERIODOS = {
@@ -13,8 +13,8 @@ const CACHE_TTL_MS = 60 * 1000;
 const CACHE_MAX = 40;
 const cache = new Map();
 
-// Cada metrica declara a fonte de dados real que ja e retida pelo sistema.
-// Metricas sem fonte confiavel por sala simplesmente nao existem aqui.
+// Each metric declares the real data source the system already retains. Metrics without a reliable
+// per-room source do not exist here.
 const METRICAS = {
   disponibilidade: {
     rotulo: "Disponibilidade do ESP32",
@@ -119,8 +119,8 @@ function normalizar(metrica, periodo) {
   return { metrica: m, periodo: p };
 }
 
-// Historico de conectividade segue a retencao de auditoria: um periodo maior que
-// ela cobre menos dias do que o rotulo sugere, e isso precisa ficar visivel.
+// Connectivity history follows audit retention: a period longer than that covers fewer days than
+// the label suggests, and this must be visible.
 function diasRetencaoConectividade() {
   const valor = require("./configuracoesService").obter().retencaoAuditoriaDias;
   return Number.isInteger(valor) && valor >= 1 && valor <= 365 ? valor : 7;
@@ -170,9 +170,9 @@ function agregar(metrica, inicio, fim, janelaSegundos, offlinePorSala, quedasPor
   }
   if (metrica === "comandosOffline") {
     const mapa = contagemPorSala(
-      // Percorre as indisponibilidades (tabela pequena) e conta os comandos de cada
-      // intervalo pelo indice (sala, criadoEm). O caminho inverso, com EXISTS por
-      // comando, custava ordens de grandeza mais em 30 dias.
+      // Walks the outages (small table) and counts each interval's commands through the (sala,
+      // criadoEm) index. The reverse path, with EXISTS per command, cost orders of magnitude more
+      // over 30 days.
       `SELECT i.sala sala, COUNT(c.id) n
          FROM esp_indisponibilidades i
          JOIN comandos_log c
@@ -303,8 +303,8 @@ function calcular(metricaPedida, periodoPedido) {
   };
 }
 
-// Cache curto apenas para repetir a mesma consulta (troca de aba, redimensionamento).
-// Expira por tempo, sem invalidacao por evento.
+// Short cache only for repeating the same query (tab switch, resize). Expires by time, with no
+// event-based invalidation.
 function obter(metrica, periodo) {
   const { metrica: m, periodo: p } = normalizar(metrica, periodo);
   const chave = `${m}|${p}`;

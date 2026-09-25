@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Consulta o /health da aplicação e imprime uma linha legível. Sai 0 quando saudável.
-// Usado pelos scripts do console; equivale ao healthcheck.sh do servidor, mas resolve a porta
-// pelo mesmo .env sem depender de grep/curl.
+// Queries the application's /health and prints a readable line. Exits 0 when healthy. Used by the
+// Console scripts; equivalent to the server's healthcheck.sh, but resolves the port from the same
+// .env without depending on grep/curl.
 
 const path = require("path");
 const coleta = require(path.join(__dirname, "..", "src", "coleta"));

@@ -1,6 +1,6 @@
 /*
- * Registro público do manual. Os módulos em js/manual/ acrescentam seções por
- * domínio; conteúdo administrativo continua sendo entregue apenas pela API.
+ * Public manual registry. Modules in js/manual/ add sections per domain; administrative content is
+ * still delivered only through the API.
  */
 const ManualContent = (() => {
   const secoes = [];

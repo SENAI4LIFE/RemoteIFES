@@ -6,9 +6,9 @@ const path = require("path");
 const crypto = require("crypto");
 const ajuda = require("./ajuda");
 
-// Integração com o GitHub, exercitada contra um servidor falso. Os casos que importam são os
-// de borda: credencial ausente, sem permissão, limite de taxa, disparo sem id na resposta,
-// disparo ambíguo, artefato expirado e download com verificação de digest.
+// GitHub integration, exercised against a fake server. The cases that matter are the edges: missing
+// credential, no permission, rate limit, dispatch without an id in the response, ambiguous
+// dispatch, expired artifact and download with digest verification.
 
 function servidorFalso(rotas) {
   const chamadas = [];
@@ -287,8 +287,8 @@ test("o download confere tamanho e calcula o digest do que foi gravado", async (
   assert.equal(r.sha256, crypto.createHash("sha256").update(conteudo).digest("hex"));
   assert.equal(r.digestDeclarado, "sha256:declarado");
   assert.ok(fs.existsSync(destino));
-  // O zip não é extraído: conteúdo de CI é entrada não confiável e a extração segura é outro
-  // problema. O console entrega arquivo + digest.
+  // The zip is not extracted: CI content is untrusted input and safe extraction is another problem.
+  // The Console delivers file + digest.
 });
 
 test("o token com formato implausível é recusado na gravação", (t) => {

@@ -1,8 +1,8 @@
 const { test, expect, VIEWPORTS, injetarSessao } = require("../harness/fixtures");
 
-// O painel de acessibilidade segue o mesmo ciclo de foco dos outros painéis: ao abrir o
-// foco entra nele, Esc fecha, ao fechar o foco volta ao botão que abriu e nenhum controle
-// escondido fica com o foco.
+// The accessibility panel follows the same focus cycle as the other panels: opening moves focus
+// into it, Esc closes it, closing returns focus to the button that opened it, and no hidden control
+// keeps focus.
 
 async function focoAtual(page) {
   return page.evaluate(() => {
@@ -86,14 +86,15 @@ test("clicar fora fecha o painel sem prender o foco nele nem roubar o foco do qu
   await page.locator("#a11yResetAllBtn").focus();
   expect((await focoAtual(page)).dentroDoPainel).toBe(true);
 
-  // Um clique em área neutra da página: o painel fecha e o foco não fica em nada escondido.
+  // A click on a neutral area of the page: the panel closes and focus does not remain on anything
+  // hidden.
   await page.locator("#screen-inicio h2, #screen-inicio .hub-secao-titulo, #screen-inicio").first().click({ position: { x: 5, y: 5 } });
   await expect(page.locator("#a11yPanel")).toBeHidden();
   const foco = await focoAtual(page);
   expect(foco.dentroDoPainel).toBe(false);
   expect(foco.escondido).toBe(false);
 
-  // Um clique em um controle da página: ele fica com o foco, o painel não o rouba de volta.
+  // A click on a page control: that control keeps focus and the panel does not take it back.
   await page.locator("#a11yToggleBtn").click();
   await expect(page.locator("#a11yPanel")).toBeVisible();
   await page.locator("#accountMenuBtn").click();
@@ -113,14 +114,14 @@ test("abrir o painel de ajuda fecha o de acessibilidade e vice-versa, com foco c
   await page.locator("#helpFabToggleBtn").click();
   await expect(page.locator("#a11yPanel")).toBeHidden();
   await expect(page.locator("#helpFabPanel")).toBeVisible();
-  // O painel de ajuda leva o foco ao seu botão de fechar logo depois de abrir (mesmo ciclo do
-  // painel de acessibilidade): espera o foco entrar antes de teclar, para conferir a devolução
-  // do foco a partir do estado documentado. Um foco em controle escondido também é pego aqui.
+  // The help panel moves focus to its close button right after opening (same cycle as the
+  // accessibility panel): wait for focus to enter before pressing keys, so focus return is checked
+  // from the documented state. Focus on a hidden control is also caught here.
   await expect(page.locator("#helpFabCloseBtn"), "o foco entra no painel de ajuda").toBeFocused();
   expect((await focoAtual(page)).escondido, "o foco não fica em controle escondido").toBe(false);
 
-  // O painel de ajuda aberto cobre a coluna dos botões flutuantes; Esc o fecha e devolve o
-  // foco ao seu botão, e daí o painel de acessibilidade abre normalmente.
+  // The open help panel covers the floating button column; Esc closes it and returns focus to its
+  // button, after which the accessibility panel opens normally.
   await page.keyboard.press("Escape");
   await expect(page.locator("#helpFabPanel")).toBeHidden();
   await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
@@ -129,8 +130,9 @@ test("abrir o painel de ajuda fecha o de acessibilidade e vice-versa, com foco c
   await expect(page.locator("#a11yCloseBtn")).toBeFocused();
 });
 
-// O foco pode voltar ao botão flutuante com o painel ainda aberto (Shift+Tab a partir do fechar;
-// no Firefox passando antes pelo próprio painel rolável). Esc precisa fechar também daí.
+// Focus can return to the floating button while the panel is still open (Shift+Tab from the close
+// button; in Firefox after passing through the scrollable panel itself). Esc must also close it
+// from there.
 test("com o painel de ajuda aberto, Esc fecha mesmo com o foco no botão flutuante", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.setViewportSize(VIEWPORTS.notebook);

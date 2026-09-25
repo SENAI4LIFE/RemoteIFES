@@ -5,8 +5,8 @@ const os = require("os");
 const path = require("path");
 const ajuda = require("./ajuda");
 
-// Execução gerenciada: contenção de caminhos, validação de argumentos, trava de manutenção
-// compartilhada com a CLI, ciclo de vida dos trabalhos e reconciliação de desfecho.
+// Managed execution: path containment, argument validation, maintenance lock shared with the CLI,
+// job lifecycle and outcome reconciliation.
 
 function checkoutFalso(opcoes = {}) {
   const raiz = ajuda.dirTemporario("console-checkout-");
@@ -17,7 +17,7 @@ function checkoutFalso(opcoes = {}) {
   return raiz;
 }
 
-// --- Contenção de caminhos ---------------------------------------------------------------
+// --- Path containment ---------------------------------------------------------------
 
 test("caminhoContidoEm bloqueia travessia, caminho absoluto e byte nulo", (t) => {
   const amb = ajuda.ambiente();
@@ -71,8 +71,8 @@ test("o auxiliar privilegiado só aceita verbos da lista", async (t) => {
   assert.equal(r.ok, false);
   assert.match(r.erro, /verbo não permitido/);
 
-  // Verbo válido, mas sem privilégio neste ambiente: a recusa é por indisponibilidade, e o
-  // console diz isso em vez de fingir que executou.
+  // Valid verb, but no privilege in this environment: the refusal is for unavailability, and the
+  // Console says so instead of pretending it ran.
   const v = await amb.processos.chamarAuxiliar("servico-estado");
   assert.equal(v.ok, false);
   assert.ok(v.indisponivel);
@@ -93,7 +93,7 @@ test("a saída limitada preserva começo e fim e marca o que ficou de fora", (t)
   assert.ok(texto.length < 1000);
 });
 
-// --- Validação de argumentos das ações ------------------------------------------------------
+// --- Action argument validation ------------------------------------------------------
 
 test("argumentos de ação são validados por esquema, não por escape", (t) => {
   const amb = ajuda.ambiente();
@@ -142,8 +142,8 @@ test("não existe ação que receba uma linha de comando", (t) => {
 });
 
 test("o catálogo de comandos da documentação não é um registro executável", (t) => {
-  // commands.js tem espaços reservados, pipelines e exemplos de várias linhas. Este teste
-  // impede que alguém, um dia, resolva alimentar o registro de ações com ele.
+  // commands.js has placeholders, pipelines and multi-line examples. This test prevents anyone from
+  // ever feeding the action registry with it.
   const commands = require(path.join(ajuda.RAIZ, "..", "remoteifes-server", "src", "services", "documentation", "commands"));
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
@@ -157,7 +157,7 @@ test("o catálogo de comandos da documentação não é um registro executável"
   assert.match(todos, /<[a-z]+>/, "o catálogo tem espaços reservados — prova de que é texto, não ação");
 });
 
-// --- Trava de manutenção ----------------------------------------------------------------------
+// --- Maintenance lock ----------------------------------------------------------------------
 
 test("a trava do console usa o mesmo arquivo e formato da CLI", (t) => {
   const checkout = checkoutFalso();
@@ -193,7 +193,7 @@ test("uma trava viva nunca é atropelada, por mais antiga que seja", (t) => {
   });
 
   const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
-  // Processo vivo (este) e mtime muito antigo: os scripts trariam isso como resíduo por idade.
+  // Live process (this one) and very old mtime: the scripts would treat this as leftover by age.
   fs.writeFileSync(arquivo, `${process.pid} 2020-01-01T00:00:00Z\n`);
   const antigo = new Date(Date.now() - 3 * 60 * 60 * 1000);
   fs.utimesSync(arquivo, antigo, antigo);
@@ -217,7 +217,7 @@ test("uma trava de processo morto é reconciliada e assumida", (t) => {
   });
 
   const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
-  // PID altíssimo e improvável de existir.
+  // Very high PID, unlikely to exist.
   fs.writeFileSync(arquivo, "4194303 2026-01-01T00:00:00Z\n");
 
   const situacao = amb.trava.situacao();
@@ -329,7 +329,7 @@ test("a reconciliação marca como desconhecido o trabalho cujo processo sumiu",
     fs.rmSync(checkout, { recursive: true, force: true });
   });
 
-  // Simula o que o console encontraria depois de cair no meio de uma operação.
+  // Simulates what the Console would find after crashing in the middle of an operation.
   const arquivo = path.join(amb.estadoDir, "trabalhos.json");
   fs.writeFileSync(
     arquivo,

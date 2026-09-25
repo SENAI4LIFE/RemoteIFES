@@ -7,17 +7,17 @@ const processos = require("./processos");
 const trava = require("./trava");
 const plataforma = require("./plataforma");
 
-// Observação do host e da aplicação.
+// Host and application observation.
 //
-// Regra inegociável: este módulo **não** carrega `src/app.js`, `src/config/database.js` nem
-// qualquer serviço do servidor. Aqueles módulos criam o diretório de dados, abrem o SQLite,
-// rodam `criarSchema()` e `popularBanco()` já no require — um "processo passivo de diagnóstico"
-// que os importasse criaria e migraria o banco de outro processo. Aqui só há:
-//  - /health por HTTP no loopback (barato e é a fonte de verdade do processo em execução);
-//  - leitura somente-leitura e sob demanda do arquivo SQLite, sem escrever nada;
-//  - arquivos de estado que os scripts já gravam;
-//  - observações do sistema operacional.
-// O que não puder ser observado vira `null`/"desconhecido", nunca zero.
+// Non-negotiable rule: this module does **not** load `src/app.js`, `src/config/database.js` or any
+// server service. Those modules create the data directory, open SQLite and run `criarSchema()` and
+// `popularBanco()` on require; a passive diagnostic process importing them would create and migrate
+// the database from another process. Only these sources are used:
+//  - /health over HTTP on loopback (cheap, and the source of truth for the running process);
+//  - on-demand, read-only access to the SQLite file, writing nothing;
+//  - state files the scripts already write;
+//  - operating system observations.
+// What cannot be observed becomes `null`/"unknown", never zero.
 
 const DESCONHECIDO = null;
 
@@ -29,7 +29,7 @@ function lerTexto(arquivo) {
   }
 }
 
-// --- Aplicação --------------------------------------------------------------------------
+// --- Application --------------------------------------------------------------------------
 
 function consultarSaude({ timeoutMs = 3000 } = {}) {
   const app = config.caminhosDaAplicacao();
@@ -70,8 +70,8 @@ function consultarSaude({ timeoutMs = 3000 } = {}) {
 }
 
 /**
- * Leitura oportunista e somente-leitura do banco. Usada só quando o operador pede o painel
- * completo ou uma checagem de pré-requisitos: nunca em polling.
+ * Opportunistic read-only database access. Used only when the operator requests the full panel or a
+ * prerequisite check: never in polling.
  */
 function espiarBanco({ permitirLeitura = null } = {}) {
   const app = config.caminhosDaAplicacao();
@@ -88,11 +88,10 @@ function espiarBanco({ permitirLeitura = null } = {}) {
   resultado.wal = fs.existsSync(`${app.banco}-wal`);
   const temShm = fs.existsSync(`${app.banco}-shm`);
 
-  // Abrir um banco em modo WAL cria os arquivos -shm/-wal quando eles não existem, mesmo com
-  // readOnly. Um processo que só observa não pode deixar rastro no diretório de dados da
-  // aplicação, então a leitura só acontece quando alguém já tem o banco aberto (o -shm existe)
-  // ou quando o chamador confirmou que a aplicação está no ar. Caso contrário ficam apenas os
-  // metadados do arquivo, com o motivo dito em voz alta.
+  // Opening a WAL database creates the -shm/-wal files when missing, even with readOnly. A process
+  // that only observes must leave no trace in the application's data directory, so the read happens
+  // only when someone already has the database open (-shm exists) or when the caller confirmed the
+  // application is running. Otherwise only file metadata is reported, with the reason stated.
   const podeAbrir = permitirLeitura === true || (permitirLeitura === null && temShm);
   if (!podeAbrir) {
     resultado.erro =
@@ -136,11 +135,11 @@ function espiarBanco({ permitirLeitura = null } = {}) {
   return resultado;
 }
 
-// --- Serviço, watchdog e registros (via adaptador de plataforma) ---------------------------
+// --- Service, watchdog and logs (through the platform adapter) ---------------------------
 //
-// Tudo que depende do sistema operacional mudou de lugar: `src/plataforma/` decide como
-// consultar o serviço, o watchdog e os registros, e devolve um **estado explícito** em vez de
-// um booleano. "Não existe neste sistema" deixou de ser confundido com "instalado e parado".
+// `src/plataforma/` decides how to query the service, watchdog and logs, and returns an **explicit
+// state** instead of a boolean, so "does not exist on this system" is never confused with
+// "installed and stopped".
 
 async function estadoDoServico() {
   const r = await plataforma.estadoDoServico();
@@ -252,7 +251,7 @@ function quarentenaDoBanco() {
   return nomes.filter((n) => n.startsWith(`${base}.corrompido-`));
 }
 
-// --- Estado de implantação registrado pelos scripts --------------------------------------
+// --- Deployment state recorded by the scripts --------------------------------------
 
 function historicoDeploy(limite = 15) {
   const app = config.caminhosDaAplicacao();

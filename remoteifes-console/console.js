@@ -8,13 +8,13 @@ const servidor = require("./src/servidor");
 const identidade = require("./src/identidade");
 const atualizador = require("./src/atualizador");
 
-// Ponto de entrada do Console de Operações.
+// Operations Console entry point.
 //
-// Dois modos de escuta:
-//   - **ativação por socket** (produção): o systemd guarda o socket e passa o descritor 3 na
-//     primeira conexão. Nenhum processo Node fica residente enquanto ninguém usa o console,
-//     que é o que torna o custo ocioso zero num Raspberry Pi 3 de 1 GiB.
-//   - **porta TCP** (desenvolvimento, ou host sem systemd): escuta direto em 127.0.0.1.
+// Two listening modes:
+//   - **socket activation** (production): systemd holds the socket and passes descriptor 3 on the
+//     first connection. No Node process stays resident while nobody uses the Console, which makes
+//     the idle cost zero on a 1 GiB Raspberry Pi 3.
+//   - **TCP port** (development, or host without systemd): listens directly on 127.0.0.1.
 
 const SD_LISTEN_FDS_START = 3;
 
@@ -22,7 +22,7 @@ function descritorDoSystemd() {
   const quantos = Number(process.env.LISTEN_FDS || 0);
   const paraQuem = process.env.LISTEN_PID;
   if (!quantos) return null;
-  // LISTEN_PID evita herdar por engano o descritor de um pai que não era para nós.
+  // LISTEN_PID prevents inheriting a descriptor meant for another process from a parent by mistake.
   if (paraQuem && paraQuem !== String(process.pid)) return null;
   if (quantos !== 1) {
     console.error(`esperado exatamente 1 socket do systemd, recebidos ${quantos}`);
@@ -35,21 +35,21 @@ function iniciar() {
   estado.garantirDiretorio();
   fs.mkdirSync(config.DIR_SAIDAS, { recursive: true, mode: 0o700 });
 
-  // Provisiona o segredo do contrato de prontidão. Sem ele a rota da aplicação responde 404 e
-  // o console não consegue observar canais de comando nem OTA em andamento.
+  // Provisions the readiness contract secret. Without it the application route answers 404 and the
+  // Console cannot observe command channels or OTA in progress.
   try {
     prontidao.garantirTokenProntidao();
   } catch (erro) {
     console.error(`aviso: não foi possível provisionar o contrato de prontidão (${erro.message})`);
   }
 
-  // Reconciliação de uma atualização do console interrompida (queda de energia entre o estágio
-  // e a troca do ponteiro). A troca em si é um rename, então nunca há instalação pela metade —
-  // o que pode sobrar é estágio a limpar.
+  // Reconciles an interrupted Console update (power loss between staging and the pointer swap). The
+  // swap itself is a rename, so there is never a half installation; what can remain is staging to
+  // clean up.
   try {
-    // Divergência entre o ponteiro e o código que de fato carregou: o bootstrap já caiu para
-    // uma versão utilizável, então o console está no ar — e é justamente por isso que precisa
-    // ficar registrado, senão o sucesso aparente encobre uma atualização que não pegou.
+    // Divergence between the pointer and the code that actually loaded: the bootstrap already fell
+    // back to a usable version, so the Console is up, and that is exactly why it must be recorded;
+    // otherwise apparent success hides an update that did not take effect.
     const instaladas = atualizador.versoesInstaladas();
     const emExecucao = atualizador.versaoEmExecucao();
     if (instaladas.gerenciadoLadoALado && instaladas.ativa && emExecucao && instaladas.ativa !== emExecucao) {
@@ -68,8 +68,8 @@ function iniciar() {
     console.error(`aviso: não foi possível reconciliar a atualização do console (${erro.message})`);
   }
 
-  // Reconciliação: o processo pode ter saído por ociosidade, caído ou sido reiniciado por uma
-  // auto-atualização enquanto um trabalho corria.
+  // Reconciliation: the process may have exited on idle, crashed or been restarted by a self-update
+  // while a job was running.
   const desconhecidos = execucao.reconciliar();
   if (desconhecidos) {
     console.error(`${desconhecidos} operação(ões) ficaram com desfecho desconhecido e estão marcadas como tal.`);
@@ -111,8 +111,8 @@ function iniciar() {
     return porta;
   };
 
-  // O lançador sabe religar o console; o socket do systemd também. Em execução avulsa não há
-  // quem reative, então a saída por ociosidade fica desarmada.
+  // The launcher can restart the Console, and so can the systemd socket. A standalone run has
+  // nothing to reactivate it, so idle exit is disarmed.
   const reativavel = fd !== null || process.env.CONSOLE_INICIADO_PELO_LANCADOR === "1";
 
   if (fd !== null) {
@@ -149,9 +149,9 @@ function iniciar() {
   });
 }
 
-// Entrada explícita. `require.main === module` não vale quando a camada estável de bootstrap
-// carrega este arquivo: ali o módulo principal é o bootstrap, e confiar nisso deixaria o
-// serviço subir sem escutar nada.
+// Explicit entry. `require.main === module` does not hold when the stable bootstrap layer loads
+// this file: there the main module is the bootstrap, and relying on it would start the service
+// without listening.
 if (require.main === module) iniciar();
 
 module.exports = { iniciar, executar: iniciar, descritorDoSystemd };

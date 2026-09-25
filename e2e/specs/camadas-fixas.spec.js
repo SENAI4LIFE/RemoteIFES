@@ -1,8 +1,8 @@
 const { test, expect, VIEWPORTS, injetarSessao } = require("../harness/fixtures");
 
-// Botões flutuantes, painel de ajuda, menu da conta e barra inferior: as camadas fixas
-// precisam caber na tela e não cobrir umas às outras, em qualquer altura de tela e com o
-// texto ampliado ao máximo (a barra inferior cresce para mais de 100px).
+// Floating buttons, help panel, account menu and bottom bar: the fixed layers must fit on screen
+// and not cover each other at any screen height and with text enlarged to the maximum (the bottom
+// bar grows beyond 100px).
 
 const MAXIMO_A11Y = {
   remoteifes_font_scale: "2",
@@ -86,8 +86,8 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
       const ajuda = document.getElementById("helpFabToggleBtn").getBoundingClientRect();
       const a11y = document.getElementById("a11yToggleBtn").getBoundingClientRect();
       const variavel = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tabbar-h"));
-      // A barra rola na horizontal quando as abas não cabem: cada aba é trazida à vista
-      // antes de conferir se algo flutuante a cobre.
+      // The bar scrolls horizontally when the tabs do not fit: each tab is scrolled into view
+      // before checking whether anything floating covers it.
       const abas = Array.from(document.querySelectorAll(".tab-btn:not(.hidden)")).map((aba) => {
         aba.scrollIntoView({ inline: "nearest", block: "nearest" });
         const r = aba.getBoundingClientRect();
