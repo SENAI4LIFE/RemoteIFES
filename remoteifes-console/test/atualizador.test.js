@@ -680,3 +680,118 @@ test("uma trava de processo morto é recuperada em vez de travar a instalação 
   atualizador.liberarTrava();
   assert.ok(!fs.existsSync(path.join(raiz, "operacao-em-andamento.json")), "liberar remove a trava");
 });
+
+test("a recuperação de trava órfã não deixa dois processos entrarem", (t) => {
+  // Remover e recriar era uma corrida: dois processos veem o mesmo dono morto, o primeiro recria
+  // a trava e o segundo remove justamente essa trava VIVA e cria a sua. A reivindicação agora é
+  // por rename, que é atômico: só um consegue mover aquele caminho.
+  const raiz = ajuda.dirTemporario("console-corrida-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const arquivo = path.join(raiz, "operacao-em-andamento.json");
+
+  // Trava de um processo morto.
+  fs.writeFileSync(arquivo, `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: 999999, em: new Date().toISOString() })}\n`);
+
+  const primeira = atualizador.adquirirTrava("A");
+  assert.equal(primeira.ok, true, "quem recupera a órfã fica com a trava");
+  const dono = JSON.parse(fs.readFileSync(arquivo, "utf8"));
+  assert.equal(dono.pid, process.pid);
+  assert.equal(dono.operacao, "A");
+
+  // Uma segunda aquisição, agora com dono VIVO (este processo), tem de recusar — e não remover.
+  const segunda = atualizador.adquirirTrava("B");
+  assert.equal(segunda.ok, false, "com dono vivo, a segunda recusa");
+  const aindaDono = JSON.parse(fs.readFileSync(arquivo, "utf8"));
+  assert.equal(aindaDono.operacao, "A", "a trava viva não pode ser substituída pela segunda operação");
+
+  atualizador.liberarTrava();
+  assert.ok(!fs.existsSync(arquivo));
+  assert.ok(!fs.readdirSync(raiz).some((n) => n.includes(".orfa-")), "nenhum resíduo de recuperação fica para trás");
+});
+
+test("a reconciliação não mexe em versoes/ enquanto uma operação viva detém a trava", (t) => {
+  // Um segundo console subindo durante uma atualização chamava reconciliar() e apagava o estágio
+  // da operação em andamento.
+  const raiz = ajuda.dirTemporario("console-recon-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  fs.mkdirSync(path.join(raiz, "versoes"), { recursive: true });
+  const estagio = path.join(raiz, "versoes", "3.0.0.parcial-abc123");
+  fs.mkdirSync(estagio, { recursive: true });
+  fs.writeFileSync(path.join(estagio, "console.js"), "//\n");
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "1.0.0", versaoAnterior: null, transacao: { versao: "3.0.0", etapa: "instalando" } })}\n`
+  );
+  // Trava de um processo VIVO que não é este: usa o pid do próprio processo de teste via arquivo,
+  // e a checagem de "outro processo" é feita comparando com process.pid — então simulamos com um
+  // pid vivo diferente usando o pid do processo pai, que existe.
+  fs.writeFileSync(
+    path.join(raiz, "operacao-em-andamento.json"),
+    `${JSON.stringify({ operacao: "atualizar 3.0.0", pid: process.ppid, em: new Date().toISOString() })}\n`
+  );
+
+  const r = atualizador.reconciliar();
+  assert.equal(r.adiado, true, `a reconciliação precisa ser adiada. Recebi: ${JSON.stringify(r)}`);
+  assert.ok(fs.existsSync(estagio), "o estágio da operação em andamento não pode ser apagado");
+  assert.ok(atualizador.lerEstadoInstalacao().transacao, "a transação da outra operação continua registrada");
+});
+
+test("a reconciliação preserva .substituido-*, que é a única cópia durante uma troca", (t) => {
+  const raiz = ajuda.dirTemporario("console-subst-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  fs.mkdirSync(path.join(raiz, "versoes"), { recursive: true });
+  const parcial = path.join(raiz, "versoes", "3.0.0.parcial-aaa111");
+  const substituido = path.join(raiz, "versoes", "1.0.0.substituido-bbb222");
+  for (const d of [parcial, substituido]) {
+    fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(d, "console.js"), "//\n");
+  }
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({ versaoAtiva: "1.0.0", versaoAnterior: null, transacao: { versao: "3.0.0", etapa: "instalando" } })}\n`
+  );
+
+  atualizador.reconciliar();
+  assert.ok(!fs.existsSync(parcial), "o parcial da transação interrompida sai");
+  assert.ok(fs.existsSync(substituido), "o .substituido-* NÃO pode sair: é a única cópia do payload anterior");
+});
+
+test("o artefato tem o tamanho conferido antes de ser lido para a memória", (t) => {
+  // A correção de TOCTOU passou a ler o arquivo para então comparar o tamanho — num Pi de 1 GiB
+  // isso derruba o host antes de qualquer verificação dizer que o artefato era inválido.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+
+  const dir = ajuda.dirTemporario("console-tam-");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const arquivo = path.join(dir, "a.tar.gz");
+  fs.writeFileSync(arquivo, Buffer.alloc(2048, 7));
+
+  // Tamanho divergente: recusa sem precisar do digest.
+  const r = release.conferirArtefato(arquivo, { bytes: 999_999, sha256: "0".repeat(64) });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /bytes no arquivo/, "a recusa vem da conferência por stat, não da leitura");
+
+  // Acima do teto do console, mesmo com o tamanho declarado batendo.
+  const acima = release.conferirArtefato(arquivo, { bytes: 2048, sha256: "0".repeat(64) }, { limiteBytes: 1024 });
+  assert.equal(acima.ok, false);
+  assert.match(acima.motivo, /acima do teto/);
+});

@@ -923,3 +923,78 @@ test("atualizar e reverter não apagam o escopo nem o estado registrados", (t) =
   assert.equal(depois.estado, "/caminho/registrado", "o diretório de estado sobrevive");
   assert.equal(depois.porta, 8123, "a porta sobrevive");
 });
+
+test("a desinstalação recusa apagar o programa quando não consegue provar que o console parou", async (t) => {
+  // Antes, uma exceção ao encerrar devolvia `encerrado:false` e o chamador seguia apagando; e
+  // qualquer falha da requisição de identidade durante a espera — inclusive tempo esgotado —
+  // contava como "parou". Apagar o programa deixando um processo vivo e autenticado é o pior
+  // desfecho possível.
+  const amb = ajuda.ambiente();
+  const raiz = ajuda.dirTemporario("console-prova-");
+  const estadoDir = ajuda.dirTemporario("console-prova-est-");
+  t.after(() => {
+    amb.restaurar();
+    for (const d of [raiz, estadoDir]) fs.rmSync(d, { recursive: true, force: true });
+  });
+
+  const inst = await instalar(["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--checkout", path.join(ajuda.RAIZ, "..")]);
+  assert.equal(inst.codigo, 0, inst.saida);
+  const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
+
+  // Um "console" que prova identidade corretamente e NUNCA morre: o pid do contrato é de um
+  // processo que o desinstalador não consegue matar (ele mesmo), então a porta continua aberta.
+  const crypto = require("crypto");
+  const segredo = crypto.randomBytes(32).toString("base64url");
+  const teimoso = http.createServer((req, res) => {
+    const url = new URL(req.url, "http://127.0.0.1");
+    const desafio = url.searchParams.get("desafio");
+    if (url.pathname === "/api/identidade" && desafio) {
+      const prova = crypto.createHmac("sha256", Buffer.from(segredo, "base64url")).update(desafio).digest("base64url");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ prova, versao }));
+    }
+    res.writeHead(200);
+    res.end("{}");
+  });
+  await new Promise((r) => teimoso.listen(0, "127.0.0.1", r));
+  t.after(() => new Promise((r) => teimoso.close(() => r())));
+
+  // O contrato aponta para um pid que NÃO é o servidor (um pid inexistente): encerrar "dá certo"
+  // sem nada morrer, e a porta continua aceitando conexão.
+  fs.writeFileSync(
+    path.join(estadoDir, "endereco.json"),
+    `${JSON.stringify({ porta: teimoso.address().port, pid: 999999, modo: "tcp", versao, segredo })}\n`
+  );
+
+  const r = await rodarNodeAsync([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"], { CONSOLE_PARADA_MS: "1200" });
+  assert.equal(r.codigo, 1, `a desinstalação tem de falhar sem prova de parada. Saída:\n${r.saida}`);
+  assert.match(r.saida, /não foi possível confirmar que o console parou/);
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "o programa NÃO pode ser removido sem prova de parada");
+});
+
+test("a reexecução do desinstalador repassa o escopo, não deixa a cópia adivinhar", async (t) => {
+  // A cópia temporária não mora dentro de uma instalação, então não consegue inferir nada. Sem
+  // repassar o escopo, uma desinstalação de usuário virava de sistema no filho: deixava a
+  // integração do usuário instalada e podia mexer na de sistema de outra instalação.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"), "utf8");
+
+  assert.match(fonte, /"--escopo", escopoEfetivo/, "o escopo resolvido precisa ir para a cópia temporária");
+  assert.match(
+    fonte,
+    /a === "--raiz" \|\| a === "--estado" \|\| a === "--escopo"/,
+    "o escopo original precisa ser filtrado para não duplicar com o resolvido"
+  );
+});
+
+test("a substituição do payload restaura a versão anterior se o segundo rename falhar", (t) => {
+  // Entre os dois renames a versão ativa não existe. Se o segundo falhar, o payload ficava só sob
+  // `.substituido-*`, sem restauração automática, e o ponteiro apontava para um diretório ausente.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "instalacao", "instalar.js"), "utf8");
+
+  assert.match(fonte, /fs\.renameSync\(aposentado, destinoVersao\)/, "a falha do segundo rename precisa restaurar o anterior");
+  assert.match(fonte, /a versão anterior foi restaurada/);
+});
