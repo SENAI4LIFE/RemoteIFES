@@ -771,7 +771,7 @@ function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = nu
 function intencaoAlteradaDesde(sala, instanteUtcSqlite) {
   return !!db.prepare(`
     SELECT 1 FROM comandos_log
-    WHERE sala = ? AND criadoEm > ? AND (origem IN ('manual', 'agendamento') OR cmd = 'failsafe_off_local')
+    WHERE sala = ? AND criadoEm > ? AND (origem IN ('manual', 'agendamento', 'desligamento_diario') OR cmd = 'failsafe_off_local')
     LIMIT 1
   `).get(sala, instanteUtcSqlite);
 }

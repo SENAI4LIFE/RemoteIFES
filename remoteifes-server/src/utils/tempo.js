@@ -15,7 +15,7 @@ const MAPA_DIA_SEMANA = {
   Sat: 6,
 };
 
-function partesAgoraBrasilia() {
+function partesAgoraBrasilia(instante = new Date()) {
   const formatador = new Intl.DateTimeFormat("en-CA", {
     timeZone: FUSO,
     year: "numeric",
@@ -27,14 +27,14 @@ function partesAgoraBrasilia() {
     hour12: false,
   });
   const partes = {};
-  for (const { type, value } of formatador.formatToParts(new Date())) {
+  for (const { type, value } of formatador.formatToParts(instante)) {
     if (type !== "literal") partes[type] = value;
   }
   return partes;
 }
 
-function horaAtualBrasilia() {
-  const p = partesAgoraBrasilia();
+function horaAtualBrasilia(instante = new Date()) {
+  const p = partesAgoraBrasilia(instante);
   return `${p.hour}:${p.minute}`;
 }
 
@@ -43,9 +43,19 @@ function diaAtualBrasilia() {
   return MAPA_DIA_SEMANA[abreviacao];
 }
 
-function dataAtualBrasiliaISO() {
-  const p = partesAgoraBrasilia();
+function dataAtualBrasiliaISO(instante = new Date()) {
+  const p = partesAgoraBrasilia(instante);
   return `${p.year}-${p.month}-${p.day}`;
+}
+
+// Instant in SQLite datetime('now') format (UTC), taken from the JavaScript clock.
+function utcSqlite(instante = new Date()) {
+  return instante.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function deslocarDataISO(dataISO, dias) {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia + dias)).toISOString().slice(0, 10);
 }
 
 function formatarParaBrasilia(datetimeUtcSqlite) {
@@ -77,4 +87,6 @@ module.exports = {
   formatarParaBrasilia,
   brasiliaParaUtcSqlite,
   paraEpochMs,
+  utcSqlite,
+  deslocarDataISO,
 };

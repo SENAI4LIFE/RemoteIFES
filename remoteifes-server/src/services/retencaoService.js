@@ -49,6 +49,7 @@ function alvosTemporais() {
     { nome: "notificacoes", sql: "DELETE FROM notificacoes WHERE lida = 1 AND criadoEm < datetime('now', ?)", dias: DIAS_LOGS },
     { nome: "notificacoes_antigas", sql: "DELETE FROM notificacoes WHERE criadoEm < datetime('now', ?)", dias: DIAS_NOTIFICACOES },
     { nome: "agendamentos_execucoes", sql: "DELETE FROM agendamentos_execucoes WHERE executadoEm < datetime('now', ?)", dias: DIAS_EXECUCOES },
+    { nome: "desligamento_diario_execucoes", sql: "DELETE FROM desligamento_diario_execucoes WHERE executadoEm < datetime('now', ?)", dias: DIAS_EXECUCOES },
     { nome: "agendamentos_execucoes_orfas", sql: "DELETE FROM agendamentos_execucoes WHERE agendamentoId IN (SELECT id FROM agendamentos WHERE data < date('now', ?))", dias: DIAS_AGENDAMENTOS },
     { nome: "agendamentos_passados", sql: "DELETE FROM agendamentos WHERE data < date('now', ?)", dias: DIAS_AGENDAMENTOS },
     { nome: "sessoes", sql: "DELETE FROM sessoes WHERE logout IS NOT NULL AND logout < datetime('now', ?)", dias: DIAS_SESSOES },

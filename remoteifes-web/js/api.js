@@ -348,6 +348,10 @@ const Api = {
     return chamar("/admin/configuracoes", { headers: headersComToken() });
   },
 
+  async obterDesligamentoDiario() {
+    return chamar("/admin/desligamento-diario", { headers: headersComToken() });
+  },
+
   async atualizarConfiguracoes(dados) {
     return chamar("/admin/configuracoes", {
       method: "PATCH",
