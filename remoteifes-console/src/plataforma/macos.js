@@ -146,6 +146,30 @@ async function reiniciarHost() {
   return recurso(ESTADO.INDISPONIVEL, (r.saida || r.erro || "").slice(0, 300));
 }
 
+/**
+ * Starts the Console as the LaunchAgent job, so launchd owns the one Console process: the launcher,
+ * the status, the restart after an update (kickstart -k) and the uninstaller (bootout) all act on
+ * the same job instead of on a process the launcher spawned outside launchd. `kickstart` without
+ * `-k` never kills an instance that is already running.
+ */
+async function iniciarConsoleGerenciado() {
+  const uid = uidAtual();
+  const destino = caminhoAgente();
+  if (uid === null || !fs.existsSync(destino)) {
+    return recurso(ESTADO.NAO_APLICAVEL, "o LaunchAgent do console não está instalado; o lançador inicia o processo diretamente");
+  }
+  const alvo = `gui/${uid}/${ROTULO_AGENTE}`;
+  const carregado = await launchctl(["print", alvo]);
+  if (!carregado.ok) {
+    const carga = await launchctl(["bootstrap", `gui/${uid}`, destino], { timeoutMs: 30_000 });
+    if (!carga.ok) return recurso(ESTADO.INDISPONIVEL, `launchctl bootstrap falhou: ${(carga.saida || carga.erro || "").slice(0, 200)}`);
+  }
+  const r = await launchctl(["kickstart", alvo], { timeoutMs: 30_000 });
+  return r.ok
+    ? { ...recurso(ESTADO.SUPORTADO), mecanismo: "launchd" }
+    : recurso(ESTADO.INDISPONIVEL, `launchctl kickstart falhou: ${(r.saida || r.erro || "").slice(0, 200)}`);
+}
+
 async function reiniciarConsole() {
   const uid = uidAtual();
   if (uid === null) return recurso(ESTADO.INDISPONIVEL, "não foi possível determinar o uid atual");
@@ -288,6 +312,15 @@ ${itens}
     <false/>
     <key>KeepAlive</key>
     <false/>
+    <!-- Started by the launcher through launchctl kickstart, so idle exit is armed and the bootstrap
+         loads the Console entry. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>CONSOLE_INICIADO_PELO_LANCADOR</key>
+      <string>1</string>
+      <key>CONSOLE_BOOTSTRAP_ALVO</key>
+      <string>console</string>
+    </dict>
     <key>ProcessType</key>
     <string>Background</string>
     <key>StandardOutPath</key>
@@ -362,4 +395,5 @@ module.exports = {
   registrarInicializacao,
   removerInicializacao,
   estadoDaInicializacao,
+  iniciarConsoleGerenciado,
 };

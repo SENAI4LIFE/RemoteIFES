@@ -199,6 +199,20 @@ async function garantirBackend() {
     };
   }
 
+  // Where a service manager owns the Console (macOS LaunchAgent), it starts the process: status,
+  // restart after an update and uninstall then act on that same job. A job that launchd started but
+  // that does not become ready is reported, never followed by a second, directly spawned process.
+  const gerenciado = await plataforma.iniciarConsoleGerenciado();
+  if (gerenciado.disponivel) {
+    log(`Iniciando o console pelo ${gerenciado.mecanismo}...`);
+    const pronto = await esperarPronto();
+    if (pronto.ok) return { ok: true, jaEstava: false, contrato: pronto.contrato, versao: pronto.versao, gerenciadoPor: gerenciado.mecanismo };
+    return { ok: false, motivo: `o ${gerenciado.mecanismo} iniciou o console, mas ele não ficou pronto (${pronto.motivo})` };
+  }
+  if (gerenciado.estado === "indisponivel") {
+    log(`O gerenciador de serviços não iniciou o console (${gerenciado.motivo}); iniciando o processo diretamente.`);
+  }
+
   const alvo = caminhoDoBackend();
   if (!fs.existsSync(alvo)) return { ok: false, motivo: `o backend do console não foi encontrado em ${alvo}` };
 
