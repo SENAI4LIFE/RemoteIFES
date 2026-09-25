@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="258" viewBox="0 0 800 258" role="img" aria-labelledby="t d">
+  <title id="t">Do pedido ao ar-condicionado</title>
+  <desc id="d">Cinco etapas: pedido; o servidor grava o estado desejado e avança a versão (ok: true); envia ao socket da placa ou, na malha, ao gateway (enviadoAoDispositivo), e sem canal o estado fica salvo para a reconexão; a placa transmite o infravermelho e ecoa a versão (dispositivoConfirmou); a recepção pelo aparelho não é medida.</desc>
+  <!-- Theme-neutral: every text sits on an opaque card or pill, and lines use mid-tones that keep
+       3:1 on white and on GitHub dark. Each stage is one <g>; edit text in place. -->
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #1f2b23; }
+    .cartao { fill: #ffffff; stroke: #cfd6d1; stroke-width: 1; }
+    .titulo { font-size: 13.4px; font-weight: 700; }
+    .corpo { font-size: 12.3px; fill: #4d5a54; }
+    .fraco { font-size: 11.3px; fill: #62706a; font-style: italic; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.6px; font-weight: 600; }
+    .num { font-size: 11.5px; font-weight: 700; fill: #ffffff; }
+    .pilula { fill: #ffffff; stroke: #aab4ae; stroke-width: 1; }
+    .lugar { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; fill: #4d5a54; }
+    .linha { fill: none; stroke: #6e7781; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .seta { fill: #6e7781; }
+    .rotulo { font-size: 11.5px; font-weight: 600; fill: #4d5a54; }
+  </style>
+
+  <!-- Where each stage happens -->
+  <g>
+    <rect class="pilula" x="36" y="2" width="84" height="20" rx="10"/><text class="lugar" x="78" y="16" text-anchor="middle">CLIENTE</text>
+    <path d="M178 18 v-6 H240 M312 12 H374 v6" stroke="#aab4ae" stroke-width="1" fill="none"/>
+    <rect class="pilula" x="240" y="2" width="72" height="20" rx="10"/><text class="lugar" x="276" y="16" text-anchor="middle">SERVIDOR</text>
+    <rect class="pilula" x="506" y="2" width="68" height="20" rx="10"/><text class="lugar" x="540" y="16" text-anchor="middle">ESP32</text>
+    <rect class="pilula" x="698" y="2" width="60" height="20" rx="10"/><text class="lugar" x="728" y="16" text-anchor="middle">SALA</text>
+  </g>
+
+  <!-- 1 · Pedido -->
+  <g>
+    <rect class="cartao" x="6" y="30" width="144" height="176" rx="12"/>
+    <path d="M18 30 h120 a12 12 0 0 1 12 12 H6 a12 12 0 0 1 12 -12 z" fill="#1a5fb4"/>
+    <circle cx="25" cy="61" r="10" fill="#1a5fb4"/><text class="num" x="25" y="65" text-anchor="middle">1</text>
+    <text class="titulo" x="41" y="66">Pedido</text>
+    <text class="corpo" x="16" y="94">painel da sala,</text>
+    <text class="corpo" x="16" y="110">agendamento ou</text>
+    <text class="corpo" x="16" y="126">desligamento diário</text>
+  </g>
+
+  <!-- 2 · Estado desejado -->
+  <g>
+    <rect class="cartao" x="170" y="30" width="144" height="176" rx="12"/>
+    <path d="M182 30 h120 a12 12 0 0 1 12 12 H170 a12 12 0 0 1 12 -12 z" fill="#1c6b3c"/>
+    <circle cx="189" cy="61" r="10" fill="#1c6b3c"/><text class="num" x="189" y="65" text-anchor="middle">2</text>
+    <text class="titulo" x="205" y="66">Estado desejado</text>
+    <text class="corpo" x="180" y="94">gravado no banco;</text>
+    <text class="corpo" x="180" y="110">a versão da sala</text>
+    <text class="corpo" x="180" y="126">avança</text>
+    <rect x="180" y="174" width="124" height="22" rx="6" fill="#e3f3e8"/><text class="mono" x="242" y="189" text-anchor="middle" fill="#124a29">ok: true</text>
+  </g>
+
+  <!-- 3 · Envio ao canal -->
+  <g>
+    <rect class="cartao" x="334" y="30" width="144" height="176" rx="12"/>
+    <path d="M346 30 h120 a12 12 0 0 1 12 12 H334 a12 12 0 0 1 12 -12 z" fill="#1c6b3c"/>
+    <circle cx="353" cy="61" r="10" fill="#1c6b3c"/><text class="num" x="353" y="65" text-anchor="middle">3</text>
+    <text class="titulo" x="369" y="66">Envio</text>
+    <text class="corpo" x="344" y="94">ao socket da placa</text>
+    <text class="corpo" x="344" y="110">ou, na malha, ao</text>
+    <text class="corpo" x="344" y="126">gateway</text>
+    <text class="fraco" x="344" y="148">sem canal: fica salvo</text>
+    <text class="fraco" x="344" y="163">e vai na reconexão</text>
+    <rect x="342" y="174" width="128" height="22" rx="6" fill="#e3f3e8"/><text class="mono" x="406" y="189" text-anchor="middle" fill="#124a29">enviadoAoDispositivo</text>
+  </g>
+
+  <!-- 4 · A placa executa e confirma -->
+  <g>
+    <rect class="cartao" x="498" y="30" width="144" height="176" rx="12"/>
+    <path d="M510 30 h120 a12 12 0 0 1 12 12 H498 a12 12 0 0 1 12 -12 z" fill="#0f6b70"/>
+    <circle cx="517" cy="61" r="10" fill="#0f6b70"/><text class="num" x="517" y="65" text-anchor="middle">4</text>
+    <text class="titulo" x="533" y="66">Placa executa</text>
+    <text class="corpo" x="508" y="94">transmite o IR e</text>
+    <text class="corpo" x="508" y="110">ecoa a versão que</text>
+    <text class="corpo" x="508" y="126">recebeu</text>
+    <rect x="506" y="174" width="128" height="22" rx="6" fill="#e1f1f1"/><text class="mono" x="570" y="189" text-anchor="middle" fill="#0b4f53">dispositivoConfirmou</text>
+  </g>
+
+  <!-- 5 · Aparelho: outside the system, never measured -->
+  <g>
+    <rect x="676" y="30" width="118" height="176" rx="12" fill="#fbf3d9" stroke="#8a5a06" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <circle cx="695" cy="61" r="10" fill="#8a5a06"/><text class="num" x="695" y="65" text-anchor="middle">5</text>
+    <text class="titulo" x="711" y="66">Aparelho</text>
+    <text x="686" y="95" font-size="14" font-weight="800" fill="#6b4604">não é medido</text>
+    <text class="corpo" x="686" y="116" fill="#5c3c04">o sistema não</text>
+    <text class="corpo" x="686" y="132" fill="#5c3c04">sabe se o sinal</text>
+    <text class="corpo" x="686" y="148" fill="#5c3c04">chegou</text>
+    <rect x="684" y="174" width="102" height="22" rx="6" fill="#ffffff" stroke="#8a5a06" stroke-width="1"/><text x="735" y="189" text-anchor="middle" font-size="10.8" font-weight="700" fill="#6b4604">sem prova física</text>
+  </g>
+
+  <!-- Forward path -->
+  <g>
+    <path class="linha" d="M152 118 H160"/><path class="seta" d="M168 118 l-9 -4.5 v9 z"/>
+    <path class="linha" d="M316 118 H324"/><path class="seta" d="M332 118 l-9 -4.5 v9 z"/>
+    <path class="linha" d="M480 118 H488"/><path class="seta" d="M496 118 l-9 -4.5 v9 z"/>
+    <path class="linha" d="M644 118 H665"/><path class="seta" d="M673 118 l-9 -4.5 v9 z"/>
+    <rect class="pilula" x="645" y="92" width="26" height="16" rx="8"/><text class="rotulo" x="658" y="104" text-anchor="middle">IR</text>
+  </g>
+
+  <!-- Return: the board's own report is what confirms the desired state -->
+  <g>
+    <path class="linha" d="M570 208 V230 a8 8 0 0 1 -8 8 H250 a8 8 0 0 1 -8 -8 V218"/>
+    <path class="seta" d="M242 210 l-4.5 9 h9 z"/>
+    <rect class="pilula" x="318" y="227" width="178" height="22" rx="11"/>
+    <text class="rotulo" x="407" y="242" text-anchor="middle">eco da versão pela placa</text>
+  </g>
+</svg>

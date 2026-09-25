@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="374" viewBox="0 0 800 374" role="img" aria-labelledby="t d">
+  <title id="t">Instalar, operar, atualizar e reverter</title>
+  <desc id="d">A instalação é feita uma vez pelo terminal. A rotina passa pelo Console de Operações: a atualização grava um backup verificado, aplica o código, reinicia o serviço e exige que o /health informe o commit implantado em até 40 segundos; sem essa confirmação, volta sozinha para a versão anterior. Restaurar o banco é uma decisão separada. Sem o console, os mesmos scripts rodam pelo terminal.</desc>
+  <!-- Theme-neutral: text sits on opaque cards or pills; lines are mid-tones that keep 3:1 on white
+       and on GitHub dark. Source of truth: remoteifes-server/deploy.sh, rollback.sh, verificar-versao.sh
+       and remoteifes-console/src/acoes.js. -->
+  <style>
+    text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #1f2b23; }
+    .cartao { fill: #ffffff; stroke: #cfd6d1; stroke-width: 1; }
+    .titulo { font-size: 13.2px; font-weight: 700; }
+    .corpo { font-size: 12px; fill: #4d5a54; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.2px; font-weight: 600; fill: #1f2b23; }
+    .num { font-size: 11px; font-weight: 700; fill: #ffffff; }
+    .pilula { fill: #ffffff; stroke: #aab4ae; stroke-width: 1; }
+    .faixa { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; fill: #4d5a54; }
+    .linha { fill: none; stroke: #6e7781; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .seta { fill: #6e7781; }
+    .divisa { stroke: #8b949e; stroke-width: 1; stroke-dasharray: 3 4; }
+    .rotulo { font-size: 11.3px; font-weight: 700; }
+  </style>
+
+  <!-- Lane 1 · installation, once, from the terminal -->
+  <g>
+    <rect class="pilula" x="6" y="4" width="226" height="20" rx="10"/>
+    <text class="faixa" x="119" y="18" text-anchor="middle">1 · INSTALAR · TERMINAL, UMA VEZ</text>
+    <rect class="cartao" x="6" y="32" width="150" height="28" rx="8"/><text class="mono" x="81" y="50" text-anchor="middle">npm run setup</text>
+    <path class="linha" d="M158 46 H168"/><path class="seta" d="M176 46 l-8 -4 v8 z"/>
+    <rect class="cartao" x="178" y="32" width="230" height="28" rx="8"/><text class="mono" x="293" y="50" text-anchor="middle">sudo bash install-service.sh</text>
+    <path class="linha" d="M410 46 H420"/><path class="seta" d="M428 46 l-8 -4 v8 z"/>
+    <rect class="cartao" x="430" y="32" width="364" height="28" rx="8"/><text class="corpo" x="612" y="50" text-anchor="middle" fill="#1f2b23">instalador do Console de Operações + primeiro operador</text>
+  </g>
+
+  <line class="divisa" x1="6" y1="76" x2="794" y2="76"/>
+
+  <!-- Lane 2 · routine through the Operations Console -->
+  <g>
+    <rect class="pilula" x="6" y="86" width="264" height="20" rx="10"/>
+    <text class="faixa" x="138" y="100" text-anchor="middle">2 · OPERAR · CONSOLE DE OPERAÇÕES</text>
+
+    <!-- Console tabs -->
+    <rect class="cartao" x="6" y="116" width="174" height="138" rx="12"/>
+    <path d="M18 116 h150 a12 12 0 0 1 12 12 H6 a12 12 0 0 1 12 -12 z" fill="#6b3fa0"/>
+    <text class="titulo" x="18" y="148">Serviço</text>
+    <text class="corpo" x="18" y="163">iniciar, parar, reiniciar</text>
+    <text class="titulo" x="18" y="188">Atualizações</text>
+    <text class="corpo" x="18" y="203">implantar ou reverter</text>
+    <text class="titulo" x="18" y="228">Dados e recuperação</text>
+    <text class="corpo" x="18" y="243">backup e restauração</text>
+
+    <!-- Update pipeline (deploy.sh) -->
+    <path class="linha" d="M182 182 H192"/><path class="seta" d="M200 182 l-8 -4 v8 z"/>
+
+    <rect class="cartao" x="202" y="116" width="136" height="72" rx="10"/>
+    <circle cx="219" cy="134" r="9" fill="#1c6b3c"/><text class="num" x="219" y="138" text-anchor="middle">1</text>
+    <text class="titulo" x="233" y="139">Backup</text>
+    <text class="corpo" x="212" y="160">verificado, antes de</text>
+    <text class="corpo" x="212" y="175">mexer no código</text>
+
+    <path class="linha" d="M340 152 H348"/><path class="seta" d="M356 152 l-8 -4 v8 z"/>
+    <rect class="cartao" x="356" y="116" width="136" height="72" rx="10"/>
+    <circle cx="373" cy="134" r="9" fill="#1c6b3c"/><text class="num" x="373" y="138" text-anchor="middle">2</text>
+    <text class="titulo" x="387" y="139">Código novo</text>
+    <text class="corpo" x="366" y="160">npm ci apenas se</text>
+    <text class="corpo" x="366" y="175">o package mudou</text>
+
+    <path class="linha" d="M494 152 H502"/><path class="seta" d="M510 152 l-8 -4 v8 z"/>
+    <rect class="cartao" x="510" y="116" width="126" height="72" rx="10"/>
+    <circle cx="527" cy="134" r="9" fill="#1c6b3c"/><text class="num" x="527" y="138" text-anchor="middle">3</text>
+    <text class="titulo" x="541" y="139">Reinício</text>
+    <text class="corpo" x="520" y="160">do serviço; encerra</text>
+    <text class="corpo" x="520" y="175">as sessões abertas</text>
+
+    <path class="linha" d="M638 152 H646"/><path class="seta" d="M654 152 l-8 -4 v8 z"/>
+    <rect class="cartao" x="654" y="116" width="140" height="72" rx="10"/>
+    <circle cx="671" cy="134" r="9" fill="#1c6b3c"/><text class="num" x="671" y="138" text-anchor="middle">4</text>
+    <text class="titulo" x="685" y="139">Verificação</text>
+    <text class="corpo" x="664" y="160">/health informa o</text>
+    <text class="corpo" x="664" y="175">commit em até 40 s</text>
+
+    <!-- Outcomes -->
+    <path class="linha" d="M760 190 V224"/><path class="seta" d="M760 232 l-4 -8 h8 z"/>
+    <rect class="pilula" x="766" y="200" width="30" height="18" rx="9"/><text class="rotulo" x="781" y="213" text-anchor="middle" fill="#1c6b3c">sim</text>
+    <rect x="690" y="234" width="104" height="44" rx="10" fill="#ffffff" stroke="#1c6b3c" stroke-width="2"/>
+    <text class="titulo" x="742" y="252" text-anchor="middle" fill="#124a29">✓ Verificada</text>
+    <text class="corpo" x="742" y="268" text-anchor="middle">em deploy.log</text>
+
+    <path class="linha" d="M690 190 V202 a6 6 0 0 1 -6 6 H646 a6 6 0 0 0 -6 6 V224"/><path class="seta" d="M640 232 l-4 -8 h8 z"/>
+    <rect class="pilula" x="598" y="199" width="36" height="18" rx="9"/><text class="rotulo" x="616" y="212" text-anchor="middle" fill="#b3261e">não</text>
+    <rect x="470" y="234" width="212" height="44" rx="10" fill="#ffffff" stroke="#b3261e" stroke-width="2"/>
+    <text class="titulo" x="576" y="252" text-anchor="middle" fill="#8c1d18">↩ Reversão automática</text>
+    <text class="corpo" x="576" y="268" text-anchor="middle">à versão anterior, mesma verificação</text>
+
+    <!-- Database restore is a separate decision -->
+    <rect x="202" y="234" width="256" height="44" rx="10" fill="#ffffff" stroke="#8b949e" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <text class="titulo" x="330" y="252" text-anchor="middle">Restaurar o banco é outra decisão</text>
+    <text class="corpo" x="330" y="268" text-anchor="middle">com o serviço parado, nunca automática</text>
+  </g>
+
+  <line class="divisa" x1="6" y1="294" x2="794" y2="294"/>
+
+  <!-- Lane 3 · without the Console -->
+  <g>
+    <rect class="pilula" x="6" y="304" width="408" height="20" rx="10"/>
+    <text class="faixa" x="210" y="318" text-anchor="middle">SEM O CONSOLE · TERMINAL (DESENVOLVIMENTO OU EMERGÊNCIA)</text>
+    <rect class="cartao" x="6" y="332" width="126" height="28" rx="8"/><text class="mono" x="69" y="350" text-anchor="middle">bash deploy.sh</text>
+    <rect class="cartao" x="140" y="332" width="136" height="28" rx="8"/><text class="mono" x="208" y="350" text-anchor="middle">bash rollback.sh</text>
+    <rect class="cartao" x="284" y="332" width="136" height="28" rx="8"/><text class="mono" x="352" y="350" text-anchor="middle">npm run restore</text>
+    <rect class="pilula" x="430" y="332" width="364" height="28" rx="14"/>
+    <text class="corpo" x="612" y="350" text-anchor="middle">os mesmos scripts e a mesma trava .deploy-lock do console</text>
+  </g>
+</svg>
