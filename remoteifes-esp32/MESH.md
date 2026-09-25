@@ -12,9 +12,10 @@ documentation (pt-BR) is in the main README, section "Rede mesh opcional e topol
 | Mesh protocol v1, server side (`remoteifes-server/src/services/meshService.js`) | implemented, covered by protocol tests |
 | Reference implementation of the board side (`remoteifes-server/test/support/mesh-reference.js`) | implemented; drives the server tests and the topology E2E test |
 | Topology view (Administração › Status › Topologia) and `GET /admin/topologia` | implemented |
-| Firmware: gateway relay and node mode | **pending** (not written) |
+| Firmware: protocol and crypto (`src/mesh_protocolo.cpp`) | implemented; compiled for the host and run against the server's own vectors (`test/mesh-protocol.test.js`) |
+| Firmware: gateway relay and node mode (`src/mesh.cpp`) | implemented; compiled and linked against the pinned framework |
 | Radio, range, reliability and multi-hop behavior on real ESP32 boards | **pending**: no hardware in the validation environment |
-| OTA over the mesh | **unavailable by design** for now; the server refuses it with an explicit message; direct OTA unchanged |
+| OTA over the mesh | **unavailable by design**; the server refuses it and the firmware refuses it too; direct OTA unchanged |
 
 Direct Wi-Fi/WebSocket remains the default. A board with no gateway involved behaves exactly as
 before, and a direct-only installation shows the mesh as "not in use" in the topology view.
@@ -31,10 +32,17 @@ and the [platform-espressif32 v7.0.1 release notes](https://github.com/platformi
 The firmware builds with `platform = espressif32@7.0.1`, `framework = arduino`, which ships
 **Arduino-ESP32 2.0.17 on ESP-IDF 4.4.7**. That constrains the choice more than anything else.
 
+That framework does carry ESP-WIFI-MESH: `esp_mesh.h` is in its SDK headers and `libmesh.a` is in the
+link line its PlatformIO build script produces. Compiling and linking the firmware with the mesh
+modules confirms it. The cost, measured against the same tree without them, is **+226 KiB flash**
+(64.1% → 75.6% of the 1.92 MiB application partition of `min_spiffs.csv`) and **+7 KiB static RAM**
+(15.1% → 17.3%). One firmware serves all three modes, so a board can change role without a different
+image and OTA keeps offering one artifact per version.
+
 | Option | Multi-hop | IP per node | Framework impact | Limits relevant here | Verdict |
 |---|---|---|---|---|---|
 | Direct Wi-Fi (baseline) | n/a | yes | none | every board needs infrastructure coverage | **default, unchanged** |
-| ESP-WIFI-MESH (`esp_mesh`) | yes, self-healing tree, root election | **root only**; other nodes route through the root | part of ESP-IDF's Wi-Fi component; no framework migration expected, but its use under Arduino 2.0.17 is **not yet verified by a firmware build** | whole network on the router's channel; per-hop latency 10–30 ms and root healing < 10 s in Espressif's test conditions | **recommended radio for multi-hop**, pending firmware work |
+| ESP-WIFI-MESH (`esp_mesh`) | yes, self-healing tree, root election | **root only**; other nodes route through the root | part of ESP-IDF's Wi-Fi component; no framework migration, and its use under Arduino 2.0.17 is confirmed by the firmware build | whole network on the router's channel; per-hop latency 10–30 ms and root healing < 10 s in Espressif's test conditions | **chosen radio**; implemented, hardware validation pending |
 | ESP-Mesh-Lite | yes | yes (NAT per parent) | **requires ESP-IDF 5.x** → migration of the whole firmware framework | would let each node keep its current WebSocket code | rejected for now: framework migration without evidence |
 | ESP-NOW with application routing | no (single hop per frame) | no | available in Arduino core 2.0.17 | 250-byte frames (1470 only in newer IDF), 20 peers, 7 encrypted peers, send callback confirms MAC-layer only | fallback for small single-hop extensions; needs fragmentation for larger messages |
 
@@ -112,16 +120,90 @@ The topology is an in-memory observation: nothing about routes is written to SQL
   reception remain distinct. For a mesh node "sent" means handed to the gateway; the node's ack
   means received by the board; only the node's own report confirms the desired state.
 
-## What the firmware must implement (pending)
+## Firmware
 
-* Gateway (root) mode: keep the direct WebSocket; announce nodes (`mesh_evento`), relay `mesh`
-  frames both ways without interpreting them; report route metadata; declare `gateway: true` in
-  `info`.
-* Node mode: join the mesh instead of the infrastructure network; run the handshake and the
-  AES-GCM framing above (mbedTLS `mbedtls_gcm_*` and `mbedtls_md_hmac` are available in the
-  Arduino core); feed the decrypted messages to the existing message handling.
-* A firmware build in CI proving `esp_mesh` under Arduino 2.0.17, then hardware validation of
-  joining, parent changes, root loss, partitions and credential rotation.
+`src/mesh_protocolo.cpp` is the protocol and the crypto; `src/mesh.cpp` is the radio and the two
+state machines. The sketch keeps one exit toward the server (`enviarAoServidor`) and one predicate
+for the channel (`canalServidorAberto`), so every existing message travels on whichever transport is
+configured and the direct path is unchanged.
+
+### Modes
+
+Configured in the local setup portal and stored in NVS (`meshModo`, `meshId`, `meshSenha`). The
+default is `direto`: no mesh code runs, and a board that never opts in behaves exactly as before. A
+mesh mode that cannot be used (bad mesh id, short password, no credential) falls back to `direto`
+with the reason on the serial console, rather than leaving the board with no way to reach the server.
+
+* **`gateway`** keeps the infrastructure connection the sketch makes with `WiFi.begin` and its own
+  WebSocket, and becomes the fixed root of the mesh. It relays what the nodes send, verbatim, to the
+  server, and what the server sends, to the node it names. It declares `gateway: true` in `info`;
+  the server treats a gateway as present when it actually relays, which is the signal that proves
+  the role rather than a self-declaration.
+* **`no`** has no infrastructure connection: the mesh is its network. It never calls `WiFi.begin`,
+  never uses the HTTP room identification or heartbeat (the server resolves its room from the
+  credential it proved), and reaches the server only through the root.
+
+Both mesh modes require the board's own provisioned credential: a gateway may not relay without an
+identity of its own, and a node authenticates end to end with the key derived from its secret.
+
+### Radio integration
+
+ESP-WIFI-MESH is used as an **application** transport, not as an IP transport. The gateway is started
+with `esp_mesh_fix_root(true)`, `esp_mesh_set_self_organized(false, false)` and
+`esp_mesh_set_type(MESH_ROOT)`, and deliberately **without** router configuration and without
+`esp_mesh_connect()`: nothing is routed through the mesh toward the external network, so the stack
+never needs to own the root's station interface, and the connection the sketch already owns stays the
+single source of IP. Nodes use `esp_mesh_set_self_organized(true, false)` with `fix_root`, so a node
+can never become root — only the gateway has the server connection and the credential to relay.
+
+One radio means one channel: the mesh runs on the channel the gateway's router puts it on. Nodes are
+configured with `channel = 0` and `allow_channel_switch`, so they find the network by mesh id.
+
+The configuration portal replaces the access point the mesh uses for its children. On a gateway or a
+node, closing the portal window therefore restarts the board to bring the mesh back in a known state;
+a direct board just drops the access point and keeps running.
+
+### Route metadata the firmware reports
+
+A node reports `saltos` (its mesh layer minus one) and the RSSI of its parent link. It names `pai`
+only when the parent **is** the root (`"gateway"`): a node knows its parent's MAC, and deviceIds are
+not derived from MACs, so reporting a guess would put a wrong edge on the topology view. Deeper
+parent-child edges are therefore not drawn; the hop count still shows the depth.
+
+### Bounds in the firmware
+
+| Bound | Value |
+|---|---|
+| Nodes bound per gateway | 32 (mirrors the server's ceiling) |
+| Children per board on the radio | 6 |
+| Mesh layers | 6 |
+| Message size on the radio | 1200 bytes (under `MESH_MPS`, 1472); a larger message is dropped and counted |
+| Uplink messages queued in a gateway | 12; the oldest is dropped when the WebSocket is down |
+| Frames drained per `loop()` pass | 8 received, 4 relayed |
+| Announcement retry while unauthenticated | every 10 s; 30 s after a `mesh_recusado` |
+| Route sweep that reports departures | every 10 s |
+
+The size bound has one visible consequence: **IR capture (clone mode) does not work over the mesh**,
+because a captured signal can exceed one frame. Cloning is done with the board on the direct
+transport, which is also where a protocol is normally taught to it.
+
+The sequence number advances even when the radio refuses a frame: reusing it would reuse the
+(key, nonce) pair, which breaks GCM. The server accepts strictly increasing numbers, so a gap costs
+nothing.
+
+### Gateway identity in the handshake
+
+The `ola` proof binds the gateway that relayed the announcement, which is what stops a gateway from
+presenting a node's proof as if the node were behind a different gateway. The node needs that
+deviceId, and the server's challenge does not carry it, so the relaying gateway states its own
+identity in the envelope it sends down the mesh. Trusting it costs nothing: a wrong value only
+produces a proof the server refuses. The sealed frame inside the envelope is never touched.
+
+### What is still pending
+
+Hardware. The protocol is verified by a host test against the server's vectors, and the radio
+integration is verified only by compiling and linking. Joining, parent changes, root loss, temporary
+partitions, credential rotation over the mesh, range and reliability all need real boards.
 
 ## OTA over the mesh
 
@@ -129,5 +211,6 @@ Not implemented. A safe design needs bounded, acknowledged chunks per hop with b
 resumption after route changes, no full-image buffering on relays, and the same SHA-256 and
 post-reboot version verification as direct OTA. Until then the server refuses OTA for a board
 whose current channel is the mesh ("atualização OTA indisponível para placas conectadas pela
-malha") and the topology view says so. The smallest next step is to reconnect the board directly
-for the update, which the existing direct OTA already supports.
+malha") and the topology view says so. The firmware refuses it as well, with the same message, so an
+older server that still offers it gets the same answer. The smallest next step is to reconnect the
+board directly for the update, which the existing direct OTA already supports.
