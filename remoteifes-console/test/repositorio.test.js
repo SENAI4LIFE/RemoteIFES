@@ -5,9 +5,9 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 const ajuda = require("./ajuda");
 
-// Descoberta de versões e do remoto, com os estados que realmente acontecem num Pi:
-// checkout sujo, HEAD destacado, adiantado, divergente, sem remoto, remoto inacessível e
-// clone raso. Cada um deve produzir uma leitura honesta, nunca "tudo certo".
+// Version and remote discovery, with the states that actually happen on a Pi: dirty checkout,
+// detached HEAD, ahead, diverged, no remote, unreachable remote and shallow clone. Each must
+// produce an honest reading, never "all good".
 
 function git(cwd, args) {
   return execFileSync("git", args, {
@@ -181,7 +181,7 @@ test("adiantado, atrasado e divergente são distinguidos", async (t) => {
   });
 
   const base = git(raiz, ["rev-parse", "HEAD"]);
-  // Ramo paralelo simulando o que existe em origin.
+  // Parallel branch simulating what exists on origin.
   git(raiz, ["checkout", "--quiet", "-b", "remoto"]);
   fs.writeFileSync(path.join(raiz, "leia.md"), "remoto\n");
   git(raiz, ["commit", "--quiet", "-am", "commit remoto"]);
@@ -271,7 +271,7 @@ test("a observação do remoto carrega a hora e envelhece", async (t) => {
   assert.equal(situacao.remoto.recente, true);
   assert.equal(situacao.remoto.ressalva, null);
 
-  // Envelhece a observação: passa a ser exibida com ressalva em vez de como dado atual.
+  // Ages the observation: it is then shown with a caveat instead of as current data.
   const arquivo = path.join(amb.estadoDir, "observacao-remota.json");
   const obs = JSON.parse(fs.readFileSync(arquivo, "utf8"));
   obs.observadoEm = new Date(Date.now() - 4 * 3600 * 1000).toISOString();
@@ -316,7 +316,7 @@ test("a divergência entre processo em execução e checkout é explicada", asyn
     limpar(raiz);
   });
 
-  // Sem aplicação no ar, a versão em execução é desconhecida — e isso é dito com todas as letras.
+  // Without the application running, the running version is unknown, and this is stated explicitly.
   const situacao = await amb.repositorio.situacaoDeAtualizacao();
   assert.equal(situacao.emExecucao.commit, null);
   assert.equal(situacao.emExecucao.confirmadoPeloProcesso, false);

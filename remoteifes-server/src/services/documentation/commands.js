@@ -1,7 +1,7 @@
-// Referência canônica para comandos repetidos no manual privilegiado.
-// documentation.test.js confere os grupos críticos que também aparecem no README.
-// Cada grupo menor é um bloco do manual; operações alternativas entre si ou destrutivas ficam
-// em grupos próprios, para nunca serem lidas como uma sequência.
+// Canonical reference for commands repeated in the privileged manual. documentation.test.js checks
+// the critical groups that also appear in the README. Each smaller group is one manual block;
+// mutually alternative or destructive operations have their own groups so they are never read as a
+// sequence.
 const congelar = (lista) => Object.freeze(lista);
 
 const instalacao = congelar(["cd remoteifes-server", "npm run setup", "npm start"]);
@@ -15,9 +15,9 @@ const servicoControlar = congelar(["sudo systemctl start remoteifes.service", "s
 const proxy = congelar(["sudo bash lan-setup.sh", "sudo bash https-setup.sh <dominio> <email>"]);
 const redes = congelar(["npm run redes -- 10.10.0.0/16 192.168.0.0/16", "npm run redes", "sudo systemctl restart remoteifes.service"]);
 
-// Console de Operações: instalação, acesso e reparo. O console passou a ser o caminho normal
-// para serviço, atualização, backup/restauração e recuperação de conta; os comandos abaixo são
-// o que continua sendo feito por terminal.
+// Operations Console: installation, access and repair. The Console is the normal path for service
+// control, updates, backup/restore and account recovery; the commands below are what still runs
+// from a terminal.
 const consoleInstalar = congelar(["cd remoteifes-console", "sudo node instalacao/instalar.js --escopo sistema"]);
 const consoleAcesso = congelar(["ssh -L 8099:127.0.0.1:8099 <usuario>@<host-do-pi>"]);
 const consoleReparo = congelar([

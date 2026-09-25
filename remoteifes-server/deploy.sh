@@ -135,9 +135,10 @@ reverter() {
 . ./verificar-versao.sh
 ROTULO_VERSAO="a nova versão"
 
-# HEAD já é o alvo. Isso não prova que o serviço a executa: uma atualização interrompida, um
-# 'git pull' manual ou um deploy --no-restart deixam o código adiante do processo. Só é "nada a
-# fazer" quando o processo em execução confirma a versão; senão o serviço é reiniciado e verificado.
+# HEAD is already the target. That does not prove the service runs it: an interrupted update, a
+# manual 'git pull' or a deploy --no-restart leave the code ahead of the process. It is only
+# "nothing to do" when the running process confirms the version; otherwise the service is restarted
+# and verified.
 if [ "$DEPOIS" = "$ANTES" ]; then
   if [ "$RESTART" -eq 0 ]; then
     echo "Já está na versão alvo ($DEPOIS). Serviço não reiniciado nem verificado (--no-restart)."

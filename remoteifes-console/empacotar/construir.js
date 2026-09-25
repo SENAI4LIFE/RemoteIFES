@@ -6,37 +6,36 @@ const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 const { listarDependencias } = require("../instalacao/dependencias");
 
-// Construção dos artefatos de distribuição.
+// Builds the distribution artifacts.
 //
-// Só são produzidos formatos que a CI consegue **construir e instalar** numa máquina real do
-// sistema alvo. MSI/WiX, NSIS e `.pkg` assinado ficaram de fora de propósito: sem credencial de
-// assinatura e sem ambiente de validação, entregariam um instalador não testado — que é pior
-// que não entregar.
+// Only formats CI can **build and install** on a real machine of the target system are produced.
+// MSI/WiX, NSIS and a signed `.pkg` are deliberately excluded: without signing credentials and a
+// validation environment they would ship an untested installer.
 //
-//   payload .tar.gz   consumido pelo atualizador por release, em qualquer plataforma
-//   .deb              Linux com dpkg (a CI instala e verifica)
-//   .zip              Windows (a CI instala com instalar.ps1 e verifica)
+//   payload .tar.gz   consumed by the release updater on every platform
+//   .deb              Linux with dpkg (CI installs and verifies)
+//   .zip              Windows (CI installs with instalar.ps1 and verifies)
 //
-// O `tar` é montado aqui, sem depender do binário do sistema: o Windows não tem `tar` GNU e a
-// forma dos cabeçalhos precisa casar exatamente com o extrator do atualizador.
+// The `tar` is assembled here without the system binary: Windows has no GNU tar and the header
+// layout must match the updater's extractor exactly.
 //
-// Uso:
+// Usage:
 //   node empacotar/construir.js [--saida <dir>] [--alvo <so-arch>] [--formato payload|deb|zip|todos]
 //                               [--commit <sha>]
 //
-// O manifesto registra o commit construído (do Git, ou --commit fora de um checkout); a atestação
-// do release precisa nomear o mesmo commit. Os payloads levam as dependências de produção fixadas
-// pelo package-lock.json, e nada mais de node_modules.
+// The manifest records the commit built (from Git, or --commit outside a checkout); the release
+// attestation must name the same commit. Payloads carry the production dependencies pinned by
+// package-lock.json, and nothing else from node_modules.
 
 const RAIZ = path.join(__dirname, "..");
 const PACOTE = JSON.parse(fs.readFileSync(path.join(RAIZ, "package.json"), "utf8"));
 const VERSAO = PACOTE.version;
 
-// O que entra no payload. Testes, empacotamento e artefatos de build ficam fora: o programa
-// instalado não precisa deles e cada MiB conta num Raspberry Pi.
+// What goes into the payload. Tests, packaging and build artifacts stay out: the installed program
+// does not need them and every MiB counts on a Raspberry Pi.
 const INCLUIR = ["console.js", "launcher.js", "package.json", "package-lock.json", "ARQUITETURA.md", "DISTRIBUICAO.md", "src", "bin", "web", "instalacao", "helper", "systemd"];
 
-/** Tudo o que um payload leva: INCLUIR mais as dependências de produção. */
+/** Everything a payload carries: INCLUIR plus the production dependencies. */
 function itensDoPayload(raiz = RAIZ) {
   return [...INCLUIR, ...listarDependencias(raiz)];
 }
@@ -53,8 +52,8 @@ function log(linha) {
 // --- tar ----------------------------------------------------------------------------------
 
 /**
- * Divide um caminho para o cabeçalho ustar: um nome de até 100 bytes, e os diretórios antes dele
- * no campo de prefixo, de 155 bytes. O dpkg e o extrator do atualizador os juntam de volta com "/".
+ * Splits a path for the ustar header: a name of up to 100 bytes, and the directories before it in
+ * the 155-byte prefix field. dpkg and the updater's extractor both join them back with "/".
  */
 function dividirNome(nome) {
   if (Buffer.byteLength(nome) <= 100) return { prefixo: "", nome };
@@ -71,7 +70,7 @@ function cabecalhoTar({ nome: completo, tamanho, modo, tipo = "0" }) {
   const b = Buffer.alloc(512);
   const escrever = (texto, inicio, tam) => b.write(String(texto).slice(0, tam - 1), inicio, tam, "utf8");
   const { prefixo, nome } = dividirNome(completo);
-  // Escrito inteiro, não por `escrever`: um nome de exatamente 100 bytes não tem terminador no ustar.
+  // Written whole, not through `escrever`: a name of exactly 100 bytes has no terminator in ustar.
   b.write(nome, 0, 100, "utf8");
   if (prefixo) b.write(prefixo, 345, 155, "utf8");
   escrever(`${(modo & 0o7777).toString(8).padStart(7, "0")}\0`, 100, 8);
@@ -80,11 +79,10 @@ function cabecalhoTar({ nome: completo, tamanho, modo, tipo = "0" }) {
   escrever(`${tamanho.toString(8).padStart(11, "0")}\0`, 124, 12);
   escrever("00000000000\0", 136, 12);
   b.write("        ", 148, 8, "utf8");
-  // O typeflag tem exatamente 1 byte e NÃO é terminado por NUL, então não passa por
-  // `escrever`, que reserva o último byte para o terminador — com tamanho 1 isso truncava o
-  // campo para vazio. O byte ficava zerado (AREGTYPE), que a maioria dos leitores trata como
-  // arquivo comum: os arquivos saíam certos e um diretório virava um arquivo vazio de mesmo
-  // nome, quebrando tudo que viesse dentro dele.
+  // The typeflag is exactly 1 byte and is NOT NUL-terminated, so it does not go through `escrever`,
+  // which reserves the last byte for the terminator (with size 1 that truncates the field to
+  // empty). A zero byte (AREGTYPE) makes a directory entry an empty file of the same name for
+  // readers such as dpkg.
   b.write(String(tipo), 156, 1, "utf8");
   b.write("ustar\0", 257, 6, "utf8");
   b.write("00", 263, 2, "utf8");
@@ -95,16 +93,15 @@ function cabecalhoTar({ nome: completo, tamanho, modo, tipo = "0" }) {
 }
 
 /**
- * Arquivos a empacotar. Usa `lstat` e **recusa** qualquer link.
+ * Files to package. Uses `lstat` and **refuses** any link.
  *
- * Com `statSync` o link era seguido: um link dentro de um diretório incluído empacotaria um
- * arquivo de fora da árvore como se fosse conteúdo do programa — configuração do Git,
- * credenciais, o que estivesse do outro lado. Um ciclo de diretórios também levaria a recursão
- * infinita. Recusar é melhor que resolver: um payload não tem por que conter links.
+ * Following a link inside an included directory would package a file from outside the tree as
+ * program content (Git configuration, credentials, whatever is on the other side), and a directory
+ * cycle would recurse forever. A payload has no reason to contain links.
  */
 function listarArquivos(base, relativo = "") {
   const completo = path.join(base, relativo);
-  // Os links do npm para os executáveis dos pacotes: o console não executa nenhum deles.
+  // npm's links to package executables: the Console runs none of them.
   if (path.basename(relativo) === ".bin" && relativo.includes("node_modules")) return [];
   const info = fs.lstatSync(completo);
   if (info.isSymbolicLink()) {
@@ -120,20 +117,17 @@ function listarArquivos(base, relativo = "") {
 }
 
 /**
- * Monta um `.tar.gz`. `prefixo` reposiciona a árvore copiada (o .deb precisa dela sob
- * `opt/...`); `extras` acrescenta arquivos que só existem no pacote, com caminho próprio e sem
- * passar pelo disco.
+ * Builds a `.tar.gz`. `prefixo` relocates the copied tree (the .deb needs it under `opt/...`);
+ * `extras` adds package-only files with their own path, without touching the disk.
  */
 function montarTarGz(base, itens, { prefixo = "", extras = [] } = {}) {
   const blocos = [];
   const diretoriosEmitidos = new Set();
 
-  // Entradas de DIRETÓRIO, antes de cada arquivo que mora nelas.
+  // DIRECTORY entries, before every file that lives in them.
   //
-  // O extrator do atualizador cria os diretórios sozinho (`mkdir -p`), então um tar só de
-  // arquivos passava nos testes — e o `dpkg` recusava o pacote com "No such file or directory",
-  // porque ele extrai membro a membro e não inventa o caminho. Um tar sem diretórios é um tar
-  // malformado; parecia funcionar só porque o único leitor era o nosso.
+  // dpkg extracts member by member and does not create missing parent paths, so a tar without
+  // directory entries is malformed even though the updater's extractor (`mkdir -p`) accepts it.
   const garantirDiretorio = (caminhoNoArquivo) => {
     const partes = caminhoNoArquivo.split("/").slice(0, -1);
     let acumulado = "";
@@ -156,15 +150,15 @@ function montarTarGz(base, itens, { prefixo = "", extras = [] } = {}) {
   for (const item of itens) {
     for (const arquivo of listarArquivos(base, item)) {
       const conteudo = fs.readFileSync(arquivo.completo);
-      // O bit de execução vem do shebang, não do índice do Git: o Git guarda 100644 para estes
-      // arquivos e um runner sem +x falharia com EACCES na primeira operação real.
+      // The executable bit comes from the shebang, not the Git index: Git stores 100644 for these
+      // files and a runner without +x would fail with EACCES on the first real operation.
       const executavel = conteudo.slice(0, 2).toString() === "#!";
       acrescentar(`${prefixo}${arquivo.relativo}`, conteudo, executavel ? 0o755 : 0o644);
     }
   }
   for (const extra of extras) {
-    // Extras trazem o caminho pronto dentro do arquivo: eles existem só no pacote e nem sempre
-    // ficam sob o mesmo prefixo da árvore copiada.
+    // Extras carry their final path inside the archive: they exist only in the package and are not
+    // always under the copied tree's prefix.
     const conteudo = Buffer.isBuffer(extra.conteudo) ? extra.conteudo : Buffer.from(extra.conteudo, "utf8");
     acrescentar(extra.nome, conteudo, extra.modo === undefined ? 0o644 : extra.modo);
   }
@@ -249,13 +243,13 @@ function crc32(buf) {
 // --- deb --------------------------------------------------------------------------------------
 
 function montarDeb(saida) {
-  // Um .deb é um `ar` com debian-binary, control.tar.gz e data.tar.gz. Tudo é montado aqui, sem
-  // dpkg-deb e sem o `tar` do sistema: a máquina de build pode ser qualquer uma das três, e o
-  // Windows não tem GNU tar.
+  // A .deb is an `ar` with debian-binary, control.tar.gz and data.tar.gz. Everything is assembled
+  // here, without dpkg-deb and without the system `tar`: the build machine can be any of the three
+  // systems, and Windows has no GNU tar.
   //
-  // O pacote é dono só da camada estável e da primeira versão. As atualizações seguintes vão
-  // para `versoes/` sem tocar em arquivo registrado pelo dpkg, então o gerenciador de pacotes
-  // nunca fica inconsistente por causa de uma autoatualização.
+  // The package owns only the stable layer and the first version. Later updates go to `versoes/`
+  // without touching files registered by dpkg, so the package manager never becomes inconsistent
+  // because of a self-update.
   const raizPacote = "opt/remoteifes-console";
 
   const atalho = [
@@ -298,8 +292,8 @@ function montarDeb(saida) {
     `Section: admin`,
     `Priority: optional`,
     `Architecture: all`,
-    // Node é pré-requisito do que o console administra; declarar a dependência é melhor do que
-    // instalar algo que não subiria.
+    // Node is a prerequisite of what the Console manages; declaring the dependency is better than
+    // installing something that would not start.
     `Depends: nodejs (>= 22.13.0)`,
     `Maintainer: RemoteIFES <brunoalexandersenai@gmail.com>`,
     `Description: Console de Operacoes do RemoteIFES`,
@@ -336,9 +330,8 @@ function montarDeb(saida) {
 
 function commitDoCheckout() {
   try {
-    // stderr silenciado: construir fora de um checkout é legítimo (o payload extraído de um
-    // artefato, por exemplo), e um "fatal: not a git repository" na tela faz um build que
-    // deu certo parecer quebrado. Fora de um checkout, --commit informa o commit.
+    // stderr is silenced: building outside a checkout is legitimate (a payload extracted from an
+    // artifact, a test's copy of the tree); --commit names the commit then.
     return execFileSync("git", ["rev-parse", "HEAD"], { cwd: RAIZ, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
@@ -361,7 +354,7 @@ function main() {
 
   const artefatos = [];
 
-  // Payload: é o que o atualizador por release consome, em qualquer plataforma.
+  // Payload: what the release updater consumes, on every platform.
   const nomePayload = `remoteifes-console-${VERSAO}-${alvo}.tar.gz`;
   const caminhoPayload = path.join(saida, nomePayload);
   const payload = montarTarGz(RAIZ, itensDoPayload());
@@ -389,9 +382,9 @@ function main() {
     }
   }
 
-  // O manifesto do release. Ele não tem assinatura própria: a publicação o atesta, junto com cada
-  // artefato, pela atestação de artefato do GitHub, sem chave, e o console só o aceita como esses
-  // bytes exatos (src/atestacao.js).
+  // The release manifest. It carries no signature of its own: the release publication attests it and
+  // every artifact with GitHub's keyless artifact attestation, and the Console accepts it only as
+  // those exact bytes (src/atestacao.js).
   const manifesto = {
     esquema: 1,
     versao: VERSAO,
@@ -414,9 +407,9 @@ function main() {
   fs.writeFileSync(caminhoManifesto, `${JSON.stringify(manifesto, null, 2)}\n`);
   log(`  manifesto: manifesto.json (commit ${commit.slice(0, 12)}; a atestação é da publicação)`);
 
-  // O que foi construído, onde e a partir de quê. Os executáveis do Windows e do macOS não têm
-  // assinatura de código da plataforma (Authenticode, notarização da Apple): essa credencial não
-  // existe. A origem deles é provada pela atestação do release, que cobre cada arquivo.
+  // What was built, where and from what. Windows and macOS executables carry no platform code
+  // signature (Authenticode, Apple notarization): no such credential exists. Their origin is proven
+  // by the release attestation instead, which covers every file of a release.
   const proveniencia = {
     versao: VERSAO,
     alvo,

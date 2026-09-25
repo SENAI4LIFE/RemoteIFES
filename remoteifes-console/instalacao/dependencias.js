@@ -1,21 +1,20 @@
 const fs = require("fs");
 const path = require("path");
 
-// Dependências de produção que um console instalado leva: o verificador de releases (veja o
-// package.json).
+// Production dependencies an installed Console carries: the release verifier (see package.json).
 //
-// A lista vem do package-lock.json, que nomeia cada pacote instalado, fixa a sua versão e marca os
-// que só os testes usam. Um payload leva exatamente os pacotes de produção, cada um conferido
-// contra a versão que o lockfile fixou, então uma instalação nunca roda um pacote que ninguém
-// revisou e o mock de atestações usado pelos testes nunca é distribuído. O build
-// (empacotar/construir.js) e o instalador (instalacao/instalar.js) usam esta mesma lista.
+// The list comes from package-lock.json, which names every installed package, pins its version and
+// marks the ones only tests use. A payload carries exactly the production packages, each checked
+// against the version the lockfile pinned, so an installation never runs a package nobody reviewed
+// and the attestation mock used by the tests never ships. The build (empacotar/construir.js) and
+// the installer (instalacao/instalar.js) both use this list.
 
 const PREFIXO = "node_modules/";
 
 /**
- * Caminhos relativos (`node_modules/<pacote>`) dos pacotes de produção instalados sob `raiz`.
- * Lança quando um falta ou está em outra versão: construir ou instalar sem o verificador produziria
- * um console que nunca consegue aceitar uma atualização.
+ * Relative paths (`node_modules/<pacote>`) of the production packages installed under `raiz`.
+ * Throws when one is missing or at another version: building or installing without the verifier
+ * would produce a Console that can never accept an update.
  */
 function listarDependencias(raiz) {
   const arquivo = path.join(raiz, "package-lock.json");
@@ -28,7 +27,7 @@ function listarDependencias(raiz) {
   const saida = [];
   for (const [chave, info] of Object.entries(trava.packages || {})) {
     if (!chave.startsWith(PREFIXO) || !info || info.dev || info.devOptional) continue;
-    // Um node_modules aninhado viaja dentro do pacote que o contém.
+    // A nested node_modules travels inside the package that holds it.
     if (chave.slice(PREFIXO.length).includes(`/${PREFIXO}`)) continue;
     let instalada = null;
     try {

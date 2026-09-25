@@ -78,8 +78,8 @@ test("usuário sem permissão de controle vê o painel em modo somente leitura",
   await expect(page.locator("#tempDown")).toBeDisabled();
 });
 
-// A placa vista só por heartbeat HTTP (o firmware usa esse caminho enquanto o WebSocket está caído)
-// conta como presente, mas o servidor não tem por onde entregar o comando.
+// A board seen only through HTTP heartbeats (the firmware uses that path while the WebSocket is
+// down) counts as present, but the server has no channel to deliver the command.
 test.describe("presença sem canal de comandos", () => {
   test.afterEach(async ({ request }) => {
     await request.post(`${process.env.E2E_API_URL}/__e2e/so-heartbeat/off`);

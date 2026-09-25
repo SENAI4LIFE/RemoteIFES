@@ -39,8 +39,8 @@ function resolverRef(dirGit, ref) {
   return null;
 }
 
-// Lê o commit direto do .git para não depender do binário git nem das suas checagens de
-// propriedade do diretório; o git só é consultado se a leitura direta não resolver.
+// Reads the commit directly from .git to avoid depending on the git binary and its directory
+// ownership checks; git is only consulted when the direct read fails.
 function commitPelosArquivos(raiz) {
   const dirGit = diretorioGit(raiz);
   if (!dirGit) return null;
@@ -69,8 +69,8 @@ function resolverCommitEmExecucao(raiz = RAIZ_REPOSITORIO) {
   return commitPelosArquivos(raiz) || commitPeloGit(raiz);
 }
 
-// Capturado uma única vez ao iniciar o processo: identifica o código que este processo carregou,
-// mesmo que o checkout seja trocado depois por um deploy.
+// Captured once at process start: identifies the code this process loaded, even if a deploy
+// replaces the checkout afterwards.
 const COMMIT_EM_EXECUCAO = resolverCommitEmExecucao();
 
 module.exports = { COMMIT_EM_EXECUCAO, resolverCommitEmExecucao };

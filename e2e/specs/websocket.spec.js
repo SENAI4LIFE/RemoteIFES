@@ -242,9 +242,9 @@ test("falha no bootstrap da sessão não deixa o overlay de conexão preso", asy
   await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 20_000 });
 });
 
-// Um aparelho que suspende, troca de rede ou perde o servidor pode deixar o socket em
-// OPEN sem que nada chegue e sem evento de fechamento. Sem prova de vida ao retomar, o
-// app seguiria mostrando salas e telemetria antigas como se fossem o estado atual.
+// A device that suspends, switches networks or loses the server can leave the socket OPEN with
+// nothing arriving and no close event. Without a liveness check on resume, the app would keep
+// showing old rooms and telemetry as if they were current.
 test("socket que ficou meio-aberto é detectado ao retomar e reconectado", async ({ page, context, sessaoComo }) => {
   await context.addInitScript(() => {
     const WebSocketNativo = window.WebSocket;

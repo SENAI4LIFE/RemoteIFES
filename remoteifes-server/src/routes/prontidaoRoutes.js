@@ -11,17 +11,18 @@ const logger = require("../utils/logger");
 
 const router = express.Router();
 
-// Contrato de prontidão para o Console de Operações.
+// Readiness contract for the Operations Console.
 //
-// Existe porque os estados que decidem se uma parada é segura são de processo, não de banco:
-// `deviceHub.conexoes`, `otaService.estados` e o rollout vivem em memória neste processo. Um
-// observador externo não consegue lê-los pelo SQLite, e mandar o console abrir `src/app.js`
-// criaria/migraria o banco a partir de outro processo.
+// It exists because the state that decides whether stopping is safe belongs to the process, not the
+// database: `deviceHub.conexoes`, `otaService.estados` and the rollout live in memory in this
+// process. An external observer cannot read them from SQLite, and having the Console load
+// `src/app.js` would create/migrate the database from another process.
 //
-// Desenho deliberadamente mínimo:
-//  - só responde no loopback e só com o segredo compartilhado em <DIR_DADOS>/.console-token;
-//  - sem o arquivo de segredo a rota não existe (404): quem não instalou o console não paga nada;
-//  - lê apenas estruturas em memória — nenhuma consulta de histórico, nenhuma agregação.
+// Deliberately minimal:
+//  - answers only on loopback and only with the shared secret in <DIR_DADOS>/.console-token;
+//  - without the secret file the route does not exist (404): installations without the Console pay
+//    nothing;
+//  - reads only in-memory structures: no history query, no aggregation.
 
 const CAMINHO_TOKEN = path.join(DIR_DADOS, ".console-token");
 const FASES_ATIVAS = ["ofertado", "baixando", "gravado", "reiniciando", "validando"];
@@ -53,7 +54,7 @@ function comparacaoConstante(a, b) {
 function autorizar(req, res, next) {
   const esperado = lerToken();
   if (!esperado) return res.status(404).json({ ok: false, erro: "não encontrado" });
-  // O IP é o do socket: TRUST_PROXY não pode transformar um cliente remoto em loopback aqui.
+  // The IP is the socket's: TRUST_PROXY must not turn a remote client into loopback here.
   const enderecoSocket = normalizarIp(req.socket && req.socket.remoteAddress);
   if (enderecoSocket !== "127.0.0.1") {
     return res.status(403).json({ ok: false, erro: "disponível apenas no host" });
@@ -89,12 +90,10 @@ router.get("/manutencao/prontidao", autorizar, (req, res) => {
         estado: rollout.estado || null,
         versao: rollout.versao || null,
         pausado: rollout.estado === "pausado",
-        // Um rollout pausado com trabalho pendente volta a mexer em dispositivos quando for
-        // retomado: ele conta como manutenção conflitante, mesmo parado agora.
+        // A paused rollout with pending work touches devices again when resumed: it counts as
+        // conflicting maintenance even while stopped.
         //
-        // A contagem vem de `rollout.dispositivos[].estado`, que é a estrutura real do serviço.
-        // Campos `pendentes`/`fila` no topo do objeto nunca existiram: lê-los devolvia sempre
-        // null e um rollout pausado com trabalho pendente passava despercebido.
+        // The count comes from `rollout.dispositivos[].estado`, the service's actual structure.
         pendentes: Array.isArray(rollout.dispositivos)
           ? rollout.dispositivos.filter((d) => d && d.estado === "pendente").length
           : null,
@@ -110,8 +109,8 @@ router.get("/manutencao/prontidao", autorizar, (req, res) => {
     em: new Date().toISOString(),
     dispositivos: {
       conectados: salas.length,
-      // Presença no hub não é o mesmo que canal de comandos aberto: um heartbeat HTTP deixa
-      // o dispositivo "online" sem haver socket por onde mandar comando.
+      // Presence in the hub is not an open command channel: an HTTP heartbeat keeps the device
+      // "online" with no socket to send a command through.
       canaisDeComando: canaisDeComando.length,
       salas: canaisDeComando.slice(0, 200),
     },

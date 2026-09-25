@@ -1,20 +1,20 @@
 #!/usr/bin/env node
-// Medição do custo de recursos do console.
+// Console resource cost measurement.
 //
-// Existe porque "o console é leve" não é afirmação verificável. Este script mede, no host em
-// que roda, os números que sustentam (ou derrubam) a escolha de arquitetura:
+// "The Console is light" is not verifiable by assertion. This script measures, on the host where it
+// runs, the numbers that support (or refute) the architecture choice:
 //
-//   1. console desligado                -> processos e RSS do console: zero, por construção
-//   2. console ligado, sem navegador    -> partida do processo e RSS logo após subir
-//   3. painel aberto e ocioso           -> custo de uma tela aberta sem interação
-//   4. atualização de status            -> custo por requisição de /api/painel
-//   5. leitura de registros             -> custo de uma leitura de journal
-//   6. manutenção representativa        -> custo de uma operação real (backup)
+//   1. Console off                    -> Console processes and RSS: zero, by construction
+//   2. Console on, no browser         -> process start and RSS right after startup
+//   3. panel open and idle            -> cost of an open screen without interaction
+//   4. status refresh                 -> cost per /api/painel request
+//   5. log reading                    -> cost of one journal read
+//   6. representative maintenance     -> cost of a real operation (backup)
 //
-// Ele NÃO extrapola: imprime o host real onde mediu. Num Raspberry Pi 3 os números serão
-// diferentes dos de um desktop, e o relatório diz isso em voz alta.
+// It does NOT extrapolate: it prints the real host where it measured. On a Raspberry Pi 3 the
+// numbers will differ from a desktop's, and the report says so.
 //
-// Uso:  node test/medicao-recursos.js [--json]
+// Usage:  node test/medicao-recursos.js [--json]
 
 const os = require("os");
 const fs = require("fs");
@@ -25,16 +25,16 @@ const { spawn, execFileSync } = require("child_process");
 const RAIZ = path.join(__dirname, "..");
 const JSON_SAIDA = process.argv.includes("--json");
 
-// O diretório de estado precisa estar definido antes de qualquer require de src/,
-// porque config.js lê o ambiente no carregamento e fica em cache.
+// The state directory must be set before any require of src/, because config.js reads the
+// environment at load time and is cached.
 const ESTADO_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "console-medicao-"));
 process.env.CONSOLE_ESTADO_DIR = ESTADO_DIR;
 process.env.CONSOLE_SEM_PRIVILEGIO = "1";
 
 /**
- * Mede um cenário isoladamente. Uma sonda lenta não pode derrubar a medição inteira: um
- * relatório que morre porque uma leitura passou do prazo não diz nada sobre as outras cinco, e
- * "não medido, porque X" é informação — um traceback não é.
+ * Measures one scenario in isolation. A slow probe must not abort the whole measurement: a report
+ * that dies because one read timed out says nothing about the other five, and "not measured,
+ * because X" is information while a traceback is not.
  */
 async function cenario(nome, fn) {
   try {
@@ -49,12 +49,8 @@ function agora() {
 }
 
 /**
- * Memória residente do processo, nos três sistemas.
- *
- * Antes isto só media no Linux e devolvia `null` no resto, o que transformava a afirmação
- * central — "o console é leve" — em algo não verificado justamente onde não há ativação por
- * socket para garantir o zero ocioso. Cada sistema tem sua fonte: /proc no Linux, `ps` no
- * macOS, `tasklist` no Windows (working set, que é o análogo prático do RSS).
+ * Resident memory of the process, on all three systems: /proc on Linux, `ps` on macOS, `tasklist`
+ * on Windows (working set, the practical analog of RSS).
  */
 function rssDe(pid) {
   if (!pid) return null;
@@ -77,7 +73,9 @@ function rssDe(pid) {
   return null;
 }
 
-/** Custo de partida de um processo Node deste host, para separar o que é nosso do que é runtime. */
+/**
+ * Start cost of a Node process on this host, to separate what is ours from what is the runtime.
+ */
 function medirPartida(args) {
   const inicio = agora();
   try {
@@ -141,8 +139,8 @@ async function medir() {
     cenarios: {},
   };
 
-  // 1. Console desligado. O zero é o mesmo nos três sistemas, mas o MOTIVO não é — e dizer
-  // "ativação por socket" num Windows seria descrever um mecanismo que não existe ali.
+  // 1. Console off. The zero is the same on all three systems, but the REASON differs, and saying
+  // "socket activation" on Windows would describe a mechanism that does not exist there.
   const mecanismoOcioso = {
     linux:
       "Com ativação por socket, o systemd guarda a porta e nenhum processo do console existe. " +
@@ -164,9 +162,8 @@ async function medir() {
     observacao: mecanismoOcioso[process.platform] || "Nenhum processo do console fica residente neste sistema.",
   };
 
-  // 1b. Custo de uma abertura fria: é o que o operador sente onde não há socket guardando a
-  // porta. O Node sozinho já custa uma parte disso, e separar as duas evita cobrar do console
-  // o preço do runtime.
+  // 1b. Cold open cost: what the operator feels where no socket holds the port. Node alone already
+  // costs part of it, and separating the two avoids billing the runtime's price to the Console.
   const partidaNodeVazio = medirPartida(["-e", "0"]);
   const partidaLancador = medirPartida([path.join(RAIZ, "launcher.js"), "--status"]);
   resultados.cenarios.aberturaFria = {
@@ -226,10 +223,10 @@ async function medir() {
       "ociosidade ativa (padrão 900 s), ele volta a zero quando o console deixa de ser usado.",
   };
 
-  // 3-6: cenários autenticados.
+  // 3-6: authenticated scenarios.
   const auth = require(path.join(RAIZ, "src", "auth"));
 
-  // O operador é criado pelo próprio processo de medição, no mesmo diretório de estado.
+  // The operator is created by the measuring process itself, in the same state directory.
   const nome = "medicao";
   const senha = "senha-de-medicao-123456";
   try {
@@ -259,7 +256,7 @@ async function medir() {
   if (login.status !== 200) throw new Error(`login de medição falhou: ${login.status} ${login.texto}`);
   const cabecalhosSessao = { Cookie: login.cookie, Origin: `http://127.0.0.1:${porta}` };
 
-  // 3. Painel aberto e ocioso: a interface não faz polling; mede o repouso.
+  // 3. Panel open and idle: the interface does not poll; measures rest.
   const rssAntesRepouso = rssDe(filho.pid);
   await pedir(porta, "/api/painel", cabecalhosSessao);
   await esperar(5000);
@@ -271,7 +268,7 @@ async function medir() {
     observacao: "A interface não faz polling automático: uma aba aberta e parada não gera requisição nem trabalho.",
   };
 
-  // 4. Atualização de status.
+  // 4. Status refresh.
   resultados.cenarios.atualizacaoDeStatus = await cenario(
     "GET /api/painel (serviço, watchdog, host, backups, versões)",
     async () => {
@@ -308,7 +305,7 @@ async function medir() {
   };
   });
 
-  // 6. Manutenção representativa: um backup do banco, se houver banco.
+  // 6. Representative maintenance: a database backup, if there is a database.
   const config = require(path.join(RAIZ, "src", "config"));
   const app = config.caminhosDaAplicacao();
   if (fs.existsSync(app.banco)) {
@@ -338,7 +335,7 @@ async function medir() {
     };
   }
 
-  // 7. Terminal, se o PTY estiver disponível.
+  // 7. Terminal, if the PTY is available.
   const terminal = require(path.join(RAIZ, "src", "terminal"));
   const disp = terminal.disponibilidade();
   resultados.cenarios.terminal = disp.disponivel
@@ -400,9 +397,8 @@ medir()
   })
   .then((r) => {
     if (!r) return;
-    // Um cenário OBRIGATÓRIO que não foi medido é falha da medição, não um campo informativo.
-    // Tolerar tudo faria o passo da CI passar verde sem número nenhum — e o objetivo do script é
-    // justamente não aceitar "é leve" sem medida.
+    // A MANDATORY scenario that was not measured is a measurement failure, not an informational
+    // field. Tolerating everything would let the CI step pass green with no numbers at all.
     const OBRIGATORIOS = ["ligadoSemNavegador", "atualizacaoDeStatus"];
     const faltando = OBRIGATORIOS.filter((nome) => !r.cenarios[nome] || r.cenarios[nome].medido === false);
     if (faltando.length) {

@@ -30,12 +30,12 @@ $ErrorActionPreference = "Stop"
 $origem = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Resolver-Node {
-    # Ordem: o Node do PATH; depois as instalações padrão do MSI. Um Node só de usuário costuma
-    # estar no PATH; um de máquina nem sempre está, numa sessão elevada recém-aberta.
+    # Order: the Node on PATH, then the standard MSI locations. A per-user Node is usually on PATH;
+    # a machine-wide one is not always on PATH in a freshly opened elevated session.
     #
-    # Cada base é conferida ANTES do Join-Path: com $ErrorActionPreference = "Stop", montar um
-    # caminho sobre uma variável de ambiente ausente derruba o instalador com um erro de binding
-    # que não diz nada ao operador. ${env:ProgramFiles(x86)} não existe em toda instalação.
+    # Each base is checked BEFORE Join-Path: with $ErrorActionPreference = "Stop", building a path
+    # over a missing environment variable aborts the installer with a binding error that tells the
+    # operator nothing. ${env:ProgramFiles(x86)} does not exist on every installation.
     $candidatos = @()
     $doCaminho = Get-Command node.exe -ErrorAction SilentlyContinue
     if ($null -ne $doCaminho) { $candidatos += $doCaminho.Source }
@@ -73,9 +73,8 @@ if (-not (Test-Path -LiteralPath $instalador)) {
     exit 1
 }
 
-# A verificação de versão, o escopo e a permissão são decididos pelo instalador portátil, que é
-# quem conhece o contrato. Duplicar essas regras aqui só criaria duas respostas para a mesma
-# pergunta.
+# Version check, scope and permission are decided by the portable installer, which owns the
+# contract. Duplicating those rules here would create two answers to the same question.
 $argumentos = @($instalador)
 if ($Escopo)   { $argumentos += @("--escopo", $Escopo) }
 if ($Raiz)     { $argumentos += @("--raiz", $Raiz) }

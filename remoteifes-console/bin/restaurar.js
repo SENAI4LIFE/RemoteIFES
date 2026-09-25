@@ -1,27 +1,25 @@
 #!/usr/bin/env node
-// Restauração gerenciada do banco da aplicação.
+// Managed restore of the application database.
 //
-// `restore-backup.js` do servidor avisa que o servidor "precisa estar PARADO", mas não verifica:
-// restaurar com a aplicação escrevendo é perder dados. Aqui a quiescência é **estabelecida e
-// provada**, não inferida.
+// Writer quiescence is **established and proven**, not inferred: restoring while the application
+// writes loses data.
 //
-// A prova não pode ser "o /health parou de responder". Um processo travado, um servidor com
-// outra porta, uma instância iniciada à mão ou um proxy fora do ar produzem o mesmo silêncio
-// enquanto o banco continua com um escritor vivo. A prova positiva usada aqui é um **lock
-// exclusivo do próprio SQLite**: se alguém ainda tem o banco aberto para escrita, o lock falha
-// e a restauração não acontece.
+// The proof cannot be "/health stopped answering". A hung process, a server on another port, an
+// instance started by hand or a proxy that is down all produce the same silence while the database
+// still has a live writer. The positive proof used here is an **exclusive SQLite lock**: if anyone
+// still has the database open for writing, the lock fails and the restore does not happen.
 //
-// Sequência:
-//   1. valida o backup escolhido (identificador validado, nunca caminho livre do navegador);
-//   2. desliga o watchdog, onde existe, para que ele não reinicie a aplicação no meio;
-//   3. para a aplicação pelo mecanismo da plataforma e confirma pelo gerenciador de serviços;
-//   4. **prova** que ninguém mais escreve, tomando o lock exclusivo do banco;
-//   5. delega a troca a backupService.restaurarBackup, que preserva o banco anterior, valida
-//      antes e depois e faz rollback se a verificação final falhar;
-//   6. restabelece o ciclo de vida anterior e confere a saúde.
+// Sequence:
+//   1. validates the chosen backup (validated identifier, never a free path from the browser);
+//   2. disables the watchdog, where it exists, so it does not restart the application midway;
+//   3. stops the application through the platform mechanism and confirms with the service manager;
+//   4. **proves** nobody else writes by taking the exclusive database lock;
+//   5. delegates the swap to backupService.restaurarBackup, which preserves the previous database,
+//      validates before and after, and rolls back if the final check fails;
+//   6. restores the previous lifecycle and checks health.
 //
-// Em qualquer falha depois do passo 3, o ciclo de vida é restabelecido mesmo assim: deixar o
-// RemoteIFES parado e o watchdog desligado seria pior que a falha original.
+// On any failure after step 3 the lifecycle is restored anyway: leaving RemoteIFES stopped and the
+// watchdog disabled would be worse than the original failure.
 
 const fs = require("fs");
 const path = require("path");
@@ -47,11 +45,11 @@ async function aplicacaoRespondendo() {
 }
 
 /**
- * Prova positiva de que ninguém mais escreve no banco.
+ * Positive proof that nobody else writes to the database.
  *
- * Abre o arquivo e tenta um lock exclusivo do SQLite. Com outro escritor vivo — mesmo travado,
- * mesmo em outra porta, mesmo iniciado à mão — o SQLite recusa com SQLITE_BUSY. Ausência de
- * resposta HTTP não prova nada; isto prova.
+ * Opens the file and attempts an exclusive SQLite lock. With another live writer (even hung, on
+ * another port, or started by hand) SQLite refuses with SQLITE_BUSY. The absence of an HTTP
+ * response proves nothing; this does.
  */
 function provarQuiescencia(caminhoBanco) {
   if (!fs.existsSync(caminhoBanco)) return { ok: true, motivo: "não há banco a proteger" };
@@ -65,10 +63,10 @@ function provarQuiescencia(caminhoBanco) {
   try {
     conexao = new DatabaseSync(caminhoBanco);
     conexao.exec("PRAGMA busy_timeout = 3000");
-    // WAL permite vários escritores coexistirem; para provar exclusividade é preciso sair dele.
+    // WAL lets several writers coexist; proving exclusivity requires leaving it.
     conexao.exec("PRAGMA journal_mode = DELETE");
     conexao.exec("PRAGMA locking_mode = EXCLUSIVE");
-    // Só uma transação de escrita força a tomada do lock exclusivo de verdade.
+    // Only a write transaction actually forces the exclusive lock.
     conexao.exec("BEGIN IMMEDIATE");
     conexao.exec("ROLLBACK");
     return { ok: true, motivo: "lock exclusivo do SQLite obtido: nenhum outro escritor está aberto" };
@@ -100,8 +98,8 @@ async function main() {
   passo("Validando o backup escolhido");
   let arquivo;
   try {
-    // Identificador validado contra a pasta de backups: bloqueia travessia, caminho absoluto
-    // e symlink apontando para fora.
+    // Identifier validated against the backup directory: blocks traversal, absolute paths and
+    // symlinks pointing outside.
     arquivo = processos.caminhoContidoEm(app.backups, nomeBackup);
   } catch (erro) {
     console.error(`Backup recusado: ${erro.message}`);
@@ -152,7 +150,7 @@ async function main() {
     if (servicoAntes.disponivel) {
       const r = await plataforma.controlarServico("parar");
       if (!r.disponivel) throw new Error(`não foi possível parar o serviço: ${r.motivo}`);
-      // Confirma pelo gerenciador de serviços, não pelo silêncio do /health.
+      // Confirms through the service manager, not through /health silence.
       let parou = false;
       for (let i = 0; i < 20; i += 1) {
         const atual = await plataforma.estadoDoServico();
@@ -213,8 +211,8 @@ async function main() {
 
   if (erroRestauracao) return 1;
 
-  // Só faz sentido exigir saúde se a aplicação estava no ar antes: uma restauração feita com o
-  // serviço intencionalmente parado termina com ele parado, e isso não é falha.
+  // Health is only required if the application was running before: a restore done with the service
+  // intentionally stopped ends with it stopped, and that is not a failure.
   if (!precisaRestabelecerServico) {
     console.log("\nA aplicação estava parada antes da operação e continua parada, como esperado.");
     console.log(`CONSOLE_RESULTADO ${JSON.stringify({ restaurado: restaurou, arquivo: path.basename(arquivo), aplicacaoIniciada: false })}`);

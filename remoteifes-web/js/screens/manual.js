@@ -68,7 +68,7 @@ const Manual = (() => {
   let hashAnterior = null;
   let elementoAnterior = null;
   let carregando = null;
-  // Módulos públicos cujo script chegou e executou; os demais são tentados de novo a cada abertura.
+  // Public modules whose script arrived and executed; the others are retried on every open.
   const modulosCarregados = new Set();
   let modulosPendentes = [];
 
@@ -250,7 +250,8 @@ const Manual = (() => {
         .some((item) => !item.classList.contains("hidden"));
       cabecalho.classList.toggle("hidden", !algum);
     });
-    // "Nenhuma seção corresponde" responde a uma busca; sem termo (manual que não carregou), não aparece.
+    // "Nenhuma seção corresponde" answers a search; without a term (manual that did not load) it is
+    // not shown.
     tocVazioEl.classList.toggle("hidden", !termo || visiveis !== 0);
   }
 
@@ -264,9 +265,9 @@ const Manual = (() => {
     });
   }
 
-  // Carrega os módulos públicos que ainda faltam, na ordem (o registro primeiro). Um script que
-  // não chega (rede) fica pendente e é tentado de novo na próxima abertura; um que executou não é
-  // reinserido, para não registrar seções duas vezes. Sem o registro, os demais nem são tentados.
+  // Loads the missing public modules in order (the registry first). A script that does not arrive
+  // (network) stays pending and is retried on the next open; one that executed is not reinserted,
+  // so sections are never registered twice. Without the registry, the others are not attempted.
   async function garantirConteudo() {
     if (!carregando) {
       carregando = (async () => {
@@ -314,8 +315,8 @@ const Manual = (() => {
     if (typeof RoleDocumentation !== "undefined") await RoleDocumentation.carregar();
     renderRole = null;
     render();
-    // Abrir (ou reabrir) parte sempre do sumário completo: uma busca anterior não fica
-    // retida com o seu "nenhuma seção" ao lado de seções visíveis.
+    // Opening (or reopening) always starts from the full table of contents: a previous search does
+    // not linger with its "nenhuma seção" next to visible sections.
     buscaEl.value = "";
     filtrar();
 
@@ -349,8 +350,8 @@ const Manual = (() => {
     overlay.classList.add("hidden");
     document.body.classList.remove("manual-open");
     document.removeEventListener("keydown", aoTeclar, true);
-    // O foco volta a quem abriu; se esse controle já não está visível (o item do menu de ajuda,
-    // escondido ao abrir o manual), vai ao botão flutuante de ajuda, nunca fica solto no body.
+    // Focus returns to the opener; if that control is no longer visible (the help menu item, hidden
+    // when the manual opens), it goes to the floating help button, never loose on body.
     const visivel = (el) => !!el && el !== document.body && el !== document.documentElement && el.isConnected && typeof el.focus === "function" && el.getClientRects().length > 0;
     const alvoFoco = visivel(elementoAnterior) ? elementoAnterior : document.getElementById("helpFabToggleBtn");
     if (visivel(alvoFoco)) {
@@ -406,8 +407,8 @@ const Manual = (() => {
       });
     }
     const idsAtalho = [...ATALHOS, ...(state.isAdmin ? ["administracao"] : []), ...(state.isSuperAdmin ? ["monitoramento", "operacao-admin"] : [])];
-    // Sem o registro público carregado, os atalhos ficam vazios, mas "Manual completo" continua
-    // aqui: o manual abre com o aviso de carga e o "Tentar de novo".
+    // Without the public registry loaded the shortcuts are empty, but "Manual completo" stays here:
+    // the manual opens with the load warning and "Tentar de novo".
     const disponiveis = [...(typeof ManualContent !== "undefined" ? ManualContent.secoes : []), ...(typeof RoleDocumentation !== "undefined" ? RoleDocumentation.secoes() : [])];
     cont.innerHTML = idsAtalho.map((id) => {
       const s = disponiveis.find((x) => x.id === id && papelPermitido(x.papel));
