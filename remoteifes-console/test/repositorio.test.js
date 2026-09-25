@@ -46,7 +46,7 @@ function limpar(raiz) {
   } catch {}
 }
 
-test("checkout limpo num ramo é reportado como limpo", async (t) => {
+test("a clean checkout on a branch is reported as clean", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -64,7 +64,7 @@ test("checkout limpo num ramo é reportado como limpo", async (t) => {
   assert.match(estado.descricaoHead, /primeiro commit/);
 });
 
-test("alterações locais e arquivos novos são contados separadamente", async (t) => {
+test("local changes and new files are counted separately", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -82,7 +82,7 @@ test("alterações locais e arquivos novos são contados separadamente", async (
   assert.deepEqual(estado.naoRastreados, ["novo.txt"]);
 });
 
-test("uma atualização é recusada com o checkout sujo, sem oferecer --force", async (t) => {
+test("an update is refused with a dirty checkout, without offering --force", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -100,7 +100,7 @@ test("uma atualização é recusada com o checkout sujo, sem oferecer --force", 
   assert.match(impedimento, /nunca usa --force/);
 });
 
-test("HEAD destacado é identificado", async (t) => {
+test("a detached HEAD is identified", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -115,7 +115,7 @@ test("HEAD destacado é identificado", async (t) => {
   assert.equal(estado.ramo, null);
 });
 
-test("sem remoto configurado a consulta explica em vez de falhar em silêncio", async (t) => {
+test("without a configured remote the query explains instead of failing silently", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -131,7 +131,7 @@ test("sem remoto configurado a consulta explica em vez de falhar em silêncio", 
   assert.match(consulta.mensagem, /não está configurado/);
 });
 
-test("remoto inacessível é classificado como offline, não como 'atualizado'", async (t) => {
+test("an unreachable remote is classified as offline, not as 'up to date'", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -149,7 +149,7 @@ test("remoto inacessível é classificado como offline, não como 'atualizado'",
   assert.equal(situacao.remoto, null, "sem observação prévia, não se inventa uma");
 });
 
-test("classificação de falha distingue DNS, conexão e autenticação", (t) => {
+test("failure classification distinguishes DNS, connection and authentication", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -159,7 +159,7 @@ test("classificação de falha distingue DNS, conexão e autenticação", (t) =>
   assert.equal(amb.repositorio.classificarFalhaDeRede("remote: Repository not found.").classe, "remoto-ausente");
 });
 
-test("comparação com um commit ausente diz que os objetos precisam ser buscados", async (t) => {
+test("comparison with a missing commit says the objects need to be fetched", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -172,7 +172,7 @@ test("comparação com um commit ausente diz que os objetos precisam ser buscado
   assert.match(comparacao.motivo, /ainda não está no checkout/);
 });
 
-test("adiantado, atrasado e divergente são distinguidos", async (t) => {
+test("ahead, behind and diverged are distinguished", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -205,7 +205,7 @@ test("adiantado, atrasado e divergente são distinguidos", async (t) => {
   assert.equal(cmp.commitsSoRemotos, 1);
 });
 
-test("clone raso é sinalizado na comparação", async (t) => {
+test("a shallow clone is flagged in the comparison", async (t) => {
   const origem = repositorio();
   fs.writeFileSync(path.join(origem, "b.txt"), "b\n");
   git(origem, ["add", "-A"]);
@@ -229,7 +229,7 @@ test("clone raso é sinalizado na comparação", async (t) => {
   assert.ok(cmp.ressalvaRaso, "a ressalva sobre histórico raso precisa acompanhar a comparação");
 });
 
-test("a mudança do endereço de origin é registrada e exibida", async (t) => {
+test("a change of the origin URL is recorded and shown", async (t) => {
   const raiz = repositorio();
   const espelho = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
@@ -253,7 +253,7 @@ test("a mudança do endereço de origin é registrada e exibida", async (t) => {
   limpar(outro);
 });
 
-test("a observação do remoto carrega a hora e envelhece", async (t) => {
+test("the remote observation carries its time and ages", async (t) => {
   const raiz = repositorio();
   const espelho = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
@@ -282,7 +282,7 @@ test("a observação do remoto carrega a hora e envelhece", async (t) => {
   assert.match(situacao.remoto.ressalva, /antiga/);
 });
 
-test("resumo de mudanças agrupa por componente e limita a lista", async (t) => {
+test("the change summary groups by component and bounds the list", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {
@@ -308,7 +308,7 @@ test("resumo de mudanças agrupa por componente e limita a lista", async (t) => 
   assert.equal(resumo.commits[0].assunto, "mexe em web, console e docs");
 });
 
-test("a divergência entre processo em execução e checkout é explicada", async (t) => {
+test("divergence between the running process and the checkout is explained", async (t) => {
   const raiz = repositorio();
   const amb = ajuda.ambiente({ checkout: raiz });
   t.after(() => {

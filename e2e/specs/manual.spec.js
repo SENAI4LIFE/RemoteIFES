@@ -13,7 +13,7 @@ async function abrirManualPeloFab(page) {
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 10_000 });
 }
 
-test("\"Precisa de ajuda?\" abre o manual completo, não um popup", async ({ page, context }) => {
+test("\"Precisa de ajuda?\" opens the full manual, not a popup", async ({ page, context }) => {
   await abrirApp(page, context, "user");
   await abrirManualPeloFab(page);
   await expect(page.locator("#helpFabPanel")).toBeHidden();
@@ -23,14 +23,14 @@ test("\"Precisa de ajuda?\" abre o manual completo, não um popup", async ({ pag
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#\/ajuda/);
 });
 
-test("o manual esconde as seções de administração de um usuário comum", async ({ page, context }) => {
+test("the manual hides administration sections from a regular user", async ({ page, context }) => {
   await abrirApp(page, context, "user");
   await abrirManualPeloFab(page);
   await expect(page.locator("#manual-sec-monitoramento")).toHaveCount(0);
   await expect(page.locator("#manual-sec-administracao")).toHaveCount(0);
 });
 
-test("o manual mostra as seções de administração ao superadministrador", async ({ page, context }) => {
+test("the manual shows administration sections to the superadministrator", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/ajuda/monitoramento");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -40,7 +40,7 @@ test("o manual mostra as seções de administração ao superadministrador", asy
   await expect(page.locator("#manual-sec-android-release .manual-command")).not.toHaveCount(0);
 });
 
-test("admin herda o manual comum e administrativo, sem procedimentos Superadministrador", async ({ page, context }) => {
+test("admin inherits the common and administrative manual, without Superadministrator procedures", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/ajuda/usuarios-admin");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -50,7 +50,7 @@ test("admin herda o manual comum e administrativo, sem procedimentos Superadmini
   await expect(page.locator("#manualConteudo .manual-command")).toHaveCount(0);
 });
 
-test("busca do manual filtra as seções", async ({ page, context }) => {
+test("manual search filters the sections", async ({ page, context }) => {
   await abrirApp(page, context, "admin");
   await abrirManualPeloFab(page);
   const total = await page.locator("#manualConteudo .manual-secao").count();
@@ -61,7 +61,7 @@ test("busca do manual filtra as seções", async ({ page, context }) => {
   await expect(page.locator("#manualConteudo .manual-secao:not(.hidden)")).not.toHaveCount(0);
 });
 
-test("\"Ver no app\" leva à tela correspondente e fecha o manual", async ({ page, context }) => {
+test("\"Ver no app\" goes to the matching screen and closes the manual", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/ajuda/esp32-cadastro");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -70,7 +70,7 @@ test("\"Ver no app\" leva à tela correspondente e fecha o manual", async ({ pag
   await expect(page.locator("#adminSub-macs")).toBeVisible({ timeout: 10_000 });
 });
 
-test("o ícone de ajuda de uma tela leva à seção do manual", async ({ page, context }) => {
+test("a screen's help icon goes to the manual section", async ({ page, context }) => {
   await abrirApp(page, context, "user");
   await page.locator('.tab-btn[data-tab="salas"]').click();
   await expect(page.locator("#screen-simple")).toBeVisible();
@@ -81,7 +81,7 @@ test("o ícone de ajuda de uma tela leva à seção do manual", async ({ page, c
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/ajuda/selecao-sala");
 });
 
-test("Esc fecha o manual e volta para a tela anterior", async ({ page, context }) => {
+test("Esc closes the manual and returns to the previous screen", async ({ page, context }) => {
   await abrirApp(page, context, "admin");
   await page.locator("#gradeTabBtn").click();
   await expect(page.locator("#screen-grade")).toBeVisible();
@@ -93,7 +93,7 @@ test("Esc fecha o manual e volta para a tela anterior", async ({ page, context }
   await expect(page.locator("#helpFabToggleBtn")).toBeFocused();
 });
 
-test("o manual não faz requisições externas e cabe no celular", async ({ page, context }) => {
+test("the manual makes no external requests and fits on a phone", async ({ page, context }) => {
   const externas = [];
   await page.route("**/*", (route) => {
     const u = route.request().url();
@@ -110,7 +110,7 @@ test("o manual não faz requisições externas e cabe no celular", async ({ page
   expect(await semRolagemHorizontal(page)).toBe(true);
 });
 
-test("fluxos conceituais permanecem legíveis no celular com fonte ampliada", async ({ page, context }) => {
+test("conceptual flows stay legible on a phone with enlarged text", async ({ page, context }) => {
   await context.addInitScript(() => {
     localStorage.setItem("remoteifes_font_scale", "2");
     localStorage.setItem("remoteifes_line_height", "3");
@@ -132,7 +132,7 @@ test("fluxos conceituais permanecem legíveis no celular com fonte ampliada", as
   expect(await semRolagemHorizontal(page)).toBe(true);
 });
 
-test("referência cruzada atualiza o deep link sem depender da posição visual", async ({ page, context }) => {
+test("a cross-reference updates the deep link without depending on visual position", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/#/ajuda/papeis");
   await expect(page.locator("#manual-sec-papeis")).toBeVisible({ timeout: 20_000 });
@@ -140,7 +140,7 @@ test("referência cruzada atualiza o deep link sem depender da posição visual"
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/ajuda/controle-acesso-sala");
 });
 
-test("a Ajuda pública cobre Início, conta, conexão, acessibilidade e PWA", async ({ page, context }) => {
+test("public Help covers Início, account, connection, accessibility and PWA", async ({ page, context }) => {
   await abrirApp(page, context, "user");
   await abrirManualPeloFab(page);
   for (const id of ["inicio", "inicio-acoes", "papeis", "conta-sessao", "conexao", "selecao-sala", "controlador", "relatos", "pwa-mobile", "acessibilidade", "solucao-problemas"]) {
@@ -150,7 +150,7 @@ test("a Ajuda pública cobre Início, conta, conexão, acessibilidade e PWA", as
   await expect(page.locator("#manual-sec-pwa-mobile")).toContainText("atualiza sozinha");
 });
 
-test("todo item do sumário da Ajuda aponta para uma seção existente", async ({ page, context }) => {
+test("every Help table-of-contents item points to an existing section", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/ajuda");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -170,7 +170,7 @@ test("todo item do sumário da Ajuda aponta para uma seção existente", async (
   await expect(page.locator("#manualToc .manual-toc-category")).not.toHaveCount(0);
 });
 
-test("Notificações do sistema está na Ajuda do administrador e leva à aba correta", async ({ page, context }) => {
+test("Notificações do sistema is in the administrator Help and leads to the right tab", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/ajuda/notificacoes");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -180,7 +180,7 @@ test("Notificações do sistema está na Ajuda do administrador e leva à aba co
   await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 15_000 });
 });
 
-test("Auditoria só aparece na Ajuda do superadministrador e Energia não existe mais", async ({ page, context }) => {
+test("Auditoria appears only in the superadministrator Help and Energia no longer exists", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await page.goto("/#/ajuda");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -198,7 +198,7 @@ test("Auditoria só aparece na Ajuda do superadministrador e Energia não existe
   await expect(page.locator("#screen-manual")).not.toContainText("Energia estimada");
 });
 
-test("os ícones de ajuda das abas novas de Administração abrem a orientação correta", async ({ page, context }) => {
+test("the help icons of the new Administration tabs open the right guidance", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/admin/notificacoes");
   await expect(page.locator("#adminSub-notificacoes")).toBeVisible({ timeout: 20_000 });
@@ -218,7 +218,7 @@ test("os ícones de ajuda das abas novas de Administração abrem a orientação
 
 // The help for Status > Mapa and Logs > Sessões opens topics whose "Ver no app" returns to the same
 // tab, not to a neighboring topic (owners, active users).
-test("a ajuda do Mapa e a do histórico de Sessões levam a tópicos próprios, que voltam à mesma aba", async ({ page, context }) => {
+test("Mapa help and Sessões history help lead to their own topics, which return to the same tab", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   for (const [rota, painel, titulo, secao] of [
     ["/#/admin/status/mapa", "#statusAba-mapa", "Status > Mapa", "status-mapa"],
@@ -238,7 +238,7 @@ test("a ajuda do Mapa e a do histórico de Sessões levam a tópicos próprios, 
   }
 });
 
-test("o manual do admin apresenta a Administração agrupada e o grupo Dispositivos", async ({ page, context }) => {
+test("the admin manual presents grouped Administration and the Dispositivos group", async ({ page, context }) => {
   await injetarSessao(context, "admin");
   await page.goto("/#/ajuda/administracao");
   const secao = page.locator("#manual-sec-administracao");
@@ -256,7 +256,7 @@ test("o manual do admin apresenta a Administração agrupada e o grupo Dispositi
   await expect(secao).toContainText("Administração > Grupo > Função");
 });
 
-test("o manual do superadministrador documenta o cadastro imediato e cadastrado ≠ online", async ({ page, context }) => {
+test("the superadministrator manual documents immediate registration and registered ≠ online", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/ajuda/esp32-cadastro");
   const secao = page.locator("#manual-sec-esp32-cadastro");
@@ -272,7 +272,7 @@ test("o manual do superadministrador documenta o cadastro imediato e cadastrado 
   await expect(page.locator("#adminSub-macs")).toBeVisible({ timeout: 15_000 });
 });
 
-test("\"Ver no app\" das seções movidas abre a aba interna correspondente", async ({ page, context }) => {
+test("\"Ver no app\" of moved sections opens the matching inner tab", async ({ page, context }) => {
   test.setTimeout(90_000);
   await injetarSessao(context, "superadmin");
   for (const [secao, painel, rota] of [
@@ -292,7 +292,7 @@ test("\"Ver no app\" das seções movidas abre a aba interna correspondente", as
   }
 });
 
-test("nenhum tópico visível do manual usa a navegação antiga de Administração", async ({ page, context }) => {
+test("no visible manual topic uses the old Administration navigation", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.goto("/#/ajuda");
   await expect(page.locator("#screen-manual")).toBeVisible({ timeout: 20_000 });
@@ -327,7 +327,7 @@ test("nenhum tópico visível do manual usa a navegação antiga de Administraç
   expect(texto).toContain("Administração > Sistema > Status > Sistema");
 });
 
-test("reabrir o manual depois de uma busca sem resultado começa com o sumário completo e a busca limpa", async ({ page, context }) => {
+test("reopening the manual after a search with no results starts with the full table of contents and a cleared search", async ({ page, context }) => {
   await abrirApp(page, context, "user");
   await abrirManualPeloFab(page);
   await page.fill("#manualBusca", "zzzz-nada-disso");
@@ -356,7 +356,7 @@ test("reabrir o manual depois de uma busca sem resultado começa com o sumário 
 // Without a service worker, so the real network decides: a public module that does not arrive is
 // reported (with the sections that did arrive) and is retried on the next open; when registration
 // fails, nothing is registered twice afterwards.
-test("um módulo público que não carrega é avisado e recarregado na próxima abertura, sem seções duplicadas", async ({ browser }) => {
+test("a public module that fails to load is reported and reloaded on the next open, without duplicate sections", async ({ browser }) => {
   const context = await browser.newContext({ serviceWorkers: "block", baseURL: process.env.E2E_WEB_URL });
   await context.addInitScript((apiUrl) => { try { window.localStorage.setItem("remoteifes_server_url", apiUrl); } catch (e) {} }, API_URL);
   await injetarSessao(context, "user");
@@ -396,7 +396,7 @@ test("um módulo público que não carrega é avisado e recarregado na próxima 
   await context.close();
 });
 
-test("a documentação privilegiada não sobrevive ao logout, nem quando a resposta chega depois de sair", async ({ page, context }) => {
+test("privileged documentation does not survive logout, even when the response arrives after logging out", async ({ page, context }) => {
   await abrirApp(page, context, "superadmin");
   // The superadmin token is shared by the other tests: logout happens on the client only, which is
   // where privileged content must be discarded.
@@ -433,7 +433,7 @@ for (const [nome, tamanho, ampliado, fonteLarga] of [
   ["celular deitado com texto máximo", { width: 844, height: 390 }, true, false],
   ["celular deitado com texto máximo e fonte larga", { width: 844, height: 390 }, true, true],
 ]) {
-  test(`os passos dos fluxos ficam dentro da figura e o artigo não rola na horizontal em ${nome}`, async ({ page, context }) => {
+  test(`flow steps stay inside the figure and the article does not scroll horizontally at ${nome}`, async ({ page, context }) => {
     if (ampliado) {
       await context.addInitScript(() => {
         localStorage.setItem("remoteifes_font_scale", "2");

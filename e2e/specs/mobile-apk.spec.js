@@ -27,7 +27,7 @@ async function comoAplicativoInstalado(page, build, versao = "1.0.0") {
   await expect(page.locator(".mobile-app-status")).toBeVisible();
 }
 
-test("o aplicativo publicado é anunciado com versão, data, novidades e ação de download", async ({ page, context, request }) => {
+test("the published app is announced with version, date, release notes and a download action", async ({ page, context, request }) => {
   const meta = await publicarApkFixture(request);
   await page.setViewportSize(VIEWPORTS["mobile-portrait"]);
   await abrirAplicativo(page, context);
@@ -45,7 +45,7 @@ test("o aplicativo publicado é anunciado com versão, data, novidades e ação 
   expect(await semRolagemHorizontal(page), "página do aplicativo sem rolagem horizontal").toBe(true);
 });
 
-test("os detalhes técnicos ficam fora do fluxo principal, mas continuam disponíveis", async ({ page, context, request }) => {
+test("technical details stay out of the main flow but remain available", async ({ page, context, request }) => {
   const meta = await publicarApkFixture(request);
   await abrirAplicativo(page, context);
 
@@ -61,7 +61,7 @@ test("os detalhes técnicos ficam fora do fluxo principal, mas continuam dispon�
   await expect(integridade).toContainText(meta.certificateSha256);
 });
 
-test("no navegador a página mostra a versão disponível sem afirmar o que está instalado", async ({ page, context, request }) => {
+test("in the browser the page shows the available version without claiming what is installed", async ({ page, context, request }) => {
   await publicarApkFixture(request);
   await abrirAplicativo(page, context);
 
@@ -72,7 +72,7 @@ test("no navegador a página mostra a versão disponível sem afirmar o que est�
   await expect(page.locator(".mobile-app-download-btn")).toContainText("Baixar aplicativo");
 });
 
-test("o aplicativo instalado na versão publicada aparece como atualizado", async ({ page, context, request }) => {
+test("an app installed at the published version appears as up to date", async ({ page, context, request }) => {
   const meta = await publicarApkFixture(request);
   await abrirAplicativo(page, context);
   await comoAplicativoInstalado(page, meta.build, meta.version);
@@ -84,7 +84,7 @@ test("o aplicativo instalado na versão publicada aparece como atualizado", asyn
   await expect(status).toContainText("Não é preciso fazer nada");
 });
 
-test("um build instalado mais antigo aparece como atualização disponível", async ({ page, context, request }) => {
+test("an older installed build appears as an available update", async ({ page, context, request }) => {
   const meta = await publicarApkFixture(request);
   await abrirAplicativo(page, context);
   await comoAplicativoInstalado(page, "9000", "0.9.0");
@@ -98,7 +98,7 @@ test("um build instalado mais antigo aparece como atualização disponível", as
   await expect(page.locator(".mobile-app-instructions h2").first()).toHaveText("Como atualizar");
 });
 
-test("sem a versão instalada o app diz isso em vez de adivinhar", async ({ page, context, request }) => {
+test("without the installed version the app says so instead of guessing", async ({ page, context, request }) => {
   await publicarApkFixture(request);
   await abrirAplicativo(page, context);
   await comoAplicativoInstalado(page, null);
@@ -109,7 +109,7 @@ test("sem a versão instalada o app diz isso em vez de adivinhar", async ({ page
   await expect(page.locator(".mobile-app-download-btn")).toBeVisible();
 });
 
-test("sem release publicada a página oferece a PWA e não promete download", async ({ page, context }) => {
+test("without a published release the page offers the PWA and does not promise a download", async ({ page, context }) => {
   await abrirAplicativo(page, context);
 
   const status = page.locator(".mobile-app-status");
@@ -119,7 +119,7 @@ test("sem release publicada a página oferece a PWA e não promete download", as
   await expect(page.locator(".mobile-app-card.is-recommended h3")).toHaveText("Instalar como PWA");
 });
 
-test("uma release publicada enquanto a página está aberta aparece ao voltar ao primeiro plano", async ({ page, context, request }) => {
+test("a release published while the page is open appears when returning to the foreground", async ({ page, context, request }) => {
   await abrirAplicativo(page, context);
   await expect(page.locator(".mobile-app-status")).toHaveClass(/is-indisponivel/);
 
@@ -133,7 +133,7 @@ test("uma release publicada enquanto a página está aberta aparece ao voltar ao
   await expect(page.locator(".mobile-app-versao")).toContainText(meta.version);
 });
 
-test("baixar o aplicativo publicado confirma a integridade pelo SHA-256 anunciado", async ({ page, context, request }) => {
+test("downloading the published app confirms integrity through the announced SHA-256", async ({ page, context, request }) => {
   const meta = await publicarApkFixture(request);
   await abrirAplicativo(page, context);
   const baixar = page.locator(".mobile-app-download-btn");
@@ -159,7 +159,7 @@ async function semCryptoSubtle(context) {
   });
 }
 
-test("em origem HTTP sem crypto.subtle (rede local sem HTTPS) o download ainda confere o SHA-256", async ({ page, context, request }) => {
+test("on an HTTP origin without crypto.subtle (local network without HTTPS) the download still checks the SHA-256", async ({ page, context, request }) => {
   const meta = await publicarApkFixture(request);
   await semCryptoSubtle(context);
   await abrirAplicativo(page, context);
@@ -175,7 +175,7 @@ test("em origem HTTP sem crypto.subtle (rede local sem HTTPS) o download ainda c
   expect(baixado).toBe(meta.sha256);
 });
 
-test("em origem HTTP sem crypto.subtle um APK adulterado continua sendo recusado", async ({ page, context, request }) => {
+test("on an HTTP origin without crypto.subtle a tampered APK is still refused", async ({ page, context, request }) => {
   await publicarApkFixture(request);
   await semCryptoSubtle(context);
   await abrirAplicativo(page, context);
@@ -193,7 +193,7 @@ test("em origem HTTP sem crypto.subtle um APK adulterado continua sendo recusado
   expect(baixou).toBe(false);
 });
 
-test("um APK adulterado em trânsito é recusado pela verificação de integridade no cliente", async ({ page, context, request }) => {
+test("an APK tampered with in transit is refused by the client integrity check", async ({ page, context, request }) => {
   await publicarApkFixture(request);
   await abrirAplicativo(page, context);
   const baixar = page.locator(".mobile-app-download-btn");
@@ -218,7 +218,7 @@ test("um APK adulterado em trânsito é recusado pela verificação de integrida
   expect(baixou, "nenhum arquivo é salvo quando o hash diverge").toBe(false);
 });
 
-test("o endpoint de download entrega exatamente os bytes cujo hash é anunciado", async ({ request, tokens }) => {
+test("the download endpoint delivers exactly the bytes whose hash is announced", async ({ request, tokens }) => {
   const meta = await publicarApkFixture(request);
   const info = await request.get(`${API_URL}/mobile-app/info`, {
     headers: { Authorization: `Bearer ${tokens.user}` },
@@ -239,7 +239,7 @@ test("o endpoint de download entrega exatamente os bytes cujo hash é anunciado"
 });
 
 for (const nome of ["mobile-compact", "mobile-portrait", "tablet-compact", "notebook"]) {
-  test(`a página do aplicativo cabe na tela e mantém alvos tocáveis (${nome})`, async ({ page, context, request }) => {
+  test(`the app page fits on screen and keeps touch targets (${nome})`, async ({ page, context, request }) => {
     await publicarApkFixture(request);
     await page.setViewportSize(VIEWPORTS[nome]);
     await abrirAplicativo(page, context);

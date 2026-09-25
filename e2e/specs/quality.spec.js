@@ -5,7 +5,7 @@ const SUPERADMIN = [...ADMIN_COMUM, "relatos", "macs", "esp32", "protocolos", "c
 
 for (const [papel, subtabs] of [["admin", ADMIN_COMUM], ["superadmin", SUPERADMIN]]) {
   for (const viewport of ["mobile-compact", "desktop-compact"]) {
-    test(`${papel}: todas as subtelas administrativas carregam sem erro ou overflow em ${viewport}`, async ({ page, context }) => {
+    test(`${papel}: every administrative sub-screen loads without error or overflow at ${viewport}`, async ({ page, context }) => {
       await injetarSessao(context, papel);
       await page.setViewportSize(VIEWPORTS[viewport]);
       const erros = [];
@@ -30,7 +30,7 @@ for (const [papel, subtabs] of [["admin", ADMIN_COMUM], ["superadmin", SUPERADMI
   }
 }
 
-test("controles interativos visíveis têm nome acessível e alvo mínimo no celular", async ({ page, context }) => {
+test("visible interactive controls have an accessible name and minimum target on a phone", async ({ page, context }) => {
   await injetarSessao(context, "superadmin");
   await page.setViewportSize(VIEWPORTS["mobile-compact"]);
   await page.goto("/#/inicio");
@@ -49,7 +49,7 @@ test("controles interativos visíveis têm nome acessível e alvo mínimo no cel
   expect(problemas).toEqual([]);
 });
 
-test("métricas locais da tela inicial permanecem nos alvos de Core Web Vitals", async ({ page, context }) => {
+test("local metrics of the home screen stay within the Core Web Vitals targets", async ({ page, context }) => {
   await injetarSessao(context, "user");
   await context.addInitScript(() => {
     window.__metricasRemIFES = { lcp: 0, cls: 0, inp: 0 };

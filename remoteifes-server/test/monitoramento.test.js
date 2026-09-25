@@ -37,7 +37,7 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("/admin/monitoramento exige o superadministrador", async () => {
+test("/admin/monitoramento requires the superadministrator", async () => {
   usuariosService.criar(
     { usuario: "mon-comum", senha: "senhaSegura123", nome: "Comum", podeControlar: true },
     { nivel: 3 }
@@ -53,7 +53,7 @@ test("/admin/monitoramento exige o superadministrador", async () => {
   assert.equal((await authGet("/admin/monitoramento", await login("superadmin", "admin"))).status, 200);
 });
 
-test("o payload traz banco, armazenamento, backup, esp32, serviço e falhas — sem segredos", async () => {
+test("the payload carries database, storage, backup, esp32, service and failures, without secrets", async () => {
   const token = await login("superadmin", "admin");
   const corpo = await (await authGet("/admin/monitoramento", token)).json();
   const m = corpo.monitoramento;
@@ -78,7 +78,7 @@ test("o payload traz banco, armazenamento, backup, esp32, serviço e falhas — 
   assert.ok(!bruto.includes("segredoHash"));
 });
 
-test("registrar() incrementa contadores e aparece no payload", async () => {
+test("registrar() increments counters and appears in the payload", async () => {
   const token = await login("superadmin", "admin");
   const antes = (await (await authGet("/admin/monitoramento", token)).json()).monitoramento.falhas.contadores.telemetriaFalha;
   monitoramentoService.registrar("telemetriaFalha", { sala: "X-1" });
@@ -87,7 +87,7 @@ test("registrar() incrementa contadores e aparece no payload", async () => {
   assert.equal(depois, antes + 2);
 });
 
-test("reconexões próximas contam como reconexão anormal", () => {
+test("close reconnections count as abnormal reconnection", () => {
   const antes = monitoramentoService.coletar().falhas.contadores.reconexaoAnormal;
   monitoramentoService.registrarConexaoDispositivo("flap-sala");
   monitoramentoService.registrarConexaoDispositivo("flap-sala");
@@ -95,7 +95,7 @@ test("reconexões próximas contam como reconexão anormal", () => {
   assert.equal(depois, antes + 1);
 });
 
-test("ESP32 com MAC porém offline entra em offlineInesperado", async () => {
+test("an ESP32 with a MAC but offline enters offlineInesperado", async () => {
   db.prepare(`INSERT INTO salas (sala, nome, bloco, andar, mac, online) VALUES ('MON-OFF', 'x', 'A', 1, 'AA:00:00:00:0F:01', 0)`).run();
   const token = await login("superadmin", "admin");
   const m = (await (await authGet("/admin/monitoramento", token)).json()).monitoramento;
@@ -103,7 +103,7 @@ test("ESP32 com MAC porém offline entra em offlineInesperado", async () => {
   assert.ok(m.esp32.offlineInesperado >= 1);
 });
 
-test("avaliar() cria uma notificação de monitoramento para um alerta e não duplica em 6h", () => {
+test("avaliar() creates a monitoring notification for an alert and does not duplicate it within 6h", () => {
   db.prepare(`INSERT INTO salas (sala, nome, bloco, andar) VALUES ('MON-FLAP', 'x', 'A', 1)`).run();
   for (let i = 0; i < 5; i += 1) {
     db.prepare(`INSERT INTO esp_eventos (sala, status, criadoEm) VALUES ('MON-FLAP', 'online', datetime('now', '-10 minutes'))`).run();
@@ -120,7 +120,7 @@ test("avaliar() cria uma notificação de monitoramento para um alerta e não du
   assert.equal(depois, meio.length, "mudança no contador não deve duplicar o mesmo alerta");
 });
 
-test("comandoNaoEntregue conta apenas o que o servidor não conseguiu entregar ao socket do ESP32", () => {
+test("comandoNaoEntregue counts only what the server could not deliver to the ESP32 socket", () => {
   const salasService = require("../src/services/salasService");
   db.prepare("INSERT OR IGNORE INTO salas (sala, nome, bloco, andar, irProtocolo, temperaturaAlvo) VALUES ('MON-CMD', 'Mon', 'A', 1, 16, 23)").run();
   const contador = () => monitoramentoService.coletar().falhas.contadores.comandoNaoEntregue;

@@ -125,7 +125,7 @@ const TELAS = [
 
 for (const [modo, ajustes] of [["tema claro", {}], ["alto contraste", ALTO_CONTRASTE]]) {
   for (const tela of TELAS) {
-    test(`${tela.nome}: todo texto visível atinge o contraste mínimo em ${modo}`, async ({ page, context, request }) => {
+    test(`${tela.nome}: every visible text meets the minimum contrast in ${modo}`, async ({ page, context, request }) => {
       if (tela.antes) await tela.antes(request);
       await abrir(page, context, tela.papel, tela.rota, ajustes, tela.seletor);
       if (ajustes.remoteifes_high_contrast) await expect(page.locator("body")).toHaveClass(/a11y-high-contrast/);
@@ -136,7 +136,7 @@ for (const [modo, ajustes] of [["tema claro", {}], ["alto contraste", ALTO_CONTR
 }
 
 // Os pares apontados nas auditorias, medidos diretamente.
-test("os pares apontados nas auditorias ficam acima do mínimo nos dois modos", async ({ page, context }) => {
+test("the pairs flagged in audits stay above the minimum in both modes", async ({ page, context }) => {
   const medir = (seletor) => page.evaluate((sel) => {
     const el = document.querySelector(sel);
     if (!el) return null;
@@ -167,7 +167,7 @@ test("os pares apontados nas auditorias ficam acima do mínimo nos dois modos", 
   expect(razao(fechar.cor, fechar.fundo), "botão de fechar o painel de relatos").toBeGreaterThanOrEqual(4.5);
 });
 
-test("em alto contraste o topo, os rótulos da planta e os selos apagados são legíveis", async ({ page, context }) => {
+test("in high contrast the top bar, floor plan labels and muted badges are legible", async ({ page, context }) => {
   await abrir(page, context, "superadmin", "/#/salas/planta/a-terreo", ALTO_CONTRASTE, "#fpScaleInner .room");
   const medida = await page.evaluate(() => {
     const parse = (s) => s.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);

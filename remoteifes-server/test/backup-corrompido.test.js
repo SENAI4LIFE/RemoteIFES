@@ -52,7 +52,7 @@ test.after(() => {
   fs.rmSync(RAIZ_TMP, { recursive: true, force: true });
 });
 
-test("um banco corrompido é diagnosticado e a restauração normal continua recusando sobrescrevê-lo", () => {
+test("a corrupted database is diagnosed and a normal restore still refuses to overwrite it", () => {
   corromper();
   const diagnostico = backupService.diagnosticarBancoAtual(DB);
   assert.equal(diagnostico.integro, false);
@@ -63,7 +63,7 @@ test("um banco corrompido é diagnosticado e a restauração normal continua rec
   assert.equal(fs.readdirSync(RAIZ_TMP).filter((n) => n.includes(".corrompido-")).length, 0);
 });
 
-test("com a recuperação explícita o banco danificado vai para quarentena, o backup verificado é instalado e os arquivos forenses ficam", () => {
+test("with explicit recovery the damaged database is quarantined, the verified backup is installed and the forensic files are kept", () => {
   const resultado = backupService.restaurarBackup(ponto.arquivo, { quarentenarDanificado: true });
   assert.equal(resultado.copiaSeguranca, null, "não existe cópia de segurança verificada de um banco corrompido");
   assert.ok(resultado.quarentena.banco.includes(".corrompido-"));
@@ -76,7 +76,7 @@ test("com a recuperação explícita o banco danificado vai para quarentena, o b
   assert.doesNotThrow(() => backupService.verificarArquivoBackup(DB));
 });
 
-test("um banco íntegro nunca é posto em quarentena, mesmo com a opção ligada", () => {
+test("a sound database is never quarantined, even with the option enabled", () => {
   const resultado = backupService.restaurarBackup(ponto.arquivo, { quarentenarDanificado: true });
   assert.equal(resultado.quarentena, null);
   assert.ok(resultado.copiaSeguranca && fs.existsSync(resultado.copiaSeguranca));
@@ -84,7 +84,7 @@ test("um banco íntegro nunca é posto em quarentena, mesmo com a opção ligada
   assert.equal(fs.readdirSync(RAIZ_TMP).filter((n) => n.includes(".corrompido-")).length, 3);
 });
 
-test("a linha de comando expõe a recuperação e recusa por padrão", () => {
+test("the command line exposes recovery and refuses by default", () => {
   corromper();
   const semFlag = spawnSync(process.execPath, ["restore-backup.js", ponto.arquivo, "--sim"], {
     cwd: path.join(__dirname, ".."),

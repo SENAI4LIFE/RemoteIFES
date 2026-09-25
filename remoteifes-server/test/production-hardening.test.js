@@ -20,28 +20,28 @@ const { ipAutorizado } = require("../src/utils/rede");
 require("../src/app");
 popularBanco();
 
-test("bootstrap de produção cria a credencial padrão sem enfraquecer os controles de rede e dispositivo", () => {
+test("production bootstrap creates the default credential without weakening network and device controls", () => {
   const admin = db.prepare("SELECT senhaHash FROM usuarios WHERE usuario = 'superadmin'").get();
   assert.equal(bcrypt.compareSync("admin", admin.senhaHash), true);
   assert.equal(configuracoesService.acessoRestritoAtivo().modoTeste, false);
   assert.equal(configuracoesService.obter().espCredenciaisObrigatorias, true);
 });
 
-test("loopback permanece autorizado sem faixas cadastradas para manutenção local", () => {
+test("loopback stays authorized without registered ranges for local maintenance", () => {
   assert.equal(ipAutorizado("127.0.0.1", []), true);
   assert.equal(ipAutorizado("::1", []), true);
   assert.equal(ipAutorizado("::ffff:127.0.0.1", []), true);
   assert.equal(ipAutorizado("10.10.1.50", []), false);
 });
 
-test("bootstrap aceita uma senha inicial configurada sem alterar contas existentes", () => {
+test("bootstrap accepts a configured initial password without changing existing accounts", () => {
   db.prepare("DELETE FROM usuarios WHERE usuario = 'superadmin'").run();
   process.env.SENHA_ADMIN_INICIAL = "production-test-pass-123";
   assert.doesNotThrow(() => popularBanco());
   assert.equal(bcrypt.compareSync("production-test-pass-123", db.prepare("SELECT senhaHash FROM usuarios WHERE usuario = 'superadmin'").get().senhaHash), true);
 });
 
-test("bootstrap preserva a credencial padrão e não cria arquivo de senha", () => {
+test("bootstrap keeps the default credential and does not create a password file", () => {
   db.prepare("UPDATE usuarios SET senhaHash = ? WHERE usuario = 'superadmin'").run(bcrypt.hashSync("admin", 10));
   assert.doesNotThrow(() => popularBanco());
   const admin = db.prepare("SELECT senhaHash FROM usuarios WHERE usuario = 'superadmin'").get();

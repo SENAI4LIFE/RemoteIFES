@@ -26,14 +26,14 @@ test.after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-test("a CSP nao permite JavaScript inline", async () => {
+test("the CSP does not allow inline JavaScript", async () => {
   const resposta = await fetch(baseUrl);
   const csp = resposta.headers.get("content-security-policy");
   assert.ok(csp.includes("script-src 'self'"));
   assert.equal(csp.includes("script-src 'self' 'unsafe-inline'"), false);
 });
 
-test("GET / entrega o index.html do frontend na mesma origem", async () => {
+test("GET / serves the frontend index.html on the same origin", async () => {
   const resp = await fetch(`${baseUrl}/`);
   assert.equal(resp.status, 200);
   assert.equal(resp.headers.get("x-powered-by"), null);
@@ -44,7 +44,7 @@ test("GET / entrega o index.html do frontend na mesma origem", async () => {
   assert.ok(html.includes(`name="remoteifes-version" content="${FRONTEND_VERSION}"`));
 });
 
-test("ativos estáticos do frontend são servidos com o tipo correto", async () => {
+test("static frontend assets are served with the correct type", async () => {
   const js = await fetch(`${baseUrl}/js/config.js`);
   assert.equal(js.status, 200);
   assert.match(js.headers.get("content-type"), /javascript/);
@@ -54,7 +54,7 @@ test("ativos estáticos do frontend são servidos com o tipo correto", async () 
   assert.match(manifest.headers.get("content-type"), /manifest\+json/);
 });
 
-test("HTML, service worker e ativos versionados usam cache coerente", async () => {
+test("HTML, service worker and versioned assets use coherent caching", async () => {
   for (const rota of ["/", "/index.html", "/sw.js", "/manifest.webmanifest", "/version.json"]) {
     const resp = await fetch(`${baseUrl}${rota}`);
     assert.match(resp.headers.get("cache-control"), /no-cache|no-store/, rota);
@@ -63,7 +63,7 @@ test("HTML, service worker e ativos versionados usam cache coerente", async () =
   assert.match(ativo.headers.get("cache-control"), /immutable/);
 });
 
-test("a CSP no modo frontend permite a própria origem para script, estilo e conexão", async () => {
+test("the CSP in frontend mode allows the own origin for script, style and connection", async () => {
   const resp = await fetch(`${baseUrl}/`);
   const csp = resp.headers.get("content-security-policy");
   assert.match(csp, /script-src 'self'/);
@@ -72,12 +72,12 @@ test("a CSP no modo frontend permite a própria origem para script, estilo e con
   assert.doesNotMatch(csp, /default-src 'none'/);
 });
 
-test("HSTS não é enviado pela operação HTTP local", async () => {
+test("HSTS is not sent by local HTTP operation", async () => {
   const resp = await fetch(`${baseUrl}/`);
   assert.equal(resp.headers.get("strict-transport-security"), null);
 });
 
-test("as rotas de API e /health continuam respondendo com o frontend ativo", async () => {
+test("API routes and /health keep answering with the frontend enabled", async () => {
   const health = await fetch(`${baseUrl}/health`);
   assert.equal(health.status, 200);
   assert.equal((await health.json()).ok, true);
@@ -90,7 +90,7 @@ test("as rotas de API e /health continuam respondendo com o frontend ativo", asy
   assert.notEqual(dispositivo.status, 404);
 });
 
-test("endpoints exclusivos do harness E2E não existem no servidor de produção", async () => {
+test("E2E-harness-only endpoints do not exist on the production server", async () => {
   db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('modoTeste', 'true') ON CONFLICT(chave) DO UPDATE SET valor = 'true'").run();
   try {
     for (const rota of ["/__e2e/publicar-apk", "/__e2e/despublicar-apk", "/__e2e/encerrar"]) {
@@ -102,23 +102,23 @@ test("endpoints exclusivos do harness E2E não existem no servidor de produção
   }
 });
 
-test("CORS de produção aceita requisição da mesma origem sem CORS_ORIGIN configurado", async () => {
+test("production CORS accepts a same-origin request without CORS_ORIGIN configured", async () => {
   const resp = await fetch(`${baseUrl}/health`, { headers: { Origin: baseUrl } });
   assert.equal(resp.status, 200);
   assert.equal((await resp.json()).ok, true);
 });
 
-test("CORS de produção bloqueia uma Origin de outro site", async () => {
+test("production CORS blocks an Origin from another site", async () => {
   const resp = await fetch(`${baseUrl}/health`, { headers: { Origin: "https://site-externo.example" } });
   assert.equal(resp.status, 403);
 });
 
-test("CORS de produção rejeita origem com o mesmo host, mas outro protocolo", async () => {
+test("production CORS rejects an origin with the same host but another protocol", async () => {
   const resp = await fetch(`${baseUrl}/health`, { headers: { Origin: baseUrl.replace("http:", "https:") } });
   assert.equal(resp.status, 403);
 });
 
-test("o frontend carrega mesmo quando a API está bloqueada pela restrição de rede", async () => {
+test("the frontend loads even when the API is blocked by the network restriction", async () => {
   const pagina = await fetch(`${baseUrl}/`);
   assert.equal(pagina.status, 200);
 

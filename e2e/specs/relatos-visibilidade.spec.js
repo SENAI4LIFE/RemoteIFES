@@ -51,7 +51,7 @@ const ESTADOS = {
 
 for (const [rotulo, ajustes] of Object.entries(ESTADOS)) {
   for (const viewport of ["mobile-portrait", "desktop"]) {
-    test(`relato enviado, resposta e erro continuam legíveis com ${rotulo} em ${viewport}`, async ({ page, context, sessaoComo, request }) => {
+    test(`a sent report, reply and error stay legible with ${rotulo} at ${viewport}`, async ({ page, context, sessaoComo, request }) => {
       await page.setViewportSize(VIEWPORTS[viewport]);
 
       const criado = await request.post(`${API_URL}/relatos`, {

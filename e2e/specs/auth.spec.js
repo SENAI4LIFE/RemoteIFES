@@ -1,6 +1,6 @@
 const { test, expect } = require("../harness/fixtures");
 
-test("login de usuário comum abre o início (hub)", async ({ appPage, loginComo }) => {
+test("a regular user login opens the home hub", async ({ appPage, loginComo }) => {
   await loginComo("user");
   await expect(appPage.locator("#mainApp")).toBeVisible();
   await expect(appPage.locator("#screen-inicio")).toBeVisible();
@@ -10,13 +10,13 @@ test("login de usuário comum abre o início (hub)", async ({ appPage, loginComo
   await expect(appPage.locator("#accountMenuName")).toContainText("Usuário E2E");
 });
 
-test("login de administrador mostra o rótulo (admin)", async ({ appPage, loginComo }) => {
+test("an administrator login shows the (admin) label", async ({ appPage, loginComo }) => {
   await loginComo("admin");
   await appPage.locator("#accountMenuBtn").click();
   await expect(appPage.locator("#accountMenuRole")).toHaveText("Administrador");
 });
 
-test("senha incorreta não autentica e mantém a tela de login", async ({ appPage }) => {
+test("a wrong password does not authenticate and keeps the login screen", async ({ appPage }) => {
   await appPage.locator('.portal-option[data-tipo="normal"]').click();
   await appPage.fill("#username", "e2e_user");
   await appPage.fill("#password", "senha-errada");
@@ -25,7 +25,7 @@ test("senha incorreta não autentica e mantém a tela de login", async ({ appPag
   await expect(appPage.locator("#mainApp")).toBeHidden();
 });
 
-test("entrar pela porta de administrador com conta comum é recusado", async ({ appPage }) => {
+test("entering through the administrator door with a regular account is refused", async ({ appPage }) => {
   await appPage.locator('.portal-option[data-tipo="admin"]').click();
   await appPage.fill("#username", "e2e_user");
   await appPage.fill("#password", "e2e-user-pass-123");
@@ -34,7 +34,7 @@ test("entrar pela porta de administrador com conta comum é recusado", async ({ 
   await expect(appPage.locator("#screen-login")).toBeVisible();
 });
 
-test("logout volta ao portal e esconde as abas autenticadas", async ({ appPage, loginComo }) => {
+test("logout returns to the portal and hides the authenticated tabs", async ({ appPage, loginComo }) => {
   await loginComo("admin");
   await appPage.locator("#accountMenuBtn").click();
   await appPage.locator('[data-account-action="logout"]').click();

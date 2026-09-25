@@ -83,7 +83,7 @@ test.after(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test("o OFF agendado que ficou pendente na queda é aplicado uma única vez ao voltar no dia seguinte", (t) => {
+test("a scheduled OFF left pending by an outage is applied exactly once when the server returns the next day", (t) => {
   sala("VD-1");
   const ag = simularQuedaAntesDoDesligar(t, "VD-1", () => agendamentos.criar({ sala: "VD-1", usuarioId: superadmin().id, data: dataAtualBrasiliaISO(), temperatura: 24, horaInicio: "20:00", horaFim: "23:30" }));
   const versaoAntes = linha("VD-1").estadoVersao;
@@ -102,7 +102,7 @@ test("o OFF agendado que ficou pendente na queda é aplicado uma única vez ao v
   assert.equal(agendamentos.listarDesligamentosPendentesDeOntem().length, 0);
 });
 
-test("a recuperação respeita uma intenção mais nova após a hora devida, mas não um ajuste feito dentro do período", (t) => {
+test("recovery respects newer intent after the due time, but not an adjustment made within the period", (t) => {
   sala("VD-2");
   sala("VD-3");
   const usuarioId = superadmin().id;
@@ -128,7 +128,7 @@ test("a recuperação respeita uma intenção mais nova após a hora devida, mas
   assert.equal(linha("VD-3").ligado, 1);
 });
 
-test("cancelamento e execução já registrada são respeitados; um agendamento que nunca ligou não é tocado", (t) => {
+test("cancellation and an already recorded execution are respected; a schedule that never turned on is not touched", (t) => {
   sala("VD-4");
   sala("VD-5");
   sala("VD-6");
@@ -152,7 +152,7 @@ test("cancelamento e execução já registrada são respeitados; um agendamento 
   assert.equal(db.prepare("SELECT COUNT(*) n FROM comandos_log WHERE cmd = 'desligar' AND sala IN ('VD-4', 'VD-5', 'VD-6')").get().n, 0);
 });
 
-test("ao reconectar depois da volta, a placa recebe o OFF recuperado, não o ligado expirado do agendamento", async (t) => {
+test("on reconnecting after the restart, the board receives the recovered OFF, not the schedule's expired ON", async (t) => {
   sala("VD-7", "AA:BB:CC:DD:0D:07");
   t.mock.timers.enable({ apis: ["Date"], now: VESPERA_1959 });
   t.after(() => scheduler.pararScheduler());

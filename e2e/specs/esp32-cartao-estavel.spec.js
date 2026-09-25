@@ -42,7 +42,7 @@ test.afterEach(async ({ request }) => {
 });
 
 for (const [nome, tamanho] of [["celular", VIEWPORTS["mobile-portrait"]], ["notebook", VIEWPORTS.notebook]]) {
-  test(`o cartão do ESP32 não muda de altura nem desloca o que vem abaixo quando a placa confirma, deixa de confirmar ou relata outro comando (${nome})`, async ({ page, context, request }) => {
+  test(`the ESP32 card does not change height or shift what is below when the board confirms, stops confirming or reports another command (${nome})`, async ({ page, context, request }) => {
     await request.post(`${API_URL}/__e2e/resetar-dispositivo`);
     await injetarSessao(context, "superadmin");
     await page.setViewportSize(tamanho);

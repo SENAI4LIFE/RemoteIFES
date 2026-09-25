@@ -44,7 +44,7 @@ test.afterEach(async ({ request }) => {
   await limparCadastro(request);
 });
 
-test("um ESP32 cadastrado aparece na hora em Dispositivos > Cadastro, sem recarregar", async ({ page, context }) => {
+test("a registered ESP32 appears immediately in Dispositivos > Cadastro, without reloading", async ({ page, context }) => {
   await abrirCadastro(page, context);
   const cartaoSala = cartao(page);
   await expect(cartaoSala.locator(".mac-cadastro-badge")).toHaveText("sem ESP32 cadastrado");
@@ -59,7 +59,7 @@ test("um ESP32 cadastrado aparece na hora em Dispositivos > Cadastro, sem recarr
   expect(await page.evaluate(() => performance.getEntriesByType("navigation").length)).toBe(1);
 });
 
-test("cadastrar não marca o dispositivo como online", async ({ page, context }) => {
+test("registering does not mark the device as online", async ({ page, context }) => {
   await abrirCadastro(page, context);
   const cartaoSala = cartao(page);
   await cartaoSala.locator(".mac-input").fill(MAC);
@@ -69,7 +69,7 @@ test("cadastrar não marca o dispositivo como online", async ({ page, context })
   await expect(cartaoSala.locator(".mac-conexao-badge")).toHaveText("offline");
 });
 
-test("uma segunda sessão autorizada recebe o cadastro sem interagir", async ({ page, context, browser }) => {
+test("a second authorized session receives the registration without interacting", async ({ page, context, browser }) => {
   await abrirCadastro(page, context);
   const outra = await segundaSessao(browser);
   try {
@@ -88,7 +88,7 @@ test("uma segunda sessão autorizada recebe o cadastro sem interagir", async ({ 
   }
 });
 
-test("um cadastro recusado não aparece como cadastrado", async ({ page, context }) => {
+test("a refused registration does not appear as registered", async ({ page, context }) => {
   await abrirCadastro(page, context);
   const cartaoSala = cartao(page);
 
@@ -101,7 +101,7 @@ test("um cadastro recusado não aparece como cadastrado", async ({ page, context
   await expect(cartaoSala.locator(".mac-cadastro-badge")).toHaveText("sem ESP32 cadastrado");
 });
 
-test("o cadastro em tempo real não duplica nem troca a sala de um MAC já vinculado", async ({ page, context, request }) => {
+test("real-time registration neither duplicates nor changes the room of an already bound MAC", async ({ page, context, request }) => {
   await abrirCadastro(page, context);
   const cartaoSala = cartao(page);
 

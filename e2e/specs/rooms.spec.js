@@ -5,7 +5,7 @@ async function abrirSalas(page) {
   await expect(page.locator("#screen-simple")).toBeVisible();
 }
 
-test("assistente simples: bloco -> andar -> sala abre o painel de controle", async ({ page, sessaoComo }) => {
+test("simple wizard: block -> floor -> room opens the control panel", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await abrirSalas(page);
 
@@ -21,7 +21,7 @@ test("assistente simples: bloco -> andar -> sala abre o painel de controle", asy
   await expect(page.locator("#panelRoomName")).toContainText("A-108");
 });
 
-test("navegação em lista tradicional (bloco/andar) chega à mesma sala", async ({ page, sessaoComo }) => {
+test("traditional list navigation (block/floor) reaches the same room", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await abrirSalas(page);
   await page.locator("#simpleListBtn").click();
@@ -37,7 +37,7 @@ test("navegação em lista tradicional (bloco/andar) chega à mesma sala", async
   await expect(page.locator("#panelRoomName")).toContainText("A-108");
 });
 
-test("planta baixa mostra as seis seções e permite voltar para o assistente", async ({ page, sessaoComo }) => {
+test("the floor plan shows the six sections and allows returning to the wizard", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await abrirSalas(page);
   await page.locator("#simpleFloorplanBtn").click();
@@ -47,7 +47,7 @@ test("planta baixa mostra as seis seções e permite voltar para o assistente", 
   await expect(page.locator("#screen-simple")).toBeVisible();
 });
 
-test("sala com ESP32 conectado aparece como online na lista", async ({ page, sessaoComo }) => {
+test("a room with a connected ESP32 appears online in the list", async ({ page, sessaoComo }) => {
   await sessaoComo("user");
   await abrirSalas(page);
   await page.locator("#simpleListBtn").click();

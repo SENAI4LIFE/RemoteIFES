@@ -141,7 +141,7 @@ function ambienteDeAtualizacao({ base, chavePublica, raizInstalacao, versaoPaylo
 
 // --- Trust ----------------------------------------------------------------------------
 
-test("sem chave pública provisionada, nenhuma atualização é aceita", (t) => {
+test("without a provisioned public key, no update is accepted", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
@@ -153,7 +153,7 @@ test("sem chave pública provisionada, nenhuma atualização é aceita", (t) => 
   assert.match(r.motivo, /não está configurada/);
 });
 
-test("manifesto com assinatura inválida é recusado antes de qualquer escrita", (t) => {
+test("a manifest with an invalid signature is refused before any write", (t) => {
   const chaves = parDeChaves();
   const outra = parDeChaves();
   const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
@@ -168,7 +168,7 @@ test("manifesto com assinatura inválida é recusado antes de qualquer escrita",
   assert.match(r.motivo, /não confere com nenhuma chave confiável/);
 });
 
-test("manifesto expirado é recusado (replay e congelamento de versão)", (t) => {
+test("an expired manifest is refused (replay and version freezing)", (t) => {
   const chaves = parDeChaves();
   const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
   t.after(() => amb.restaurar());
@@ -186,7 +186,7 @@ test("manifesto expirado é recusado (replay e congelamento de versão)", (t) =>
   assert.match(r.motivo, /expirado/);
 });
 
-test("alvo ausente no manifesto é recusado com a lista do que existe", (t) => {
+test("a target missing from the manifest is refused with the list of what exists", (t) => {
   const chaves = parDeChaves();
   const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
   t.after(() => amb.restaurar());
@@ -199,7 +199,7 @@ test("alvo ausente no manifesto é recusado com a lista do que existe", (t) => {
   assert.match(r.motivo, /linux-arm/);
 });
 
-test("política de versão recusa downgrade e exige o mínimo declarado", (t) => {
+test("the version policy refuses downgrades and requires the declared minimum", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
@@ -211,7 +211,7 @@ test("política de versão recusa downgrade e exige o mínimo declarado", (t) =>
   assert.equal(release.politicaDeVersao({ versao: "3.0.0", minimoParaAtualizar: "2.0.0" }, "2.0.0").ok, true);
 });
 
-test("a rotação de chave só é aceita vinda de um manifesto já autenticado", (t) => {
+test("key rotation is accepted only from an already authenticated manifest", (t) => {
   const chaves = parDeChaves();
   const sucessora = parDeChaves();
   const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
@@ -230,7 +230,7 @@ test("a rotação de chave só é aceita vinda de um manifesto já autenticado",
 
 // --- Extraction -------------------------------------------------------------------------------
 
-test("a extração recusa caminho que escapa do destino", (t) => {
+test("extraction refuses a path that escapes the destination", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
@@ -243,7 +243,7 @@ test("a extração recusa caminho que escapa do destino", (t) => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("a extração recusa caminho absoluto", (t) => {
+test("extraction refuses an absolute path", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
@@ -255,7 +255,7 @@ test("a extração recusa caminho absoluto", (t) => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("a extração aceita um payload legítimo e preserva só o bit de execução", (t) => {
+test("extraction accepts a legitimate payload and preserves only the executable bit", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
@@ -273,7 +273,7 @@ test("a extração aceita um payload legítimo e preserva só o bit de execuçã
 
 // --- Transaction -------------------------------------------------------------------------------
 
-test("fluxo completo: verifica, instala lado a lado e troca o ponteiro", async (t) => {
+test("complete flow: verifies, installs side by side and swaps the pointer", async (t) => {
   const chaves = parDeChaves();
   const artefatoBin = payloadValido("2.0.0");
   const nomeArtefato = `remoteifes-console-2.0.0-${process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux"}-${process.arch}.tar.gz`;
@@ -320,7 +320,7 @@ test("fluxo completo: verifica, instala lado a lado e troca o ponteiro", async (
   assert.ok(servidor.pedidos.every((p) => p.autorizacao === null), "downloads de release não carregam credencial");
 });
 
-test("digest divergente aborta antes de trocar a versão ativa", async (t) => {
+test("a mismatched digest aborts before switching the active version", async (t) => {
   const chaves = parDeChaves();
   const artefatoBin = payloadValido("2.0.0");
   const alvo = `${process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux"}-${process.arch}`;
@@ -349,7 +349,7 @@ test("digest divergente aborta antes de trocar a versão ativa", async (t) => {
   assert.ok(!fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "nada instalado");
 });
 
-test("artefato cuja versão interna diverge do alvo é recusado", async (t) => {
+test("an artifact whose internal version differs from the target is refused", async (t) => {
   const chaves = parDeChaves();
   const artefatoBin = payloadValido("9.9.9");
   const alvo = `${process.platform === "win32" ? "windows" : process.platform === "darwin" ? "macos" : "linux"}-${process.arch}`;
@@ -378,7 +378,7 @@ test("artefato cuja versão interna diverge do alvo é recusado", async (t) => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8")).versaoAtiva, "1.0.0");
 });
 
-test("uma transação interrompida é reconciliada na partida, sem instalação pela metade", (t) => {
+test("an interrupted transaction is reconciled at startup, with no half installation", (t) => {
   const raiz = instalacaoFalsa("1.0.0");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -403,7 +403,7 @@ test("uma transação interrompida é reconciliada na partida, sem instalação 
   assert.equal(JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8")).versaoAtiva, "1.0.0");
 });
 
-test("uma transação concluída não é desfeita pela reconciliação", (t) => {
+test("a completed transaction is not undone by reconciliation", (t) => {
   const raiz = instalacaoFalsa("2.0.0", ["1.0.0", "2.0.0"]);
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -421,7 +421,7 @@ test("uma transação concluída não é desfeita pela reconciliação", (t) => 
   assert.ok(fs.existsSync(path.join(raiz, "versoes", "2.0.0")), "a versão concluída permanece");
 });
 
-test("a reversão troca o ponteiro para a versão anterior, sem rede", async (t) => {
+test("rollback swaps the pointer to the previous version, without network", async (t) => {
   const raiz = instalacaoFalsa("2.0.0", ["1.0.0", "2.0.0"]);
   fs.writeFileSync(
     path.join(raiz, "estado-instalacao.json"),
@@ -441,7 +441,7 @@ test("a reversão troca o ponteiro para a versão anterior, sem rede", async (t)
   assert.equal(estadoFinal.versaoAnterior, "2.0.0", "a que saiu vira a anterior, para poder voltar");
 });
 
-test("o bootstrap cai para a versão anterior quando a ativa está quebrada", (t) => {
+test("the bootstrap falls back to the previous version when the active one is broken", (t) => {
   const raiz = instalacaoFalsa("2.0.0", ["1.0.0", "2.0.0"]);
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
 
@@ -463,7 +463,7 @@ test("o bootstrap cai para a versão anterior quando a ativa está quebrada", (t
   assert.ok(true, saida);
 });
 
-test("o ponteiro apontando para uma versão que não subiu é denunciado, não escondido", async (t) => {
+test("a pointer at a version that did not start is reported, not hidden", async (t) => {
   // The bootstrap falls back to a usable version when the active one does not load (the safety net
   // working). The problem is silence: the update reported success, the Console came back, and the
   // operator believes they run code that is not running. The divergence between pointer and process
@@ -495,7 +495,7 @@ test("o ponteiro apontando para uma versão que não subiu é denunciado, não e
   assert.match(s.divergenciaDeVersao.motivo, /NÃO é o que a versão ativa indica/);
 });
 
-test("sem divergência, a situação não inventa um alarme", async (t) => {
+test("without divergence, the status does not invent an alarm", async (t) => {
   const raiz = ajuda.dirTemporario("console-ok-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -516,7 +516,7 @@ test("sem divergência, a situação não inventa um alarme", async (t) => {
   assert.equal(s.divergenciaDeVersao, null, "instalação coerente não pode gerar aviso");
 });
 
-test("execução a partir do código-fonte não é tratada como divergência", async (t) => {
+test("running from source is not treated as divergence", async (t) => {
   // Without a side-by-side layout there is no pointer to diverge from; warning here would be noise
   // in every development session.
   const amb = ajuda.ambiente();
@@ -528,7 +528,7 @@ test("execução a partir do código-fonte não é tratada como divergência", a
   assert.equal(s.divergenciaDeVersao, null);
 });
 
-test("situação distingue instalada, publicada e observação antiga", async (t) => {
+test("the status distinguishes installed, published and stale observation", async (t) => {
   const raiz = instalacaoFalsa("1.0.0");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -544,7 +544,7 @@ test("situação distingue instalada, publicada e observação antiga", async (t
   assert.match(s.observacaoDeDistribuicao, /independente do commit do RemoteIFES/);
 });
 
-test("o bootstrap cai para a anterior quando a versão ativa EXISTE mas não carrega", (t) => {
+test("the bootstrap falls back to the previous version when the active one EXISTS but does not load", (t) => {
   // The file existing is not the same as loading it. A signed payload can carry everything required
   // and still have a syntax error or a failing require; the previous version must then be tried.
   const raiz = ajuda.dirTemporario("console-boot-");
@@ -577,7 +577,7 @@ test("o bootstrap cai para a anterior quando a versão ativa EXISTE mas não car
   assert.match(saida, /payload quebrado de proposito/, "o erro original precisa ser mostrado, não engolido");
 });
 
-test("quando nenhuma versão carrega, o bootstrap falha dizendo isso", (t) => {
+test("when no version loads, the bootstrap fails and says so", (t) => {
   const raiz = ajuda.dirTemporario("console-boot2-");
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
 
@@ -599,7 +599,7 @@ test("quando nenhuma versão carrega, o bootstrap falha dizendo isso", (t) => {
   assert.match(saida, /Reinstale o pacote/);
 });
 
-test("um payload sem a entrada executar é tratado como falha de carregamento", (t) => {
+test("a payload without the executar entry is treated as a load failure", (t) => {
   const raiz = ajuda.dirTemporario("console-boot3-");
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
 
@@ -624,7 +624,7 @@ test("um payload sem a entrada executar é tratado como falha de carregamento", 
   assert.match(saida, /executar/);
 });
 
-test("duas operações de versão não rodam ao mesmo tempo", async (t) => {
+test("two version operations do not run at the same time", async (t) => {
   // Update, offline import and rollback change the same pointer and versoes/. Without exclusion,
   // two operations could install different versions at once and one could prune the version the
   // other was about to activate: pointer at a missing directory, Console unable to start.
@@ -658,7 +658,7 @@ test("duas operações de versão não rodam ao mesmo tempo", async (t) => {
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "2.0.0");
 });
 
-test("uma trava de processo morto é recuperada em vez de travar a instalação para sempre", (t) => {
+test("a dead process's lock is recovered instead of locking the installation forever", (t) => {
   const raiz = ajuda.dirTemporario("console-trava2-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -681,7 +681,7 @@ test("uma trava de processo morto é recuperada em vez de travar a instalação 
   assert.ok(!fs.existsSync(path.join(raiz, "operacao-em-andamento.json")), "liberar remove a trava");
 });
 
-test("a recuperação de trava órfã não deixa dois processos entrarem", (t) => {
+test("orphan lock recovery does not let two processes in", (t) => {
   // Remove-and-recreate races: two processes see the same dead owner, the first recreates the lock
   // and the second removes that LIVE lock and creates its own. The claim is a rename, which is
   // atomic: only one can move that path.
@@ -714,7 +714,7 @@ test("a recuperação de trava órfã não deixa dois processos entrarem", (t) =
   assert.ok(!fs.readdirSync(raiz).some((n) => n.includes(".orfa-")), "nenhum resíduo de recuperação fica para trás");
 });
 
-test("a reconciliação não mexe em versoes/ enquanto uma operação viva detém a trava", (t) => {
+test("reconciliation does not touch versoes/ while a live operation holds the lock", (t) => {
   // A second Console starting during an update must not call reconciliar() and delete the staging
   // of the operation in progress.
   const raiz = ajuda.dirTemporario("console-recon-");
@@ -746,7 +746,7 @@ test("a reconciliação não mexe em versoes/ enquanto uma operação viva deté
   assert.ok(atualizador.lerEstadoInstalacao().transacao, "a transação da outra operação continua registrada");
 });
 
-test("a reconciliação preserva .substituido-*, que é a única cópia durante uma troca", (t) => {
+test("reconciliation preserves .substituido-*, the only copy during a swap", (t) => {
   const raiz = ajuda.dirTemporario("console-subst-");
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
   t.after(() => {
@@ -772,7 +772,7 @@ test("a reconciliação preserva .substituido-*, que é a única cópia durante 
   assert.ok(fs.existsSync(substituido), "o .substituido-* NÃO pode sair: é a única cópia do payload anterior");
 });
 
-test("o artefato tem o tamanho conferido antes de ser lido para a memória", (t) => {
+test("the artifact's size is checked before it is read into memory", (t) => {
   // Size is checked before reading: reading first would load an oversized artifact into memory,
   // which on a 1 GiB Pi brings the host down before any check says it was invalid.
   const amb = ajuda.ambiente();
@@ -795,7 +795,7 @@ test("o artefato tem o tamanho conferido antes de ser lido para a memória", (t)
   assert.match(acima.motivo, /acima do teto/);
 });
 
-test("reinício pendente não é anunciado como versão que não subiu", async (t) => {
+test("a pending restart is not announced as a version that did not start", async (t) => {
   // Between the pointer swap and the restart, the running process is legitimately the previous one.
   // An error there would say the version "did not start" at the exact moment everything is correct,
   // and a warning that fires on the normal path is one the operator learns to ignore.
@@ -851,7 +851,7 @@ test("reinício pendente não é anunciado como versão que não subiu", async (
   assert.match(falha.divergenciaDeVersao.motivo, /não subiu/);
 });
 
-test("um tar só de diretórios também bate no teto de entradas", (t) => {
+test("a tar of directories only also hits the entry ceiling", (t) => {
   // A ceiling counting only files would let a tar with millions of directory entries pass and still
   // exhaust inodes.
   const amb = ajuda.ambiente();

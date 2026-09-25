@@ -53,7 +53,7 @@ test.afterEach(async ({ request }) => {
   await limparAgendamentos(request);
 });
 
-test("agendamento removido sai da lista na hora, sem depender de uma nova leitura", async ({ page, context, request }) => {
+test("a removed schedule leaves the list immediately, without depending on a new read", async ({ page, context, request }) => {
   await abrirAgendaComDois(page, context, request);
 
   let listagens = 0;
@@ -74,7 +74,7 @@ test("agendamento removido sai da lista na hora, sem depender de uma nova leitur
 
 // A read issued before the removal still sees the deleted schedule. Arriving afterwards, it used to
 // repaint the whole list and bring back an item the server no longer had.
-test("leitura anterior à remoção não traz o agendamento apagado de volta", async ({ page, context, request }) => {
+test("a read issued before the removal does not bring the deleted schedule back", async ({ page, context, request }) => {
   const { tarde } = await abrirAgendaComDois(page, context, request);
 
   await page.route(ehListagem, async (route) => {
@@ -102,7 +102,7 @@ test("leitura anterior à remoção não traz o agendamento apagado de volta", a
   expect(await agendamentosNoServidor(request), "servidor e tela concordam sobre o que sobrou").toHaveLength(1);
 });
 
-test("agendamento continua na lista quando a remoção falha no servidor", async ({ page, context, request }) => {
+test("a schedule stays in the list when the server fails the removal", async ({ page, context, request }) => {
   const { tarde } = await abrirAgendaComDois(page, context, request);
 
   await page.route(ehRemocao(tarde), (route) =>
@@ -119,7 +119,7 @@ test("agendamento continua na lista quando a remoção falha no servidor", async
   await expect(page.locator("#agendaEmpty")).toBeHidden();
 });
 
-test("remover o último agendamento mostra a mensagem de lista vazia", async ({ page, context, request }) => {
+test("removing the last schedule shows the empty-list message", async ({ page, context, request }) => {
   await criarAgendamento(request, "08:00", "09:00");
   await injetarSessao(context, "admin");
   await page.goto("/#/agenda");

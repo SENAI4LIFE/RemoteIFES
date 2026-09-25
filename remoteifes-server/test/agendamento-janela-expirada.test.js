@@ -41,7 +41,7 @@ function criar(codigo, horaInicio, horaFim, extra = {}) {
 
 test.after(() => db.close());
 
-test("agendamento criado depois da própria janela não desliga uma sala ligada manualmente", (t) => {
+test("a schedule created after its own window does not turn off a manually turned-on room", (t) => {
   sala("JE-1");
   relogio(t, "13:59");
   salasService.aplicarComando("JE-1", "ligar", undefined, ADMIN);
@@ -55,7 +55,7 @@ test("agendamento criado depois da própria janela não desliga uma sala ligada 
   assert.deepEqual(logs("JE-1"), ["ligar:manual"]);
 });
 
-test("na hora exata do fim: quem ligou desliga; quem foi criado nesse minuto não liga nem desliga", (t) => {
+test("at the exact end time: the schedule that turned on turns off; one created in that minute neither turns on nor off", (t) => {
   sala("JE-2");
   sala("JE-3");
   relogio(t, "08:59");
@@ -76,7 +76,7 @@ test("na hora exata do fim: quem ligou desliga; quem foi criado nesse minuto nã
   assert.deepEqual(logs("JE-3"), ["ligar:manual"]);
 });
 
-test("ciclo normal: liga no início, desliga no fim e nada se repete", (t) => {
+test("normal cycle: turns on at start, off at end, and nothing repeats", (t) => {
   sala("JE-4");
   relogio(t, "07:58");
   const ag = criar("JE-4", "08:00", "08:02");
@@ -96,7 +96,7 @@ test("ciclo normal: liga no início, desliga no fim e nada se repete", (t) => {
   assert.equal(agendamentos.jaExecutadoHoje(ag.id, "desligar", dataAtualBrasiliaISO()), true);
 });
 
-test("reinício no mesmo dia: o OFF pendente de quem ligou é recuperado; um agendamento perdido inteiro na queda não é tocado", (t) => {
+test("same-day restart: the pending OFF of the schedule that turned on is recovered; a schedule missed entirely during the outage is not touched", (t) => {
   sala("JE-5");
   sala("JE-6");
   relogio(t, "08:00");
@@ -120,7 +120,7 @@ test("reinício no mesmo dia: o OFF pendente de quem ligou é recuperado; um age
   assert.deepEqual(logs("JE-6"), ["ligar:manual"]);
 });
 
-test("ligar_intervalo criado depois do intervalo de ligar mantém a reserva, mas não liga nem desliga", (t) => {
+test("ligar_intervalo created after the turn-on interval keeps the reservation but neither turns on nor off", (t) => {
   sala("JE-7");
   relogio(t, "15:00");
   salasService.aplicarComando("JE-7", "ligar", undefined, ADMIN);
@@ -134,7 +134,7 @@ test("ligar_intervalo criado depois do intervalo de ligar mantém a reserva, mas
   assert.equal(bloqueio && bloqueio.agendamentoId, ag.id, "a reserva continua valendo até horaFim");
 });
 
-test("ligar_intervalo criado dentro do intervalo de ligar liga na hora e desliga em ligarFim, não em horaFim", (t) => {
+test("ligar_intervalo created inside the turn-on interval turns on immediately and off at ligarFim, not at horaFim", (t) => {
   sala("JE-8");
   relogio(t, "14:10");
   const ag = criar("JE-8", "14:00", "16:00", { modo: "ligar_intervalo", ligarInicio: "14:00", ligarFim: "14:12" });
@@ -148,7 +148,7 @@ test("ligar_intervalo criado dentro do intervalo de ligar liga na hora e desliga
   assert.ok(salasService.bloqueioAtivo("JE-8"), "a reserva segue até 16:00");
 });
 
-test("reservas adjacentes de usuários diferentes: no minuto exato do fim a sala já pertence à próxima", (t) => {
+test("adjacent reservations of different users: at the exact end minute the room already belongs to the next one", (t) => {
   sala("JE-9");
   relogio(t, "08:30");
   const outro = usuariosService.criar({ usuario: "je-adjacente", senha: "senhaSegura123", nome: "Adjacente", podeControlar: true }, { nivel: 3 });
@@ -171,7 +171,7 @@ test("reservas adjacentes de usuários diferentes: no minuto exato do fim a sala
   assert.equal(agendamentos.salasComAgendamentoAtivo()["JE-9"], undefined);
 });
 
-test("remover ou desativar um agendamento em curso libera a reserva e cancela o OFF, sem desligar o ar-condicionado", (t) => {
+test("removing or disabling a running schedule releases the reservation and cancels the OFF without turning off the air conditioner", (t) => {
   sala("JE-10");
   sala("JE-11");
   relogio(t, "08:00");

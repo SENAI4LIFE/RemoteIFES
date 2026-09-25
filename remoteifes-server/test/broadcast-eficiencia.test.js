@@ -77,7 +77,7 @@ test.after(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test("o custo em consultas de uma retransmissão não cresce com a quantidade de navegadores conectados", async () => {
+test("the query cost of a rebroadcast does not grow with the number of connected browsers", async () => {
   const conexoes = [];
   for (let i = 0; i < 12; i += 1) {
     const u = usuariosService.criar({ usuario: `fanout-${i}`, senha: "SenhaFanout123", nome: `Fanout ${i}`, podeControlar: true }, SUPER);
@@ -101,7 +101,7 @@ test("o custo em consultas de uma retransmissão não cresce com a quantidade de
   assert.equal(supervisor.ultimaLista().salas.every((s) => s.podeControlarEsta), true);
 });
 
-test("a autorização continua fresca: revogar acesso ou desativar a conta reflete já na próxima retransmissão, sem cache", async () => {
+test("authorization stays fresh: revoking access or disabling the account takes effect on the next rebroadcast, without a cache", async () => {
   const u = usuariosService.criar({ usuario: "fanout-fresco", senha: "SenhaFanout123", nome: "Fresco", podeControlar: true }, SUPER);
   salasService.concederAcesso("A-108", u.id);
   const c = await cliente(tokenService.gerarToken(u.id), "A-108");
@@ -122,7 +122,7 @@ test("a autorização continua fresca: revogar acesso ou desativar a conta refle
   assert.equal(c.fechamento(), 4001, "sessão de conta desativada é encerrada na validação em lote");
 });
 
-test("uma sessão encerrada em outro lugar é derrubada pela validação em lote e as demais continuam recebendo", async () => {
+test("a session ended elsewhere is dropped by batch validation and the others keep receiving", async () => {
   const a = usuariosService.criar({ usuario: "fanout-a", senha: "SenhaFanout123", nome: "A", podeControlar: true }, SUPER);
   const b = usuariosService.criar({ usuario: "fanout-b", senha: "SenhaFanout123", nome: "B", podeControlar: true }, SUPER);
   const tokenA = tokenService.gerarToken(a.id);
@@ -136,7 +136,7 @@ test("uma sessão encerrada em outro lugar é derrubada pela validação em lote
   assert.equal(cb.fechamento(), null);
 });
 
-test("o estado IR vai para a placa antes da retransmissão aos navegadores", (t) => {
+test("the IR state goes to the board before the rebroadcast to browsers", (t) => {
   const ordem = [];
   t.mock.method(deviceHub, "enviarComando", () => { ordem.push("esp32"); return true; });
   const ouvinte = () => ordem.push("navegadores");
@@ -147,7 +147,7 @@ test("o estado IR vai para a placa antes da retransmissão aos navegadores", (t)
   assert.deepEqual(ordem, ["esp32", "navegadores"]);
 });
 
-test("o uso da sessão é gravado no máximo a cada 30 s por sessão, sem alterar a expiração por inatividade", () => {
+test("session use is written at most every 30 s per session, without changing idle expiry", () => {
   const u = usuariosService.criar({ usuario: "fanout-uso", senha: "SenhaFanout123", nome: "Uso" }, SUPER);
   const token = tokenService.gerarToken(u.id);
   db.prepare("UPDATE sessoes SET ultimoUso = datetime('now', '-120 seconds') WHERE usuarioId = ?").run(u.id);

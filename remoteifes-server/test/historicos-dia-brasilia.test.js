@@ -30,7 +30,7 @@ function rotulos(linhas, campo = "rotulo") {
 
 test.after(() => db.close());
 
-test("Logs > Comandos: filtrar e apagar por dia usam o dia de Brasília, com as duas bordas da meia-noite", () => {
+test("Logs > Comandos: filtering and deleting by day use the Brasília day, at both midnight edges", () => {
   db.prepare("DELETE FROM comandos_log").run();
   for (const [rotulo, instante] of Object.entries(INSTANTES)) {
     db.prepare("INSERT INTO comandos_log (usuario, sala, cmd, valor, origem, criadoEm) VALUES ('x', 'A-108', 'ligar', ?, 'manual', ?)").run(rotulo, instante);
@@ -45,7 +45,7 @@ test("Logs > Comandos: filtrar e apagar por dia usam o dia de Brasília, com as 
   assert.deepEqual(salasService.listarLogs({}), []);
 });
 
-test("Logs > Dispositivos: eventos online/offline filtrados pelo dia de Brasília", () => {
+test("Logs > Dispositivos: online/offline events filtered by the Brasília day", () => {
   db.prepare("DELETE FROM esp_eventos").run();
   for (const [rotulo, instante] of Object.entries(INSTANTES)) {
     db.prepare("INSERT INTO esp_eventos (sala, status, criadoEm) VALUES ('A-108', ?, ?)").run(rotulo, instante);
@@ -54,7 +54,7 @@ test("Logs > Dispositivos: eventos online/offline filtrados pelo dia de Brasíli
   assert.deepEqual(rotulos(salasService.listarEventosEsp({ data: "2026-09-21" }), "status"), [...DO_DIA_21].sort());
 });
 
-test("Logs > Acessos: filtrar e apagar por dia usam o dia de Brasília", () => {
+test("Logs > Acessos: filtering and deleting by day use the Brasília day", () => {
   db.prepare("DELETE FROM esp_acessos").run();
   for (const [rotulo, instante] of Object.entries(INSTANTES)) {
     db.prepare("INSERT INTO esp_acessos (sala, ip, userAgent, criadoEm) VALUES ('A-108', '10.0.0.1', ?, ?)").run(rotulo, instante);
@@ -65,7 +65,7 @@ test("Logs > Acessos: filtrar e apagar por dia usam o dia de Brasília", () => {
   assert.deepEqual(rotulos(salasService.listarAcessosEsp({}), "userAgent"), [...DO_DIA_20].sort());
 });
 
-test("Sessões: histórico filtrado e apagado pelo dia de Brasília do login", () => {
+test("Sessões: history filtered and deleted by the login's Brasília day", () => {
   db.prepare("DELETE FROM sessoes").run();
   for (const [rotulo, instante] of Object.entries(INSTANTES)) {
     db.prepare("INSERT INTO sessoes (token, usuarioId, login, logout, ultimoUso) VALUES (?, ?, ?, ?, ?)").run(`tok-${rotulo}`, superadmin.id, instante, instante, instante);
@@ -77,7 +77,7 @@ test("Sessões: histórico filtrado e apagado pelo dia de Brasília do login", (
   assert.deepEqual(porLogin(tokenService.listarHistoricoSessoes({})), [...DO_DIA_21].sort());
 });
 
-test("Auditoria e conectividade: filtro de dia em Brasília", () => {
+test("Audit and connectivity: day filter in Brasília time", () => {
   db.prepare("DELETE FROM auditoria_eventos").run();
   for (const [rotulo, instante] of Object.entries(INSTANTES)) {
     const id = auditoriaService.registrar({ tipo: "teste_dia", ator: superadmin, alvoTipo: "x", alvoId: "1", alvoRotulo: rotulo, descricao: rotulo });

@@ -33,7 +33,7 @@ test.after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-test("instalação nova cria exatamente uma conta superadmin com a credencial inicial", () => {
+test("a new installation creates exactly one superadmin account with the initial credential", () => {
   iniciarServidor();
   const lista = privilegiadas();
   assert.equal(lista.length, 1);
@@ -42,7 +42,7 @@ test("instalação nova cria exatamente uma conta superadmin com a credencial in
   assert.equal(usuarios.senhaPadraoAtiva(usuarios.buscarPorId(lista[0].id)), true);
 });
 
-test("renomear o superadmin e reiniciar não recria a conta padrão privilegiada", () => {
+test("renaming the superadmin and restarting does not recreate the privileged default account", () => {
   const [conta] = privilegiadas();
   const requisitante = usuarios.buscarPorId(conta.id);
   usuarios.trocarLogin(conta.id, "coordenacao.ti", requisitante);
@@ -59,7 +59,7 @@ test("renomear o superadmin e reiniciar não recria a conta padrão privilegiada
   assert.equal(usuarios.senhaPadraoAtiva(usuarios.buscarPorId(conta.id)), false);
 });
 
-test("a senha padrão continua sendo detectada mesmo com o login renomeado", () => {
+test("the default password is still detected with the login renamed", () => {
   const [conta] = privilegiadas();
   db.prepare("UPDATE usuarios SET senhaHash = ? WHERE id = ?").run(bcrypt.hashSync("admin", 4), conta.id);
   assert.equal(usuarios.senhaPadraoAtiva(usuarios.buscarPorId(conta.id)), true);
@@ -67,7 +67,7 @@ test("a senha padrão continua sendo detectada mesmo com o login renomeado", () 
   assert.equal(usuarios.senhaPadraoAtiva(usuarios.buscarPorId(conta.id)), false);
 });
 
-test("instalação estabelecida sem superadmin não recebe uma credencial padrão silenciosa", () => {
+test("an established installation without a superadmin does not receive a silent default credential", () => {
   db.prepare("DELETE FROM usuarios").run();
   db.prepare(
     "INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo) VALUES ('professor', 'hash', 'Professor', 0, 1, 1, 1)"
@@ -85,7 +85,7 @@ test("instalação estabelecida sem superadmin não recebe uma credencial padrã
   assert.ok(erros.some((l) => l.includes("seed-superadmin-ausente")), "o operador precisa ser avisado");
 });
 
-test("instalação histórica com a conta 'admin' privilegiada é migrada sem criar uma segunda conta", () => {
+test("a historical installation with a privileged 'admin' account is migrated without creating a second account", () => {
   db.prepare("DELETE FROM usuarios").run();
   db.prepare(
     "INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo) VALUES ('admin', 'hash-historico', 'Administrador', 1, 3, 1, 1)"
@@ -103,7 +103,7 @@ test("instalação histórica com a conta 'admin' privilegiada é migrada sem cr
   assert.equal(contas().length, 2);
 });
 
-test("um usuário comum chamado 'admin' nunca é promovido nem renomeado pela migração", () => {
+test("a regular user named 'admin' is never promoted or renamed by the migration", () => {
   db.prepare("DELETE FROM usuarios").run();
   db.prepare(
     "INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo) VALUES ('gestor', 'hash-gestor', 'Gestor', 1, 3, 1, 1)"

@@ -45,7 +45,7 @@ function ptyFalso(registro = {}) {
   };
 }
 
-test("sem o módulo de PTY o terminal é declarado indisponível, sem substituto inseguro", (t) => {
+test("without the PTY module the terminal is declared unavailable, with no unsafe substitute", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -62,7 +62,7 @@ test("sem o módulo de PTY o terminal é declarado indisponível, sem substituto
   assert.equal(r.ok, false);
 });
 
-test("uma sessão de terminal abre, recebe entrada, redimensiona e encerra", (t) => {
+test("a terminal session opens, receives input, resizes and closes", (t) => {
   const amb = ajuda.ambiente();
   const registro = {};
   amb.terminal.definirFabricaParaTeste(ptyFalso(registro));
@@ -90,7 +90,7 @@ test("uma sessão de terminal abre, recebe entrada, redimensiona e encerra", (t)
   assert.equal(amb.terminal.sessoesAtivas(), 0);
 });
 
-test("uma sessão pertence ao operador que a abriu", (t) => {
+test("a session belongs to the operator who opened it", (t) => {
   const amb = ajuda.ambiente();
   amb.terminal.definirFabricaParaTeste(ptyFalso());
   t.after(() => {
@@ -105,7 +105,7 @@ test("uma sessão pertence ao operador que a abriu", (t) => {
   assert.equal(amb.terminal.listar("dono").length, 1);
 });
 
-test("o número de sessões simultâneas é limitado", (t) => {
+test("the number of concurrent sessions is limited", (t) => {
   const amb = ajuda.ambiente({ env: { CONSOLE_TERMINAL_MAX_SESSOES: "2" } });
   amb.terminal.definirFabricaParaTeste(ptyFalso());
   t.after(() => {
@@ -120,7 +120,7 @@ test("o número de sessões simultâneas é limitado", (t) => {
   assert.match(terceira.erro, /limite de 2 sessões/);
 });
 
-test("a sessão expira por ociosidade e pelo prazo máximo", (t) => {
+test("a session expires on idle and at the maximum deadline", (t) => {
   const amb = ajuda.ambiente({ terminalOciosoS: 60, terminalMaxS: 300 });
   const registro = {};
   amb.terminal.definirFabricaParaTeste(ptyFalso(registro));
@@ -148,7 +148,7 @@ test("a sessão expira por ociosidade e pelo prazo máximo", (t) => {
   assert.ok(registro.abertos[0].sinais.includes("SIGHUP"));
 });
 
-test("o fim da elevação derruba as sessões de terminal do operador", (t) => {
+test("the end of elevation closes the operator's terminal sessions", (t) => {
   const amb = ajuda.ambiente();
   const registro = {};
   amb.terminal.definirFabricaParaTeste(ptyFalso(registro));
@@ -167,7 +167,7 @@ test("o fim da elevação derruba as sessões de terminal do operador", (t) => {
   assert.equal(amb.terminal.listar("outro").length, 1);
 });
 
-test("a rolagem é limitada e informa quando perdeu conteúdo", (t) => {
+test("scrollback is bounded and reports when content was lost", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -184,7 +184,7 @@ test("a rolagem é limitada e informa quando perdeu conteúdo", (t) => {
   assert.equal(rolagem.sequencia, 5400, "a posição continua monotônica mesmo com descarte");
 });
 
-test("a saída do terminal chega ao cliente pela posição e nunca é interpretada", (t) => {
+test("terminal output reaches the client by offset and is never interpreted", (t) => {
   const amb = ajuda.ambiente();
   const registro = {};
   amb.terminal.definirFabricaParaTeste(ptyFalso(registro));
@@ -204,7 +204,7 @@ test("a saída do terminal chega ao cliente pela posição e nunca é interpreta
   assert.ok(rolagem.desde(0).texto.includes("\u001b"));
 });
 
-test("a auditoria do terminal guarda metadados, nunca a transcrição", (t) => {
+test("the terminal audit keeps metadata, never the transcript", (t) => {
   const amb = ajuda.ambiente();
   const registro = {};
   amb.terminal.definirFabricaParaTeste(ptyFalso(registro));
@@ -230,7 +230,7 @@ test("a auditoria do terminal guarda metadados, nunca a transcrição", (t) => {
   assert.equal(typeof fim.duracaoSegundos, "number");
 });
 
-test("as rotas do terminal exigem sessão e elevação", async (t) => {
+test("terminal routes require session and elevation", async (t) => {
   const amb = ajuda.ambiente();
   amb.terminal.definirFabricaParaTeste(ptyFalso());
   const s = await ajuda.subir(amb);
@@ -282,7 +282,7 @@ test("as rotas do terminal exigem sessão e elevação", async (t) => {
   assert.equal(depois.status, 403);
 });
 
-test("entrada grande demais é recusada", (t) => {
+test("oversized input is refused", (t) => {
   const amb = ajuda.ambiente();
   amb.terminal.definirFabricaParaTeste(ptyFalso());
   t.after(() => {

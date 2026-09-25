@@ -22,7 +22,7 @@ function carregarManualPublico() {
   return vm.runInContext("ManualContent", contexto);
 }
 
-test("documentação herda conteúdo sem entregar tópicos superiores a papéis inferiores", () => {
+test("documentation inherits content without delivering higher topics to lower roles", () => {
   const usuario = service.para({ usuario: "u", isAdmin: false, nivel: 1 });
   const admin = service.para({ usuario: "a", isAdmin: true, nivel: 2 });
   const superadmin = service.para({ usuario: "s", isAdmin: true, nivel: 3 });
@@ -39,7 +39,7 @@ test("documentação herda conteúdo sem entregar tópicos superiores a papéis 
   assert.ok(!admin.secoes.some((secao) => secao.id === "operacao-admin"));
 });
 
-test("catálogo privilegiado tem IDs estáveis, categorias e referências válidas", () => {
+test("the privileged catalog has stable IDs, categories and valid references", () => {
   assert.equal(service.validar(), true);
   const todas = [...service._adminSections, ...service._superSections];
   assert.equal(new Set(todas.map((s) => s.id)).size, todas.length);
@@ -50,7 +50,7 @@ test("catálogo privilegiado tem IDs estáveis, categorias e referências válid
   });
 });
 
-test("catálogo público cobre as funções comuns e não contém links quebrados", () => {
+test("the public catalog covers the common functions and contains no broken links", () => {
   const manual = carregarManualPublico();
   const ids = new Set(manual.secoes.map((s) => s.id));
   for (const id of [
@@ -72,7 +72,7 @@ test("catálogo público cobre as funções comuns e não contém links quebrado
 // The README is the single owner of terminal commands: installation, the procedures the Console
 // deliberately does not run and the emergency recovery reference. The privileged manual does not
 // repeat those tutorials; it points to the Console path.
-test("comandos críticos continuam com uma única forma canônica no README", () => {
+test("critical commands keep a single canonical form in the README", () => {
   const grupos = [
     "instalacao", "iniciar", "backupCriar", "backupRestaurar", "deployAtualizar", "deployReverter", "release", "firmwareOta",
     "credenciaisConsultar", "credenciaisEmitir", "credenciaisDerrubar", "recuperacaoConta", "carga",
@@ -86,7 +86,7 @@ test("comandos críticos continuam com uma única forma canônica no README", ()
   }
 });
 
-test("o manual descreve o AP apenas como portal de provisionamento, sem AP permanente nem estimativa de energia", () => {
+test("the manual describes the AP only as a provisioning portal, without a permanent AP or energy estimate", () => {
   const manual = carregarManualPublico();
   const tudo = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
   for (const obsoleto of [/rede aberta/i, /ponto de acesso aberto/i, /AP de recuperação/i, /portal de recuperação/i, /AP permanente/i, /fica no ar o tempo todo/i, /energia estimada/i, /kWh/i, /BTU/i]) {
@@ -104,7 +104,7 @@ test("o manual descreve o AP apenas como portal de provisionamento, sem AP perma
   assert.ok(/credencial do dispositivo no servidor/.test(superadmin), "a autenticação no servidor continua documentada à parte");
 });
 
-test("manual e README documentam Protocolos IR, o clonador vinculado à placa, o switch físico e o Auto-ON", () => {
+test("manual and README document IR Protocols, the board-bound cloner, the physical switch and Auto-ON", () => {
   const manual = carregarManualPublico();
   const publico = JSON.stringify(manual.secoes);
   const superadmin = JSON.stringify(service._superSections);
@@ -144,7 +144,7 @@ test("manual e README documentam Protocolos IR, o clonador vinculado à placa, o
   assert.ok(README.includes(`atualmente \`${versaoFirmware}\``), `README precisa citar a versão do firmware compilada (${versaoFirmware})`);
 });
 
-test("procedimentos restritos continuam fora do conjunto de Administrador", () => {
+test("restricted procedures stay out of the Administrator set", () => {
   const admin = JSON.stringify(service._adminSections);
   for (const trecho of ["deploy.sh", "npm run restore", "python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE", "instalacao/instalar.js", "console-helper.sh"]) {
     assert.ok(!admin.includes(trecho), `admin recebeu procedimento restrito: ${trecho}`);
@@ -155,7 +155,7 @@ test("procedimentos restritos continuam fora do conjunto de Administrador", () =
   }
 });
 
-test("os procedimentos de rotina do host apontam para o console em vez de repetir o tutorial", () => {
+test("routine host procedures point to the Console instead of repeating the tutorial", () => {
   const infra = service._superSections.filter((secao) => secao.categoria === "super_infra");
   const porId = Object.fromEntries(infra.map((secao) => [secao.id, JSON.stringify(secao)]));
 
@@ -177,7 +177,7 @@ test("os procedimentos de rotina do host apontam para o console em vez de repeti
   assert.match(porId["instalacao-servidor"], /install-service\.sh/);
 });
 
-test("o console tem seção própria com acesso, fronteira e reparo", () => {
+test("the Console has its own section with access, boundary and repair", () => {
   const console = service._superSections.find((secao) => secao.id === "console-operacoes");
   assert.ok(console, "a seção do console precisa existir no conjunto Superadministrador");
   assert.equal(console.papel, "superadmin");
@@ -195,7 +195,7 @@ test("o console tem seção própria com acesso, fronteira e reparo", () => {
   assert.ok(!admin.includes("Console de Opera"), "o manual de Administrador não precisa do console");
 });
 
-test("o README mantém uma referência única de recuperação de emergência", () => {
+test("the README keeps a single emergency recovery reference", () => {
   assert.match(README, /^## Recuperação de emergência por terminal$/m, "a seção precisa existir");
   assert.match(README, /^## Console de Operações$/m, "o README documenta o acesso ao console");
 
@@ -222,7 +222,7 @@ test("o README mantém uma referência única de recuperação de emergência", 
   assert.match(secao, /sem console e sem login/, "precisa dizer que funciona sem console e sem aplicação");
 });
 
-test("manual e README descrevem a Administração agrupada em vigor", () => {
+test("manual and README describe the current grouped Administration", () => {
   const manual = carregarManualPublico();
   const documentacao = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
 
@@ -311,7 +311,7 @@ test("manual e README descrevem a Administração agrupada em vigor", () => {
   }
 });
 
-test("a documentação apresenta Logs e Status como abas internas, sem função autônoma", () => {
+test("the documentation presents Logs and Status as inner tabs, without standalone functions", () => {
   const manual = carregarManualPublico();
   const documentacao = JSON.stringify([...manual.secoes, ...service._adminSections, ...service._superSections]);
 
@@ -339,7 +339,7 @@ test("a documentação apresenta Logs e Status como abas internas, sem função 
   assert.match(README, /#\/admin\/acessos/);
 });
 
-test("o manual explica o cadastro imediato de ESP32 e a diferença entre cadastrado e online", () => {
+test("the manual explains immediate ESP32 registration and the difference between registered and online", () => {
   const cadastro = service._superSections.find((secao) => secao.id === "esp32-cadastro");
   const texto = JSON.stringify(cadastro);
   assert.match(texto, /sem recarregar a página/);

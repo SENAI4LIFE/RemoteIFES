@@ -15,7 +15,7 @@ function checkoutMinimo() {
   return raiz;
 }
 
-test("preparar uma ação devolve propósito, impacto e prontidão sem executar nada", async (t) => {
+test("preparing an action returns purpose, impact and readiness without running anything", async (t) => {
   const checkout = checkoutMinimo();
   const amb = ajuda.ambiente({ checkout });
   const s = await ajuda.subir(amb);
@@ -44,7 +44,7 @@ test("preparar uma ação devolve propósito, impacto e prontidão sem executar 
   assert.equal(amb.execucao.trabalhoAtivo(), null, "preparar não pode iniciar nada");
 });
 
-test("uma ação com confirmação textual recusa a palavra errada", async (t) => {
+test("an action with textual confirmation refuses the wrong word", async (t) => {
   const checkout = checkoutMinimo();
   const amb = ajuda.ambiente({ checkout });
   const s = await ajuda.subir(amb);
@@ -69,7 +69,7 @@ test("uma ação com confirmação textual recusa a palavra errada", async (t) =
   assert.equal(amb.execucao.trabalhoAtivo(), null);
 });
 
-test("fluxo completo: elevar, executar, acompanhar a saída e ler o desfecho", async (t) => {
+test("complete flow: elevate, run, follow the output and read the outcome", async (t) => {
   const checkout = checkoutMinimo();
   const amb = ajuda.ambiente({ checkout });
   const s = await ajuda.subir(amb);
@@ -129,7 +129,7 @@ test("fluxo completo: elevar, executar, acompanhar a saída e ler o desfecho", a
   assert.equal(lista.json.trabalhos[0].id, id);
 });
 
-test("a saída de um trabalho é legível por posição, para retomar depois de uma desconexão", async (t) => {
+test("a job's output is readable by offset, to resume after a disconnect", async (t) => {
   const checkout = checkoutMinimo();
   const amb = ajuda.ambiente({ checkout });
   const s = await ajuda.subir(amb);
@@ -165,7 +165,7 @@ test("a saída de um trabalho é legível por posição, para retomar depois de 
   assert.match(parcial.json.texto, /PARTE-DOIS/);
 });
 
-test("uma ação desconhecida ou com argumento a mais é recusada", async (t) => {
+test("an unknown action or one with an extra argument is refused", async (t) => {
   const checkout = checkoutMinimo();
   const amb = ajuda.ambiente({ checkout });
   const s = await ajuda.subir(amb);
@@ -199,7 +199,7 @@ test("uma ação desconhecida ou com argumento a mais é recusada", async (t) =>
 
 // --- Console isolation from public surfaces ------------------------------------
 
-test("o console não é publicado pelo GitHub Pages nem entra no pacote Cordova", () => {
+test("the Console is not published by GitHub Pages and does not enter the Cordova package", () => {
   const raiz = path.join(ajuda.RAIZ, "..");
 
   const pages = fs.readFileSync(path.join(raiz, ".github", "workflows", "pages.yml"), "utf8");
@@ -216,14 +216,14 @@ test("o console não é publicado pelo GitHub Pages nem entra no pacote Cordova"
   assert.ok(!app.includes("remoteifes-console"), "o servidor da aplicação não serve arquivos do console");
 });
 
-test("o console não tem dependências npm", () => {
+test("the Console has no npm dependencies", () => {
   const pacote = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8"));
   assert.equal(pacote.dependencies, undefined, "o console não deve declarar dependências de runtime");
   assert.equal(pacote.devDependencies, undefined, "nem dependências de desenvolvimento");
   assert.match(pacote.engines.node, /22/);
 });
 
-test("nenhum arquivo de código do console contém byte nulo", () => {
+test("no Console source file contains a NUL byte", () => {
   // A stray NUL makes Git treat the file as binary: the diff stops being reviewable.
   const ignorar = new Set(["node_modules", ".git"]);
   const varrer = (dir) => {
@@ -242,7 +242,7 @@ test("nenhum arquivo de código do console contém byte nulo", () => {
   varrer(ajuda.RAIZ);
 });
 
-test("nenhum segredo fica versionado no diretório do console", () => {
+test("no secret is committed in the Console directory", () => {
   // The patterns describe **real** secrets, not anything similar. A real scrypt hash has an N of
   // four or more digits and long base64 salt/key; `scrypt$1$1$1$a$b` is a test fixture and nobody's
   // credential. Loosening here would lose protection; being specific keeps it without false alarms.

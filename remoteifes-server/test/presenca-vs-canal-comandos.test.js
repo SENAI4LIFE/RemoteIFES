@@ -93,7 +93,7 @@ test.after(async () => {
   db.close();
 });
 
-test("visto por heartbeat HTTP sem socket: online, mas sem canal de comandos, e o comando não é submetido", async () => {
+test("seen through an HTTP heartbeat without a socket: online but without a command channel, and the command is not submitted", async () => {
   sala("PC-1", "AA:BB:CC:F0:00:01");
   assert.equal(status("PC-1").online, false);
   assert.equal(status("PC-1").canalComandos, false);
@@ -115,7 +115,7 @@ test("visto por heartbeat HTTP sem socket: online, mas sem canal de comandos, e 
   assert.equal(status("PC-1").dispositivoConfirmou, null, "sem placa no socket não há confirmação a esperar");
 });
 
-test("a rota /comando devolve a mesma distinção ao painel", async () => {
+test("the /comando route returns the same distinction to the panel", async () => {
   sala("PC-2", "AA:BB:CC:F0:00:02");
   salasService.heartbeatDispositivo("PC-2", { temperatura: 24 }, "AA:BB:CC:F0:00:02", "127.0.0.1");
   const token = await login();
@@ -131,7 +131,7 @@ test("a rota /comando devolve a mesma distinção ao painel", async () => {
   assert.equal(st.canalComandos, false);
 });
 
-test("quando o socket reconecta, o canal volta, o painel observador é avisado e o próximo comando é submetido", async () => {
+test("when the socket reconnects, the channel returns, the observing panel is notified and the next command is submitted", async () => {
   sala("PC-3", "AA:BB:CC:F0:00:03");
   salasService.heartbeatDispositivo("PC-3", { temperatura: 24 }, "AA:BB:CC:F0:00:03", "127.0.0.1");
   const token = await login();

@@ -11,7 +11,7 @@ const ajuda = require("./ajuda");
 
 // --- Adaptadores --------------------------------------------------------------------------
 
-test("cada plataforma tem adaptador e o contrato é o mesmo", (t) => {
+test("every platform has an adapter and the contract is the same", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const seletor = require(path.join(ajuda.RAIZ, "src", "plataforma", "index.js"));
@@ -35,7 +35,7 @@ test("cada plataforma tem adaptador e o contrato é o mesmo", (t) => {
   delete process.env.CONSOLE_PLATAFORMA;
 });
 
-test("capacidades indisponíveis têm causa distinta, não um booleano", async (t) => {
+test("unavailable capabilities have distinct causes, not a boolean", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const base = require(path.join(ajuda.RAIZ, "src", "plataforma", "base.js"));
@@ -59,7 +59,7 @@ test("capacidades indisponíveis têm causa distinta, não um booleano", async (
   delete process.env.CONSOLE_PLATAFORMA;
 });
 
-test("a arquitetura distingue hardware, kernel, userland e runtime", async (t) => {
+test("the architecture distinguishes hardware, kernel, userland and runtime", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma", "index.js"));
@@ -74,7 +74,7 @@ test("a arquitetura distingue hardware, kernel, userland e runtime", async (t) =
   else assert.equal(a.ressalva, null);
 });
 
-test("o runtime mínimo é conferido contra o exigido pelo RemoteIFES", (t) => {
+test("the minimum runtime is checked against what RemoteIFES requires", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma", "index.js"));
@@ -85,7 +85,7 @@ test("o runtime mínimo é conferido contra o exigido pelo RemoteIFES", (t) => {
   assert.equal(typeof r.atende, "boolean");
 });
 
-test("os diretórios seguem a convenção de cada sistema, não um dotfolder para todos", (t) => {
+test("directories follow each system's convention, not a dotfolder for all", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -103,7 +103,7 @@ test("os diretórios seguem a convenção de cada sistema, não um dotfolder par
   assert.match(macos.estado, /Application Support/);
 });
 
-test("o plist do LaunchAgent é sob demanda, sem RunAtLoad", (t) => {
+test("the LaunchAgent plist is on demand, without RunAtLoad", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const macos = require(path.join(ajuda.RAIZ, "src", "plataforma", "macos.js"));
@@ -115,7 +115,7 @@ test("o plist do LaunchAgent é sob demanda, sem RunAtLoad", (t) => {
   assert.match(plist, /ProcessType<\/key>\s*<string>Background/);
 });
 
-test("o Windows encerra a árvore por taskkill, e não por grupo POSIX", (t) => {
+test("Windows ends the tree with taskkill, not a POSIX group", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -128,7 +128,7 @@ test("o Windows encerra a árvore por taskkill, e não por grupo POSIX", (t) => 
   assert.match(fonte, /icacls/, "proteção de arquivo no Windows é ACL, não modo POSIX");
 });
 
-test("a tarefa agendada do Windows recebe o script, e o caminho com espaço sobrevive", async (t) => {
+test("the Windows scheduled task receives the script, and the path with a space survives", async (t) => {
   // `argumentos` must reach the task (otherwise it runs `node.exe` without a script), and the
   // command must not go through a PowerShell script with hand-escaped quotes, since the real target
   // is a path with a space ("...\RemoteIFES Console\console-bootstrap.js").
@@ -180,7 +180,7 @@ test("a tarefa agendada do Windows recebe o script, e o caminho com espaço sobr
   assert.deepEqual(criacaoSistema.args.slice(-2), ["/RU", "SYSTEM"]);
 });
 
-test("remover uma inicialização que não existe é sucesso, não falha", async (t) => {
+test("removing a startup entry that does not exist is success, not failure", async (t) => {
   const amb = ajuda.ambiente();
   const processos = require(path.join(ajuda.RAIZ, "src", "processos.js"));
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -198,7 +198,7 @@ test("remover uma inicialização que não existe é sucesso, não falha", async
   assert.match(r.mecanismo, /não havia tarefa/);
 });
 
-test("no Windows o disco é medido sem abrir processo nenhum", async (t) => {
+test("on Windows disk space is measured without starting any process", async (t) => {
   // Readiness measures two paths before every operation, so disk measurement must not start a
   // process per path on Windows.
   //
@@ -229,7 +229,7 @@ test("no Windows o disco é medido sem abrir processo nenhum", async (t) => {
   }
 });
 
-test("cada sistema mede o disco e diz qual dispositivo mediu", async (t) => {
+test("each system measures disk space and states which device it measured", async (t) => {
   // Linux and macOS keep `df`: it names the real device and mount point, which statfs does not. On
   // a Pi with /var on another device, that is the difference between measuring the right and the
   // wrong disk before a backup.
@@ -244,7 +244,7 @@ test("cada sistema mede o disco e diz qual dispositivo mediu", async (t) => {
   assert.ok(r[0].montagem, "a medição precisa dizer onde mediu");
 });
 
-test("no Windows a proteção de arquivo não é afirmada por modo POSIX", (t) => {
+test("on Windows file protection is not claimed through a POSIX mode", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -261,7 +261,7 @@ test("no Windows a proteção de arquivo não é afirmada por modo POSIX", (t) =
 
 // --- Identidade do listener ---------------------------------------------------------------
 
-test("o backend publica um contrato de identidade protegido", async (t) => {
+test("the backend publishes a protected identity contract", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -281,7 +281,7 @@ test("o backend publica um contrato de identidade protegido", async (t) => {
   if (protecao.verificavel) assert.equal(protecao.restrito, true, "o contrato não pode ser legível por outros");
 });
 
-test("a prova de identidade confere e não revela o segredo", async (t) => {
+test("the identity proof verifies and does not reveal the secret", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -304,7 +304,7 @@ test("a prova de identidade confere e não revela o segredo", async (t) => {
   assert.notEqual(outro.json.prova, r.json.prova);
 });
 
-test("desafio malformado é recusado", async (t) => {
+test("a malformed challenge is refused", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -319,7 +319,7 @@ test("desafio malformado é recusado", async (t) => {
   }
 });
 
-test("o lançador recusa abrir o navegador num impostor que tomou a porta", async (t) => {
+test("the launcher refuses to open the browser on an impostor that took the port", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
@@ -349,7 +349,7 @@ test("o lançador recusa abrir o navegador num impostor que tomou a porta", asyn
   assert.equal(garantia.impostor, true, "o lançador não pode subir outro backend nem abrir o navegador");
 });
 
-test("o lançador abre o console real depois de verificar a identidade", async (t) => {
+test("the launcher opens the real Console after verifying identity", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -365,7 +365,7 @@ test("o lançador abre o console real depois de verificar a identidade", async (
   assert.equal(launcher.urlDoConsole(r.contrato), `http://127.0.0.1:${s.porta}/`);
 });
 
-test("o lançador só abre endereços HTTP(S) validados", async (t) => {
+test("the launcher opens only validated HTTP(S) addresses", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
@@ -376,7 +376,7 @@ test("o lançador só abre endereços HTTP(S) validados", async (t) => {
   }
 });
 
-test("a URL da aplicação sai da configuração real, não de uma porta fixa", (t) => {
+test("the application URL comes from the real configuration, not a fixed port", (t) => {
   const checkout = ajuda.dirTemporario("console-url-");
   fs.mkdirSync(path.join(checkout, "remoteifes-server"), { recursive: true });
   fs.writeFileSync(path.join(checkout, "remoteifes-server", "package.json"), JSON.stringify({ version: "3.0.0" }));
@@ -397,7 +397,7 @@ test("a URL da aplicação sai da configuração real, não de uma porta fixa", 
   amb2.restaurar();
 });
 
-test("o status do lançador separa console, aplicação e versão do programa", async (t) => {
+test("the launcher status separates Console, application and program version", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
@@ -411,7 +411,7 @@ test("o status do lançador separa console, aplicação e versão do programa", 
 
 // --- Idle exit -------------------------------------------------------------------
 
-test("a saída por ociosidade fica desarmada quando ninguém sabe religar o console", async (t) => {
+test("idle exit is disarmed when nothing can restart the Console", async (t) => {
   const amb = ajuda.ambiente({ ociosidadeS: 1 });
   const s = await ajuda.subir(amb);
   t.after(async () => {
@@ -470,7 +470,7 @@ const SC_QC_PT = [
 
 const SC_QC_PT_MANUAL = SC_QC_PT.replace("TIPO_DE_INÍCIO      : 2   AUTO_START", "TIPO_DE_INÍCIO      : 3   DEMAND_START");
 
-test("o estado do serviço é lido por código, não pelo rótulo em inglês", (t) => {
+test("the service state is read by code, not by the English label", (t) => {
   // On Portuguese Windows `sc.exe` prints ESTADO instead of STATE. Looking up the English name
   // would report a running service as stopped, and start/stop would wait out the deadline and fail.
   const amb = ajuda.ambiente();
@@ -485,7 +485,7 @@ test("o estado do serviço é lido por código, não pelo rótulo em inglês", (
   assert.notEqual(windows.codigoDeEstadoSc(SC_QUERY_PT), 10);
 });
 
-test("o tipo de início é lido por código, e não exige o rótulo AUTO_START", (t) => {
+test("the start type is read by code and does not require the AUTO_START label", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -495,7 +495,7 @@ test("o tipo de início é lido por código, e não exige o rótulo AUTO_START",
   assert.match(windows.inicioAutomaticoSc(SC_QC_PT).rotulo || "", /AUTO_START/);
 });
 
-test("estados de transição são distinguidos de parado e em execução", (t) => {
+test("transition states are distinguished from stopped and running", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
@@ -506,7 +506,7 @@ test("estados de transição são distinguidos de parado e em execução", (t) =
   assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT.replace("4  RUNNING", "3  STOP_PENDING")), 3);
 });
 
-test("com a porta já reservada, o lançador conecta em vez de disputar o endereço", async (t) => {
+test("with the port already reserved, the launcher connects instead of competing for the address", async (t) => {
   // Normal Linux state with socket activation after an idle exit: the contract was removed, but
   // systemd still owns the port. Starting a TCP backend there gets EADDRINUSE. One connection is
   // enough to activate the service; then the new contract appears.
@@ -560,7 +560,7 @@ test("com a porta já reservada, o lançador conecta em vez de disputar o endere
   assert.equal(r.contrato.porta, porta);
 });
 
-test("porta ocupada por um impostor não é aceita só porque respondeu", async (t) => {
+test("a port held by an impostor is not accepted just because it answered", async (t) => {
   // Connecting activates the service but does not prove identity: if whoever answers does not know
   // the secret, the launcher must refuse instead of treating the occupied port as a running
   // Console.
