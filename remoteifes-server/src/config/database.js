@@ -2,8 +2,19 @@ const path = require("path");
 const fs = require("fs");
 const { DatabaseSync } = require("node:sqlite");
 const { CAMINHO_DB } = require("./paths");
+const { restauracaoEmAndamento } = require("./restauracao");
 
 const DB_PATH = CAMINHO_DB;
+
+const restauracao = restauracaoEmAndamento(DB_PATH);
+if (restauracao) {
+  const erro = new Error(
+    `restauração do banco em andamento (processo ${restauracao.pid}, desde ${restauracao.desde}): ` +
+      "o RemoteIFES não abre o banco até ela terminar. O serviço volta sozinho quando a restauração acabar."
+  );
+  erro.code = "RESTAURACAO_EM_ANDAMENTO";
+  throw erro;
+}
 
 if (DB_PATH !== ":memory:") {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
