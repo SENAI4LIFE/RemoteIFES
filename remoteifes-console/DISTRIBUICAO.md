@@ -139,7 +139,21 @@ governam o arquivo:
    profundidade mínima, pertencer a quem desinstala (uid em POSIX, permissão de escrita no
    Windows) e **não** estar dentro de um checkout do RemoteIFES;
 2. **o estado fica por padrão** — operadores, auditoria e histórico sobrevivem; `--apagar-estado`
-   é explícito, e `--simular` mostra exatamente o que sairia antes de qualquer remoção.
+   é explícito, e `--simular` mostra exatamente o que sairia **sem chamar nada que mute** (nem o
+   registro de inicialização, nem unidades, nem a regra de sudo);
+3. **nada de processo órfão** — o console em execução é encerrado antes de o programa sair. O que
+   autoriza encerrar não é o PID do contrato, que é reciclado, mas a prova de identidade: quem
+   responde na porta demonstra possuir o segredo que só este console publicou. Falhando a prova,
+   nada é encerrado e o operador é avisado.
+
+Raiz, estado e escopo são **inferidos da instalação** de onde o desinstalador saiu, não presumidos
+pelo sistema: uma instalação de usuário no Linux era tratada como de sistema, reclamava que
+`/opt` não existia e deixava `~/.local/...` intacto.
+
+As operações de versão — atualizar, importar offline, reverter — tomam uma **trava exclusiva** na
+raiz da instalação. Sem ela, duas operações simultâneas podiam instalar versões diferentes e uma
+podar a que a outra estava a ponto de ativar, deixando o ponteiro apontando para um diretório
+inexistente. Uma trava de processo morto é recuperada e auditada.
 
 O desinstalador mora dentro do que apaga, então ele se copia para um diretório temporário e
 recomeça de lá. Sem isso, no Windows o arquivo em execução mantém um handle aberto e a raiz
@@ -159,7 +173,14 @@ manifesto.json.sig                                         (assinatura Ed25519 d
 
 O manifesto declara versão, canal, alvos (SO/arquitetura/formato), SHA-256 e tamanho de cada
 artefato, versão mínima que pode atualizar para esta, e validade (`expiraEm`) contra replay e
-congelamento. A verificação é **fechada por padrão**: assinatura inválida, manifesto expirado,
+congelamento.
+
+**Assinado não é o mesmo que correto.** O console impõe tetos próprios que o manifesto não pode
+ampliar: bytes comprimidos, bytes descomprimidos e quantidade de arquivos. Um erro de publicação
+que declare um tamanho absurdo, ou um artefato pequeno que expanda para centenas de MiB, é
+recusado antes de qualquer escrita — num Raspberry Pi de 1 GiB isso é a diferença entre uma
+atualização recusada e um host derrubado. Um `minimoParaAtualizar` presente mas malformado
+também é recusado, em vez de desligar o portão de compatibilidade em silêncio. A verificação é **fechada por padrão**: assinatura inválida, manifesto expirado,
 alvo ausente, digest divergente ou downgrade não autorizado interrompem a atualização antes de
 qualquer escrita no diretório ativo.
 
