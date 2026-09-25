@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>device-networking</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  #servidor { padding: 6px 14px 6px 8px; }
+  #servidor .sub { font-size: 12.5px; }
+  .paineis { display: grid; grid-template-columns: 366px 1fr; gap: 18px; margin-top: 70px; align-items: start; }
+  .coluna-esq { display: flex; flex-direction: column; gap: 14px; }
+  .painel {
+    position: relative;
+    display: flex; flex-direction: column;
+    border: 1px solid var(--painel-borda);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--tom-suave) 55%, transparent);
+    padding: 12px 11px 0;
+  }
+  .painel.opcional { border: 1.5px dashed var(--linha); }
+  .legenda-painel {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 14px;
+    padding: 9px 2px 10px;
+    border-top: 1px solid var(--painel-borda);
+    position: relative; z-index: 2;
+  }
+  .legenda-painel .titulo { font-size: 14px; color: var(--petroleo); }
+  .legenda-painel .sub { font-size: 12px; }
+  .placas { display: flex; justify-content: space-between; gap: 8px; }
+  .placa { padding: 5px 9px 5px 5px; gap: 6px; }
+  .placa .titulo { font-size: 14px; }
+  .placa .sub { font-size: 11.5px; white-space: nowrap; }
+  .placa .quadro { position: relative; flex: 0 0 auto; }
+  .placa .quadro .ic {
+    position: absolute; right: -3px; bottom: -2px;
+    width: 15px; height: 15px; padding: 2px;
+    color: var(--petroleo); background: var(--cartao);
+    border: 1px solid var(--cartao-borda); border-radius: 50%;
+  }
+  .linha-gateway { display: grid; grid-template-columns: 1fr 1fr; justify-items: center; align-items: center; padding: 0 11px; }
+  #repassa { justify-self: start; margin-left: 2px; }
+  .sem-wifi {
+    position: relative;
+    margin-top: 50px;
+    padding: 12px 10px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--cartao) 55%, transparent);
+    border: 1px solid var(--painel-borda);
+  }
+  .arvore { display: grid; grid-template-columns: 1fr 1fr; row-gap: 30px; justify-items: center; align-items: center; }
+  #no1 { grid-column: 1; grid-row: 1; }
+  #no2 { grid-column: 2; grid-row: 1; }
+  #no3 { grid-column: 2; grid-row: 2; }
+  .nota-cobertura {
+    grid-column: 1; grid-row: 2; justify-self: start; align-self: center;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--texto-fraco); line-height: 1.35; padding-left: 4px;
+  }
+  .limites { display: flex; flex-direction: column; gap: 7px; align-items: flex-start; }
+  .limites .pilula { font-size: 12px; padding: 4px 10px; white-space: normal; border-radius: 10px; }
+</style>
+</head>
+<body>
+<div id="tela">
+  <div class="cartao tom-verde" id="servidor">
+    <img class="modulo" src="../modules/server.png" alt="">
+    <div><div class="titulo">Servidor RemoteIFES</div><div class="sub">autentica cada placa pela credencial dela, venha direto ou pelo gateway</div></div>
+  </div>
+
+  <div class="paineis">
+    <div class="coluna-esq">
+      <section class="painel tom-petroleo" id="direto">
+        <div class="placas">
+          <div class="cartao tom-petroleo placa" id="d1">
+            <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+            <div><div class="titulo">ESP32</div><div class="sub">sala A</div></div>
+          </div>
+          <div class="cartao tom-petroleo placa" id="d2">
+            <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+            <div><div class="titulo">ESP32</div><div class="sub">sala B</div></div>
+          </div>
+          <div class="cartao tom-petroleo placa" id="d3">
+            <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+            <div><div class="titulo">ESP32</div><div class="sub">sala C</div></div>
+          </div>
+        </div>
+        <div class="legenda-painel">
+          <img class="modulo p" src="../modules/wifi-ap.png" alt="">
+          <div><div class="titulo">Wi-Fi direto · padrão</div><div class="sub">cada placa com Wi-Fi e WebSocket próprios</div></div>
+        </div>
+      </section>
+
+      <div class="limites">
+        <span class="pilula tom-ambar"><svg class="ic p"><use href="#i-aviso"/></svg>OTA e clonagem de IR: só pelo Wi-Fi direto</span>
+        <span class="pilula tom-ambar"><svg class="ic p"><use href="#i-aviso"/></svg>gateway fora do ar: os nós atrás dele ficam offline</span>
+      </div>
+    </div>
+
+    <section class="painel opcional tom-petroleo" id="malha">
+      <div class="linha-gateway">
+        <div class="cartao tom-petroleo placa" id="gateway">
+          <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+          <div><div class="titulo">gateway</div><div class="sub">sala D · raiz</div></div>
+        </div>
+        <span class="pilula tom-petroleo" id="repassa"><svg class="ic p"><use href="#x-repassa"/></svg>repassa sem ler</span>
+      </div>
+      <div class="sem-wifi">
+        <div class="arvore">
+          <div class="cartao tom-petroleo placa" id="no1">
+            <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+            <div><div class="titulo">nó</div><div class="sub">sala E · 1 salto</div></div>
+          </div>
+          <div class="cartao tom-petroleo placa" id="no2">
+            <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+            <div><div class="titulo">nó</div><div class="sub">sala F · 1 salto</div></div>
+          </div>
+          <div class="nota-cobertura">Sem cobertura<br>de Wi-Fi</div>
+          <div class="cartao tom-petroleo placa" id="no3">
+            <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+            <div><div class="titulo">nó</div><div class="sub">sala G · 2 saltos</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="legenda-painel">
+        <svg class="ic" style="width:22px;height:22px;color:var(--petroleo)"><use href="#i-cadeado"/></svg>
+        <div><div class="titulo">Mesh · opcional</div><div class="sub">rádio ESP-WIFI-MESH, até 6 camadas</div></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="legenda">
+    <span><svg class="ic p" style="color:var(--petroleo)"><use href="#i-chave"/></svg>credencial própria</span>
+    <span><svg width="26" height="8"><path d="M1 4h24" stroke="var(--linha)" stroke-width="2"/></svg>WebSocket</span>
+    <span><svg width="26" height="8"><path d="M2 4h22" stroke="var(--linha)" stroke-width="2.2" stroke-dasharray="0.1 5" stroke-linecap="round"/></svg>rádio mesh</span>
+    <span><svg width="26" height="14"><path d="M4 7h18" stroke="var(--petroleo)" stroke-opacity="0.22" stroke-width="12" stroke-linecap="round"/></svg>sessão cifrada da placa até o servidor (AES-256-GCM)</span>
+  </div>
+</div>
+<script src="conectores.js"></script>
+<script>
+  window.CONECTORES = [
+    { de: "#no1", para: "#servidor", lados: ["topo", "base"], reto: true, estilo: "tunel", tom: "petroleo",
+      rotulo: '<svg class="ic p" style="color:var(--petroleo);vertical-align:-2px"><use href="#i-cadeado"/></svg> sessão cifrada da sala E', noRotulo: 0.8, desvioRotulo: [62, 0], tomRotulo: "petroleo" },
+    { de: "#d1", para: "#servidor", lados: ["topo", "base"], reto: true, pontas: "ambas", tom: "petroleo" },
+    { de: "#d2", para: "#servidor", lados: ["topo", "base"], reto: true, pontas: "ambas", tom: "petroleo" },
+    { de: "#d3", para: "#servidor", lados: ["topo", "base"], reto: true, pontas: "ambas", tom: "petroleo" },
+    { de: "#gateway", para: "#servidor", lados: ["topo", "base"], em: [0.16], reto: true, pontas: "ambas", tom: "petroleo" },
+    { de: "#no1", para: "#gateway", lados: ["topo", "base"], reto: true, estilo: "radio", pontas: "nenhuma", tom: "petroleo" },
+    { de: "#no2", para: "#gateway", lados: ["topo", "base"], em: [0.5, 0.84], estilo: "radio", pontas: "nenhuma", tom: "petroleo" },
+    { de: "#no3", para: "#no2", lados: ["topo", "base"], reto: true, estilo: "radio", pontas: "nenhuma", tom: "petroleo" },
+  ];
+</script>
+</body>
+</html>

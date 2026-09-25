@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>architecture-overview</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  .grade {
+    display: grid;
+    grid-template-columns: 156px 40px 284px 40px 230px;
+    align-items: start;
+  }
+  .coluna { display: flex; flex-direction: column; gap: 12px; }
+  .cabecalho {
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--texto-fraco); margin: 0 0 2px 2px;
+  }
+  #clientes { grid-column: 1; margin-top: 126px; gap: 10px; }
+  #clientes .cartao { padding: 6px 10px 6px 6px; gap: 8px; }
+  #host { grid-column: 3; display: flex; flex-direction: column; gap: 30px; }
+  #salas { grid-column: 5; margin-top: 52px; gap: 8px; }
+  .subcabecalho { font-size: 12px; font-weight: 650; color: var(--petroleo); margin: 4px 0 0 2px; }
+  .linha-sala { display: flex; align-items: center; justify-content: space-between; }
+  .linha-sala .cartao { width: 118px; padding: 6px 8px 6px 6px; gap: 6px; }
+  .ac {
+    width: 54px; height: 50px; display: grid; place-items: center;
+    border: 1.5px dashed var(--linha); border-radius: 12px;
+  }
+  .ac img { width: 46px; height: 46px; object-fit: contain; }
+  #malha { display: flex; flex-direction: column; gap: 44px; margin-top: 10px; padding-left: 8px; padding-right: 8px; }
+  #malha > .rotulo-grupo { left: 9px; }
+  .papel { margin-top: 3px; }
+</style>
+</head>
+<body>
+<div id="tela">
+  <div class="grade">
+    <div class="coluna" id="clientes">
+      <div class="cabecalho">Clientes</div>
+      <div class="cartao tom-azul" id="navegador">
+        <img class="modulo p" src="../modules/browser.png" alt="">
+        <div><div class="titulo">Navegador</div><div class="sub">site e PWA</div></div>
+      </div>
+      <div class="cartao tom-azul" id="app">
+        <img class="modulo p" src="../modules/phone.png" alt="">
+        <div><div class="titulo">App móvel</div><div class="sub">Android e iOS</div></div>
+      </div>
+    </div>
+
+    <div class="grupo tom-verde" id="host" style="grid-column: 3;">
+      <div class="rotulo-grupo">Host do servidor</div>
+      <div class="cartao tom-roxo" id="console">
+        <img class="modulo" src="../modules/console.png" alt="">
+        <div><div class="titulo">Console de Operações</div><div class="sub">serviço separado · 127.0.0.1</div></div>
+      </div>
+      <div class="cartao tom-verde" id="servidor">
+        <img class="modulo" src="../modules/server.png" alt="">
+        <div><div class="titulo">Servidor RemoteIFES</div><div class="sub">Node.js · Express<br>API, WebSocket, agendador</div></div>
+      </div>
+      <div class="cartao tom-verde" id="sqlite">
+        <img class="modulo" src="../modules/database.png" alt="">
+        <div><div class="titulo">SQLite</div><div class="sub">um arquivo · backups verificados</div></div>
+      </div>
+    </div>
+
+    <div class="coluna" id="salas">
+      <div class="cabecalho">Salas · um ESP32 por sala</div>
+      <div class="subcabecalho">Wi-Fi direto · padrão</div>
+      <div class="linha-sala">
+        <div class="cartao tom-petroleo" id="esp-direto">
+          <img class="modulo p" src="../modules/esp32.png" alt="">
+          <div><div class="titulo">ESP32</div><div class="sub papel">direto</div></div>
+        </div>
+        <div class="ac" id="ac1"><img src="../modules/air-conditioner.png" alt=""></div>
+      </div>
+      <div class="grupo opcional tom-petroleo" id="malha">
+        <div class="rotulo-grupo">Mesh · opcional</div>
+        <div class="linha-sala">
+          <div class="cartao tom-petroleo" id="gateway">
+            <img class="modulo p" src="../modules/esp32.png" alt="">
+            <div><div class="titulo">ESP32</div><div class="sub papel">gateway</div></div>
+          </div>
+          <div class="ac" id="ac2"><img src="../modules/air-conditioner.png" alt=""></div>
+        </div>
+        <div class="linha-sala">
+          <div class="cartao tom-petroleo" id="no">
+            <img class="modulo p" src="../modules/esp32.png" alt="">
+            <div><div class="titulo">ESP32</div><div class="sub papel">nó mesh</div></div>
+          </div>
+          <div class="ac" id="ac3"><img src="../modules/air-conditioner.png" alt=""></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legenda">
+    <span><svg width="26" height="8"><path d="M1 4h24" stroke="var(--linha)" stroke-width="2"/></svg>troca de dados</span>
+    <span><svg width="26" height="8"><path d="M1 4h24" stroke="var(--linha)" stroke-width="2" stroke-dasharray="6 5"/></svg>opcional</span>
+    <span><svg width="26" height="8"><path d="M2 4h22" stroke="var(--linha)" stroke-width="2.2" stroke-dasharray="0.1 5" stroke-linecap="round"/></svg>rádio mesh</span>
+    <span><svg width="26" height="8"><path d="M1 4h16" stroke="var(--neutro)" stroke-width="2"/><path d="M25 4l-8 4V0z" fill="var(--neutro)"/></svg>infravermelho: só ida, o aparelho não é medido</span>
+  </div>
+</div>
+<script src="conectores.js"></script>
+<script>
+  window.CONECTORES = [
+    { de: "#navegador", para: "#servidor", lados: ["direita", "esquerda"], em: [0.5, 0.25], pontas: "ambas", tom: "azul" },
+    { de: "#app", para: "#servidor", lados: ["direita", "esquerda"], em: [0.5, 0.75], pontas: "ambas", tom: "azul" },
+    { de: "#console", para: "#servidor", lados: ["base", "topo"], em: [0.5, 0.5], tom: "roxo", rotulo: "administra o serviço" },
+    { de: "#servidor", para: "#sqlite", lados: ["base", "topo"], pontas: "ambas", tom: "verde" },
+    { de: "#servidor", para: "#esp-direto", lados: ["direita", "esquerda"], em: [0.3, 0.5], pontas: "ambas", tom: "petroleo" },
+    { de: "#servidor", para: "#gateway", lados: ["direita", "esquerda"], em: [0.7, 0.5], pontas: "ambas", estilo: "tracejado", tom: "petroleo" },
+    { de: "#no", para: "#gateway", lados: ["topo", "base"], em: [0.3, 0.3], estilo: "radio", pontas: "ambas", tom: "petroleo" },
+    { de: "#esp-direto", para: "#ac1", lados: ["direita", "esquerda"], tom: "neutro" },
+    { de: "#gateway", para: "#ac2", lados: ["direita", "esquerda"], tom: "neutro" },
+    { de: "#no", para: "#ac3", lados: ["direita", "esquerda"], tom: "neutro" },
+  ];
+</script>
+</body>
+</html>

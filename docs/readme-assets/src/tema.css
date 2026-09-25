@@ -1,0 +1,195 @@
+/* Shared look of the composed README figures. Colors are the app's own tokens
+   (remoteifes-web/css/style.css): IFES green and the semantic icon tones. The dark theme uses the
+   app's high-contrast tones on GitHub's dark surfaces. */
+
+:root {
+  --pagina: transparent;
+  --painel: #f6f8f6;
+  --painel-borda: #e1e7e2;
+  --cartao: #ffffff;
+  --cartao-borda: #dfe3df;
+  --texto: #1f2b23;
+  --texto-fraco: #5a6862;
+  --linha: #7d8a83;
+  --sombra: 0 1px 2px rgba(15, 26, 18, 0.08), 0 6px 16px rgba(15, 26, 18, 0.07);
+
+  --verde: #1c6b3c;
+  --verde-suave: #e3f3e8;
+  --azul: #1a5fb4;
+  --azul-suave: #e6eef9;
+  --roxo: #6b3fa0;
+  --roxo-suave: #f0e9f8;
+  --petroleo: #0f6b70;
+  --petroleo-suave: #e1f1f1;
+  --ambar: #8a5a06;
+  --ambar-suave: #fbf3d9;
+  --neutro: #62706a;
+  --neutro-suave: #eef1ef;
+}
+
+:root[data-tema="escuro"] {
+  --painel: #151b23;
+  --painel-borda: #2b333d;
+  --cartao: #1c232c;
+  --cartao-borda: #36404b;
+  --texto: #e6edf3;
+  --texto-fraco: #a3aeb9;
+  --linha: #8b96a1;
+  --sombra: 0 1px 2px rgba(0, 0, 0, 0.35);
+
+  --verde: #3fcf7f;
+  --verde-suave: #16301f;
+  --azul: #8ecbff;
+  --azul-suave: #172a3f;
+  --roxo: #d8b4fe;
+  --roxo-suave: #2a2038;
+  --petroleo: #5ce1e6;
+  --petroleo-suave: #12302f;
+  --ambar: #f2c94c;
+  --ambar-suave: #332a12;
+  --neutro: #a3aeb9;
+  --neutro-suave: #232b33;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--pagina);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.3;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The figure itself: what the renderer screenshots. */
+#tela {
+  position: relative;
+  width: 800px;
+  padding: 22px 24px 18px;
+  background: var(--painel);
+  border: 1px solid var(--painel-borda);
+  border-radius: 18px;
+}
+
+/* Tone helpers: set --tom/--tom-suave for a card, chip or badge. */
+.tom-verde { --tom: var(--verde); --tom-suave: var(--verde-suave); }
+.tom-azul { --tom: var(--azul); --tom-suave: var(--azul-suave); }
+.tom-roxo { --tom: var(--roxo); --tom-suave: var(--roxo-suave); }
+.tom-petroleo { --tom: var(--petroleo); --tom-suave: var(--petroleo-suave); }
+.tom-ambar { --tom: var(--ambar); --tom-suave: var(--ambar-suave); }
+.tom-neutro { --tom: var(--neutro); --tom-suave: var(--neutro-suave); }
+
+.cartao {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  background: var(--cartao);
+  border: 1px solid var(--cartao-borda);
+  border-left: 4px solid var(--tom, var(--cartao-borda));
+  border-radius: 12px;
+  box-shadow: var(--sombra);
+}
+
+.cartao.fora {
+  /* Outside the system: drawn, never measured. */
+  background: transparent;
+  box-shadow: none;
+  border-style: dashed;
+  border-left-width: 1px;
+}
+
+.modulo {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+.modulo.p { width: 40px; height: 40px; }
+.modulo.g { width: 64px; height: 64px; }
+
+.titulo { font-weight: 650; font-size: 15px; letter-spacing: -0.005em; }
+.sub { color: var(--texto-fraco); font-size: 12.5px; margin-top: 1px; }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 11.5px; }
+
+.grupo {
+  position: relative;
+  border: 1px solid var(--painel-borda);
+  border-radius: 14px;
+  padding: 26px 12px 12px;
+  background: color-mix(in srgb, var(--tom-suave, var(--cartao)) 55%, transparent);
+}
+.grupo.opcional { border: 1.5px dashed var(--linha); }
+.grupo > .rotulo-grupo {
+  position: absolute;
+  top: 7px;
+  left: 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tom, var(--texto-fraco));
+}
+
+.pilula {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tom, var(--texto-fraco));
+  background: var(--cartao);
+  border: 1px solid var(--tom, var(--cartao-borda));
+  white-space: nowrap;
+}
+.pilula.tracejada { border-style: dashed; }
+
+.ic {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex: 0 0 auto;
+}
+.ic.p { width: 13px; height: 13px; }
+
+/* Connector labels sit on the line, on an opaque pill so they read over any background. */
+.rotulo-conector {
+  position: absolute !important;
+  transform: translate(-50%, -50%);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--painel);
+  color: var(--texto-fraco);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--painel-borda);
+  color: var(--texto-fraco);
+  font-size: 12px;
+}
+.legenda span { display: inline-flex; align-items: center; gap: 7px; }
+.legenda svg { overflow: visible; }
+
+/* Stacking: group backgrounds < connectors < cards and labels, so a band can pass behind a card. */
+#conectores {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+.cartao, .item, .pilula, .ac, .rotulo-grupo, .cabecalho, .subcabecalho { position: relative; z-index: 2; }
+.rotulo-conector { z-index: 3; }
