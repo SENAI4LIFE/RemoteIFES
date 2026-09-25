@@ -174,6 +174,7 @@ test("política de versão recusa downgrade e exige o mínimo declarado", (t) =>
   assert.equal(release.politicaDeVersao({ versao: "2.0.0" }, "2.0.0").jaInstalada, true);
   assert.equal(release.politicaDeVersao({ versao: "3.0.0", minimoParaAtualizar: "2.5.0" }, "2.0.0").ok, false);
   assert.equal(release.politicaDeVersao({ versao: "3.0.0", minimoParaAtualizar: "2.0.0" }, "2.0.0").ok, true);
+  assert.match(release.politicaDeVersao({ versao: "3.0.0", minimoParaAtualizar: "2.x" }, "2.0.0").motivo, /inválido/);
 });
 
 test("uma publicação sem a sua atestação não instala nada", async (t) => {
