@@ -3,6 +3,7 @@ const path = require("path");
 const readline = require("readline");
 const backupService = require("./src/services/backupService");
 const { CAMINHO_DB } = require("./src/config/paths");
+const { publicarMarcador } = require("./src/config/restauracao");
 
 const args = process.argv.slice(2);
 const semConfirmar = args.includes("--sim") || args.includes("-y");
@@ -55,6 +56,9 @@ if (recuperarCorrompido) {
 }
 
 function prosseguir() {
+  // Until the swap ends no RemoteIFES process opens the database (src/config/restauracao.js).
+  const removerMarcador = publicarMarcador(CAMINHO_DB);
+  process.on("exit", removerMarcador);
   try {
     const resultado = backupService.restaurarBackup(arquivo, { quarentenarDanificado: recuperarCorrompido });
     console.log(`Banco restaurado em ${resultado.destino}`);
