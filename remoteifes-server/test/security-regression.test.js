@@ -74,7 +74,7 @@ test("finding #12: a regular admin cannot delete another admin", () => {
     /apenas o superadministrador/,
     "um admin comum não pode remover outro admin"
   );
-  assert.ok(usuariosService.buscarPorId(admin2.id), "a conta alvo deve continuar existindo após a tentativa bloqueada");
+  assert.ok(usuariosService.buscarPorId(admin2.id), "the target account must still exist after the blocked attempt");
 });
 
 test("finding #12: a superadmin can still delete an admin normally", () => {
@@ -84,7 +84,7 @@ test("finding #12: a superadmin can still delete an admin normally", () => {
   );
 
   usuariosService.remover(admin.id, { id: 999999, nivel: usuariosService.NIVEL_SUPERADMIN });
-  assert.equal(usuariosService.buscarPorId(admin.id), undefined, "o superadmin deve conseguir remover o admin");
+  assert.equal(usuariosService.buscarPorId(admin.id), undefined, "the superadmin must be able to remove the admin");
 });
 
 test("finding #14: removing a user who has logged in does not fail on FOREIGN KEY (sessoes)", () => {
@@ -96,9 +96,9 @@ test("finding #14: removing a user who has logged in does not fail on FOREIGN KE
   tokenService.gerarToken(usuario.id);
 
   assert.doesNotThrow(() => usuariosService.remover(usuario.id, { id: 999999, nivel: usuariosService.NIVEL_SUPERADMIN }));
-  assert.equal(usuariosService.buscarPorId(usuario.id), undefined, "o usuário deve ter sido removido");
+  assert.equal(usuariosService.buscarPorId(usuario.id), undefined, "the user must have been removed");
   const sessoesRestantes = db.prepare(`SELECT COUNT(*) AS total FROM sessoes WHERE usuarioId = ?`).get(usuario.id);
-  assert.equal(sessoesRestantes.total, 0, "as sessões do usuário removido não devem sobrar órfãs");
+  assert.equal(sessoesRestantes.total, 0, "the removed user's sessions must not be left orphaned");
 });
 
 test("finding #16: the session token is not stored in plain text in the database", () => {
@@ -109,15 +109,15 @@ test("finding #16: the session token is not stored in plain text in the database
   const token = tokenService.gerarToken(usuario.id);
 
   const linha = db.prepare(`SELECT token FROM sessoes WHERE usuarioId = ? ORDER BY id DESC LIMIT 1`).get(usuario.id);
-  assert.notEqual(linha.token, token, "o valor gravado não pode ser o token em texto puro");
-  assert.equal(linha.token.length, 64, "o valor gravado deve ser o hash sha256 (64 hex) do token");
+  assert.notEqual(linha.token, token, "the stored value must not be the plain-text token");
+  assert.equal(linha.token.length, 64, "the stored value must be the token's sha256 hash (64 hex)");
 
   const validado = tokenService.validarToken(token);
-  assert.ok(validado, "validarToken deve continuar aceitando o token original em texto puro");
+  assert.ok(validado, "validarToken must still accept the original plain-text token");
   assert.equal(validado.id, usuario.id);
 
   tokenService.removerToken(token);
-  assert.equal(tokenService.validarToken(token), null, "após logout, o token não deve mais validar");
+  assert.equal(tokenService.validarToken(token), null, "after logout, the token must no longer validate");
 });
 
 test("a session expires at the absolute limit even with recent use", () => {

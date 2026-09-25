@@ -141,7 +141,7 @@ test("the response is compact, covers every room and does not leak raw history",
   // One item per room carries only the summary, never individual events.
   const chaves = new Set(corpo.salas.flatMap((s) => Object.keys(s)));
   assert.deepEqual([...chaves].sort(), ["minutosOffline", "nome", "quedas", "sala", "valor"]);
-  assert.ok(JSON.stringify(corpo.salas).length < 24 * 1024, "payload por sala deveria continuar compacto");
+  assert.ok(JSON.stringify(corpo.salas).length < 24 * 1024, "the per-room payload should stay compact");
 });
 
 test("invalid metric and period fall back to the default instead of failing", async () => {

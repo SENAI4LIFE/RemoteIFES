@@ -63,7 +63,7 @@ test("with Auto-ON, changing the temperature of an appliance that is off turns i
 
   db.prepare("DELETE FROM comandos_log WHERE sala = 'AUTO-1'").run();
   salas.aplicarComando("AUTO-1", "temperatura", 25, contexto);
-  assert.deepEqual(logs("AUTO-1"), [{ cmd: "temperatura", valor: "25", origem: "manual" }], "com o aparelho já ligado não há acionamento automático");
+  assert.deepEqual(logs("AUTO-1"), [{ cmd: "temperatura", valor: "25", origem: "manual" }], "with the appliance already on there is no automatic trigger");
 });
 
 test("with Auto-ON, enabling Turbo on an appliance that is off turns it on; disabling Turbo never turns it on", () => {
@@ -74,7 +74,7 @@ test("with Auto-ON, enabling Turbo on an appliance that is off turns it on; disa
 
   reiniciar("AUTO-1", { turbo: 1 });
   const desligado = salas.aplicarComando("AUTO-1", "turbo", false, contexto);
-  assert.equal(desligado.ligado, 0, "turbo=false não pode ligar um aparelho desligado");
+  assert.equal(desligado.ligado, 0, "turbo=false must not turn on an appliance that is off");
   assert.equal(desligado.turboAtivo, 0);
 
   reiniciar("AUTO-1");
@@ -95,7 +95,7 @@ test("with Auto-ON disabled, adjustments are stored without turning the applianc
   assert.deepEqual(logs("AUTO-1"), [{ cmd: "temperatura", valor: "23", origem: "manual" }]);
 
   const turbo = salas.aplicarComando("AUTO-1", "turbo", true, contexto);
-  assert.equal(turbo.ligado, 0, "sem Auto-ON o Turbo não liga implicitamente");
+  assert.equal(turbo.ligado, 0, "without Auto-ON, Turbo does not turn the appliance on implicitly");
   assert.equal(turbo.turboAtivo, 1);
   db.prepare("UPDATE salas SET irProtocolo = 5 WHERE sala = 'AUTO-1'").run();
   assert.equal(salas.comandoEstadoIR(salas.buscar("AUTO-1")).power, false);
@@ -103,7 +103,7 @@ test("with Auto-ON disabled, adjustments are stored without turning the applianc
 
   reiniciar("AUTO-1", { ligado: 1 });
   const aindaLigado = salas.aplicarComando("AUTO-1", "temperatura", 25, contexto);
-  assert.equal(aindaLigado.ligado, 1, "um aparelho já ligado continua ligado");
+  assert.equal(aindaLigado.ligado, 1, "an appliance already on stays on");
   assert.equal(aindaLigado.temperaturaAlvo, 25);
 });
 
@@ -137,7 +137,7 @@ test("changing Auto-ON notifies open panels so they reflect the option without r
     return condicao();
   };
   ws.send(JSON.stringify({ tipo: "observar", sala: "AUTO-1" }));
-  assert.ok(await ate(() => recebidas.some((m) => m.tipo === "status")), "o painel recebe o status inicial da sala observada");
+  assert.ok(await ate(() => recebidas.some((m) => m.tipo === "status")), "the panel receives the observed room's initial status");
   assert.equal(recebidas.filter((m) => m.tipo === "status").at(-1).status.autoLigar, true);
 
   recebidas.length = 0;
@@ -148,14 +148,14 @@ test("changing Auto-ON notifies open panels so they reflect the option without r
   });
   assert.equal(resp.status, 200);
   assert.equal((await resp.json()).configuracoes.autoLigar, false);
-  assert.ok(await ate(() => recebidas.some((m) => m.tipo === "status" && m.status.autoLigar === false)), "o painel observando a sala recebe um novo status");
+  assert.ok(await ate(() => recebidas.some((m) => m.tipo === "status" && m.status.autoLigar === false)), "the panel observing the room receives a new status");
   const status = recebidas.filter((m) => m.tipo === "status").at(-1);
-  assert.ok(status, "o painel observando a sala recebe um novo status");
+  assert.ok(status, "the panel observing the room receives a new status");
   assert.equal(status.status.autoLigar, false);
   ws.close();
 
   const auditoria = db.prepare("SELECT camposAlterados FROM auditoria_eventos WHERE tipo = 'configuracao_alterada' ORDER BY id DESC LIMIT 1").get();
-  assert.ok(auditoria && auditoria.camposAlterados.split(",").includes("autoLigar"), "a mudança global é auditada como as demais configurações");
+  assert.ok(auditoria && auditoria.camposAlterados.split(",").includes("autoLigar"), "the global change is audited like the other settings");
 
   const semMudanca = await fetch(`${baseUrl}/admin/configuracoes`, {
     method: "PATCH",
@@ -163,7 +163,7 @@ test("changing Auto-ON notifies open panels so they reflect the option without r
     body: JSON.stringify({ autoLigar: false }),
   });
   assert.equal(semMudanca.status, 200);
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM auditoria_eventos WHERE tipo = 'configuracao_alterada'").get().n, 1, "salvar o mesmo valor não gera auditoria repetida");
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM auditoria_eventos WHERE tipo = 'configuracao_alterada'").get().n, 1, "saving the same value does not produce a repeated audit");
   configuracoesService.validarEAtualizar({ autoLigar: true }, SUPERADMIN);
 });
 

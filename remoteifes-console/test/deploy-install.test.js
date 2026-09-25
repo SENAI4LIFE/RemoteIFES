@@ -105,10 +105,10 @@ test("REGRESSION: the managed deploy does not compete with itself for the lock",
   const specReverter = reverter.montar({ operador: "op", argumentos: {} });
 
   for (const [nome, spec] of [["aplicar", specAplicar], ["reverter", specReverter]]) {
-    assert.equal(spec.exigeTrava, false, `${nome}: quem segura a trava é o runner, não a ação`);
-    assert.equal(spec.executavel, process.execPath, `${nome}: runner Node portátil, não bash`);
-    assert.match(spec.argumentos[0], /implantar\.js$/, `${nome}: usa o runner portátil`);
-    assert.ok(!spec.argumentos.some((a) => /deploy\.sh|rollback\.sh/.test(String(a))), `${nome}: não chama os scripts bash`);
+    assert.equal(spec.exigeTrava, false, `${nome}: the runner holds the lock, not the action`);
+    assert.equal(spec.executavel, process.execPath, `${nome}: portable Node runner, not bash`);
+    assert.match(spec.argumentos[0], /implantar\.js$/, `${nome}: uses the portable runner`);
+    assert.ok(!spec.argumentos.some((a) => /deploy\.sh|rollback\.sh/.test(String(a))), `${nome}: does not call the bash scripts`);
   }
 });
 
@@ -131,7 +131,7 @@ test("the runner acquires the lock once and releases it when done", async (t) =>
   });
   assert.equal(r.codigo, 1);
   assert.match(r.saida, /não foi possível resolver o alvo/);
-  assert.ok(!fs.existsSync(trava), "a trava não pode ficar para trás");
+  assert.ok(!fs.existsSync(trava), "the lock must not be left behind");
 });
 
 test("the runner refuses to start while another live maintenance holds the lock", async (t) => {
@@ -151,7 +151,7 @@ test("the runner refuses to start while another live maintenance holds the lock"
   });
   assert.equal(r.codigo, 1);
   assert.match(r.saida, /andamento/);
-  assert.equal(fs.readFileSync(trava, "utf8").split(/\s+/)[0], String(process.pid), "a trava alheia fica intacta");
+  assert.equal(fs.readFileSync(trava, "utf8").split(/\s+/)[0], String(process.pid), "another owner's lock stays intact");
 });
 
 // --- Portable deploy --------------------------------------------------------------------
@@ -180,9 +180,9 @@ test("deploy does not use bash or systemctl directly", (t) => {
   t.after(() => amb.restaurar());
 
   const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "src", "implantacao.js"), "utf8");
-  assert.ok(!/["']bash["']/.test(fonte), "a implantação portátil não pode depender de bash");
-  assert.ok(!/systemctl/.test(fonte), "o controle de serviço é do adaptador de plataforma");
-  assert.match(fonte, /plataforma\.controlarServico/, "o reinício vai pelo adaptador");
+  assert.ok(!/["']bash["']/.test(fonte), "the portable deploy must not depend on bash");
+  assert.ok(!/systemctl/.test(fonte), "service control belongs to the platform adapter");
+  assert.match(fonte, /plataforma\.controlarServico/, "the restart goes through the adapter");
 });
 
 test("aguardarVersao requires the process commit, and accepts a legacy version only with a proven restart", async (t) => {
@@ -216,7 +216,7 @@ test("a version without release.js is treated as legacy, not as an error", async
   git(checkout, ["add", "-A"]);
   git(checkout, ["commit", "--quiet", "-m", "sem release.js"]);
   const semRelease = git(checkout, ["rev-parse", "HEAD"]);
-  assert.equal(await implantacao.versaoInformaCommit(semRelease), false, "versão legada não pode confirmar a própria identidade");
+  assert.equal(await implantacao.versaoInformaCommit(semRelease), false, "a legacy version cannot confirm its own identity");
 });
 
 test("rollback warns that it swaps only the code, without touching the database", (t) => {
@@ -256,7 +256,7 @@ test("installation assembles the side-by-side layout with a stable layer", async
   assert.equal(r.codigo, 0, r.saida);
 
   const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
-  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "camada estável presente");
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "stable layer present");
   assert.ok(fs.existsSync(path.join(raiz, "launcher-bootstrap.js")));
   assert.ok(fs.existsSync(path.join(raiz, "versoes", versao, "console.js")), "payload versionado");
   const estadoInstalacao = JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8"));
@@ -288,7 +288,7 @@ test("reinstalling preserves credentials and does not generate a new secret", as
   const r = await instalar(["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico"]);
   assert.equal(r.codigo, 0, r.saida);
   assert.match(r.saida, /Operador já cadastrado; credenciais preservadas/);
-  assert.ok(!fs.existsSync(path.join(estadoDir, "bootstrap-token")), "não recria segredo quando já há operador");
+  assert.ok(!fs.existsSync(path.join(estadoDir, "bootstrap-token")), "does not recreate the secret when an operator exists");
   const operadores = JSON.parse(fs.readFileSync(path.join(estadoDir, "operadores.json"), "utf8"));
   assert.equal(operadores.operadores[0].nome, "op", "credencial preservada");
 });
@@ -309,8 +309,8 @@ test("migrating the old Linux layout moves atual/ to versoes/ without touching s
   const r = migrarLayoutAntigo(raiz, () => {});
   assert.equal(r.migrou, true);
   assert.ok(fs.existsSync(path.join(raiz, "versoes", "1.0.0", "console.js")));
-  assert.ok(!fs.existsSync(antigo), "o diretório antigo sai do lugar");
-  assert.ok(!fs.existsSync(path.join(raiz, "anterior")), "a cópia antiga de reserva é removida");
+  assert.ok(!fs.existsSync(antigo), "the old directory moves out of place");
+  assert.ok(!fs.existsSync(path.join(raiz, "anterior")), "the old reserve copy is removed");
 });
 
 test("the installer refuses a checkout that is not RemoteIFES", async (t) => {
@@ -366,7 +366,7 @@ test("the runners have a shebang and are installed with execute permission", (t)
   // real operation. The installer restores the bit from the shebang.
   for (const nome of fs.readdirSync(path.join(ajuda.RAIZ, "bin"))) {
     const conteudo = fs.readFileSync(path.join(ajuda.RAIZ, "bin", nome), "utf8");
-    assert.match(conteudo.slice(0, 2), /#!/, `${nome} precisa de shebang para ser executável`);
+    assert.match(conteudo.slice(0, 2), /#!/, `${nome} needs a shebang to be executable`);
   }
 
   const raiz = ajuda.dirTemporario("console-perm-");
@@ -375,7 +375,7 @@ test("the runners have a shebang and are installed with execute permission", (t)
   if (process.platform !== "win32") {
     for (const nome of fs.readdirSync(path.join(raiz, "bin"))) {
       const modo = fs.statSync(path.join(raiz, "bin", nome)).mode & 0o777;
-      assert.ok(modo & 0o100, `${nome} deveria ficar executável após a instalação (modo ${modo.toString(8)})`);
+      assert.ok(modo & 0o100, `${nome} should be executable after installation (mode ${modo.toString(8)})`);
     }
   }
   fs.rmSync(raiz, { recursive: true, force: true });
@@ -450,7 +450,7 @@ test("uninstall preserves state by default and says where it was left", (t) => {
   const r = rodarNode([path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"]);
   assert.equal(r.codigo, 0, r.saida);
   assert.ok(!fs.existsSync(path.join(raiz, "console-bootstrap.js")), "o programa sai");
-  assert.ok(fs.existsSync(path.join(estadoDir, "operadores.json")), "o estado fica");
+  assert.ok(fs.existsSync(path.join(estadoDir, "operadores.json")), "state stays");
   assert.match(r.saida, /preservado em/);
   assert.match(r.saida, /--apagar-estado/);
   assert.match(r.saida, /checkout do RemoteIFES, seu banco e seus backups/);
@@ -467,7 +467,7 @@ test("a simulated uninstall removes nothing", (t) => {
   const r = rodarNode([path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"), "--raiz", raiz, "--simular"]);
   assert.equal(r.codigo, 0, r.saida);
   assert.match(r.saida, /\[simulação\] removeria/);
-  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "a simulação não apaga o programa");
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "the simulation does not delete the program");
 });
 
 test("without a terminal and without --sim, uninstall refuses instead of assuming consent", (t) => {
@@ -516,8 +516,8 @@ test("REGRESSION: uninstalling from inside the installation removes the whole ro
 
   const d = rodarNode([deDentro, "--raiz", raiz, "--estado", estadoDir, "--sim"]);
   assert.equal(d.codigo, 0, d.saida);
-  assert.ok(!fs.existsSync(raiz), `a raiz inteira precisa sair; restou: ${fs.existsSync(raiz) ? fs.readdirSync(raiz).join(", ") : ""}`);
-  assert.ok(fs.existsSync(path.join(estadoDir, "operadores.json")) || fs.existsSync(path.join(estadoDir, "bootstrap-token")), "o estado fica");
+  assert.ok(!fs.existsSync(raiz), `the whole root must go; left: ${fs.existsSync(raiz) ? fs.readdirSync(raiz).join(", ") : ""}`);
+  assert.ok(fs.existsSync(path.join(estadoDir, "operadores.json")) || fs.existsSync(path.join(estadoDir, "bootstrap-token")), "state stays");
 });
 
 test("uninstall stops the running Console instead of leaving it orphaned", async (t) => {
@@ -554,7 +554,7 @@ test("uninstall stops the running Console instead of leaving it orphaned", async
     if (fs.existsSync(contrato)) subiu = true;
     else await new Promise((r) => setTimeout(r, 250));
   }
-  assert.ok(subiu, "o console instalado precisa subir para que o teste signifique algo");
+  assert.ok(subiu, "the installed Console must start for the test to mean anything");
 
   const r = rodarNode([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"]);
   assert.equal(r.codigo, 0, r.saida);
@@ -572,7 +572,7 @@ test("uninstall stops the running Console instead of leaving it orphaned", async
     });
     req.end();
   });
-  assert.equal(aindaAtende, false, "o console não pode continuar atendendo depois de desinstalado");
+  assert.equal(aindaAtende, false, "the Console must not keep serving after being uninstalled");
 });
 
 test("uninstall does not stop an unrelated process that merely holds the port", async (t) => {
@@ -606,11 +606,11 @@ test("uninstall does not stop an unrelated process that merely holds the port", 
   );
 
   const r = await rodarNodeAsync([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"]);
-  assert.match(r.saida, /NÃO é este console/, `esperava recusa de impostor. Saída:\n${r.saida}`);
+  assert.match(r.saida, /NÃO é este console/, `expected an impostor refusal. Output:\n${r.saida}`);
   assert.match(r.saida, /Nada foi encerrado/);
 
   // The test process (whose pid was in the contract) is still alive, and so is the intruder.
-  assert.equal(intruso.listening, true, "o processo alheio não pode ser encerrado");
+  assert.equal(intruso.listening, true, "the unrelated process must not be terminated");
 });
 
 test("REGRESSION: the installed shortcut starts the CONSOLE, not another copy of the launcher", async (t) => {
@@ -642,13 +642,13 @@ test("REGRESSION: the installed shortcut starts the CONSOLE, not another copy of
 
   // Exactly what the shortcut does, requesting only the start (no browser).
   const r = await rodarNodeAsync([path.join(raiz, "launcher-bootstrap.js"), "--iniciar"], ambienteDoAtalho);
-  assert.equal(r.codigo, 0, `o lançador do atalho precisa subir o console. Saída:\n${r.saida}`);
+  assert.equal(r.codigo, 0, `the shortcut launcher must start the Console. Output:\n${r.saida}`);
   assert.match(r.saida, /Console iniciado|Console já estava no ar/);
 
   // The proof: what started is the CONSOLE, which publishes an identity contract and serves HTTP. A
   // recursive launcher would publish no contract.
   const contrato = path.join(estadoDir, "endereco.json");
-  assert.ok(fs.existsSync(contrato), "o console precisa publicar o contrato de identidade");
+  assert.ok(fs.existsSync(contrato), "the Console must publish the identity contract");
   const dados = JSON.parse(fs.readFileSync(contrato, "utf8"));
   assert.equal(dados.porta, porta);
   t.after(() => {
@@ -666,7 +666,7 @@ test("REGRESSION: the installed shortcut starts the CONSOLE, not another copy of
     });
     req.end();
   });
-  assert.ok(atende > 0, "o console iniciado pelo atalho tem de atender HTTP");
+  assert.ok(atende > 0, "the Console started from the shortcut must serve HTTP");
 });
 
 test("the Console bootstrap ignores a launcher target inherited from the environment", (t) => {
@@ -679,7 +679,7 @@ test("the Console bootstrap ignores a launcher target inherited from the environ
   assert.match(
     lancador,
     /CONSOLE_BOOTSTRAP_ALVO:\s*"console"/,
-    "ao subir o backend, o lançador precisa fixar o alvo do bootstrap em vez de herdá-lo"
+    "when starting the backend, the launcher must set the bootstrap target instead of inheriting it"
   );
 });
 
@@ -707,13 +707,13 @@ test("REGRESSION: the documented repair reinstalls over itself without destroyin
     path.join(instaladoEm, "instalacao", "instalar.js"),
     "--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--sem-servico", "--forcar",
   ]);
-  assert.equal(r.codigo, 0, `o reparo precisa concluir. Saída:\n${r.saida}`);
+  assert.equal(r.codigo, 0, `the repair must complete. Output:\n${r.saida}`);
 
-  assert.ok(fs.existsSync(path.join(instaladoEm, "console.js")), "o payload precisa sobreviver ao reparo");
+  assert.ok(fs.existsSync(path.join(instaladoEm, "console.js")), "the payload must survive the repair");
   assert.ok(fs.existsSync(path.join(instaladoEm, "src", "servidor.js")));
-  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "a camada estável sobrevive");
-  assert.deepEqual(fs.readdirSync(instaladoEm).sort(), antes, "o conteúdo do payload continua completo");
-  assert.ok(!fs.readdirSync(path.join(raiz, "versoes")).some((n) => n.includes("parcial") || n.includes("substituido")), "nenhum estágio fica para trás");
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "the stable layer survives");
+  assert.deepEqual(fs.readdirSync(instaladoEm).sort(), antes, "the payload content stays complete");
+  assert.ok(!fs.readdirSync(path.join(raiz, "versoes")).some((n) => n.includes("parcial") || n.includes("substituido")), "no staging is left behind");
 });
 
 test("--simular does not remove the system integration", async (t) => {
@@ -735,12 +735,12 @@ test("--simular does not remove the system integration", async (t) => {
   const r = await rodarNodeAsync([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--simular"]);
   assert.equal(r.codigo, 0, r.saida);
 
-  assert.match(r.saida, /\[simulação\] removeria o registro de inicialização/, "a simulação precisa declarar o que faria");
+  assert.match(r.saida, /\[simulação\] removeria o registro de inicialização/, "the simulation must declare what it would do");
   // None of the real path's messages may appear.
   for (const real of ["tarefa agendada removida", "não havia tarefa agendada registrada", "registro de inicialização removido"]) {
-    assert.ok(!r.saida.includes(real), `a simulação executou o caminho real: "${real}"`);
+    assert.ok(!r.saida.includes(real), `the simulation ran the real path: "${real}"`);
   }
-  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "a simulação não apaga o programa");
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "the simulation does not delete the program");
 });
 
 test("removal authorization requires ALL installation marks, not just one", (t) => {
@@ -759,7 +759,7 @@ test("removal authorization requires ALL installation marks, not just one", (t) 
   fs.writeFileSync(path.join(parcial, "planilha-do-setor.csv"), "nao me apague\n");
 
   const r = autorizarRemocao(parcial, { marcas, rotulo: "instalação do console", exigirTodas: true });
-  assert.equal(r.ok, false, "uma marca sozinha não pode autorizar remoção recursiva");
+  assert.equal(r.ok, false, "a single mark must not authorize recursive removal");
   assert.match(r.motivo, /faltam:/);
   assert.ok(fs.existsSync(path.join(parcial, "planilha-do-setor.csv")));
 
@@ -780,8 +780,8 @@ test("the Windows shortcut uses the .vbs extension, because wscript picks the en
   t.after(() => amb.restaurar());
   const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "instalacao", "instalar.js"), "utf8");
 
-  assert.match(fonte, /abrir-console\.vbs/, "o script oculto do Windows precisa ser .vbs");
-  assert.ok(!/abrir-console\.js/.test(fonte), "não pode sobrar referência ao .js");
+  assert.match(fonte, /abrir-console\.vbs/, "the hidden Windows script must be .vbs");
+  assert.ok(!/abrir-console\.js/.test(fonte), "no reference to the .js may remain");
   // And the written content is still VBScript, consistent with the extension.
   assert.match(fonte, /CreateObject\("WScript\.Shell"\)/);
 });
@@ -810,10 +810,10 @@ test("rollback refuses a dirty tree and does not discard local work", async (t) 
   fs.writeFileSync(rastreado, conteudoRastreado);
 
   const r = await implantacao.reverter({ alvo: destino, offline: true, semReiniciar: true, log: () => {} });
-  assert.equal(r.ok, false, "a reversão não pode prosseguir com árvore suja");
+  assert.equal(r.ok, false, "rollback must not proceed with a dirty tree");
   assert.match(r.erro, /nunca descarta trabalho local/);
-  assert.equal(fs.readFileSync(rastreado, "utf8"), conteudoRastreado, "o arquivo local fica intacto");
-  assert.equal(git(checkout, ["rev-parse", "HEAD"]), git(checkout, ["rev-parse", "main"]), "HEAD não se move");
+  assert.equal(fs.readFileSync(rastreado, "utf8"), conteudoRastreado, "the local file stays intact");
+  assert.equal(git(checkout, ["rev-parse", "HEAD"]), git(checkout, ["rev-parse", "main"]), "HEAD does not move");
 });
 
 test("an untracked file also counts as local work", async (t) => {
@@ -831,10 +831,10 @@ test("an untracked file also counts as local work", async (t) => {
   fs.writeFileSync(naoRastreado, "medições que eu não quero perder\n");
 
   const estado = await implantacao.estadoDoCheckout();
-  assert.equal(estado.limpo, false, "um arquivo não rastreado deixa a árvore suja");
+  assert.equal(estado.limpo, false, "an untracked file makes the tree dirty");
   assert.ok(
     estado.naoRastreados.some((n) => n.includes("rascunho-do-operador")),
-    `o não rastreado precisa ser nomeado; recebi ${JSON.stringify(estado.naoRastreados)}`
+    `the untracked file must be named; got ${JSON.stringify(estado.naoRastreados)}`
   );
 
   const r = await implantacao.implantar({ commit: git(checkout, ["rev-parse", "HEAD"]), offline: true, semReiniciar: true, log: () => {} });
@@ -865,9 +865,9 @@ test("REGRESSION: the program started from the shortcut finds state where the in
   // The record must say where everything is.
   const registro = JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8"));
   assert.equal(registro.escopo, "usuario");
-  assert.equal(path.resolve(registro.estado), path.resolve(estadoDir), "o diretório de estado precisa ficar registrado");
-  assert.equal(registro.porta, porta, "a porta escolhida precisa ficar registrada");
-  assert.ok(fs.existsSync(path.join(estadoDir, "bootstrap-token")), "o token do primeiro operador está no estado registrado");
+  assert.equal(path.resolve(registro.estado), path.resolve(estadoDir), "the state directory must be recorded");
+  assert.equal(registro.porta, porta, "the chosen port must be recorded");
+  assert.ok(fs.existsSync(path.join(estadoDir, "bootstrap-token")), "the first operator's token is in the recorded state");
 
   // Start as the shortcut does: WITHOUT CONSOLE_ESTADO_DIR and WITHOUT CONSOLE_PORTA. `undefined`
   // REMOVES the variable in the child; `delete` on an object later spread over `process.env` would
@@ -883,13 +883,13 @@ test("REGRESSION: the program started from the shortcut finds state where the in
   };
 
   const r = await rodarNodeAsync([path.join(raiz, "launcher-bootstrap.js"), "--iniciar"], limpo);
-  assert.equal(r.codigo, 0, `o atalho precisa subir o console sem ambiente injetado. Saída:\n${r.saida}`);
+  assert.equal(r.codigo, 0, `the shortcut must start the Console without an injected environment. Output:\n${r.saida}`);
 
   // A prova: o contrato aparece no estado REGISTRADO, e na porta registrada.
   const contrato = path.join(estadoDir, "endereco.json");
-  assert.ok(fs.existsSync(contrato), "o contrato precisa aparecer no diretório de estado registrado");
+  assert.ok(fs.existsSync(contrato), "the contract must appear in the recorded state directory");
   const dados = JSON.parse(fs.readFileSync(contrato, "utf8"));
-  assert.equal(dados.porta, porta, "a porta registrada precisa ser a usada");
+  assert.equal(dados.porta, porta, "the recorded port must be the one used");
   t.after(() => {
     try {
       require(path.join(ajuda.RAIZ, "src", "plataforma")).encerrarArvore(dados.pid, "SIGKILL");
@@ -919,7 +919,7 @@ test("update and rollback do not erase the recorded scope or state", (t) => {
   const depois = atualizador.lerEstadoInstalacao();
   assert.equal(depois.versaoAtiva, "2.0.0", "o ponteiro muda");
   assert.equal(depois.escopo, "usuario", "o escopo sobrevive");
-  assert.equal(depois.estado, "/caminho/registrado", "o diretório de estado sobrevive");
+  assert.equal(depois.estado, "/caminho/registrado", "the state directory survives");
   assert.equal(depois.porta, 8123, "a porta sobrevive");
 });
 
@@ -965,9 +965,9 @@ test("uninstall refuses to delete the program when it cannot prove the Console s
   );
 
   const r = await rodarNodeAsync([path.join(raiz, "versoes", versao, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"], { CONSOLE_PARADA_MS: "1200" });
-  assert.equal(r.codigo, 1, `a desinstalação tem de falhar sem prova de parada. Saída:\n${r.saida}`);
+  assert.equal(r.codigo, 1, `uninstall must fail without proof of stop. Output:\n${r.saida}`);
   assert.match(r.saida, /não foi possível confirmar que o console parou/);
-  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "o programa NÃO pode ser removido sem prova de parada");
+  assert.ok(fs.existsSync(path.join(raiz, "console-bootstrap.js")), "the program must NOT be removed without proof of stop");
 });
 
 test("the uninstaller re-execution forwards the scope instead of letting the copy guess", async (t) => {
@@ -978,11 +978,11 @@ test("the uninstaller re-execution forwards the scope instead of letting the cop
   t.after(() => amb.restaurar());
   const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"), "utf8");
 
-  assert.match(fonte, /"--escopo", escopoEfetivo/, "o escopo resolvido precisa ir para a cópia temporária");
+  assert.match(fonte, /"--escopo", escopoEfetivo/, "the resolved scope must go to the temporary copy");
   assert.match(
     fonte,
     /a === "--raiz" \|\| a === "--estado" \|\| a === "--escopo"/,
-    "o escopo original precisa ser filtrado para não duplicar com o resolvido"
+    "the original scope must be filtered so it is not duplicated with the resolved one"
   );
 });
 
@@ -993,6 +993,6 @@ test("payload replacement restores the previous version if the second rename fai
   t.after(() => amb.restaurar());
   const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "instalacao", "instalar.js"), "utf8");
 
-  assert.match(fonte, /fs\.renameSync\(aposentado, destinoVersao\)/, "a falha do segundo rename precisa restaurar o anterior");
+  assert.match(fonte, /fs\.renameSync\(aposentado, destinoVersao\)/, "a failure of the second rename must restore the previous tree");
   assert.match(fonte, /a versão anterior foi restaurada/);
 });

@@ -36,7 +36,7 @@ for (const role of ["user", "admin", "superadmin"]) {
 
     for (const chave of chaves) {
       const esperado = ACOES[chave];
-      expect(esperado, `ação "${chave}" de Início sem cobertura`).toBeTruthy();
+      expect(esperado, `Início action "${chave}" without coverage`).toBeTruthy();
 
       const alvo = card(page, chave);
       await expect(alvo.locator(".hub-card-icon")).toHaveCount(1);

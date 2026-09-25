@@ -20,7 +20,7 @@ for (const variante of ["ausente", "duplicado", "fora-android", "origem-invalida
       fs.writeFileSync(config, xml);
       fs.copyFileSync(path.join(raiz, "harden-config.js"), path.join(dir, "harden-config.js"));
       const resultado = spawnSync(process.execPath, [path.join(dir, "harden-config.js"), variante === "origem-invalida" ? "invalid" : "https://example.invalid"], { encoding: "utf8" });
-      assert.notEqual(resultado.status, 0, "configuração ambígua foi aceita");
+      assert.notEqual(resultado.status, 0, "an ambiguous configuration was accepted");
       assert.equal(fs.readFileSync(config, "utf8"), xml);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });

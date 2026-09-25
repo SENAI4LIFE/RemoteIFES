@@ -56,7 +56,7 @@ test("the environment given to processes is built, not inherited", (t) => {
   process.env.SEGREDO_QUE_NAO_DEVE_VAZAR = "valor";
   const env = amb.processos.ambienteLimpo();
   assert.equal(env.SEGREDO_QUE_NAO_DEVE_VAZAR, undefined);
-  assert.equal(env.GIT_TERMINAL_PROMPT, "0", "o git não pode pedir credencial interativamente");
+  assert.equal(env.GIT_TERMINAL_PROMPT, "0", "git must not prompt for credentials interactively");
   assert.ok(env.PATH);
   delete process.env.SEGREDO_QUE_NAO_DEVE_VAZAR;
 
@@ -134,7 +134,7 @@ test("no action accepts a command line", (t) => {
     for (const [nome, regra] of Object.entries(acao.esquema || {})) {
       assert.ok(
         !/comando|cmd|shell|script|args|argv/i.test(nome),
-        `a ação ${acao.id} expõe um argumento livre de comando: ${nome}`
+        `action ${acao.id} exposes a free command argument: ${nome}`
       );
       assert.ok(["texto", "booleano", "segredo"].includes(regra.tipo), `tipo inesperado em ${acao.id}.${nome}`);
     }
@@ -150,11 +150,11 @@ test("the documentation command catalog is not an executable registry", (t) => {
 
   const idsDeAcao = new Set(amb.acoes.listar().map((a) => a.id));
   for (const [grupo, lista] of Object.entries(commands)) {
-    assert.ok(!idsDeAcao.has(grupo), `o grupo de documentação "${grupo}" não pode ser um id de ação`);
+    assert.ok(!idsDeAcao.has(grupo), `documentation group "${grupo}" must not be an action id`);
     assert.ok(Array.isArray(lista));
   }
   const todos = Object.values(commands).flat().join("\n");
-  assert.match(todos, /<[a-z]+>/, "o catálogo tem espaços reservados — prova de que é texto, não ação");
+  assert.match(todos, /<[a-z]+>/, "the catalog has placeholders, proof that it is text, not actions");
 });
 
 // --- Maintenance lock ----------------------------------------------------------------------
@@ -171,7 +171,7 @@ test("the Console lock uses the same file and format as the CLI", (t) => {
   const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
   assert.ok(fs.existsSync(arquivo));
   const conteudo = fs.readFileSync(arquivo, "utf8").trim();
-  assert.match(conteudo, /^\d+ \d{4}-\d{2}-\d{2}T/, "formato '<pid> <data>' é o que deploy.sh espera");
+  assert.match(conteudo, /^\d+ \d{4}-\d{2}-\d{2}T/, "the '<pid> <data>' format is what deploy.sh expects");
   assert.equal(Number(conteudo.split(/\s+/)[0]), process.pid);
 
   const situacao = amb.trava.situacao();
@@ -199,12 +199,12 @@ test("a live lock is never overridden, however old", (t) => {
   fs.utimesSync(arquivo, antigo, antigo);
 
   const situacao = amb.trava.situacao();
-  assert.equal(situacao.ocupada, true, "PID vivo significa operação viva, independente da idade");
+  assert.equal(situacao.ocupada, true, "a live PID means a live operation, regardless of age");
   assert.ok(situacao.idadeSegundos > amb.trava.IDADE_RESIDUO_MS / 1000);
 
   assert.throws(() => amb.trava.adquirir({ acao: "outra", trabalhoId: "t2", operador: "op" }), /andamento/);
   const remocao = amb.trava.removerResiduo("op");
-  assert.equal(remocao.ok, false, "não se remove a trava de um processo vivo");
+  assert.equal(remocao.ok, false, "a live process's lock is not removed");
   assert.match(remocao.erro, /ainda está em execução/);
 });
 
@@ -226,7 +226,7 @@ test("a dead process's lock is reconciled and taken over", (t) => {
 
   const trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
   const auditoria = amb.estado.lerAuditoria(20);
-  assert.ok(auditoria.some((a) => a.evento === "trava-residual-reconciliada"), "a reconciliação precisa ficar registrada");
+  assert.ok(auditoria.some((a) => a.evento === "trava-residual-reconciliada"), "the reconciliation must be recorded");
   trava.liberar();
 });
 
@@ -272,7 +272,7 @@ test("a job writes output to a file and records the outcome", async (t) => {
   const saida = amb.execucao.lerSaida(trabalho.id);
   assert.match(saida.texto, /linha um/);
   assert.match(saida.texto, /linha dois/);
-  assert.ok(fs.existsSync(amb.execucao.caminhoSaida(trabalho.id)), "a saída sobrevive fora da requisição HTTP");
+  assert.ok(fs.existsSync(amb.execucao.caminhoSaida(trabalho.id)), "output survives outside the HTTP request");
 });
 
 test("a failing job is recorded as a failure, with the exit code", async (t) => {
@@ -317,7 +317,7 @@ test("a job whose effect is not confirmed becomes unknown, not success", async (
     verificar: async () => ({ ok: false, resumo: "o serviço não confirmou a versão esperada" }),
   });
   const fim = await esperarFim(amb.execucao, trabalho.id);
-  assert.equal(fim.estado, amb.execucao.ESTADOS.DESCONHECIDO, "saída 0 não é prova de efeito");
+  assert.equal(fim.estado, amb.execucao.ESTADOS.DESCONHECIDO, "exit 0 is not proof of effect");
   assert.match(fim.erro, /não confirmou/);
 });
 
@@ -448,7 +448,7 @@ test("job history is bounded and old outputs are pruned", async (t) => {
     await esperarFim(amb.execucao, j.id);
   }
   const lista = amb.execucao.listar(50);
-  assert.equal(lista.length, 3, "o histórico respeita o limite configurado");
+  assert.equal(lista.length, 3, "history respects the configured limit");
   const saidas = fs.readdirSync(path.join(amb.estadoDir, "saidas"));
-  assert.ok(saidas.length <= 3, `saídas órfãs devem ser podadas (encontradas ${saidas.length})`);
+  assert.ok(saidas.length <= 3, `orphaned outputs must be pruned (found ${saidas.length})`);
 });

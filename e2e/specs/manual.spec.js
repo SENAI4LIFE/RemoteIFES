@@ -144,7 +144,7 @@ test("public Help covers Início, account, connection, accessibility and PWA", a
   await abrirApp(page, context, "user");
   await abrirManualPeloFab(page);
   for (const id of ["inicio", "inicio-acoes", "papeis", "conta-sessao", "conexao", "selecao-sala", "controlador", "relatos", "pwa-mobile", "acessibilidade", "solucao-problemas"]) {
-    await expect(page.locator(`#manual-sec-${id}`), `seção ${id} da Ajuda`).toHaveCount(1);
+    await expect(page.locator(`#manual-sec-${id}`), `Help section ${id}`).toHaveCount(1);
   }
   await expect(page.locator("#manual-sec-inicio-acoes")).toContainText("Relatar problema");
   await expect(page.locator("#manual-sec-pwa-mobile")).toContainText("atualiza sozinha");
@@ -249,7 +249,7 @@ test("the admin manual presents grouped Administration and the Dispositivos grou
     "Cadastro", "Firmware / OTA", "Alertas", "Logs", "Acessos", "Sessões", "Auditoria",
     "Status", "Usuários ativos", "Mapa", "Configurações",
   ]) {
-    await expect(secao, `manual precisa citar ${termo}`).toContainText(termo);
+    await expect(secao, `the manual must cite ${termo}`).toContainText(termo);
   }
   await expect(secao).not.toContainText("ESP32 / MACs");
   await expect(secao).not.toContainText("Saúde do sistema");
@@ -313,7 +313,7 @@ test("no visible manual topic uses the old Administration navigation", async ({ 
     "Acessos ESP32",
     "Saúde do sistema",
   ]) {
-    expect(texto, `navegação obsoleta no manual: ${obsoleto}`).not.toContain(obsoleto);
+    expect(texto, `obsolete navigation in the manual: ${obsoleto}`).not.toContain(obsoleto);
   }
   expect(texto).toContain("Administração > Dispositivos > Cadastro");
   expect(texto).toContain("Administração > Dispositivos > Firmware / OTA");
@@ -375,7 +375,7 @@ test("a public module that fails to load is reported and reloaded on the next op
   await abrirManualPeloFab(page);
   await expect(page.locator("#manualConteudo .manual-carga-falhou")).toContainText("O manual não pôde ser carregado");
   await expect(page.locator("#manualConteudo .manual-secao")).toHaveCount(0);
-  await expect(page.locator("#manualTocVazio"), "sem busca, o aviso de busca vazia não aparece").toBeHidden();
+  await expect(page.locator("#manualTocVazio"), "without a search, the empty-search notice does not appear").toBeHidden();
 
   bloqueados["manual-content.js"] = false;
   await page.locator("#manualConteudo .manual-recarregar").click();
@@ -459,8 +459,8 @@ for (const [nome, tamanho, ampliado, fonteLarga] of [
       }
       return { fora, artigoRola: artigo.scrollWidth > artigo.clientWidth + 1 };
     });
-    expect(medida.fora, "passos ou textos fora da própria caixa").toEqual([]);
-    expect(medida.artigoRola, "o artigo do manual não ganha rolagem horizontal").toBe(false);
+    expect(medida.fora, "steps or texts outside their own box").toEqual([]);
+    expect(medida.artigoRola, "the manual article gains no horizontal scroll").toBe(false);
     expect(await semRolagemHorizontal(page)).toBe(true);
   });
 }

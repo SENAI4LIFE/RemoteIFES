@@ -61,8 +61,8 @@ test("deploy.sh proceeds when .env does not define REMOTEIFES_DATA_DIR and uses 
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /Versão atual:/);
   assert.match(r.stdout, /não foi possível resolver o ref 'origin\/main'/);
-  assert.ok(fs.existsSync(path.join(dir, "data")), "o diretório padrão de dados precisa ter sido criado");
-  assert.ok(!fs.existsSync(path.join(dir, "data", ".deploy-lock")), "o lock deve ser removido na saída");
+  assert.ok(fs.existsSync(path.join(dir, "data")), "the default data directory must have been created");
+  assert.ok(!fs.existsSync(path.join(dir, "data", ".deploy-lock")), "the lock must be removed on exit");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -91,8 +91,8 @@ test("deploy.sh does not accept the update when npm ci fails, even with an old/p
   assert.match(r.stdout, /npm ci falhou/);
   assert.doesNotMatch(r.stdout, /Atualização aplicada/);
   assert.match(r.stdout, /Revertendo para/);
-  assert.equal(git(dir, "rev-parse", "HEAD"), shaA, "o código precisa voltar à versão anterior");
-  assert.ok(fs.existsSync(path.join(dir, "node_modules", ".parcial")), "o cenário simulou um node_modules parcial");
+  assert.equal(git(dir, "rev-parse", "HEAD"), shaA, "the code must return to the previous version");
+  assert.ok(fs.existsSync(path.join(dir, "node_modules", ".parcial")), "the scenario simulated a partial node_modules");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -221,10 +221,10 @@ test("deploy.sh does not complete when the restart fails and the old process kee
     assert.match(r.stdout, new RegExp(`o processo em execução continua em ${shaA}, não em ${shaC}`));
     assert.match(r.stdout, /Revertendo para/);
     assert.match(r.stdout, new RegExp(`Revertido para ${shaA} e o servidor em execução está saudável nessa versão`));
-    assert.equal(git(dir, "rev-parse", "HEAD"), shaA, "o código volta à versão que de fato está rodando");
-    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")), "nada é registrado como versão corrente");
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaA, "the code returns to the version actually running");
+    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")), "nothing is recorded as the current version");
     assert.match(lerDeployLog(dir), /FALHOU: o processo em execução continua em/);
-    assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 2, "um restart no deploy e um na reversão");
+    assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 2, "one restart in deploy and one in the rollback");
   } finally {
     servico.parar();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -242,7 +242,7 @@ test("deploy.sh does not complete when the started process reports another versi
     assert.doesNotMatch(r.stdout, /Deploy concluído/);
     assert.match(r.stdout, /o processo em execução continua em 1{40}/);
     assert.equal(git(dir, "rev-parse", "HEAD"), shaA);
-    assert.match(r.stdout, /ATENÇÃO: código revertido para/, "a reversão também não finge sucesso: o processo divergente continua no ar");
+    assert.match(r.stdout, /ATENÇÃO: código revertido para/, "the rollback does not fake success either: the diverging process stays up");
     assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")));
   } finally {
     servico.parar();
@@ -281,7 +281,7 @@ test("rollback.sh does not complete when the restart fails and the current versi
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.doesNotMatch(r.stdout, /Rollback concluído/);
     assert.match(r.stdout, new RegExp(`o processo em execução continua em ${shaC}, não em ${shaA} \\(o reinício não aplicou a reversão\\)`));
-    assert.equal(git(dir, "rev-parse", "HEAD"), shaA, "o código fica na versão pedida para o operador agir");
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaA, "the code stays at the requested version for the operator to act");
     assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")));
     assert.match(lerDeployLog(dir), /rollback .* FALHOU: o processo em execução continua em/);
   } finally {
@@ -334,7 +334,7 @@ test("rollback.sh to a version without identity does not complete when the old p
     assert.doesNotMatch(r.stdout, /Rollback concluído/);
     assert.match(r.stdout, /não informa o commit e está no ar há \d+s, ou seja, sobreviveu ao reinício/);
     assert.match(lerDeployLog(dir), /rollback .* FALHOU: o processo em execução não informa o commit e está no ar há/);
-    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")), "um /health saudável sem identidade não vira registro de sucesso");
+    assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")), "a healthy /health without identity does not become a success record");
   } finally {
     legado.parar();
   }
@@ -404,13 +404,13 @@ test("deploy.sh with the code already at the target does not mark it complete: i
     assert.equal(servico.commitEmExecucao(), shaC);
     assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 1);
     assert.equal(fs.readFileSync(path.join(dir, "data", "current-version"), "utf8").trim(), shaC);
-    assert.equal(fs.readFileSync(path.join(dir, "data", "previous-version"), "utf8").trim(), shaA, "a versão que estava rodando é a de retorno");
+    assert.equal(fs.readFileSync(path.join(dir, "data", "previous-version"), "utf8").trim(), shaA, "the version that was running is the rollback target");
     assert.match(lerDeployLog(dir), new RegExp(`deploy ${shaA} -> ${shaC} .* ok \\(código já estava em ${shaC}; processo em execução confirmou`));
 
     r = sh(dir, `bash deploy.sh ${shaC} --offline`, servico.ambiente("falha"));
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /Já está na versão alvo .* e o processo em execução a confirma\. Nada a fazer\./);
-    assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 1, "nada é reiniciado quando o processo já confirma a versão");
+    assert.equal(servico.chamadasSystemctl().filter((c) => c.includes("restart")).length, 1, "nothing is restarted when the process already confirms the version");
   } finally {
     servico.parar();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -428,7 +428,7 @@ test("deploy.sh with the code already at the target and a failing restart does n
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.doesNotMatch(r.stdout, /Deploy concluído|Nada a fazer/);
     assert.match(r.stdout, new RegExp(`ATENÇÃO: o código está em ${shaC}, mas o processo em execução continua em ${shaA}`));
-    assert.equal(git(dir, "rev-parse", "HEAD"), shaC, "sem versão anterior conhecida do checkout, o código fica para o operador agir");
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaC, "without a known previous checkout version, the code stays for the operator to act");
     assert.ok(!fs.existsSync(path.join(dir, "data", "current-version")));
     assert.match(lerDeployLog(dir), /FALHOU: o processo em execução continua em/);
   } finally {

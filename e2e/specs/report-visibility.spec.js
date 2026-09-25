@@ -89,10 +89,10 @@ for (const [rotulo, ajustes] of Object.entries(ESTADOS)) {
 
       const medidos = await page.evaluate(contrastes);
       for (const [nome, medida] of Object.entries(medidos)) {
-        expect(medida, `${nome} não foi encontrado na tela`).not.toBeNull();
-        expect(medida.texto.length, `${nome} está sem conteúdo`).toBeGreaterThan(0);
-        expect(medida.opacidade, `${nome} está transparente`).toBeGreaterThan(0.5);
-        expect(medida.razao, `${nome} ficou ilegível (contraste ${medida.razao.toFixed(2)}:1)`).toBeGreaterThanOrEqual(4.5);
+        expect(medida, `${nome} was not found on screen`).not.toBeNull();
+        expect(medida.texto.length, `${nome} has no content`).toBeGreaterThan(0);
+        expect(medida.opacidade, `${nome} is transparent`).toBeGreaterThan(0.5);
+        expect(medida.razao, `${nome} became illegible (contrast ${medida.razao.toFixed(2)}:1)`).toBeGreaterThanOrEqual(4.5);
       }
     });
   }

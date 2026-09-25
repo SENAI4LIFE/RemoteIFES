@@ -57,15 +57,15 @@ test("a corrupted database is diagnosed and a normal restore still refuses to ov
   const diagnostico = backupService.diagnosticarBancoAtual(DB);
   assert.equal(diagnostico.integro, false);
   assert.throws(() => backupService.restaurarBackup(ponto.arquivo), /recuperação com quarentena/);
-  assert.ok(fs.existsSync(DB), "sem a opção explícita nada é movido");
-  assert.equal(fs.readFileSync(`${DB}-wal`, "utf8"), "lixo de wal", "a tentativa recusada não pode destruir o WAL forense");
+  assert.ok(fs.existsSync(DB), "without the explicit option nothing is moved");
+  assert.equal(fs.readFileSync(`${DB}-wal`, "utf8"), "lixo de wal", "the refused attempt must not destroy the forensic WAL");
   assert.ok(fs.existsSync(`${DB}-shm`));
   assert.equal(fs.readdirSync(RAIZ_TMP).filter((n) => n.includes(".corrompido-")).length, 0);
 });
 
 test("with explicit recovery the damaged database is quarantined, the verified backup is installed and the forensic files are kept", () => {
   const resultado = backupService.restaurarBackup(ponto.arquivo, { quarentenarDanificado: true });
-  assert.equal(resultado.copiaSeguranca, null, "não existe cópia de segurança verificada de um banco corrompido");
+  assert.equal(resultado.copiaSeguranca, null, "there is no verified safety copy of a corrupted database");
   assert.ok(resultado.quarentena.banco.includes(".corrompido-"));
   assert.ok(fs.existsSync(resultado.quarentena.banco));
   assert.ok(fs.existsSync(resultado.quarentena.wal));

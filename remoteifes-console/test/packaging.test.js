@@ -111,14 +111,14 @@ test("the builder produces payload, manifest and honest provenance", (t) => {
   assert.equal(manifesto.esquema, 1);
   assert.equal(manifesto.versao, versao);
   assert.ok(manifesto.artefatos.length >= 1);
-  assert.ok(Date.parse(manifesto.expiraEm) > Date.now(), "o manifesto precisa nascer com validade futura");
+  assert.ok(Date.parse(manifesto.expiraEm) > Date.now(), "the manifest must be created with a future expiry");
 
   // Without a signature the manifest is worthless, and the builder does not produce one: signing is
   // a credentialed step, separate from the build so the key is never exposed to build code.
-  assert.ok(!fs.existsSync(path.join(saida, "manifesto.json.sig")), "quem assina é a etapa credenciada");
+  assert.ok(!fs.existsSync(path.join(saida, "manifesto.json.sig")), "the credentialed step signs");
 
   const proveniencia = JSON.parse(fs.readFileSync(path.join(saida, "proveniencia.json"), "utf8"));
-  assert.equal(proveniencia.assinado, false, "artefatos de CI não são de produção");
+  assert.equal(proveniencia.assinado, false, "CI artifacts are not production artifacts");
   assert.match(proveniencia.observacao, /NÃO ASSINADOS/);
   assert.ok(proveniencia.artefatos.every((a) => /^[0-9a-f]{64}$/.test(a.sha256)));
 });
@@ -139,11 +139,11 @@ test("the built payload is exactly what the updater's extractor understands", (t
   const r = atualizador.extrairTarGz(path.join(saida, manifesto.artefatos[0].arquivo), destino);
   assert.ok(r.arquivos > 20, "o payload traz o programa inteiro");
   for (const exigido of ["console.js", "launcher.js", "package.json", path.join("src", "servidor.js"), path.join("web", "index.html"), path.join("instalacao", "console-bootstrap.js")]) {
-    assert.ok(fs.existsSync(path.join(destino, exigido)), `payload sem ${exigido}`);
+    assert.ok(fs.existsSync(path.join(destino, exigido)), `payload without ${exigido}`);
   }
   // Tests and packaging material are not part of the installed program.
-  assert.ok(!fs.existsSync(path.join(destino, "test")), "testes não entram no payload");
-  assert.ok(!fs.existsSync(path.join(destino, "empacotar")), "o empacotador não entra no payload");
+  assert.ok(!fs.existsSync(path.join(destino, "test")), "tests do not enter the payload");
+  assert.ok(!fs.existsSync(path.join(destino, "empacotar")), "the packager does not enter the payload");
 });
 
 test("the tar is well formed for ANY reader, not only our extractor", (t) => {
@@ -173,15 +173,15 @@ test("the tar is well formed for ANY reader, not only our extractor", (t) => {
 
   assert.ok(membros.length > 40, "o payload tem o programa inteiro");
   for (const m of membros) {
-    assert.ok(m.tipo === "0" || m.tipo === "5", `${m.nome} tem typeflag ${JSON.stringify(m.tipo)}; só arquivo (0) e diretório (5) são emitidos`);
-    assert.equal(m.ustar, "ustar", `${m.nome} não declara o formato ustar`);
+    assert.ok(m.tipo === "0" || m.tipo === "5", `${m.nome} has typeflag ${JSON.stringify(m.tipo)}; only file (0) and directory (5) are emitted`);
+    assert.equal(m.ustar, "ustar", `${m.nome} does not declare the ustar format`);
   }
 
   // Every directory appears as its own member, BEFORE anything that lives in it.
   const vistos = new Set();
   for (const m of membros) {
     if (m.tipo === "5") {
-      assert.match(m.nome, /\/$/, `entrada de diretório ${m.nome} precisa terminar em barra`);
+      assert.match(m.nome, /\/$/, `directory entry ${m.nome} must end with a slash`);
       vistos.add(m.nome);
       continue;
     }
@@ -189,15 +189,15 @@ test("the tar is well formed for ANY reader, not only our extractor", (t) => {
     let acumulado = "";
     for (const parte of partes) {
       acumulado += `${parte}/`;
-      assert.ok(vistos.has(acumulado), `${m.nome} aparece antes da entrada de diretório ${acumulado}`);
+      assert.ok(vistos.has(acumulado), `${m.nome} appears before the directory entry ${acumulado}`);
     }
   }
-  assert.ok(vistos.has("src/") && vistos.has("src/plataforma/"), "diretórios aninhados também têm entrada própria");
+  assert.ok(vistos.has("src/") && vistos.has("src/plataforma/"), "nested directories also have their own entry");
 
   // The executable bit comes from the shebang; no setuid/setgid comes out of here.
   const runner = membros.find((m) => m.nome === "bin/backup.js");
   assert.ok(runner, "os runners viajam no payload");
-  assert.equal(runner.modo, 0o755, "um runner com shebang precisa sair executável");
+  assert.equal(runner.modo, 0o755, "a runner with a shebang must be executable");
   assert.ok(membros.every((m) => (m.modo & 0o6000) === 0), "nenhum membro pode carregar setuid/setgid");
 });
 
@@ -232,7 +232,7 @@ test("complete chain: build, sign, publish and actually update", async (t) => {
   assert.equal(r.versao, NOVA);
   assert.ok(
     linhas.some((l) => /SHA-256 confere/.test(l)),
-    "o digest precisa ser conferido contra o manifesto assinado"
+    "the digest must be checked against the signed manifest"
   );
 
   // The new version is on disk, the pointer references it, and the previous one is kept.
@@ -242,8 +242,8 @@ test("complete chain: build, sign, publish and actually update", async (t) => {
   const info = atualizador.lerEstadoInstalacao();
   assert.equal(info.versaoAtiva, NOVA);
   assert.equal(info.versaoAnterior, "0.0.1");
-  assert.equal(info.transacao.etapa, "concluida", "nenhuma transação fica pendente depois do sucesso");
-  assert.ok(!fs.existsSync(path.join(instalacao, "descargas", NOVA)), "a área de estágio é limpa");
+  assert.equal(info.transacao.etapa, "concluida", "no transaction stays pending after success");
+  assert.ok(!fs.existsSync(path.join(instalacao, "descargas", NOVA)), "the staging area is cleaned");
 
   // And rollback moves the pointer back without any network: the release server is already closed.
   await servidor.fechar();
@@ -286,9 +286,9 @@ test("offline import actually installs, without any network", async (t) => {
 
   assert.equal(r.ok, true, r.erro);
   assert.equal(r.versao, NOVA);
-  assert.ok(fs.existsSync(path.join(instalacao, "versoes", NOVA, "src", "servidor.js")), "o payload precisa ficar instalado");
+  assert.ok(fs.existsSync(path.join(instalacao, "versoes", NOVA, "src", "servidor.js")), "the payload must be installed");
   const info = atualizador.lerEstadoInstalacao();
-  assert.equal(info.versaoAtiva, NOVA, "o ponteiro tem de apontar para a versão importada");
+  assert.equal(info.versaoAtiva, NOVA, "the pointer must reference the imported version");
   assert.equal(info.versaoAnterior, "0.0.1");
   assert.equal(info.transacao.etapa, "concluida");
 });
@@ -342,11 +342,11 @@ test("swapping the artifact after verification does not change what is installed
     log: () => {},
   });
 
-  assert.equal(r.ok, true, `a instalação deve usar os bytes verificados: ${r.erro}`);
+  assert.equal(r.ok, true, `installation must use the verified bytes: ${r.erro}`);
   const instalado = path.join(instalacao, "versoes", NOVA);
-  assert.ok(fs.existsSync(path.join(instalado, "src", "servidor.js")), "o payload verificado é o que ficou instalado");
+  assert.ok(fs.existsSync(path.join(instalado, "src", "servidor.js")), "the verified payload is what was installed");
   const pacote = JSON.parse(fs.readFileSync(path.join(instalado, "package.json"), "utf8"));
-  assert.equal(pacote.version, NOVA, "o conteúdo instalado é o do artefato original, não o trocado");
+  assert.equal(pacote.version, NOVA, "the installed content is the original artifact's, not the swapped one");
 });
 
 test("offline import refuses a tampered artifact and installs nothing", async (t) => {
@@ -380,8 +380,8 @@ test("offline import refuses a tampered artifact and installs nothing", async (t
     log: () => {},
   });
   assert.equal(r.ok, false);
-  assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nada pode ser instalado com digest divergente");
-  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "o ponteiro não se move");
+  assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nothing may be installed with a mismatched digest");
+  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "the pointer does not move");
 });
 
 test("a manifest tampered with after signing is refused", async (t) => {
@@ -447,8 +447,8 @@ test("an artifact swapped on the server does not pass the signed manifest's dige
 
   const r = await atualizador.atualizar(NOVA, { log: () => {} });
   assert.equal(r.ok, false);
-  assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nada é instalado quando o digest não confere");
-  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "o ponteiro não se move");
+  assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nothing is installed when the digest does not match");
+  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "the pointer does not move");
 });
 
 test("without a provisioned publishing key, the Console says so instead of accepting any release", async (t) => {
@@ -457,7 +457,7 @@ test("without a provisioned publishing key, the Console says so instead of accep
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
 
-  assert.equal(release.CHAVE_PUBLICA_OFICIAL, null, "nenhuma chave de produção fica no repositório");
+  assert.equal(release.CHAVE_PUBLICA_OFICIAL, null, "no production key stays in the repository");
   assert.equal(release.confianciaConfigurada(), false);
   const r = await atualizador.verificarPublicacao({ forcar: true });
   assert.equal(r.ok, false);
@@ -479,14 +479,14 @@ test("the signing tool refuses a manifest that is already expired", (t) => {
     `${JSON.stringify({ esquema: 1, versao: "2.0.0", expiraEm: new Date(Date.now() - 1000).toISOString(), artefatos: [] })}\n`
   );
   assert.throws(() => assinar(manifesto, par.privada));
-  assert.ok(!fs.existsSync(`${manifesto}.sig`), "nada é assinado");
+  assert.ok(!fs.existsSync(`${manifesto}.sig`), "nothing is signed");
 });
 
 test("the private publishing key never comes from a command-line argument", () => {
   const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "empacotar", "assinar-manifesto.js"), "utf8");
   // `--chave` receives a PATH; key material comes from a file or the environment variable.
   assert.match(fonte, /CONSOLE_CHAVE_PRIVADA/);
-  assert.ok(!/--chave-conteudo|--chave-privada-conteudo|--segredo/.test(fonte), "não pode existir opção que receba a chave em argv");
+  assert.ok(!/--chave-conteudo|--chave-privada-conteudo|--segredo/.test(fonte), "no option may accept the key in argv");
 });
 
 test("the .deb is assembled in the ar format dpkg understands", (t) => {
@@ -496,10 +496,10 @@ test("the .deb is assembled in the ar format dpkg understands", (t) => {
   construir(ajuda.RAIZ, saida, ["--alvo", "linux-x64", "--formato", "todos"]);
   const versao = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8")).version;
   const deb = path.join(saida, `remoteifes-console_${versao}_all.deb`);
-  assert.ok(fs.existsSync(deb), "o .deb precisa ser construído a partir de qualquer plataforma");
+  assert.ok(fs.existsSync(deb), "the .deb must be buildable from any platform");
 
   const conteudo = fs.readFileSync(deb);
-  assert.equal(conteudo.subarray(0, 8).toString(), "!<arch>\n", "o .deb é um arquivo ar");
+  assert.equal(conteudo.subarray(0, 8).toString(), "!<arch>\n", "the .deb is an ar archive");
   for (const membro of ["debian-binary", "control.tar.gz", "data.tar.gz"]) {
     assert.ok(conteudo.includes(Buffer.from(membro)), `membro ${membro} ausente`);
   }
@@ -576,12 +576,12 @@ test("the GitHub token does not follow a redirect to another host", async (t) =>
   assert.ok(daApi.length >= 2, `esperava listagem + download na API; recebi ${JSON.stringify(api.recebidas)}`);
   assert.ok(
     daApi.every((x) => /^Bearer /.test(x.autorizacao || "")),
-    "o host da API precisa receber a credencial em todas as chamadas"
+    "the API host must receive the credential on every call"
   );
 
-  assert.equal(cdn.recebidas.length, 1, "o armazenamento recebe o download redirecionado");
-  assert.equal(cdn.recebidas[0].autorizacao, null, "o armazenamento NÃO pode receber a credencial");
-  assert.equal(fs.readFileSync(destino).toString(), CORPO_ARTEFATO.toString(), "o conteúdo baixado é o do armazenamento");
+  assert.equal(cdn.recebidas.length, 1, "storage receives the redirected download");
+  assert.equal(cdn.recebidas[0].autorizacao, null, "storage must NOT receive the credential");
+  assert.equal(fs.readFileSync(destino).toString(), CORPO_ARTEFATO.toString(), "the downloaded content is storage's");
 });
 
 test("a redirect loop is cut off instead of followed forever", async (t) => {
@@ -609,6 +609,6 @@ test("a redirect loop is cut off instead of followed forever", async (t) => {
   const r = await github.baixarArtefato(1, 9, destino);
   assert.equal(r.ok, false);
   assert.match(r.erro, /redirecionamentos/);
-  assert.ok(saltos <= 6, `o laço tem de ser cortado rápido; houve ${saltos} redirecionamentos`);
-  assert.ok(!fs.existsSync(destino), "nada é gravado quando o download não conclui");
+  assert.ok(saltos <= 6, `the loop must be cut quickly; there were ${saltos} redirects`);
+  assert.ok(!fs.existsSync(destino), "nothing is written when the download does not complete");
 });

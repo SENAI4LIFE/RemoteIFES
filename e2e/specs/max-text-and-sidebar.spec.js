@@ -32,7 +32,7 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
       await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--a11y-font-scale").trim())).toBe("2");
       await expect(page.locator(".hub-card-badge:not(.hidden)").first()).toBeVisible();
 
-      expect(await semRolagemHorizontal(page), "documento sem rolagem horizontal").toBe(true);
+      expect(await semRolagemHorizontal(page), "document without horizontal scroll").toBe(true);
       const medida = await page.evaluate(() => {
         const limite = document.documentElement.clientWidth;
         const selos = Array.from(document.querySelectorAll(".hub-card-badge:not(.hidden)")).map((selo) => {
@@ -48,11 +48,11 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
         return { selos, heroiTextoAlem: Math.round(textoHeroi.right - heroi.right) };
       });
       for (const selo of medida.selos) {
-        expect(selo.textoAlemDaCaixa, `texto do selo «${selo.texto}» dentro da própria caixa`).toBeLessThanOrEqual(1);
-        expect(selo.caixaAlemDoCartao, `selo «${selo.texto}» dentro do cartão`).toBeLessThanOrEqual(0);
+        expect(selo.textoAlemDaCaixa, `badge text «${selo.texto}» inside its own box`).toBeLessThanOrEqual(1);
+        expect(selo.caixaAlemDoCartao, `badge «${selo.texto}» inside the card`).toBeLessThanOrEqual(0);
         expect(selo.alemDaTela, `selo «${selo.texto}» dentro da tela`).toBeLessThanOrEqual(0);
       }
-      expect(medida.heroiTextoAlem, "o texto do herói não alarga o bloco além dele").toBeLessThanOrEqual(0);
+      expect(medida.heroiTextoAlem, "the hero text does not widen the block beyond it").toBeLessThanOrEqual(0);
     });
   }
 }
@@ -114,20 +114,20 @@ for (const [nome, tamanho, ajustes] of CENARIOS_LATERAL) {
     await expect(page.locator(".admin-subtabs")).toBeVisible();
 
     const parada = await page.evaluate(medirLateral);
-    expect(parada.sticky, "a barra lateral é sticky neste tamanho").toBe(true);
+    expect(parada.sticky, "the sidebar is sticky at this size").toBe(true);
     if (!parada.comecaAbaixoDaBarra) {
       expect(parada.caixaBase, "parada: a caixa termina acima da barra inferior").toBeLessThanOrEqual(parada.topoDaBarra);
-      expect(parada.ultimoSobABarra, "parada: o último item não fica sob a barra").toBe(0);
-      expect(parada.ultimoAlcancavel, "parada: o último item recebe o toque").toBe(true);
+      expect(parada.ultimoSobABarra, "at rest: the last item is not under the bar").toBe(0);
+      expect(parada.ultimoAlcancavel, "at rest: the last item receives the tap").toBe(true);
     }
 
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     const rolada = await page.evaluate(medirLateral);
     // The clearance is measured against the real bottom bar (with maximum text it exceeds 100px).
-    expect(rolada.topoDaBarra - rolada.caixaBase, "rolada: folga até a barra inferior real").toBeGreaterThanOrEqual(20);
-    expect(rolada.ultimoSobABarra, "rolada: o último item não fica sob a barra").toBe(0);
-    expect(rolada.ultimoAlcancavel, "rolada: o último item recebe o toque").toBe(true);
+    expect(rolada.topoDaBarra - rolada.caixaBase, "scrolled: clearance to the real bottom bar").toBeGreaterThanOrEqual(20);
+    expect(rolada.ultimoSobABarra, "scrolled: the last item is not under the bar").toBe(0);
+    expect(rolada.ultimoAlcancavel, "scrolled: the last item receives the tap").toBe(true);
   });
 }
 
@@ -177,18 +177,18 @@ for (const [nome, tamanho] of CENARIOS_PAGINACAO) {
         await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--a11y-font-scale").trim())).toBe(ajustes.remoteifes_font_scale);
       }
 
-      expect(await semRolagemHorizontal(page), "documento sem rolagem horizontal").toBe(true);
+      expect(await semRolagemHorizontal(page), "document without horizontal scroll").toBe(true);
       const medida = await page.evaluate(medirPaginacao);
-      expect(medida.caixaDentroDaTela, "a paginação cabe na tela").toBe(true);
+      expect(medida.caixaDentroDaTela, "the pagination fits on screen").toBe(true);
       for (const [rotulo, botao] of [["← Anterior", medida.anterior], ["Próxima →", medida.proxima]]) {
-        expect(botao.linhas, `«${rotulo}» fica em uma linha`).toBe(1);
-        expect(botao.dentroDaCaixa, `«${rotulo}» dentro da paginação`).toBe(true);
-        expect(botao.recebeOToque, `«${rotulo}» recebe o toque no centro`).toBe(true);
+        expect(botao.linhas, `«${rotulo}» stays on one line`).toBe(1);
+        expect(botao.dentroDaCaixa, `«${rotulo}» inside the pagination`).toBe(true);
+        expect(botao.recebeOToque, `«${rotulo}» receives the tap at its center`).toBe(true);
       }
-      expect(medida.contador.dentroDaCaixa, "o contador fica dentro da paginação").toBe(true);
+      expect(medida.contador.dentroDaCaixa, "the counter stays inside the pagination").toBe(true);
       if (!ajustes.remoteifes_font_scale) {
         // With default text both buttons stay on the same line (the counter wraps before them).
-        expect(medida.anterior.topo < medida.proxima.base && medida.proxima.topo < medida.anterior.base, "os botões dividem a linha").toBe(true);
+        expect(medida.anterior.topo < medida.proxima.base && medida.proxima.topo < medida.anterior.base, "the buttons share the line").toBe(true);
       }
     });
   }

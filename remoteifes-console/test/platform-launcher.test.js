@@ -28,9 +28,9 @@ test("every platform has an adapter and the contract is the same", (t) => {
     process.env.CONSOLE_PLATAFORMA = alvo;
     const adaptador = seletor.escolher();
     for (const fn of exigidos) {
-      assert.equal(typeof adaptador[fn], "function", `${alvo} não implementa ${fn}`);
+      assert.equal(typeof adaptador[fn], "function", `${alvo} does not implement ${fn}`);
     }
-    assert.ok(adaptador.nome && adaptador.rotulo, `${alvo} sem identificação`);
+    assert.ok(adaptador.nome && adaptador.rotulo, `${alvo} without identification`);
   }
   delete process.env.CONSOLE_PLATAFORMA;
 });
@@ -65,8 +65,8 @@ test("the architecture distinguishes hardware, kernel, userland and runtime", as
   const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma", "index.js"));
 
   const a = await plataforma.classificarArquitetura();
-  assert.equal(a.runtime, process.arch, "o runtime é quem decide o artefato");
-  assert.ok("kernel" in a && "userland" in a && "hardware" in a, "as quatro camadas são separadas");
+  assert.equal(a.runtime, process.arch, "the runtime decides the artifact");
+  assert.ok("kernel" in a && "userland" in a && "hardware" in a, "the four layers are separate");
   assert.match(a.alvoDeArtefato, new RegExp(process.arch));
   assert.match(a.observacao, /Raspberry Pi 3/);
   // The ARMv7 caveat appears only when the userland/runtime is 32-bit.
@@ -121,11 +121,11 @@ test("Windows ends the tree with taskkill, not a POSIX group", (t) => {
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
   const linux = require(path.join(ajuda.RAIZ, "src", "plataforma", "linux.js"));
 
-  assert.notEqual(windows.encerrarArvore, linux.encerrarArvore, "o Windows precisa de implementação própria");
+  assert.notEqual(windows.encerrarArvore, linux.encerrarArvore, "Windows needs its own implementation");
   assert.equal(windows.opcoesDeGrupo().windowsHide, true);
   const fonte = fs.readFileSync(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"), "utf8");
-  assert.match(fonte, /taskkill/, "matar só o pai deixaria netos vivos no Windows");
-  assert.match(fonte, /icacls/, "proteção de arquivo no Windows é ACL, não modo POSIX");
+  assert.match(fonte, /taskkill/, "killing only the parent would leave grandchildren alive on Windows");
+  assert.match(fonte, /icacls/, "file protection on Windows is an ACL, not a POSIX mode");
 });
 
 test("the Windows scheduled task receives the script, and the path with a space survives", async (t) => {
@@ -158,17 +158,17 @@ test("the Windows scheduled task receives the script, and the path with a space 
   assert.equal(r.disponivel, true, r.motivo);
 
   const criacao = chamadas.find((c) => c.args.includes("/Create"));
-  assert.ok(criacao, "a criação precisa ir para o schtasks");
-  assert.equal(criacao.exe, "schtasks.exe", "o schtasks é chamado direto, sem PowerShell em volta");
+  assert.ok(criacao, "creation must go to schtasks");
+  assert.equal(criacao.exe, "schtasks.exe", "schtasks is called directly, without PowerShell around it");
 
   const alvo = criacao.args[criacao.args.indexOf("/TR") + 1];
-  assert.ok(alvo.includes("console-bootstrap.js"), `a tarefa precisa apontar para o bootstrap; recebeu: ${alvo}`);
-  assert.ok(alvo.includes(raiz), "o caminho da instalação precisa chegar inteiro");
+  assert.ok(alvo.includes("console-bootstrap.js"), `the task must point to the bootstrap; got: ${alvo}`);
+  assert.ok(alvo.includes(raiz), "the installation path must arrive whole");
   assert.equal(alvo, '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\op\\AppData\\Local\\Programs\\RemoteIFES Console\\console-bootstrap.js"');
 
   // The task name goes as its own argument: no embedded quotes for a shell to undo.
   assert.equal(criacao.args[criacao.args.indexOf("/TN") + 1], "RemoteIFES Console");
-  assert.ok(!criacao.args.includes("/RU"), "escopo de usuário não pede execução como SYSTEM");
+  assert.ok(!criacao.args.includes("/RU"), "user scope does not ask to run as SYSTEM");
 
   const comoSistema = await windows.registrarInicializacao({
     comando: "node.exe",
@@ -219,11 +219,11 @@ test("on Windows disk space is measured without starting any process", async (t)
   });
 
   const r = await windows.disco([ajuda.RAIZ, require("os").tmpdir()]);
-  assert.equal(abriuProcesso, false, "a medição de disco do Windows não pode abrir processo");
+  assert.equal(abriuProcesso, false, "Windows disk measurement must not start a process");
   assert.equal(r.length, 2);
   for (const d of r) {
     assert.equal(d.suportado, true, d.motivo);
-    assert.ok(d.totalBytes > 0, "o total precisa ser um número real");
+    assert.ok(d.totalBytes > 0, "the total must be a real number");
     assert.ok(d.livreBytes >= 0 && d.livreBytes <= d.totalBytes);
     assert.ok(d.usoPercentual >= 0 && d.usoPercentual <= 100);
   }
@@ -241,7 +241,7 @@ test("each system measures disk space and states which device it measured", asyn
   assert.equal(r.length, 1);
   assert.equal(r[0].suportado, true, r[0].motivo);
   assert.ok(r[0].totalBytes > 0);
-  assert.ok(r[0].montagem, "a medição precisa dizer onde mediu");
+  assert.ok(r[0].montagem, "the measurement must say where it measured");
 });
 
 test("on Windows file protection is not claimed through a POSIX mode", (t) => {
@@ -278,7 +278,7 @@ test("the backend publishes a protected identity contract", async (t) => {
 
   const protecao = identidade.protecaoDoContrato();
   assert.equal(protecao.presente, true);
-  if (protecao.verificavel) assert.equal(protecao.restrito, true, "o contrato não pode ser legível por outros");
+  if (protecao.verificavel) assert.equal(protecao.restrito, true, "the contract must not be readable by others");
 });
 
 test("the identity proof verifies and does not reveal the secret", async (t) => {
@@ -297,7 +297,7 @@ test("the identity proof verifies and does not reveal the secret", async (t) => 
   assert.equal(r.status, 200);
   const esperado = crypto.createHmac("sha256", Buffer.from(contrato.segredo, "base64url")).update(desafio).digest("base64url");
   assert.equal(r.json.prova, esperado);
-  assert.ok(!r.texto.includes(contrato.segredo), "o segredo nunca vai na resposta");
+  assert.ok(!r.texto.includes(contrato.segredo), "the secret never goes in the response");
 
   // Different challenge, different proof: there is no reusable fixed answer.
   const outro = await ajuda.pedir(s.porta, `/api/identidade?desafio=${encodeURIComponent(crypto.randomBytes(32).toString("base64url"))}`);
@@ -346,7 +346,7 @@ test("the launcher refuses to open the browser on an impostor that took the port
 
   const garantia = await launcher.garantirBackend();
   assert.equal(garantia.ok, false);
-  assert.equal(garantia.impostor, true, "o lançador não pode subir outro backend nem abrir o navegador");
+  assert.equal(garantia.impostor, true, "the launcher must not start another backend or open the browser");
 });
 
 test("the launcher opens the real Console after verifying identity", async (t) => {
@@ -361,7 +361,7 @@ test("the launcher opens the real Console after verifying identity", async (t) =
 
   const r = await launcher.garantirBackend();
   assert.equal(r.ok, true, JSON.stringify(r));
-  assert.equal(r.jaEstava, true, "não sobe um segundo backend quando já há um válido");
+  assert.equal(r.jaEstava, true, "does not start a second backend when a valid one exists");
   assert.equal(launcher.urlDoConsole(r.contrato), `http://127.0.0.1:${s.porta}/`);
 });
 
@@ -388,12 +388,12 @@ test("the application URL comes from the real configuration, not a fixed port", 
   });
   const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
 
-  assert.equal(launcher.urlDaAplicacao(), "https://remoteifes.ifes.edu.br", "atrás de proxy, o endereço é o domínio");
+  assert.equal(launcher.urlDaAplicacao(), "https://remoteifes.ifes.edu.br", "behind a proxy, the address is the domain");
 
   fs.writeFileSync(path.join(checkout, "remoteifes-server", ".env"), "PORTA=9090\n");
   const amb2 = ajuda.ambiente({ checkout });
   const launcher2 = require(path.join(ajuda.RAIZ, "launcher.js"));
-  assert.equal(launcher2.urlDaAplicacao(), "http://127.0.0.1:9090/", "sem domínio, usa a porta configurada — não 8080 fixo");
+  assert.equal(launcher2.urlDaAplicacao(), "http://127.0.0.1:9090/", "without a domain, uses the configured port, not a fixed 8080");
   amb2.restaurar();
 });
 
@@ -422,10 +422,10 @@ test("idle exit is disarmed when nothing can restart the Console", async (t) => 
   // Without the systemd socket and without the launcher, exiting would leave the operator without a
   // Console.
   const semReativacao = amb.servidor.armarSaidaPorOciosidade(s.servidor, () => {}, { reativavel: false });
-  assert.equal(semReativacao, null, "não arma quando não há como reativar");
+  assert.equal(semReativacao, null, "does not arm when nothing can reactivate");
 
   const comReativacao = amb.servidor.armarSaidaPorOciosidade(s.servidor, () => {}, { reativavel: true });
-  assert.ok(comReativacao, "arma quando o lançador ou o socket podem religar");
+  assert.ok(comReativacao, "arms when the launcher or the socket can restart it");
   clearInterval(comReativacao);
 });
 
@@ -477,8 +477,8 @@ test("the service state is read by code, not by the English label", (t) => {
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
 
-  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_EN), 4, "en-US: em execução");
-  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT), 4, "pt-BR: em execução");
+  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_EN), 4, "en-US: running");
+  assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT), 4, "pt-BR: running");
   assert.equal(windows.codigoDeEstadoSc(SC_QUERY_PT_PARADO), 1, "pt-BR: parado");
 
   // The type (10) must never be confused with a state.
@@ -490,7 +490,7 @@ test("the start type is read by code and does not require the AUTO_START label",
   t.after(() => amb.restaurar());
   const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
 
-  assert.equal(windows.inicioAutomaticoSc(SC_QC_PT).automatico, true, "2 = automático, em qualquer idioma");
+  assert.equal(windows.inicioAutomaticoSc(SC_QC_PT).automatico, true, "2 = automatic, in any language");
   assert.equal(windows.inicioAutomaticoSc(SC_QC_PT_MANUAL).automatico, false, "3 = manual");
   assert.match(windows.inicioAutomaticoSc(SC_QC_PT).rotulo || "", /AUTO_START/);
 });
@@ -555,8 +555,8 @@ test("with the port already reserved, the launcher connects instead of competing
   } catch {}
 
   const r = await lancador.garantirBackend();
-  assert.equal(r.ok, true, `o lançador deve compor com o socket, não disputar a porta: ${r.motivo}`);
-  assert.ok(conexoes >= 1, "precisa ter havido uma conexão para ativar o serviço");
+  assert.equal(r.ok, true, `the launcher must compose with the socket, not compete for the port: ${r.motivo}`);
+  assert.ok(conexoes >= 1, "there must have been a connection to activate the service");
   assert.equal(r.contrato.porta, porta);
 });
 
@@ -584,6 +584,6 @@ test("a port held by an impostor is not accepted just because it answered", asyn
   } catch {}
 
   const r = await lancador.garantirBackend();
-  assert.equal(r.ok, false, "sem identidade publicada, a porta ocupada não vira sucesso");
+  assert.equal(r.ok, false, "without a published identity, the occupied port does not become success");
   assert.match(r.motivo, /não publicou identidade|ocupada/);
 });

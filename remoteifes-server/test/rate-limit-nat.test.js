@@ -63,14 +63,14 @@ test("distinct users behind the same IP each have their own command budget; a si
   const limitar = criarLimitador({ janelaMs: 60000, maxTentativas: 5, chave: (req) => req.usuario.id });
   for (let usuario = 1; usuario <= 19; usuario += 1) {
     for (let i = 0; i < 5; i += 1) {
-      assert.equal(passa(limitar, requisicaoFalsa("10.0.0.1", { usuario: { id: usuario } })).seguiu, true, `usuário ${usuario} pedido ${i + 1}`);
+      assert.equal(passa(limitar, requisicaoFalsa("10.0.0.1", { usuario: { id: usuario } })).seguiu, true, `user ${usuario} request ${i + 1}`);
     }
   }
   const excedido = passa(limitar, requisicaoFalsa("10.0.0.1", { usuario: { id: 1 } }));
-  assert.equal(excedido.seguiu, false, "o sexto comando do mesmo usuário é recusado");
+  assert.equal(excedido.seguiu, false, "the same user's sixth command is refused");
   assert.equal(excedido.res.codigo, 429);
   assert.ok(Number(excedido.res.cabecalhos["Retry-After"]) >= 1);
-  assert.equal(passa(limitar, requisicaoFalsa("10.0.0.1", { usuario: { id: 21 } })).seguiu, true, "outro usuário do mesmo IP segue livre");
+  assert.equal(passa(limitar, requisicaoFalsa("10.0.0.1", { usuario: { id: 21 } })).seguiu, true, "another user on the same IP stays free");
 });
 
 test("a single IP presenting itself as many principals hits the per-IP ceiling", () => {
@@ -79,8 +79,8 @@ test("a single IP presenting itself as many principals hits the per-IP ceiling",
   for (let usuario = 1; usuario <= 100; usuario += 1) {
     if (passa(limitar, requisicaoFalsa("10.0.0.2", { usuario: { id: usuario } })).seguiu) aceitos += 1;
   }
-  assert.equal(aceitos, 30, "teto de abuso por IP independente do número de principais");
-  assert.equal(passa(limitar, requisicaoFalsa("10.0.0.3", { usuario: { id: 1 } })).seguiu, true, "outro IP não é afetado");
+  assert.equal(aceitos, 30, "per-IP abuse ceiling independent of the number of principals");
+  assert.equal(passa(limitar, requisicaoFalsa("10.0.0.3", { usuario: { id: 1 } })).seguiu, true, "another IP is not affected");
 });
 
 test("without an identified principal the limit falls on the IP, as before", () => {
@@ -95,14 +95,14 @@ test("the login limit counts failures per IP: successful logins from a whole cam
   usuariosService.criar({ usuario: "nat-ok", senha: "SenhaNat12345", nome: "Nat", podeControlar: true }, SUPER);
   for (let i = 0; i < 30; i += 1) {
     const resp = await post("/login", { usuario: "nat-ok", senha: "SenhaNat12345" });
-    assert.equal(resp.status, 200, `login legítimo ${i + 1} de um mesmo IP`);
+    assert.equal(resp.status, 200, `legitimate login ${i + 1} from the same IP`);
   }
   for (let i = 0; i < 20; i += 1) {
     const resp = await post("/login", { usuario: "nat-ok", senha: "errada-errada" });
     assert.equal(resp.status, 401, `falha ${i + 1}`);
   }
   const bloqueado = await post("/login", { usuario: "nat-ok", senha: "SenhaNat12345" });
-  assert.equal(bloqueado.status, 429, "após 20 falhas o IP fica bloqueado mesmo com a senha certa");
+  assert.equal(bloqueado.status, 429, "after 20 failures the IP is blocked even with the right password");
   assert.ok(Number(bloqueado.headers.get("retry-after")) > 0);
 });
 
