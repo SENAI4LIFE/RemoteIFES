@@ -314,7 +314,15 @@ const MEDIDAS_MONITORAMENTO = [
 
 function migrarColunasEspCredenciais() {
   const colunas = db.prepare(`PRAGMA table_info(esp_credenciais)`).all().map((c) => c.name);
-  for (const [coluna, tipo] of [["segredoHashPendente", "TEXT"], ["pendenteCriadoEm", "TEXT"], ["pendenteEntregueEm", "TEXT"]]) {
+  for (const [coluna, tipo] of [
+    ["segredoHashPendente", "TEXT"],
+    ["pendenteCriadoEm", "TEXT"],
+    ["pendenteEntregueEm", "TEXT"],
+    // Mesh session keys derived from each generation's secret (see esp32CredenciaisService).
+    ["chaveMesh", "TEXT"],
+    ["chaveMeshPendente", "TEXT"],
+    ["chaveMeshAnterior", "TEXT"],
+  ]) {
     if (!colunas.includes(coluna)) db.exec(`ALTER TABLE esp_credenciais ADD COLUMN ${coluna} ${tipo}`);
   }
 }
