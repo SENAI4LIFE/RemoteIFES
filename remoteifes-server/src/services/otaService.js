@@ -351,6 +351,16 @@ function identidadeDaSala(sala) {
 function ofertar(sala, { rolloutId, tentativa, sha256 } = {}) {
   const reserva = require("./otaRolloutService").reserva(sala);
   if (reserva && reserva !== rolloutId) throw erroConflito("dispositivo reservado pela distribuição em andamento");
+  // Over the mesh a firmware image would cross every hop in bounded, acknowledged chunks with
+  // resumption; that transfer is not implemented and not validated on radios, so it is refused
+  // instead of attempted. Direct OTA is unaffected (remoteifes-esp32/MESH.md).
+  const conexao = require("./deviceHub").conexaoDaSala(sala);
+  if (conexao && conexao.canal.transporte !== "direto") {
+    throw erroConflito(
+      "atualização OTA indisponível para placas conectadas pela malha: conecte a placa diretamente ao Wi-Fi da instituição para atualizar",
+      { transporte: conexao.canal.transporte }
+    );
+  }
   const manifesto = lerManifesto();
   if (!manifesto) {
     throw erroConflito("nenhum firmware publicado — publique um com `npm run firmware` antes de ofertar a atualização");
