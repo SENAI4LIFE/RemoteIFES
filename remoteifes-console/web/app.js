@@ -1100,7 +1100,14 @@
         "a reconciliação limpa o resto na próxima partida.");
     }
     if (p.console.divergenciaDeVersao) {
-      aviso(avisos, "erro", "A versão em execução não é a versão ativa", p.console.divergenciaDeVersao.motivo);
+      // Reinício pendente é o caminho normal entre ativar e reabrir; só o descompasso persistente
+      // é erro. Gritar nos dois casos ensina o operador a ignorar o aviso.
+      var d = p.console.divergenciaDeVersao;
+      if (d.reinicioPendente) {
+        aviso(avisos, "info", "Reinício pendente", d.motivo);
+      } else {
+        aviso(avisos, "erro", "A versão em execução não é a versão ativa", d.motivo);
+      }
     }
     if (!p.console.confiancaConfigurada) {
       aviso(avisos, "info", "Atualização por release não configurada",

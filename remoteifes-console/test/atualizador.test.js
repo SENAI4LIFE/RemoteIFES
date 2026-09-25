@@ -795,3 +795,107 @@ test("o artefato tem o tamanho conferido antes de ser lido para a memória", (t)
   assert.equal(acima.ok, false);
   assert.match(acima.motivo, /acima do teto/);
 });
+
+test("reinício pendente não é anunciado como versão que não subiu", async (t) => {
+  // Entre a troca do ponteiro e o reinício, o processo em execução é legitimamente o anterior. Um
+  // alarme de erro ali diria que a versão "não subiu" no exato instante em que tudo está certo, e
+  // um aviso que grita no caminho normal é um aviso que o operador aprende a ignorar.
+  const raiz = ajuda.dirTemporario("console-pend-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: raiz } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const emExecucao = atualizador.versaoEmExecucao();
+
+  for (const v of [emExecucao, "99.0.0"]) {
+    fs.mkdirSync(path.join(raiz, "versoes", v), { recursive: true });
+    fs.writeFileSync(path.join(raiz, "versoes", v, "package.json"), `${JSON.stringify({ version: v })}
+`);
+  }
+
+  // Ponteiro já na nova, anterior é a que roda, transação concluída AGORA: reinício pendente.
+  const agora = new Date().toISOString();
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({
+      versaoAtiva: "99.0.0",
+      versaoAnterior: emExecucao,
+      transacao: { versao: "99.0.0", etapa: "concluida", em: agora },
+      atualizadoEm: agora,
+    })}
+`
+  );
+
+  const pendente = await atualizador.situacao();
+  assert.ok(pendente.divergenciaDeVersao, "a situação ainda precisa relatar o descompasso");
+  assert.equal(pendente.divergenciaDeVersao.reinicioPendente, true, "mas como reinício pendente, não como falha");
+  assert.match(pendente.divergenciaDeVersao.motivo, /reinício está pendente/);
+
+  // Transação antiga: aí sim é falha de ativação.
+  const velho = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  fs.writeFileSync(
+    path.join(raiz, "estado-instalacao.json"),
+    `${JSON.stringify({
+      versaoAtiva: "99.0.0",
+      versaoAnterior: emExecucao,
+      transacao: { versao: "99.0.0", etapa: "concluida", em: velho },
+      atualizadoEm: velho,
+    })}
+`
+  );
+  const falha = await atualizador.situacao();
+  assert.ok(falha.divergenciaDeVersao);
+  assert.ok(!falha.divergenciaDeVersao.reinicioPendente, "uma hora depois já não é reinício pendente");
+  assert.match(falha.divergenciaDeVersao.motivo, /não subiu/);
+});
+
+test("um tar só de diretórios também bate no teto de entradas", (t) => {
+  // O teto contava só arquivos, então um tar com milhões de entradas de diretório passava e ainda
+  // esgotava inodes.
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const zlib = require("zlib");
+
+  // Campos do cabeçalho tar são terminados por NUL. O byte vai por `String.fromCharCode`: um NUL
+  // literal no fonte faz o Git tratar o arquivo como binário, e há um teste que proíbe isso.
+  const NUL = String.fromCharCode(0);
+  const OCTAL_MODO = `0000755${NUL}`;
+  const OCTAL_ZERO = `0000000${NUL}`;
+  const OCTAL_LONGO = `00000000000${NUL}`;
+  const USTAR = `ustar${NUL}`;
+  const cabecalho = (nome, tipo) => {
+    const b = Buffer.alloc(512);
+    b.write(nome, 0, 100, "utf8");
+    b.write(OCTAL_MODO, 100, 8, "utf8");
+    b.write(OCTAL_ZERO, 108, 8, "utf8");
+    b.write(OCTAL_ZERO, 116, 8, "utf8");
+    b.write(OCTAL_LONGO, 124, 12, "utf8");
+    b.write(OCTAL_LONGO, 136, 12, "utf8");
+    b.write("        ", 148, 8, "utf8");
+    b.write(tipo, 156, 1, "utf8");
+    b.write(USTAR, 257, 6, "utf8");
+    b.write("00", 263, 2, "utf8");
+    let soma = 0;
+    for (const byte of b) soma += byte;
+    b.write(`${soma.toString(8).padStart(6, "0")}${NUL} `, 148, 8, "utf8");
+    return b;
+  };
+
+  const blocos = [];
+  for (let i = 0; i < 6000; i += 1) blocos.push(cabecalho(`d${i}/`, "5"));
+  blocos.push(Buffer.alloc(1024));
+
+  const dir = ajuda.dirTemporario("console-inodes-");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const arquivo = path.join(dir, "muitos.tar.gz");
+  fs.writeFileSync(arquivo, zlib.gzipSync(Buffer.concat(blocos)));
+
+  assert.throws(
+    () => atualizador.extrairTarGz(arquivo, path.join(dir, "saida")),
+    /mais de \d+ entradas/,
+    "um tar só de diretórios tem de ser recusado pelo teto de entradas"
+  );
+});
