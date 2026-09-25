@@ -19,6 +19,12 @@ Environment=NODE_ENV=production
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=20
+# Parar ou reiniciar o console encerra só o processo principal. Cada operação longa roda sob um
+# supervisor próprio (bin/supervisionar.js), que aplica o prazo máximo da operação, mantém a trava
+# de manutenção e grava o desfecho; o console seguinte o adota ou lê esse desfecho. Com o padrão
+# (control-group), uma queda ou atualização do console mataria uma restauração ou implantação no
+# meio. Nenhum processo fica solto sem prazo: o supervisor encerra a operação ao fim do prazo.
+KillMode=process
 
 # Endurecimento compatível com o desenho de privilégio.
 #

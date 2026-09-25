@@ -840,7 +840,7 @@ Os detalhes de empacotamento, assinatura e matriz de sistemas estão em [`remote
 
 Antes de qualquer operação que interrompa o serviço, o console avalia o impacto: bloqueia quando há **OTA em andamento** (todas as fases ativas, inclusive `validando`), rollout ativo, outra manutenção em curso ou disco insuficiente; e avisa, em vez de assumir zero, quando a atividade dos ESP32 **não pode ser observada**. A avaliação é refeita no instante da execução.
 
-Operações longas não são abandonadas quando o navegador fecha: elas rodam em grupo de processos próprio, a saída vai para arquivo e o console reconcilia o que encontrar ao voltar. Um trabalho cujo processo desapareceu sem marca de conclusão fica registrado como **desfecho desconhecido** — nunca como sucesso presumido.
+Operações longas não dependem do navegador nem do próprio processo do console: cada uma roda sob um **supervisor** próprio, em grupo de processos separado, que guarda a saída em arquivo, aplica o prazo máximo da operação, mantém a trava de manutenção em seu nome e grava o desfecho (código de saída) ao terminar. Se o console cair, sair por ociosidade, for atualizado ou reiniciado no meio de uma restauração ou implantação, a operação continua (a unidade do systemd usa `KillMode=process`); o console seguinte acompanha o supervisor ainda vivo até o fim ou lê o desfecho gravado. Uma operação que terminou sem ninguém acompanhando aparece com o código de saída real e com o aviso de que **o efeito não foi verificado automaticamente**. Só um trabalho cujo supervisor desapareceu sem gravar desfecho fica registrado como **desfecho desconhecido** — nunca como sucesso presumido.
 
 ### Modelo de segurança do console
 
