@@ -178,8 +178,10 @@ Section "Console" SecConsole
   SetDetailsPrint both
   Call ResolverNode
   ${If} $Node == ""
-    DetailPrint "Node.js não encontrado."
-    MessageBox MB_OK|MB_ICONSTOP "O Node.js 22.13 ou mais novo não foi encontrado.$\r$\n$\r$\nInstale-o de https://nodejs.org/ e execute este instalador novamente. O console usa o mesmo runtime que o RemoteIFES exige."
+    DetailPrint "Node.js 22.13 ou mais novo não foi encontrado; instale-o de https://nodejs.org/."
+    ${IfNot} ${Silent}
+      MessageBox MB_OK|MB_ICONSTOP "O Node.js 22.13 ou mais novo não foi encontrado.$\r$\n$\r$\nInstale-o de https://nodejs.org/ e execute este instalador novamente. O console usa o mesmo runtime que o RemoteIFES exige."
+    ${EndIf}
     Abort "Node.js não encontrado."
   ${EndIf}
   DetailPrint "Node encontrado: $Node"
@@ -211,8 +213,10 @@ Section "Console" SecConsole
   nsExec::ExecToLog $R0
   Pop $0
   ${If} $0 != 0
-    DetailPrint "O instalador terminou com o código $0."
-    MessageBox MB_OK|MB_ICONSTOP "A instalação não foi concluída (código $0). A janela de detalhes mostra o que falhou."
+    DetailPrint "O instalador terminou com o código $0; a instalação não foi concluída."
+    ${IfNot} ${Silent}
+      MessageBox MB_OK|MB_ICONSTOP "A instalação não foi concluída (código $0). A janela de detalhes mostra o que falhou."
+    ${EndIf}
     Abort "Instalação não concluída."
   ${EndIf}
 
@@ -252,18 +256,27 @@ Section "Uninstall"
   Call un.ResolverNode
   ${If} $Node == ""
     DetailPrint "Node.js não encontrado: o programa não pode ser removido com segurança."
-    MessageBox MB_OK|MB_ICONSTOP "O Node.js não foi encontrado. Quem remove o programa é o desinstalador do próprio console, que precisa dele.$\r$\n$\r$\nInstale o Node.js e repita, ou remova pelo terminal com o comando da documentação."
+    ${IfNot} ${Silent}
+      MessageBox MB_OK|MB_ICONSTOP "O Node.js não foi encontrado. Quem remove o programa é o desinstalador do próprio console, que precisa dele.$\r$\n$\r$\nInstale o Node.js e repita, ou remova pelo terminal com o comando da documentação."
+    ${EndIf}
     Abort "Node.js não encontrado."
   ${EndIf}
 
   ; The payload uninstaller does the removal: it stops a running Console, removes the scheduled
   ; task and the Start Menu shortcut, refuses any directory that does not prove to be a Console
   ; installation, keeps the state and never touches the RemoteIFES checkout.
+  ;
+  ; It removes the whole program tree, which is where this executable lives. NSIS normally copies
+  ; the uninstaller to the temporary directory and runs it from there, so the tree is free. Invoking
+  ; it with `_?=<dir>` keeps it running inside the tree, and Windows then refuses to delete a
+  ; running executable: do not use that switch here.
   nsExec::ExecToLog '"$Node" "$INSTDIR\desinstalar-console.js" --sim --raiz "$INSTDIR"'
   Pop $0
   ${If} $0 != 0
-    DetailPrint "O desinstalador do console terminou com o código $0."
-    MessageBox MB_OK|MB_ICONSTOP "A remoção não foi concluída (código $0). A janela de detalhes mostra o que falhou; o programa continua instalado."
+    DetailPrint "O desinstalador do console terminou com o código $0; o programa continua instalado."
+    ${IfNot} ${Silent}
+      MessageBox MB_OK|MB_ICONSTOP "A remoção não foi concluída (código $0). A janela de detalhes mostra o que falhou; o programa continua instalado."
+    ${EndIf}
     Abort "Remoção não concluída."
   ${EndIf}
 
