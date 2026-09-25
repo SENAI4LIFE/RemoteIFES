@@ -2,34 +2,20 @@
 
 Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web acessível, agendamento diário, integração ESP32 por MAC ou credencial por dispositivo (com atualização de firmware por OTA), monitoramento operacional local e um servidor central em Node.js.
 
-[![Node.js](https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=node.js)](#)
-[![Express](https://img.shields.io/badge/Express-API-000000?logo=express)](#)
-[![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite)](#)
-[![ESP32](https://img.shields.io/badge/ESP32-Arduino-E7352C?logo=espressif)](#)
-[![Arduino](https://img.shields.io/badge/Arduino-IDE-00979D?logo=arduino)](#)
-[![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-F5822A?logo=platformio)](#)
-[![IRremoteESP8266](https://img.shields.io/badge/IRremoteESP8266-2.9.0-blue)](#)
-[![WebSockets](https://img.shields.io/badge/WebSockets-Library-010101?logo=websockets)](#)
-[![DHT](https://img.shields.io/badge/DHT-Temperature-green)](#)
-[![HTML5](https://img.shields.io/badge/HTML5-Frontend-E34F26?logo=html5)](#)
-[![CSS3](https://img.shields.io/badge/CSS3-Frontend-1572B6?logo=css3)](#)
-[![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-F7DF1E?logo=javascript)](#)
-[![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa)](#)
-[![Cordova](https://img.shields.io/badge/Apache%20Cordova-Android%20%2F%20iOS-E8E8E8?logo=apachecordova&logoColor=black)](#)
-[![Android](https://img.shields.io/badge/Android-App-3DDC84?logo=android&logoColor=white)](#)
-[![iOS](https://img.shields.io/badge/iOS-App-000000?logo=apple)](#)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Demo-222222?logo=github)](#)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](#)
-[![HTTP](https://img.shields.io/badge/API-HTTP-005571?logo=http)](#)
-[![REST](https://img.shields.io/badge/API-REST-0A66C2)](#)
-[![HTTPS](https://img.shields.io/badge/Production-HTTPS-success?logo=letsencrypt)](#)
-[![Nginx](https://img.shields.io/badge/Reverse%20Proxy-Nginx-009639?logo=nginx)](#)
-[![Caddy](https://img.shields.io/badge/Reverse%20Proxy-Caddy-1F88C0?logo=caddy)](#)
-[![PM2](https://img.shields.io/badge/Process%20Manager-PM2-2B037A?logo=pm2)](#)
-[![Linux](https://img.shields.io/badge/Server-Linux-FCC624?logo=linux&logoColor=black)](#)
-[![Windows](https://img.shields.io/badge/Server-Windows-0078D4?logo=windows)](#)
-[![macOS](https://img.shields.io/badge/Server-macOS-000000?logo=apple)](#)
-[![Git](https://img.shields.io/badge/Git-Version%20Control-F05032?logo=git)](#)
+![Node.js 22.13+](https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=node.js)
+![Express e SQLite](https://img.shields.io/badge/Express-SQLite-003B57?logo=sqlite)
+![WebSocket](https://img.shields.io/badge/Tempo%20real-WebSocket-010101?logo=websocket)
+![PWA](https://img.shields.io/badge/PWA-Instal%C3%A1vel-5A0FC8?logo=pwa)
+![Cordova](https://img.shields.io/badge/Apache%20Cordova-Android%20%2F%20iOS-E8E8E8?logo=apachecordova&logoColor=black)
+![ESP32](https://img.shields.io/badge/ESP32-PlatformIO-E7352C?logo=espressif)
+![IRremoteESP8266](https://img.shields.io/badge/IRremoteESP8266-2.9.0-blue)
+![Nginx](https://img.shields.io/badge/Proxy%20reverso-Nginx-009639?logo=nginx)
+![Servidor](https://img.shields.io/badge/Servidor-Linux%20%C2%B7%20Windows%20%C2%B7%20macOS-FCC624?logo=linux&logoColor=black)
+
+<p align="center">
+  <img src="docs/readme-assets/screenshots/home.png" width="580" alt="Tela Início do RemoteIFES vista por um administrador: saudação com 5 de 86 salas on-line e cartões para Salas, Planta baixa, Agenda, Grade, Notificações, Relatar problema, Ajuda e manual e Aplicativo móvel.">
+  <img src="docs/readme-assets/screenshots/room-panel-mobile.png" width="204" alt="Painel da sala A-108 no celular: ar-condicionado ligado a 23 °C, placa online, botões de temperatura, Power e Turbo.">
+</p>
 
 ## Acesso rápido
 
@@ -89,23 +75,27 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 
 ## Visão Geral
 
-O projeto é dividido em quatro partes independentes:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/architecture-overview-dark.png">
+  <img src="docs/readme-assets/composed/architecture-overview-light.png" width="800" alt="Arquitetura do RemoteIFES. À esquerda, os clientes: navegador ou PWA e o app Android/iOS, que trocam dados com o Servidor RemoteIFES. No centro, o host do servidor reúne o Console de Operações, que administra o serviço, o servidor Node.js com API, WebSocket e agendador, e o banco SQLite. À direita, um ESP32 por sala: no Wi-Fi direto, o padrão, ou numa malha mesh opcional em que um nó chega ao servidor pelo gateway. Cada ESP32 envia infravermelho ao ar-condicionado da sala, só de ida: o aparelho não é medido.">
+</picture>
 
-```
-remoteifes-web/      Frontend estático (HTML/CSS/JS puro, sem build), entregue pelo próprio servidor
-                     central na mesma origem da API; instalável como PWA (GitHub Pages só para demonstração)
-remoteifes-cordova/  Empacotamento do mesmo frontend como app nativo Android/iOS via Apache Cordova
-remoteifes-server/   API central (Node.js + Express + SQLite), roda em um servidor/host próprio
-remoteifes-esp32/    Firmware Arduino/ESP32 instalado em cada sala, ao lado do ar-condicionado
-```
+O RemoteIFES tem três partes que conversam pela rede, e um serviço de manutenção ao lado.
 
-Fluxo geral:
+- **Clientes.** O mesmo frontend roda no navegador, instalado como PWA ou empacotado como app Android/iOS. Ele fala com o servidor por HTTP(S) e pelo WebSocket `/ws`. Em produção o próprio servidor entrega o frontend, na mesma origem da API; o GitHub Pages serve só como [demonstração](#frontend-no-github-pages-opcional-para-demonstração).
+- **Servidor central.** Guarda o banco SQLite, autentica, aplica as permissões, roda o agendador e fala com os ESP32 pelo WebSocket `/ws/dispositivo` e pelas rotas `/dispositivo/*`. Um [proxy reverso](#proxy-reverso) na frente é opcional.
+- **Salas.** Cada ESP32 transmite infravermelho ao ar-condicionado e reporta o próprio estado, identificado pelo MAC ou por uma [credencial exclusiva](#credenciais-por-dispositivo-e-migração). O Wi-Fi direto é o padrão; placas sem cobertura chegam por um gateway da [rede mesh opcional](#rede-mesh-opcional-e-topologia). Uma única placa com receptor IR, o clonador oficial, aprende os sinais do controle original para a biblioteca de protocolos.
+- **Console de Operações.** Serviço separado, no mesmo host, para manter o servidor: serviço, atualizações, backups e acesso de rede. Veja [Console de Operações](#console-de-operações).
 
-1. Cada sala possui um **ESP32 transmissor infravermelho** (e, opcionalmente, um sensor de temperatura DHT), conectado à rede Wi-Fi local. Uma única placa, escolhida pelo superadministrador e equipada com receptor IR, é o **clonador oficial**: ela aprende os sinais do controle original, que ficam guardados no servidor como uma biblioteca de protocolos e podem ser aplicados às demais salas. Cada ESP32 envia comandos ao ar-condicionado e reporta seu estado (ligado/desligado, temperatura, MAC, IP) ao servidor central via HTTP ou HTTPS, identificado pelo MAC ou por uma credencial exclusiva de dispositivo (veja [Segurança](#segurança)).
+O infravermelho não tem retorno. O sistema sabe o que foi pedido e o que a placa confirmou, mas não mede o aparelho; veja [Do pedido ao ar-condicionado](#do-pedido-ao-ar-condicionado).
 
-2. O **servidor central** (`remoteifes-server`) mantém o banco de dados (SQLite), a lógica de autenticação, permissões, agendamentos, limites de temperatura, notificações e configurações globais. Ele expõe uma API REST usada tanto pelo frontend web quanto pelos ESP32, além de canais WebSocket para atualização de status e comandos em tempo real.
-
-3. O **frontend** (`remoteifes-web`) é um site estático (sem framework de build) que fala com o servidor central via `fetch` e WebSocket. Em produção ele é entregue pelo próprio Express, na mesma origem da API e do WebSocket (veja [Deploy](#deploy)); a publicação no GitHub Pages é opcional e serve só como demonstração pública (veja [Frontend no GitHub Pages](#frontend-no-github-pages-opcional-para-demonstração)).
+| Pasta | Conteúdo |
+|---|---|
+| `remoteifes-web/` | frontend estático (HTML, CSS e JS, sem build) e PWA |
+| `remoteifes-cordova/` | o mesmo frontend empacotado como app Android/iOS |
+| `remoteifes-server/` | API Node.js + Express, WebSocket, agendador e banco SQLite |
+| `remoteifes-console/` | Console de Operações, instalado fora do checkout |
+| `remoteifes-esp32/` | firmware PlatformIO de cada sala, clonador e modos da malha |
 
 ## Papéis e Permissões
 
@@ -174,7 +164,7 @@ O sistema oferece três formas de chegar até uma sala, todas equivalentes em fu
   - verde: online, ligado
   - contorno amarelo: com agendamento ativo no momento
 
-  "Online" é presença (a placa foi vista há pouco); "ligado/desligado" é o estado desejado guardado no servidor. A confirmação da placa aparece no painel da sala e em `Dispositivos > Firmware / OTA`; o efeito no aparelho não é medido (veja [Painel dos ESP32](#painel-dos-esp32-protocolos-ir-e-failsafe-administração--dispositivos)).
+  "Online" é presença (a placa foi vista há pouco); "ligado/desligado" é o estado desejado guardado no servidor. A confirmação da placa aparece no painel da sala e em `Dispositivos > Firmware / OTA`; o efeito no aparelho não é medido (veja [Do pedido ao ar-condicionado](#do-pedido-ao-ar-condicionado)).
 - **Lista tradicional** (`Bloco → Andar → Sala`): navegação simples em lista, sem elementos gráficos.
 
 Qualquer usuário autenticado pode visualizar o estado de todas as salas — isso inclui salas às quais o usuário não tem permissão de controle, que aparecem marcadas como "visualização" e cujos controles ficam desabilitados no painel. Os três modos de navegação têm botões cruzados para alternar entre si a qualquer momento.
@@ -500,9 +490,26 @@ Qualquer comando de controle limpa a trava, então a placa nunca fica presa ness
 
 O estado reaplicado na reconexão vai marcado como `restauracao: true`. A partir do firmware **4.3.0** a placa não trata essa restauração como comando explícito: se estiver travada em OFF local, ignora-a, não limpa a trava e responde com `failsafe_status`, que o servidor adota como desligamento local (`adotado_em_operacao`) — mesmo quando o `info` chega depois da espera de 3 s. No servidor, uma sincronização por tempo esgotado só ocorre depois de processar qualquer `info` já recebido no socket, para que uma pausa longa do event loop não a antecipe. O firmware 4.2.0 não distingue a restauração de um comando: nele, um `info` que chegue depois da espera de 3 s ainda recebe o estado guardado; atualize a frota por OTA para fechar essa janela.
 
-**Presença, canal de comandos, estado desejado, envio e confirmação são coisas distintas.** `online` no status de uma sala é **presença**: a placa foi vista há pouco, pelo WebSocket ou apenas pelo heartbeat HTTP (que o firmware usa enquanto o WebSocket está caído); ele não diz que a sala é controlável. `canalComandos` diz se há um socket de comandos aberto para a sala — só por ele um comando chega à placa. `POST /comando` responde `ok: true` quando o estado desejado foi **persistido** (e `enviadoAoDispositivo` diz se a mensagem foi **submetida ao socket** da placa — não se ela a executou; a resposta repete `canalComandos` para dizer por que nada foi submetido). Uma sala `online` sem canal aparece no painel como "online, sem comandos", e um comando enviado nessa condição recebe um aviso de que **não foi entregue** — o estado fica salvo e é restaurado quando a placa reconectar. Cada mudança de intenção avança `salas.estadoVersao`, enviado como `versao` em todo `send_known_state`; o firmware 4.3.0 ecoa essa versão em `info`, `telemetria` e `failsafe_status`, e o `status` da sala (`dispositivoConfirmou`: `true`, `false` ou `null` sem placa/protocolo) diz se a placa conectada já **reportou** o estado vigente. Um relato da placa que ecoa uma versão anterior — ou, no firmware 4.2.0, cujo último comando IR relatado não bate com a intenção — é tratado como atrasado e nunca sobrescreve a intenção: o `ligado` reportado na telemetria e no heartbeat é apenas o eco do último comando processado, não é gravado como estado desejado. A trava reportada em operação só é adotada quando o relato comprovadamente reflete a intenção vigente (versão ecoada igual à atual ou, sem eco, depois que a mesma conexão confirmou a intenção). Um comando explícito enviado logo após a conexão, antes de o `info` inicial chegar, prevalece: esse `info` descreve a placa de antes do comando, não adota a trava, não apaga a intenção nova e dispensa a restauração. Os testes IR administrativos (`teste/estado`, `teste/raw` e transmitir um protocolo da biblioteca) não alteram a intenção nem a versão, mas invalidam a confirmação — o eco da versão anterior ao teste deixa de contar — até uma intenção nova ser enviada. Alterações de configuração que mudam o estado IR (limites globais de temperatura, função extra do turbo) e os limites por sala avançam a versão na mesma transação que ajusta o alvo, e nada é submetido à placa antes do commit. O painel mostra reticências no estado até a confirmação e avisa se ela passar de 12 s; nem a confirmação da placa prova que o ar-condicionado recebeu o sinal infravermelho. O agendador grava a execução de um agendamento na mesma transação da mudança de estado, então uma falha entre os dois nunca repete o comando no minuto seguinte.
-
 Um **buzzer ativo** no **GPIO 27** soa a cada transmissão infravermelha (comando do servidor, teste, retransmissão ou failsafe): ele é ligado imediatamente antes do envio e desligado pelo `loop()` após um mínimo de 60 ms, sem nenhum `delay()` adicional antes do sinal.
+
+### Do pedido ao ar-condicionado
+
+<img src="docs/readme-assets/flows/command-state-flow.svg" width="800" alt="Cinco etapas de um comando. 1, pedido: painel da sala, agendamento ou desligamento diário. 2, estado desejado: gravado no banco e com a versão da sala avançada; a resposta é ok: true. 3, envio: ao socket da placa ou, na malha, ao gateway; sem canal, o estado fica salvo e vai na reconexão; o campo é enviadoAoDispositivo. 4, a placa executa: transmite o infravermelho e ecoa a versão recebida, o que marca dispositivoConfirmou; uma seta volta da placa ao servidor com esse eco. 5, o aparelho: o sistema não mede se ele recebeu o sinal, então não há prova física.">
+
+Presença, canal de comandos, estado desejado, envio e confirmação são coisas distintas:
+
+- **Presença.** `online` no status de uma sala quer dizer que a placa foi vista há pouco, pelo WebSocket ou só pelo heartbeat HTTP, que o firmware usa enquanto o WebSocket está caído. Não diz que a sala é controlável.
+- **Canal de comandos.** `canalComandos` diz se há um socket de comandos aberto para a sala; só por ele um comando chega à placa. Uma sala `online` sem canal aparece no painel como "online, sem comandos".
+- **Estado desejado.** `POST /comando` responde `ok: true` quando a intenção foi **persistida**. Cada mudança de intenção avança `salas.estadoVersao`.
+- **Envio.** `enviadoAoDispositivo` diz se a mensagem foi **submetida ao socket** da placa, não se ela a executou, e a resposta repete `canalComandos` para dizer por que nada foi submetido. Sem canal, o comando recebe o aviso de que **não foi entregue**; o estado fica salvo e é restaurado quando a placa reconectar. Na malha, "enviado" quer dizer entregue ao gateway.
+- **Confirmação.** Todo `send_known_state` leva a versão como `versao`. O firmware 4.3.0 ecoa essa versão em `info`, `telemetria` e `failsafe_status`, e o `status` da sala traz `dispositivoConfirmou`: `true`, `false` ou `null` sem placa ou protocolo, conforme a placa conectada já tenha **reportado** o estado vigente. O painel mostra reticências até a confirmação e avisa se ela passar de 12 s.
+- **Aparelho.** Nem a confirmação da placa prova que o ar-condicionado recebeu o sinal infravermelho.
+
+Um relato atrasado nunca sobrescreve a intenção. É atrasado o relato que ecoa uma versão anterior ou, no firmware 4.2.0, cujo último comando IR relatado não bate com a intenção. O `ligado` da telemetria e do heartbeat é só o eco do último comando processado e não é gravado como estado desejado.
+
+A trava de failsafe relatada em operação só é adotada quando o relato comprovadamente reflete a intenção vigente: versão ecoada igual à atual ou, sem eco, depois que a mesma conexão confirmou a intenção. Um comando explícito enviado logo após a conexão, antes de o `info` inicial chegar, prevalece. Esse `info` descreve a placa de antes do comando, não adota a trava, não apaga a intenção nova e dispensa a restauração.
+
+Os testes IR administrativos (`teste/estado`, `teste/raw` e transmitir um protocolo da biblioteca) não alteram a intenção nem a versão, mas invalidam a confirmação até uma intenção nova ser enviada: o eco da versão anterior ao teste deixa de contar. Alterações de configuração que mudam o estado IR (limites globais de temperatura, função extra do turbo) e os limites por sala avançam a versão na mesma transação que ajusta o alvo, e nada é submetido à placa antes do commit. O agendador grava a execução de um agendamento na mesma transação da mudança de estado, então uma falha entre os dois nunca repete o comando no minuto seguinte.
 
 ### Detecção automática de ESP32 na rede
 
@@ -622,7 +629,7 @@ npm run setup
 sudo bash install-service.sh
 ```
 
-Esse é o startup persistente canônico para Linux/Raspberry Pi: instala e habilita `remoteifes.service` e o watchdog. Gerencie-o com `sudo systemctl status|start|stop|restart remoteifes.service`; consulte logs com `sudo journalctl -u remoteifes.service -f` e saúde com `npm run health`. O instalador configura produção e pergunta as redes autorizadas. Os detalhes de atualização, backup e recuperação ficam em [Deploy](#deploy).
+Esse é o startup persistente canônico para Linux/Raspberry Pi: instala e habilita `remoteifes.service` e o watchdog. O instalador configura produção e pergunta as redes autorizadas. Depois disso o serviço, os registros e a saúde são acompanhados pelo [Console de Operações](#console-de-operações); os comandos `systemctl` e `journalctl` equivalentes ficam em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal). Os detalhes de atualização, backup e recuperação ficam em [Deploy](#deploy).
 
 ### Proxy reverso
 
@@ -740,11 +747,7 @@ Na mesma tela, o administrador também define se uma sala tem **acesso restrito*
 
 ## Deploy
 
-A operação de produção é **local, na rede da instituição, e não depende da Internet nem do GitHub Pages**. O caminho é:
-
-```
-Navegador/PWA → rede local → proxy reverso → remoteifes-web → API Node/Express + WebSocket → SQLite → ESP32
-```
+A operação de produção é **local, na rede da instituição, e não depende da Internet nem do GitHub Pages**. O navegador ou a PWA chega ao servidor pela rede local, passando por um proxy reverso quando há um, e o servidor fala com o SQLite e com os ESP32 (veja a [Visão Geral](#visão-geral)).
 
 O próprio servidor Node entrega o `remoteifes-web` na **mesma origem** da API quando `NODE_ENV=production` (ou `SERVIR_FRONTEND=true`). Assim não há CORS entre frontend e backend, o WebSocket usa a mesma origem da página, e o `remoteifes-web` não precisa ser publicado em lugar nenhum.
 
@@ -760,15 +763,9 @@ Faça a instalação pelo fluxo único de [Linux com systemd](#linux-com-systemd
 
 Depois disso o sistema já responde em `http://<ip-do-servidor>:<PORTA>/` (padrão 8080) para os navegadores da rede local e em `/ws` e `/ws/dispositivo` para o tempo real e os ESP32 — tudo na mesma porta.
 
-**Liberar o acesso da rede local.** Em produção, com o modo de teste desligado, o acesso é bloqueado até que as faixas de IP da rede local sejam cadastradas. Faça isso na máquina do servidor (sem precisar da interface):
+**Liberar o acesso da rede local.** Em produção, com o modo de teste desligado, o acesso é bloqueado até que as faixas de IP da rede local sejam cadastradas. O `install-service.sh` pergunta as faixas na instalação. Depois disso elas mudam no Console de Operações, em `Rede e domínio › Acesso à aplicação`, ou, sem o console, com `npm run redes` ([Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal)).
 
-```bash
-npm run redes -- 10.10.0.0/16 192.168.0.0/16   # define as faixas autorizadas
-npm run redes                                   # mostra o estado atual
-sudo systemctl restart remoteifes.service
-```
-
-As rotas `/dispositivo/*`, usadas pelos ESP32, e o acesso por `localhost`, útil para um túnel SSH, nunca dependem dessa lista. Com o Console de Operações instalado, o mesmo cadastro é feito em `Rede e domínio › Acesso à aplicação`. Para uma rede local isolada e confiável o modo de teste pode ser deixado ligado nessa mesma tela, mas o cadastro das faixas é a opção recomendada.
+As rotas `/dispositivo/*`, usadas pelos ESP32, e o acesso por `localhost`, útil para um túnel SSH, nunca dependem dessa lista. Para uma rede local isolada e confiável o modo de teste pode ser deixado ligado na mesma tela do console, mas o cadastro das faixas é a opção recomendada.
 
 ### Proxy reverso na porta 80 (rede local, sem Internet)
 
@@ -784,7 +781,11 @@ O script instala Nginx e Certbot se necessário, cria um site apontando para `12
 
 ### Atualização, versões e reversão
 
+<img src="docs/readme-assets/flows/update-recovery.svg" width="800" alt="Três faixas. 1, instalar, pelo terminal e uma vez: npm run setup, sudo bash install-service.sh e o instalador do Console de Operações com o primeiro operador. 2, operar pelo Console de Operações: nas abas Serviço, Atualizações e Dados e recuperação; a atualização faz backup verificado, aplica o código novo com npm ci só se o package mudou, reinicia o serviço e exige que o /health informe o commit em até 40 s. Se sim, a implantação fica verificada em deploy.log; se não, há reversão automática à versão anterior com a mesma verificação. Restaurar o banco é outra decisão, com o serviço parado e nunca automática. 3, sem o console, no terminal de desenvolvimento ou emergência: bash deploy.sh, bash rollback.sh e npm run restore, os mesmos scripts e a mesma trava .deploy-lock do console.">
+
 A atualização de rotina é feita pelo [Console de Operações](#console-de-operações), em **Atualizações**, no próprio host. O GitHub continua sendo a origem do código, mas a atualização não depende de Actions nem do GitHub Pages. Os comandos equivalentes de terminal ficam em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal) e continuam válidos quando o console não estiver disponível.
+
+<img src="docs/readme-assets/screenshots/console-updates.png" width="700" alt="Aba Atualizações do Console de Operações, em Situação das versões: commit do processo em execução, HEAD e descrição do checkout, ramo local main, upstream origin/main, checkout limpo, remoto origin no GitHub, último origin/main observado com a hora, comparação indicando que o checkout está no commit observado e última implantação verificada.">
 
 O console mostra separadamente cinco coisas que um único número de versão esconde: o commit do processo em execução, lido do `/health` e não do disco; o HEAD do checkout e se há alterações locais; o ramo e o upstream; o último `origin/main` observado, com a hora da observação; e a última implantação verificada, registrada em `deploy.log`.
 
@@ -830,9 +831,16 @@ O campo `commit` é lido do `.git` uma única vez ao iniciar o processo (`src/co
 
 ## Console de Operações
 
-O **Console de Operações** (`remoteifes-console/`) é um serviço local, separado do RemoteIFES, para manutenção do servidor, do host e da infraestrutura. A operação do prédio continua no próprio RemoteIFES: salas, agendamentos, contas, ESP32, protocolos IR e configurações da aplicação. O console resume a saúde dessas áreas e leva até elas, sem duplicar seus editores.
+O **Console de Operações** (`remoteifes-console/`) é um serviço local, separado do RemoteIFES, para manutenção do servidor, do host e da infraestrutura. A operação do prédio continua no próprio RemoteIFES. O console resume a saúde dessas áreas e leva até elas, sem duplicar seus editores.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/management-boundaries-dark.png">
+  <img src="docs/readme-assets/composed/management-boundaries-light.png" width="800" alt="Quem altera o quê. O Site RemoteIFES opera o prédio, por papel de usuário: salas e ar-condicionado, agendamentos e grade, usuários, papéis e proprietários, ESP32 com cadastro, credenciais, OTA e IR, monitoramento, alertas e topologia, relatos, logs e auditoria e configurações da aplicação. O Console de Operações opera o host e o software, com operador próprio: serviço e registros do host, atualizar e reverter a aplicação, backup, restauração e senha do superadmin, acesso de rede da aplicação, que o site só exibe, programa do console e reinício do host. Em modo somente leitura, o console consulta rede, proxy, DNS e TLS e também aplicativo e CI. Fora das duas interfaces, no terminal do servidor, ficam a instalação do servidor, o proxy com HTTPS e a recuperação de emergência. Cada valor tem um único dono.">
+</picture>
 
 A exceção é a política de acesso de rede, com o modo de teste e as faixas autorizadas. Ela decide quem alcança o site, então é editada só aqui e no terminal do servidor. Veja [Restrição de Rede](#restrição-de-rede).
+
+**Rede e domínio** só diagnostica interfaces, rotas, DNS, proxy e certificado. `lan-setup.sh` e `https-setup.sh` instalam pacotes, reescrevem o site do Nginx e alteram o `.env`, então continuam como procedimento de terminal, com decisão humana ([Proxy reverso](#proxy-reverso)). **Aplicativo e CI** também só consulta.
 
 Abrir o console informa o estado atual do servidor e não o inicia nem o reinicia. Instalar o programa, registrar o serviço, abrir o console, subir o servidor e reiniciar o servidor são cinco coisas distintas, e o console só reinicia a aplicação quando a operação exige e o operador aceita o impacto.
 
@@ -993,8 +1001,8 @@ Os detalhes de empacotamento, assinatura e matriz de sistemas estão em [`remote
 | **Serviço** | reiniciar, parar (desligando o watchdog junto) e iniciar o RemoteIFES; ler o journal das unidades |
 | **Atualizações** | comparar versão em execução, checkout e `origin`; implantar um commit revisado; reverter |
 | **Dados e recuperação** | backup verificado, restauração com o serviço parado e senha do superadministrador |
-| **Aplicativo e CI** | versões de servidor, PWA, Cordova e Android, APK publicado e execuções do GitHub Actions |
-| **Rede e domínio** | acesso à aplicação (modo de teste e faixas autorizadas, único editor desses valores); interfaces, rotas, resolvedor, portas em escuta, proxy, DNS e validade do certificado |
+| **Aplicativo e CI** | consulta: versões de servidor, PWA, Cordova e Android, APK publicado e execuções do GitHub Actions |
+| **Rede e domínio** | acesso à aplicação (modo de teste e faixas autorizadas, único editor desses valores); consulta de interfaces, rotas, resolvedor, portas em escuta, proxy, DNS e validade do certificado |
 | **Programa** | versão do próprio console, atualização e reversão do programa, capacidades da plataforma com o motivo de cada indisponibilidade, e onde a instalação mora |
 | **Avançado** | elevação, auditoria do console, histórico de operações e Terminal Expert |
 
@@ -1128,7 +1136,7 @@ No Pi, `npm run setup` detecta a arquitetura (ARM64 ou ARMv7) e instala o Node.j
 
 Depois de instalado, a operação de rotina é feita pelo [Console de Operações](#console-de-operações). Os comandos de `systemd` equivalentes, para quando o console não estiver disponível, ficam em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal).
 
-Reinicie o serviço (`systemctl restart`) sempre que editar `remoteifes-server/.env`. Atualizações e reversões seguem o fluxo de [Atualização, versões e reversão](#atualização-versões-e-reversão) (`bash deploy.sh` / `bash rollback.sh`), que funciona igual no Raspberry Pi, inclusive com `--offline`. Para expor o Pi fora da rede local com HTTPS em um domínio próprio (necessário para PWA/Cordova em domínio público), use `https-setup.sh` — ele funciona da mesma forma em um Raspberry Pi.
+Reinicie o serviço sempre que editar `remoteifes-server/.env`, pelo console (**Serviço**) ou com `systemctl restart`. Atualizações e reversões seguem [Atualização, versões e reversão](#atualização-versões-e-reversão), que funciona igual no Raspberry Pi, inclusive sem rede (`--offline`). Para expor o Pi fora da rede local com HTTPS em um domínio próprio, necessário para PWA/Cordova em domínio público, use `https-setup.sh`, que funciona da mesma forma no Pi.
 
 Cada sala continua com seu próprio ESP32 fazendo a ponte com o ar-condicionado (veja [Firmware ESP32](#firmware-esp32)); o Raspberry Pi hospeda apenas o servidor central que os agrega.
 
@@ -1339,9 +1347,14 @@ Dentro de `Administração > Sistema > Status > Sistema`, a seção recolhível 
 
 ## Rede Mesh Opcional e Topologia
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/device-networking-dark.png">
+  <img src="docs/readme-assets/composed/device-networking-light.png" width="800" alt="O servidor RemoteIFES autentica cada placa pela credencial dela, venha direto ou pelo gateway. À esquerda, o Wi-Fi direto, padrão: três ESP32 de salas diferentes, cada um com Wi-Fi, WebSocket e credencial próprios e uma linha própria até o servidor. À direita, a mesh opcional: um ESP32 gateway, raiz da malha e também placa de uma sala, com credencial e WebSocket próprios, repassa sem ler; abaixo dele, sem cobertura de Wi-Fi, nós a um e a dois saltos ligados pelo rádio mesh, cada um com credencial própria. Uma faixa marca a sessão cifrada de um nó, que atravessa o gateway até o servidor. Avisos: OTA e clonagem de IR só pelo Wi-Fi direto; com o gateway fora do ar, os nós atrás dele ficam offline.">
+</picture>
+
 O transporte padrão dos ESP32 continua sendo o Wi-Fi direto: cada placa abre o próprio WebSocket com o servidor. O servidor aceita também, de forma opcional e misturada na mesma instalação, placas que chegam por uma rede mesh através de uma placa gateway, que tem acesso direto ao servidor e retransmite o tráfego das demais.
 
-Use a malha apenas onde não há cobertura de Wi-Fi. Uma instalação só com Wi-Fi direto não precisa configurar nada.
+Use a malha apenas onde não há cobertura de Wi-Fi. Uma instalação só com Wi-Fi direto não precisa configurar nada. O modo mesh ainda não foi validado com placas reais; veja [O que ainda não foi validado](#o-que-ainda-não-foi-validado).
 
 ### Configurar
 
@@ -1379,6 +1392,8 @@ O servidor recusa a oferta para uma placa conectada pela malha e diz por quê, e
 Em `Administração > Sistema > Status > Topologia`, visível somente ao superadministrador, um diagrama mostra o servidor, as placas no Wi-Fi direto, os gateways e as placas atrás deles. Cada uma aparece com a situação (conectada, autenticando, inalcançável ou recusada), saltos, sinal (RSSI), indicação de retransmissor e a última notícia.
 
 Selecionar uma placa destaca o caminho até o servidor e mostra o diagnóstico: transporte, gateway e pai, firmware, canal de comandos, mudanças de rota e entregas. Há filtros por transporte e por situação, e uma tabela com os mesmos dados para leitores de tela.
+
+<img src="docs/readme-assets/screenshots/topology.png" width="800" alt="Aba Topologia com duas placas no Wi-Fi direto, A-108 e A-110, o gateway B-204 e dois nós atrás dele, B-206 e B-208. A placa B-206 está selecionada: o caminho B-206, B-204, servidor aparece destacado, e o painel ao lado mostra transporte pela malha através do gateway da sala B-204, pai na malha igual ao próprio gateway, 1 salto, situação conectado, canal de comandos pronto, firmware 4.3.0, sinal de -63 dBm, 3 entregas enviadas e confirmadas e atualização OTA indisponível pela malha. Captura de um ambiente de teste com placas simuladas.">
 
 A tela é atualizada a cada 15 s só enquanto está aberta e lê uma observação em memória do servidor (`GET /admin/topologia`), sem consultar o banco. Numa instalação só com Wi-Fi direto ela informa "Rede mesh não utilizada".
 
@@ -1628,7 +1643,7 @@ O repositório traz uma bateria de verificação de regressão. Todos os comando
 
 ### Health check do servidor central
 
-`GET /health` responde o estado do servidor central (conexão com o banco e tempo de processo) sem exigir autenticação. Retorna `200` com `{"ok":true,"banco":"ok",...}` quando o banco responde e `503` quando não. **Não depende de nenhum ESP32**: um dispositivo offline não afeta o resultado.
+O contrato do `GET /health`, usado pelo CI, pelo watchdog e pelas implantações, está em [Recuperação e verificação de saúde](#recuperação-e-verificação-de-saúde). Ele não depende de nenhum ESP32.
 
 ### CI
 
@@ -1787,9 +1802,12 @@ remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento com
   resources/              imagens-fonte (icon.png, splash.png) usadas por cordova-res
   www/                    cópia gerada de remoteifes-web (gitignored fora de commits manuais, se preferir)
 
+remoteifes-console/      Console de Operações: servidor local, lançador, instalador e empacotamento (veja Console de Operações)
+
 e2e/                     testes end-to-end de navegador (Playwright) — specs, harness (API + estático + ESP32 simulado)
 .github/workflows/ci.yml workflow de CI: testes do servidor, end-to-end, validação Cordova e build do firmware
 docs/                    material de apoio do projeto (imagens, documento acadêmico)
+  readme-assets/         figuras e capturas deste README, com as fontes editáveis (veja docs/readme-assets/README.md)
 export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxiliares)
 ```
 
