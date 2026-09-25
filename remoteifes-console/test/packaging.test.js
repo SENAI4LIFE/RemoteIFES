@@ -546,6 +546,10 @@ test("the Windows installer script delegates to the portable installer and asks 
     assert.ok(nsi.includes(`"${chave}"`), `uninstall entry missing ${chave}`);
   }
   assert.match(nsi, /wscript\.exe/, "the shortcuts open the Console without a console window");
+
+  // A payload file without an extension must not be silently left out of the installer.
+  assert.ok(!/File \/r "\$\{PAYLOAD\}\\\*\.\*"/.test(nsi), "the payload glob must not be *.*");
+  assert.match(nsi, /File \/r "\$\{PAYLOAD\}\\\*"/);
   assert.match(nsi, /MUI_LANGUAGE "PortugueseBR"/);
 });
 

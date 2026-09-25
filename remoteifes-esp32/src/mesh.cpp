@@ -77,6 +77,12 @@ String nnPendente;
 // stops a gateway from presenting a node's proof as if the node were behind another gateway.
 String gatewayAtual;
 unsigned long proximoAnuncio = 0;
+// Set by the mesh event handler, which runs on the ESP-IDF event task, and consumed by
+// meshProcessar() on the Arduino loop. The handler only raises flags: writing the session state or
+// an Arduino String from another task would race with the loop that owns them, and a String
+// reallocated under a concurrent read corrupts the heap.
+volatile bool avisoPaiConectado = false;
+volatile bool avisoPaiPerdido = false;
 uint32_t quadrosRejeitados = 0;
 uint32_t quadrosDuplicados = 0;
 uint32_t quadrosEnviados = 0;
@@ -454,39 +460,42 @@ void noRecebeuDoGateway(const char* json, size_t tamanho) {
 
 // --- Events -------------------------------------------------------------------------------------
 
-void eventoMesh(void* /*arg*/, esp_event_base_t /*base*/, int32_t id, void* dados) {
+void eventoMesh(void* /*arg*/, esp_event_base_t /*base*/, int32_t id, void* /*dados*/) {
   switch (id) {
-    case MESH_EVENT_PARENT_CONNECTED: {
-      if (meshNoAtivo()) {
-        estadoNo = NO_NA_MALHA;
-        proximoAnuncio = 0;
-        Serial.printf("Malha: conectado à malha na camada %d.\n", esp_mesh_get_layer());
-      }
+    case MESH_EVENT_PARENT_CONNECTED:
+      avisoPaiConectado = true;
       break;
-    }
-    case MESH_EVENT_PARENT_DISCONNECTED: {
-      if (meshNoAtivo()) {
-        // Losing the parent invalidates the session: the server's own liveness will drop the node,
-        // and a new handshake is required after reconnecting. Nothing is assumed to have survived.
-        estadoNo = NO_SEM_MALHA;
-        nsPendente = "";
-        nnPendente = "";
-        gatewayAtual = "";
-        Serial.println("Malha: pai perdido; a sessão com o servidor foi encerrada.");
-      }
+    case MESH_EVENT_PARENT_DISCONNECTED:
+    case MESH_EVENT_NO_PARENT_FOUND:
+      avisoPaiPerdido = true;
       break;
-    }
-    case MESH_EVENT_LAYER_CHANGE: {
-      const mesh_event_layer_change_t* evento = static_cast<mesh_event_layer_change_t*>(dados);
-      Serial.printf("Malha: camada agora é %u.\n", static_cast<unsigned>(evento->new_layer));
-      break;
-    }
-    case MESH_EVENT_NO_PARENT_FOUND: {
-      if (meshNoAtivo()) estadoNo = NO_SEM_MALHA;
-      break;
-    }
     default:
       break;
+  }
+}
+
+/** Applies what the event handler raised, on the task that owns the state. */
+void aplicarAvisosDaMalha() {
+  if (avisoPaiPerdido) {
+    avisoPaiPerdido = false;
+    avisoPaiConectado = false;
+    if (estadoNo != NO_SEM_MALHA) {
+      // Losing the parent invalidates the session: the server's own liveness drops the node, and a
+      // new handshake is required after reconnecting. Nothing is assumed to have survived.
+      estadoNo = NO_SEM_MALHA;
+      nsPendente = "";
+      nnPendente = "";
+      gatewayAtual = "";
+      Serial.println("Malha: pai perdido; a sessão com o servidor foi encerrada.");
+    }
+  }
+  if (avisoPaiConectado) {
+    avisoPaiConectado = false;
+    if (estadoNo == NO_SEM_MALHA) {
+      estadoNo = NO_NA_MALHA;
+      proximoAnuncio = 0;
+      Serial.printf("Malha: conectado à malha na camada %d.\n", esp_mesh_get_layer());
+    }
   }
 }
 
@@ -599,6 +608,7 @@ bool meshIniciar(String& motivo) {
 
 void meshProcessar() {
   if (!iniciado) return;
+  if (meshNoAtivo()) aplicarAvisosDaMalha();
 
   // The receive queue is drained every pass and bounded per pass, so one busy neighbour cannot keep
   // the sketch out of its own loop (IR, sensors, the action switch).
