@@ -557,8 +557,18 @@ jobs:
             ~/.platformio
             remoteifes-esp32/.pio
           key: pio-${{ runner.os }}-${{ hashFiles('remoteifes-esp32/platformio.ini') }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
       - run: pip install platformio==6.1.19
       - run: pio run
+        working-directory: remoteifes-esp32
+
+      # The mesh protocol module is compiled for the host and run against the vectors the server
+      # produced. It is the only executable check of the firmware's crypto and framing that does not
+      # need a board; the radio itself still needs hardware (remoteifes-esp32/MESH.md).
+      - name: Mesh protocol host test
+        run: node --test test/*.test.js
         working-directory: remoteifes-esp32
 
   android:
