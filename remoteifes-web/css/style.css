@@ -4706,3 +4706,43 @@ body.a11y-high-contrast .gr-area { opacity: .3; }
 .protocolos-ir-item .esp32-capture-actions { margin-top: 4px; }
 #protocolosIrClonadorAviso, #protocolosIrFailsafeAviso { margin-top: 10px; }
 body.a11y-high-contrast .protocolos-ir-failsafe.ok { color: inherit; text-decoration: underline; }
+
+/* Device topology (Administração > Status > Topologia). The drawing scrolls inside its own box so a
+   wide campus never scrolls the page; colors come from the theme tokens, so high contrast applies. */
+.topo-aviso { margin: 0 0 var(--space-3); font-weight: 600; }
+.topo-filtros { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+.topo-filtros label { display: flex; flex-direction: column; gap: 4px; font-size: calc(13px * var(--a11y-font-scale)); min-width: 0; }
+.topo-area { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); gap: var(--space-3); align-items: start; }
+@media (max-width: 900px) { .topo-area { grid-template-columns: minmax(0, 1fr); } }
+.topo-desenho { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); min-width: 0; }
+.topo-svg { display: block; min-width: 100%; }
+.topo-aresta { stroke: var(--text-muted); stroke-width: 1.5; }
+.topo-aresta-mesh { stroke-dasharray: 5 4; }
+.topo-rota { stroke: var(--focus-color); stroke-width: 3.5; stroke-dasharray: none; }
+.topo-rotulo-aresta { font-size: 11px; fill: var(--text-muted); }
+.topo-no { cursor: pointer; }
+.topo-no circle, .topo-no rect { stroke: var(--text); stroke-width: 1.5; }
+.topo-no.topo-ok circle:not(.topo-anel-retransmissor), .topo-no.topo-ok rect { fill: var(--success); }
+.topo-no.topo-atencao circle:not(.topo-anel-retransmissor), .topo-no.topo-atencao rect { fill: var(--warning); }
+.topo-no.topo-falha circle:not(.topo-anel-retransmissor), .topo-no.topo-falha rect { fill: var(--danger); }
+.topo-no.topo-servidor rect { fill: var(--ifes-green-dark); }
+.topo-anel-retransmissor { fill: none; stroke-dasharray: 3 3; }
+.topo-no:focus { outline: none; }
+.topo-no:focus-visible circle, .topo-no:focus-visible rect, .topo-selecionado circle, .topo-selecionado rect { stroke: var(--focus-color); stroke-width: 4; }
+.topo-rotulo { font-size: 12px; fill: var(--text); text-anchor: middle; }
+.topo-detalhe { padding: var(--space-3); min-width: 0; overflow-wrap: anywhere; }
+.topo-detalhe h3 { margin: 0 0 var(--space-2); font-size: calc(15px * var(--a11y-font-scale)); }
+.topo-detalhe dl { margin: 0; }
+.topo-detalhe dt { color: var(--text-muted); font-size: calc(12.5px * var(--a11y-font-scale)); margin-top: var(--space-2); }
+.topo-detalhe dd { margin: 0; }
+.topo-legenda { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--space-3) 0; font-size: calc(12.5px * var(--a11y-font-scale)); }
+.topo-chip { padding: 2px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface-muted); }
+.topo-chip.topo-ok { border-color: var(--success); }
+.topo-chip.topo-atencao { border-color: var(--warning); }
+.topo-chip.topo-falha { border-color: var(--danger); }
+.topo-tabela-caixa { overflow-x: auto; }
+.topo-tabela { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--a11y-font-scale)); }
+.topo-tabela caption { text-align: left; font-weight: 600; padding-bottom: 4px; }
+.topo-tabela th, .topo-tabela td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.topo-tabela tbody tr { cursor: pointer; }
+.topo-tabela tbody tr:focus-visible { outline: var(--focus-ring) solid var(--focus-color); outline-offset: -3px; }

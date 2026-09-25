@@ -348,6 +348,10 @@ const Api = {
     return chamar("/admin/configuracoes", { headers: headersComToken() });
   },
 
+  async obterTopologia() {
+    return chamar("/admin/topologia", { headers: headersComToken() });
+  },
+
   async obterDesligamentoDiario() {
     return chamar("/admin/desligamento-diario", { headers: headersComToken() });
   },

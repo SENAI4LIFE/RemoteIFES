@@ -15,7 +15,7 @@ const ABAS = {
     ["comandos", "Comandos"], ["acesso", "Acessos"], ["dispositivos", "Dispositivos"],
     ["sessoes", "Sessões"], ["auditoria", "Auditoria"],
   ],
-  status: [["ativos", "Usuários ativos"], ["mapa", "Mapa"], ["sistema", "Sistema"]],
+  status: [["ativos", "Usuários ativos"], ["mapa", "Mapa"], ["sistema", "Sistema"], ["topologia", "Topologia"]],
 };
 const ABAS_SUPERADMIN_ONLY = { logs: ["auditoria"], status: ["sistema"] };
 
