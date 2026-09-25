@@ -329,6 +329,10 @@ router.get("/admin/configuracoes", exigirSuperAdmin, (req, res) => {
   res.json({ ok: true, configuracoes: configuracoesService.obter() });
 });
 
+router.get("/admin/topologia", exigirSuperAdmin, (req, res) => {
+  res.json({ ok: true, ...require("../services/meshService").topologia() });
+});
+
 router.get("/admin/desligamento-diario", exigirSuperAdmin, (req, res) => {
   res.json({ ok: true, ...require("../services/desligamentoDiarioService").situacao() });
 });

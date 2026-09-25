@@ -1111,6 +1111,7 @@ const ADMIN_CARGA = {
   "logs:auditoria": () => Admin.carregarAuditoria(),
   "status:ativos": () => Admin.carregarAtivos(),
   "status:mapa": () => Admin.carregarMapa(),
+  "status:topologia": () => Topologia.aoAbrir(),
   "status:sistema": async () => {
     await Monitoramento.aoAbrir();
     Heatmap.aoAbrir();
@@ -1183,6 +1184,7 @@ function encerrarAdminAtivo(chave) {
     Monitoramento.aoFechar();
     Heatmap.aoFechar();
   }
+  if (chave !== "status:topologia") Topologia.aoFechar();
   if (chave !== "macs") Admin.aoFecharMacs();
   if (chave !== "esp32") Esp32Admin.aoFechar();
   if (chave !== "protocolos") ProtocolosIrAdmin.aoFechar();
