@@ -1,0 +1,24 @@
+{
+  "_": "Test vectors for mesh protocol v1. remoteifes-server/test/mesh-vectors.test.js proves the server reproduces them; remoteifes-esp32/test/mesh_protocolo_test.cpp proves the firmware does.",
+  "segredo": "s3gr3d0-de-placa-para-vetores-de-teste-0001",
+  "no": "esp_00112233445566aa",
+  "gateway": "esp_ffeeddccbbaa9988",
+  "ns": "bm9uY2UtZG8tc2Vydmlkbw",
+  "nn": "bm9uY2UtZG8tbm8tMTZieQ",
+  "chave": "79942e1d8672df094be6ee4de4540c798f7b91a02c28d9a1ec537fcea1e9dce9",
+  "chaveSessao": "c098c19bf2b0eb921d89d55ee20426fee6307b720e510042aa5c31ebaf187c16",
+  "provaOla": "JFdjhkkH1wX54I2Wp8hZ_i6AQLUC0tG78ckwMLVm4E4",
+  "provaAceito": "oFEyazT9MKPIQyT6tmC9Ux4oYICGu4IE6Cn5fkPJWaI",
+  "quadroDoNo": {
+    "seq": 1,
+    "dados": "i8fiR56ltwJBkGZNqjyOUngqqOBp1QmNHMDB_GZknMeyTZOj5GPnw4aiw7z6",
+    "tag": "_IRccLPJcCpJYkP8HgzKDQ",
+    "texto": "{\"tipo\":\"telemetria\",\"rssi\":-61,\"fw\":\"4.3.0\"}"
+  },
+  "quadroDoServidor": {
+    "seq": 1,
+    "dados": "fN27QgVY7vzVHSjkoHwpzEyjciNj8d0ndaiGY0nif0jj_N_t3CDeU2Hne-RtDN1_hqnzn7lty_6YPTXPJ4NIHbITf5fXQHTBLEey",
+    "tag": "c0SIkMtELT8_cGftpw1qCg",
+    "texto": "{\"tipo\":\"send_known_state\",\"protocol\":18,\"temp\":23,\"power\":true,\"versao\":7}"
+  }
+}
