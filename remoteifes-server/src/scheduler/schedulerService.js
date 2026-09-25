@@ -8,6 +8,7 @@ const {
 const { encerrarSessoesAbandonadas } = require("../services/tokenService");
 const { executarLimpezaRetencao } = require("../services/retencaoService");
 const { criarBackup, normalizarInteiro } = require("../services/backupService");
+const desligamentoDiarioService = require("../services/desligamentoDiarioService");
 const otaService = require("../services/otaService");
 const otaRolloutService = require("../services/otaRolloutService");
 const monitoramentoService = require("../services/monitoramentoService");
@@ -32,6 +33,15 @@ function verificarAgendamentos({ aoIniciar = false } = {}) {
   const hora = horaAtualBrasilia();
   const dataISO = dataAtualBrasiliaISO();
   const enviarAoDispositivo = !aoIniciar;
+
+  // The daily shutdown runs first: its cutoff is older than any schedule decision made in this
+  // pass, and a schedule turning a room on afterwards is newer intent in either order.
+  try {
+    desligamentoDiarioService.verificar({ enviarAoDispositivo });
+  } catch (erro) {
+    logger.error("desligamento-diario-falhou", { mensagem: erro.message });
+    monitoramentoService.registrar("schedulerFalha", { tarefa: "desligamento-diario" });
+  }
 
   // A scheduled shutdown left pending across midnight is applied exactly once, unless newer intent
   // (manual command, another schedule, local OFF) appeared after the time it was due; otherwise the
