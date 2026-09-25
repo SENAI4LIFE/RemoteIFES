@@ -14,7 +14,7 @@
 // It does NOT extrapolate: it prints the real host where it measured. On a Raspberry Pi 3 the
 // numbers will differ from a desktop's, and the report says so.
 //
-// Usage:  node test/medicao-recursos.js [--json]
+// Usage:  node test/measure-resources.js [--json]
 
 const os = require("os");
 const fs = require("fs");

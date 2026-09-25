@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 const { criarAutoridade, sha256, MINUTO } = require("./support/atestacoes");
 
 // Release provenance: what makes an installed Console accept a publication.

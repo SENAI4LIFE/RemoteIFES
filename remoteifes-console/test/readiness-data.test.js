@@ -22,7 +22,7 @@ function rodarRunner(script, args, env) {
     filho.on("close", (codigo) => resolve({ codigo, saida }));
   });
 }
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Impact assessment before interrupting, and database restore safety.
 
