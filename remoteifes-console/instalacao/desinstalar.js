@@ -115,6 +115,15 @@ function autorizarRemocao(caminho, { marcas, rotulo, exigirTodas = false }) {
   return { ok: true, alvo };
 }
 
+function lerJsonSeguro(arquivo) {
+  try {
+    const dados = JSON.parse(fs.readFileSync(arquivo, "utf8"));
+    return dados && typeof dados === "object" ? dados : {};
+  } catch {
+    return {};
+  }
+}
+
 function remover(caminho, { simular, rotulo }) {
   if (simular) {
     log(`   [simulação] removeria ${rotulo}: ${caminho}`);
@@ -256,9 +265,17 @@ async function main() {
   const escopo = argumento("escopo", process.platform === "linux" ? "sistema" : "usuario");
   if (!["usuario", "sistema"].includes(escopo)) falhar("--escopo aceita apenas 'usuario' ou 'sistema'");
 
-  const padroes = plataforma.diretoriosPadrao({ escopo });
-  const raiz = path.resolve(argumento("raiz", padroes.raizInstalacao));
-  const dirEstado = path.resolve(argumento("estado", padroes.estado));
+  // A instalação que contém ESTE script é a referência: o desinstalador viaja dentro do payload,
+  // então `../..` é a raiz instalada. Presumir o escopo pelo sistema fazia uma instalação de
+  // usuário no Linux ser tratada como de sistema, reclamar que `/opt` não existe e deixar
+  // `~/.local/...` intacto — e é exatamente o comando que a interface manda executar.
+  const raizDoProprioScript = path.resolve(path.join(__dirname, "..", "..", ".."));
+  const pareceInstalacao = fs.existsSync(path.join(raizDoProprioScript, "estado-instalacao.json"));
+  const registro = pareceInstalacao ? lerJsonSeguro(path.join(raizDoProprioScript, "estado-instalacao.json")) : {};
+  const escopoEfetivo = argumento("escopo", registro.escopo || escopo);
+  const padroes = plataforma.diretoriosPadrao({ escopo: escopoEfetivo });
+  const raiz = path.resolve(argumento("raiz", pareceInstalacao ? raizDoProprioScript : padroes.raizInstalacao));
+  const dirEstado = path.resolve(argumento("estado", registro.estado || padroes.estado));
 
   if (!temFlag("simular") && reexecutarForaDaInstalacao(raiz, dirEstado)) return;
 
@@ -266,7 +283,7 @@ async function main() {
   log("  Console de Operações RemoteIFES — desinstalação");
   log("  ──────────────────────────────────────────────");
   log(`  Plataforma : ${plataforma.rotulo}`);
-  log(`  Escopo     : ${escopo}`);
+  log(`  Escopo     : ${escopoEfetivo}`);
   log(`  Programa   : ${raiz}`);
   log(`  Estado     : ${dirEstado}${temFlag("apagar-estado") ? " (será apagado)" : " (preservado)"}`);
   if (simular) log("  Modo       : simulação — nada será removido");
@@ -307,7 +324,7 @@ async function main() {
     log("   [simulação] removeria o registro de inicialização e, no Linux, unidades, regra de sudo e auxiliar.");
   } else {
     try {
-      const r = await plataforma.removerInicializacao({ escopo });
+      const r = await plataforma.removerInicializacao({ escopo: escopoEfetivo });
       log(r.disponivel ? `   ${r.mecanismo || "registro de inicialização removido"}` : `   nada a remover (${r.motivo})`);
     } catch (erro) {
       log(`   não foi possível remover o registro de inicialização: ${erro.message}`);
@@ -377,7 +394,7 @@ async function main() {
   log("   • o Node instalado no host.");
   if (!temFlag("apagar-estado")) log(`   • o estado do console em ${dirEstado}.`);
   log("");
-  if (plataforma.nome === "linux" && escopo === "sistema") {
+  if (plataforma.nome === "linux" && escopoEfetivo === "sistema") {
     log("  Se o console foi instalado por pacote (.deb), remova-o também com:");
     log("      sudo apt-get remove remoteifes-console");
     log("");

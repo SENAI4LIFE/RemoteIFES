@@ -92,6 +92,22 @@ if (!disponiveis.length) {
 // administrar versoes/ e o ponteiro mesmo quando roda de dentro de versoes/<v>/.
 process.env.CONSOLE_RAIZ_INSTALACAO = RAIZ;
 
+// Onde o estado mora vem do REGISTRO da instalação, não do padrão da plataforma.
+//
+// O atalho do sistema roda este bootstrap sem variável de ambiente nenhuma. Sem ler o registro,
+// uma instalação de usuário procurava o estado em `/var/lib/...` (ou `%ProgramData%`) e o
+// primeiro operador não achava o token que o instalador tinha acabado de gravar. Uma variável já
+// posta pelo operador ou pelo serviço continua tendo precedência.
+{
+  const registrado = lerEstado();
+  if (!process.env.CONSOLE_ESTADO_DIR && typeof registrado.estado === "string" && registrado.estado) {
+    process.env.CONSOLE_ESTADO_DIR = registrado.estado;
+  }
+  if (!process.env.CONSOLE_PORTA && Number.isInteger(registrado.porta) && registrado.porta > 0) {
+    process.env.CONSOLE_PORTA = String(registrado.porta);
+  }
+}
+
 let iniciou = false;
 for (const [indice, candidata] of disponiveis.entries()) {
   if (indice > 0) {
