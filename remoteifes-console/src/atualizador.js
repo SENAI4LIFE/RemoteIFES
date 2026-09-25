@@ -58,6 +58,66 @@ function dirDescargas() {
   return path.join(raizInstalacao(), "descargas");
 }
 
+/**
+ * Trava exclusiva das operações de versão na raiz de instalação.
+ *
+ * Atualizar, importar offline e reverter mexem no mesmo ponteiro e no mesmo `versoes/`. Sem
+ * exclusão, duas operações simultâneas podem instalar v2 e v3 ao mesmo tempo e uma podar a
+ * versão que a outra está a ponto de ativar — o ponteiro fica apontando para um diretório que
+ * não existe, e o console não sobe. O campo `transacao` é único e também seria sobrescrito.
+ *
+ * `wx` falha se o arquivo existir, então a criação é a própria prova de exclusividade. Uma trava
+ * de processo morto é recuperada: sem isso, uma queda no meio de uma atualização deixaria a
+ * instalação travada para sempre.
+ */
+function arquivoTrava() {
+  return path.join(raizInstalacao(), "operacao-em-andamento.json");
+}
+
+function processoVivo(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (erro) {
+    return erro && erro.code === "EPERM";
+  }
+}
+
+function adquirirTrava(operacao) {
+  const arquivo = arquivoTrava();
+  fs.mkdirSync(path.dirname(arquivo), { recursive: true });
+  try {
+    const fd = fs.openSync(arquivo, "wx", 0o644);
+    fs.writeFileSync(fd, `${JSON.stringify({ operacao, pid: process.pid, em: new Date().toISOString() })}\n`);
+    fs.closeSync(fd);
+    return { ok: true };
+  } catch (erro) {
+    if (erro.code !== "EEXIST") return { ok: false, motivo: `não foi possível criar a trava de operação: ${erro.message}` };
+  }
+
+  const dono = estado.lerJson(arquivo, {});
+  if (processoVivo(dono.pid)) {
+    return {
+      ok: false,
+      motivo:
+        `outra operação de versão está em andamento (${dono.operacao || "desconhecida"}, pid ${dono.pid}, desde ` +
+        `${dono.em || "?"}). Espere que ela termine.`,
+    };
+  }
+  // Dono morto: a trava é resíduo. Registrar a recuperação evita que ela pareça normal.
+  estado.auditar("trava-de-operacao-residual", { operacao: dono.operacao || null, pid: dono.pid || null });
+  fs.rmSync(arquivo, { force: true });
+  return adquirirTrava(operacao);
+}
+
+function liberarTrava() {
+  try {
+    const dono = estado.lerJson(arquivoTrava(), {});
+    if (dono.pid === process.pid) fs.rmSync(arquivoTrava(), { force: true });
+  } catch {}
+}
+
 function lerEstadoInstalacao() {
   return estado.lerJson(arquivoEstado(), { versaoAtiva: null, versaoAnterior: null, transacao: null, atualizadoEm: null });
 }
@@ -542,12 +602,22 @@ async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, 
  * atestação, política de versão e digest conferirem.
  */
 async function atualizar(versaoAlvo, { log = () => {} } = {}) {
+  const impedimento = await validarAlvo(versaoAlvo);
+  if (impedimento) return { ok: false, erro: impedimento };
+
+  const trava = adquirirTrava(`atualizar ${versaoAlvo}`);
+  if (!trava.ok) return { ok: false, erro: trava.motivo };
+  try {
+    return await atualizarComTrava(versaoAlvo, { log });
+  } finally {
+    liberarTrava();
+  }
+}
+
+async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
   const raiz = raizInstalacao();
   const instaladas = versoesInstaladas();
   const emExecucao = versaoEmExecucao();
-
-  const impedimento = await validarAlvo(versaoAlvo);
-  if (impedimento) return { ok: false, erro: impedimento };
 
   log("Verificando a publicação...");
   const publicacao = await verificarPublicacao({ forcar: true });
@@ -606,6 +676,16 @@ async function atualizar(versaoAlvo, { log = () => {} } = {}) {
 
 /** Reversão: troca o ponteiro para a versão anterior já instalada e verificada. Sem rede. */
 async function reverter({ log = () => {} } = {}) {
+  const trava = adquirirTrava("reverter");
+  if (!trava.ok) return { ok: false, erro: trava.motivo };
+  try {
+    return await reverterComTrava({ log });
+  } finally {
+    liberarTrava();
+  }
+}
+
+async function reverterComTrava({ log = () => {} } = {}) {
   const instaladas = versoesInstaladas();
   if (!instaladas.anterior) return { ok: false, erro: "não há versão anterior instalada para a qual voltar." };
   const destino = path.join(dirVersoes(), instaladas.anterior);
@@ -649,6 +729,16 @@ async function importarOffline({ manifesto, atestacao: arquivoAtestacao, artefat
   if (!fs.existsSync(manifesto) || !fs.existsSync(arquivoAtestacao) || !fs.existsSync(artefato)) {
     return { ok: false, erro: "informe manifesto, atestação e artefato existentes" };
   }
+  const trava = adquirirTrava("importar offline");
+  if (!trava.ok) return { ok: false, erro: trava.motivo };
+  try {
+    return await importarOfflineComTrava({ manifesto, arquivoAtestacao, artefato, log });
+  } finally {
+    liberarTrava();
+  }
+}
+
+async function importarOfflineComTrava({ manifesto, arquivoAtestacao, artefato, log = () => {} }) {
   // Sem rede aqui: a raiz de confiança do Sigstore é a última que uma atualização conferiu, ou a
   // que o console traz.
   let raiz;
@@ -716,5 +806,7 @@ module.exports = {
   podarVersoes,
   extrairTarGz,
   importarOffline,
+  adquirirTrava,
+  liberarTrava,
   baixar,
 };
