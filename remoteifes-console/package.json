@@ -14,7 +14,7 @@
     "instalar": "node instalacao/instalar.js",
     "desinstalar": "node instalacao/desinstalar.js",
     "empacotar": "node empacotar/construir.js",
-    "medir": "node test/medicao-recursos.js"
+    "medir": "node test/measure-resources.js"
   },
   "_comentario-dependencias": "Só o verificador de releases: @sigstore/verify confere a atestação de proveniência do GitHub (Sigstore), e @sigstore/tuf obtém a raiz de confiança do Sigstore. O override de tuf-js usa a versão que busca com o fetch do próprio Node em vez de make-fetch-happen: 14 pacotes de produção (~2 MB) em vez de ~50, sem subir o Node mínimo. @sigstore/mock só gera atestações de teste.",
   "dependencies": {

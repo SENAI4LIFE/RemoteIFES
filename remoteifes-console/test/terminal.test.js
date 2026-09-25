@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Expert Terminal: the whole authorization and lifecycle envelope is exercised with an injected
 // fake PTY. The native module (node-pty) is not required to test what is critical: unlock,

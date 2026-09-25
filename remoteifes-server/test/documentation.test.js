@@ -133,9 +133,9 @@ test("manual and README document IR Protocols, the board-bound cloner, the physi
     "`failsafe_raw_set`",
     "`failsafe_raw_clear`",
     "um clonador oficial ativo por vez",
-    "protocolos-ir.spec.js",
+    "ir-protocols.spec.js",
     "auto-on.spec.js",
-    "firmware-contrato.test.js",
+    "firmware-contract.test.js",
   ]) {
     assert.ok(README.includes(trecho), `README sem: ${trecho}`);
   }
