@@ -661,3 +661,20 @@ test("the launcher lets the service manager start the Console when it owns it", 
   assert.equal(denovo.jaEstava, true);
   assert.equal(chamadas, 1, "a running Console is never started again");
 });
+
+test("the launcher checks the Node version before starting anything", async (t) => {
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
+  const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
+  plataforma.runtimeAtual = () => ({ atende: false, versao: "20.0.0", minimoExigido: "22.13.0", motivo: "Node 20.0.0 abaixo do mínimo" });
+  let tentou = false;
+  plataforma.iniciarConsoleGerenciado = async () => {
+    tentou = true;
+    return { disponivel: false, estado: "nao-aplicavel" };
+  };
+  const r = await launcher.garantirBackend();
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /exigem Node 22\.13\.0/);
+  assert.equal(tentou, false, "nothing is started with an unsupported runtime");
+});

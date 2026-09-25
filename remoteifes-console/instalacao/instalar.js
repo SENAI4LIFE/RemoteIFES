@@ -98,6 +98,43 @@ function compararVersoes(a, b) {
 
 const MODO_PACOTE = temFlag("pacote");
 
+// Progress reported when each real step finishes, weighted by its usual share of the work. Nothing
+// advances on a timer: a step that takes long simply keeps the percentage where it is.
+const ETAPAS = {
+  prerequisitos: { rotulo: "Pré-requisitos conferidos (Node, privilégio, destino)", peso: 5 },
+  programa: { rotulo: "Programa instalado", peso: 45 },
+  estado: { rotulo: "Estado e primeiro acesso preparados", peso: 10 },
+  integracao: { rotulo: "Integração com o sistema configurada", peso: 30 },
+  verificacao: { rotulo: "Instalação verificada", peso: 10 },
+};
+let percentual = 0;
+
+function concluirEtapa(chave, detalhe = "") {
+  const etapa = ETAPAS[chave];
+  percentual = Math.min(100, percentual + etapa.peso);
+  log(`[${String(percentual).padStart(3)}%] ${etapa.rotulo}${detalhe ? ` — ${detalhe}` : ""}`);
+}
+
+/**
+ * Loads the installed launcher through the stable layer, as the shortcut does: proves the pointer
+ * resolves to a payload that loads under this Node, without starting the Console.
+ */
+function verificarInstalacao(raiz) {
+  const lancador = path.join(raiz, "launcher-bootstrap.js");
+  if (!fs.existsSync(lancador)) return { ok: false, motivo: `${lancador} não existe` };
+  try {
+    execFileSync(process.execPath, [lancador, "--ajuda"], {
+      stdio: "ignore",
+      timeout: 30_000,
+      env: { ...process.env, CONSOLE_BOOTSTRAP_ALVO: "launcher" },
+      windowsHide: true,
+    });
+    return { ok: true };
+  } catch (erro) {
+    return { ok: false, motivo: erro.message.split("\n")[0] };
+  }
+}
+
 async function main() {
   const pacote = JSON.parse(fs.readFileSync(path.join(ORIGEM, "package.json"), "utf8"));
   const versao = pacote.version;
@@ -136,6 +173,7 @@ async function main() {
   log(`  Estado     : ${dirEstado}`);
   log(`  Node       : ${runtime.versao}`);
   log("");
+  concluirEtapa("prerequisitos", `Node ${runtime.versao}`);
 
   // --- Migration from the previous Linux layout (atual/anterior) ----------------------------
   const migrado = migrarLayoutAntigo(raiz, log);
@@ -250,6 +288,8 @@ async function main() {
     )}\n`
   );
 
+  concluirEtapa("programa", `versão ativa ${versaoAtiva}`);
+
   // --- State -------------------------------------------------------------------------------
   log("== Preparando o diretório de estado");
   fs.mkdirSync(dirEstado, { recursive: true });
@@ -296,10 +336,23 @@ async function main() {
     plataforma.protegerArquivo(arquivoSegredo);
   }
 
+  concluirEtapa("estado", jaTemOperador ? "operador existente preservado" : "segredo de primeiro acesso gerado");
+
   // --- Platform integration --------------------------------------------------------------------
   const resultadoPlataforma = temFlag("sem-servico")
     ? { pulado: true }
     : await integrarComPlataforma({ plataforma, raiz, dirEstado, dirLogs, escopo: escopoPedido, admin, log });
+  concluirEtapa("integracao", resultadoPlataforma.pulado ? "pulada (--sem-servico)" : "");
+
+  // --- Verification ----------------------------------------------------------------------------
+  const verificacao = verificarInstalacao(raiz);
+  if (!verificacao.ok) {
+    falhar(
+      `A instalação não passou na verificação: o programa instalado não carregou (${verificacao.motivo}).\n` +
+        `Repare com: ${comandoDoLancador(raiz).replace("launcher-bootstrap.js", path.join("versoes", versao, "instalacao", "instalar.js"))} --forcar`
+    );
+  }
+  concluirEtapa("verificacao", "o lançador instalado carrega a versão ativa");
 
   // --- Wrap-up ----------------------------------------------------------------------------
   log("");
