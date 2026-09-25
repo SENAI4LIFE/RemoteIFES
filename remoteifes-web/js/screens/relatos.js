@@ -137,8 +137,8 @@ const Relatos = {
       <p class="hint relatos-subtitulo">Seus relatos enviados</p>
       <ul class="relato-lista" aria-live="polite"></ul>
       <p class="hint relato-vazio hidden">Você ainda não enviou nenhum relato.</p>`;
-    await this.renderMeus(painel);
 
+    // The buttons are wired before the list request: a click while the list loads must not be lost.
     painel.querySelector(".relatos-fechar-btn").addEventListener("click", () => this.fecharPainel());
     painel.querySelector(".relatos-novo-btn").addEventListener("click", () => this.abrirFormulario());
     const gestaoBtn = painel.querySelector(".relatos-gestao-btn");
@@ -148,6 +148,7 @@ const Relatos = {
         if (typeof Router !== "undefined") Router.ir("/admin/relatos", { push: true });
       });
     }
+    await this.renderMeus(painel);
   },
 
   async renderMeus(painel) {
