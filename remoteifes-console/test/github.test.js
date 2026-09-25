@@ -58,7 +58,7 @@ test("without a credential the Console does not query GitHub and says why", asyn
   const r = await amb.github.listarRuns({ workflow: "ci" });
   assert.equal(r.ok, false);
   assert.equal(r.semCredencial, true);
-  assert.equal(falso.chamadas.length, 0, "não pode haver requisição sem credencial");
+  assert.equal(falso.chamadas.length, 0, "there must be no request without a credential");
 
   const ci = await amb.mobile.estadoCI();
   assert.equal(ci.disponivel, false);
@@ -79,8 +79,8 @@ test("the token is stored outside the API and sent only in the header", async (t
   await amb.github.listarRuns({ workflow: "ci" });
 
   assert.equal(falso.chamadas[0].autorizacao, "Bearer ghp_tokenfalsoparateste000000000000000");
-  assert.equal(falso.chamadas[0].versaoApi, "2022-11-28", "a versão de API é fixada");
-  assert.ok(!falso.chamadas[0].url.includes("ghp_"), "o token nunca vai na URL");
+  assert.equal(falso.chamadas[0].versaoApi, "2022-11-28", "the API version is pinned");
+  assert.ok(!falso.chamadas[0].url.includes("ghp_"), "the token never goes in the URL");
 
   const estado = amb.github.estadoDoToken();
   assert.equal(estado.presente, true);

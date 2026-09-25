@@ -29,10 +29,10 @@ test("an ongoing outage that started before the retention cutoff is never delete
   retencaoService.executarLimpezaRetencao();
 
   assert.equal(db.prepare("SELECT COUNT(*) n FROM esp_indisponibilidades WHERE sala = 'RET-01'").get().n, 1, "a queda aberta atravessa o corte");
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM esp_indisponibilidades WHERE sala = 'RET-02'").get().n, 0, "a queda encerrada antiga é podada");
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM esp_indisponibilidades WHERE sala = 'RET-02'").get().n, 0, "the old closed outage is pruned");
 
   const fechada = auditoriaService.registrarOnline("RET-01");
-  assert.ok(fechada, "a reconexão precisa encontrar o intervalo aberto");
+  assert.ok(fechada, "reconnection must find the open interval");
   assert.ok(fechada.duracaoSegundos >= 12 * 86400 - 5);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM esp_indisponibilidades WHERE sala = 'RET-01' AND onlineEm IS NULL").get().n, 0);
 });
@@ -66,11 +66,11 @@ test("in the 30-day heatmap availability is computed over the span with retained
   const sete = heatmapService.calcular("disponibilidade", "7d");
   assert.equal(sete.avisoRetencao, null);
   assert.equal(sete.janela.horasEfetivas, sete.janela.horas);
-  assert.ok(Math.abs(sete.salas.find((s) => s.sala === "RET-01").valor - ret01.valor) < 0.2, "7d e 30d concordam quando só há 7 dias de evidência");
+  assert.ok(Math.abs(sete.salas.find((s) => s.sala === "RET-01").valor - ret01.valor) < 0.2, "7d and 30d agree when there are only 7 days of evidence");
 
   const quedas = heatmapService.calcular("quedas", "30d");
-  assert.equal(quedas.janela.horasEfetivas, 720, "contagens mantêm a janela pedida e apenas avisam sobre a retenção");
+  assert.equal(quedas.janela.horasEfetivas, 720, "counts keep the requested window and only warn about retention");
   assert.match(quedas.avisoRetencao, /retenção|mantido/);
   const comandos = heatmapService.calcular("comandos", "30d");
-  assert.equal(comandos.janela.horasEfetivas, 720, "métricas sem dependência de conectividade mantêm a janela cheia");
+  assert.equal(comandos.janela.horasEfetivas, 720, "metrics without connectivity dependency keep the full window");
 });

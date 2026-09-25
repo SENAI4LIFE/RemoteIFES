@@ -67,24 +67,24 @@ test("a local OFF latched on the board is not undone by the ON state the server 
   salasService.eventos.on("mudanca", ouvinte);
   const d = await conectar("LATCH-1", "AA:BB:CC:F5:00:01");
   await ate(() => d.mensagens.some((m) => m.tipo === "device_role"));
-  assert.equal(d.estados().length, 0, "nenhum estado é empurrado antes da placa se apresentar");
+  assert.equal(d.estados().length, 0, "no state is pushed before the board introduces itself");
   d.enviar({ ...INFO_BASE, failsafeLatched: true, ligado: false });
   await ate(() => deviceHub.estadoPublico("LATCH-1").failsafe?.latched === true);
   await esperar(150);
-  assert.equal(d.estados().length, 0, "o servidor não reenvia power=true sobre um failsafe local");
+  assert.equal(d.estados().length, 0, "the server does not resend power=true over a local failsafe");
   const row = salasService.buscar("LATCH-1");
   assert.equal(row.ligado, 0);
   assert.equal(row.turboAtivo, 0);
   assert.ok(db.prepare("SELECT 1 FROM comandos_log WHERE sala = 'LATCH-1' AND cmd = 'failsafe_off_local' AND valor = 'mantido_na_reconexao' AND origem = 'esp32_local'").get());
-  assert.ok(mudancas >= 1, "os navegadores são avisados que a sala está desligada");
+  assert.ok(mudancas >= 1, "browsers are notified that the room is off");
   salasService.eventos.removeListener("mudanca", ouvinte);
 
   d.enviar({ ...INFO_BASE, failsafeLatched: true, ligado: false });
   await esperar(100);
-  assert.equal(d.estados().length, 0, "um segundo info não muda nada");
+  assert.equal(d.estados().length, 0, "a second info changes nothing");
 
   salasService.aplicarComando("LATCH-1", "ligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true }, origem: "manual" });
-  assert.ok(await ate(() => d.estados().length === 1), "um comando explícito continua chegando à placa");
+  assert.ok(await ate(() => d.estados().length === 1), "an explicit command still reaches the board");
   assert.equal(d.estados()[0].power, true);
   d.enviar({ tipo: "telemetria", fw: "4.2.0", modo: "operation", ligado: true, failsafeConfigurado: true, failsafePulsos: 4, failsafeCarrierHz: 38000, failsafeProtocolRecordId: 1, failsafeLatched: false });
   await ate(() => deviceHub.estadoPublico("LATCH-1").failsafe?.latched === false);
@@ -110,7 +110,7 @@ test("firmware that never sends info receives the state after the safety wait", 
   sala("LATCH-3", "AA:BB:CC:F5:00:03", true);
   const d = await conectar("LATCH-3", "AA:BB:CC:F5:00:03");
   await esperar(1500);
-  assert.equal(d.estados().length, 0, "ainda dentro da espera");
+  assert.equal(d.estados().length, 0, "still within the wait");
   assert.ok(await ate(() => d.estados().length === 1, 4000));
   assert.equal(d.estados()[0].power, true);
   d.ws.close();

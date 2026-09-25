@@ -84,24 +84,24 @@ test("rotation creates a pending generation: the old one stays valid until the b
   const atual = credenciais.provisionar("ROT-1");
   const nova = credenciais.rotacionar("ROT-1");
   assert.equal(nova.pendente, true);
-  assert.equal(nova.enviadoAoDispositivo, false, "sem dispositivo conectado nada foi entregue");
+  assert.equal(nova.enviadoAoDispositivo, false, "without a connected device nothing was delivered");
   let estado = credenciais.estado("ROT-1");
   assert.equal(estado.rotacaoPendente, true);
   assert.equal(estado.pendenteEntregueEm, null);
-  assert.equal(estado.graceRotacaoAtivo, false, "nada expira antes de a placa confirmar");
+  assert.equal(estado.graceRotacaoAtivo, false, "nothing expires before the board confirms");
   assert.equal(linha("ROT-1").segredoHashAnterior, null);
 
   const antigaAindaVale = credenciais.verificar(atual.deviceId, atual.segredo);
-  assert.ok(antigaAindaVale && !antigaAindaVale.grace, "a credencial antiga continua sendo a ativa");
+  assert.ok(antigaAindaVale && !antigaAindaVale.grace, "the old credential is still the active one");
   assert.equal(credenciais.estado("ROT-1").rotacaoPendente, true);
 
   const prova = credenciais.verificar(nova.deviceId, nova.segredo);
-  assert.ok(prova && !prova.grace, "a placa provou a nova geração");
+  assert.ok(prova && !prova.grace, "the board proved the new generation");
   estado = credenciais.estado("ROT-1");
   assert.equal(estado.rotacaoPendente, false);
   assert.equal(estado.graceRotacaoAtivo, true);
   const emTolerancia = credenciais.verificar(atual.deviceId, atual.segredo);
-  assert.ok(emTolerancia && emTolerancia.grace && emTolerancia.expiraEm, "a antiga passa a valer só na tolerância limitada");
+  assert.ok(emTolerancia && emTolerancia.grace && emTolerancia.expiraEm, "the old one is now valid only within the bounded grace period");
   assert.ok(new Date(emTolerancia.expiraEm).getTime() - Date.now() <= 24 * 3600 * 1000 + 5000);
 });
 
@@ -113,15 +113,15 @@ test("a board that was offline during rotation does not become unreachable: it r
   db.prepare("UPDATE esp_credenciais SET pendenteCriadoEm = datetime('now', '-3 days') WHERE sala = 'ROT-2'").run();
 
   const placa = await conectar(atual.deviceId, atual.segredo);
-  assert.equal(placa.aberto, true, "três dias depois a credencial antiga ainda autentica");
-  assert.ok(await ate(() => placa.pushes().length === 1), "a geração pendente é entregue na reconexão");
+  assert.equal(placa.aberto, true, "three days later the old credential still authenticates");
+  assert.ok(await ate(() => placa.pushes().length === 1), "the pending generation is delivered on reconnection");
   assert.equal(placa.pushes()[0].segredo, nova.segredo);
   assert.equal(placa.pushes()[0].deviceId, nova.deviceId);
   assert.ok(await ate(() => credenciais.estado("ROT-2").pendenteEntregueEm !== null));
 
   const reconectada = await conectar(nova.deviceId, nova.segredo);
   assert.equal(reconectada.aberto, true);
-  assert.ok(await ate(() => placa.fechamento() === 4002), "a sessão anterior é substituída pela nova conexão");
+  assert.ok(await ate(() => placa.fechamento() === 4002), "the previous session is replaced by the new connection");
   assert.equal(credenciais.estado("ROT-2").rotacaoPendente, false);
   assert.equal(credenciais.estado("ROT-2").graceRotacaoAtivo, true);
   reconectada.ws.close();
@@ -162,9 +162,9 @@ test("after a server restart the pending generation cannot be redelivered, but t
   assert.equal(filho.status, 0, filho.stderr);
   const resultado = JSON.parse(filho.stdout.trim().split("\n").pop());
   assert.deepEqual(resultado, { reentregavel: false, pendente: true, antigaVale: true, entregue: false });
-  assert.equal(credenciais.verificar(perdida.deviceId, perdida.segredo), null, "a geração pendente de uma credencial revogada não vale");
+  assert.equal(credenciais.verificar(perdida.deviceId, perdida.segredo), null, "the pending generation of a revoked credential is not valid");
   const terceira = credenciais.rotacionar("ROT-4");
-  assert.equal(credenciais.verificar(perdida2.deviceId, perdida2.segredo), null, "uma nova rotação substitui a pendente anterior");
+  assert.equal(credenciais.verificar(perdida2.deviceId, perdida2.segredo), null, "a new rotation replaces the previous pending one");
   assert.ok(credenciais.verificar(terceira.deviceId, terceira.segredo));
   assert.ok(credenciais.verificar(outra.deviceId, outra.segredo).grace);
 });
@@ -178,13 +178,13 @@ test("a socket authenticated with the previous generation is closed when the gra
   db.prepare("UPDATE esp_credenciais SET anteriorExpiraEm = ? WHERE sala = 'ROT-5'").run(expira);
 
   const obsoleta = await conectar(antiga.deviceId, antiga.segredo);
-  assert.equal(obsoleta.aberto, true, "dentro da tolerância a geração anterior ainda conecta");
-  assert.equal(deviceHub.encerrarCredenciaisExpiradas(), 0, "ainda não expirou");
+  assert.equal(obsoleta.aberto, true, "within the grace period the previous generation still connects");
+  assert.equal(deviceHub.encerrarCredenciaisExpiradas(), 0, "not expired yet");
   await esperar(1700);
   assert.equal(deviceHub.encerrarCredenciaisExpiradas(), 1);
   assert.ok(await ate(() => obsoleta.fechamento() === 4001));
   const recusada = await conectar(antiga.deviceId, antiga.segredo);
-  assert.equal(recusada.aberto, false, "após a tolerância a geração anterior não autentica mais");
+  assert.equal(recusada.aberto, false, "after the grace period the previous generation no longer authenticates");
 
   const atual = await conectar(nova.deviceId, nova.segredo);
   assert.equal(atual.aberto, true);
@@ -210,27 +210,27 @@ test("a board returning with the previous generation after activation (the NVS w
   sala("ROT-7", "AA:CC:11:00:00:07");
   const antiga = credenciais.provisionar("ROT-7");
   const nova = credenciais.rotacionar("ROT-7");
-  assert.equal(credenciais.estado("ROT-7").atualReentregavel, false, "antes da ativação não há segredo ativado para reentregar");
-  assert.ok(credenciais.verificar(nova.deviceId, nova.segredo), "a placa prova o novo segredo (só em RAM, no cenário)");
+  assert.equal(credenciais.estado("ROT-7").atualReentregavel, false, "before activation there is no activated secret to redeliver");
+  assert.ok(credenciais.verificar(nova.deviceId, nova.segredo), "the board proves the new secret (RAM only, in this scenario)");
   assert.equal(credenciais.estado("ROT-7").rotacaoPendente, false);
   assert.equal(credenciais.estado("ROT-7").atualReentregavel, true);
 
   const reiniciada = await conectar(antiga.deviceId, antiga.segredo);
-  assert.equal(reiniciada.aberto, true, "após reiniciar com a NVS antiga, a placa ainda conecta pela tolerância");
-  assert.ok(await ate(() => reiniciada.pushes().length === 1), "o servidor reentrega o segredo atual à conexão em tolerância");
+  assert.equal(reiniciada.aberto, true, "after restarting with the old NVS, the board still connects through the grace period");
+  assert.ok(await ate(() => reiniciada.pushes().length === 1), "the server redelivers the current secret to the connection in grace");
   assert.equal(reiniciada.pushes()[0].deviceId, nova.deviceId);
   assert.equal(reiniciada.pushes()[0].segredo, nova.segredo);
-  assert.equal(linha("ROT-7").segredoHashPendente, null, "a reentrega não cria uma geração pendente");
+  assert.equal(linha("ROT-7").segredoHashPendente, null, "redelivery does not create a pending generation");
 
   const atualizada = await conectar(nova.deviceId, nova.segredo);
   assert.equal(atualizada.aberto, true);
   assert.ok(await ate(() => atualizada.pushes().length === 0 && reiniciada.fechamento() === 4002));
   await esperar(150);
-  assert.equal(atualizada.pushes().length, 0, "quem conecta com o segredo atual não recebe reentrega");
+  assert.equal(atualizada.pushes().length, 0, "a connection with the current secret receives no redelivery");
   atualizada.ws.close();
 
   db.prepare("UPDATE esp_credenciais SET anteriorExpiraEm = datetime('now', '-1 minute') WHERE sala = 'ROT-7'").run();
-  assert.equal(credenciais.estado("ROT-7").atualReentregavel, false, "fora da tolerância o segredo ativado não fica mais em memória");
+  assert.equal(credenciais.estado("ROT-7").atualReentregavel, false, "outside the grace period the activated secret is no longer kept in memory");
   assert.equal(credenciais.reentregarAtual("ROT-7"), false);
 });
 
@@ -241,9 +241,9 @@ test("replace, revoke and a new activated rotation discard the activated secret 
   credenciais.verificar(primeira.deviceId, primeira.segredo);
   assert.equal(credenciais.estado("ROT-8").atualReentregavel, true);
   const segunda = credenciais.rotacionar("ROT-8");
-  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true, "a pendente nova não invalida a reentrega da atual");
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true, "the new pending generation does not invalidate redelivery of the current one");
   credenciais.verificar(segunda.deviceId, segunda.segredo);
-  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true, "agora é a segunda geração que fica reentregável");
+  assert.equal(credenciais.estado("ROT-8").atualReentregavel, true, "now the second generation is the one that can be redelivered");
   credenciais.substituir("ROT-8");
   assert.equal(credenciais.estado("ROT-8").atualReentregavel, false);
   const terceira = credenciais.rotacionar("ROT-8");

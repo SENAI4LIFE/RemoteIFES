@@ -115,7 +115,7 @@ test("a database in the first-release format migrates without error: columns bef
   assert.ok(colunasAg.includes("data"));
   assert.ok(colunasEx.includes("dataExecucao"));
   for (const indice of ["idx_agendamentos_data", "idx_ag_execucoes_ag_tipo_data", "idx_salas_mac", "idx_sessoes_logout", "idx_mon_amostras_criado"]) {
-    assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?").get(indice), `índice ${indice} ausente`);
+    assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?").get(indice), `index ${indice} missing`);
   }
 });
 
@@ -130,13 +130,13 @@ test("historical data is preserved and the privileged account is not duplicated"
 
   const datado = db.prepare("SELECT * FROM agendamentos WHERE horaInicio = '08:00'").get();
   assert.equal(datado.data, "2026-01-05");
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM agendamentos").get().n, 1, "o agendamento sem data não é representável e sai com suas execuções");
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM agendamentos").get().n, 1, "a schedule without a date cannot be represented and is removed with its executions");
   assert.equal(db.prepare("SELECT COUNT(*) n FROM agendamentos_execucoes").get().n, 1);
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 
   const contas = db.prepare("SELECT usuario, nivel, senhaHash FROM usuarios ORDER BY id").all();
   assert.deepEqual(contas.map((c) => c.usuario), ["superadmin", "professor"]);
-  assert.equal(contas[0].nivel, 3, "a conta de bootstrap da era sem níveis é o superadministrador");
+  assert.equal(contas[0].nivel, 3, "the bootstrap account from before levels is the superadministrator");
   assert.equal(contas[1].nivel, 1);
   assert.equal(contas[0].senhaHash, "hash-admin");
   assert.ok(!db.prepare("PRAGMA table_info(usuarios)").all().some((c) => c.name === "senha"));

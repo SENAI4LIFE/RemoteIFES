@@ -103,7 +103,7 @@ test("an offer's download returns exactly the offered artifact, even after other
   assert.ok(await ate(() => placaA.ofertas().length === 1));
 
   const manifestoB = otaService.publicarFirmware({ origem: b.origem, versao: "4.2.0", notas: "B" });
-  assert.deepEqual(bins(), ["firmware-4.1.0.bin", "firmware-4.2.0.bin"], "o artefato A continua no disco enquanto a oferta estiver ativa");
+  assert.deepEqual(bins(), ["firmware-4.1.0.bin", "firmware-4.2.0.bin"], "artifact A stays on disk while the offer is active");
   assert.equal(otaService.lerManifesto().versao, "4.2.0", "o publicado passa a ser B");
 
   const download = await baixar("ART-1", "AA:BB:CC:AA:00:01");
@@ -111,12 +111,12 @@ test("an offer's download returns exactly the offered artifact, even after other
   assert.equal(download.versao, "4.1.0");
   assert.equal(download.sha256, manifestoA.sha256);
   assert.equal(download.tamanho, String(manifestoA.tamanho));
-  assert.ok(download.corpo.equals(a.bytes), "bytes idênticos aos ofertados");
+  assert.ok(download.corpo.equals(a.bytes), "bytes identical to the offered ones");
 
   placaA.enviar({ tipo: "ota_progresso", recebido: 65536, total: manifestoA.tamanho });
   await ate(() => otaService.estadoDaSala("ART-1").fase === "baixando");
   const deNovo = await baixar("ART-1", "AA:BB:CC:AA:00:01");
-  assert.equal(deNovo.sha256, manifestoA.sha256, "uma retomada durante o download continua no mesmo artefato");
+  assert.equal(deNovo.sha256, manifestoA.sha256, "a resume during the download continues on the same artifact");
 
   const placaB = await placa("ART-2", "AA:BB:CC:AA:00:02");
   const ofertaB = otaService.ofertar("ART-2");
@@ -131,7 +131,7 @@ test("an offer's download returns exactly the offered artifact, even after other
   placaA.enviar({ tipo: "ota_resultado", resultado: "ok" });
   await ate(() => otaService.estadoDaSala("ART-1").fase === "gravado");
   otaService.verificarTimeouts();
-  assert.deepEqual(bins(), ["firmware-4.2.0.bin"], "gravado o firmware, o artefato A deixa de ser necessário e é removido");
+  assert.deepEqual(bins(), ["firmware-4.2.0.bin"], "once the firmware is written, artifact A is no longer needed and is removed");
   assert.equal(otaService.estadoDaSala("ART-2").fase, "ofertado", "a oferta B segue intacta");
 
   placaB.enviar({ tipo: "ota_resultado", resultado: "ok" });
@@ -161,10 +161,10 @@ test("without an active offer the room downloads the published firmware; a faile
   placaC.enviar({ tipo: "ota_resultado", resultado: "erro", erro: "falhou de propósito" });
   await ate(() => otaService.estadoDaSala("ART-3").fase === "falhou");
   otaService.verificarTimeouts();
-  assert.deepEqual(bins(), ["firmware-4.4.0.bin"], "artefato sem oferta ativa é removido na varredura seguinte");
+  assert.deepEqual(bins(), ["firmware-4.4.0.bin"], "an artifact without an active offer is removed on the next sweep");
 
   const depois = await baixar("ART-3", "AA:BB:CC:AA:00:03");
-  assert.equal(depois.versao, "4.4.0", "sem oferta ativa, a sala recebe o publicado");
+  assert.equal(depois.versao, "4.4.0", "without an active offer, the room receives the published one");
   await placaC.fechar();
   otaService.limparEstado("ART-3");
 });
@@ -179,8 +179,8 @@ test("republishing the same version with different bytes is refused while an off
 
   const outroConteudo = criarBin(19);
   assert.throws(() => otaService.publicarFirmware({ origem: outroConteudo.origem, versao: "4.5.0", notas: "E'" }), /4\.5\.0.*em andamento|em andamento.*4\.5\.0/);
-  assert.equal(otaService.lerManifesto().sha256, manifestoE.sha256, "o publicado não mudou");
-  assert.deepEqual(bins(), ["firmware-4.5.0.bin"], "o temporário recusado não fica no disco");
+  assert.equal(otaService.lerManifesto().sha256, manifestoE.sha256, "the published one did not change");
+  assert.deepEqual(bins(), ["firmware-4.5.0.bin"], "the refused temporary does not stay on disk");
 
   const mesmoConteudo = criarBin(17);
   const republicado = otaService.publicarFirmware({ origem: mesmoConteudo.origem, versao: "4.5.0", notas: "E de novo" });
@@ -190,7 +190,7 @@ test("republishing the same version with different bytes is refused while an off
   placaE.enviar({ tipo: "ota_resultado", resultado: "ok" });
   await ate(() => otaService.estadoDaSala("ART-5").fase === "gravado");
   const outraVersao = otaService.publicarFirmware({ origem: outroConteudo.origem, versao: "4.5.1", notas: "E''" });
-  assert.deepEqual(bins(), ["firmware-4.5.1.bin"], "sem oferta ativa, publicar substitui o artefato anterior na hora");
+  assert.deepEqual(bins(), ["firmware-4.5.1.bin"], "without an active offer, publishing replaces the previous artifact immediately");
   assert.equal(otaService.lerManifesto().sha256, outraVersao.sha256);
   await placaE.fechar();
   otaService.limparEstado("ART-5");
@@ -210,7 +210,7 @@ test("if the offered artifact disappears from disk, the download is refused inst
   const resp = await baixar("ART-6", "AA:BB:CC:AA:00:06");
   assert.equal(resp.status, 409);
   assert.match(resp.corpo.toString(), /não está mais disponível/);
-  assert.equal(otaService.estadoDaSala("ART-6").fase, "ofertado", "o estado da oferta não é alterado pelo download recusado");
+  assert.equal(otaService.estadoDaSala("ART-6").fase, "ofertado", "the offer state is not changed by the refused download");
   await placaF.fechar();
   otaService.limparEstado("ART-6");
 });

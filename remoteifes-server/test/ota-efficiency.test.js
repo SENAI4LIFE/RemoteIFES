@@ -81,7 +81,7 @@ test("the published image hash is computed once and reused while the file is the
   const primeira = contarHashes(() => otaService.lerManifesto());
   assert.equal(primeira.resultado.sha256, publicado.sha256);
   const repetidas = contarHashes(() => { for (let i = 0; i < 5; i += 1) otaService.lerManifesto(); });
-  assert.equal(repetidas.hashes, 0, "cinco leituras seguidas não devem reler nem rehashear a imagem");
+  assert.equal(repetidas.hashes, 0, "five consecutive reads must not reread or rehash the image");
 });
 
 test("republishing another image or tampering with the file invalidates the memoized hash", () => {
@@ -97,7 +97,7 @@ test("republishing another image or tampering with the file invalidates the memo
   const futuro = new Date(Date.now() + 5000);
   fs.utimesSync(caminho, futuro, futuro);
   const recusada = contarHashes(() => otaService.lerManifesto());
-  assert.equal(recusada.resultado, null, "arquivo alterado no disco não passa pela verificação, mesmo com hash memorizado");
+  assert.equal(recusada.resultado, null, "a file changed on disk does not pass verification, even with a memoized hash");
   assert.equal(recusada.hashes, 1);
 });
 
@@ -124,7 +124,7 @@ test("the rollout rewrites its state file only when something changed", async ()
     }
     return n;
   };
-  assert.equal(escritas(), 0, "dez ticks sem qualquer evento não devem regravar o estado da distribuição");
+  assert.equal(escritas(), 0, "ten ticks without any event must not rewrite the rollout state");
   assert.equal(JSON.parse(fs.readFileSync(otaRolloutService.ARQUIVO_ROLLOUT, "utf8")).versao, "4.9.3");
   otaRolloutService.cancelar({ id: 1, usuario: "superadmin" });
 });

@@ -38,7 +38,7 @@ test("hourly consolidation keeps how many valid samples each measure had", () =>
   assert.equal(a.bancoMsAmostras, 60);
   assert.equal(a.bancoMs, 10);
   assert.equal(b.amostras, 60);
-  assert.equal(b.bancoMsAmostras, 10, "só as amostras com valor contam para a média da medida");
+  assert.equal(b.bancoMsAmostras, 10, "only samples with a value count toward the measure's mean");
   assert.equal(b.bancoMs, 100);
   assert.equal(b.rssMBAmostras, 60);
 });
@@ -46,9 +46,9 @@ test("hourly consolidation keeps how many valid samples each measure had", () =>
 test("long ranges weight each measure by its own number of valid samples", () => {
   const h30 = monitoramentoService.historico("30d");
   const indice = h30.t.indexOf(bucketAnterior);
-  assert.ok(indice >= 0, "o bucket de 6 h anterior precisa estar na grade");
+  assert.ok(indice >= 0, "the previous 6 h bucket must be on the grid");
   const esperado = (60 * 10 + 10 * 100) / 70;
-  assert.ok(Math.abs(h30.medidas.bancoMs[indice] - esperado) < 0.01, `esperava ${esperado}, obteve ${h30.medidas.bancoMs[indice]} (a ponderação antiga daria 55)`);
+  assert.ok(Math.abs(h30.medidas.bancoMs[indice] - esperado) < 0.01, `expected ${esperado}, got ${h30.medidas.bancoMs[indice]} (the old weighting would give 55)`);
   assert.equal(h30.medidas.rssMB[indice], 50);
   assert.equal(h30.n[indice], 120);
 });

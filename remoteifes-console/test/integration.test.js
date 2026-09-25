@@ -36,12 +36,12 @@ test("preparing an action returns purpose, impact and readiness without running 
 
   assert.equal(r.status, 200);
   assert.ok(r.json.acao.proposito);
-  assert.match(r.json.acao.impacto, /sess/i, "o impacto precisa falar das sessões de usuário");
+  assert.match(r.json.acao.impacto, /sess/i, "the impact must mention user sessions");
   assert.equal(r.json.acao.exigeElevacao, true);
-  assert.ok(r.json.prontidao, "a prontidão é avaliada antes de confirmar");
+  assert.ok(r.json.prontidao, "readiness is evaluated before confirmation");
   assert.equal(Array.isArray(r.json.prontidao.bloqueios), true);
   assert.equal(r.json.elevada, false);
-  assert.equal(amb.execucao.trabalhoAtivo(), null, "preparar não pode iniciar nada");
+  assert.equal(amb.execucao.trabalhoAtivo(), null, "preparing must not start anything");
 });
 
 test("an action with textual confirmation refuses the wrong word", async (t) => {
@@ -91,7 +91,7 @@ test("complete flow: elevate, run, follow the output and read the outcome", asyn
   });
   assert.equal(saude.status, 202);
   assert.equal(saude.json.imediata, true);
-  assert.equal(saude.json.resultado.saude.respondeu, false, "sem aplicação no ar, o /health não responde");
+  assert.equal(saude.json.resultado.saude.respondeu, false, "without the application running, /health does not answer");
 
   // A real job: a backup without a database fails with a useful message, and the engine's full
   // cycle (record, output to file, outcome) is exercised through the API.
@@ -118,8 +118,8 @@ test("complete flow: elevate, run, follow the output and read the outcome", asyn
     }
     await new Promise((res) => setTimeout(res, 100));
   }
-  assert.ok(estadoFinal, "o trabalho precisa terminar");
-  assert.equal(estadoFinal.estado, "falhou", "sem banco, o backup falha — e diz por quê");
+  assert.ok(estadoFinal, "the job must finish");
+  assert.equal(estadoFinal.estado, "falhou", "without a database, the backup fails and says why");
 
   const saida = await ajuda.pedir(s.porta, `/api/trabalhos/${id}/saida`, { cookie: sessao.cookie, origem: s.base });
   assert.equal(saida.status, 200);
@@ -161,7 +161,7 @@ test("a job's output is readable by offset, to resume after a disconnect", async
 
   const posicao = tudo.json.texto.indexOf("PARTE-DOIS");
   const parcial = await ajuda.pedir(s.porta, `/api/trabalhos/${trabalho.id}/saida?desde=${posicao}`, { cookie: sessao.cookie, origem: s.base });
-  assert.ok(!parcial.json.texto.includes("PARTE-UM"), "a leitura por posição não repete o que já foi lido");
+  assert.ok(!parcial.json.texto.includes("PARTE-UM"), "reading by offset does not repeat what was already read");
   assert.match(parcial.json.texto, /PARTE-DOIS/);
 });
 
@@ -204,22 +204,22 @@ test("the Console is not published by GitHub Pages and does not enter the Cordov
 
   const pages = fs.readFileSync(path.join(raiz, ".github", "workflows", "pages.yml"), "utf8");
   assert.match(pages, /path:\s*remoteifes-web/, "o Pages publica apenas o frontend");
-  assert.ok(!pages.includes("remoteifes-console"), "o console não pode entrar no artefato do Pages");
+  assert.ok(!pages.includes("remoteifes-console"), "the Console must not enter the Pages artifact");
 
   const sync = fs.readFileSync(path.join(raiz, "remoteifes-cordova", "sync-www.js"), "utf8");
   assert.match(sync, /remoteifes-web/, "o Cordova empacota apenas o frontend");
-  assert.ok(!sync.includes("remoteifes-console"), "o console não pode entrar no www do Cordova");
+  assert.ok(!sync.includes("remoteifes-console"), "the Console must not enter the Cordova www");
 
   // The application serves the frontend from remoteifes-web; the Console stays outside that root.
   const app = fs.readFileSync(path.join(raiz, "remoteifes-server", "src", "app.js"), "utf8");
   assert.match(app, /"remoteifes-web"/);
-  assert.ok(!app.includes("remoteifes-console"), "o servidor da aplicação não serve arquivos do console");
+  assert.ok(!app.includes("remoteifes-console"), "the application server does not serve Console files");
 });
 
 test("the Console has no npm dependencies", () => {
   const pacote = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8"));
-  assert.equal(pacote.dependencies, undefined, "o console não deve declarar dependências de runtime");
-  assert.equal(pacote.devDependencies, undefined, "nem dependências de desenvolvimento");
+  assert.equal(pacote.dependencies, undefined, "the Console must not declare runtime dependencies");
+  assert.equal(pacote.devDependencies, undefined, "nor development dependencies");
   assert.match(pacote.engines.node, /22/);
 });
 
@@ -268,7 +268,7 @@ test("no secret is committed in the Console directory", () => {
         // The security test uses synthetic tokens on purpose; they are recognizable.
         const achado = padrao.exec(texto);
         if (achado && !/tokenfalso|umtokenfalso|teste/i.test(achado[0])) {
-          assert.fail(`possível segredo em ${path.relative(ajuda.RAIZ, completo)}: ${achado[0].slice(0, 20)}…`);
+          assert.fail(`possible secret in ${path.relative(ajuda.RAIZ, completo)}: ${achado[0].slice(0, 20)}…`);
         }
       }
     }

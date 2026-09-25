@@ -183,7 +183,7 @@ test("changing the cloner room's MAC invalidates the binding until a new confirm
 
 test("with a provisioned credential the binding requires the same deviceId; replacing or revoking removes the authorization", () => {
   const { deviceId } = credenciais.provisionar("CLONE-1");
-  assert.equal(protocolos.papelDaSala("CLONE-1"), "cloner", "provisionar credencial na mesma placa não invalida o vínculo por MAC");
+  assert.equal(protocolos.papelDaSala("CLONE-1"), "cloner", "provisioning a credential on the same board does not invalidate the MAC binding");
   const confirmado = protocolos.definirClonador("CLONE-1");
   assert.equal(confirmado.deviceId, deviceId);
   assert.equal(protocolos.papelDaConexao("CLONE-1", { mac: "AA:BB:CC:DD:EE:C2", deviceId }), "cloner");

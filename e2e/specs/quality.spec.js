@@ -22,7 +22,7 @@ for (const [papel, subtabs] of [["admin", ADMIN_COMUM], ["superadmin", SUPERADMI
         await page.goto(`/#/admin/${rota}`);
         await expect(page.locator(`#adminSub-${sub}`)).toBeVisible({ timeout: 20_000 });
         if (aba) await expect(page.locator(`#${sub}Aba-${aba}`)).toBeVisible({ timeout: 20_000 });
-        expect(await semRolagemHorizontal(page), `${rota} sem rolagem horizontal`).toBe(true);
+        expect(await semRolagemHorizontal(page), `${rota} without horizontal scroll`).toBe(true);
       }
 
       expect(erros).toEqual([]);
