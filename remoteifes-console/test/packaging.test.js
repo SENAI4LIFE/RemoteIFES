@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const { execFileSync } = require("child_process");
-const ajuda = require("./ajuda");
+const ajuda = require("./helpers");
 
 // Complete distribution chain: build -> sign -> publish -> update -> verify.
 //
