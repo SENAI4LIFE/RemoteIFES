@@ -76,10 +76,20 @@ rollback para revisão anterior ao console **apagaria** este diretório. Por iss
   usa git, não copia o checkout e não depende do `origin/main` da aplicação;
 * reverter é trocar o ponteiro de volta para a versão anterior, já verificada, **sem rede**.
 
-Trabalhos longos gravam a saída em arquivo limitado no diretório de estado e rodam em grupo de
-processos próprio, de modo que sobrevivem à queda do navegador **e** à reinicialização do console.
-Na partida o console reconcilia: PID vivo, reata a leitura do arquivo; PID morto sem marca de
-conclusão, desfecho **desconhecido** — nunca sucesso presumido.
+Trabalhos longos rodam sob um **supervisor** (`bin/supervisionar.js`) iniciado em grupo de processos
+próprio, sem nenhum pipe ligado ao console. O supervisor é o dono do trabalho: lê a saída do
+executor e a grava em arquivo limitado, aplica o prazo máximo da ação, mantém a trava de manutenção
+(que passa a registrar o PID dele) e grava o desfecho em `<id>.fim.json` de forma atômica antes de
+sair. A unidade do systemd usa `KillMode=process`, então parar, reiniciar ou atualizar o console não
+atinge o supervisor. Antes, a saída passava por pipes do próprio console e a trava levava o PID do
+console: uma queda do console matava o executor na escrita seguinte (EPIPE) e deixava a trava com
+aparência de resíduo enquanto a restauração ainda corria.
+
+Na partida o console reconcilia a partir de fatos: desfecho gravado, usa o código de saída real e
+registra que o efeito **não foi verificado automaticamente** (a verificação de cada ação só roda no
+processo que acompanhou o trabalho); supervisor vivo (PID e horário de início), acompanha até o fim;
+supervisor morto sem desfecho, **desconhecido** — nunca sucesso presumido. A trava de um trabalho
+concluído sem acompanhamento é liberada nessa reconciliação.
 
 ## 4. Identidade, autorização e privilégio
 
