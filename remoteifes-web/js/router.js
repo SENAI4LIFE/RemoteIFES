@@ -13,6 +13,7 @@ const Router = (() => {
     ativos: ["status", "ativos"],
     mapa: ["status", "mapa"],
     monitoramento: ["status", "sistema"],
+    topologia: ["status", "topologia"],
   };
   const FP_SECOES = ["a-terreo", "a-2pav", "a-3pav", "b-terreo", "b-2pav", "b-3pav"];
   const RAIZES_COM_PARAMETRO = ["agenda", "agendamentos", "grade", "config", "ajuda"];
