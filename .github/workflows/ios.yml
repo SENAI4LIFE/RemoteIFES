@@ -1,15 +1,13 @@
 name: iOS app
+# Called from ci.yml when the web or Cordova sources change; can also be dispatched directly.
 on:
-  push:
-    branches: [main]
-    paths: ['remoteifes-cordova/**', 'remoteifes-web/**', '.github/workflows/ios.yml']
-  pull_request:
-    paths: ['remoteifes-cordova/**', 'remoteifes-web/**', '.github/workflows/ios.yml']
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   build:
+    name: Simulator build and smoke
     runs-on: macos-latest
     timeout-minutes: 40
     defaults:
