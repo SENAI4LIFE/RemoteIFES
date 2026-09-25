@@ -90,6 +90,23 @@ class Trava {
     this.sidecar = sidecar;
     this.relogio = null;
     this.liberada = false;
+    this.pid = process.pid;
+  }
+
+  /**
+   * Hands the lock to the process that actually runs the operation (the job supervisor). Liveness
+   * checks then follow that process: the lock stays valid if this Console process ends first.
+   */
+  transferirPara(pid) {
+    if (this.liberada || !Number.isInteger(pid) || pid <= 0) return;
+    const conteudo = fs.readFileSync(this.arquivo, "utf8").trim();
+    if (Number.parseInt(conteudo.split(/\s+/)[0], 10) !== this.pid) return;
+    const temporario = `${this.arquivo}.${process.pid}.tmp`;
+    fs.writeFileSync(temporario, `${pid} ${new Date().toISOString()}\n`, { encoding: "utf8", mode: 0o644 });
+    fs.renameSync(temporario, this.arquivo);
+    const meta = estado.lerJson(this.sidecar, null);
+    if (meta && meta.pid === this.pid) estado.gravarJson(this.sidecar, { ...meta, pid, consolePid: process.pid }, 0o644);
+    this.pid = pid;
   }
 
   iniciarHeartbeat() {
@@ -112,13 +129,13 @@ class Trava {
     try {
       // Removes only if still ours: avoids deleting a lock another process took over.
       const conteudo = fs.readFileSync(this.arquivo, "utf8").trim();
-      if (Number.parseInt(conteudo.split(/\s+/)[0], 10) === process.pid) {
+      if (Number.parseInt(conteudo.split(/\s+/)[0], 10) === this.pid) {
         fs.rmSync(this.arquivo, { force: true });
       }
     } catch {}
     try {
       const meta = estado.lerJson(this.sidecar, null);
-      if (meta && meta.pid === process.pid) fs.rmSync(this.sidecar, { force: true });
+      if (meta && meta.pid === this.pid) fs.rmSync(this.sidecar, { force: true });
     } catch {}
   }
 }
@@ -178,6 +195,19 @@ function adquirir({ acao, trabalhoId, operador }) {
 }
 
 /**
+ * Removes the lock of a finished job whose supervisor is gone, during reconciliation. Only when the
+ * lock still names that PID and the process is dead.
+ */
+function removerDoProcesso(pid) {
+  const atual = lerTrava();
+  if (!atual || atual.pid !== pid || atual.vivo) return false;
+  const { trava, sidecar } = caminhos();
+  fs.rmSync(trava, { force: true });
+  fs.rmSync(sidecar, { force: true });
+  return true;
+}
+
+/**
  * Explicit removal of a leftover lock, requested by the operator. Refuses a live process's lock.
  */
 function removerResiduo(operador) {
@@ -191,4 +221,4 @@ function removerResiduo(operador) {
   return { ok: true };
 }
 
-module.exports = { adquirir, situacao, lerTrava, removerResiduo, processoVivo, IDADE_RESIDUO_MS };
+module.exports = { adquirir, situacao, lerTrava, removerResiduo, removerDoProcesso, processoVivo, IDADE_RESIDUO_MS };

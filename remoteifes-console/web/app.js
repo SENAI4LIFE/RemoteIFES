@@ -484,7 +484,7 @@
       }
       if (t.erro) aviso(estadoCaixa, t.estado === "desconhecido" ? "alerta" : "erro", "Resultado", t.erro);
       if (t.verificacao && t.verificacao.resumo) {
-        aviso(estadoCaixa, t.verificacao.ok === false ? "alerta" : "ok", "Verificação", t.verificacao.resumo);
+        aviso(estadoCaixa, t.verificacao.ok === true ? "ok" : "alerta", "Verificação", t.verificacao.resumo);
       }
       if (t.estado === "desconhecido") {
         aviso(estadoCaixa, "alerta", "Próximo passo", "Confira o estado atual na Visão geral antes de repetir a operação: o efeito não pôde ser comprovado.");
