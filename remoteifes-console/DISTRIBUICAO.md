@@ -76,11 +76,29 @@ lugar: `src/plataforma/windows.js` isola tudo que dependeria dele.
 |---|---|---|---|
 | Linux (deb) | `remoteifes-console_<versão>_all.deb` | sim | **sim** — `dpkg -i` com provisionamento real (estado, segredo, unidades, auxiliar, regra de sudo, console respondendo pelo socket), `dpkg --verify`, `dpkg -r` e `dpkg -P` |
 | Linux (portátil) | `.tar.gz` + `instalacao/instalar.js` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
-| Windows | `.zip` + `instalar.ps1` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
+| Windows (instalador) | `remoteifes-console-<versão>-windows-<arco>-instalador.exe` | sim | **sim** — instalação silenciosa, atalhos, entrada em Programas e Recursos e remoção, num runner Windows |
+| Windows (portátil) | `.zip` + `instalar.ps1` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
 | macOS | `.tar.gz` com bundle `.app` + `instalacao/instalar.js` | sim | **sim** — instala fora da árvore de código e roda o programa instalado |
 
-MSI/WiX, NSIS e `.pkg` assinado foram deliberadamente deixados de fora: sem credenciais de
-assinatura e sem ambiente de validação, entregariam um instalador não testado.
+O instalador do Windows é só a porta de entrada: quem instala é `instalacao/instalar.js`, o mesmo
+instalador portátil das outras plataformas, e o destino escolhido na tela é passado a ele em
+`--raiz`. Assim existe uma única resposta para onde o programa vai e uma única implementação de como
+ele chega lá. O que o executável acrescenta é o que só um instalador do Windows acrescenta: o duplo
+clique, a entrada em Programas e Recursos, o atalho opcional na área de trabalho e uma janela que
+mostra o progresso real do instalador.
+
+A instalação é por usuário, sem elevação, porque a tarefa que abre o console na entrada do usuário
+não exige Administrador. A instalação para todos os usuários continua sendo o caminho elevado e
+documentado (`instalar.ps1 -Escopo sistema`). A remoção chama o desinstalador do próprio console,
+que recusa qualquer pasta que não prove ser uma instalação e preserva operadores, auditoria e
+backups.
+
+O executável é construído com o NSIS (`empacotar/windows/instalador.nsi`); sem o `makensis` na
+máquina de build ele simplesmente não é produzido, como acontece com o `.deb`. **Ele não tem
+assinatura de código do Windows**: sem essa credencial o SmartScreen avisa, e a procedência declara
+`assinaturaDeCodigo: false`. A origem dele, como a de todo arquivo de um release, é provada pela
+atestação de proveniência (seção 5). MSI/WiX e `.pkg` assinado seguem de fora: sem credenciais e
+sem ambiente de validação, entregariam um instalador não testado.
 
 O job `pacotes` da CI roda em `ubuntu-latest`, `windows-latest` e `macos-latest` e faz, em cada
 um: constrói o artefato; confere o que a procedência declara e que cada digest do manifesto bate
@@ -291,7 +309,7 @@ que impedem uma instalação ruim.
 
 | Capacidade | Estado | Bloqueio exato |
 |---|---|---|
-| Assinatura de código Windows / notarização macOS | **sem credenciais** | não há certificado nem conta de desenvolvedor; a procedência declara `assinaturaDeCodigo: false`. A origem dos arquivos é provada pela atestação do release (seção 5) |
+| Assinatura de código Windows / notarização macOS | **sem credenciais** | não há certificado nem conta de desenvolvedor; a procedência declara `assinaturaDeCodigo: false`, e isso vale também para o instalador `.exe`. A origem dos arquivos é provada pela atestação do release (seção 5) |
 | Host de serviço SCM no Windows | **não suportado** (usa partida sob demanda) | exige componente nativo compilado e validado; ausente aqui |
 | Terminal Expert | **indisponível por padrão** nas três plataformas | `node-pty` é módulo nativo; não é distribuído aqui porque não há build por plataforma/arquitetura validado na CI. O console informa o requisito e o comando exatos **daquele** sistema (ConPTY no Windows, ferramentas do Xcode no macOS, `build-essential` no Linux) e não oferece nenhum substituto |
 | Publicação de APK de produção | inalterado, fora do host | exige Android SDK |
