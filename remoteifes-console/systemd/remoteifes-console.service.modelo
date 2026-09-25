@@ -42,7 +42,9 @@ RestrictSUIDSGID=yes
 RestrictRealtime=yes
 RestrictNamespaces=yes
 LockPersonality=yes
-MemoryDenyWriteExecute=yes
+# MemoryDenyWriteExecute NÃO é usado: o JIT do V8 precisa tornar executável memória que foi
+# gravável, e com a diretiva o Node aborta ao compilar código (o socket aceitaria conexões sem
+# que o serviço jamais subisse).
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 # Caminhos graváveis, explicitamente: estado do console, dados da aplicação (backup, trava,
 # registro de deploy) e o checkout (deploy.sh troca o código e roda npm ci).
