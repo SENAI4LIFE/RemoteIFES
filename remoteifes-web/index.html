@@ -22,17 +22,17 @@
         + '</div></div><!--');
     })();
   </script>
-  <link rel="manifest" href="manifest.webmanifest?v=2026.09.25.3" />
+  <link rel="manifest" href="manifest.webmanifest?v=2026.09.25.4" />
   <meta name="theme-color" content="#1c6b3c" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemoteIFES" />
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.25.3" />
-  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.25.3" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.25.3" />
-  <meta name="remoteifes-version" content="2026.09.25.3" />
-  <link rel="stylesheet" href="css/style.css?v=2026.09.25.3" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2026.09.25.4" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2026.09.25.4" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2026.09.25.4" />
+  <meta name="remoteifes-version" content="2026.09.25.4" />
+  <link rel="stylesheet" href="css/style.css?v=2026.09.25.4" />
 </head>
 <body>
 
@@ -105,7 +105,7 @@
 
   <header class="topbar">
     <button type="button" id="homeBtn" class="home-btn" aria-label="Início">
-      <img src="assets/remoteifes-logo.png?v=2026.09.25.3" alt="RemoteIFES" />
+      <img src="assets/remoteifes-logo.png?v=2026.09.25.4" alt="RemoteIFES" />
       <span class="home-btn-title">RemoteIFES</span>
     </button>
     <div class="topbar-right">
@@ -171,7 +171,7 @@
             </div>
           </div>
           <div class="portal-footer">
-            <img src="assets/ifes-logo.png?v=2026.09.25.3" alt="Instituto Federal do Espírito Santo" />
+            <img src="assets/ifes-logo.png?v=2026.09.25.4" alt="Instituto Federal do Espírito Santo" />
             <span>Instituto Federal do Espírito Santo: controle de ar-condicionado do campus.</span>
           </div>
         </div>
@@ -1171,6 +1171,7 @@
             <button type="button" class="admin-inner-tab-btn active" data-aba="ativos" role="tab" aria-selected="true" aria-controls="statusAba-ativos">Usuários ativos</button>
             <button type="button" class="admin-inner-tab-btn" data-aba="mapa" role="tab" aria-selected="false" aria-controls="statusAba-mapa">Mapa</button>
             <button type="button" class="admin-inner-tab-btn superadmin-only hidden" data-aba="sistema" role="tab" aria-selected="false" aria-controls="statusAba-sistema">Sistema</button>
+            <button type="button" class="admin-inner-tab-btn superadmin-only hidden" data-aba="topologia" role="tab" aria-selected="false" aria-controls="statusAba-topologia">Topologia</button>
           </div>
 
           <div id="statusAba-ativos" class="admin-inner-tab" role="tabpanel">
@@ -1194,6 +1195,40 @@
               <span><i class="mapa-cell mapa-reservada"></i> reservada agora</span>
             </div>
             <div id="mapaGrid" class="mapa-grid"></div>
+          </div>
+
+          <div id="statusAba-topologia" class="admin-inner-tab hidden" role="tabpanel">
+            <p class="hint">Como cada ESP32 chega ao servidor: Wi-Fi direto ou rede mesh por um gateway. Observação em memória, atualizada a cada 15 s enquanto esta aba está aberta. Estar ligado ao gateway não prova que a placa está conectada: só a autenticação da própria placa prova.</p>
+            <p id="topoAviso" class="topo-aviso" role="status" aria-live="polite">Carregando…</p>
+            <div class="topo-filtros">
+              <label for="topoFiltroTransporte">Transporte
+                <select id="topoFiltroTransporte">
+                  <option value="todos">Todos</option>
+                  <option value="direto">Wi-Fi direto</option>
+                  <option value="mesh">Rede mesh</option>
+                </select>
+              </label>
+              <label for="topoFiltroEstado">Situação
+                <select id="topoFiltroEstado">
+                  <option value="todos">Todas</option>
+                  <option value="problema">Só com problema</option>
+                </select>
+              </label>
+            </div>
+            <div class="topo-area">
+              <div class="topo-desenho" role="group" aria-label="Diagrama da topologia">
+                <svg id="topoSvg" class="topo-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="false"></svg>
+              </div>
+              <div id="topoDetalhe" class="topo-detalhe card" aria-live="polite"></div>
+            </div>
+            <p class="topo-legenda"><span class="topo-chip topo-ok">conectado</span> <span class="topo-chip topo-atencao">autenticando</span> <span class="topo-chip topo-falha">inalcançável ou recusado</span> <span class="topo-chip">quadrado: servidor ou gateway</span> <span class="topo-chip">anel: retransmite outras placas</span></p>
+            <div class="topo-tabela-caixa">
+              <table id="topoTabela" class="topo-tabela">
+                <caption>Placas na topologia</caption>
+                <thead><tr><th scope="col">Sala</th><th scope="col">Transporte</th><th scope="col">Situação</th><th scope="col">Saltos</th><th scope="col">Sinal</th><th scope="col">Última notícia</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
 
           <div id="statusAba-sistema" class="admin-inner-tab hidden" role="tabpanel">
@@ -1631,46 +1666,47 @@
     </div>
   </div>
 
-  <script src="js/version.js?v=2026.09.25.3"></script>
-  <script src="js/icons.js?v=2026.09.25.3"></script>
-  <script src="js/state.js?v=2026.09.25.3"></script>
-  <script src="js/config.js?v=2026.09.25.3"></script>
-  <script src="js/toast.js?v=2026.09.25.3"></script>
-  <script src="js/server-status.js?v=2026.09.25.3"></script>
-  <script src="js/tempo.js?v=2026.09.25.3"></script>
-  <script src="js/rooms-data.js?v=2026.09.25.3"></script>
-  <script src="js/api.js?v=2026.09.25.3"></script>
-  <script src="js/rtstatus.js?v=2026.09.25.3"></script>
-  <script src="js/nav.js?v=2026.09.25.3"></script>
-  <script src="js/idle-timer.js?v=2026.09.25.3"></script>
-  <script src="js/a11y.js?v=2026.09.25.3"></script>
-  <script src="js/ui-dialog.js?v=2026.09.25.3"></script>
-  <script src="js/ui-status.js?v=2026.09.25.3"></script>
-  <script src="js/help.js?v=2026.09.25.3"></script>
-  <script src="js/screens/notifications.js?v=2026.09.25.3"></script>
-  <script src="js/screens/relatos.js?v=2026.09.25.3"></script>
-  <script src="js/screens/login.js?v=2026.09.25.3"></script>
-  <script src="js/screens/portal-funcoes.js?v=2026.09.25.3"></script>
-  <script src="js/screens/location.js?v=2026.09.25.3"></script>
-  <script src="js/screens/simple.js?v=2026.09.25.3"></script>
-  <script src="js/floorplan.js?v=2026.09.25.3"></script>
-  <script src="js/screens/floorplan.js?v=2026.09.25.3"></script>
-  <script src="js/screens/rooms.js?v=2026.09.25.3"></script>
-  <script src="js/screens/panel.js?v=2026.09.25.3"></script>
-  <script src="js/screens/schedule.js?v=2026.09.25.3"></script>
-  <script src="js/screens/grade.js?v=2026.09.25.3"></script>
-  <script src="js/screens/propriedade.js?v=2026.09.25.3"></script>
-  <script src="js/charts.js?v=2026.09.25.3"></script>
-  <script src="js/screens/monitoramento.js?v=2026.09.25.3"></script>
-  <script src="js/screens/heatmap.js?v=2026.09.25.3"></script>
-  <script src="js/screens/inicio.js?v=2026.09.25.3"></script>
-  <script src="js/screens/admin.js?v=2026.09.25.3"></script>
-  <script src="js/screens/esp32-admin.js?v=2026.09.25.3"></script>
-  <script src="js/screens/protocolos-ir-admin.js?v=2026.09.25.3"></script>
-  <script src="js/screens/manual.js?v=2026.09.25.3"></script>
-  <script src="js/screens/mobile-app.js?v=2026.09.25.3"></script>
-  <script src="js/account-menu.js?v=2026.09.25.3"></script>
-  <script src="js/router.js?v=2026.09.25.3"></script>
-  <script src="js/app.js?v=2026.09.25.3"></script>
+  <script src="js/version.js?v=2026.09.25.4"></script>
+  <script src="js/icons.js?v=2026.09.25.4"></script>
+  <script src="js/state.js?v=2026.09.25.4"></script>
+  <script src="js/config.js?v=2026.09.25.4"></script>
+  <script src="js/toast.js?v=2026.09.25.4"></script>
+  <script src="js/server-status.js?v=2026.09.25.4"></script>
+  <script src="js/tempo.js?v=2026.09.25.4"></script>
+  <script src="js/rooms-data.js?v=2026.09.25.4"></script>
+  <script src="js/api.js?v=2026.09.25.4"></script>
+  <script src="js/rtstatus.js?v=2026.09.25.4"></script>
+  <script src="js/nav.js?v=2026.09.25.4"></script>
+  <script src="js/idle-timer.js?v=2026.09.25.4"></script>
+  <script src="js/a11y.js?v=2026.09.25.4"></script>
+  <script src="js/ui-dialog.js?v=2026.09.25.4"></script>
+  <script src="js/ui-status.js?v=2026.09.25.4"></script>
+  <script src="js/help.js?v=2026.09.25.4"></script>
+  <script src="js/screens/notifications.js?v=2026.09.25.4"></script>
+  <script src="js/screens/relatos.js?v=2026.09.25.4"></script>
+  <script src="js/screens/login.js?v=2026.09.25.4"></script>
+  <script src="js/screens/portal-funcoes.js?v=2026.09.25.4"></script>
+  <script src="js/screens/location.js?v=2026.09.25.4"></script>
+  <script src="js/screens/simple.js?v=2026.09.25.4"></script>
+  <script src="js/floorplan.js?v=2026.09.25.4"></script>
+  <script src="js/screens/floorplan.js?v=2026.09.25.4"></script>
+  <script src="js/screens/rooms.js?v=2026.09.25.4"></script>
+  <script src="js/screens/panel.js?v=2026.09.25.4"></script>
+  <script src="js/screens/schedule.js?v=2026.09.25.4"></script>
+  <script src="js/screens/grade.js?v=2026.09.25.4"></script>
+  <script src="js/screens/propriedade.js?v=2026.09.25.4"></script>
+  <script src="js/charts.js?v=2026.09.25.4"></script>
+  <script src="js/screens/monitoramento.js?v=2026.09.25.4"></script>
+  <script src="js/screens/heatmap.js?v=2026.09.25.4"></script>
+  <script src="js/screens/topologia.js?v=2026.09.25.4"></script>
+  <script src="js/screens/inicio.js?v=2026.09.25.4"></script>
+  <script src="js/screens/admin.js?v=2026.09.25.4"></script>
+  <script src="js/screens/esp32-admin.js?v=2026.09.25.4"></script>
+  <script src="js/screens/protocolos-ir-admin.js?v=2026.09.25.4"></script>
+  <script src="js/screens/manual.js?v=2026.09.25.4"></script>
+  <script src="js/screens/mobile-app.js?v=2026.09.25.4"></script>
+  <script src="js/account-menu.js?v=2026.09.25.4"></script>
+  <script src="js/router.js?v=2026.09.25.4"></script>
+  <script src="js/app.js?v=2026.09.25.4"></script>
 </body>
 </html>
