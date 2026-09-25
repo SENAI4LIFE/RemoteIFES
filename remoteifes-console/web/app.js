@@ -10,6 +10,23 @@
 
   var estadoApp = { csrf: null, operador: null, elevada: false, area: "visao", painel: null, atualizacao: null, fluxo: null };
 
+  // First-access invitation opened by the launcher. It is read once from the URL fragment (which is
+  // never sent to the server in a request line) and removed from the address bar and the history
+  // before any request is made.
+  var conviteInicial = (function () {
+    var m = /(?:^#|&)primeiro-acesso=([A-Za-z0-9_-]{32,128})(?:&|$)/.exec(window.location.hash || "");
+    if (!m) return null;
+    try { window.history.replaceState(null, "", window.location.pathname + window.location.search); } catch (e) {}
+    return m[1];
+  })();
+
+  function usarConvite(ativo) {
+    $("bsCampoSegredo").classList.toggle("oculto", ativo);
+    $("bsSegredo").required = !ativo;
+    $("bsAvisoConvite").classList.toggle("oculto", !ativo);
+    $("bsAvisoSegredo").classList.toggle("oculto", ativo);
+  }
+
   // --- utilities -------------------------------------------------------------------------
 
   function $(id) { return document.getElementById(id); }
@@ -107,6 +124,8 @@
         $("formLogin").classList.add("oculto");
         $("formBootstrap").classList.remove("oculto");
         $("loginTitulo").textContent = "Primeiro acesso ao console";
+        usarConvite(!!conviteInicial);
+        (conviteInicial ? $("bsNome") : $("bsSegredo")).focus();
       } else {
         $("formLogin").classList.remove("oculto");
         $("formBootstrap").classList.add("oculto");
@@ -1388,14 +1407,23 @@
 
     $("formBootstrap").addEventListener("submit", function (ev) {
       ev.preventDefault();
-      api("/api/bootstrap", { method: "POST", corpo: { segredo: $("bsSegredo").value, nome: $("bsNome").value.trim(), senha: $("bsSenha").value } }).then(function (r) {
+      var corpo = { nome: $("bsNome").value.trim(), senha: $("bsSenha").value };
+      if (conviteInicial) corpo.convite = conviteInicial;
+      else corpo.segredo = $("bsSegredo").value;
+      api("/api/bootstrap", { method: "POST", corpo: corpo }).then(function (r) {
         if (!r.ok) {
           var caixa = $("loginAviso");
           limpar(caixa);
           caixa.classList.remove("oculto");
           aviso(caixa, "erro", "Não foi possível criar o operador", r.corpo.erro || "falha");
+          if (conviteInicial && r.status === 403) {
+            // Expired or unknown invitation: fall back to the secret, which still works.
+            conviteInicial = null;
+            usarConvite(false);
+          }
           return;
         }
+        conviteInicial = null;
         $("bsSegredo").value = "";
         $("bsSenha").value = "";
         mostrarLogin("Operador criado. Entre com as credenciais que acabou de definir.");

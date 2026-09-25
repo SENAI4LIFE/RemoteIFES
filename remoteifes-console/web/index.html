@@ -31,8 +31,9 @@
       </form>
 
       <form id="formBootstrap" class="oculto">
-        <p class="aviso info"><strong>Primeiro acesso</strong>Nenhum operador foi criado ainda. Use o segredo de instalação exibido pelo instalador — ele também fica em <code>bootstrap-token</code>, no diretório de estado.</p>
-        <div class="campo">
+        <p class="aviso info" id="bsAvisoSegredo"><strong>Primeiro acesso</strong>Nenhum operador foi criado ainda. Abra o console pelo atalho do sistema neste computador, com uma conta de administrador, para autorizar o primeiro acesso sem digitar segredo. Ou use o segredo de instalação guardado em <code>bootstrap-token</code>, no diretório de estado (legível só pelo administrador), ou ainda crie o operador pelo terminal com <code>--criar-operador</code>.</p>
+        <p class="aviso ok oculto" id="bsAvisoConvite"><strong>Primeiro acesso autorizado</strong>Este computador autorizou a criação do primeiro operador. A autorização vale por poucos minutos e deixa de valer assim que o operador for criado.</p>
+        <div class="campo" id="bsCampoSegredo">
           <label for="bsSegredo">Segredo de instalação</label>
           <input type="password" id="bsSegredo" required autocomplete="one-time-code" />
         </div>

@@ -103,7 +103,7 @@ concluído sem acompanhamento é liberada nessa reconciliação.
 | Item | Decisão |
 |---|---|
 | Credencial | operador local, senha com `scrypt` (`node:crypto`), em `/var/lib/remoteifes-console/operadores.json` (0600) |
-| Provisionamento | o instalador gera um segredo de uso único, exibido **uma vez** e gravado em `bootstrap-token` (0600); nunca reaproveita `SENHA_ADMIN_INICIAL` nem `superadmin/admin` |
+| Provisionamento | o instalador gera um segredo de uso único gravado em `bootstrap-token` (0600) — exibido uma vez na instalação manual, nunca pela do pacote (o apt registra a saída em log); nunca reaproveita `SENHA_ADMIN_INICIAL` nem `superadmin/admin`. Quem lê o arquivo (autorização local) cria o primeiro operador: pelo lançador, que troca o segredo por um convite de uso único de 10 minutos entregue ao navegador por uma página privada (fragmento da URL, removido do histórico antes do uso), ou por `--criar-operador` no terminal. Comparação em tempo constante, limite de tentativas; criado o operador, segredo e convites deixam de valer |
 | Sessão | cookie `HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` quando houver TLS; validade absoluta 8 h e ociosidade 30 min |
 | Elevação | reautenticação por senha para operações sensíveis; validade 5 min, revogada no logout e no fim da sessão |
 | CSRF | token por sessão exigido em cabeçalho próprio em **todo** método mutante, mais checagem exata de `Origin` e de `Host` (anti-DNS-rebinding). CORS não é considerado defesa |

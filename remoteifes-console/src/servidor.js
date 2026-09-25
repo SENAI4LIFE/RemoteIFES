@@ -237,6 +237,66 @@ function exigirElevacao(res, sessao) {
   return true;
 }
 
+// --- First access ---------------------------------------------------------------------------------
+
+const CONVITE_VALIDADE_MS = 10 * 60 * 1000;
+const CONVITES_MAX = 5;
+// Invitation digest -> expiry. Only digests are kept; the invitation itself leaves in the response.
+const convites = new Map();
+
+function digestDe(texto) {
+  return crypto.createHash("sha256").update(String(texto)).digest();
+}
+
+/**
+ * Checks the installation secret in constant time, with the same attempt limit as the login.
+ * Returns null when accepted, or { status, erro }.
+ */
+function conferirSegredoDeInstalacao(recebido) {
+  const espera = auth.bloqueado("bootstrap");
+  if (espera > 0) return { status: 429, erro: `muitas tentativas; tente novamente em ${espera}s` };
+  let esperado = null;
+  try {
+    esperado = fs.readFileSync(path.join(config.DIR_ESTADO, "bootstrap-token"), "utf8").trim();
+  } catch {}
+  if (!esperado) {
+    return { status: 409, erro: "nenhum segredo de instalação disponível; repare a instalação com instalar.js para gerar um" };
+  }
+  if (!crypto.timingSafeEqual(digestDe(recebido || ""), digestDe(esperado))) {
+    auth.registrarFalha("bootstrap");
+    estado.auditar("bootstrap-recusado", { via: "segredo" });
+    return { status: 403, erro: "segredo de instalação incorreto" };
+  }
+  return null;
+}
+
+function emitirConvite() {
+  const agora = Date.now();
+  for (const [chave, expira] of convites) if (expira <= agora) convites.delete(chave);
+  while (convites.size >= CONVITES_MAX) convites.delete(convites.keys().next().value);
+  const convite = crypto.randomBytes(32).toString("base64url");
+  convites.set(digestDe(convite).toString("hex"), agora + CONVITE_VALIDADE_MS);
+  estado.auditar("bootstrap-convite-emitido", { validadeS: CONVITE_VALIDADE_MS / 1000 });
+  return { convite, expiraEmS: CONVITE_VALIDADE_MS / 1000 };
+}
+
+/**
+ * An invitation stays valid until it expires or an operator is created (which clears them all), so
+ * a refused password can be corrected without a new invitation; it can never create a second
+ * operator.
+ */
+function conviteValido(convite) {
+  if (!/^[A-Za-z0-9_-]{32,128}$/.test(convite)) return false;
+  const chave = digestDe(convite).toString("hex");
+  const expira = convites.get(chave);
+  if (!expira) return false;
+  if (expira <= Date.now()) {
+    convites.delete(chave);
+    return false;
+  }
+  return true;
+}
+
 // --- Routes -------------------------------------------------------------------------------------
 
 async function rotear(req, res, url, params) {
@@ -263,27 +323,48 @@ async function rotear(req, res, url, params) {
     });
   }
 
-  // Bootstrap: only while there is no operator yet. The installation secret is shown once by the
-  // installer and kept in a file only the Console user reads.
+  // Bootstrap: only while there is no operator yet. The installation secret stays in a file only
+  // the Console's administrator reads; it is never shown by the package installation.
+  //
+  // Two ways in, both local-administrator only:
+  //  - the secret itself (typed in the first-access form, or sent by `launcher --criar-operador`);
+  //  - a first-access invitation: the launcher, run by someone who can read the secret file, trades
+  //    the secret for a single-use invitation valid for a few minutes and opens the browser with it
+  //    in the URL fragment (never sent to the server in a request line, never in a process
+  //    argument). The page removes it from the address bar and history before using it.
+  if (caminho === "/api/bootstrap/convite" && metodo === "POST") {
+    if (auth.existeOperador()) return responderErro(res, 409, "o console já tem um operador");
+    const corpo = await lerCorpo(req);
+    const recusa = conferirSegredoDeInstalacao(corpo.segredo);
+    if (recusa) return responderErro(res, recusa.status, recusa.erro);
+    return responderJson(res, 201, { ok: true, ...emitirConvite() });
+  }
+
   if (caminho === "/api/bootstrap" && metodo === "POST") {
     if (auth.existeOperador()) return responderErro(res, 409, "o console já tem um operador");
     const corpo = await lerCorpo(req);
-    const arquivoSegredo = path.join(config.DIR_ESTADO, "bootstrap-token");
-    let esperado = null;
-    try {
-      esperado = fs.readFileSync(arquivoSegredo, "utf8").trim();
-    } catch {}
-    if (!esperado) return responderErro(res, 409, "nenhum segredo de instalação disponível; reinstale com `node instalacao/instalar.js` para gerar um");
-    if (String(corpo.segredo || "") !== esperado) {
-      estado.auditar("bootstrap-recusado", {});
-      return responderErro(res, 403, "segredo de instalação incorreto");
+    if (corpo.convite !== undefined) {
+      const espera = auth.bloqueado("bootstrap");
+      if (espera > 0) return responderJson(res, 429, { ok: false, erro: `muitas tentativas; tente novamente em ${espera}s` });
+      if (!conviteValido(String(corpo.convite))) {
+        auth.registrarFalha("bootstrap");
+        estado.auditar("bootstrap-recusado", { via: "convite" });
+        return responderErro(res, 403, "convite de primeiro acesso inválido ou vencido; abra o console de novo pelo atalho");
+      }
+    } else {
+      const recusa = conferirSegredoDeInstalacao(corpo.segredo);
+      if (recusa) return responderErro(res, recusa.status, recusa.erro);
     }
     try {
       auth.criarOperador(String(corpo.nome || ""), String(corpo.senha || ""));
     } catch (erro) {
       return responderErro(res, 400, erro.message);
     }
-    fs.rmSync(arquivoSegredo, { force: true });
+    // The bootstrap is over: the secret and every outstanding invitation stop working.
+    fs.rmSync(path.join(config.DIR_ESTADO, "bootstrap-token"), { force: true });
+    convites.clear();
+    auth.limparTentativas("bootstrap");
+    estado.auditar("bootstrap-concluido", { via: corpo.convite !== undefined ? "convite" : "segredo" });
     return responderJson(res, 201, { ok: true });
   }
 
