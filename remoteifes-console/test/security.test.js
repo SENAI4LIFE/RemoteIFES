@@ -24,7 +24,7 @@ test("the application's known default passwords are refused as Console credentia
   t.after(() => amb.restaurar());
 
   for (const proibida of ["admin", "superadmin", "SuperAdmin", "senha", "password"]) {
-    assert.ok(amb.auth.validarForcaDaSenha(proibida), `deveria recusar "${proibida}"`);
+    assert.ok(amb.auth.validarForcaDaSenha(proibida), `should refuse "${proibida}"`);
   }
   assert.ok(amb.auth.validarForcaDaSenha("curta"), "a short password must be refused");
   assert.equal(amb.auth.validarForcaDaSenha("uma-senha-aceitavel-123"), null);
@@ -118,7 +118,7 @@ test("repeated login attempts are limited per operator", (t) => {
   assert.equal(amb.auth.bloqueado(chave), 0);
 });
 
-// --- Transporte ---------------------------------------------------------------------------
+// --- Transport ---------------------------------------------------------------------------
 
 test("an unexpected Host is refused with 421 (DNS rebinding defense)", async (t) => {
   const amb = ajuda.ambiente();

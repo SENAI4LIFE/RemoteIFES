@@ -65,7 +65,7 @@ const Notificacoes = {
     await this.renderizar(document.getElementById("adminNotifList"), document.getElementById("adminNotifEmpty"));
   },
 
-  // Os dois popovers de rodape sao mutuamente exclusivos: abrir um fecha o outro.
+  // The two footer popovers are mutually exclusive: opening one closes the other.
   async abrirPainel() {
     const painel = document.getElementById("notifPanel");
     if (!painel) return;

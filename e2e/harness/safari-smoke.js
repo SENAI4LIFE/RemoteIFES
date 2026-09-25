@@ -32,7 +32,7 @@ async function esperarHttp(url, tentativas = 120) {
     } catch (erro) {}
     await new Promise((res) => setTimeout(res, 500));
   }
-  throw new Error(`${url} não respondeu`);
+  throw new Error(`${url} did not answer`);
 }
 
 async function subirServidores() {
@@ -58,7 +58,7 @@ function prepararSimulador() {
     .sort(([a], [b]) => b.localeCompare(a, undefined, { numeric: true }))
     .flatMap(([runtime, aparelhos]) => aparelhos.filter((d) => d.isAvailable && /^iPhone/.test(d.name)).map((d) => ({ ...d, runtime })));
   const aparelho = nomeDesejado ? candidatos.find((d) => d.name === nomeDesejado) : candidatos[0];
-  if (!aparelho) throw new Error(nomeDesejado ? `simulador "${nomeDesejado}" indisponível` : "nenhum iPhone disponível no iOS Simulator");
+  if (!aparelho) throw new Error(nomeDesejado ? `simulator "${nomeDesejado}" unavailable` : "no iPhone available in the iOS Simulator");
   if (aparelho.state !== "Booted") simctl("boot", aparelho.udid);
   simctl("bootstatus", aparelho.udid, "-b");
   execFileSync("open", ["-a", "Simulator", "--args", "-CurrentDeviceUDID", aparelho.udid]);
@@ -127,7 +127,7 @@ function sessao(id) {
         await new Promise((res) => setTimeout(res, 250));
       }
       relatorio.diagnostico = await executar(ESTADO_DA_PAGINA);
-      throw new Error(`${descricao}: condição não satisfeita em ${tempoMs}ms (último valor: ${JSON.stringify(ultimo)})`);
+      throw new Error(`${descricao}: condition not met within ${tempoMs}ms (last value: ${JSON.stringify(ultimo)})`);
     },
     encerrar: () => wd("DELETE", raiz),
   };
@@ -162,7 +162,7 @@ async function fluxo(s) {
     await s.executar(COLETOR_DE_ERROS);
     relatorio.userAgent = await s.executar("return navigator.userAgent;");
     relatorio.viewport = await s.executar("return { largura: innerWidth, altura: innerHeight };");
-    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("o portal tem rolagem horizontal");
+    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("the portal scrolls horizontally");
   });
 
   await passo("faz login pela interface", async () => {
@@ -173,18 +173,18 @@ async function fluxo(s) {
     await s.clicar("#loginForm button[type=submit]");
     await s.esperar("app principal", visivel("#mainApp"));
     await s.esperar("aba de salas", visivel('.tab-btn[data-tab="salas"]'));
-    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("o app principal tem rolagem horizontal");
+    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("the main app scrolls horizontally");
   });
 
   await passo("abre a sala com ESP32 simulado e recebe o estado por WebSocket", async () => {
     const reset = await fetch(`${API_URL}/__e2e/resetar-dispositivo`, { method: "POST" });
-    if (!reset.ok) throw new Error(`não foi possível preparar o dispositivo E2E (HTTP ${reset.status})`);
+    if (!reset.ok) throw new Error(`could not prepare the E2E device (HTTP ${reset.status})`);
     await s.executar(`location.hash = ${JSON.stringify(`#/sala/${SALA}`)};`);
     await s.esperar("painel da sala", visivel("#screen-panel"));
     await s.esperar("nome da sala", `return document.querySelector("#panelRoomName").textContent.includes(${JSON.stringify(SALA)});`);
     await s.esperar("dispositivo online", texto("#conexaoValue", "online"), 20000);
     await s.esperar("modo Off", texto("#modoValue", "Off"));
-    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("o painel da sala tem rolagem horizontal");
+    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("the room panel scrolls horizontally");
   });
 
   await passo("liga e desliga o ar-condicionado", async () => {
@@ -199,7 +199,7 @@ async function fluxo(s) {
   await passo("navega até o status da administração", async () => {
     await s.executar('location.hash = "#/admin/status";');
     await s.esperar("sub-aba de status", visivel("#adminSub-status"));
-    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("a administração tem rolagem horizontal");
+    if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("Administration scrolls horizontally");
   });
 
   await passo("sai da conta e volta ao portal", async () => {

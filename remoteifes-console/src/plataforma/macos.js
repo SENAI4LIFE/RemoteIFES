@@ -282,8 +282,8 @@ function plistDoAgente({ comando, argumentos = [], logs }) {
     <array>
 ${itens}
     </array>
-    <!-- Sob demanda: o lançador aciona quando alguém abre o console, e o processo sai por
-         ociosidade. RunAtLoad=false é o que mantém o custo ocioso em zero. -->
+    <!-- On demand: the launcher starts it when someone opens the console, and the process exits
+         when idle. RunAtLoad=false is what keeps the idle cost at zero. -->
     <key>RunAtLoad</key>
     <false/>
     <key>KeepAlive</key>

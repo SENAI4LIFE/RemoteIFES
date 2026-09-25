@@ -221,7 +221,7 @@ test("a deep link on a path with /index.html is restored after refresh (Cordova 
 });
 
 test("the manual opens by direct link even offline, served from the PWA cache", async ({ page, context, browserName }) => {
-  test.skip(browserName === "webkit", "no projeto WebKit o service worker fica bloqueado para que page.route intercepte a API; a emulação offline do Playwright tampouco alcança navegações servidas pelo worker nesse motor");
+  test.skip(browserName === "webkit", "in the WebKit project the service worker is blocked so that page.route can intercept the API, and Playwright's offline emulation does not reach worker-served navigations in that engine either");
   await page.goto("/");
   await expect(page.locator("#screen-portal")).toBeVisible({ timeout: 20_000 });
   await page.evaluate(() => navigator.serviceWorker.ready);

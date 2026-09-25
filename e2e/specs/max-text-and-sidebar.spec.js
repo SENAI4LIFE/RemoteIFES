@@ -50,7 +50,7 @@ for (const [nome, tamanho] of [["mobile-compact", VIEWPORTS["mobile-compact"]], 
       for (const selo of medida.selos) {
         expect(selo.textoAlemDaCaixa, `badge text «${selo.texto}» inside its own box`).toBeLessThanOrEqual(1);
         expect(selo.caixaAlemDoCartao, `badge «${selo.texto}» inside the card`).toBeLessThanOrEqual(0);
-        expect(selo.alemDaTela, `selo «${selo.texto}» dentro da tela`).toBeLessThanOrEqual(0);
+        expect(selo.alemDaTela, `badge «${selo.texto}» inside the screen`).toBeLessThanOrEqual(0);
       }
       expect(medida.heroiTextoAlem, "the hero text does not widen the block beyond it").toBeLessThanOrEqual(0);
     });

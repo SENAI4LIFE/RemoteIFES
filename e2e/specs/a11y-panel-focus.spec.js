@@ -52,7 +52,7 @@ test("Esc closes the panel from any inner control and focus returns to the butto
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   const antes = await focoAtual(page);
-  expect(antes.dentroDoPainel, "Tab percorre os controles do painel").toBe(true);
+  expect(antes.dentroDoPainel, "Tab moves through the panel controls").toBe(true);
 
   await page.keyboard.press("Escape");
   await expect(page.locator("#a11yPanel")).toBeHidden();
@@ -117,7 +117,7 @@ test("opening the help panel closes the accessibility panel and vice versa, with
   // The help panel moves focus to its close button right after opening (same cycle as the
   // accessibility panel): wait for focus to enter before pressing keys, so focus return is checked
   // from the documented state. Focus on a hidden control is also caught here.
-  await expect(page.locator("#helpFabCloseBtn"), "o foco entra no painel de ajuda").toBeFocused();
+  await expect(page.locator("#helpFabCloseBtn"), "focus enters the help panel").toBeFocused();
   expect((await focoAtual(page)).escondido, "focus does not stay on a hidden control").toBe(false);
 
   // The open help panel covers the floating button column; Esc closes it and returns focus to its

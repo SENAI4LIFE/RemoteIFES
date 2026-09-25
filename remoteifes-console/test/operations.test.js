@@ -29,13 +29,13 @@ test("caminhoContidoEm blocks traversal, absolute paths and NUL bytes", (t) => {
   assert.ok(amb.processos.caminhoContidoEm(raiz, "ok.db").endsWith("ok.db"));
 
   for (const ruim of ["../fora.db", "sub/../../fora.db", "..\\fora.db", "a\u0000b"]) {
-    assert.throws(() => amb.processos.caminhoContidoEm(raiz, ruim), /inválido|travessia|fora/i, `deveria recusar ${JSON.stringify(ruim)}`);
+    assert.throws(() => amb.processos.caminhoContidoEm(raiz, ruim), /inválido|travessia|fora/i, `should refuse ${JSON.stringify(ruim)}`);
   }
   assert.throws(() => amb.processos.caminhoContidoEm(raiz, path.join(os.tmpdir(), "x.db")), /absoluto/);
   fs.rmSync(raiz, { recursive: true, force: true });
 });
 
-test("caminhoContidoEm blocks a symlink pointing outside the folder", { skip: process.platform === "win32" ? "symlink exige privilégio no Windows" : false }, (t) => {
+test("caminhoContidoEm blocks a symlink pointing outside the folder", { skip: process.platform === "win32" ? "symlinks require privilege on Windows" : false }, (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
 
@@ -110,7 +110,7 @@ test("action arguments are validated by schema, not by escaping", (t) => {
     "remoteifes-20260101-010101-abcdef.db\nrm -rf /",
     "/etc/shadow",
   ]) {
-    assert.throws(() => amb.acoes.validarArgumentos(restaurar, { backup: ruim }), /valor inválido|obrigatório/, `deveria recusar ${JSON.stringify(ruim)}`);
+    assert.throws(() => amb.acoes.validarArgumentos(restaurar, { backup: ruim }), /valor inválido|obrigatório/, `should refuse ${JSON.stringify(ruim)}`);
   }
   const ok = amb.acoes.validarArgumentos(restaurar, { backup: "remoteifes-20260101-010101-abcdef.db" });
   assert.equal(ok.backup, "remoteifes-20260101-010101-abcdef.db");
@@ -136,7 +136,7 @@ test("no action accepts a command line", (t) => {
         !/comando|cmd|shell|script|args|argv/i.test(nome),
         `action ${acao.id} exposes a free command argument: ${nome}`
       );
-      assert.ok(["texto", "booleano", "segredo"].includes(regra.tipo), `tipo inesperado em ${acao.id}.${nome}`);
+      assert.ok(["texto", "booleano", "segredo"].includes(regra.tipo), `unexpected type in ${acao.id}.${nome}`);
     }
   }
 });
@@ -230,11 +230,11 @@ test("a dead process's lock is reconciled and taken over", (t) => {
   trava.liberar();
 });
 
-// --- Motor de trabalhos ---------------------------------------------------------------------------
+// --- Job engine ---------------------------------------------------------------------------
 
 function esperarFim(execucao, id, timeoutMs = 20_000) {
   return new Promise((resolve, reject) => {
-    const limite = setTimeout(() => reject(new Error("trabalho não terminou a tempo")), timeoutMs);
+    const limite = setTimeout(() => reject(new Error("job did not finish in time")), timeoutMs);
     const checar = () => {
       const t = execucao.obter(id);
       if (t && t.estado !== execucao.ESTADOS.EXECUTANDO) {

@@ -65,7 +65,7 @@ test.before(async () => {
   comando.run(SALA_SEM_ESP, horasAtras(2));
   comando.run(SALA_COM_ESP, horasAtras(24 * 10));
 
-  // Relatos: um pendente e um resolvido, ambos nas ultimas 24 h.
+  // Reports: one pending and one resolved, both within the last 24 h.
   const relato = db.prepare(
     "INSERT INTO relatos (usuarioId, titulo, descricao, categoria, sala, status, criadoEm, atualizadoEm) VALUES (NULL, ?, 'd', 'outro', ?, ?, ?, ?)"
   );

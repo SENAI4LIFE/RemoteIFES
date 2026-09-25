@@ -84,7 +84,7 @@ for (const nome of ["mobile-compact", "mobile-portrait", "mobile-large", "mobile
       };
     });
     expect(medida, "planta baixa renderizada").not.toBeNull();
-    expect(medida.vazaDireita <= 1 || medida.rolavel, `planta cabe ou rola (${JSON.stringify(medida)})`).toBe(true);
+    expect(medida.vazaDireita <= 1 || medida.rolavel, `floor plan fits or scrolls (${JSON.stringify(medida)})`).toBe(true);
     expect(medida.fimAlcancavel, `the end of the plan is reachable by scrolling the wrapper (${JSON.stringify(medida)})`).toBe(true);
     expect(medida.involucroVazaDireita, `the plan wrapper fits the picker (${JSON.stringify(medida)})`).toBeLessThanOrEqual(1);
     expect(medida.seletorEscondeConteudo, `nothing is hidden beyond the picker edge (${JSON.stringify(medida)})`).toBe(false);
@@ -213,7 +213,7 @@ for (const nome of ["mobile-compact", "mobile-portrait"]) {
     });
     expect(medida.barraEmDuasLinhas, "a fonte ampliada realmente alarga a barra").toBe(true);
     expect(medida.painelAbaixoDaBarra, "the panel starts below the real bar, not at a fixed height").toBeGreaterThanOrEqual(0);
-    expect(medida.painelDentroDaTela, "o painel termina dentro da tela").toBeGreaterThanOrEqual(0);
+    expect(medida.painelDentroDaTela, "the panel ends inside the screen").toBeGreaterThanOrEqual(0);
     expect(medida.botaoRecebeToque, "the report-problem button receives the tap").toBe(true);
 
     await page.locator("#bugReportBtn").click();
