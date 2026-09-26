@@ -45,7 +45,7 @@ const firmwareUsbErase = congelar(["pio run --target erase"]);
 const firmwareOta = congelar([
   "pio run -d ../remoteifes-esp32",
   "npm run firmware",
-  "npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.0.1 \"nota opcional\"",
+  "npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.3.0 \"nota opcional\"",
 ]);
 
 const credenciaisConsultar = congelar(["npm run credencial -- A-101"]);
@@ -76,7 +76,7 @@ const androidPublicacao = congelar([
 
 const testes = congelar([
   "cd remoteifes-server && npm test",
-  "cd e2e && npm install && npx playwright install chromium && npx playwright test",
+  "cd remoteifes-server && npm ci && cd ../e2e && npm ci && npx playwright install chromium && npx playwright test",
   "cd remoteifes-cordova && npm ci && npm run validate",
   "cd remoteifes-esp32 && pio run",
   "python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0",
