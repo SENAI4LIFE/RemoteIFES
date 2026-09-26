@@ -576,6 +576,12 @@ test("a failed deploy takes the pre-update backup, reverts the code and leaves t
     assert.match(backups[0], /pre-update/);
     assert.deepEqual(fs.readFileSync(path.join(dir, "data", "backups", backups[0])), antes);
     assert.equal(fs.existsSync(path.join(dir, "data", ".deploy-lock")), false);
+    // A version that crashes at start exhausts systemd's start limit, which refuses even a manual
+    // restart: every restart (of the new version and of the revert) clears that counter first.
+    const chamadas = servico.chamadasSystemctl();
+    const reinicios = chamadas.map((c, i) => [c, i]).filter(([c]) => /^systemctl restart remoteifes\.service$/.test(c));
+    assert.equal(reinicios.length, 2);
+    for (const [, i] of reinicios) assert.equal(chamadas[i - 1], "systemctl reset-failed remoteifes.service");
     // Going back to the backup is the operator's explicit step, never part of an automatic revert:
     // outside the messages printed to the operator, neither script restores or replaces the database.
     const codigo = ["deploy.sh", "rollback.sh"].map((s) => fs.readFileSync(path.join(RAIZ, s), "utf8")).join("\n").replace(/^\s*echo .*$/gm, "");
