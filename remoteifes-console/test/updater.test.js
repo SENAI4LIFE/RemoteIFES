@@ -179,6 +179,15 @@ test("the version policy refuses downgrades and requires the declared minimum", 
   assert.match(release.politicaDeVersao({ versao: "3.0.0", minimoParaAtualizar: "2.x" }, "2.0.0").motivo, /inválido/);
 });
 
+test("a manifest with two artifacts for one target is refused", (t) => {
+  const amb = ajuda.ambiente();
+  t.after(() => amb.restaurar());
+  const artefato = { alvo: "linux-x64", formato: "tar.gz", arquivo: "remoteifes-console-2.0.0-linux-x64.tar.gz", sha256: "a".repeat(64), bytes: 10 };
+  const m = { esquema: 1, versao: "2.0.0", commit: COMMIT, artefatos: [artefato, { ...artefato }] };
+  assert.match(amb.release.validarEstrutura(m).motivo, /dois artefatos para linux-x64/);
+  assert.match(amb.release.validarEstrutura({ ...m, commit: undefined, artefatos: [artefato] }).motivo, /commit/);
+});
+
 test("a publication without its attestation installs nothing", async (t) => {
   const arquivos = await publicacao({ versao: "2.0.0" });
   delete arquivos["atestacao.sigstore.json"];

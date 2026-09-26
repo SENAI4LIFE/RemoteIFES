@@ -1004,7 +1004,7 @@ Antes de abrir o navegador, o lançador confere a identidade de quem responde na
 
 A versão do console é independente do commit do RemoteIFES implantado, e as duas atualizações não se misturam. Atualizar o console baixa um artefato de release, confere a atestação de proveniência do GitHub e o SHA-256 do artefato, instala a versão nova ao lado da atual e troca o ponteiro. Reverter é trocar o ponteiro de volta, sem rede. O processo não usa `git`, não copia o checkout e não consome o `origin/main` da aplicação.
 
-Instalar, iniciar ou implantar não pede nenhuma etapa de chave ou de confiança. Enquanto não houver release publicado, a aba **Programa** diz que não há publicação, e atualizar o console é reinstalar o pacote.
+Toda cópia instalada confere os releases sozinha: instalar, iniciar ou implantar não pede nenhuma etapa de chave ou de confiança. Enquanto não houver release publicado, a aba **Programa** diz que não há publicação, e atualizar o console é reinstalar o pacote.
 
 #### Versão nova que falha depois de subir
 
@@ -1016,9 +1016,11 @@ O limite é deliberado e não é uma ativação em duas fases. Uma versão saud�
 
 Nenhuma chave de assinatura existe. Um release do console é aceito porque o GitHub Actions, executando o workflow de publicação deste repositório (`.github/workflows/console-release.yml`) para a etiqueta `console-v<versão>`, atestou os bytes exatos de cada arquivo com uma atestação de artefato do GitHub, sem chave, pelo Sigstore. O console confere a atestação com `@sigstore/verify` e exige, a partir do certificado, o repositório e o dono (por nome e identificador numérico), esse workflow, a etiqueta da versão do manifesto, o commit do manifesto, o gatilho `push`, um executor hospedado pelo GitHub e o ambiente `console-release`. Sem atestação válida, nada é instalado.
 
+Publicar um release é subir a versão em `remoteifes-console/package.json` na `main` e enviar a etiqueta `console-v<versão>`. O workflow testa, constrói em Linux e em Windows e exige resultados idênticos, atesta, confere como um console instalado conferiria e publica. Não há chave para guardar, copiar ou trocar.
+
 Ainda não há certificado de assinatura de código do Windows nem conta de desenvolvedor Apple para notarização. Os executáveis se declaram `assinaturaDeCodigo: false` em `proveniencia.json`, e no Windows o SmartScreen avisa ao abrir o instalador. A origem deles é provada pela atestação do release.
 
-Os detalhes de empacotamento, proveniência e matriz de sistemas estão em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md).
+O modelo completo, o que ele não cobre e o procedimento sem Internet estão em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md#5-confiança-da-atualização), junto com os detalhes de empacotamento e a matriz de sistemas.
 
 ### O que o console faz
 
