@@ -1450,7 +1450,7 @@ Um nó informa a quantidade de saltos e o sinal do enlace com o pai, mas nomeia 
 
 O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Do lado do servidor, testes com gateways e nós simulados cobrem várias topologias, troca de gateway, reinícios, gerações de credencial, quadros adulterados, truncados ou repetidos, os limites e um gateway que se comporta mal (`test/mesh-adversarial.test.js`). Nada disso envolve rádio: alcance, interferência, eleição real de pai e raiz, recuperação do rádio após perda do pai ou da raiz, estabilidade em vários saltos, latência de RF e a rotação de credencial pela malha em placas reais continuam pendentes.
 
-A escolha da tecnologia de rádio, o protocolo, os limites e o que falta estão em [`remoteifes-esp32/MESH.md`](remoteifes-esp32/MESH.md).
+A escolha da tecnologia de rádio, o protocolo, os limites e o que falta estão em [`remoteifes-esp32/MESH.md`](remoteifes-esp32/MESH.md). O roteiro de aceitação em hardware, para a malha e para o resto da placa (IR, GPIO, switch, buzzer, DHT11, NVS com queda de energia, flash, OTA A/B no ESP32 real, Wi-Fi, alcance, latência de RF e heap em longa duração), está em [`remoteifes-esp32/HARDWARE-ACCEPTANCE.md`](remoteifes-esp32/HARDWARE-ACCEPTANCE.md); nenhum desses itens foi validado ainda.
 
 
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
