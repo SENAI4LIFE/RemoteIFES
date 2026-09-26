@@ -167,6 +167,8 @@ O sistema oferece três formas de chegar até uma sala, todas equivalentes em fu
   "Online" é presença (a placa foi vista há pouco); "ligado/desligado" é o estado desejado guardado no servidor. A confirmação da placa aparece no painel da sala e em `Dispositivos > Firmware / OTA`; o efeito no aparelho não é medido (veja [Do pedido ao ar-condicionado](#do-pedido-ao-ar-condicionado)).
 - **Lista tradicional** (`Bloco → Andar → Sala`): navegação simples em lista, sem elementos gráficos.
 
+<img src="docs/readme-assets/screenshots/floorplan.png" width="800" alt="Planta baixa do Bloco A, térreo, com a legenda de estados e as abas dos seis setores. A-110, A-107 e A-106 aparecem verdes, online e ligadas; A-108 e A-104 azuis, online e desligadas; A-109 azul com o contorno de reserva em curso; A-111, A-105, A-103a e A-103b cinza, offline; as salas sem ar-condicionado controlado ficam brancas. Abaixo da planta, os botões de zoom. Captura de um ambiente de teste com placas simuladas.">
+
 Qualquer usuário autenticado pode visualizar o estado de todas as salas — isso inclui salas às quais o usuário não tem permissão de controle, que aparecem marcadas como "visualização" e cujos controles ficam desabilitados no painel. Os três modos de navegação têm botões cruzados para alternar entre si a qualquer momento.
 
 ### Endereço, refresh e histórico
@@ -220,6 +222,13 @@ Cada agendamento reserva a sala durante um período (`horaInicio`–`horaFim`) e
 | `reserva` | Apenas bloqueia a sala para outros usuários no período; não liga o ar-condicionado automaticamente |
 | `ligar_completo` | Reserva a sala e liga o ar-condicionado durante todo o horário definido (padrão) |
 | `ligar_intervalo` | Reserva a sala no período, mas o ar-condicionado só liga dentro de um intervalo menor, definido dentro do período reservado |
+
+Os três modos num mesmo dia, na Agenda da sala e na [Grade](#grade-de-horários):
+
+<p align="center">
+  <img src="docs/readme-assets/screenshots/schedule.png" width="390" align="top" alt="Agenda da sala A-107 com quatro agendamentos do dia: 07:00 a 08:50, liga no período todo; 09:20 a 11:20, liga em intervalo das 10:30 às 11:20; 13:00 a 14:50, apenas reserva; 19:10 a 22:10, liga no período todo. Cada um mostra a temperatura, o autor e as ações desativar e remover.">
+  <img src="docs/readme-assets/screenshots/schedule-grid.png" width="390" align="top" alt="Grade do mesmo dia da sala A-107, por período de aula de 07:00 a 22:10: verde onde o ar-condicionado liga, amarelo onde a sala só está reservada, das 09:20 às 10:10 e das 13:00 às 14:50, e vermelho claro nos períodos livres; cada período ocupado mostra quem agendou.">
+</p>
 
 O agendador do servidor verifica agendamentos ativos a cada minuto e não repete uma mesma ação, ligar ou desligar, mais de uma vez no mesmo dia. O período é fechado no início e aberto no fim (`[horaInicio, horaFim)`): no minuto exato de `horaFim` a reserva já não vale e o desligamento agendado é aplicado. Uma reserva seguinte que comece nesse minuto assume a sala sem intervalo.
 
@@ -454,9 +463,18 @@ Painel operacional de cada ESP32 com MAC cadastrado, visível apenas ao superadm
 - Mostra a **versão do firmware** instalada e a publicada, com **atualização por OTA** e a **distribuição em etapas** para vários ESP32 (veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)).
 - Gerencia a **credencial exclusiva do dispositivo** (provisionar, rotacionar, substituir, revogar), com o segredo exibido uma única vez (veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)).
 
+<img src="docs/readme-assets/screenshots/firmware-ota.png" width="800" alt="Cartão do ESP32 da sala A-107 em Firmware / OTA: Wi-Fi e servidor conectados, modo operação, papel transmissor IR; temperatura 23,4 °C, umidade 54 %, sinal de -57 dBm, protocolo IR 15 vindo da biblioteca, failsafe OFF gravado na NVS com 12 pulsos, último comando IR 23 °C ligado e estado desejado confirmado pela placa; firmware 4.2.0 com a 4.3.0 publicada e o botão Atualizar firmware (OTA); credencial ativa com Rotacionar, Substituir e Revogar; e Resetar Wi-Fi do dispositivo. Captura de um ambiente de teste com placas simuladas.">
+
 Essa aba não tem controles de captura: o modo clone é controlado exclusivamente em Protocolos IR.
 
 ### Administração > Dispositivos > Protocolos IR
+
+O caminho de um sinal, do controle original ao ar-condicionado da sala:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/ir-cloning-dark.png">
+  <img src="docs/readme-assets/composed/ir-cloning-light.png" width="800" alt="Caminho de um sinal infravermelho. O controle original do aparelho transmite para a ESP32 clonadora, a única com receptor IR, que no modo clone captura sem parar e envia cada captura ao servidor. A biblioteca IR, na tabela protocolos_ir do servidor, guarda as 20 capturas recentes da clonadora; salvar dá um nome à captura, e o navegador manda só o id dela, nunca o RAW; o failsafe OFF é a captura do botão de desligar, anexada ao protocolo; e só protocolo reconhecido vira protocolo da sala. Aplicado a uma sala, o protocolo vai à ESP32 da sala, que guarda o failsafe OFF na NVS e transmite por infravermelho ao ar-condicionado, que não é medido. Notas: segurar o botão da placa por 5 s transmite o failsafe OFF da NVS sem servidor nem Wi-Fi; a clonagem só funciona pelo Wi-Fi direto, nunca pela malha.">
+</picture>
 
 Biblioteca central de sinais infravermelhos, persistida na tabela `protocolos_ir` do SQLite e exclusiva do superadministrador:
 
@@ -466,6 +484,8 @@ Biblioteca central de sinais infravermelhos, persistida na tabela `protocolos_ir
 - **Salvar com nome**: o label tem de 2 a 80 caracteres, é normalizado (espaços repetidos, Unicode NFKC) e é único sem diferenciar maiúsculas de minúsculas. O RAW aceita de 1 a 1024 pulsos com valores de 0 a 65535 e portadora entre 20 e 60 kHz (padrão 38 kHz). Sinais RAW genéricos também são guardados e podem ser testados e retransmitidos, mas não viram protocolo operacional de sala.
 - **Lista**: para cada protocolo, **transmitir** pela ESP32 de destino (`send_raw`), **aplicar** como protocolo operacional de uma sala (somente protocolos reconhecidos: grava `irProtocolo` e o registro da biblioteca na sala, reenvia o estado desejado e sincroniza o failsafe), **configurar/recapturar o failsafe OFF**, **remover o failsafe**, **renomear** e **excluir**. Excluir um protocolo mantém o protocolo operacional já gravado nas salas, mas apaga o failsafe vinculado dos ESP32.
 - **Failsafe OFF (opcional)**: com a clonadora em modo clone, use "configurar failsafe OFF" no protocolo e transmita ao receptor **somente o botão de desligar** do controle original; a próxima captura fica anexada ao protocolo como RAW de desligamento em vez de virar um novo protocolo. Quando o protocolo é aplicado a uma sala, o servidor envia `failsafe_raw_set` ao ESP32 transmissor, que grava o RAW na NVS (chaves `fsRaw`, `fsLen`, `fsHz`, `fsProto`) e confirma com `failsafe_status`. A sincronização é refeita **a cada reconexão** da placa, ao definir ou remover o failsafe do protocolo e ao excluí-lo; aplicar um protocolo sem failsafe, ou trocar o protocolo da sala por um que não veio da biblioteca, envia `failsafe_raw_clear` para que um código de outro equipamento não fique na placa. O firmware compara o RAW recebido com o gravado e só regrava a NVS quando há diferença.
+
+<img src="docs/readme-assets/screenshots/ir-protocols.png" width="800" alt="Tela Protocolos IR. Clonador oficial: A-108 conectado, em modo clone, com o botão Sair do modo clone. Última captura: protocolo reconhecido COOLIX, 10 pulsos a 38 kHz, recebida de A-108, com testar na ESP32 de destino, descartar e o campo para salvar na biblioteca com um nome. Protocolos salvos: Split COOLIX dos laboratórios, reconhecido, capturado por A-108 e aplicado em A-107, com failsafe OFF de 12 pulsos e as ações transmitir, aplicar, recapturar ou remover o failsafe, renomear e excluir. Captura de um ambiente de teste com placas simuladas.">
 
 Essa comunicação usa um canal WebSocket dedicado (`/ws/dispositivo`, distinto do `/ws` usado pelos navegadores) pelo qual o próprio ESP32 se conecta ao servidor como cliente. A conexão é associada à sala pelo MAC cadastrado ou pela credencial do dispositivo e é reaproveitada para telemetria, comandos administrativos, papel, failsafe e OTA, sem abrir portas adicionais no dispositivo nem exigir que o servidor alcance o ESP32 diretamente. O ESP32 reconecta automaticamente caso a conexão caia, e o servidor reaplica o papel, o failsafe e o estado desejado depois da reconexão.
 
@@ -644,6 +664,13 @@ Para voltar ao modo normal, pare o Live Server e acesse `http://localhost:8080`.
 ### Firmware ESP32
 
 O firmware é um projeto [PlatformIO](https://platformio.org/) padrão (`remoteifes-esp32/platformio.ini`). O código-fonte fica em `src/`, e a interface local de status e provisionamento em `data/*.html`, gravada separadamente no sistema de arquivos LittleFS do dispositivo.
+
+As peças de cada placa e os pinos que o firmware usa (`src/main.ino`):
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/esp32-hardware-dark.png">
+  <img src="docs/readme-assets/composed/esp32-hardware-light.png" width="800" alt="Ligações de sinal de cada ESP32, conforme o firmware. Saídas: o emissor IR no GPIO 4, que transmite por infravermelho ao ar-condicionado, e o buzzer ativo no GPIO 27, que soa a cada transmissão. Entradas: o botão momentâneo no GPIO 26, ligado entre o pino e o GND com pull-up interno e sem resistor externo; o sensor DHT11 opcional no GPIO 14, para temperatura e umidade; e o receptor IR no GPIO 15, só na placa clonadora. A figura não mostra alimentação, resistores nem o acionamento do LED, que o repositório não define.">
+</picture>
 
 O caminho automatizado é o recomendado:
 
@@ -1191,6 +1218,11 @@ Configurações ausentes ou inválidas usam o modo CA validado; não há downgra
 
 O firmware do ESP32 pode ser atualizado pela rede, sem ir fisicamente até cada equipamento. O modelo é **A/B com reversão automática**: a partição `min_spiffs.csv` tem dois slots de aplicação; a imagem nova é gravada no slot ocioso e só passa a ser o slot de boot depois de gravada e verificada por hash. Após reiniciar, o novo firmware roda um autoteste (Wi-Fi conectado + WebSocket com o servidor) dentro de 90 s; se passar, ele se marca como válido, se não, o bootloader reverte sozinho para a versão anterior no próximo boot.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/esp32-ota-dark.png">
+  <img src="docs/readme-assets/composed/esp32-ota-light.png" width="800" alt="Ciclo da OTA de um ESP32, com os dois slots de aplicação e a fase registrada no servidor. 1, oferta pelo WebSocket com versão, tamanho, SHA-256 e tentativa; a placa recusa se já estiver atualizando, em modo de configuração, conectada pela malha, sem Wi-Fi, com versão menor ou imagem maior que o slot; fase ofertado. 2, download autenticado e gravação no slot ocioso B enquanto A segue em uso, com o SHA-256 calculado durante a gravação; hash ou tamanho divergente aborta; fase baixando. 3, B passa a ser o slot de boot, a tentativa e o SHA-256 ficam na NVS e a placa reinicia; fases gravado e reiniciando. 4, autoteste em até 90 s: LittleFS, Wi-Fi ou malha e canal com o servidor; fase validando. Se passar, a imagem é marcada válida, a placa envia ota_validado e a fase vira concluido. Se não passar, a imagem é marcada inválida, a placa volta ao slot A e a fase vira falhou por rollback. Prazos do servidor: 4 minutos de transferência, 3 para voltar depois de gravar e 4 para a evidência de boot, que exige firmware 4.2.0 ou mais novo.">
+</picture>
+
 **Publicar uma imagem no servidor** (na máquina do servidor, dentro de `remoteifes-server`):
 
 ```bash
@@ -1269,6 +1301,11 @@ O ESP32 envia a credencial no cabeçalho (`X-Device-Id` / `X-Device-Secret`) no 
 
 **A rotação acontece em duas fases.** Rotacionar cria uma geração **pendente** enquanto o segredo atual continua plenamente válido, sem prazo. O novo segredo é entregue à placa conectada ou, se ela estiver offline, guardado apenas em memória e entregue quando ela reconectar com a credencial atual (o painel mostra "rotação pendente: será entregue quando a placa conectar"). A geração nova só é **ativada** quando a placa prova possuí-la — conectando pelo WebSocket ou fazendo um heartbeat com o novo segredo; nesse momento o segredo anterior entra na tolerância de 24 h e, ao fim dela, qualquer conexão ainda autenticada com ele é encerrada. Uma placa que perdeu a entrega nunca fica inacessível: sua credencial atual vale até a nova ser provada. O segredo pendente nunca é persistido em texto, então depois de um reinício do servidor ele não pode mais ser reentregue — o painel avisa e uma nova rotação o substitui. Substituir ou revogar descartam a geração pendente. O firmware 4.1.0 já grava o segredo recebido e reconecta com ele, portanto o mecanismo não exige atualização de firmware.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/credential-rotation-dark.png">
+  <img src="docs/readme-assets/composed/credential-rotation-light.png" width="800" alt="Rotação de credencial entre o servidor e o ESP32. 1, o servidor cria a geração pendente, com só o hash no banco e o segredo só na memória, e a credencial atual continua valendo, sem prazo; ele envia credencial_rotacionar pela conexão aberta ou quando a placa reconecta com a atual. 2, a placa grava deviceId e segredo na NVS e, a partir do firmware 4.3.0, só passa a usar o segredo novo e reconecta depois de conferir a releitura; ela conecta com o segredo novo, por WebSocket ou heartbeat. 3, o servidor ativa a geração nova; o segredo anterior vale por mais 24 horas e, ao fim, as conexões autenticadas com ele são encerradas. Se a gravação falha, a placa desfaz, segue com a credencial atual e relata credencial=falha_nvs, e a geração pendente continua pendente e é entregue de novo na próxima conexão. Notas: uma placa que volta com o segredo anterior dentro das 24 horas recebe o atual de novo pela própria conexão; reiniciar o servidor apaga da memória o segredo pendente, e é preciso rotacionar de novo com a placa conectada.">
+</picture>
+
 **Ativar significa que a placa apresentou o novo segredo, não que ele sobreviveu a um reinício.** A partir do firmware 4.3.0 a placa só troca a credencial em uso — e só reconecta com ela — depois de gravar as duas chaves na NVS e relê-las com o valor esperado; uma gravação recusada ou parcial é desfeita, a credencial atual continua em uso e a placa reporta `credencial=falha_nvs` (visível em `Auditoria > Logs`, origem `esp32_local`), de modo que a geração pendente permanece pendente e reentregável. Para cobrir firmware anterior e a perda de energia entre a gravação e o próximo boot, o servidor guarda em memória o segredo já ativado enquanto a geração anterior está na tolerância: uma placa que reconecta com a credencial anterior recebe o segredo atual de novo pela própria conexão (`atualReentregavel` no estado da credencial). Depois de um reinício do servidor essa reentrega deixa de ser possível e vale o comportamento anterior — rotacione de novo com a placa conectada. A durabilidade real da NVS em queda de energia não é verificada por software.
 
 Revogar mantém a exigência de credencial na sala, mesmo com a opção global desligada: o MAC sozinho não recupera o acesso. Para reconectar, provisione ou substitua a credencial e informe o novo valor no setup do dispositivo.
@@ -1302,6 +1339,8 @@ Quando o servidor roda sob **PM2**, o cartão *Serviço* mostra nome, id, modo e
 ### Histórico e gráficos
 
 Abaixo dos cartões, a seção recolhível **Histórico e gráficos** transforma o status em um painel operacional leve. Os cartões continuam sendo a leitura exata (atualizada a cada 20 s); os gráficos mostram a evolução e são desenhados em SVG pelo próprio frontend (`js/charts.js`, sem biblioteca externa nem CDN, incluído no shell da PWA e no Cordova). A preferência de manter a seção recolhida fica no navegador e, recolhida, nada é consultado nem desenhado.
+
+<img src="docs/readme-assets/screenshots/system-monitoring.png" width="800" alt="Seção Histórico e gráficos, faixa de 24 horas. ESP32 conectados: as linhas de MAC cadastrado, online e conectados por WebSocket, com quedas curtas, uma lacuna sem amostras e o marcador de reinício do serviço. Abaixo, reconexões e quedas de ESP32 por intervalo de 15 minutos e falhas por período empilhadas por telemetria, credencial, agendador, banco e OTA, cada gráfico com o total e o link para a tabela de valores. Histórico de teste gerado pelo harness.">
 
 | Gráfico | Forma | Fonte |
 | --- | --- | --- |

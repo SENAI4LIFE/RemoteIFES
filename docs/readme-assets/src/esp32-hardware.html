@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>esp32-hardware</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  /* Signal pins only, as remoteifes-esp32/src/main.ino defines them (DHTPIN, IR_RECV_PIN,
+     IR_SEND_PIN, BUZZER_PIN, ACTION_SWITCH_PIN). Power, resistors and the LED drive are not
+     defined in the repository and are deliberately not drawn. */
+  .bancada { display: grid; grid-template-columns: 232px 1fr 246px; align-items: center; }
+  .coluna { display: flex; flex-direction: column; gap: 16px; }
+  .peca { padding: 6px 10px 6px 6px; gap: 8px; }
+  .peca .modulo { width: 50px; height: 50px; }
+  .peca .titulo { font-size: 14px; }
+  .peca .sub { font-size: 11.5px; line-height: 1.3; }
+  .pino {
+    display: inline-block; margin-top: 3px;
+    font: 700 11.5px/1 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: var(--tom); padding: 2px 6px; border-radius: 6px;
+    background: var(--tom-suave); border: 1px solid color-mix(in srgb, var(--tom) 45%, transparent);
+  }
+  #placa { flex-direction: column; justify-self: center; padding: 10px 14px 12px; gap: 4px; text-align: center; border-left-width: 1px; border-top: 4px solid var(--petroleo); }
+  #placa .modulo { width: 150px; height: 150px; }
+  #placa .titulo { font-size: 15px; }
+  #placa .sub { font-size: 11.5px; max-width: 172px; }
+  #ac { margin-bottom: 24px; }
+  #ac .modulo { width: 58px; height: 58px; }
+  .tag-clonadora { margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="tela">
+  <div class="bancada">
+    <div class="coluna">
+      <div class="cartao fora peca" id="ac">
+        <img class="modulo" src="../modules/air-conditioner.png" alt="">
+        <div><div class="titulo">Ar-condicionado</div><div class="sub">recebe o infravermelho;<br>não é medido</div></div>
+      </div>
+      <div class="cartao tom-petroleo peca" id="led">
+        <img class="modulo" src="../modules/ir-led.png" alt="">
+        <div><div class="titulo">Emissor IR</div><div class="sub">transmite os comandos</div><span class="pino">GPIO 4 · saída</span></div>
+      </div>
+      <div class="cartao tom-petroleo peca" id="buzzer">
+        <img class="modulo" src="../modules/buzzer.png" alt="">
+        <div><div class="titulo">Buzzer ativo</div><div class="sub">soa a cada transmissão IR</div><span class="pino">GPIO 27 · saída</span></div>
+      </div>
+    </div>
+
+    <div class="cartao" id="placa">
+      <img class="modulo" src="../modules/esp32.png" alt="">
+      <div class="titulo">ESP32 (esp32dev)</div>
+      <div class="sub">o mesmo firmware em todas as placas</div>
+    </div>
+
+    <div class="coluna">
+      <div class="cartao tom-verde peca" id="botao">
+        <img class="modulo" src="../modules/push-button.png" alt="">
+        <div><div class="titulo">Botão momentâneo</div><div class="sub">entre o pino e o GND; pull-up interno, sem resistor externo</div><span class="pino">GPIO 26 · entrada</span></div>
+      </div>
+      <div class="cartao tom-verde peca" id="dht">
+        <img class="modulo" src="../modules/dht11.png" alt="">
+        <div><div class="titulo">DHT11 · opcional</div><div class="sub">temperatura e umidade da telemetria</div><span class="pino">GPIO 14 · dados</span></div>
+      </div>
+      <div class="cartao tom-ambar peca" id="receptor">
+        <img class="modulo" src="../modules/ir-receiver.png" alt="">
+        <div><div class="titulo">Receptor IR</div><div class="sub">só na placa clonadora</div><span class="pino">GPIO 15 · entrada</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legenda">
+    <span><svg width="26" height="8"><path d="M1 4h24" stroke="var(--linha)" stroke-width="2"/></svg>sinal, no sentido da seta</span>
+    <span><svg width="26" height="8"><path d="M1 4h24" stroke="var(--linha)" stroke-width="2" stroke-dasharray="6 5"/></svg>nem toda placa tem</span>
+    <span><svg width="26" height="8"><path d="M2 4h22" stroke="var(--linha)" stroke-width="2.2" stroke-dasharray="0.1 5" stroke-linecap="round"/></svg>infravermelho</span>
+    <span>Só os pinos de sinal do firmware; alimentação, resistores e o acionamento do LED não são definidos no repositório.</span>
+  </div>
+</div>
+<script src="conectores.js"></script>
+<script>
+  window.CONECTORES = [
+    { de: "#led", para: "#placa", lados: ["direita", "esquerda"], reto: true, pontas: "inicio", tom: "petroleo" },
+    { de: "#buzzer", para: "#placa", lados: ["direita", "esquerda"], reto: true, pontas: "inicio", tom: "petroleo" },
+    { de: "#led", para: "#ac", lados: ["topo", "base"], em: [0.14, 0.14], reto: true, estilo: "radio", tom: "petroleo" },
+    { de: "#botao", para: "#placa", lados: ["esquerda", "direita"], reto: true, tom: "verde" },
+    { de: "#dht", para: "#placa", lados: ["esquerda", "direita"], reto: true, estilo: "tracejado", tom: "verde" },
+    { de: "#receptor", para: "#placa", lados: ["esquerda", "direita"], reto: true, estilo: "tracejado", tom: "ambar" },
+  ];
+</script>
+</body>
+</html>

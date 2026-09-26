@@ -25,6 +25,8 @@
   --ambar-suave: #fbf3d9;
   --neutro: #62706a;
   --neutro-suave: #eef1ef;
+  --critico: #b3261e;
+  --critico-suave: #fbe9e7;
 }
 
 :root[data-tema="escuro"] {
@@ -49,6 +51,8 @@
   --ambar-suave: #332a12;
   --neutro: #a3aeb9;
   --neutro-suave: #232b33;
+  --critico: #ff8a80;
+  --critico-suave: #3a1d1b;
 }
 
 * { box-sizing: border-box; }
@@ -80,6 +84,7 @@ html, body {
 .tom-petroleo { --tom: var(--petroleo); --tom-suave: var(--petroleo-suave); }
 .tom-ambar { --tom: var(--ambar); --tom-suave: var(--ambar-suave); }
 .tom-neutro { --tom: var(--neutro); --tom-suave: var(--neutro-suave); }
+.tom-critico { --tom: var(--critico); --tom-suave: var(--critico-suave); }
 
 .cartao {
   position: relative;
