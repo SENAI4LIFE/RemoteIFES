@@ -8,7 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { createHistogram } = require("perf_hooks");
+const { createHistogram, performance } = require("perf_hooks");
 
 const SRC = path.join(__dirname, "..", "..", "src");
 const modulo = (rel) => require(path.join(SRC, rel));
@@ -113,12 +113,116 @@ function criarSalas({ quantidade, prefixo = "ENSAIO" }) {
   return nomes;
 }
 
-const OPERACOES = { metricas, "criar-salas": criarSalas };
+// --- Command timestamps (latency benchmark) -------------------------------------------------
+//
+// Wall-clock milliseconds with sub-millisecond resolution, comparable with the benchmark process on
+// the same host: performance.timeOrigin + performance.now() in both. Installed only on request; the
+// wrappers take one timestamp each and add nothing else to the command path.
 
-process.on("message", (msg) => {
+const agora = () => performance.timeOrigin + performance.now();
+const MAX_REGISTROS = 20_000;
+const registros = new Map(); // "sala|versao" -> { sala, versao, entrada, despacho, entregueAoCanal, retorno, confirmado }
+const pendentesPorSala = new Map(); // sala -> Set of versions awaiting confirmation
+const esperas = new Map(); // "sala|versao" -> [resolve]
+let instrumentado = false;
+
+function registro(sala, versao) {
+  const chave = `${sala}|${versao}`;
+  let r = registros.get(chave);
+  if (!r) {
+    if (registros.size >= MAX_REGISTROS) registros.delete(registros.keys().next().value);
+    r = { sala, versao };
+    registros.set(chave, r);
+  }
+  if (!pendentesPorSala.has(sala)) pendentesPorSala.set(sala, new Set());
+  if (!r.confirmado) pendentesPorSala.get(sala).add(versao);
+  return r;
+}
+
+function verificarConfirmacao(sala) {
+  const pendentes = pendentesPorSala.get(sala);
+  if (!pendentes || !pendentes.size) return;
+  const salaRow = modulo("services/salasService").buscar(sala);
+  if (!salaRow || !pendentes.has(salaRow.estadoVersao)) return;
+  if (modulo("services/deviceHub").estadoConfirmado(salaRow) !== true) return;
+  const chave = `${sala}|${salaRow.estadoVersao}`;
+  const r = registros.get(chave);
+  r.confirmado = agora();
+  pendentes.delete(salaRow.estadoVersao);
+  for (const resolver of esperas.get(chave) || []) resolver(r);
+  esperas.delete(chave);
+}
+
+function instrumentarComandos() {
+  if (instrumentado) return { jaInstrumentado: true };
+  instrumentado = true;
+  const salas = modulo("services/salasService");
+  const hub = modulo("services/deviceHub");
+  const aplicar = salas.aplicarComando;
+  salas.aplicarComando = function aplicarComandoMedido(sala, ...resto) {
+    const entrada = agora();
+    const resultado = aplicar.call(this, sala, ...resto);
+    Object.assign(registro(sala, resultado.estadoVersao), { entrada, retorno: agora() });
+    return resultado;
+  };
+  const enviar = hub.enviarComando;
+  hub.enviarComando = function enviarComandoMedido(sala, payload) {
+    const despacho = agora();
+    const ok = enviar.call(this, sala, payload);
+    if (payload && payload.tipo === "send_known_state" && Number.isInteger(payload.versao)) {
+      Object.assign(registro(sala, payload.versao), { despacho, entregueAoCanal: ok });
+    }
+    return ok;
+  };
+  // Reports are reconciled before this event is emitted: it marks when the server has recorded the
+  // confirmation.
+  hub.eventos.on("telemetria", ({ sala }) => verificarConfirmacao(sala));
+  return { instrumentado: true };
+}
+
+/**
+ * Resolves when the server records the board's confirmation of `versao` (or rejects on timeout).
+ * `desde` ignores a confirmation recorded before that instant (the same version confirmed on an
+ * earlier connection).
+ */
+function aguardarConfirmacao({ sala, versao, desde = 0, limiteMs = 10_000 }) {
+  const r = registro(sala, versao);
+  if (r.confirmado && r.confirmado < desde) {
+    delete r.confirmado;
+    pendentesPorSala.get(sala).add(versao);
+  }
+  verificarConfirmacao(sala);
+  if (r.confirmado) return Promise.resolve(r);
+  const chave = `${sala}|${versao}`;
+  return new Promise((resolve, reject) => {
+    const tempo = setTimeout(() => reject(new Error(`sem confirmação de ${chave}`)), limiteMs);
+    if (!esperas.has(chave)) esperas.set(chave, []);
+    esperas.get(chave).push((valor) => {
+      clearTimeout(tempo);
+      resolve(valor);
+    });
+  });
+}
+
+function latencias() {
+  const lista = [...registros.values()];
+  registros.clear();
+  pendentesPorSala.clear();
+  return lista;
+}
+
+const OPERACOES = {
+  metricas,
+  "criar-salas": criarSalas,
+  "instrumentar-comandos": instrumentarComandos,
+  "aguardar-confirmacao": aguardarConfirmacao,
+  latencias,
+};
+
+process.on("message", async (msg) => {
   if (!msg || typeof msg !== "object" || !OPERACOES[msg.tipo]) return;
   try {
-    process.send({ id: msg.id, resultado: OPERACOES[msg.tipo](msg) });
+    process.send({ id: msg.id, resultado: await OPERACOES[msg.tipo](msg) });
   } catch (erro) {
     process.send({ id: msg.id, erro: erro.message });
   }

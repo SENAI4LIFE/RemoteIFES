@@ -48,6 +48,8 @@ async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs
 
   // `ambiente` is the server's environment, for the production command-line tools (backup, restore)
   // that must see the same data directory.
+  let pedido = 0;
+  const pendentes = new Map();
   const servidor = { porta, base, dir, ambiente, caminhoBanco: path.join(dir, "remoteifes.db"), filho: null, saida: "", token: null, partidas: 0 };
 
   servidor.subir = async () => {
@@ -59,6 +61,16 @@ async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs
     });
     servidor.filho = filho;
     servidor.partidas += 1;
+    // One listener dispatches every probe answer by id: concurrent requests (a burst of commands)
+    // would otherwise stack a listener each on the child process.
+    if (sonda) filho.on("message", (msg) => {
+      const pendente = msg && pendentes.get(msg.id);
+      if (!pendente) return;
+      pendentes.delete(msg.id);
+      clearTimeout(pendente.tempo);
+      if (msg.erro) pendente.reject(new Error(msg.erro));
+      else pendente.resolve(msg.resultado);
+    });
     const guardar = (d) => {
       servidor.saida = (servidor.saida + d.toString()).slice(-20_000);
     };
@@ -101,25 +113,17 @@ async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs
     return { status: resposta.status, corpo: dados, ms: Number(process.hrtime.bigint() - inicio) / 1e6 };
   };
 
-  let pedido = 0;
-  /** Sends a request to the probe ("metricas", "criar-salas") and resolves with its answer. */
+  /** Sends a request to the probe ("metricas", "criar-salas", ...) and resolves with its answer. */
   servidor.sondar = (tipo, dados = {}) =>
     new Promise((resolve, reject) => {
       const filho = servidor.filho;
       if (!sonda || !filho || !filho.connected) return reject(new Error("servidor sem sonda"));
       const id = ++pedido;
       const tempo = setTimeout(() => {
-        filho.off("message", ouvir);
+        pendentes.delete(id);
         reject(new Error(`a sonda não respondeu a ${tipo}`));
       }, 10_000);
-      const ouvir = (msg) => {
-        if (!msg || msg.id !== id) return;
-        clearTimeout(tempo);
-        filho.off("message", ouvir);
-        if (msg.erro) reject(new Error(msg.erro));
-        else resolve(msg.resultado);
-      };
-      filho.on("message", ouvir);
+      pendentes.set(id, { resolve, reject, tempo });
       filho.send({ id, tipo, ...dados });
     });
   // `gc: true` collects garbage first; `zerarLaco: true` starts a new event-loop window.
