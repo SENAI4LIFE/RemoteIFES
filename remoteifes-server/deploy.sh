@@ -44,7 +44,9 @@ DB_PATH=$(node --env-file-if-exists=.env -e 'process.stdout.write(require("./src
 mkdir -p "$DATA_DIR"
 
 LOCK="$DATA_DIR/.deploy-lock"
-if [ -f "$LOCK" ] && [ "$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || echo 0) ))" -ge 1800 ]; then
+# A lock older than 30 minutes is left over from an interrupted run. find -mmin works with GNU, BSD
+# and BusyBox alike; a failure to read the age keeps the lock instead of discarding it.
+if [ -f "$LOCK" ] && [ -n "$(find "$LOCK" -mmin +30 2>/dev/null)" ]; then
   rm -f "$LOCK"
 fi
 if ! ( set -o noclobber; echo "$$ $(date -Iseconds)" > "$LOCK" ) 2>/dev/null; then

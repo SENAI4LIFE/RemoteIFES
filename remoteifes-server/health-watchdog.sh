@@ -12,7 +12,9 @@ mkdir -p "$DATA_DIR"
 ESTADO="$DATA_DIR/.health-falhas"
 LOCK="$DATA_DIR/.deploy-lock"
 
-if [ -f "$LOCK" ] && [ "$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || echo 0) ))" -lt 1800 ]; then
+# A deployment holds the lock: restarting now would fight it. Only a lock younger than 30 minutes
+# counts (the scripts discard older ones as left over); find -mmin is portable across find variants.
+if [ -f "$LOCK" ] && [ -n "$(find "$LOCK" -mmin -30 2>/dev/null)" ]; then
   exit 0
 fi
 

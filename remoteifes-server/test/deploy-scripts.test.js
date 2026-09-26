@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const { spawnSync } = require("child_process");
 
 const RAIZ = path.join(__dirname, "..");
@@ -466,6 +467,119 @@ test("rollback.sh with the code already at the target restarts and confirms inst
     r = sh(dir, `bash rollback.sh ${shaA} --offline`, servico.ambiente("falha"));
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /Já está em .* e o processo em execução a confirma\. Nada a fazer\./);
+  } finally {
+    servico.parar();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// --- Deployment lock and the database ------------------------------------------------------------
+
+function travaEm(dir, idadeMin) {
+  const trava = path.join(dir, "data", ".deploy-lock");
+  fs.mkdirSync(path.dirname(trava), { recursive: true });
+  fs.writeFileSync(trava, "4242 em-andamento\n");
+  const quando = new Date(Date.now() - idadeMin * 60_000);
+  fs.utimesSync(trava, quando, quando);
+  return trava;
+}
+
+// A `stat` without GNU's -c (BSD and macOS): the lock's age must not depend on it.
+function statSemGnu(dir) {
+  const bin = path.join(dir, "bin-stat-bsd");
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, "stat"), '#!/usr/bin/env bash\necho "stat: illegal option -- c" >&2\nexit 1\n');
+  fs.chmodSync(path.join(bin, "stat"), 0o755);
+  return { PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+}
+
+test("a recent deployment lock is respected by deploy.sh and rollback.sh, and survives the refusal", { skip: !disponivel }, () => {
+  const { dir, shaA, shaB } = prepararRepo();
+  try {
+    for (const ambiente of [{}, statSemGnu(dir)]) {
+      const trava = travaEm(dir, 5);
+      for (const comando of [`bash deploy.sh ${shaB} --offline --no-restart`, `bash rollback.sh ${shaA} --offline --no-restart`]) {
+        const r = sh(dir, comando, ambiente);
+        assert.equal(r.status, 1, r.stdout + r.stderr);
+        assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+        assert.equal(fs.readFileSync(trava, "utf8"), "4242 em-andamento\n", "the other operation's lock is not touched");
+      }
+    }
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaA);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a lock older than 30 minutes is taken as left over, and a failed deploy releases its own", { skip: !disponivel }, () => {
+  const { dir, shaB } = prepararRepo();
+  try {
+    const trava = travaEm(dir, 40);
+    // The deploy gets past the lock and then fails at npm ci; it must not leave a lock behind.
+    const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: npmFalso(dir) });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+    assert.match(r.stdout + r.stderr, /npm/);
+    assert.equal(fs.existsSync(trava), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the health watchdog stays quiet while a recent deployment lock exists, and not for a left-over one", { skip: !disponivel }, () => {
+  const { dir } = prepararRepo();
+  try {
+    fs.copyFileSync(path.join(RAIZ, "health-watchdog.sh"), path.join(dir, "health-watchdog.sh"));
+    // A health check that always fails: without the lock the watchdog counts a failure.
+    fs.writeFileSync(path.join(dir, "healthcheck.sh"), "#!/usr/bin/env bash\nexit 1\n");
+    travaEm(dir, 5);
+    for (const ambiente of [{}, statSemGnu(dir)]) {
+      const r = sh(dir, "bash health-watchdog.sh", ambiente);
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.equal(fs.existsSync(path.join(dir, "data", ".health-falhas")), false, "no failure is counted during a deployment");
+    }
+    travaEm(dir, 40);
+    sh(dir, "bash health-watchdog.sh");
+    assert.equal(fs.readFileSync(path.join(dir, "data", ".health-falhas"), "utf8").trim(), "1", "a left-over lock does not silence the watchdog");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a failed deploy takes the pre-update backup, reverts the code and leaves the database byte for byte", { skip: !disponivel }, async () => {
+  const { dir, shaA } = prepararRepo();
+  const shaC = commitC(dir, shaA);
+  const servico = await servicoFalso(dir, { commitInicial: shaA });
+  fs.writeFileSync(path.join(dir, ".env"), `PORTA=${servico.porta}\n`);
+  // The data the deploy must not touch, and a stand-in for backup-db.js that copies it (the real
+  // backup and restore run in ensaio-recuperacao.js).
+  const banco = path.join(dir, "data", "remoteifes.db");
+  fs.mkdirSync(path.dirname(banco), { recursive: true });
+  fs.writeFileSync(banco, crypto.randomBytes(8192));
+  const antes = fs.readFileSync(banco);
+  fs.writeFileSync(path.join(dir, "backup-db.js"), [
+    'const fs = require("fs");',
+    'const path = require("path");',
+    'const destino = path.join("data", "backups", "remoteifes-" + Date.now() + "-" + process.argv[2] + ".db");',
+    "fs.mkdirSync(path.dirname(destino), { recursive: true });",
+    'fs.copyFileSync(path.join("data", "remoteifes.db"), destino);',
+    "",
+  ].join("\n"));
+  try {
+    const r = sh(dir, `bash deploy.sh ${shaC} --offline`, servico.ambiente("falha"));
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /Revertendo para/);
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaA);
+    assert.deepEqual(fs.readFileSync(banco), antes, "the database is exactly as before the deploy");
+    const backups = fs.readdirSync(path.join(dir, "data", "backups"));
+    assert.equal(backups.length, 1);
+    assert.match(backups[0], /pre-update/);
+    assert.deepEqual(fs.readFileSync(path.join(dir, "data", "backups", backups[0])), antes);
+    assert.equal(fs.existsSync(path.join(dir, "data", ".deploy-lock")), false);
+    // Going back to the backup is the operator's explicit step, never part of an automatic revert:
+    // outside the messages printed to the operator, neither script restores or replaces the database.
+    const codigo = ["deploy.sh", "rollback.sh"].map((s) => fs.readFileSync(path.join(RAIZ, s), "utf8")).join("\n").replace(/^\s*echo .*$/gm, "");
+    assert.doesNotMatch(codigo, /restore-backup|npm run restore|rm [^\n]*DB_PATH|mv [^\n]*DB_PATH|cp [^\n]*DB_PATH/);
   } finally {
     servico.parar();
     fs.rmSync(dir, { recursive: true, force: true });
