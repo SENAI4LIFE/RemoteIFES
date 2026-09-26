@@ -194,7 +194,7 @@ async function criarAutoridade({ relogio = new Date(Date.now() + 2000) } = {}) {
 }
 
 /**
- * What publishing a release does to a build directory: one attestation over every file in it,
+ * What the release workflow does to a build directory: one attestation over every file in it,
  * written next to them as atestacao.sigstore.json. Returns the manifest.
  */
 async function atestarDiretorio(autoridade, dir, opcoes = {}) {

@@ -174,7 +174,7 @@ jobs:
           "MAKENSIS=$padrao" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # Building uses no credential and no identity. A release is attested only by the release
-      # publication; nothing built here is attested.
+      # workflow (console-release.yml) for a console-v* tag; nothing built here is attested.
       - run: npm ci --omit=dev
         working-directory: remoteifes-console
       - name: Build the artifacts

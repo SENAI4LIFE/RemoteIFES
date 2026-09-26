@@ -295,6 +295,10 @@ async function verificarPublicacao({ forcar = false } = {}) {
 
   const base = baseDeRelease();
   const manifestoResp = await baixar(`${base}/${atestacao.ARQUIVO_MANIFESTO}`, { timeoutMs: 30_000 });
+  if (!manifestoResp.ok && manifestoResp.status === 404) {
+    // The origin answered: there is simply no Console publication there yet.
+    return { ok: false, motivo: `nenhuma publicação do console em ${base}`, semPublicacao: true, ultimaObservacao: anterior };
+  }
   if (!manifestoResp.ok) {
     return { ok: false, motivo: `não foi possível obter o manifesto (${manifestoResp.erro})`, offline: true, ultimaObservacao: anterior };
   }
