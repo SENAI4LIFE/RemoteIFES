@@ -46,7 +46,9 @@ async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs
   delete ambiente.REMOTEIFES_DB_PATH;
   delete ambiente.REMOTEIFES_FIRMWARE_DIR;
 
-  const servidor = { porta, base, dir, filho: null, saida: "", token: null, partidas: 0 };
+  // `ambiente` is the server's environment, for the production command-line tools (backup, restore)
+  // that must see the same data directory.
+  const servidor = { porta, base, dir, ambiente, caminhoBanco: path.join(dir, "remoteifes.db"), filho: null, saida: "", token: null, partidas: 0 };
 
   servidor.subir = async () => {
     const argumentos = sonda ? ["--expose-gc", "--require", path.join(__dirname, "sonda-servidor.js"), "server.js"] : ["server.js"];

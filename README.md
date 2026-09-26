@@ -384,6 +384,8 @@ O banco danificado e seus `-wal` e `-shm` são renomeados para `remoteifes.db.co
 
 As credenciais dos ESP32 fazem parte do banco e entram normalmente no backup. Se a restauração voltar para antes de uma rotação, substituição ou revogação, a NVS do dispositivo e o banco podem ficar em versões diferentes; nesse caso, emita uma credencial de substituição e informe-a no portal de setup do controlador afetado.
 
+**Simulado de recuperação.** `npm run ensaio-recuperacao` comprova o caminho inteiro numa instância isolada, com os mesmos `backup-db.js` e `restore-backup.js` de produção. Ele monta um sistema em funcionamento, com contas, salas, credenciais de ESP32, configurações, agendamento e comandos. Depois faz o backup e percorre os cenários: banco apagado; banco corrompido, recusado sem a opção e quarentenado com ela; nove tipos de backup inválido recusados com o banco atual intacto; e o aviso de restauração impedindo o servidor de abrir o banco, sem que um aviso órfão o mantenha fora do ar. Em cada restauração ele reinicia o servidor, confere o `/health` e os dados, entra com as contas e conecta uma placa com a credencial restaurada. A CI roda o mesmo simulado (`test/recovery-drill.test.js`), e `test/recovery-failure-injection.test.js` injeta falhas de disco e de troca de arquivo em cada etapa da restauração e do backup. O atualizador (`deploy.sh`, `rollback.sh`) nunca restaura nem substitui o banco: ele faz o backup pré-atualização e, se a nova versão não subir, reverte só o código. Voltar ao backup é sempre um passo explícito do operador.
+
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `BACKUP_AUTOMATICO` | `true` em produção, `false` nos demais | Liga/desliga o backup periódico do agendador |
