@@ -27,7 +27,13 @@ O script gera `-light.png` e `-dark.png` a 2× a largura exibida (800 px), escol
 
 ## Módulos
 
-`modules/*.png` são ilustrações de 256 px com fundo transparente: navegador, celular, servidor, banco, console, ESP32, ar-condicionado e ponto de acesso Wi-Fi. Gateway e nó mesh usam o mesmo módulo do ESP32, porque são o mesmo hardware e o mesmo firmware; o papel vem do rótulo. Um módulo novo segue o mesmo estilo: vista de três quartos, luz de cima à esquerda, paleta do app, sem texto, logotipo ou marca.
+`modules/*.png` são ilustrações de 256 px com fundo transparente, cada uma com um único objeto:
+
+- hardware real, desenhado de forma realista e simplificada: `server.png` é um Raspberry Pi, `esp32.png` é uma placa de desenvolvimento ESP32;
+- `wifi-ap.png` é o mesmo `esp32.png`, menor, com o símbolo de Wi-Fi (três arcos e um ponto, `#2a78d4`) acima da placa, fora dela. Representa o ESP32 no papel de raiz da malha, usado no cartão do gateway. Ao trocar o `esp32.png`, refaça os dois juntos;
+- conceitos, no estilo de ícone de produto: navegador, celular, banco, console e ar-condicionado.
+
+Direto, gateway e nó são o mesmo hardware e o mesmo firmware; o papel vem do rótulo e, no gateway, do símbolo de Wi-Fi. Credencial, cifra e limites ficam em selos e legendas da figura, nunca desenhados dentro do objeto. Um módulo novo mantém a vista de três quartos, a luz de cima à esquerda, a paleta do app e nenhum texto, logotipo ou marca.
 
 ## Fluxos SVG
 
