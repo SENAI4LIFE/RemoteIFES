@@ -155,17 +155,17 @@ function exposicaoDaAplicacao() {
 
 function exposicaoDoConsole() {
   const servidor = require("./servidor");
+  const host = config.ENDERECO.includes(":") ? `[${config.ENDERECO}]` : config.ENDERECO;
   return {
     endereco: config.ENDERECO,
     porta: config.PORTA,
     hostsAceitos: servidor.hostsAceitos(),
     atrasDeTls: config.ATRAS_DE_TLS,
+    // console.js refuses any other address, so this is the only way in from another machine.
     orientacao:
-      config.ENDERECO === "127.0.0.1"
-        ? "O console escuta apenas no loopback do Pi. De outra máquina, use um túnel SSH: " +
-          `ssh -L ${config.PORTA}:127.0.0.1:${config.PORTA} <usuario>@<host-do-pi> e então abra http://127.0.0.1:${config.PORTA}. ` +
-          "O localhost do seu computador não é o do Pi."
-        : "O console está escutando fora do loopback. Nesse modo, TLS e restrição de origem por rede são obrigatórios.",
+      "O console escuta apenas no loopback do Pi. De outra máquina, use um túnel SSH: " +
+      `ssh -L ${config.PORTA}:${host}:${config.PORTA} <usuario>@<host-do-pi> e então abra http://127.0.0.1:${config.PORTA}. ` +
+      "O localhost do seu computador não é o do Pi.",
   };
 }
 
