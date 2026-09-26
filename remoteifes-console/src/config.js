@@ -1,4 +1,5 @@
 const fs = require("fs");
+const net = require("net");
 const os = require("os");
 const path = require("path");
 
@@ -12,6 +13,19 @@ function inteiro(valor, padrao, min, max) {
   if (!/^\d+$/.test(String(valor).trim())) return padrao;
   const n = Number(valor);
   return Number.isSafeInteger(n) && n >= min && n <= max ? n : padrao;
+}
+
+// The Console serves on loopback only (ARQUITETURA.md, section 4); operators on another machine use
+// an SSH tunnel. Only IP literals are checked: a hostname, localhost included, resolves through
+// files and DNS the Console does not control, so it is refused rather than trusted.
+const LOOPBACK = new net.BlockList();
+LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
+LOOPBACK.addAddress("::1", "ipv6");
+
+function enderecoLoopback(endereco) {
+  const familia = typeof endereco === "string" ? net.isIP(endereco) : 0;
+  if (!familia) return false;
+  return LOOPBACK.check(endereco, familia === 4 ? "ipv4" : "ipv6");
 }
 
 function booleano(valor, padrao) {
@@ -160,7 +174,8 @@ const config = {
   DIR_CORDOVA,
   DIR_WEB_CONSOLE: path.join(RAIZ_CONSOLE, "web"),
 
-  // Network: loopback by default. The port is used only without socket activation.
+  // Network: loopback only. CONSOLE_BIND chooses IPv4 or IPv6 loopback; console.js refuses to start
+  // on anything else. Under socket activation systemd owns the address and the port.
   ENDERECO: process.env.CONSOLE_BIND || "127.0.0.1",
   PORTA: inteiro(process.env.CONSOLE_PORTA, 8099, 1, 65535),
   // Hosts accepted in the Host header. Closes DNS rebinding: a name resolving to 127.0.0.1 is not
@@ -196,6 +211,7 @@ const config = {
 
   inteiro,
   booleano,
+  enderecoLoopback,
   lerEnvServidor,
   caminhosDaAplicacao,
   urlDaAplicacao,
