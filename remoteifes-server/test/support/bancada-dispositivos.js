@@ -452,6 +452,9 @@ class GatewaySimulado extends PlacaSimulada {
     this.nos = new Map();
     this.rota = { pai: "gateway", saltos: 1, rssi: -58 };
     this.relay = { atrasoMs: 0, duplicar: false };
+    // The firmware announces a node again 30 s after a refusal. aposRecusaMs does the same for a
+    // node refused by a bound ("limite"), usually with a shorter delay so a run stays short.
+    this.reanuncio = { aposRecusaMs: null };
     this.emTransito = 0;
     this.capturados = [];
     this.recusas = [];
@@ -461,12 +464,22 @@ class GatewaySimulado extends PlacaSimulada {
     return super.info({ gateway: true, ...extra });
   }
 
-  /** A node joining through this gateway. `segredo` may be wrong on purpose. */
+  /**
+   * A node joining through this gateway. `segredo` may be wrong on purpose. Like a direct board, the
+   * node reports the desired state it applied (a telemetry frame echoing the version) unless
+   * `no.semConfirmacao` is set.
+   */
   no({ deviceId, segredo, rota = null }) {
     const no = new NoDeReferencia({ deviceId, segredo, gatewayDeviceId: this.credencial && this.credencial.deviceId });
     no.rota = rota;
+    no.semConfirmacao = false;
     this.nos.set(deviceId, no);
     return no;
+  }
+
+  telemetriaDoNo(no, extra = {}) {
+    if (!no.sessao) return false;
+    return this.doNo(no, { tipo: "telemetria", temp: 23, hum: 50, rssi: -60, modo: "operation", fw: FW_PADRAO, ...(no.versaoEstado !== undefined ? { versao: no.versaoEstado } : {}), ...extra });
   }
 
   anunciar(no, evento = "entrou") {
@@ -476,9 +489,14 @@ class GatewaySimulado extends PlacaSimulada {
   /** Sends a sealed payload from a node, as the node would, through this gateway. Returns the frame. */
   doNo(no, payload, { rota } = {}) {
     const quadro = no.selar(payload);
-    this.capturados.push({ no: no.deviceId, quadro });
+    this.capturar(no.deviceId, quadro);
     this.encaminhar({ tipo: "mesh", no: no.deviceId, quadro, rota: rota || no.rota || this.rota });
     return quadro;
+  }
+
+  capturar(deviceId, quadro) {
+    this.capturados.push({ no: deviceId, quadro });
+    if (this.capturados.length > 200) this.capturados.shift();
   }
 
   /** Re-sends a frame seen earlier, byte for byte (replay). Defaults to the last captured one. */
@@ -523,14 +541,21 @@ class GatewaySimulado extends PlacaSimulada {
     if (!msg) return;
     if (msg.tipo === "mesh_recusado") {
       this.recusas.push(msg);
+      if (this.recusas.length > 500) this.recusas.shift();
       const no = this.nos.get(msg.no);
       if (no) no.recusado = msg.motivo;
+      if (no && msg.motivo === "limite" && this.reanuncio.aposRecusaMs !== null) {
+        this.bancada.depois(this.reanuncio.aposRecusaMs, () => {
+          if (this.nos.get(no.deviceId) === no && this.aberta()) this.anunciar(no);
+        });
+      }
       return;
     }
     if (msg.tipo !== "mesh") return;
     const no = this.nos.get(msg.no);
     if (!no || no.mudo) return;
     let respostas;
+    const antes = no.recebidos.length;
     try {
       respostas = no.receber(msg.quadro);
     } catch (erro) {
@@ -538,9 +563,20 @@ class GatewaySimulado extends PlacaSimulada {
       return;
     }
     for (const quadro of respostas) {
-      this.capturados.push({ no: no.deviceId, quadro });
+      this.capturar(no.deviceId, quadro);
       this.encaminhar({ tipo: "mesh", no: no.deviceId, quadro, rota: no.rota || this.rota });
     }
+    // Keeps the reference node's log bounded over long runs.
+    const novos = no.recebidos.slice(antes);
+    if (no.recebidos.length > 200) no.recebidos.splice(0, no.recebidos.length - 200);
+    for (const payload of novos) {
+      this.emit("mensagem-no", no, payload);
+      if (payload.tipo === "send_known_state" && Number.isInteger(payload.versao)) {
+        no.versaoEstado = payload.versao;
+        if (!no.semConfirmacao) this.telemetriaDoNo(no);
+      }
+    }
+    if (novos.length) this.emit("mensagens-no");
   }
 }
 

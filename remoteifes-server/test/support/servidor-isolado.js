@@ -24,7 +24,11 @@ function portaLivre() {
   });
 }
 
-async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs = 40_000 } = {}) {
+/**
+ * `sonda: true` loads support/sonda-servidor.js into the server process (with --expose-gc) and opens
+ * an IPC channel, so a measuring tool can read the process's own metrics with servidor.metricas().
+ */
+async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs = 40_000, sonda = false } = {}) {
   const porta = await portaLivre();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-isolado-"));
   const base = `http://127.0.0.1:${porta}`;
@@ -45,7 +49,12 @@ async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs
   const servidor = { porta, base, dir, filho: null, saida: "", token: null, partidas: 0 };
 
   servidor.subir = async () => {
-    const filho = spawn(process.execPath, ["server.js"], { cwd: RAIZ_SERVIDOR, env: ambiente, stdio: ["ignore", "pipe", "pipe"] });
+    const argumentos = sonda ? ["--expose-gc", "--require", path.join(__dirname, "sonda-servidor.js"), "server.js"] : ["server.js"];
+    const filho = spawn(process.execPath, argumentos, {
+      cwd: RAIZ_SERVIDOR,
+      env: ambiente,
+      stdio: sonda ? ["ignore", "pipe", "pipe", "ipc"] : ["ignore", "pipe", "pipe"],
+    });
     servidor.filho = filho;
     servidor.partidas += 1;
     const guardar = (d) => {
@@ -89,6 +98,30 @@ async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs
     const dados = await resposta.json().catch(() => null);
     return { status: resposta.status, corpo: dados, ms: Number(process.hrtime.bigint() - inicio) / 1e6 };
   };
+
+  let pedido = 0;
+  /** Sends a request to the probe ("metricas", "criar-salas") and resolves with its answer. */
+  servidor.sondar = (tipo, dados = {}) =>
+    new Promise((resolve, reject) => {
+      const filho = servidor.filho;
+      if (!sonda || !filho || !filho.connected) return reject(new Error("servidor sem sonda"));
+      const id = ++pedido;
+      const tempo = setTimeout(() => {
+        filho.off("message", ouvir);
+        reject(new Error(`a sonda não respondeu a ${tipo}`));
+      }, 10_000);
+      const ouvir = (msg) => {
+        if (!msg || msg.id !== id) return;
+        clearTimeout(tempo);
+        filho.off("message", ouvir);
+        if (msg.erro) reject(new Error(msg.erro));
+        else resolve(msg.resultado);
+      };
+      filho.on("message", ouvir);
+      filho.send({ id, tipo, ...dados });
+    });
+  // `gc: true` collects garbage first; `zerarLaco: true` starts a new event-loop window.
+  servidor.metricas = (opcoes = {}) => servidor.sondar("metricas", opcoes);
 
   /** Stops the process. SIGTERM is a graceful stop; SIGKILL is a crash. */
   servidor.parar = async (sinal = "SIGTERM") => {
