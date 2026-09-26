@@ -22,6 +22,7 @@
     "credencial": "node --env-file-if-exists=.env credencial-esp32.js",
     "carga": "node carga-esp32.js",
     "ensaio": "node ensaio-dispositivos.js",
+    "ensaio-recuperacao": "node ensaio-recuperacao.js",
     "health": "bash healthcheck.sh",
     "deploy": "bash deploy.sh",
     "rollback": "bash rollback.sh",
