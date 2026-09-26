@@ -23,6 +23,7 @@
     "carga": "node carga-esp32.js",
     "ensaio": "node ensaio-dispositivos.js",
     "ensaio-recuperacao": "node ensaio-recuperacao.js",
+    "latencia": "node latencia-comandos.js",
     "health": "bash healthcheck.sh",
     "deploy": "bash deploy.sh",
     "rollback": "bash rollback.sh",
