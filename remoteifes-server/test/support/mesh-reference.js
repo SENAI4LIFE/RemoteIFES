@@ -48,9 +48,12 @@ class NoDeReferencia {
     }
     if (quadro.t === "dados" && this.sessao) {
       if (quadro.seq <= this.sessao.seqRecebido) return [this.selar({ tipo: "mesh_ack", seq: quadro.seq })];
-      const decifra = crypto.createDecipheriv("aes-256-gcm", this.sessao.chave, nonceDe(DIRECAO.servidor, quadro.seq));
+      // Like the firmware (mesh_protocolo.cpp): only a full 16-byte tag is checked.
+      const tag = Buffer.from(quadro.tag, "base64url");
+      if (tag.length !== 16) throw new Error("tag de autenticação com tamanho inválido");
+      const decifra = crypto.createDecipheriv("aes-256-gcm", this.sessao.chave, nonceDe(DIRECAO.servidor, quadro.seq), { authTagLength: 16 });
       decifra.setAAD(Buffer.from(this.deviceId));
-      decifra.setAuthTag(Buffer.from(quadro.tag, "base64url"));
+      decifra.setAuthTag(tag);
       const payload = JSON.parse(Buffer.concat([decifra.update(Buffer.from(quadro.dados, "base64url")), decifra.final()]).toString("utf8"));
       this.sessao.seqRecebido = quadro.seq;
       this.recebidos.push(payload);

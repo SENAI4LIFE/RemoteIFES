@@ -36,6 +36,10 @@ const RE_B64 = /^[A-Za-z0-9_-]{16,128}$/;
 const MAX_CORPO_BYTES = 16 * 1024;
 
 const DIRECAO = { servidor: 0x01, no: 0x02 };
+// AES-GCM checks a shorter tag as a prefix of the real one unless the length is fixed, which would
+// let a relaying gateway forge a frame with a 4-byte tag at 2^-32 odds. The firmware refuses any tag
+// that is not 16 bytes; so does the server.
+const TAG_BYTES = 16;
 
 // deviceId -> observed node (topology + session).
 const nos = new Map();
@@ -80,9 +84,11 @@ function selar(chave, no, direcao, seq, payload) {
 }
 
 function abrir(chave, no, direcao, quadro) {
-  const decifra = crypto.createDecipheriv("aes-256-gcm", chave, nonceDe(direcao, quadro.seq));
+  const tag = Buffer.from(quadro.tag, "base64url");
+  if (tag.length !== TAG_BYTES) throw new Error("tag de autenticação com tamanho inválido");
+  const decifra = crypto.createDecipheriv("aes-256-gcm", chave, nonceDe(direcao, quadro.seq), { authTagLength: TAG_BYTES });
   decifra.setAAD(Buffer.from(no));
-  decifra.setAuthTag(Buffer.from(quadro.tag, "base64url"));
+  decifra.setAuthTag(tag);
   const texto = Buffer.concat([decifra.update(Buffer.from(quadro.dados, "base64url")), decifra.final()]).toString("utf8");
   return JSON.parse(texto);
 }

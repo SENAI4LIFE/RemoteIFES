@@ -374,7 +374,7 @@ Logo depois de gravado, o arquivo é reaberto somente-leitura e validado com `PR
 
 **Backup manual:** dentro de `remoteifes-server`, `npm run backup` grava um backup imediato (verificado e já sujeito à rotação) e imprime o caminho. Aceita um rótulo opcional: `npm run backup -- pre-migracao`.
 
-**Restauração.** O caminho normal é o [Console de Operações](#console-de-operações), em **Dados e recuperação**, que para o serviço, restaura e religa. Pelo terminal, com o servidor parado, `npm run restore` lista os backups disponíveis e `npm run restore -- <arquivo>` restaura o indicado, por nome dentro de `BACKUP_DIR` ou por caminho completo. Use `--sim` para pular a confirmação interativa em scripts e reinicie o servidor depois.
+**Restauração.** O caminho normal é o [Console de Operações](#console-de-operações), em **Dados e recuperação**, que para o serviço, restaura e religa. Pelo terminal, com o servidor parado, `npm run restore` lista os backups disponíveis e `npm run restore -- <arquivo>` restaura o indicado, por nome dentro de `BACKUP_DIR` ou por caminho completo. Se o servidor ainda responder no endereço e na porta configurados, o comando recusa e pede para pará-lo antes: trocar o arquivo sob um servidor em execução perderia tudo o que ele gravasse até o próximo reinício. Use `--sim` para pular a confirmação interativa em scripts e reinicie o servidor depois.
 
 Antes de sobrescrever, o script verifica o backup candidato, diagnostica o banco atual em modo somente-leitura, faz uma cópia de segurança consistente dele (`pre-restauracao-<data>.db` em `BACKUP_DIR`) e, depois da troca, revalida o arquivo restaurado.
 

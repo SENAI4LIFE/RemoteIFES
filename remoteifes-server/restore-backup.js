@@ -55,7 +55,30 @@ if (recuperarCorrompido) {
   console.log("Uma cópia de segurança do banco atual será criada automaticamente antes da troca.\n");
 }
 
-function prosseguir() {
+// The marker keeps a server from STARTING during the swap; a server already running would keep its
+// open database: on Linux it goes on writing to the replaced file, and everything written until its
+// next restart is lost while other tools read the restored one. The running server is found by its
+// own /health, on the address and port it is configured with.
+async function servidorNoAr() {
+  const porta = Number(process.env.PORTA || 8080);
+  const bind = process.env.BIND_ADDR;
+  const host = !bind || bind === "0.0.0.0" || bind === "::" ? "127.0.0.1" : bind;
+  const url = `http://${host.includes(":") ? `[${host}]` : host}:${porta}/health`;
+  try {
+    const resposta = await fetch(url, { signal: AbortSignal.timeout(2000) });
+    const corpo = await resposta.json();
+    return corpo && typeof corpo === "object" && "banco" in corpo ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+async function prosseguir() {
+  const emExecucao = await servidorNoAr();
+  if (emExecucao) {
+    console.error(`O servidor RemoteIFES está respondendo em ${emExecucao}. Pare-o antes de restaurar (sudo systemctl stop remoteifes.service) e rode de novo.`);
+    process.exit(1);
+  }
   // Until the swap ends no RemoteIFES process opens the database (src/config/restauracao.js).
   const removerMarcador = publicarMarcador(CAMINHO_DB);
   process.on("exit", removerMarcador);
