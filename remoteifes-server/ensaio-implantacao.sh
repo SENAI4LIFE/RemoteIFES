@@ -80,12 +80,17 @@ como_usuario git reset -q --hard "$PRIMEIRA"
 cd "$SERVIDOR"
 como_usuario bash deploy.sh "$NOVA" --offline
 verificar "http://127.0.0.1:$PORTA" --commit "$NOVA" --exigir-marca --dispositivos 1
+INICIO_FALHA=$(date +%s)
 set +e
 como_usuario bash deploy.sh "$QUEBRADA" --offline
 codigo=$?
 set -e
 [ "$codigo" -ne 0 ] || { echo "a atualização quebrada foi dada como concluída"; exit 1; }
-systemctl show -p Result -p NRestarts remoteifes.service
+# The crashing version must have exhausted systemd's start limit, or this step would not show that
+# the revert brings the service back over it.
+LIMITE=$(journalctl -u remoteifes.service --since "@$INICIO_FALHA" --no-pager 2>/dev/null | grep -cE "Start request repeated too quickly|start-limit-hit" || true)
+echo "registros de limite de partidas do systemd durante a atualização que falhou: $LIMITE"
+[ "$LIMITE" -ge 1 ] || { echo "a versão que cai ao iniciar não chegou ao limite de partidas do systemd"; exit 1; }
 verificar "http://127.0.0.1:$PORTA" --commit "$NOVA" --exigir-marca --dispositivos 1
 [ "$(commit_atual)" = "$NOVA" ] || { echo "o código não voltou para a versão anterior"; exit 1; }
 como_usuario bash rollback.sh --offline
