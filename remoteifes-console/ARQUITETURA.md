@@ -107,7 +107,7 @@ concluído sem acompanhamento é liberada nessa reconciliação.
 | Sessão | cookie `HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` quando houver TLS; validade absoluta 8 h e ociosidade 30 min |
 | Elevação | reautenticação por senha para operações sensíveis; validade 5 min, revogada no logout e no fim da sessão |
 | CSRF | token por sessão exigido em cabeçalho próprio em **todo** método mutante, mais checagem exata de `Origin` e de `Host` (anti-DNS-rebinding). CORS não é considerado defesa |
-| Exposição | `127.0.0.1` por padrão. Acesso remoto é túnel SSH (`ssh -L 8099:127.0.0.1:8099 pi@host`): o `localhost` do operador **não** é o do Pi. Não há modo de rede local: `CONSOLE_BIND` fora do loopback faz o console escutar em HTTP, sem TLS próprio nem filtro de faixas, protegido só pela lista de `Host` (`CONSOLE_HOSTS`) |
+| Exposição | `127.0.0.1` por padrão. Acesso remoto é túnel SSH (`ssh -L 8099:127.0.0.1:8099 pi@host`): o `localhost` do operador **não** é o do Pi. Só loopback: `CONSOLE_BIND` escolhe entre `127.0.0.1` e `::1`, e qualquer outro endereço, curinga ou nome faz o console recusar a partida; sob ativação por socket, o descritor recebido do systemd passa pela mesma conferência. `CONSOLE_HOSTS` só amplia a lista de `Host` aceitos contra DNS rebinding e não expõe o console na rede |
 | Privilégio | o console roda como o usuário dono do checkout e dos dados; tudo que precisa de root passa por **um** auxiliar root (`/usr/local/lib/remoteifes/console-helper.sh`, root:root 0755, diretórios pais root) com verbos fixos e argumentos validados por lista |
 | Endurecimento | o serviço do console **não** usa `NoNewPrivileges=yes`, que quebraria o `sudo` do auxiliar; usa `PrivateTmp`, `ProtectHome=read-only`, `ProtectKernelTunables`, `RestrictAddressFamilies` e `ReadWritePaths` explícitos |
 | Segredos | tokens GitHub, chaves e senhas nunca voltam por API nem vão para log, auditoria ou diagnóstico: o console informa **presença e validade**, jamais o valor |
@@ -121,6 +121,7 @@ alvo fixo. Não existe endpoint `/exec` genérico.
 |---|---|
 | Navegador de outra origem dispara ação (CSRF) | `SameSite=Strict`, token em cabeçalho, `Origin` exato e recusa de efeito colateral em GET |
 | DNS rebinding para `127.0.0.1:8099` | `Host` conferido contra lista exata; qualquer outro valor recebe 421 |
+| Console exposto na rede por configuração (`CONSOLE_BIND`, unidade do socket editada) | partida recusada fora do loopback, antes de escutar ou gravar estado; o socket herdado do systemd é conferido antes da primeira requisição; teste de contrato da unidade instalada |
 | Cookie vazando entre aplicação e console | portas **não** isolam cookies; por isso a sessão do console não vale nada sem o cabeçalho CSRF, e a aplicação não usa cookies |
 | Service worker da aplicação capturando o console | origem distinta, o console não registra SW e envia `Clear-Site-Data` no logout |
 | Injeção por argumento, opção ou caminho | sem shell: `execFile`/`spawn` com vetor de argumentos; cada ação declara esquema e valida opção por opção; caminhos resolvidos e conferidos contra raiz permitida (`realpath`, sem symlink para fora) |

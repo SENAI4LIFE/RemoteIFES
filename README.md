@@ -980,7 +980,7 @@ Sem `--apagar-estado`, operadores, auditoria e histórico são preservados. A re
 
 ### Acessar
 
-Abra o console pelo atalho do sistema. Ele escuta apenas em `127.0.0.1`, então de outra máquina é preciso um túnel SSH: o `localhost` do seu computador não é o do Pi.
+Abra o console pelo atalho do sistema. Ele escuta apenas em loopback, então de outra máquina é preciso um túnel SSH: o `localhost` do seu computador não é o do Pi. `CONSOLE_BIND` só escolhe entre `127.0.0.1` e `::1`; com qualquer outro endereço o console não sobe.
 
 ```bash
 ssh -L 8099:127.0.0.1:8099 <usuario>@<host-do-pi>
@@ -1049,7 +1049,7 @@ Uma operação que terminou sem ninguém acompanhando aparece com o código de s
 
 - **Identidade própria**, com senha `scrypt` guardada em `/var/lib/remoteifes-console/operadores.json`. Nunca reutiliza `SENHA_ADMIN_INICIAL` nem `superadmin/admin`.
 - **Sessão** em cookie `HttpOnly`, `SameSite=Strict`, com prazo absoluto e de ociosidade. Operações sensíveis exigem reautenticação, válida por poucos minutos e revogada no logout e na troca de senha.
-- **CSRF** por token em cabeçalho próprio, `Origin` exato e `Host` conferido contra lista fechada, o que fecha DNS rebinding. CORS não é tratado como defesa. Portas não isolam cookies, por isso a sessão não vale nada sem o cabeçalho.
+- **CSRF** por token em cabeçalho próprio, `Origin` exato e `Host` conferido contra lista fechada, o que fecha DNS rebinding. `CONSOLE_HOSTS` só amplia essa lista e não expõe o console na rede. CORS não é tratado como defesa. Portas não isolam cookies, por isso a sessão não vale nada sem o cabeçalho.
 - **Privilégio** por um único auxiliar `root` em `/usr/local/lib/remoteifes/console-helper.sh`, com verbos fixos e alvo fixo. Não há git, npm, shell, unidade, caminho ou ambiente arbitrários, e não existe endpoint genérico de comando. O auxiliar recusa executar se ele ou qualquer diretório acima dele for gravável por quem não é root.
 - **Segredos** como o token do GitHub e senhas nunca voltam por API, log, auditoria ou diagnóstico. O console informa presença e validade, jamais o valor.
 - O serviço do console não usa `NoNewPrivileges=yes`, ao contrário de `remoteifes.service`, porque isso quebraria o `sudo` do auxiliar. O endurecimento aplicado está no arquivo de unidade e é explícito sobre esse ponto.
