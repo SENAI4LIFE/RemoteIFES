@@ -39,6 +39,11 @@ REINICIO_EM=""
 reiniciar_servico() {
   echo "Reiniciando remoteifes.service..."
   REINICIO_EM=$(date +%s)
+  # A version that crashes at start makes systemd restart it until StartLimitBurst is reached; from
+  # then on it refuses every start, a manual one included, for StartLimitIntervalSec. The revert to
+  # the previous version would then leave the service down. Deploy and rollback are deliberate
+  # operator actions, so the counter is cleared first.
+  $SYSTEMCTL reset-failed remoteifes.service >/dev/null 2>&1 || true
   $SYSTEMCTL restart remoteifes.service || echo "aviso: 'systemctl restart' retornou erro; verificando qual versão está em execução mesmo assim."
 }
 

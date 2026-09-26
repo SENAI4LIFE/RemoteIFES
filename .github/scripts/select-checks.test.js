@@ -20,7 +20,7 @@ function selected(p) {
 
 test("console changes select console tests and native package checks only", () => {
   const p = plan(["remoteifes-console/src/servidor.js"]);
-  assert.deepEqual(selected(p), ["console", "packages"]);
+  assert.deepEqual(selected(p), ["console", "packages", "deployment"]);
   assert.deepEqual(p.jobs.console, ALL_OS);
   assert.deepEqual(p.jobs.packages, ALL_OS);
 });
@@ -42,12 +42,12 @@ test("web changes select contracts, fast Chromium E2E and dependent mobile packa
 
 test("server changes select server on every OS, the console and frontend integration", () => {
   const p = plan(["remoteifes-server/src/app.js"]);
-  assert.deepEqual(selected(p), ["server", "console", "e2e"]);
+  assert.deepEqual(selected(p), ["server", "console", "deployment", "e2e"]);
   assert.deepEqual(p.jobs.server, ALL_OS);
 });
 
 test("server lockfile changes are server changes", () => {
-  assert.deepEqual(selected(plan(["remoteifes-server/package-lock.json"])), ["server", "console", "e2e"]);
+  assert.deepEqual(selected(plan(["remoteifes-server/package-lock.json"])), ["server", "console", "deployment", "e2e"]);
 });
 
 test("Cordova changes select mobile validation and the server app contracts", () => {
@@ -113,7 +113,7 @@ test("E2E shards cover 1..n exactly once per target", () => {
 test("verification accepts selected-success and unselected-skipped only", () => {
   const p = plan(["remoteifes-console/src/servidor.js"]);
   const needs = { changes: { result: "success" } };
-  for (const job of JOBS) needs[job] = { result: ["console", "packages"].includes(job) ? "success" : "skipped" };
+  for (const job of JOBS) needs[job] = { result: ["console", "packages", "deployment"].includes(job) ? "success" : "skipped" };
   assert.deepEqual(verifyResults(p, needs), []);
 
   assert.match(verifyResults(p, { ...needs, console: { result: "skipped" } }).join(), /console: expected success, got skipped/);

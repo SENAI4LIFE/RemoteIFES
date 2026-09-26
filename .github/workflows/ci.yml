@@ -46,6 +46,7 @@ jobs:
       server_os: ${{ steps.select.outputs.server_os }}
       console_os: ${{ steps.select.outputs.console_os }}
       packages_os: ${{ steps.select.outputs.packages_os }}
+      deployment: ${{ steps.select.outputs.deployment }}
       e2e_matrix: ${{ steps.select.outputs.e2e_matrix }}
       cordova_os: ${{ steps.select.outputs.cordova_os }}
       safari: ${{ steps.select.outputs.safari }}
@@ -444,6 +445,29 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The production installation path on a disposable host with systemd: clean install, service,
+  # updates that succeed and fail, rollback, backup and restore, the nginx reverse proxy, the HTTPS
+  # configuration up to certificate issuance (which needs a public domain and is not exercised),
+  # and the Operations Console package against that installation. Simulated boards connect through
+  # every step; no ESP32 hardware is involved. The runner is discarded afterwards, which is what
+  # makes installing units, nginx and a .deb here acceptable.
+  deployment:
+    name: Deployment rehearsal (ubuntu-latest)
+    needs: changes
+    if: needs.changes.outputs.deployment == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The rehearsal clones this checkout and deploys and rolls back commits in the clone.
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Rehearse the production installation
+        run: sudo env ENSAIO_HOST_DESCARTAVEL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh
+
   e2e:
     name: Browser E2E (${{ matrix.os }}, ${{ matrix.channel || matrix.browser }}, ${{ matrix.shard }}/${{ matrix.shards }})
     needs: changes
@@ -604,7 +628,7 @@ jobs:
   result:
     name: CI result
     if: always()
-    needs: [changes, server, console, packages, e2e, safari, cordova, firmware, android, ios]
+    needs: [changes, server, console, packages, deployment, e2e, safari, cordova, firmware, android, ios]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
