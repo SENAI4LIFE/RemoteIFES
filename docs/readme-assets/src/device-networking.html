@@ -31,13 +31,16 @@
   .placa { padding: 5px 9px 5px 5px; gap: 6px; }
   .placa .titulo { font-size: 14px; }
   .placa .sub { font-size: 11.5px; white-space: nowrap; }
-  .placa .quadro { position: relative; flex: 0 0 auto; }
+  /* The credential badge sits on the card corner, outside the board illustration. */
+  .placa .quadro { position: static; flex: 0 0 auto; }
   .placa .quadro .ic {
-    position: absolute; right: -3px; bottom: -2px;
+    position: absolute; right: -7px; top: -7px;
     width: 15px; height: 15px; padding: 2px;
     color: var(--petroleo); background: var(--cartao);
     border: 1px solid var(--cartao-borda); border-radius: 50%;
   }
+  .modulo.raiz { width: 48px; height: 48px; }
+  .modulo.pi { width: 60px; height: 60px; }
   .linha-gateway { display: grid; grid-template-columns: 1fr 1fr; justify-items: center; align-items: center; padding: 0 11px; }
   #repassa { justify-self: start; margin-left: 2px; }
   .sem-wifi {
@@ -64,7 +67,7 @@
 <body>
 <div id="tela">
   <div class="cartao tom-verde" id="servidor">
-    <img class="modulo" src="../modules/server.png" alt="">
+    <img class="modulo pi" src="../modules/server.png" alt="">
     <div><div class="titulo">Servidor RemoteIFES</div><div class="sub">autentica cada placa pela credencial dela, venha direto ou pelo gateway</div></div>
   </div>
 
@@ -86,7 +89,7 @@
           </div>
         </div>
         <div class="legenda-painel">
-          <img class="modulo p" src="../modules/wifi-ap.png" alt="">
+          <svg class="ic" style="width:22px;height:22px;color:var(--petroleo)"><use href="#x-wifi"/></svg>
           <div><div class="titulo">Wi-Fi direto · padrão</div><div class="sub">cada placa com Wi-Fi e WebSocket próprios</div></div>
         </div>
       </section>
@@ -100,7 +103,7 @@
     <section class="painel opcional tom-petroleo" id="malha">
       <div class="linha-gateway">
         <div class="cartao tom-petroleo placa" id="gateway">
-          <span class="quadro"><img class="modulo p" src="../modules/esp32.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
+          <span class="quadro"><img class="modulo p raiz" src="../modules/wifi-ap.png" alt=""><svg class="ic"><use href="#i-chave"/></svg></span>
           <div><div class="titulo">gateway</div><div class="sub">sala D · raiz</div></div>
         </div>
         <span class="pilula tom-petroleo" id="repassa"><svg class="ic p"><use href="#x-repassa"/></svg>repassa sem ler</span>
