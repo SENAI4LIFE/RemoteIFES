@@ -243,6 +243,9 @@ None of the above involves an ESP32 radio. These remain unvalidated until real b
 * the firmware's gateway relay and node state machines on real boards, including credential
   rotation over the mesh (compiled and linked only).
 
+How to test each of these, and the rest of the board, is in
+[HARDWARE-ACCEPTANCE.md](HARDWARE-ACCEPTANCE.md).
+
 ## OTA over the mesh
 
 Not implemented. A safe design needs bounded, acknowledged chunks per hop with backpressure,
