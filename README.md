@@ -1444,7 +1444,7 @@ Um nó informa a quantidade de saltos e o sinal do enlace com o pai, mas nomeia 
 
 ### O que ainda não foi validado
 
-O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Nada foi validado em rádio com placas reais: entrada na malha, troca de pai, perda da raiz, partições temporárias, rotação de credencial pela malha, alcance e confiabilidade continuam pendentes.
+O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Do lado do servidor, testes com gateways e nós simulados cobrem várias topologias, troca de gateway, reinícios, gerações de credencial, quadros adulterados, truncados ou repetidos, os limites e um gateway que se comporta mal (`test/mesh-adversarial.test.js`). Nada disso envolve rádio: alcance, interferência, eleição real de pai e raiz, recuperação do rádio após perda do pai ou da raiz, estabilidade em vários saltos, latência de RF e a rotação de credencial pela malha em placas reais continuam pendentes.
 
 A escolha da tecnologia de rádio, o protocolo, os limites e o que falta estão em [`remoteifes-esp32/MESH.md`](remoteifes-esp32/MESH.md).
 

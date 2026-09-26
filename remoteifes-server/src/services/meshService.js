@@ -104,6 +104,9 @@ function observar(deviceId) {
       estado: "anunciado",
       desde: new Date().toISOString(),
       ultimaVez: Date.now(),
+      // Last frame that proved the node itself (handshake or authenticated data). Session liveness
+      // is measured from here; ultimaVez also moves with what the gateway reports about the node.
+      ultimaProva: 0,
       mudancasDeRota: 0,
       ultimaMudancaRotaEm: null,
       entregas: { enviados: 0, confirmados: 0, falhas: 0 },
@@ -177,8 +180,12 @@ function doGateway(salaGateway, entradaGateway, msg) {
 
   if (msg.tipo === "mesh_evento") {
     const no = observar(deviceId);
-    no.ultimaVez = Date.now();
-    atualizarRota(no, msg.rota);
+    // Only the gateway a node's session goes through reports on it: another gateway announcing the
+    // node starts a new handshake (a move), but does not rewrite the route of a working session.
+    if (!no.sessao || no.gateway === salaGateway) {
+      no.ultimaVez = Date.now();
+      atualizarRota(no, msg.rota);
+    }
     if (msg.evento === "entrou") iniciarHandshake(salaGateway, entradaGateway, no);
     else if (msg.evento === "saiu" && no.gateway === salaGateway) perderNo(no, "o gateway informou que o nó saiu da malha");
     return;
@@ -207,14 +214,21 @@ function nosDoGatewayAtivos(salaGateway) {
 }
 
 function iniciarHandshake(salaGateway, entradaGateway, no) {
-  const pendentes = Array.from(nos.values()).filter((n) => n.handshake && n.gateway === salaGateway && n.handshake.expira > Date.now()).length;
+  const agora = Date.now();
+  // A node announcing again while its own challenge is pending is a retry, not one more handshake.
+  const pendentes = Array.from(nos.values()).filter((n) => n !== no && n.handshake && n.gateway === salaGateway && n.handshake.expira > agora).length;
   if (pendentes >= MAX_HANDSHAKES_PENDENTES || (!no.sessao && nosDoGatewayAtivos(salaGateway) >= MAX_NOS_POR_GATEWAY)) {
     no.rejeitados += 1;
     enviarAoGateway(salaGateway, { tipo: "mesh_recusado", no: no.deviceId, motivo: "limite" });
     return;
   }
   const ns = b64(crypto.randomBytes(16));
-  no.handshake = { ns, gateway: salaGateway, gatewayDeviceId: entradaGateway.deviceId, expira: Date.now() + HANDSHAKE_EXPIRA_MS };
+  // The challenge this one replaces may already be answered and in flight (the node's announcement
+  // was repeated or duplicated). Its answer is recognised as late instead of refused: a refusal
+  // would make the node drop what it has and wait before announcing again.
+  const anterior = no.handshake && no.handshake.gateway === salaGateway && no.handshake.expira > agora ? no.handshake : null;
+  const superados = anterior ? [anterior.ns, ...anterior.superados].slice(0, 2) : [];
+  no.handshake = { ns, superados, gateway: salaGateway, gatewayDeviceId: entradaGateway.deviceId, expira: agora + HANDSHAKE_EXPIRA_MS };
   if (!no.sessao) {
     no.gateway = salaGateway;
     no.gatewayDeviceId = entradaGateway.deviceId;
@@ -233,15 +247,41 @@ function recusar(no, salaGateway, motivo) {
 
 function concluirHandshake(salaGateway, entradaGateway, no, quadro) {
   const h = no.handshake;
-  if (!h || h.gateway !== salaGateway || h.expira < Date.now()) return recusar(no, salaGateway, "sem desafio válido");
+  // The node holds a working session through this gateway: an answer arriving now is a copy of the
+  // one that opened it (duplicated or delayed on the way) or a forgery. Neither may close the
+  // session, and a refusal sent down would make the node drop it.
+  const sessaoViva = !!no.sessao && no.gateway === salaGateway;
+  const recusarTentativa = (motivo) => {
+    if (!sessaoViva) return recusar(no, salaGateway, motivo);
+    no.rejeitados += 1;
+    no.handshake = null;
+    logger.warn("mesh-no-tentativa-recusada-com-sessao", { no: no.deviceId, gateway: salaGateway, motivo });
+  };
+  if (!h || h.gateway !== salaGateway || h.expira < Date.now()) {
+    if (sessaoViva) {
+      no.duplicados += 1;
+      return;
+    }
+    return recusar(no, salaGateway, "sem desafio válido");
+  }
   if (typeof quadro.nn !== "string" || !RE_B64.test(quadro.nn) || typeof quadro.prova !== "string") {
-    return recusar(no, salaGateway, "resposta malformada");
+    return recusarTentativa("resposta malformada");
   }
   const registro = credenciais().chavesMeshPara(no.deviceId);
-  if (!registro || !registro.chaves.length) return recusar(no, salaGateway, "sem chave de malha para esta credencial");
-  const texto = `ola|${no.deviceId}|${h.gatewayDeviceId}|${h.ns}|${quadro.nn}`;
+  if (!registro || !registro.chaves.length) return recusarTentativa("sem chave de malha para esta credencial");
+  const provaDe = (ns) => `ola|${no.deviceId}|${h.gatewayDeviceId}|${ns}|${quadro.nn}`;
+  const texto = provaDe(h.ns);
   const usada = registro.chaves.find((c) => iguais(b64(hmac(c.chave, texto)), quadro.prova));
-  if (!usada) return recusar(no, salaGateway, "prova inválida");
+  if (!usada) {
+    // A valid answer to a challenge the current one replaced: late, not wrong. The current
+    // challenge stays open for the answer that is on its way.
+    const tardia = h.superados.some((ns) => registro.chaves.some((c) => iguais(b64(hmac(c.chave, provaDe(ns))), quadro.prova)));
+    if (tardia) {
+      no.duplicados += 1;
+      return;
+    }
+    return recusarTentativa("prova inválida");
+  }
   if (usada.geracao === "pendente") credenciais().ativarPendentePorMesh(no.deviceId);
   credenciais().registrarUsoMesh(no.deviceId);
 
@@ -252,6 +292,7 @@ function concluirHandshake(salaGateway, entradaGateway, no, quadro) {
   const chaveSessao = hmac(usada.chave, `sessao|${h.ns}|${quadro.nn}`);
   const anterior = no.sessao;
   no.sessao = { chave: chaveSessao, seqEnvio: 0, seqRecebido: 0, iniciadaEm: new Date().toISOString() };
+  no.ultimaProva = Date.now();
   no.fila = [];
   no.sala = registro.sala;
   no.gateway = salaGateway;
@@ -308,6 +349,7 @@ function receberDados(no, quadro) {
     return;
   }
   no.sessao.seqRecebido = quadro.seq;
+  no.ultimaProva = Date.now();
   if (!payload || typeof payload.tipo !== "string") return;
 
   if (payload.tipo === "mesh_ack") {
@@ -419,7 +461,7 @@ function varrer() {
       if (!no.sessao) no.estado = "inalcancavel";
     }
     if (!no.sessao) continue;
-    if (agora - no.ultimaVez > SEM_NOTICIAS_MS) {
+    if (agora - no.ultimaProva > SEM_NOTICIAS_MS) {
       perderNo(no, "sem notícias do nó pela malha");
       continue;
     }
