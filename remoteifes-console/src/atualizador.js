@@ -304,6 +304,10 @@ async function verificarPublicacao({ forcar = false } = {}) {
 
   const base = baseDeRelease();
   const manifestoResp = await baixar(`${base}/manifesto.json`, { timeoutMs: 30_000 });
+  if (!manifestoResp.ok && manifestoResp.status === 404) {
+    // The origin answered: there is simply no signed Console publication there yet.
+    return { ok: false, motivo: `nenhuma publicação do console em ${base}`, semPublicacao: true, ultimaObservacao: anterior };
+  }
   if (!manifestoResp.ok) {
     return { ok: false, motivo: `não foi possível obter o manifesto (${manifestoResp.erro})`, offline: true, ultimaObservacao: anterior };
   }
@@ -317,7 +321,7 @@ async function verificarPublicacao({ forcar = false } = {}) {
     estado.auditar("release-manifesto-recusado", { motivo: verificacao.motivo });
     return { ok: false, motivo: verificacao.motivo, recusado: true };
   }
-  release.registrarRotacao(verificacao.manifesto);
+  release.registrarRotacao(verificacao);
 
   const observacao = {
     observadoEm: new Date().toISOString(),
@@ -327,6 +331,7 @@ async function verificarPublicacao({ forcar = false } = {}) {
     alvos: verificacao.manifesto.artefatos.map((a) => a.alvo),
     expiraEm: verificacao.manifesto.expiraEm,
     chaveUsada: verificacao.chaveUsada,
+    idChave: verificacao.idChave,
   };
   estado.gravarJson(arquivoObservacao(), observacao, 0o600);
   return { ok: true, ...observacao, manifesto: verificacao.manifesto };
@@ -392,6 +397,7 @@ async function situacao({ consultarRede = false } = {}) {
   if (consultarRede) consulta = await verificarPublicacao({ forcar: true });
 
   const alvo = release.alvoAtual();
+  const chaves = release.chavesConfiaveis();
   const disponivel = consulta && consulta.ok ? consulta.versao : observacao ? observacao.versao : null;
   const politica = disponivel && emExecucao ? release.politicaDeVersao({ versao: disponivel }, emExecucao) : null;
 
@@ -406,7 +412,8 @@ async function situacao({ consultarRede = false } = {}) {
     ativacaoPendente: instaladas.ativacaoPendente,
     reversaoAutomatica: instaladas.reversaoAutomatica,
     alvo,
-    confiancaConfigurada: release.confianciaConfigurada(),
+    confiancaConfigurada: chaves.length > 0,
+    chavesDePublicacao: chaves.map((c) => ({ id: c.id, origem: c.origem })),
     ultimaObservacao: observacao
       ? {
           ...observacao,
@@ -840,7 +847,7 @@ async function importarOffline({ manifesto, assinatura, artefato, log = () => {}
 async function importarOfflineComTrava({ manifesto, assinatura, artefato, log = () => {} }) {
   const verificacao = release.verificarManifesto(fs.readFileSync(manifesto), fs.readFileSync(assinatura, "utf8"));
   if (!verificacao.ok) return { ok: false, erro: verificacao.motivo };
-  release.registrarRotacao(verificacao.manifesto);
+  release.registrarRotacao(verificacao);
 
   const escolha = release.escolherArtefato(verificacao.manifesto);
   if (!escolha.ok) return { ok: false, erro: escolha.motivo };

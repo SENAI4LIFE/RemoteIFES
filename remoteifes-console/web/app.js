@@ -1191,6 +1191,9 @@
       dado(dl, "Layout", "execução a partir do código-fonte; sem versões lado a lado");
     }
     dado(dl, "Alvo de artefato", p.console.alvo, "mono");
+    if (p.console.chavesDePublicacao && p.console.chavesDePublicacao.length) {
+      dado(dl, "Chave de publicação", p.console.chavesDePublicacao.map(function (c) { return c.id + " (" + c.origem + ")"; }).join(", "), "mono");
+    }
     if (p.console.ultimaObservacao) {
       var obs = p.console.ultimaObservacao;
       dado(dl, "Publicação observada", obs.versao + " (" + (obs.canal || "estável") + ")", "mono");

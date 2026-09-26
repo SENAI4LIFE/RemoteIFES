@@ -22,7 +22,11 @@ const { execFileSync, spawnSync } = require("child_process");
 // layout must match the updater's extractor exactly.
 //
 // Usage:
-//   node empacotar/construir.js [--saida <dir>] [--alvo <so-arch>] [--formato payload|deb|zip|exe|todos]
+//   node empacotar/construir.js [--saida <dir>] [--alvo <so-arch>[,<so-arch>...]] [--formato payload|deb|zip|exe|todos]
+//                               [--proxima-chave <publica.b64>]
+//
+// A release lists every target in one manifest, because each console fetches the same
+// `manifesto.json` and picks its own entry: `--alvo linux-arm64,linux-x64,windows-x64,...`.
 
 const RAIZ = path.join(__dirname, "..");
 const PACOTE = JSON.parse(fs.readFileSync(path.join(RAIZ, "package.json"), "utf8"));
@@ -448,50 +452,58 @@ function main() {
   const saida = path.resolve(arg("saida", path.join(RAIZ, "dist")));
   const formato = arg("formato", "todos");
   const so = { win32: "windows", darwin: "macos", linux: "linux" }[process.platform] || process.platform;
-  const alvo = arg("alvo", `${so}-${process.arch}`);
+  const alvos = [...new Set(arg("alvo", `${so}-${process.arch}`).split(",").map((a) => a.trim()).filter(Boolean))];
+  const invalido = alvos.find((a) => !/^[a-z0-9]+-[a-z0-9]+$/.test(a));
+  if (invalido || !alvos.length) throw new Error(`alvo inválido: ${invalido || "(vazio)"}`);
 
   fs.mkdirSync(saida, { recursive: true });
-  log(`Construindo Console de Operações ${VERSAO} para ${alvo}`);
+  log(`Construindo Console de Operações ${VERSAO} para ${alvos.join(", ")}`);
 
   const artefatos = [];
-
-  // Payload: what the release updater consumes, on every platform.
-  const nomePayload = `remoteifes-console-${VERSAO}-${alvo}.tar.gz`;
-  const caminhoPayload = path.join(saida, nomePayload);
+  // The payload is platform independent: it is assembled once and written once per target name.
   const payload = montarTarGz(RAIZ, INCLUIR);
-  fs.writeFileSync(caminhoPayload, payload);
-  artefatos.push({ alvo, formato: "tar.gz", arquivo: nomePayload, caminho: caminhoPayload });
-  log(`  payload: ${nomePayload} (${(payload.length / 1024).toFixed(0)} KiB)`);
+  let debFeito = false;
 
-  if (["todos", "zip"].includes(formato) && alvo.startsWith("windows")) {
-    const nomeZip = `remoteifes-console-${VERSAO}-${alvo}.zip`;
-    const caminhoZip = path.join(saida, nomeZip);
-    fs.writeFileSync(caminhoZip, montarZip(RAIZ, [...INCLUIR, "instalar.ps1"].filter((i) => fs.existsSync(path.join(RAIZ, i)))));
-    artefatos.push({ alvo, formato: "zip", arquivo: nomeZip, caminho: caminhoZip });
-    log(`  zip: ${nomeZip}`);
-  }
+  for (const alvo of alvos) {
+    // Payload: what the release updater consumes, on every platform.
+    const nomePayload = `remoteifes-console-${VERSAO}-${alvo}.tar.gz`;
+    const caminhoPayload = path.join(saida, nomePayload);
+    fs.writeFileSync(caminhoPayload, payload);
+    artefatos.push({ alvo, formato: "tar.gz", arquivo: nomePayload, caminho: caminhoPayload });
+    log(`  payload: ${nomePayload} (${(payload.length / 1024).toFixed(0)} KiB)`);
 
-  if (["todos", "exe"].includes(formato) && alvo.startsWith("windows")) {
-    const nomeExe = `remoteifes-console-${VERSAO}-${alvo}-instalador.exe`;
-    const caminhoExe = path.join(saida, nomeExe);
-    try {
-      const bytes = montarExe(caminhoExe);
-      artefatos.push({ alvo, formato: "exe", arquivo: nomeExe, caminho: caminhoExe });
-      log(`  exe: ${nomeExe} (${(bytes / 1024).toFixed(0)} KiB)`);
-    } catch (erro) {
-      log(`  exe: não construído (${erro.message})`);
+    if (["todos", "zip"].includes(formato) && alvo.startsWith("windows")) {
+      const nomeZip = `remoteifes-console-${VERSAO}-${alvo}.zip`;
+      const caminhoZip = path.join(saida, nomeZip);
+      fs.writeFileSync(caminhoZip, montarZip(RAIZ, [...INCLUIR, "instalar.ps1"].filter((i) => fs.existsSync(path.join(RAIZ, i)))));
+      artefatos.push({ alvo, formato: "zip", arquivo: nomeZip, caminho: caminhoZip });
+      log(`  zip: ${nomeZip}`);
     }
-  }
 
-  if (["todos", "deb"].includes(formato) && alvo.startsWith("linux")) {
-    const nomeDeb = `remoteifes-console_${VERSAO}_all.deb`;
-    const caminhoDeb = path.join(saida, nomeDeb);
-    try {
-      const bytes = montarDeb(caminhoDeb);
-      artefatos.push({ alvo, formato: "deb", arquivo: nomeDeb, caminho: caminhoDeb });
-      log(`  deb: ${nomeDeb} (${(bytes / 1024).toFixed(0)} KiB)`);
-    } catch (erro) {
-      log(`  deb: não construído (${erro.message})`);
+    if (["todos", "exe"].includes(formato) && alvo.startsWith("windows")) {
+      const nomeExe = `remoteifes-console-${VERSAO}-${alvo}-instalador.exe`;
+      const caminhoExe = path.join(saida, nomeExe);
+      try {
+        const bytes = montarExe(caminhoExe);
+        artefatos.push({ alvo, formato: "exe", arquivo: nomeExe, caminho: caminhoExe });
+        log(`  exe: ${nomeExe} (${(bytes / 1024).toFixed(0)} KiB)`);
+      } catch (erro) {
+        log(`  exe: não construído (${erro.message})`);
+      }
+    }
+
+    // The .deb is architecture independent (`_all`): one for every Linux target.
+    if (["todos", "deb"].includes(formato) && alvo.startsWith("linux") && !debFeito) {
+      debFeito = true;
+      const nomeDeb = `remoteifes-console_${VERSAO}_all.deb`;
+      const caminhoDeb = path.join(saida, nomeDeb);
+      try {
+        const bytes = montarDeb(caminhoDeb);
+        artefatos.push({ alvo, formato: "deb", arquivo: nomeDeb, caminho: caminhoDeb });
+        log(`  deb: ${nomeDeb} (${(bytes / 1024).toFixed(0)} KiB)`);
+      } catch (erro) {
+        log(`  deb: não construído (${erro.message})`);
+      }
     }
   }
 
@@ -505,7 +517,8 @@ function main() {
     expiraEm: new Date(Date.now() + 180 * 86400_000).toISOString(),
     minimoParaAtualizar: null,
     notas: `https://github.com/SENAI4LIFE/RemoteIFES/releases/tag/console-v${VERSAO}`,
-    proximaChave: null,
+    // The rotation release announces the successor; signing checks that it is a usable Ed25519 key.
+    proximaChave: arg("proxima-chave") ? { publica: fs.readFileSync(arg("proxima-chave"), "utf8").trim() } : null,
     artefatos: artefatos
       .filter((a) => a.formato === "tar.gz")
       .map((a) => ({
@@ -523,7 +536,7 @@ function main() {
   // Verifiable provenance of what was built.
   const proveniencia = {
     versao: VERSAO,
-    alvo,
+    alvo: alvos.join(","),
     construidoEm: new Date().toISOString(),
     node: process.version,
     plataformaDeBuild: `${process.platform}-${process.arch}`,

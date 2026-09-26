@@ -17,42 +17,91 @@ const estado = require("./estado");
 // **after** the manifest signature checks out. That is why the digest is never checked in
 // isolation.
 //
-// PUBLISHING KEY: the matching private key does not exist in this repository. Until a production
-// key is provisioned, `CHAVE_PUBLICA_OFICIAL` stays null and release updates report themselves as
-// **not configured** instead of accepting any manifest. Configuring means publishing the public key
-// here (or in CONSOLE_CHAVE_RELEASE for test environments) and signing with
-// `empacotar/assinar-manifesto.js`.
+// PUBLISHING KEY: only the public half lives here. The private key belongs to the release
+// maintainer, outside this repository and outside CI; `empacotar/assinar-manifesto.js` signs with
+// it. Installing, bootstrapping and running the Console never need it: installed copies carry this
+// key and verify publications by themselves. DISTRIBUICAO.md, section 5, has the signing, rotation
+// and key-loss procedures.
 
 const ESQUEMA_SUPORTADO = 1;
 
-// Ed25519 public key in base64 (SPKI DER). Null until a production key is published.
-const CHAVE_PUBLICA_OFICIAL = null;
+// Production publishing key: Ed25519, SPKI DER in base64. Its identifier (idDaChave) is documented
+// in DISTRIBUICAO.md so an operator can compare it with what the Programa tab shows.
+const CHAVE_PUBLICA_OFICIAL = "MCowBQYDK2VwAyEAVnTqrShYEnetLU2MXd0OFUiMT26m+6xs02MZB0vflTo=";
 
 const RE_VERSAO = /^\d+\.\d+\.\d+$/;
 const RE_SHA256 = /^[0-9a-f]{64}$/;
 const RE_ARQUIVO = /^[A-Za-z0-9._-]{1,120}$/;
+// A 64-byte Ed25519 signature in canonical base64. Node's decoder skips characters it does not
+// know, so a lenient parse would accept text that is not the signature that was published.
+const RE_ASSINATURA = /^[A-Za-z0-9+/]{86}==$/;
 
+// Successor keys and retired keys kept in the state directory. Both lists are short by nature (a
+// key is rotated a few times in a product's life); the caps keep a hostile file from growing them.
+const MAX_SUCESSORAS = 5;
+const MAX_APOSENTADAS = 20;
+
+/** Loads an SPKI public key and refuses anything that is not Ed25519. */
 function chaveDeBase64(base64) {
-  return crypto.createPublicKey({ key: Buffer.from(base64, "base64"), format: "der", type: "spki" });
+  if (typeof base64 !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64.trim())) throw new Error("chave pública ilegível");
+  const chave = crypto.createPublicKey({ key: Buffer.from(base64.trim(), "base64"), format: "der", type: "spki" });
+  if (chave.asymmetricKeyType !== "ed25519") throw new Error(`chave ${chave.asymmetricKeyType}, não Ed25519`);
+  return chave;
+}
+
+/** Full SHA-256 fingerprint of the key (over its SPKI DER). */
+function impressaoDaChave(base64) {
+  return crypto.createHash("sha256").update(Buffer.from(String(base64).trim(), "base64")).digest("hex");
+}
+
+/** Short identifier shown to operators and written to the audit log. */
+function idDaChave(base64) {
+  return `ed25519:${impressaoDaChave(base64).slice(0, 16)}`;
+}
+
+function arquivoDeChaves() {
+  return path.join(config.DIR_ESTADO, "chaves-release.json");
+}
+
+function lerRegistro() {
+  const registro = estado.lerJson(arquivoDeChaves(), {});
+  return {
+    chaves: Array.isArray(registro.chaves) ? registro.chaves.filter((c) => c && typeof c === "object") : [],
+    aposentadas: Array.isArray(registro.aposentadas) ? registro.aposentadas.filter((a) => a && typeof a.id === "string") : [],
+  };
 }
 
 /**
- * Accepted keys: the embedded one, the environment one (tests) and already authenticated rotated
- * keys.
+ * Keys that verify publications.
+ *
+ * Anchors: the key embedded in this code and, for test environments, CONSOLE_CHAVE_RELEASE (only
+ * whoever controls the process environment can set it, and the Programa tab names its origin).
+ * Successors: keys declared by an authenticated manifest, each bound to the anchor its chain
+ * started from. A successor counts only while that anchor is still an anchor, so installing a
+ * package that embeds a new key after a compromise also drops the successors the old key vouched
+ * for. Retired keys never count again.
  */
-function chavesConfiaveis() {
+function chavesConfiaveis({ registro = lerRegistro() } = {}) {
   const chaves = [];
-  const adicionar = (base64, origem) => {
+  const adicionar = (base64, origem, extra = {}) => {
     if (!base64) return;
     try {
-      chaves.push({ chave: chaveDeBase64(base64), base64, origem });
+      const chave = chaveDeBase64(base64);
+      const id = idDaChave(base64);
+      if (chaves.some((c) => c.id === id)) return;
+      chaves.push({ chave, base64: base64.trim(), id, origem, ...extra });
     } catch {}
   };
   adicionar(CHAVE_PUBLICA_OFICIAL, "embutida");
   adicionar(process.env.CONSOLE_CHAVE_RELEASE, "ambiente");
-  const rotacionadas = estado.lerJson(path.join(config.DIR_ESTADO, "chaves-release.json"), { chaves: [] });
-  for (const item of rotacionadas.chaves || []) adicionar(item.publica, `rotacionada em ${item.aceitaEm}`);
-  return chaves;
+  const ancoras = new Set(chaves.map((c) => c.id));
+  for (const item of registro.chaves) {
+    if (typeof item.publica === "string" && ancoras.has(item.ancora)) {
+      adicionar(item.publica, `sucessora aceita em ${item.aceitaEm}`, { ancora: item.ancora, anterior: item.anterior });
+    }
+  }
+  const aposentadas = new Set(registro.aposentadas.map((a) => a.id));
+  return chaves.filter((c) => !aposentadas.has(c.id));
 }
 
 function confianciaConfigurada() {
@@ -70,11 +119,72 @@ function compararVersoes(a, b) {
 }
 
 /**
+ * Shape and validity of a manifest. Shared by the Console and by the signing tool, so a manifest
+ * the publisher signs is one the Console accepts.
+ */
+function validarEstrutura(manifesto, { agora = new Date(), idAssinante = null, aposentadas = new Set() } = {}) {
+  if (!manifesto || typeof manifesto !== "object" || Array.isArray(manifesto)) return { ok: false, motivo: "manifesto não é um objeto JSON" };
+  if (manifesto.esquema !== ESQUEMA_SUPORTADO) {
+    return { ok: false, motivo: `esquema de manifesto ${manifesto.esquema} não é suportado por esta versão do console` };
+  }
+  if (!RE_VERSAO.test(String(manifesto.versao || ""))) return { ok: false, motivo: "versão do manifesto inválida" };
+  if (!manifesto.expiraEm || Number.isNaN(Date.parse(manifesto.expiraEm))) {
+    return { ok: false, motivo: "manifesto sem validade declarada" };
+  }
+  // Validity closes replay and freezing: a re-presented old manifest does not pass.
+  if (Date.parse(manifesto.expiraEm) < agora.getTime()) {
+    return { ok: false, motivo: `manifesto expirado em ${manifesto.expiraEm}; obtenha a publicação atual` };
+  }
+  if (!Array.isArray(manifesto.artefatos) || !manifesto.artefatos.length) {
+    return { ok: false, motivo: "manifesto sem artefatos" };
+  }
+  const alvos = new Set();
+  const arquivos = new Set();
+  for (const artefato of manifesto.artefatos) {
+    if (!artefato || typeof artefato !== "object") return { ok: false, motivo: "artefato malformado no manifesto" };
+    if (!RE_ARQUIVO.test(String(artefato.arquivo || ""))) return { ok: false, motivo: "nome de artefato inválido no manifesto" };
+    if (!RE_SHA256.test(String(artefato.sha256 || ""))) return { ok: false, motivo: `artefato ${artefato.arquivo} sem SHA-256 válido` };
+    if (!Number.isSafeInteger(artefato.bytes) || artefato.bytes <= 0) return { ok: false, motivo: `artefato ${artefato.arquivo} sem tamanho válido` };
+    if (!/^[a-z0-9]+-[a-z0-9]+$/.test(String(artefato.alvo || ""))) return { ok: false, motivo: `artefato ${artefato.arquivo} sem alvo válido` };
+    // Two entries for one target would make the choice depend on their order.
+    if (alvos.has(artefato.alvo)) return { ok: false, motivo: `o manifesto declara dois artefatos para ${artefato.alvo}` };
+    if (arquivos.has(artefato.arquivo)) return { ok: false, motivo: `o manifesto declara ${artefato.arquivo} duas vezes` };
+    alvos.add(artefato.alvo);
+    arquivos.add(artefato.arquivo);
+  }
+  // A declared successor that cannot be used is a publishing error: refusing it keeps the rotation
+  // from failing silently on some consoles and not on others.
+  const proxima = manifesto.proximaChave;
+  if (proxima !== null && proxima !== undefined) {
+    if (typeof proxima !== "object" || typeof proxima.publica !== "string") return { ok: false, motivo: "proximaChave malformada no manifesto" };
+    let id;
+    try {
+      chaveDeBase64(proxima.publica);
+      id = idDaChave(proxima.publica);
+    } catch (erro) {
+      return { ok: false, motivo: `proximaChave recusada: ${erro.message}` };
+    }
+    if (idAssinante && id === idAssinante) return { ok: false, motivo: "proximaChave é a própria chave que assinou o manifesto" };
+    if (aposentadas.has(id)) return { ok: false, motivo: `proximaChave ${id} já foi aposentada neste console` };
+  }
+  return { ok: true };
+}
+
+// Results issued by verificarManifesto against this console's own trust. Only those can register
+// a rotation, so the rule "a successor comes from an authenticated manifest" is held by the code
+// and not by each caller's discipline.
+const VERIFICADAS = new WeakSet();
+
+/**
  * Verifies the manifest's signature and shape. Receives the file's **exact bytes**, because the
  * signature covers bytes, not a reserialized object.
+ *
+ * `chaves` replaces this console's trust with an explicit list (the signing tool checks a release
+ * against the key it is meant for); such a result cannot register a rotation.
  */
-function verificarManifesto(bytesManifesto, assinatura, { agora = new Date() } = {}) {
-  const chaves = chavesConfiaveis();
+function verificarManifesto(bytesManifesto, assinatura, { agora = new Date(), chaves: chavesExplicitas = null } = {}) {
+  const registro = chavesExplicitas ? { chaves: [], aposentadas: [] } : lerRegistro();
+  const chaves = chavesExplicitas || chavesConfiaveis({ registro });
   if (!chaves.length) {
     return {
       ok: false,
@@ -86,13 +196,9 @@ function verificarManifesto(bytesManifesto, assinatura, { agora = new Date() } =
   }
   if (!Buffer.isBuffer(bytesManifesto) || !bytesManifesto.length) return { ok: false, motivo: "manifesto vazio" };
 
-  let assinaturaBin;
-  try {
-    assinaturaBin = Buffer.from(String(assinatura).trim(), "base64");
-  } catch {
-    return { ok: false, motivo: "assinatura ilegível" };
-  }
-  if (assinaturaBin.length !== 64) return { ok: false, motivo: "assinatura Ed25519 tem tamanho inesperado" };
+  const texto = typeof assinatura === "string" ? assinatura.trim() : Buffer.isBuffer(assinatura) ? assinatura.toString("utf8").trim() : "";
+  if (!RE_ASSINATURA.test(texto)) return { ok: false, motivo: "assinatura malformada: esperado Ed25519 de 64 bytes em base64" };
+  const assinaturaBin = Buffer.from(texto, "base64");
 
   const usada = chaves.find((c) => {
     try {
@@ -110,49 +216,81 @@ function verificarManifesto(bytesManifesto, assinatura, { agora = new Date() } =
     return { ok: false, motivo: "manifesto não é JSON válido" };
   }
 
-  if (manifesto.esquema !== ESQUEMA_SUPORTADO) {
-    return { ok: false, motivo: `esquema de manifesto ${manifesto.esquema} não é suportado por esta versão do console` };
-  }
-  if (!RE_VERSAO.test(String(manifesto.versao || ""))) return { ok: false, motivo: "versão do manifesto inválida" };
-  if (!manifesto.expiraEm || Number.isNaN(Date.parse(manifesto.expiraEm))) {
-    return { ok: false, motivo: "manifesto sem validade declarada" };
-  }
-  // Validity closes replay and freezing: a re-presented old manifest does not pass.
-  if (Date.parse(manifesto.expiraEm) < agora.getTime()) {
-    return { ok: false, motivo: `manifesto expirado em ${manifesto.expiraEm}; obtenha a publicação atual` };
-  }
-  if (!Array.isArray(manifesto.artefatos) || !manifesto.artefatos.length) {
-    return { ok: false, motivo: "manifesto sem artefatos" };
-  }
-  for (const artefato of manifesto.artefatos) {
-    if (!RE_ARQUIVO.test(String(artefato.arquivo || ""))) return { ok: false, motivo: "nome de artefato inválido no manifesto" };
-    if (!RE_SHA256.test(String(artefato.sha256 || ""))) return { ok: false, motivo: `artefato ${artefato.arquivo} sem SHA-256 válido` };
-    if (!Number.isSafeInteger(artefato.bytes) || artefato.bytes <= 0) return { ok: false, motivo: `artefato ${artefato.arquivo} sem tamanho válido` };
-    if (!/^[a-z0-9]+-[a-z0-9]+$/.test(String(artefato.alvo || ""))) return { ok: false, motivo: `artefato ${artefato.arquivo} sem alvo válido` };
-  }
+  const estrutura = validarEstrutura(manifesto, {
+    agora,
+    idAssinante: usada.id,
+    aposentadas: new Set(registro.aposentadas.map((a) => a.id)),
+  });
+  if (!estrutura.ok) return estrutura;
 
-  return { ok: true, manifesto, chaveUsada: usada.origem };
+  const resultado = { ok: true, manifesto, chaveUsada: usada.origem, idChave: usada.id };
+  if (!chavesExplicitas) {
+    VERIFICADAS.add(resultado);
+    Object.defineProperty(resultado, "assinante", { value: usada, enumerable: false });
+  }
+  return resultado;
 }
 
 /**
- * Accepts the successor key declared inside an already authenticated manifest. Since it comes
- * signed by the current key, rotation opens no new surface.
+ * Records what an authenticated manifest says about keys.
+ *
+ *   - Transition: a manifest signed by a successor retires the keys it succeeded, so a predecessor
+ *     key that later leaks no longer verifies anything here.
+ *   - Rotation: a declared `proximaChave` becomes trusted, bound to the anchor of the key that
+ *     signed. It came signed by a trusted key, so rotation opens no new surface.
+ *
+ * Accepts only a result verificarManifesto issued on this console's own trust.
  */
-function registrarRotacao(manifesto) {
-  const proxima = manifesto && manifesto.proximaChave;
-  if (!proxima || typeof proxima.publica !== "string") return { rotacionada: false };
-  try {
-    chaveDeBase64(proxima.publica);
-  } catch {
-    return { rotacionada: false, motivo: "chave sucessora ilegível" };
+function registrarRotacao(verificacao) {
+  if (!verificacao || !VERIFICADAS.has(verificacao)) return { rotacionada: false, motivo: "rotação só a partir de manifesto verificado" };
+  const assinante = verificacao.assinante;
+  const manifesto = verificacao.manifesto;
+  const registro = lerRegistro();
+  const agora = new Date().toISOString();
+  let mudou = false;
+  const aposentadasAgora = [];
+
+  if (assinante.anterior) {
+    const aposentadas = new Set(registro.aposentadas.map((a) => a.id));
+    let id = assinante.anterior;
+    for (let passos = 0; id && passos <= registro.chaves.length; passos += 1) {
+      if (id === assinante.id || aposentadas.has(id)) break;
+      registro.aposentadas.push({ id, em: agora, substituidaPor: assinante.id });
+      aposentadas.add(id);
+      aposentadasAgora.push(id);
+      const entrada = registro.chaves.find((c) => typeof c.publica === "string" && idDaChave(c.publica) === id);
+      id = entrada ? entrada.anterior : null;
+    }
+    if (aposentadasAgora.length) {
+      registro.chaves = registro.chaves.filter((c) => typeof c.publica === "string" && !aposentadasAgora.includes(idDaChave(c.publica)));
+      mudou = true;
+    }
   }
-  const arquivo = path.join(config.DIR_ESTADO, "chaves-release.json");
-  const atual = estado.lerJson(arquivo, { chaves: [] });
-  if ((atual.chaves || []).some((c) => c.publica === proxima.publica)) return { rotacionada: false, jaConhecida: true };
-  atual.chaves = [...(atual.chaves || []), { publica: proxima.publica, aceitaEm: new Date().toISOString(), viaVersao: manifesto.versao }].slice(-5);
-  estado.gravarJson(arquivo, atual, 0o600);
-  estado.auditar("release-chave-rotacionada", { viaVersao: manifesto.versao });
-  return { rotacionada: true };
+
+  let rotacionada = false;
+  const proxima = manifesto.proximaChave;
+  if (proxima && typeof proxima.publica === "string") {
+    const id = idDaChave(proxima.publica);
+    if (!registro.chaves.some((c) => typeof c.publica === "string" && idDaChave(c.publica) === id)) {
+      registro.chaves.push({
+        publica: proxima.publica.trim(),
+        aceitaEm: agora,
+        viaVersao: manifesto.versao,
+        ancora: assinante.ancora || assinante.id,
+        anterior: assinante.id,
+      });
+      rotacionada = true;
+      mudou = true;
+    }
+  }
+
+  if (!mudou) return { rotacionada: false, jaConhecida: !!proxima };
+  registro.chaves = registro.chaves.slice(-MAX_SUCESSORAS);
+  registro.aposentadas = registro.aposentadas.slice(-MAX_APOSENTADAS);
+  estado.gravarJson(arquivoDeChaves(), registro, 0o600);
+  if (aposentadasAgora.length) estado.auditar("release-chave-aposentada", { chaves: aposentadasAgora, substituidaPor: assinante.id });
+  if (rotacionada) estado.auditar("release-chave-rotacionada", { viaVersao: manifesto.versao, sucessora: idDaChave(proxima.publica), assinante: assinante.id });
+  return { rotacionada, aposentadas: aposentadasAgora };
 }
 
 /**
@@ -212,7 +350,6 @@ function politicaDeVersao(manifesto, versaoInstalada) {
   return { ok: true };
 }
 
-/** Confere o arquivo realmente gravado contra o manifesto autenticado. */
 /**
  * Checks an artifact against the signed manifest and **returns the checked bytes**.
  *
@@ -257,8 +394,12 @@ function conferirArtefato(caminho, artefato, { limiteBytes = Infinity } = {}) {
 module.exports = {
   ESQUEMA_SUPORTADO,
   CHAVE_PUBLICA_OFICIAL,
+  chaveDeBase64,
+  idDaChave,
+  impressaoDaChave,
   chavesConfiaveis,
   confianciaConfigurada,
+  validarEstrutura,
   verificarManifesto,
   registrarRotacao,
   alvoAtual,

@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const zlib = require("zlib");
+const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 const ajuda = require("./helpers");
 
@@ -44,14 +45,17 @@ function gerarChave(dir) {
   });
   return {
     privada: path.join(dir, "release-ed25519.privada.pem"),
+    publica: path.join(dir, "release-ed25519.publica.b64"),
     publicaB64: fs.readFileSync(path.join(dir, "release-ed25519.publica.b64"), "utf8").trim(),
   };
 }
 
-function assinar(manifesto, chavePrivada) {
+// Test keys are ephemeral: --publica names the key the signature must verify against, in place of
+// the embedded production key.
+function assinar(manifesto, par) {
   execFileSync(
     process.execPath,
-    [path.join(ajuda.RAIZ, "empacotar", "assinar-manifesto.js"), "--manifesto", manifesto, "--chave", chavePrivada],
+    [path.join(ajuda.RAIZ, "empacotar", "assinar-manifesto.js"), "--manifesto", manifesto, "--chave", par.privada, "--publica", par.publica],
     { stdio: ["ignore", "pipe", "pipe"], timeout: 60_000 }
   );
 }
@@ -214,7 +218,7 @@ test("complete chain: build, sign, publish and actually update", async (t) => {
 
   construir(fonte, saida);
   const par = gerarChave(chaves);
-  assinar(path.join(saida, "manifesto.json"), par.privada);
+  assinar(path.join(saida, "manifesto.json"), par);
   assert.ok(fs.existsSync(path.join(saida, "manifesto.json.sig")));
 
   const servidor = await servirDiretorio(saida);
@@ -267,7 +271,7 @@ test("offline import actually installs, without any network", async (t) => {
 
   construir(fonte, saida);
   const par = gerarChave(chaves);
-  assinar(path.join(saida, "manifesto.json"), par.privada);
+  assinar(path.join(saida, "manifesto.json"), par);
 
   // No release base configured: any network attempt would fail.
   const amb = ajuda.ambiente({
@@ -312,7 +316,7 @@ test("swapping the artifact after verification does not change what is installed
 
   construir(fonte, saida);
   const par = gerarChave(chaves);
-  assinar(path.join(saida, "manifesto.json"), par.privada);
+  assinar(path.join(saida, "manifesto.json"), par);
 
   const amb = ajuda.ambiente({
     env: { CONSOLE_CHAVE_RELEASE: par.publicaB64, CONSOLE_RAIZ_INSTALACAO: instalacao },
@@ -362,7 +366,7 @@ test("offline import refuses a tampered artifact and installs nothing", async (t
 
   construir(fonte, saida);
   const par = gerarChave(chaves);
-  assinar(path.join(saida, "manifesto.json"), par.privada);
+  assinar(path.join(saida, "manifesto.json"), par);
 
   const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
   const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
@@ -394,7 +398,7 @@ test("a manifest tampered with after signing is refused", async (t) => {
 
   construir(ajuda.RAIZ, saida);
   const par = gerarChave(chaves);
-  assinar(path.join(saida, "manifesto.json"), par.privada);
+  assinar(path.join(saida, "manifesto.json"), par);
 
   // Swapping the digest while keeping the old signature is exactly the attack the signature exists
   // to prevent: pointing a legitimate release at other content.
@@ -428,7 +432,7 @@ test("an artifact swapped on the server does not pass the signed manifest's dige
 
   construir(fonte, saida);
   const par = gerarChave(chaves);
-  assinar(path.join(saida, "manifesto.json"), par.privada);
+  assinar(path.join(saida, "manifesto.json"), par);
 
   // Manifest and signature remain intact; the served file is what was swapped.
   const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
@@ -452,18 +456,54 @@ test("an artifact swapped on the server does not pass the signed manifest's dige
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "the pointer does not move");
 });
 
-test("without a provisioned publishing key, the Console says so instead of accepting any release", async (t) => {
+test("an installed Console trusts the embedded publishing key with no setup step", (t) => {
+  const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: undefined } });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+
+  // Only the public half: nothing to provision at installation, bootstrap or first access.
+  const chaves = release.chavesConfiaveis();
+  assert.deepEqual(chaves.map((c) => c.origem), ["embutida"]);
+  assert.equal(chaves[0].chave.asymmetricKeyType, "ed25519");
+  assert.equal(release.confianciaConfigurada(), true);
+  // Operators compare this identifier with the one the maintainer documents.
+  const id = release.idDaChave(release.CHAVE_PUBLICA_OFICIAL);
+  const distribuicao = fs.readFileSync(path.join(ajuda.RAIZ, "DISTRIBUICAO.md"), "utf8");
+  assert.ok(distribuicao.includes(id), `DISTRIBUICAO.md must name the embedded key ${id}`);
+  assert.ok(distribuicao.includes(release.impressaoDaChave(release.CHAVE_PUBLICA_OFICIAL)), "and its full fingerprint");
+});
+
+test("with no trusted key at all, the updater says so instead of accepting any release", async (t) => {
   const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: undefined } });
   t.after(() => amb.restaurar());
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
 
-  assert.equal(release.CHAVE_PUBLICA_OFICIAL, null, "no production key stays in the repository");
-  assert.equal(release.confianciaConfigurada(), false);
+  // A build whose embedded key was removed: the updater consults the trust before the network.
+  release.confianciaConfigurada = () => false;
   const r = await atualizador.verificarPublicacao({ forcar: true });
   assert.equal(r.ok, false);
   assert.equal(r.naoConfigurado, true);
   assert.match(r.motivo, /chave pública/);
+  assert.equal(release.verificarManifesto(Buffer.from("{}"), "x", { chaves: [] }).naoConfigurado, true);
+});
+
+test("before the first signed publication exists, the Console says there is none", async (t) => {
+  const vazio = ajuda.dirTemporario("console-sem-release-");
+  const servidor = await servirDiretorio(vazio);
+  const amb = ajuda.ambiente({ env: { CONSOLE_RELEASE_BASE: servidor.base, CONSOLE_CHAVE_RELEASE: undefined } });
+  t.after(async () => {
+    await servidor.fechar();
+    amb.restaurar();
+    fs.rmSync(vazio, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  const r = await atualizador.verificarPublicacao({ forcar: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.semPublicacao, true);
+  assert.equal(r.offline, undefined, "a 404 from the origin is not a network failure");
+  assert.match(r.motivo, /nenhuma publicação do console/);
 });
 
 test("the signing tool refuses a manifest that is already expired", (t) => {
@@ -475,11 +515,18 @@ test("the signing tool refuses a manifest that is already expired", (t) => {
 
   const par = gerarChave(chaves);
   const manifesto = path.join(dir, "manifesto.json");
+  const artefato = Buffer.from("payload");
+  fs.writeFileSync(path.join(dir, "a.tar.gz"), artefato);
   fs.writeFileSync(
     manifesto,
-    `${JSON.stringify({ esquema: 1, versao: "2.0.0", expiraEm: new Date(Date.now() - 1000).toISOString(), artefatos: [] })}\n`
+    `${JSON.stringify({
+      esquema: 1,
+      versao: "2.0.0",
+      expiraEm: new Date(Date.now() - 1000).toISOString(),
+      artefatos: [{ alvo: "linux-x64", arquivo: "a.tar.gz", sha256: crypto.createHash("sha256").update(artefato).digest("hex"), bytes: artefato.length }],
+    })}\n`
   );
-  assert.throws(() => assinar(manifesto, par.privada));
+  assert.throws(() => assinar(manifesto, par), /expirado/);
   assert.ok(!fs.existsSync(`${manifesto}.sig`), "nothing is signed");
 });
 

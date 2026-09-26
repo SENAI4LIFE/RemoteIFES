@@ -1004,7 +1004,7 @@ Antes de abrir o navegador, o lançador confere a identidade de quem responde na
 
 A versão do console é independente do commit do RemoteIFES implantado, e as duas atualizações não se misturam. Atualizar o console baixa um artefato de release, confere a assinatura Ed25519 do manifesto e o SHA-256 do artefato, instala a versão nova ao lado da atual e troca o ponteiro. Reverter é trocar o ponteiro de volta, sem rede. O processo não usa `git`, não copia o checkout e não consome o `origin/main` da aplicação.
 
-Enquanto nenhuma chave pública de publicação estiver provisionada, o console diz isso na aba **Programa** e recusa qualquer release. Nesse estado, atualizar o console é reinstalar o pacote.
+Toda cópia instalada já traz a chave pública de publicação e confere os releases sozinha: instalar, iniciar ou implantar não pede nenhuma etapa de chave. Enquanto não houver release assinado publicado, a aba **Programa** diz que não há publicação, e atualizar o console é reinstalar o pacote.
 
 #### Versão nova que falha depois de subir
 
@@ -1014,11 +1014,11 @@ O limite é deliberado e não é uma ativação em duas fases. Uma versão saud�
 
 #### Estado da assinatura
 
-O caminho de verificação está implementado e é fechado por padrão, mas não há credencial de publicação neste repositório. Não há chave privada Ed25519, nem certificado de assinatura de código do Windows, nem conta de desenvolvedor Apple para notarização.
+O console confia na chave de publicação de produção `ed25519:4769f1b1135c7719`, embutida em `remoteifes-console/src/release.js`. A chave privada correspondente fica só com o mantenedor de releases, fora do repositório e fora da CI, e a verificação é fechada por padrão. Ainda não há certificado de assinatura de código do Windows nem conta de desenvolvedor Apple para notarização.
 
 Os artefatos que a CI constrói são de desenvolvimento e validação, inclusive o instalador `.exe`. Eles se declaram `assinado: false` em `proveniencia.json`, e um passo da própria CI falha se essa declaração for outra. No Windows isso significa que o SmartScreen avisa ao abrir o instalador.
 
-Para publicar releases de produção é preciso gerar o par de chaves com `node empacotar/assinar-manifesto.js --gerar-chave <dir>`, guardar a privada fora do repositório, embutir a pública em `src/release.js` (ou provisioná-la por `CONSOLE_CHAVE_RELEASE`) e assinar o manifesto numa etapa credenciada, separada do build e inacessível a código de pull request. Enquanto isso não for feito, o console recusa qualquer release em vez de aceitar artefatos não assinados.
+Publicar um release é construir o manifesto de todos os alvos, assinar com `node empacotar/assinar-manifesto.js` na máquina do mantenedor e anexar manifesto, assinatura e artefatos ao release do GitHub. A CI só usa pares de chave descartáveis. O procedimento, a rotação de chave e o que fazer se a chave for perdida ou vazar estão em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md#5-confiança-da-atualização).
 
 Os detalhes de empacotamento, assinatura e matriz de sistemas estão em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md).
 

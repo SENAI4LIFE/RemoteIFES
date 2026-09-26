@@ -66,6 +66,13 @@ function payloadValido(versao) {
   });
 }
 
+const ARTEFATO = { alvo: "linux-x64", arquivo: "a.tar.gz", sha256: "a".repeat(64), bytes: 10 };
+
+function assinado(par, texto) {
+  const bytes = Buffer.from(texto, "utf8");
+  return { bytes, assinatura: crypto.sign(null, bytes, par.privada).toString("base64") };
+}
+
 function manifestoDe({ versao, artefatos, expiraEm = null, minimoParaAtualizar = null, proximaChave = null }) {
   return `${JSON.stringify(
     {
@@ -141,16 +148,28 @@ function ambienteDeAtualizacao({ base, chavePublica, raizInstalacao, versaoPaylo
 
 // --- Trust ----------------------------------------------------------------------------
 
-test("without a provisioned public key, no update is accepted", (t) => {
+test("without any trusted key, no update is accepted", (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
 
-  assert.equal(release.confianciaConfigurada(), false, "the repository carries no production key");
-  const r = release.verificarManifesto(Buffer.from("{}"), "x");
+  const r = release.verificarManifesto(Buffer.from("{}"), "x", { chaves: [] });
   assert.equal(r.ok, false);
   assert.equal(r.naoConfigurado, true);
   assert.match(r.motivo, /não está configurada/);
+});
+
+test("the embedded key does not verify what an ephemeral test key signed", (t) => {
+  const chaves = parDeChaves();
+  const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: undefined } });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+
+  assert.deepEqual(release.chavesConfiaveis().map((c) => c.origem), ["embutida"]);
+  const m = assinado(chaves, manifestoDe({ versao: "2.0.0", artefatos: [ARTEFATO] }));
+  const r = release.verificarManifesto(m.bytes, m.assinatura);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /não confere com nenhuma chave confiável/);
 });
 
 test("a manifest with an invalid signature is refused before any write", (t) => {
@@ -217,15 +236,170 @@ test("key rotation is accepted only from an already authenticated manifest", (t)
   const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
   t.after(() => amb.restaurar());
   const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+  const ids = () => release.chavesConfiaveis().map((c) => c.id);
 
-  assert.equal(release.chavesConfiaveis().length, 1);
-  release.registrarRotacao({ versao: "2.1.0", proximaChave: { publica: sucessora.publicaB64 } });
-  assert.equal(release.chavesConfiaveis().length, 2, "a sucessora passa a ser aceita");
+  // An object that merely looks like a verification result registers nothing.
+  const forjado = { ok: true, manifesto: { versao: "2.1.0", proximaChave: { publica: sucessora.publicaB64 } } };
+  assert.equal(release.registrarRotacao(forjado).rotacionada, false);
+  assert.ok(!ids().includes(release.idDaChave(sucessora.publicaB64)));
+  // Neither does a manifest verified against an explicit key list instead of this console's trust.
+  const anuncio = assinado(chaves, manifestoDe({ versao: "2.1.0", artefatos: [ARTEFATO], proximaChave: { publica: sucessora.publicaB64 } }));
+  const explicito = release.verificarManifesto(anuncio.bytes, anuncio.assinatura, {
+    chaves: [{ chave: release.chaveDeBase64(chaves.publicaB64), id: release.idDaChave(chaves.publicaB64), origem: "teste" }],
+  });
+  assert.equal(explicito.ok, true);
+  assert.equal(release.registrarRotacao(explicito).rotacionada, false);
+
+  const verificado = release.verificarManifesto(anuncio.bytes, anuncio.assinatura);
+  assert.equal(verificado.ok, true, verificado.motivo);
+  assert.equal(release.registrarRotacao(verificado).rotacionada, true);
+  assert.ok(ids().includes(release.idDaChave(sucessora.publicaB64)), "the successor is trusted");
 
   // A manifest signed only by the successor now verifies.
-  const bytes = Buffer.from(manifestoDe({ versao: "2.2.0", artefatos: [{ alvo: "linux-x64", arquivo: "a.tar.gz", sha256: "a".repeat(64), bytes: 10 }] }));
-  const r = release.verificarManifesto(bytes, crypto.sign(null, bytes, sucessora.privada).toString("base64"));
-  assert.equal(r.ok, true);
+  const seguinte = assinado(sucessora, manifestoDe({ versao: "2.2.0", artefatos: [ARTEFATO] }));
+  assert.equal(release.verificarManifesto(seguinte.bytes, seguinte.assinatura).ok, true);
+});
+
+test("once the successor signs, the key it replaced is retired", (t) => {
+  const k1 = parDeChaves();
+  const k2 = parDeChaves();
+  const k3 = parDeChaves();
+  const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: k1.publicaB64 } });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+  const verificar = (m) => release.verificarManifesto(m.bytes, m.assinatura);
+  const confiaveis = () => release.chavesConfiaveis().map((c) => c.id).filter((id) => id !== release.idDaChave(release.CHAVE_PUBLICA_OFICIAL));
+
+  release.registrarRotacao(verificar(assinado(k1, manifestoDe({ versao: "2.1.0", artefatos: [ARTEFATO], proximaChave: { publica: k2.publicaB64 } }))));
+  // Until the successor is used, the current key still verifies: a console may see several
+  // manifests from the old key before the first one from the new.
+  assert.equal(verificar(assinado(k1, manifestoDe({ versao: "2.1.1", artefatos: [ARTEFATO] }))).ok, true);
+
+  const primeiroDaSucessora = verificar(assinado(k2, manifestoDe({ versao: "2.2.0", artefatos: [ARTEFATO] })));
+  assert.equal(primeiroDaSucessora.ok, true);
+  assert.deepEqual(release.registrarRotacao(primeiroDaSucessora).aposentadas, [release.idDaChave(k1.publicaB64)]);
+
+  const doAntigo = verificar(assinado(k1, manifestoDe({ versao: "9.0.0", artefatos: [ARTEFATO] })));
+  assert.equal(doAntigo.ok, false, "a retired key no longer verifies, even from the environment");
+  assert.match(doAntigo.motivo, /não confere com nenhuma chave confiável/);
+  assert.deepEqual(confiaveis(), [release.idDaChave(k2.publicaB64)]);
+
+  // The retired key cannot come back as a declared successor.
+  const devolve = verificar(assinado(k2, manifestoDe({ versao: "2.3.0", artefatos: [ARTEFATO], proximaChave: { publica: k1.publicaB64 } })));
+  assert.equal(devolve.ok, false);
+  assert.match(devolve.motivo, /aposentada/);
+
+  // A second rotation retires the chain: only the newest key remains.
+  release.registrarRotacao(verificar(assinado(k2, manifestoDe({ versao: "2.4.0", artefatos: [ARTEFATO], proximaChave: { publica: k3.publicaB64 } }))));
+  release.registrarRotacao(verificar(assinado(k3, manifestoDe({ versao: "2.5.0", artefatos: [ARTEFATO] }))));
+  assert.deepEqual(confiaveis(), [release.idDaChave(k3.publicaB64)]);
+  assert.equal(verificar(assinado(k2, manifestoDe({ versao: "9.0.0", artefatos: [ARTEFATO] }))).ok, false);
+});
+
+test("successors vouched for by a key that is no longer an anchor stop counting", (t) => {
+  const antiga = parDeChaves();
+  const sucessora = parDeChaves();
+  const nova = parDeChaves();
+  const estadoDir = ajuda.dirTemporario("console-rotacao-");
+  let amb = ajuda.ambiente({ estadoDir, env: { CONSOLE_CHAVE_RELEASE: antiga.publicaB64 } });
+  let release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+  const anuncio = assinado(antiga, manifestoDe({ versao: "2.1.0", artefatos: [ARTEFATO], proximaChave: { publica: sucessora.publicaB64 } }));
+  release.registrarRotacao(release.verificarManifesto(anuncio.bytes, anuncio.assinatura));
+  assert.ok(release.chavesConfiaveis().some((c) => c.id === release.idDaChave(sucessora.publicaB64)));
+  amb.restaurar();
+
+  // A package that anchors on a different key (the recovery from a compromised key) keeps the
+  // state directory but not what the old key vouched for.
+  amb = ajuda.ambiente({ estadoDir, env: { CONSOLE_CHAVE_RELEASE: nova.publicaB64 } });
+  t.after(() => amb.restaurar());
+  release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+  const ids = release.chavesConfiaveis().map((c) => c.id);
+  assert.ok(!ids.includes(release.idDaChave(sucessora.publicaB64)));
+  assert.ok(ids.includes(release.idDaChave(nova.publicaB64)));
+  const daSucessora = assinado(sucessora, manifestoDe({ versao: "3.0.0", artefatos: [ARTEFATO] }));
+  assert.equal(release.verificarManifesto(daSucessora.bytes, daSucessora.assinatura).ok, false);
+});
+
+test("a malformed or unusable successor key refuses the manifest", (t) => {
+  const chaves = parDeChaves();
+  const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+
+  const rsa = crypto.generateKeyPairSync("rsa", { modulusLength: 1024 }).publicKey.export({ type: "spki", format: "der" }).toString("base64");
+  for (const [proximaChave, motivo] of [
+    [{ publica: "não é base64" }, /proximaChave recusada/],
+    [{ publica: Buffer.from("curta").toString("base64") }, /proximaChave recusada/],
+    [{ publica: rsa }, /não Ed25519/],
+    [{ publica: chaves.publicaB64 }, /própria chave que assinou/],
+    ["texto", /proximaChave malformada/],
+    [{ outra: "coisa" }, /proximaChave malformada/],
+  ]) {
+    const m = assinado(chaves, manifestoDe({ versao: "2.1.0", artefatos: [ARTEFATO], proximaChave }));
+    const r = release.verificarManifesto(m.bytes, m.assinatura);
+    assert.equal(r.ok, false, JSON.stringify(proximaChave));
+    assert.match(r.motivo, motivo);
+  }
+  assert.equal(fs.existsSync(path.join(process.env.CONSOLE_ESTADO_DIR, "chaves-release.json")), false, "nothing was registered");
+});
+
+test("malformed signatures are refused before any key is tried", (t) => {
+  const chaves = parDeChaves();
+  const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+
+  const m = assinado(chaves, manifestoDe({ versao: "2.0.0", artefatos: [ARTEFATO] }));
+  assert.equal(release.verificarManifesto(m.bytes, m.assinatura).ok, true, "control: the real signature passes");
+  const bin = Buffer.from(m.assinatura, "base64");
+  for (const ruim of [
+    "",
+    "   ",
+    undefined,
+    "abc",
+    m.assinatura.slice(0, -2), // padding removed
+    `${m.assinatura.slice(0, 40)}*${m.assinatura.slice(41)}`, // a character Node's decoder would skip
+    bin.subarray(0, 63).toString("base64"),
+    Buffer.concat([bin, Buffer.from([0])]).toString("base64"),
+  ]) {
+    const r = release.verificarManifesto(m.bytes, ruim);
+    assert.equal(r.ok, false, JSON.stringify(ruim));
+    assert.match(r.motivo, /assinatura malformada/);
+  }
+  // Well formed, but not over these bytes.
+  const outro = Buffer.from(bin);
+  outro[10] ^= 0x01;
+  assert.match(release.verificarManifesto(m.bytes, outro.toString("base64")).motivo, /não confere/);
+});
+
+test("any change to the signed bytes invalidates the manifest, reformatting included", (t) => {
+  const chaves = parDeChaves();
+  const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+
+  const m = assinado(chaves, manifestoDe({ versao: "2.0.0", artefatos: [ARTEFATO] }));
+  const texto = m.bytes.toString("utf8");
+  for (const alterado of [
+    texto.replace('"2.0.0"', '"2.0.1"'),
+    texto.replace(ARTEFATO.sha256, "b".repeat(64)),
+    JSON.stringify(JSON.parse(texto)),
+    `${texto}\n`,
+  ]) {
+    const r = release.verificarManifesto(Buffer.from(alterado, "utf8"), m.assinatura);
+    assert.equal(r.ok, false);
+    assert.match(r.motivo, /não confere/);
+  }
+});
+
+test("a manifest with two artifacts for one target is refused", (t) => {
+  const chaves = parDeChaves();
+  const amb = ajuda.ambiente({ env: { CONSOLE_CHAVE_RELEASE: chaves.publicaB64 } });
+  t.after(() => amb.restaurar());
+  const release = require(path.join(ajuda.RAIZ, "src", "release.js"));
+
+  const m = assinado(chaves, manifestoDe({ versao: "2.0.0", artefatos: [ARTEFATO, { ...ARTEFATO, arquivo: "b.tar.gz" }] }));
+  assert.match(release.verificarManifesto(m.bytes, m.assinatura).motivo, /dois artefatos para linux-x64/);
 });
 
 // --- Extraction -------------------------------------------------------------------------------
@@ -538,7 +712,8 @@ test("the status distinguishes installed, published and stale observation", asyn
   const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
 
   const s = await atualizador.situacao({ consultarRede: false });
-  assert.equal(s.confiancaConfigurada, false, "no production key in this repository");
+  assert.equal(s.confiancaConfigurada, true, "installed copies carry the publishing key");
+  assert.ok(s.chavesDePublicacao.some((c) => c.origem === "embutida" && /^ed25519:[0-9a-f]{16}$/.test(c.id)));
   assert.equal(s.versaoAtivaRegistrada, "1.0.0");
   assert.ok(s.alvo.includes(process.arch));
   assert.match(s.observacaoDeDistribuicao, /independente do commit do RemoteIFES/);

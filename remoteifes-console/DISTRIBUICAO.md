@@ -198,7 +198,18 @@ mundos. Há regressão cobrindo esse caminho.
 ## 5. Confiança da atualização
 
 A raiz de confiança é uma **chave pública Ed25519 embutida no código** do console
-(`src/release.js`). Um release publicado é:
+(`src/release.js`). Toda cópia instalada já a traz e confere as publicações sozinha: instalar,
+iniciar, fazer o primeiro acesso ou implantar a aplicação não pede nenhuma etapa de chave. A chave
+privada existe só no fluxo do mantenedor de releases, fora do repositório e fora da CI.
+
+| Chave de publicação de produção | |
+|---|---|
+| Identificador | `ed25519:4769f1b1135c7719` |
+| Impressão SHA-256 (sobre o SPKI DER) | `4769f1b1135c7719b08ddc8f2e64294d91ecb88a38c0b0fe88c4a9c31b5d6ced` |
+
+A aba **Programa** mostra o identificador da chave que o console usa; ele tem de ser esse.
+
+Um release publicado é:
 
 ```
 remoteifes-console-<versão>-<plataforma>-<arch>.tar.gz     (artefato)
@@ -226,9 +237,74 @@ proveniência do GitHub são camadas complementares, não substitutas.
 Credenciais nunca acompanham redirecionamento: o download descarta o cabeçalho `Authorization`
 ao sair do host da API.
 
-Rotação de chave: o manifesto pode declarar `proximaChave`, assinada pela chave atual, e o
-console a aceita para o release seguinte. Downgrade só acontece por ação explícita de reversão,
-que usa a cópia local já verificada em `versoes/` e não a rede.
+Downgrade só acontece por ação explícita de reversão, que usa a cópia local já verificada em
+`versoes/` e não a rede.
+
+`CONSOLE_CHAVE_RELEASE` acrescenta uma âncora lida do ambiente do processo, para testes e
+homologação. Só quem controla o ambiente do console pode defini-la, e a aba **Programa** mostra a
+origem de cada chave (`embutida`, `ambiente` ou sucessora).
+
+### Assinar um release
+
+Na máquina do mantenedor, com a chave privada fora de qualquer checkout:
+
+```bash
+cd remoteifes-console
+node empacotar/construir.js --saida dist --formato payload \
+  --alvo linux-arm64,linux-arm,linux-x64,windows-x64,windows-arm64,macos-arm64,macos-x64
+node empacotar/conferir-proveniencia.js dist
+node empacotar/assinar-manifesto.js --manifesto dist/manifesto.json --chave <pasta-da-chave>/release-ed25519.privada.pem
+node empacotar/assinar-manifesto.js --verificar dist/manifesto.json dist/manifesto.json.sig
+```
+
+Um único `manifesto.json` lista todos os alvos, porque cada console baixa o mesmo manifesto e
+escolhe a sua entrada. Antes de gravar a assinatura, a ferramenta confere o que o console vai
+conferir depois: forma e validade do manifesto, tamanho e SHA-256 de cada artefato listado ao lado
+dele, e que a chave privada é a da chave pública embutida (ou a indicada em `--publica`). Uma
+assinatura que o console recusaria não chega a ser escrita. A verificação refaz o caminho do
+console: assinatura, estrutura e digest de cada artefato presente.
+
+Publique `manifesto.json`, `manifesto.json.sig` e os `.tar.gz` como arquivos do release. O console
+consulta `releases/latest/download`, então a publicação do console precisa ser o release mais
+recente do repositório. Enquanto nenhuma existir, a aba **Programa** informa que não há publicação,
+e atualizar é reinstalar o pacote.
+
+A CI não assina nada com a chave de produção. Os testes geram pares descartáveis e cobrem
+assinatura, verificação, artefato e manifesto adulterados, chave errada, assinatura malformada e
+rotação (`test/release-signing.test.js`, `test/updater.test.js`, `test/packaging.test.js`).
+
+### Guarda e cópia da chave privada
+
+`--gerar-chave` recusa pasta dentro de um checkout e nunca grava por cima de uma chave existente.
+A chave fica legível só pelo usuário (modo `0600`; no Windows, ACL só do usuário atual). Mantenha
+uma cópia **cifrada** fora da máquina do mantenedor, por exemplo um arquivo cifrado com senha em
+duas mídias offline guardadas em lugares diferentes, ou um cofre de senhas. Ela nunca vai para o
+repositório, para artefato, variável ou segredo da CI, nem para nuvem sem cifragem.
+
+### Rotação
+
+1. Gere a sucessora com `--gerar-chave` em outra pasta.
+2. No release de transição, embuta a sucessora em `CHAVE_PUBLICA_OFICIAL`, para que instalações
+   novas já nasçam confiando nela. Construa com `--proxima-chave <sucessora>.b64` e assine com a
+   chave **atual**, passando `--publica <atual>.b64`.
+3. Um console que verifica esse manifesto passa a aceitar a sucessora, vinculada à âncora que a
+   anunciou. A primeira publicação assinada pela sucessora **aposenta** a chave anterior nele: a
+   partir daí ela não confere mais nada ali, nem pode voltar como sucessora.
+4. Mantenha o release de transição disponível e dentro da validade enquanto houver consoles que
+   ainda não o viram. Um console que pule a transição inteira volta a receber releases depois de
+   reinstalar o pacote.
+
+### Perda ou comprometimento da chave
+
+Não existe desvio: nenhum manifesto é aceito sem a assinatura de uma chave confiável, e nenhuma
+opção da interface, do ambiente de produção ou do instalador relaxa isso.
+
+* **Chave perdida** (sem vazamento): gere um par novo, embuta a pública num pacote novo e reinstale
+  o console em cada host com esse pacote. É a instalação normal: estado, operadores e auditoria
+  ficam. Dali em diante os releases assinados pela chave nova chegam sozinhos.
+* **Chave comprometida**: o mesmo caminho, e retire do GitHub o release publicado com ela. A
+  reinstalação também é o que remove a confiança: as sucessoras que uma chave anunciou ficam
+  vinculadas a ela e deixam de contar quando o pacote instalado embute outra chave.
 
 ### Host sem Internet
 
