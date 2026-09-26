@@ -58,7 +58,7 @@ test("the vectors use a deviceId the server accepts and a key length the cipher 
   const nonce = Buffer.alloc(12);
   nonce[0] = DIRECAO.no;
   nonce.writeBigUInt64BE(BigInt(VETORES.quadroDoNo.seq), 4);
-  const decifra = crypto.createDecipheriv("aes-256-gcm", Buffer.from(VETORES.chaveSessao, "hex"), nonce);
+  const decifra = crypto.createDecipheriv("aes-256-gcm", Buffer.from(VETORES.chaveSessao, "hex"), nonce, { authTagLength: 16 });
   decifra.setAAD(Buffer.from(VETORES.no));
   decifra.setAuthTag(Buffer.from(VETORES.quadroDoNo.tag, "base64url"));
   const claro = Buffer.concat([decifra.update(Buffer.from(VETORES.quadroDoNo.dados, "base64url")), decifra.final()]);

@@ -97,6 +97,8 @@ where nothing is wrong:
 
 * AES-256-GCM with key `Ks`; nonce (12 bytes) = direction byte (`0x01` server→node, `0x02`
   node→server), three zero bytes, `seq` as unsigned 64-bit big endian; AAD = the node's deviceId.
+* The tag is always the full 16 bytes: both sides refuse a shorter one, which GCM would otherwise
+  check as a prefix (a 4-byte tag would leave 2^-32 odds of forging a frame).
 * `seq` starts at 1 per direction per session and strictly increases. A frame with `seq` not greater
   than the last accepted one is a replay or duplicate: counted, never processed. A frame that fails
   authentication is counted as rejected.
