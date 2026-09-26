@@ -9,7 +9,7 @@ documentation (pt-BR) is in the main README, section "Rede mesh opcional e topol
 | Part | State |
 |---|---|
 | Transport boundary in the server (`deviceHub` channels: direct or mesh) | implemented |
-| Mesh protocol v1, server side (`remoteifes-server/src/services/meshService.js`) | implemented, covered by protocol tests |
+| Mesh protocol v1, server side (`remoteifes-server/src/services/meshService.js`) | implemented; covered by host-side protocol and adversarial tests (see [Host-side validation](#host-side-validation)) |
 | Reference implementation of the board side (`remoteifes-server/test/support/mesh-reference.js`) | implemented; drives the server tests and the topology E2E test |
 | Topology view (Administração › Status › Topologia) and `GET /admin/topologia` | implemented |
 | Firmware: protocol and crypto (`src/mesh_protocolo.cpp`) | implemented; compiled for the host and run against the server's own vectors (`test/mesh-protocol.test.js`) |
@@ -80,6 +80,17 @@ A wrong proof, an expired challenge (15 s), an unknown or revoked credential, or
 handshakes produce `{ "tipo": "mesh_recusado", "no", "motivo" }` to the gateway and nothing else.
 A proof made with the pending generation activates the rotation, as a direct connection would.
 
+The node drops what it has and waits 30 s after a `mesh_recusado`, so the server does not send one
+where nothing is wrong:
+
+* When the node already holds a session through that gateway, a copy of the answer that opened it
+  (duplicated or delayed on the way) is counted as a duplicate, and a wrong proof is counted as
+  rejected. Neither closes the session, and no refusal is sent.
+* A repeated announcement replaces the pending challenge, but the answer to one of the two
+  challenges it replaced, while still valid, is recognised as late and dropped: the current
+  challenge stays open. A node announcing again while its own challenge is pending does not count
+  against the pending-handshake bound.
+
 ### Data frames
 
 `{ "t": "dados", "seq": n, "dados": base64url(ciphertext), "tag": base64url(16-byte GCM tag) }`
@@ -96,7 +107,10 @@ A proof made with the pending generation activates the rotation, as a direct con
 ### Route metadata
 
 `rota` (`pai`, `saltos` 1–15, `rssi`) is supplied by the gateway on events and frames. It feeds the
-topology view only (hop count, parent, route changes) and is never used for authorization.
+topology view only (hop count, parent, route changes) and is never used for authorization. Values
+outside those bounds are ignored. While a node has a session, only the gateway that session goes
+through updates its route: another gateway announcing the node starts a new handshake (a move), and
+frames through the old gateway are refused once the node has moved.
 
 ### Bounds
 
@@ -106,7 +120,7 @@ topology view only (hop count, parent, route changes) and is never used for auth
 | Pending handshakes per gateway | 8 (challenge valid 15 s) |
 | Queued downlink frames per node | 8; a newer `send_known_state` replaces an unacknowledged older one |
 | Retransmissions of an unacknowledged frame | 2 (every 3 s), then counted as a failed delivery |
-| Node without news | unreachable after 90 s; the room goes offline |
+| Node without news | unreachable 90 s after its last authenticated frame (handshake or data); gateway events and frames that fail authentication do not count; the room goes offline |
 | Topology cache | 256 observed nodes; unreachable ones dropped after 10 min |
 | Gateway message budget | 120 per 10 s plus 120 per authenticated node, capped at 2 400 |
 
@@ -199,11 +213,33 @@ deviceId, and the server's challenge does not carry it, so the relaying gateway 
 identity in the envelope it sends down the mesh. Trusting it costs nothing: a wrong value only
 produces a proof the server refuses. The sealed frame inside the envelope is never touched.
 
-### What is still pending
+## Host-side validation
 
-Hardware. The protocol is verified by a host test against the server's vectors, and the radio
-integration is verified only by compiling and linking. Joining, parent changes, root loss, temporary
-partitions, credential rotation over the mesh, range and reliability all need real boards.
+What runs without boards, and what it shows. Gateways and nodes are simulated at the protocol level
+(`remoteifes-server/test/support/bancada-dispositivos.js` and `mesh-reference.js`); the firmware's own
+protocol module is compiled for the host.
+
+| Area | Covered by | What is exercised |
+|---|---|---|
+| Crypto and framing, both sides | `test/mesh-protocol.test.js` (firmware, host build), `remoteifes-server/test/mesh-vectors.test.js` | the firmware's `mesh_protocolo.cpp` reproduces the server's proofs and sealed frames byte for byte |
+| Topology | `remoteifes-server/test/mesh-adversarial.test.js`, `mesh-transport.test.js`, `device-fault-injection.test.js` | several gateways with several nodes, hop counts up to 15, parent and route changes, a node moving between gateways, duplicate announcements, node, gateway and server restarts, node and gateway disappearance |
+| Authentication | same | unknown, wrong and revoked credentials; the pending generation activated only by its own proof; the previous generation during its grace and refused after it; an expired challenge; a proof relayed through another gateway; duplicated, late and superseded answers |
+| Frame security | same | modified ciphertext and tag, truncated and oversized frames, missing tag, invalid sequence numbers, authentic encryption of a non-message, a server frame reflected back upstream, replays, duplicates and old sequence numbers |
+| Bounds and cleanup | same, plus `remoteifes-server/test/device-soak-smoke.test.js` and `npm run ensaio` | pending handshakes, nodes per gateway, queued frames, the topology cache under an announcement flood, cleanup after a disconnect, after a challenge expires and after 90 s without an authenticated frame; repeated churn cycles returning the server to its baseline |
+| Gateway abuse | same | a gateway cannot forge or relay another node's authentication, activate its credential, read its payload, replay its frames, rewrite the route of a node it does not serve, or keep a departed node online |
+
+## Not validated without hardware
+
+None of the above involves an ESP32 radio. These remain unvalidated until real boards are tested:
+
+* RF range;
+* radio interference;
+* real parent and root election;
+* real radio recovery (self-healing after a parent or root loss, temporary partitions);
+* real multi-hop stability;
+* real RF latency;
+* the firmware's gateway relay and node state machines on real boards, including credential
+  rotation over the mesh (compiled and linked only).
 
 ## OTA over the mesh
 
