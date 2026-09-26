@@ -232,6 +232,15 @@ async function executarEnsaio({ log = () => {} } = {}) {
       return { codigosDeSaida: resultados };
     });
 
+    await cenario("a restauração é recusada com o servidor em funcionamento", async () => {
+      // The server is up here: swapping its database under it would lose what it writes next.
+      const r = cli(servidor, "restore-backup.js", [backup, "--sim"]);
+      if (r.codigo === 0) throw new Error("a restauração foi feita com o servidor no ar");
+      if (!/está respondendo/.test(r.saida)) throw new Error(`a recusa não disse por quê: ${r.saida.slice(-300)}`);
+      if (fs.existsSync(`${db}.restauracao`)) throw new Error("a recusa deixou o marcador de restauração");
+      return verificarEmFuncionamento(servidor, bancada, sistema);
+    });
+
     await cenario("o marcador de restauração impede o servidor de abrir o banco, e um marcador órfão não", async () => {
       await servidor.parar();
       const marcador = `${db}.restauracao`;
@@ -257,7 +266,7 @@ async function executarEnsaio({ log = () => {} } = {}) {
     await bancada.encerrar().catch(() => {});
     await servidor.encerrar().catch(() => {});
   }
-  return { ok: cenarios.length >= 5 && cenarios.every((c) => c.ok), duracaoS: Math.round((Date.now() - inicio) / 1000), cenarios };
+  return { ok: cenarios.length >= 6 && cenarios.every((c) => c.ok), duracaoS: Math.round((Date.now() - inicio) / 1000), cenarios };
 }
 
 if (require.main === module) {

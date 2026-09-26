@@ -401,6 +401,26 @@ test("tampered, truncated, malformed, oversized and reflected frames are rejecte
   await ate(() => comandosLocais(no.sala).includes("valido"));
 });
 
+test("a sealed frame whose authentication tag was truncated is rejected", async (t) => {
+  const b = bancada(t);
+  const { gateway, nos } = await malha(b, 1);
+  const [no] = nos;
+  const id = no.credencial.deviceId;
+  // AES-GCM verifies a shortened tag as a prefix unless the tag length is fixed: a 4-byte tag would
+  // leave a relaying gateway 2^-32 odds per forged frame instead of 2^-128.
+  const quadro = no.ref.selar({ tipo: "comando", cmd: "tag-truncada", valor: 1 });
+  const antes = topo(id).rejeitados;
+  for (const bytes of [4, 8, 12]) {
+    const curta = Buffer.from(quadro.tag, "base64url").subarray(0, bytes).toString("base64url");
+    gateway.enviar({ tipo: "mesh", no: id, quadro: { ...quadro, tag: curta }, rota: gateway.rota });
+  }
+  await ate(() => topo(id).rejeitados >= antes + 3, { descricao: "truncated tags rejected" });
+  assert.ok(!comandosLocais(no.sala).includes("tag-truncada"));
+  // The same frame with its full tag is still accepted: the rejections consumed nothing.
+  gateway.enviar({ tipo: "mesh", no: id, quadro, rota: gateway.rota });
+  await ate(() => comandosLocais(no.sala).includes("tag-truncada"));
+});
+
 test("replayed, duplicated and old sequence numbers are counted and processed at most once", async (t) => {
   const b = bancada(t);
   const { gateway, nos } = await malha(b, 1);
