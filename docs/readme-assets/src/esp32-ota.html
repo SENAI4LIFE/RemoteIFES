@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>esp32-ota</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  /* Source: remoteifes-esp32/src/main.ino (iniciarOtaOferta, verificarValidacaoOta,
+     OTA_SELFTEST_TIMEOUT_MS, reportarOtaValidado) and remoteifes-server/src/services/otaService.js
+     (fases, OTA_TIMEOUT_*). Slot A is whichever slot runs before the update. */
+  .cab, .etapa { display: grid; grid-template-columns: 178px 1fr 134px; column-gap: 14px; align-items: center; }
+  .cab { margin-bottom: 8px; padding: 0 2px; }
+  .cab > div { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--texto-fraco); }
+  .cab .modulo { width: 34px; height: 34px; }
+  .cab > div:last-child { justify-content: flex-start; }
+  .etapas { display: flex; flex-direction: column; gap: 10px; }
+  .etapa { padding: 8px 10px; }
+  .etapa.cartao { display: grid; border-left-width: 4px; }
+  .flash { display: flex; flex-direction: column; gap: 4px; }
+  .slot {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; line-height: 1.2; padding: 4px 7px;
+    border-radius: 6px; border: 1px solid var(--cartao-borda);
+    background: var(--neutro-suave); color: var(--texto-fraco);
+  }
+  .slot b { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 11px; color: var(--texto); }
+  .slot.roda { background: var(--verde-suave); border-color: color-mix(in srgb, var(--verde) 55%, transparent); color: var(--texto); }
+  .slot.grava { background: var(--ambar-suave); border: 1px dashed var(--ambar); color: var(--texto); }
+  .slot.boot { background: var(--azul-suave); border-color: color-mix(in srgb, var(--azul) 55%, transparent); color: var(--texto); }
+  .slot.invalida { background: var(--critico-suave); border-color: color-mix(in srgb, var(--critico) 55%, transparent); color: var(--texto); }
+  .texto .titulo { font-size: 14px; display: flex; align-items: center; gap: 7px; }
+  .texto .sub { font-size: 12px; line-height: 1.32; margin-top: 2px; }
+  .n {
+    display: inline-grid; place-items: center; flex: 0 0 auto;
+    width: 20px; height: 20px; border-radius: 50%;
+    font-size: 11.5px; font-weight: 700; color: var(--cartao); background: var(--tom);
+  }
+  .fase { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .fase .pilula { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-weight: 700; font-size: 11.5px; }
+  .desfechos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+  .desfecho { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 9px 11px; }
+  .desfecho .linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .desfecho .flash { flex-direction: row; }
+  .desfecho .slot { flex: 1; }
+  .prazos { margin-top: 14px; font-size: 12px; color: var(--texto-fraco); }
+  .prazos b { color: var(--texto); font-weight: 650; }
+</style>
+</head>
+<body>
+<div id="tela">
+  <div class="cab">
+    <div><img class="modulo" src="../modules/esp32.png" alt="">ESP32 · slots</div>
+    <div>O que acontece</div>
+    <div><img class="modulo" src="../modules/server.png" alt="">Fase no servidor</div>
+  </div>
+
+  <div class="etapas">
+    <div class="cartao tom-azul etapa" id="e1">
+      <div class="flash"><span class="slot roda"><b>A</b> versão atual · em uso</span><span class="slot"><b>B</b> ocioso</span></div>
+      <div class="texto"><div class="titulo"><span class="n">1</span>Oferta pelo WebSocket</div><div class="sub">versão, tamanho, SHA&#8209;256 e tentativa. A placa recusa se já estiver atualizando, em modo de configuração, conectada pela malha, sem Wi&#8209;Fi, com versão menor ou imagem maior que o slot.</div></div>
+      <div class="fase"><span class="pilula tom-azul">ofertado</span></div>
+    </div>
+    <div class="cartao tom-ambar etapa" id="e2">
+      <div class="flash"><span class="slot roda"><b>A</b> versão atual · em uso</span><span class="slot grava"><b>B</b> gravando a nova</span></div>
+      <div class="texto"><div class="titulo"><span class="n">2</span>Download e gravação no slot ocioso</div><div class="sub">baixa /dispositivo/firmware com a própria autenticação e calcula o SHA&#8209;256 enquanto grava. Hash ou tamanho divergente: aborta, e A segue em uso.</div></div>
+      <div class="fase"><span class="pilula tom-ambar">baixando</span></div>
+    </div>
+    <div class="cartao tom-azul etapa" id="e3">
+      <div class="flash"><span class="slot"><b>A</b> versão atual</span><span class="slot boot"><b>B</b> nova · próximo boot</span></div>
+      <div class="texto"><div class="titulo"><span class="n">3</span>Troca do slot de boot e reinício</div><div class="sub">a imagem conferida passa a ser a de boot; a tentativa e o SHA&#8209;256 ficam na NVS.</div></div>
+      <div class="fase"><span class="pilula tom-azul">gravado</span><span class="pilula tom-azul">reiniciando</span></div>
+    </div>
+    <div class="cartao tom-azul etapa" id="e4">
+      <div class="flash"><span class="slot"><b>A</b> versão atual</span><span class="slot boot"><b>B</b> nova · em uso, a validar</span></div>
+      <div class="texto"><div class="titulo"><span class="n">4</span>Autoteste em até 90 s</div><div class="sub">LittleFS montado, Wi&#8209;Fi (ou a malha) e canal com o servidor aberto. A placa reconecta já com a versão nova.</div></div>
+      <div class="fase"><span class="pilula tom-azul">validando</span></div>
+    </div>
+  </div>
+
+  <div class="desfechos">
+    <div class="cartao tom-verde desfecho" id="ok">
+      <div class="linha"><div class="titulo">Passou</div><span class="pilula tom-verde" style="font-family:ui-monospace,Consolas,monospace">concluido</span></div>
+      <div class="flash"><span class="slot"><b>A</b> ocioso</span><span class="slot roda"><b>B</b> nova · válida</span></div>
+      <div class="sub">a placa marca a imagem como válida e envia ota_validado com a tentativa, o SHA&#8209;256 e a versão.</div>
+    </div>
+    <div class="cartao tom-critico desfecho" id="falha">
+      <div class="linha"><div class="titulo">Não passou</div><span class="pilula tom-critico" style="font-family:ui-monospace,Consolas,monospace">falhou · rollback</span></div>
+      <div class="flash"><span class="slot roda"><b>A</b> versão atual · em uso</span><span class="slot invalida"><b>B</b> inválida</span></div>
+      <div class="sub">a placa marca a imagem como inválida e reinicia no slot anterior; o servidor vê a versão antiga voltar.</div>
+    </div>
+  </div>
+
+  <div class="prazos"><b>Prazos do servidor:</b> 4 min para a transferência, 3 min para a placa voltar depois de gravar e 4 min para a evidência de boot. Estourado um prazo, a OTA fica como falha. Evidência de boot: firmware 4.2.0 ou mais novo.</div>
+</div>
+<script src="conectores.js"></script>
+<script>
+  window.CONECTORES = [
+    { de: "#e4", para: "#ok", lados: ["base", "topo"], em: [0.25], reto: true, tom: "verde" },
+    { de: "#e4", para: "#falha", lados: ["base", "topo"], em: [0.75], reto: true, tom: "critico" },
+  ];
+</script>
+</body>
+</html>

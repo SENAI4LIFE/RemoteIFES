@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ir-cloning</title>
+<link rel="stylesheet" href="tema.css">
+<style>
+  /* Source: remoteifes-server/src/routes/protocolosIrRoutes.js (clonador, modo clone, salvar,
+     failsafe, aplicar), services/deviceHub.js (MAX_CAPTURAS_ARMAZENADAS), services/
+     protocolosIrService.js (isKnown), remoteifes-esp32/src/main.ino (captura, failsafe na NVS). */
+  .fluxo { display: grid; grid-template-columns: 188px 212px 1fr; grid-template-rows: auto auto; column-gap: 62px; row-gap: 34px; align-items: center; }
+  .placa { padding: 6px 10px 6px 6px; gap: 6px; }
+  .pecas { display: flex; align-items: flex-end; flex: 0 0 auto; }
+  .pecas .modulo { width: 46px; height: 46px; }
+  .pecas .modulo.p { width: 26px; height: 26px; margin-left: -4px; }
+  .placa .titulo { white-space: nowrap; }
+  .placa .titulo, .externo .titulo { font-size: 14px; }
+  .placa .sub, .externo .sub { font-size: 11.5px; line-height: 1.3; }
+  .externo { padding: 6px 10px 6px 6px; }
+  .externo .modulo { width: 44px; height: 44px; }
+  .externo .titulo { white-space: nowrap; }
+  #controle { grid-column: 1; grid-row: 1; }
+  #clonadora { grid-column: 2; grid-row: 1; }
+  #ac { grid-column: 1; grid-row: 2; }
+  #sala { grid-column: 2; grid-row: 2; }
+  #biblioteca {
+    grid-column: 3; grid-row: 1 / span 2;
+    flex-direction: column; align-items: stretch; gap: 8px;
+    padding: 10px 12px 12px;
+  }
+  #biblioteca .cabeca { display: flex; align-items: center; gap: 10px; }
+  #biblioteca .modulo { width: 46px; height: 46px; }
+  #biblioteca ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  #biblioteca li {
+    font-size: 12px; line-height: 1.32; color: var(--texto);
+    padding: 6px 8px; border-radius: 8px;
+    background: var(--tom-suave); border: 1px solid color-mix(in srgb, var(--tom) 25%, transparent);
+  }
+  #biblioteca li b { color: var(--tom); }
+  .notas { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+  .notas .pilula { font-size: 12px; padding: 4px 10px; white-space: normal; border-radius: 10px; }
+</style>
+</head>
+<body>
+<div id="tela">
+  <div class="fluxo">
+    <div class="cartao fora externo" id="controle">
+      <img class="modulo" src="../modules/remote-control.png" alt="">
+      <div><div class="titulo">Controle original</div><div class="sub">do próprio aparelho</div></div>
+    </div>
+    <div class="cartao tom-ambar placa" id="clonadora">
+      <span class="pecas"><img class="modulo" src="../modules/esp32.png" alt=""><img class="modulo p" src="../modules/ir-receiver.png" alt=""></span>
+      <div><div class="titulo">ESP32 clonadora</div><div class="sub">a única com receptor IR; no modo clone, captura sem parar</div></div>
+    </div>
+
+    <div class="cartao tom-verde" id="biblioteca">
+      <div class="cabeca">
+        <img class="modulo" src="../modules/database.png" alt="">
+        <div><div class="titulo">Biblioteca IR</div><div class="sub">no servidor, tabela protocolos_ir</div></div>
+      </div>
+      <ul>
+        <li>guarda as <b>20 capturas</b> recentes da clonadora</li>
+        <li><b>salvar</b> dá nome à captura; o navegador manda o id, nunca o RAW</li>
+        <li><b>failsafe OFF</b>: a captura do botão de desligar, anexada ao protocolo</li>
+        <li>só protocolo <b>reconhecido</b> vira protocolo da sala; RAW genérico é só testado e retransmitido</li>
+      </ul>
+    </div>
+
+    <div class="cartao fora externo" id="ac">
+      <img class="modulo" src="../modules/air-conditioner.png" alt="">
+      <div><div class="titulo">Ar-condicionado</div><div class="sub">não é medido</div></div>
+    </div>
+    <div class="cartao tom-petroleo placa" id="sala">
+      <span class="pecas"><img class="modulo" src="../modules/esp32.png" alt=""><img class="modulo p" src="../modules/ir-led.png" alt=""></span>
+      <div><div class="titulo">ESP32 da sala</div><div class="sub">transmite pelo protocolo aplicado; guarda o failsafe OFF na NVS</div></div>
+    </div>
+  </div>
+
+  <div class="notas">
+    <span class="pilula tom-petroleo"><svg class="ic p"><use href="#i-power"/></svg>botão da placa por 5 s: transmite o failsafe OFF da NVS, sem servidor nem Wi-Fi</span>
+    <span class="pilula tom-ambar"><svg class="ic p"><use href="#i-aviso"/></svg>clonagem só pelo Wi-Fi direto, nunca pela malha</span>
+  </div>
+</div>
+<script src="conectores.js"></script>
+<script>
+  window.CONECTORES = [
+    { de: "#controle", para: "#clonadora", lados: ["direita", "esquerda"], reto: true, estilo: "radio", tom: "ambar", rotulo: "IR", noRotulo: 0.5, desvioRotulo: [0, -13] },
+    { de: "#clonadora", para: "#biblioteca", lados: ["direita", "esquerda"], reto: true, tom: "ambar", rotulo: "captura", noRotulo: 0.5, desvioRotulo: [0, -13] },
+    { de: "#sala", para: "#biblioteca", lados: ["direita", "esquerda"], reto: true, pontas: "inicio", tom: "petroleo", rotulo: "aplicar", noRotulo: 0.5, desvioRotulo: [0, -13] },
+    { de: "#sala", para: "#ac", lados: ["esquerda", "direita"], reto: true, estilo: "radio", tom: "petroleo", rotulo: "IR", noRotulo: 0.5, desvioRotulo: [0, -13] },
+  ];
+</script>
+</body>
+</html>

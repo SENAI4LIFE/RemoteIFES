@@ -10,7 +10,8 @@
 //   pontas         "fim" | "inicio" | "ambas" | "nenhuma" (default "fim")
 //   tom            name of a tone variable: "verde", "azul", "petroleo", ... (default: --linha)
 //   eixo           fixed x (horizontal sides) or y (vertical sides) of the bend, in figure px
-//   reto           vertical sides only: end directly above/below the start (a straight line)
+//   reto           end level with the start: directly above/below it on vertical sides, at the same
+//                  height on horizontal sides (a straight line)
 //   rotulo         text placed on the path, at fraction `noRotulo` of its length (default 0.5)
 (function () {
   const NS = "http://www.w3.org/2000/svg";
@@ -118,7 +119,10 @@
       const [emA, emB] = c.em || [];
       const a = ancora(tela, de, ladoA, emA);
       const b = ancora(tela, para, ladoB, emB);
-      if (c.reto) b.x = a.x;
+      if (c.reto) {
+        if (a.dir[1] === 0) b.y = a.y;
+        else b.x = a.x;
+      }
       const pts = rota(a, b, c.eixo);
       const cor = c.tom ? `var(--${c.tom})` : "var(--linha)";
       const pontas = c.pontas || "fim";
