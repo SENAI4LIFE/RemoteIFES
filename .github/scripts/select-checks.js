@@ -43,7 +43,7 @@ const E2E_TARGETS = [
   { os: "macos-latest", browser: "chromium", channel: "chrome", shards: 3 },
 ];
 
-const JOBS = ["server", "console", "packages", "e2e", "safari", "cordova", "firmware", "android", "ios"];
+const JOBS = ["server", "console", "packages", "deployment", "e2e", "safari", "cordova", "firmware", "android", "ios"];
 
 function classify(paths) {
   const areas = new Set();
@@ -90,6 +90,8 @@ function selectChecks({ areas, fullDepth, allScope }) {
     server: serverChanged ? ALL_OS : serverContracts ? ["ubuntu-latest"] : [],
     console: consoleChanged || serverChanged ? ALL_OS : [],
     packages: consoleChanged ? ALL_OS : [],
+    // Installs the server and the Console package on a disposable systemd host (Linux only).
+    deployment: serverChanged || consoleChanged,
     e2e: frontend ? e2eMatrix(e2eFull) : [],
     safari: (frontend && e2eFull) || has("safari"),
     cordova: mobile ? CORDOVA_OS : [],
@@ -201,6 +203,7 @@ function writeOutputs(plan, outputFile) {
     `server_os=${JSON.stringify(plan.jobs.server)}`,
     `console_os=${JSON.stringify(plan.jobs.console)}`,
     `packages_os=${JSON.stringify(plan.jobs.packages)}`,
+    `deployment=${plan.jobs.deployment}`,
     `e2e_matrix=${JSON.stringify(plan.jobs.e2e)}`,
     `cordova_os=${JSON.stringify(plan.jobs.cordova)}`,
     `safari=${plan.jobs.safari}`,

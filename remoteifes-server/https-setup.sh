@@ -17,7 +17,9 @@ fi
 cd "$(dirname "$0")"
 
 if [ -f .env ]; then
-  PORTA=$(grep -E '^PORTA=' .env | cut -d '=' -f2)
+  # First definition only, without spaces or the carriage return of a .env saved on Windows: either
+  # would end up inside proxy_pass and fail the configuration test.
+  PORTA=$(grep -E '^PORTA=' .env | head -n1 | cut -d '=' -f2 | tr -d '[:space:]')
 fi
 PORTA=${PORTA:-8080}
 
