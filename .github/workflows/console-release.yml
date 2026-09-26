@@ -1,0 +1,234 @@
+name: Console release
+
+# Publishes the Operations Console for a `console-v<version>` tag.
+#
+# Installed Consoles accept a release only through the attestation the `attest` job makes: GitHub
+# Actions exchanges this run's OIDC identity for a short-lived Sigstore certificate naming this
+# workflow, the tag, the commit and the console-release environment, and the signature goes to the
+# public transparency log. remoteifes-console/src/atestacao.js pins each of those fields; no other
+# workflow, branch, tag pattern or repository satisfies it. No signing key exists: nothing to
+# create, store, back up or rotate. Releasing is pushing the tag.
+#
+# Every file of the release is attested, and the build is reproducible: the same commit is built on
+# Linux and on Windows and the files must be byte-identical before anything is attested. Only a tag
+# on a commit already on main becomes the latest release, which is what installed Consoles
+# discover; any other tag is published as a pre-release.
+
+on:
+  push:
+    tags: ["console-v*"]
+
+# Nothing by default: each job asks for what it needs, and only `attest` can mint an identity.
+permissions: {}
+
+concurrency:
+  group: console-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Console tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      # The backup and restore tests reuse backupService from the checkout.
+      - run: npm ci
+        working-directory: remoteifes-server
+      - run: npm ci
+        working-directory: remoteifes-console
+      - run: npm test
+        working-directory: remoteifes-console
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      # The same bytes on both systems: no line-ending conversion in the Windows checkout.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: The tag names the package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSAO=$(node -p "require('./remoteifes-console/package.json').version")
+          [ "$GITHUB_REF_NAME" = "console-v$VERSAO" ] || { echo "the tag $GITHUB_REF_NAME does not name the package version $VERSAO"; exit 1; }
+
+      - name: Provision NSIS (Windows installer)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $padrao = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if (-not (Get-Command makensis.exe -ErrorAction SilentlyContinue) -and -not (Test-Path $padrao)) {
+            choco install nsis -y --no-progress
+          }
+          if (Get-Command makensis.exe -ErrorAction SilentlyContinue) { exit 0 }
+          if (-not (Test-Path $padrao)) { throw "makensis not available after provisioning" }
+          "MAKENSIS=$padrao" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Production dependencies only: the payload carries them, and the build needs nothing else.
+      - run: npm ci --omit=dev
+        working-directory: remoteifes-console
+
+      - name: Build every target
+        shell: bash
+        working-directory: remoteifes-console
+        run: |
+          set -euo pipefail
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
+          node empacotar/construir.js --saida "$RUNNER_TEMP/dist" \
+            --alvo linux-x64,linux-arm64,linux-arm,windows-x64,windows-arm64,macos-x64,macos-arm64
+          node empacotar/conferir-proveniencia.js "$RUNNER_TEMP/dist"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            VERSAO=$(node -p "require('./package.json').version")
+            [ -f "$RUNNER_TEMP/dist/remoteifes-console-$VERSAO-windows-x64-instalador.exe" ] || { echo "the Windows installer was not built"; exit 1; }
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-${{ runner.os }}
+          path: ${{ runner.temp }}/dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # The only job that can obtain an OIDC identity, and it runs no repository code: it compares the
+  # two builds and attests the files.
+  attest:
+    name: Attest the release files
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: console-release
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-Linux
+          path: linux
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-Windows
+          path: dist
+
+      # Reproducibility: every file both systems build is byte-identical. proveniencia.json names
+      # the build system and so differs; the installer .exe is built only on Windows.
+      - name: The Linux and Windows builds are identical
+        run: |
+          set -euo pipefail
+          comparados=0
+          for arquivo in linux/*; do
+            nome=$(basename "$arquivo")
+            [ "$nome" = proveniencia.json ] && continue
+            cmp "$arquivo" "dist/$nome" || { echo "$nome differs between the Linux and Windows builds"; exit 1; }
+            comparados=$((comparados + 1))
+          done
+          for arquivo in dist/*; do
+            nome=$(basename "$arquivo")
+            case "$nome" in proveniencia.json|*-instalador.exe) continue ;; esac
+            [ -e "linux/$nome" ] || { echo "$nome was built only on Windows"; exit 1; }
+          done
+          echo "$comparados files identical"
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        id: attest
+        with:
+          subject-path: dist/*
+
+      - run: cp "${{ steps.attest.outputs.bundle-path }}" dist/atestacao.sigstore.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  # What an installed Console will do with this release, run with the Console's own code and a
+  # freshly refreshed Sigstore trusted root, before anything is published.
+  verify:
+    name: Verify as an installed Console
+    needs: attest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev
+        working-directory: remoteifes-console
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: dist
+      - run: node remoteifes-console/empacotar/conferir-atestacao.js dist
+        env:
+          CONSOLE_ESTADO_DIR: ${{ runner.temp }}/estado
+
+  publish:
+    name: Publish the GitHub release
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release
+          path: dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSAO="${TAG#console-v}"
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            TIPO=(--latest)
+          else
+            TIPO=(--prerelease --latest=false)
+          fi
+          cat > "$RUNNER_TEMP/notas.md" <<NOTAS
+          Console de Operações ${VERSAO}, construído do commit ${GITHUB_SHA}.
+
+          Os consoles instalados encontram, conferem e instalam esta versão sozinhos. A atestação de proveniência do GitHub (\`atestacao.sigstore.json\`) prova que cada arquivo foi construído pelo workflow de publicação deste repositório para esta etiqueta; nenhuma chave precisa ser configurada. Sem Internet, copie os arquivos deste release para uma pasta e use a importação offline descrita em \`remoteifes-console/DISTRIBUICAO.md\`.
+
+          Os executáveis do Windows e do macOS não têm assinatura de código da plataforma.
+          NOTAS
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Console de Operações $VERSAO" --notes-file "$RUNNER_TEMP/notas.md" "${TIPO[@]}"

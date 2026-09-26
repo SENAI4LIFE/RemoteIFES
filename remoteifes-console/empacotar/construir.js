@@ -12,7 +12,8 @@ const { listarDependencias } = require("../instalacao/dependencias");
 // Only formats CI can **build and install** on a real machine of the target system are produced.
 // MSI/WiX and a signed `.pkg` remain excluded: without signing credentials and a validation
 // environment they would ship an untested installer. The NSIS `.exe` is built because CI installs
-// and removes it on a real Windows runner; it is unsigned, and the provenance file says so.
+// and removes it on a real Windows runner; it has no Windows code signature, and the provenance
+// file says so.
 //
 //   payload .tar.gz   consumed by the release updater on every platform
 //   .deb              Linux with dpkg (CI installs and verifies)
@@ -23,12 +24,17 @@ const { listarDependencias } = require("../instalacao/dependencias");
 // layout must match the updater's extractor exactly.
 //
 // Usage:
-//   node empacotar/construir.js [--saida <dir>] [--alvo <so-arch>] [--formato payload|deb|zip|exe|todos]
+//   node empacotar/construir.js [--saida <dir>] [--alvo <so-arch>[,<so-arch>...]] [--formato payload|deb|zip|exe|todos]
 //                               [--commit <sha>]
 //
-// The manifest records the commit built (from Git, or --commit outside a checkout); the release
-// attestation must name the same commit. Payloads carry the production dependencies pinned by
-// package-lock.json, and nothing else from node_modules.
+// A release lists every target in one manifest, because each console fetches the same
+// `manifesto.json` and picks its own entry: `--alvo linux-arm64,linux-x64,windows-x64,...`. The
+// manifest records the commit built (from Git, or --commit outside a checkout); the release
+// workflow's attestation must name the same commit.
+//
+// The output is reproducible: with SOURCE_DATE_EPOCH set, the same commit produces the same bytes
+// on any system (the release workflow builds on Linux and on Windows and compares). Payloads carry
+// the production dependencies pinned by package-lock.json, and nothing else from node_modules.
 
 const RAIZ = path.join(__dirname, "..");
 const PACOTE = JSON.parse(fs.readFileSync(path.join(RAIZ, "package.json"), "utf8"));
@@ -41,6 +47,13 @@ const INCLUIR = ["console.js", "launcher.js", "package.json", "package-lock.json
 /** Everything a payload carries: INCLUIR plus the production dependencies. */
 function itensDoPayload(raiz = RAIZ) {
   return [...INCLUIR, ...listarDependencias(raiz)];
+}
+
+// Build time: SOURCE_DATE_EPOCH when set (the commit time, in the release workflow), so dates in
+// the manifest and the .deb do not make two builds of one commit differ.
+function momentoDaConstrucao() {
+  const epoca = Number(process.env.SOURCE_DATE_EPOCH);
+  return Number.isSafeInteger(epoca) && epoca > 0 ? new Date(epoca * 1000) : new Date();
 }
 
 function arg(nome, padrao = null) {
@@ -166,7 +179,12 @@ function montarTarGz(base, itens, { prefixo = "", extras = [] } = {}) {
     acrescentar(extra.nome, conteudo, extra.modo === undefined ? 0o644 : extra.modo);
   }
   blocos.push(Buffer.alloc(1024));
-  return zlib.gzipSync(Buffer.concat(blocos), { level: 9 });
+  const gz = zlib.gzipSync(Buffer.concat(blocos), { level: 9 });
+  // Byte 9 of the gzip header names the operating system zlib was built for (3 on Unix, 10 on
+  // Windows), so the same tree compressed on two systems would differ in one byte. It is set to
+  // 255, "unknown" (RFC 1952); the header is outside the CRC, and no reader uses the field.
+  gz[9] = 0xff;
+  return gz;
 }
 
 // --- zip ------------------------------------------------------------------------------------
@@ -364,7 +382,7 @@ function montarDeb(saida) {
   const membro = (nome, conteudo) => {
     const cab = Buffer.alloc(60, 0x20);
     cab.write(nome.padEnd(16), 0);
-    cab.write(String(Math.floor(Date.now() / 1000)).padEnd(12), 16);
+    cab.write(String(Math.floor(momentoDaConstrucao().getTime() / 1000)).padEnd(12), 16);
     cab.write("0".padEnd(6), 28);
     cab.write("0".padEnd(6), 34);
     cab.write("100644".padEnd(8), 40);
@@ -488,66 +506,75 @@ function main() {
   const saida = path.resolve(arg("saida", path.join(RAIZ, "dist")));
   const formato = arg("formato", "todos");
   const so = { win32: "windows", darwin: "macos", linux: "linux" }[process.platform] || process.platform;
-  const alvo = arg("alvo", `${so}-${process.arch}`);
+  const alvos = [...new Set(arg("alvo", `${so}-${process.arch}`).split(",").map((a) => a.trim()).filter(Boolean))];
+  const invalido = alvos.find((a) => !/^[a-z0-9]+-[a-z0-9]+$/.test(a));
+  if (invalido || !alvos.length) throw new Error(`alvo inválido: ${invalido || "(vazio)"}`);
 
   fs.mkdirSync(saida, { recursive: true });
-  log(`Construindo Console de Operações ${VERSAO} para ${alvo}`);
+  log(`Construindo Console de Operações ${VERSAO} para ${alvos.join(", ")}`);
 
   const commit = arg("commit", commitDoCheckout());
   if (!/^[0-9a-f]{40}$/.test(String(commit || ""))) {
     throw new Error("sem o commit construído: rode dentro de um checkout Git ou informe --commit <sha de 40 caracteres>");
   }
+  const momento = momentoDaConstrucao().toISOString();
 
   const artefatos = [];
-
-  // Payload: what the release updater consumes, on every platform.
-  const nomePayload = `remoteifes-console-${VERSAO}-${alvo}.tar.gz`;
-  const caminhoPayload = path.join(saida, nomePayload);
+  // The payload is platform independent: it is assembled once and written once per target name.
   const payload = montarTarGz(RAIZ, itensDoPayload());
-  fs.writeFileSync(caminhoPayload, payload);
-  artefatos.push({ alvo, formato: "tar.gz", arquivo: nomePayload, caminho: caminhoPayload });
-  log(`  payload: ${nomePayload} (${(payload.length / 1024).toFixed(0)} KiB)`);
+  let debFeito = false;
 
-  if (["todos", "zip"].includes(formato) && alvo.startsWith("windows")) {
-    const nomeZip = `remoteifes-console-${VERSAO}-${alvo}.zip`;
-    const caminhoZip = path.join(saida, nomeZip);
-    fs.writeFileSync(caminhoZip, montarZip(RAIZ, [...itensDoPayload(), "instalar.ps1"].filter((i) => fs.existsSync(path.join(RAIZ, i)))));
-    artefatos.push({ alvo, formato: "zip", arquivo: nomeZip, caminho: caminhoZip });
-    log(`  zip: ${nomeZip}`);
-  }
+  for (const alvo of alvos) {
+    // Payload: what the release updater consumes, on every platform.
+    const nomePayload = `remoteifes-console-${VERSAO}-${alvo}.tar.gz`;
+    const caminhoPayload = path.join(saida, nomePayload);
+    fs.writeFileSync(caminhoPayload, payload);
+    artefatos.push({ alvo, formato: "tar.gz", arquivo: nomePayload, caminho: caminhoPayload });
+    log(`  payload: ${nomePayload} (${(payload.length / 1024).toFixed(0)} KiB)`);
 
-  if (["todos", "exe"].includes(formato) && alvo.startsWith("windows")) {
-    const nomeExe = `remoteifes-console-${VERSAO}-${alvo}-instalador.exe`;
-    const caminhoExe = path.join(saida, nomeExe);
-    try {
-      const bytes = montarExe(caminhoExe);
-      artefatos.push({ alvo, formato: "exe", arquivo: nomeExe, caminho: caminhoExe });
-      log(`  exe: ${nomeExe} (${(bytes / 1024).toFixed(0)} KiB)`);
-    } catch (erro) {
-      log(`  exe: não construído (${erro.message})`);
+    if (["todos", "zip"].includes(formato) && alvo.startsWith("windows")) {
+      const nomeZip = `remoteifes-console-${VERSAO}-${alvo}.zip`;
+      const caminhoZip = path.join(saida, nomeZip);
+      fs.writeFileSync(caminhoZip, montarZip(RAIZ, [...itensDoPayload(), "instalar.ps1"].filter((i) => fs.existsSync(path.join(RAIZ, i)))));
+      artefatos.push({ alvo, formato: "zip", arquivo: nomeZip, caminho: caminhoZip });
+      log(`  zip: ${nomeZip}`);
+    }
+
+    if (["todos", "exe"].includes(formato) && alvo.startsWith("windows")) {
+      const nomeExe = `remoteifes-console-${VERSAO}-${alvo}-instalador.exe`;
+      const caminhoExe = path.join(saida, nomeExe);
+      try {
+        const bytes = montarExe(caminhoExe);
+        artefatos.push({ alvo, formato: "exe", arquivo: nomeExe, caminho: caminhoExe });
+        log(`  exe: ${nomeExe} (${(bytes / 1024).toFixed(0)} KiB)`);
+      } catch (erro) {
+        log(`  exe: não construído (${erro.message})`);
+      }
+    }
+
+    // The .deb is architecture independent (`_all`): one for every Linux target.
+    if (["todos", "deb"].includes(formato) && alvo.startsWith("linux") && !debFeito) {
+      debFeito = true;
+      const nomeDeb = `remoteifes-console_${VERSAO}_all.deb`;
+      const caminhoDeb = path.join(saida, nomeDeb);
+      try {
+        const bytes = montarDeb(caminhoDeb);
+        artefatos.push({ alvo, formato: "deb", arquivo: nomeDeb, caminho: caminhoDeb });
+        log(`  deb: ${nomeDeb} (${(bytes / 1024).toFixed(0)} KiB)`);
+      } catch (erro) {
+        log(`  deb: não construído (${erro.message})`);
+      }
     }
   }
 
-  if (["todos", "deb"].includes(formato) && alvo.startsWith("linux")) {
-    const nomeDeb = `remoteifes-console_${VERSAO}_all.deb`;
-    const caminhoDeb = path.join(saida, nomeDeb);
-    try {
-      const bytes = montarDeb(caminhoDeb);
-      artefatos.push({ alvo, formato: "deb", arquivo: nomeDeb, caminho: caminhoDeb });
-      log(`  deb: ${nomeDeb} (${(bytes / 1024).toFixed(0)} KiB)`);
-    } catch (erro) {
-      log(`  deb: não construído (${erro.message})`);
-    }
-  }
-
-  // The release manifest. It carries no signature of its own: the release publication attests it and
+  // The release manifest. It carries no signature of its own: the release workflow attests it and
   // every artifact with GitHub's keyless artifact attestation, and the Console accepts it only as
   // those exact bytes (src/atestacao.js).
   const manifesto = {
     esquema: 1,
     versao: VERSAO,
     canal: arg("canal", "estavel"),
-    publicadoEm: new Date().toISOString(),
+    publicadoEm: momento,
     commit,
     minimoParaAtualizar: null,
     notas: `https://github.com/SENAI4LIFE/RemoteIFES/releases/tag/console-v${VERSAO}`,
@@ -563,15 +590,15 @@ function main() {
   };
   const caminhoManifesto = path.join(saida, "manifesto.json");
   fs.writeFileSync(caminhoManifesto, `${JSON.stringify(manifesto, null, 2)}\n`);
-  log(`  manifesto: manifesto.json (commit ${commit.slice(0, 12)}; a atestação é da publicação)`);
+  log(`  manifesto: manifesto.json (commit ${commit.slice(0, 12)}; a atestação é do workflow de publicação)`);
 
   // What was built, where and from what. Windows and macOS executables carry no platform code
   // signature (Authenticode, Apple notarization): no such credential exists. Their origin is proven
   // by the release attestation instead, which covers every file of a release.
   const proveniencia = {
     versao: VERSAO,
-    alvo,
-    construidoEm: new Date().toISOString(),
+    alvo: alvos.join(","),
+    construidoEm: momento,
     node: process.version,
     plataformaDeBuild: `${process.platform}-${process.arch}`,
     commit,

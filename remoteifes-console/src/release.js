@@ -41,6 +41,7 @@ function nomeDoPayload(versao, alvo) {
  * produces is one the Console accepts.
  */
 function validarEstrutura(manifesto) {
+  if (!manifesto || typeof manifesto !== "object" || Array.isArray(manifesto)) return { ok: false, motivo: "manifesto não é um objeto JSON" };
   if (manifesto.esquema !== ESQUEMA_SUPORTADO) {
     return { ok: false, motivo: `esquema de manifesto ${manifesto.esquema} não é suportado por esta versão do console` };
   }
@@ -50,13 +51,18 @@ function validarEstrutura(manifesto) {
   if (!Array.isArray(manifesto.artefatos) || !manifesto.artefatos.length) {
     return { ok: false, motivo: "manifesto sem artefatos" };
   }
+  const alvos = new Set();
   for (const artefato of manifesto.artefatos) {
+    if (!artefato || typeof artefato !== "object") return { ok: false, motivo: "artefato malformado no manifesto" };
     if (!RE_ALVO.test(String(artefato.alvo || ""))) return { ok: false, motivo: "artefato sem alvo válido no manifesto" };
     if (artefato.arquivo !== nomeDoPayload(manifesto.versao, artefato.alvo)) {
       return { ok: false, motivo: `o artefato de ${artefato.alvo} deveria se chamar ${nomeDoPayload(manifesto.versao, artefato.alvo)}` };
     }
     if (!RE_SHA256.test(String(artefato.sha256 || ""))) return { ok: false, motivo: `artefato ${artefato.arquivo} sem SHA-256 válido` };
     if (!Number.isSafeInteger(artefato.bytes) || artefato.bytes <= 0) return { ok: false, motivo: `artefato ${artefato.arquivo} sem tamanho válido` };
+    // Two entries for one target would make the choice depend on their order.
+    if (alvos.has(artefato.alvo)) return { ok: false, motivo: `o manifesto declara dois artefatos para ${artefato.alvo}` };
+    alvos.add(artefato.alvo);
   }
   return { ok: true };
 }
@@ -118,7 +124,6 @@ function politicaDeVersao(manifesto, versaoInstalada) {
   return { ok: true };
 }
 
-/** Confere o arquivo realmente gravado contra o manifesto autenticado. */
 /**
  * Checks an artifact against the attested manifest and **returns the checked bytes**.
  *

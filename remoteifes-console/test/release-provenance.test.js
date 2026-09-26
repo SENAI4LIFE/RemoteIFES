@@ -88,6 +88,12 @@ test("the policy pins the repository and owner by name and numeric id, the workf
     executor: "github-hosted",
     ambiente: "console-release",
   });
+  // The workflow the policy names is the one in this repository.
+  const workflow = path.join(ajuda.RAIZ, "..", atestacao.IDENTIDADE_OFICIAL.workflow);
+  assert.ok(fs.existsSync(workflow), `${atestacao.IDENTIDADE_OFICIAL.workflow} must exist`);
+  const texto = fs.readFileSync(workflow, "utf8");
+  assert.match(texto, /tags:\s*\[\s*"console-v\*"\s*\]/, "the release workflow runs for console-v* tags");
+  assert.match(texto, /environment:\s*console-release/, "and attests in the console-release environment");
 });
 
 // --- The artifact and the manifest -------------------------------------------------------------

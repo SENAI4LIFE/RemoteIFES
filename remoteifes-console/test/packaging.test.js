@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const zlib = require("zlib");
+const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 const ajuda = require("./helpers");
 const { criarAutoridade, atestarDiretorio, confiarEm } = require("./support/atestacoes");
@@ -14,7 +15,7 @@ const { listarDependencias } = require("../instalacao/dependencias");
 // This test prevents the classic packaging failure: the artifact exists, the manifest exists, and
 // the update still does not work because the package format does not match the extractor, or
 // because the attestation was never actually checked against the downloaded content. The
-// attestations come from a private test Sigstore standing in for GitHub Actions
+// attestations come from a private test Sigstore standing in for the release workflow
 // (test/support/atestacoes.js).
 
 const ARVORE = ["console.js", "launcher.js", "package.json", "package-lock.json", "ARQUITETURA.md", "DISTRIBUICAO.md", "src", "bin", "web", "instalacao", "helper", "systemd", "empacotar"];
@@ -50,7 +51,7 @@ function construir(raizFonte, saida, extra = []) {
   });
 }
 
-/** Build and attest, as a release publication does. */
+/** Build and attest, as the release workflow does. */
 async function release(raizFonte, saida, extra = []) {
   construir(raizFonte, saida, extra);
   return atestarDiretorio(autoridade, saida);
@@ -127,7 +128,7 @@ test("the builder produces payload, manifest and honest provenance", (t) => {
   assert.equal(manifesto.commit, head, "the manifest names the commit built; the attestation must name the same");
   assert.equal(require(path.join(ajuda.RAIZ, "src", "release.js")).validarEstrutura(manifesto).ok, true, "a manifest the Console accepts");
 
-  // The build attests nothing and holds no identity: the release publication does that afterwards.
+  // The build attests nothing and holds no identity: the release workflow does that afterwards.
   assert.ok(!fs.existsSync(path.join(saida, "atestacao.sigstore.json")));
 
   const proveniencia = JSON.parse(fs.readFileSync(path.join(saida, "proveniencia.json"), "utf8"));
@@ -136,6 +137,33 @@ test("the builder produces payload, manifest and honest provenance", (t) => {
   assert.equal(proveniencia.commit, head);
   assert.ok(proveniencia.artefatos.every((a) => /^[0-9a-f]{64}$/.test(a.sha256)));
   execFileSync(process.execPath, [path.join(ajuda.RAIZ, "empacotar", "conferir-proveniencia.js"), saida], { stdio: "pipe" });
+});
+
+test("the same commit builds to the same bytes", (t) => {
+  const a = ajuda.dirTemporario("console-dist-");
+  const b = ajuda.dirTemporario("console-dist-");
+  t.after(() => [a, b].forEach((d) => fs.rmSync(d, { recursive: true, force: true })));
+  const anterior = process.env.SOURCE_DATE_EPOCH;
+  process.env.SOURCE_DATE_EPOCH = "1790000000";
+  t.after(() => {
+    if (anterior === undefined) delete process.env.SOURCE_DATE_EPOCH;
+    else process.env.SOURCE_DATE_EPOCH = anterior;
+  });
+  construir(ajuda.RAIZ, a, ["--alvo", "linux-x64,windows-x64", "--formato", "todos"]);
+  construir(ajuda.RAIZ, b, ["--alvo", "linux-x64,windows-x64", "--formato", "todos"]);
+  const nomes = fs.readdirSync(a).filter((n) => !n.endsWith(".exe")).sort();
+  assert.deepEqual(nomes, fs.readdirSync(b).filter((n) => !n.endsWith(".exe")).sort());
+  for (const nome of nomes) {
+    assert.ok(fs.readFileSync(path.join(a, nome)).equals(fs.readFileSync(path.join(b, nome))), `${nome} differs between two builds`);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.join(a, "manifesto.json"), "utf8")).publicadoEm, "2026-09-21T14:13:20.000Z");
+
+  // Nothing about the build system leaks into the archives: zlib writes its own OS into byte 9 of
+  // the gzip header (3 on Unix, 10 on Windows), which alone made Linux and Windows builds differ.
+  const payload = fs.readFileSync(path.join(a, fs.readdirSync(a).find((n) => n.endsWith(".tar.gz"))));
+  assert.equal(payload[9], 0xff, "gzip OS byte fixed to 'unknown'");
+  assert.equal(payload.readUInt32LE(4), 0, "no gzip timestamp");
+  assert.ok(zlib.gunzipSync(payload).length > 0, "and the archive still reads");
 });
 
 test("the built payload is exactly what the updater's extractor understands", (t) => {
@@ -470,6 +498,24 @@ test("an installed Console verifies releases with no setup step", (t) => {
   assert.ok(!/SIGSTORE|ATESTACAO|RAIZ_CONFIANCA/.test(configuracao), "no trust setting exists to configure");
   const instalar = fs.readFileSync(path.join(ajuda.RAIZ, "instalacao", "instalar.js"), "utf8");
   assert.ok(!/sigstore|atestacao/i.test(instalar.replace(/dependencias/g, "")), "the installer has no release-trust step");
+});
+
+test("before the first publication exists, the Console says there is none", async (t) => {
+  const vazio = ajuda.dirTemporario("console-sem-release-");
+  const servidor = await servirDiretorio(vazio);
+  const amb = ajuda.ambiente({ env: { CONSOLE_RELEASE_BASE: servidor.base } });
+  t.after(async () => {
+    await servidor.fechar();
+    amb.restaurar();
+    fs.rmSync(vazio, { recursive: true, force: true });
+  });
+  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+
+  const r = await atualizador.verificarPublicacao({ forcar: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.semPublicacao, true);
+  assert.equal(r.offline, undefined, "a 404 from the origin is not a network failure");
+  assert.match(r.motivo, /nenhuma publicação do console/);
 });
 
 test("the .deb is assembled in the ar format dpkg understands", (t) => {

@@ -120,6 +120,10 @@ O payload leva as dependências de produção do console, e só elas: o verifica
 versão que o `package-lock.json` fixa (`instalacao/dependencias.js`). O pacote que só os testes
 usam fica de fora. Construir exige `npm ci --omit=dev` antes.
 
+A construção é reprodutível: com `SOURCE_DATE_EPOCH` definido, o mesmo commit produz os mesmos
+bytes em qualquer sistema. O workflow de publicação usa a data do commit e compara as construções
+feitas em Linux e em Windows antes de atestar qualquer arquivo.
+
 ## 4. Propriedade da atualização
 
 Modelo escolhido: **payload versionado lado a lado, com camada estável de bootstrap**.
@@ -245,10 +249,9 @@ Um release publicado é:
 manifesto.json                                              (metadados)
 atestacao.sigstore.json                                     (atestação de todos os arquivos)
 remoteifes-console-<versão>-<plataforma>-<arch>.tar.gz      (payload, um por alvo)
+remoteifes-console_<versão>_all.deb, remoteifes-console-<versão>-windows-x64.zip,
+remoteifes-console-<versão>-windows-x64-instalador.exe, proveniencia.json
 ```
-
-Ainda não há release publicado nem workflow de publicação: enquanto nenhum existir, a aba
-**Programa** informa que não há publicação, e atualizar o console é reinstalar o pacote.
 
 O manifesto declara versão, canal, commit, alvos, SHA-256 e tamanho de cada payload e a versão
 mínima que pode atualizar para esta. Ele não tem assinatura própria: vale como os bytes exatos que
@@ -289,6 +292,39 @@ de raiz para ninguém manter.
 Sem rede, a verificação usa a última raiz que uma atualização conferiu neste host ou, se nunca
 houve uma, a embutida. É a verificação offline normal do Sigstore, com o limite de sempre: ela não
 fica sabendo de uma chave revogada depois daquela cópia.
+
+### Publicar um release
+
+Não há chave para criar, guardar, copiar ou trocar. Publicar é:
+
+1. subir a versão em `remoteifes-console/package.json` num commit que já está na `main`;
+2. criar e enviar a etiqueta `console-v<versão>` desse commit:
+
+```bash
+git tag console-v1.1.0 <commit>
+git push origin console-v1.1.0
+```
+
+O workflow testa o console, constrói todos os alvos em Linux e em Windows e exige que os dois
+resultados sejam idênticos byte a byte, atesta todos os arquivos, confere o release com o próprio
+código do console e uma raiz do Sigstore recém-atualizada, e só então o publica. Uma etiqueta num
+commit que ainda não está na `main` vira pré-release, que os consoles não descobrem sozinhos. O
+console consulta `releases/latest/download`, então a publicação do console precisa ser o release
+mais recente do repositório. Enquanto nenhuma existir, a aba **Programa** informa que não há
+publicação.
+
+Quem quiser conferir um arquivo fora do console pode usar
+`gh attestation verify <arquivo> --repo SENAI4LIFE/RemoteIFES --signer-workflow SENAI4LIFE/RemoteIFES/.github/workflows/console-release.yml`.
+O console não precisa disso, e ninguém no campus precisa de `gh`, `cosign`, Git ou npm.
+
+O que este modelo não cobre: quem tiver escrita no repositório pode criar uma etiqueta e fazer o
+workflow atestar o que estiver nela. A proteção está em quem pode escrever no repositório e criar
+etiquetas `console-v*`, no ambiente `console-release` (que só aceita essas etiquetas) e no log
+público, onde toda atestação fica visível. Um comprometimento do próprio GitHub Actions ou do
+Sigstore está fora do alcance do console.
+
+Os testes (`test/release-provenance.test.js`, `test/updater.test.js`, `test/packaging.test.js`)
+usam um Sigstore privado de teste, com as mesmas identidades que o GitHub emite.
 
 ### Host sem Internet
 
