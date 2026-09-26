@@ -86,6 +86,12 @@ async function abrirGateway({ headers, rota = { pai: "gateway", saltos: 1, rssi:
   };
 }
 
+// The server holds the session as soon as it sends "aceito"; the node holds it once that frame has
+// crossed the gateway. A test that seals a frame as the node waits for both.
+function sessaoNasDuasPontas(c) {
+  return deviceHub.canalDeComandos(c.salaNo) && !!c.no.sessao;
+}
+
 async function cenario() {
   sequencia += 1;
   const gw = criarSala(`GW-${sequencia}`, `AA:EE:00:00:${String(sequencia).padStart(2, "0")}:01`);
@@ -170,7 +176,7 @@ test("credential rotation travels sealed through the gateway and the new secret 
   const c = await cenario();
   t.after(() => c.gateway.fechar());
   c.gateway.anunciar(c.no);
-  assert.ok(await ate(() => deviceHub.canalDeComandos(c.salaNo)));
+  assert.ok(await ate(() => sessaoNasDuasPontas(c)));
 
   const rotacao = credenciais.rotacionar(c.salaNo);
   assert.equal(rotacao.enviadoAoDispositivo, true);
@@ -181,14 +187,14 @@ test("credential rotation travels sealed through the gateway and the new secret 
   c.no.trocarSegredo(rotacao.segredo);
   c.gateway.anunciar(c.no);
   assert.ok(await ate(() => credenciais.estado(c.salaNo).pendente === false || !db.prepare("SELECT segredoHashPendente FROM esp_credenciais WHERE sala = ?").get(c.salaNo).segredoHashPendente));
-  assert.ok(await ate(() => deviceHub.canalDeComandos(c.salaNo)));
+  assert.ok(await ate(() => sessaoNasDuasPontas(c)));
 });
 
 test("tampered, replayed and out-of-session frames are rejected and processed at most once", async (t) => {
   const c = await cenario();
   t.after(() => c.gateway.fechar());
   c.gateway.anunciar(c.no);
-  assert.ok(await ate(() => deviceHub.canalDeComandos(c.salaNo)));
+  assert.ok(await ate(() => sessaoNasDuasPontas(c)));
 
   const quadro = c.no.selar({ tipo: "comando", cmd: "ligar", valor: 1 });
   c.gateway.bruto({ tipo: "mesh", no: c.no.deviceId, quadro });
@@ -212,11 +218,14 @@ test("a board that is only announced is never online, and losing the gateway tak
   c.no.mudo = true;
   c.gateway.anunciar(c.no);
   await ate(() => meshService.topologia().nos.some((n) => n.deviceId === c.alvo.deviceId));
+  // The first challenge must have reached the muted node before it speaks again; otherwise it would
+  // answer that superseded challenge.
+  await ate(() => c.gateway.recebidas.some((m) => m.tipo === "mesh" && m.no === c.alvo.deviceId && m.quadro && m.quadro.t === "desafio"));
   assert.equal(deviceHub.canalDeComandos(c.salaNo), false, "gateway availability does not prove the board");
 
   c.no.mudo = false;
   c.gateway.anunciar(c.no);
-  assert.ok(await ate(() => deviceHub.canalDeComandos(c.salaNo)));
+  assert.ok(await ate(() => sessaoNasDuasPontas(c)));
   await c.gateway.fechar();
   assert.ok(await ate(() => !deviceHub.canalDeComandos(c.salaNo)), "the room is offline once its gateway is gone");
   assert.ok(await ate(() => meshService.topologia().nos.find((n) => n.deviceId === c.alvo.deviceId).estado === "inalcancavel"));
@@ -227,7 +236,7 @@ test("route changes are observed and downlink frames stay bounded without acknow
   const c = await cenario();
   t.after(() => c.gateway.fechar());
   c.gateway.anunciar(c.no);
-  assert.ok(await ate(() => deviceHub.canalDeComandos(c.salaNo)));
+  assert.ok(await ate(() => sessaoNasDuasPontas(c)));
 
   c.no.rota = { pai: "esp_00000000000000ff", saltos: 2, rssi: -71 };
   c.gateway.enviar(c.no, { tipo: "telemetria", temperatura: 25 });
@@ -246,7 +255,7 @@ test("OTA is refused over the mesh with an explicit reason; direct OTA is unaffe
   const c = await cenario();
   t.after(() => c.gateway.fechar());
   c.gateway.anunciar(c.no);
-  assert.ok(await ate(() => deviceHub.canalDeComandos(c.salaNo)));
+  assert.ok(await ate(() => sessaoNasDuasPontas(c)));
   const ota = require("../src/services/otaService");
   assert.throws(() => ota.ofertar(c.salaNo), (erro) => erro.conflito === true && erro.transporte === "mesh" && /malha/.test(erro.message));
   // The gateway itself is a direct board: its OTA is refused only for the usual reasons.
