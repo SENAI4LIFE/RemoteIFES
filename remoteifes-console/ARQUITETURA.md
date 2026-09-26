@@ -15,7 +15,7 @@ O RemoteIFES continua operando o prédio.
 | Atualização, rollback, versões em execução | Usuários, permissões, propriedade de sala |
 | Backup, restauração, quarentena de banco | Cadastro/OTA/credenciais/IR dos ESP32 |
 | Rede, domínio, TLS, proxy (diagnóstico); política de acesso de rede da aplicação (modo de teste e CIDR autorizados) | Demais configurações da aplicação, relatos, auditoria |
-| Mobile/CI (status, disparo, artefatos) | Página Aplicativo e download do APK pelo usuário |
+| Mobile/CI: release publicado e execuções da CI, só consulta | Página Aplicativo e download do APK pelo usuário |
 | Recuperação de conta e do próprio console | Monitoramento e mapas operacionais |
 
 O console **resume** a saúde da aplicação e oferece links profundos; não recria editores que já
@@ -53,7 +53,7 @@ Um serviço **`remoteifes-console.service`** ativado por **`remoteifes-console.s
   (padrão 900 s), o processo **sai sozinho**; o socket continua escutando;
 * sem systemd (desenvolvimento, macOS/Windows) o mesmo programa escuta uma porta TCP local.
 
-Custo: a primeira requisição paga a partida do Node. Está medido e reportado no README; num
+Custo: a primeira requisição paga a partida do Node. `npm run medir` mede esse custo no host; num
 console de manutenção usado esporadicamente essa é a troca certa contra RAM ociosa permanente.
 
 ## 3. Instalação fora do checkout (programa instalado)
@@ -107,7 +107,7 @@ concluído sem acompanhamento é liberada nessa reconciliação.
 | Sessão | cookie `HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` quando houver TLS; validade absoluta 8 h e ociosidade 30 min |
 | Elevação | reautenticação por senha para operações sensíveis; validade 5 min, revogada no logout e no fim da sessão |
 | CSRF | token por sessão exigido em cabeçalho próprio em **todo** método mutante, mais checagem exata de `Origin` e de `Host` (anti-DNS-rebinding). CORS não é considerado defesa |
-| Exposição | `127.0.0.1` por padrão. Acesso remoto é túnel SSH (`ssh -L 8099:127.0.0.1:8099 pi@host`): o `localhost` do operador **não** é o do Pi. Modo LAN explícito exige TLS e faixa autorizada |
+| Exposição | `127.0.0.1` por padrão. Acesso remoto é túnel SSH (`ssh -L 8099:127.0.0.1:8099 pi@host`): o `localhost` do operador **não** é o do Pi. Não há modo de rede local: `CONSOLE_BIND` fora do loopback faz o console escutar em HTTP, sem TLS próprio nem filtro de faixas, protegido só pela lista de `Host` (`CONSOLE_HOSTS`) |
 | Privilégio | o console roda como o usuário dono do checkout e dos dados; tudo que precisa de root passa por **um** auxiliar root (`/usr/local/lib/remoteifes/console-helper.sh`, root:root 0755, diretórios pais root) com verbos fixos e argumentos validados por lista |
 | Endurecimento | o serviço do console **não** usa `NoNewPrivileges=yes`, que quebraria o `sudo` do auxiliar; usa `PrivateTmp`, `ProtectHome=read-only`, `ProtectKernelTunables`, `RestrictAddressFamilies` e `ReadWritePaths` explícitos |
 | Segredos | tokens GitHub, chaves e senhas nunca voltam por API nem vão para log, auditoria ou diagnóstico: o console informa **presença e validade**, jamais o valor |

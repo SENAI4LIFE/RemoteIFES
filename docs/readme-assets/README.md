@@ -50,9 +50,10 @@ Os SVG são editados direto e servem aos dois temas com um arquivo só: todo tex
 
 As capturas vêm do harness de testes (`e2e/harness/api-server.js` e `static-server.js`): banco temporário, ESP32 simulados e contas de teste. Nunca use um ambiente de produção nem invente uma tela.
 
-As seis capturas mais novas são refeitas por `src/capturar.js`. Ele sobe o harness nas portas 8891 e 8890, prepara os dados pela API e pelas rotas de teste do próprio harness e grava o PNG já acabado:
+As seis capturas mais novas são refeitas por `src/capturar.js`. Ele sobe o harness nas portas 8891 e 8890, prepara os dados pela API e pelas rotas de teste do próprio harness e grava o PNG já acabado. O harness roda o código real do servidor, por isso precisa também das dependências de `remoteifes-server`:
 
 ```bash
+cd remoteifes-server && npm ci && cd ..                            # uma vez
 cd e2e && npm ci && cd ..                                          # uma vez
 node docs/readme-assets/src/capturar.js                            # todas
 node docs/readme-assets/src/capturar.js floorplan                  # uma só
@@ -68,6 +69,8 @@ O estado preparado:
 - firmware 4.3.0 publicado;
 - a placa do harness em A-108 como clonadora em modo clone, um protocolo COOLIX salvo com failsafe OFF e aplicado em A-107, e uma captura nova pendente;
 - 26 horas de amostras de monitoramento (`/__e2e/monitoramento-historico`).
+
+O navegador é o mesmo de `compor.js`. As duas portas precisam estar livres: ocupadas, o script para antes de preparar qualquer dado, porque senão prepararia o que estivesse respondendo nelas. Uma falha sai com código diferente de zero e ainda desliga as placas simuladas e o harness, que apaga o banco temporário.
 
 A barra de abas e os botões flutuantes de acessibilidade e ajuda ficam ocultos no recorte: presos à janela, eles passariam por cima da área recortada. Datas e horas são as do dia em que o script roda.
 

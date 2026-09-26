@@ -140,7 +140,7 @@ async function estadoCI() {
       disponivel: false,
       motivo: "nenhuma credencial do GitHub configurada no console",
       orientacao:
-        "Um token com permissão de leitura de Actions (e de escrita apenas se quiser disparar workflows) pode ser " +
+        "Um token com permissão de leitura de Actions pode ser " +
         "gravado em Avançado. Sem ele o console continua funcionando: a operação normal do RemoteIFES não depende do GitHub.",
     };
   }

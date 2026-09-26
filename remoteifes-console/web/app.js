@@ -1289,7 +1289,7 @@
         dado(dl, "Gravada em", quando(t.gravadoEm));
       }
       caixa.appendChild(dl);
-      caixa.appendChild(el("p", t.presente ? t.observacao : "Um token só é necessário para acompanhar e disparar a CI. Sem ele o console funciona normalmente.", "fraco"));
+      caixa.appendChild(el("p", t.presente ? t.observacao : "Um token só é necessário para acompanhar a CI. Sem ele o console funciona normalmente.", "fraco"));
     });
   }
 
