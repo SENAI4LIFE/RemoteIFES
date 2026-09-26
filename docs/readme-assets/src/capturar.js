@@ -2,11 +2,14 @@
 // Captures the README screenshots (docs/readme-assets/screenshots/<name>.png) from the e2e
 // harness: temporary database, simulated ESP32 boards and test accounts only.
 //
-//   cd e2e && npm ci                          # once: Playwright comes from the e2e dependencies
+//   cd remoteifes-server && npm ci && cd ..   # once: the harness runs the real server code
+//   cd e2e && npm ci && cd ..                 # once: Playwright and ws come from the e2e dependencies
 //   node docs/readme-assets/src/capturar.js   # every capture
 //   node docs/readme-assets/src/capturar.js floorplan schedule
 //
-// The harness runs on ports 8891 (API) and 8890 (static), apart from the e2e defaults.
+// The browser is Playwright's Chromium when installed (npx playwright install chromium), otherwise
+// the system Edge or Chrome, as in compor.js. The harness runs on ports 8891 (API) and 8890
+// (static), apart from the e2e defaults; both must be free, or the run stops before seeding.
 // CAPTURA_SAIDA=<folder> writes the PNGs elsewhere, for a trial run; CAPTURA_BRUTO=<folder> also
 // saves each uncropped page there, for choosing a crop.
 // The data is seeded here through the public API and the harness's own test endpoints; nothing
@@ -14,6 +17,7 @@
 // device secret, private address, host name or personal path may appear.
 const crypto = require("crypto");
 const fs = require("fs");
+const net = require("net");
 const path = require("path");
 const { spawn, execFileSync } = require("child_process");
 
@@ -34,29 +38,73 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------------------------------------------------------------- harness and API
 
 const processos = [];
+const placasAtivas = [];
+
+// A port already in use would make the harness fail to start while whatever answers there got
+// seeded instead, so both ports must be free before anything is spawned.
+function exigirPortaLivre(porta) {
+  return new Promise((resolve, reject) => {
+    const teste = net.createServer();
+    teste.once("error", (erro) =>
+      reject(erro.code === "EADDRINUSE"
+        ? new Error(`port ${porta} is already in use; stop what listens there or set CAPTURA_API_PORT / CAPTURA_WEB_PORT`)
+        : erro));
+    teste.listen(porta, "127.0.0.1", () => teste.close(resolve));
+  });
+}
 
 function subir(script, env) {
   const filho = spawn(process.execPath, [path.join(E2E, "harness", script)], {
     env: { ...process.env, ...env },
-    stdio: ["ignore", "ignore", process.env.DEBUG ? "inherit" : "ignore"],
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  filho.nome = script;
+  filho.erros = "";
+  filho.stderr.on("data", (d) => {
+    if (process.env.DEBUG) process.stderr.write(d);
+    filho.erros = (filho.erros + d).slice(-4000);
   });
   processos.push(filho);
+  return filho;
 }
 
-async function aguardar(url) {
+async function aguardar(url, filho) {
   for (let i = 0; i < 120; i++) {
+    if (filho.exitCode !== null) {
+      const dica = /Cannot find module/.test(filho.erros) ? "\nInstall the dependencies first: npm ci in remoteifes-server and in e2e." : "";
+      throw new Error(`${filho.nome} exited (code ${filho.exitCode}) before answering ${url}:\n${filho.erros.trim()}${dica}`);
+    }
     try {
       if ((await fetch(url)).ok) return;
     } catch {}
     await esperar(500);
   }
-  throw new Error(`no answer from ${url}`);
+  throw new Error(`no answer from ${url} after 60 s`);
 }
 
-async function encerrarHarness() {
-  // The harness removes its temporary directory on /__e2e/encerrar; killing it would leave it.
-  for (const base of [API, WEB]) await fetch(`${base}/__e2e/encerrar`, { method: "POST" }).catch(() => {});
-  await esperar(800);
+// Polls until `teste` returns a truthy value; the value is returned. Replaces fixed sleeps that
+// were long enough only on a fast machine.
+async function esperarAte(descricao, teste, limiteMs = 15000) {
+  const fim = Date.now() + limiteMs;
+  for (;;) {
+    const valor = await teste();
+    if (valor) return valor;
+    if (Date.now() > fim) throw new Error(`timed out waiting for ${descricao}`);
+    await esperar(150);
+  }
+}
+
+// Runs on success and on failure: boards stop reconnecting, and the harness removes its temporary
+// directory on /__e2e/encerrar (killing it would leave the directory behind).
+async function encerrarTudo() {
+  for (const p of placasAtivas) p.parar();
+  const vivos = processos.filter((p) => p.exitCode === null);
+  if (vivos.length) {
+    for (const base of [API, WEB]) await fetch(`${base}/__e2e/encerrar`, { method: "POST" }).catch(() => {});
+    // The harness gives itself 3 s to close and delete the directory; kill only after that.
+    const saidas = vivos.map((p) => new Promise((r) => (p.exitCode !== null ? r() : p.once("exit", r))));
+    await Promise.race([Promise.all(saidas), esperar(6000)]);
+  }
   for (const p of processos) if (p.exitCode === null) p.kill();
 }
 
@@ -148,7 +196,9 @@ function placa({ sala, mac, fw = "4.3.0", temp, hum, rssi, credencial = null }) 
     ws.on("error", () => {});
   }
   conectar();
-  return { parar: () => { parado = true; if (ws) ws.close(); } };
+  const controle = { parar: () => { parado = true; if (ws) ws.close(); } };
+  placasAtivas.push(controle);
+  return controle;
 }
 
 // ---------------------------------------------------------------- seeded state
@@ -171,21 +221,26 @@ async function semear() {
   const admin = await entrar("e2e_admin", "e2e-admin-pass-123");
   const usuario = await entrar("e2e_user", "e2e-user-pass-123");
 
-  const placas = [];
   for (const [sala, mac, fw, temp, hum, rssi, comCredencial] of PLACAS) {
     await api(su, "PATCH", `/admin/salas/${sala}/mac`, { mac });
     await api(su, "POST", `/admin/esp32/${sala}/protocolo-ir`, { protocolo: 15 });
     const credencial = comCredencial ? await api(su, "POST", `/admin/esp32/${encodeURIComponent(sala)}/credencial`) : null;
-    placas.push(placa({ sala, mac, fw, temp, hum, rssi, credencial }));
+    placa({ sala, mac, fw, temp, hum, rssi, credencial });
   }
-  await esperar(1500);
+  const dispositivo = async (sala) =>
+    ((await api(su, "GET", "/admin/esp32/dispositivos")).find((d) => d.sala === sala) || {}).dispositivo || {};
+  await esperarAte("the simulated boards to connect", async () => {
+    const lista = await api(su, "GET", "/admin/esp32/dispositivos");
+    return ["A-108", ...PLACAS.map(([sala]) => sala)].every((sala) => lista.some((d) => d.sala === sala && d.dispositivo.conectado));
+  });
 
   // Rooms on: A-110 and A-106 by users, A-107 at 23 °C.
   await api(usuario, "POST", "/comando", { sala: "A-110", cmd: "ligar" });
   await api(admin, "POST", "/comando", { sala: "A-106", cmd: "ligar" });
   await api(admin, "POST", "/comando", { sala: "A-107", cmd: "ligar" });
 
-  // A reservation in progress now (outlined on the floor plan).
+  // A reservation in progress now (outlined on the floor plan). The whole run uses this one date,
+  // so a capture taken after midnight still shows the seeded day.
   const agora = agoraBrasilia();
   const antes = agoraBrasilia(-50);
   const depois = agoraBrasilia(100);
@@ -210,13 +265,15 @@ async function semear() {
   // IR library: the harness board on A-108 is the official cloner. One captured protocol is
   // saved, gets a failsafe OFF and is applied to A-107; a new capture is left pending.
   await api(su, "PUT", "/admin/protocolos-ir/clonador", { sala: "A-108" });
-  await esperar(400);
+  await esperarAte("A-108 to take the cloner role", async () => (await dispositivo("A-108")).role === "cloner");
   await api(su, "POST", "/admin/protocolos-ir/clonador/modo-clone", { ativo: true });
-  await esperar(400);
+  await esperarAte("A-108 to enter clone mode", async () => (await dispositivo("A-108")).modo === "config_clone");
+  // Each step must use the capture it just sent, never the previous one still at the top.
   const capturar = async (captura) => {
+    const antes = new Set((await api(su, "GET", "/admin/protocolos-ir")).capturas.map((c) => c.id));
     await api(null, "POST", "/__e2e/capturar-ir", captura);
-    await esperar(400);
-    return (await api(su, "GET", "/admin/protocolos-ir")).capturas[0];
+    return esperarAte(`the ${captura.hex} capture`, async () =>
+      (await api(su, "GET", "/admin/protocolos-ir")).capturas.find((c) => !antes.has(c.id)));
   };
   const liga = await capturar({ protocol: "COOLIX", protocolId: 15, hex: "0xB2BF40" });
   const protocolo = (await api(su, "POST", "/admin/protocolos-ir", { label: "Split COOLIX dos laboratórios", capturaId: liga.id })).protocolo;
@@ -227,9 +284,8 @@ async function semear() {
 
   // 26 hours of monitoring samples, from the harness's own history fixture.
   await api(null, "POST", "/__e2e/monitoramento-historico", { horas: 26 });
-  await esperar(1500);
 
-  return { tokens: { superadmin: su, admin, user: usuario }, placas };
+  return { tokens: { superadmin: su, admin, user: usuario }, hoje: agora.data };
 }
 
 // ---------------------------------------------------------------- captures
@@ -272,7 +328,7 @@ const CAPTURAS = [
     nome: "schedule-grid",
     conta: "admin",
     viewport: { width: 620, height: 1600 },
-    rota: `#/grade/A-107/${agoraBrasilia().data}`,
+    rota: (estado) => `#/grade/A-107/${estado.hoje}`,
     pronto: "#gradeTabela tbody tr",
     recorte: (page) => caixaDe(page, ["#screen-grade .grade-legenda", "#screen-grade .grade-scroll"]),
     largura: 790,
@@ -323,20 +379,26 @@ async function capturar(navegador, estado, c) {
     },
     [API, estado.tokens[c.conta]]
   );
-  const page = await contexto.newPage();
-  await page.goto(`${WEB}/${c.rota}`);
-  await page.waitForSelector("#mainApp", { state: "visible", timeout: 20000 });
-  await page.waitForSelector(c.pronto, { state: "visible", timeout: 20000 });
-  if (c.preparar) await c.preparar(page);
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(2500);
-  if (BRUTO) await page.screenshot({ path: path.join(BRUTO, `${c.nome}.png`), fullPage: true });
-  // The tab bar and the floating accessibility and help buttons are fixed to the viewport and
-  // would float over the cropped area; they are not part of the screen being shown.
-  await page.addStyleTag({ content: ".tabbar, .a11y-widget, .help-fab-widget { visibility: hidden !important; }" });
-  const recorte = await c.recorte(page);
-  const png = await page.screenshot({ clip: recorte, fullPage: true });
-  await contexto.close();
+  let png;
+  try {
+    const page = await contexto.newPage();
+    const rota = typeof c.rota === "function" ? c.rota(estado) : c.rota;
+    await page.goto(`${WEB}/${rota}`);
+    await page.waitForSelector("#mainApp", { state: "visible", timeout: 20000 });
+    await page.waitForSelector(c.pronto, { state: "visible", timeout: 20000 });
+    if (c.preparar) await c.preparar(page);
+    await page.evaluate(() => document.fonts.ready);
+    // Settle time for what arrives after the first paint: WebSocket status pushes and chart layout.
+    await page.waitForTimeout(2500);
+    if (BRUTO) await page.screenshot({ path: path.join(BRUTO, `${c.nome}.png`), fullPage: true });
+    // The tab bar and the floating accessibility and help buttons are fixed to the viewport and
+    // would float over the cropped area; they are not part of the screen being shown.
+    await page.addStyleTag({ content: ".tabbar, .a11y-widget, .help-fab-widget { visibility: hidden !important; }" });
+    const recorte = await c.recorte(page);
+    png = await page.screenshot({ clip: recorte, fullPage: true });
+  } finally {
+    await contexto.close();
+  }
   return acabamento(navegador, png, c.largura);
 }
 
@@ -344,6 +406,14 @@ async function capturar(navegador, estado, c) {
 // and a 1 px #c8d1cb border at display size, transparent outside the corners.
 async function acabamento(navegador, png, largura) {
   const page = await navegador.newPage({ viewport: { width: 400, height: 300 }, deviceScaleFactor: 1 });
+  try {
+    return await acabar(page, png, largura);
+  } finally {
+    await page.close();
+  }
+}
+
+async function acabar(page, png, largura) {
   const url = await page.evaluate(
     async ({ dados, largura }) => {
       const bytes = Uint8Array.from(atob(dados), (c) => c.charCodeAt(0));
@@ -370,7 +440,6 @@ async function acabamento(navegador, png, largura) {
     },
     { dados: png.toString("base64"), largura }
   );
-  await page.close();
   return Buffer.from(url.split(",")[1], "base64");
 }
 
@@ -397,13 +466,18 @@ async function abrirNavegador() {
 
 async function main() {
   const pedidas = process.argv.slice(2);
+  const desconhecidas = pedidas.filter((n) => !CAPTURAS.some((c) => c.nome === n));
+  if (desconhecidas.length) {
+    throw new Error(`unknown capture: ${desconhecidas.join(", ")} (available: ${CAPTURAS.map((c) => c.nome).join(", ")})`);
+  }
   const lista = CAPTURAS.filter((c) => !pedidas.length || pedidas.includes(c.nome));
-  if (!lista.length) throw new Error(`no capture matches: ${pedidas.join(", ")}`);
 
-  subir("api-server.js", { E2E_API_PORT: String(PORTA_API) });
-  subir("static-server.js", { E2E_WEB_PORT: String(PORTA_WEB) });
-  await aguardar(`${API}/health`);
-  await aguardar(WEB);
+  await exigirPortaLivre(PORTA_API);
+  await exigirPortaLivre(PORTA_WEB);
+  const harnessApi = subir("api-server.js", { E2E_API_PORT: String(PORTA_API) });
+  const harnessWeb = subir("static-server.js", { E2E_WEB_PORT: String(PORTA_WEB) });
+  await aguardar(`${API}/health`, harnessApi);
+  await aguardar(WEB, harnessWeb);
 
   const estado = await semear();
   const navegador = await abrirNavegador();
@@ -417,7 +491,6 @@ async function main() {
     }
   } finally {
     await navegador.close();
-    for (const p of estado.placas) p.parar();
   }
 }
 
@@ -426,4 +499,4 @@ main()
     console.error(erro.message || erro);
     process.exitCode = 1;
   })
-  .finally(encerrarHarness);
+  .finally(encerrarTudo);
