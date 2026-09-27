@@ -69,15 +69,6 @@ function gravarOperadores(dados) {
   estado.gravarJson(config.ARQUIVO_OPERADORES, dados, 0o600);
 }
 
-function listarOperadores() {
-  return lerOperadores().operadores.map((o) => ({
-    nome: o.nome,
-    criadoEm: o.criadoEm,
-    trocaObrigatoria: !!o.trocaObrigatoria,
-    ultimoAcesso: o.ultimoAcesso || null,
-  }));
-}
-
 function existeOperador() {
   return lerOperadores().operadores.length > 0;
 }
@@ -337,7 +328,6 @@ module.exports = {
   hashDeSenha,
   conferirSenha,
   validarForcaDaSenha,
-  listarOperadores,
   existeOperador,
   criarOperador,
   trocarSenha,

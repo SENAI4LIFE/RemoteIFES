@@ -589,23 +589,11 @@ const Api = {
     });
   },
 
-  async estadoDispositivoEsp32(sala) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/estado`, { headers: headersComToken() });
-  },
-
   async testarRawEsp32(sala, raw, carrierHz) {
     return chamar(`/admin/esp32/${encodeURIComponent(sala)}/teste/raw`, {
       method: "POST",
       headers: headersComToken({ "Content-Type": "application/json" }),
       body: JSON.stringify({ raw, carrierHz }),
-    });
-  },
-
-  async testarEstadoEsp32(sala, dados) {
-    return chamar(`/admin/esp32/${encodeURIComponent(sala)}/teste/estado`, {
-      method: "POST",
-      headers: headersComToken({ "Content-Type": "application/json" }),
-      body: JSON.stringify(dados),
     });
   },
 
@@ -635,10 +623,6 @@ const Api = {
 
   async comandarRolloutEsp32(acao) {
     return chamar(`/admin/esp32/rollout/${encodeURIComponent(acao)}`, { method: "POST", headers: headersComToken() });
-  },
-
-  async migracaoEsp32() {
-    return chamar("/admin/esp32/migracao", { headers: headersComToken() });
   },
 
   async obterMonitoramento() {
