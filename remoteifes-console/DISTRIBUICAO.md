@@ -100,8 +100,10 @@ assinatura de código do Windows**: sem essa credencial o SmartScreen avisa, e a
 atestação de proveniência (seção 5). MSI/WiX e `.pkg` assinado seguem de fora: sem credenciais e
 sem ambiente de validação, entregariam um instalador não testado.
 
-O job `pacotes` da CI roda em `ubuntu-latest`, `windows-latest` e `macos-latest` e faz, em cada
-um: constrói o artefato; confere o que a procedência declara e que cada digest do manifesto bate
+O job `pacotes` da CI roda em `ubuntu-latest` (x64), `ubuntu-24.04-arm` (arm64), `windows-latest`
+(x64) e `macos-latest` (arm64). Os artefatos `linux-arm` (ARMv7), `windows-arm64` e `macos-x64` são
+construídos mas **não executados** na CI: levam o mesmo payload em JavaScript, e só o Node do host
+muda. O job faz, em cada runner: constrói o artefato; confere o que a procedência declara e que cada digest do manifesto bate
 com o arquivo; descompacta o artefato **fora da árvore de código** e instala a partir dele; confere
 o layout instalado, a coerência do ponteiro de versão e que o verificador de releases carrega de
 dentro do próprio payload; sobe o programa

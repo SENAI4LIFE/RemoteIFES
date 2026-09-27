@@ -13,6 +13,12 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 
 const ALL_OS = ["ubuntu-latest", "windows-latest", "macos-latest"];
+// Linux ARM64 is the production target (Raspberry Pi 64-bit). The server suite runs its Linux leg
+// there, and the Console packages are installed and executed there as well as on x64. The minimum
+// supported Node (22.13.0) runs on the Linux legs of the test jobs; the others use the newest 22.x.
+const LINUX_ARM = "ubuntu-24.04-arm";
+const SERVER_OS = [LINUX_ARM, "windows-latest", "macos-latest"];
+const PACKAGES_OS = [...ALL_OS, LINUX_ARM];
 const CORDOVA_OS = ["ubuntu-latest", "windows-latest"];
 const ZERO_SHA = /^0+$/;
 
@@ -87,10 +93,11 @@ function selectChecks({ areas, fullDepth, allScope }) {
   const e2eFull = full || has("e2eHarness");
 
   const jobs = {
-    server: serverChanged ? ALL_OS : serverContracts ? ["ubuntu-latest"] : [],
+    server: serverChanged ? SERVER_OS : serverContracts ? [LINUX_ARM] : [],
     console: consoleChanged || serverChanged ? ALL_OS : [],
-    packages: consoleChanged ? ALL_OS : [],
-    // Installs the server and the Console package on a disposable systemd host (Linux only).
+    packages: consoleChanged ? PACKAGES_OS : [],
+    // Installs the server and the Console package on disposable systemd hosts (Linux only): an
+    // older host with the minimum Node on x64, and a current one on ARM64.
     deployment: serverChanged || consoleChanged,
     e2e: frontend ? e2eMatrix(e2eFull) : [],
     safari: (frontend && e2eFull) || has("safari"),

@@ -898,6 +898,18 @@ No Linux o serviço do sistema roda como o dono do checkout, e o instalador recu
 | Windows 10/11, Server 2019+ | x64, arm64 | SCM, quando o serviço `RemoteIFES` existir | lançador sob demanda (+ tarefa `ONLOGON` opcional) | `Get-WinEvent` |
 | macOS 12+ | arm64, x64 | `launchctl`, quando o agente existir | `LaunchAgent` com `RunAtLoad=false` | `log show` |
 
+Suportado não é o mesmo que executado na CI. O que a CI instala e roda, e o que ela só constrói:
+
+| Plataforma | Na CI | Como |
+|---|---|---|
+| Linux arm64 | **instalado e executado** | testes do servidor, pacotes do console e o ensaio de implantação com systemd num runner Ubuntu 24.04 ARM64 |
+| Linux x64 | **instalado e executado** | testes do console, pacotes, o servidor sob os testes E2E e o ensaio de implantação num Ubuntu 22.04 com o Node mínimo |
+| Windows x64, macOS arm64 | **instalado e executado** | testes do servidor e do console, instalação e execução dos pacotes |
+| Linux armv7, Windows arm64, macOS x64 | construído, **não executado** | o payload é o mesmo JavaScript das outras arquiteturas; só o Node do host muda |
+| Raspberry Pi físico com Raspberry Pi OS | **não executado** | nenhum runner é um Pi; o ARM64 da CI é Ubuntu em servidor ARM |
+
+O Node mínimo declarado (22.13.0) roda nos testes Linux do servidor e do console e no ensaio de implantação mais antigo; os demais usam o 22.x mais recente.
+
 Onde uma capacidade não existe, o console diz por quê. "Não instalado", "sem permissão", "indisponível", "não se aplica" e "não suportado aqui" são estados distintos, visíveis na aba **Programa**. O servidor recusa a operação de verdade: botão desabilitado não é controle de acesso.
 
 A arquitetura não é decidida por `uname -m`. Um Raspberry Pi 3 pode ter hardware e kernel de 64 bits com userland de 32 bits, e quem decide o artefato é `process.arch`, a arquitetura do runtime que de fato vai executar. O console classifica hardware, kernel, userland e runtime separadamente e mostra os quatro.
@@ -1164,7 +1176,7 @@ Reinstalar o console não toca no `remoteifes.service` nem no banco. Para remov�
 
 ## Hospedagem em Raspberry Pi
 
-Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é suficiente para rodar `remoteifes-server`: o `node:sqlite` usado pelo projeto é nativo do próprio Node.js, então não há dependências compiladas nem ferramentas de build a instalar no dispositivo.
+Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é suficiente para rodar `remoteifes-server`: o `node:sqlite` usado pelo projeto é nativo do próprio Node.js, então não há dependências compiladas nem ferramentas de build a instalar no dispositivo. A CI executa a instalação completa em Linux ARM64, a mesma arquitetura de um Pi de 64 bits, mas não num Pi físico nem em ARMv7 (veja [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados)).
 
 Clone o repositório e siga somente [Linux com systemd](#linux-com-systemd); se quiser Nginx, continue em [Proxy reverso](#proxy-reverso). Cadastre redes adicionais depois com `npm run redes -- 10.10.0.0/16`.
 
@@ -1705,22 +1717,23 @@ O contrato do `GET /health`, usado pelo CI, pelo watchdog e pelas implantações
 
 | Mudança em | Validação rápida | Validação completa acrescenta |
 |---|---|---|
-| `remoteifes-server/` | servidor em Ubuntu, Windows e macOS; Console de Operações; end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
-| `remoteifes-console/` | Console de Operações e instalação do pacote nos três sistemas | — |
-| `remoteifes-web/` | contratos do frontend nos testes do servidor (Ubuntu); end-to-end Chromium; Cordova; builds Android e iOS | end-to-end em todos os navegadores; Safari nativo |
+| `remoteifes-server/` | servidor em Linux ARM64, Windows e macOS; Console de Operações; ensaio de implantação; end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
+| `remoteifes-console/` | Console de Operações nos três sistemas; instalação do pacote em Linux x64 e ARM64, Windows e macOS; ensaio de implantação | — |
+| `remoteifes-web/` | contratos do frontend nos testes do servidor (Linux ARM64); end-to-end Chromium; Cordova; builds Android e iOS | end-to-end em todos os navegadores; Safari nativo |
 | `remoteifes-cordova/` | contratos do app nos testes do servidor; Cordova; builds Android e iOS | — |
 | `remoteifes-esp32/` | build do firmware; contratos de dispositivo nos testes do servidor | — |
 | `e2e/specs/` | end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
 | `e2e/` (harness, configuração, lockfile) | end-to-end em todos os navegadores; Safari nativo | — |
-| `README.md`, `docs/`, scripts Git da raiz | testes de contrato da documentação (servidor, Ubuntu) | — |
+| `README.md`, `docs/`, scripts Git da raiz | testes de contrato da documentação (servidor, Linux ARM64) | — |
 | `.github/workflows/`, `.github/scripts/`, caminho não mapeado ou diff indeterminável | validação completa de tudo | — |
 
 Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também contam. As regras ficam em `.github/scripts/select-checks.js`, testadas por `select-checks.test.js` no próprio job de seleção. Uma execução nova no mesmo pull request ou ramo cancela a anterior; um **Run workflow** nunca é cancelado por um push posterior, e o deploy do GitHub Pages nunca é interrompido no meio.
 
 O que cada job cobre:
 
-- servidor (`npm test` + health check); os testes do servidor incluem os contratos do frontend, do app Cordova, do firmware e da documentação;
-- Console de Operações (`npm test` + medição de recursos) e pacote instalável (build, procedência, instalação a partir do artefato, execução pelo lançador sem ferramentas de desenvolvimento no PATH, `.deb` no Linux, desinstalação preservando o estado) em Ubuntu, Windows e macOS;
+- servidor (`npm test` + health check) em Linux ARM64 com o Node mínimo declarado (22.13.0) e em Windows e macOS com o 22.x mais recente; os testes do servidor incluem os contratos do frontend, do app Cordova, do firmware e da documentação;
+- Console de Operações (`npm test` + medição de recursos) em Ubuntu (Node 22.13.0), Windows e macOS, e pacote instalável (build, procedência, instalação a partir do artefato, execução pelo lançador sem ferramentas de desenvolvimento no PATH, `.deb` no Linux, desinstalação preservando o estado) em Linux x64 e ARM64, Windows e macOS;
+- ensaio de implantação (`ensaio-implantacao.sh`: instalação pelo systemd com o confinamento da unidade, atualização, reversão, backup e restauração, proxy reverso e o `.deb` do console) num Ubuntu 22.04 x64 com o Node mínimo e num Ubuntu 24.04 ARM64;
 - frontend end-to-end (Playwright) em Ubuntu com Chromium, Firefox e WebKit, em Windows com o Microsoft Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox, e em macOS com o Google Chrome do sistema, cada combinação dividida em shards independentes (cada shard sobe seu próprio harness);
 - Safari nativo: `e2e/harness/safari-smoke.js` dirige o Safari do macOS pelo `safaridriver` (WebDriver, sem dependência npm), contra os mesmos servidores do harness — portal, login pela interface, sala com ESP32 simulado por WebSocket, ligar/desligar, administração, logout, ausência de rolagem horizontal e de erros de JavaScript. O WebKit do Playwright não é usado como evidência de Safari. O mesmo smoke no Safari de um iPhone do iOS Simulator só roda sob demanda (**Run workflow** com `ios_safari`), porque nos runners hospedados o pareamento do `safaridriver` com o simulador e a entrega dos toques foram intermitentes; ele é um diagnóstico, não uma evidência exigida;
 - validação de configuração Cordova em Ubuntu e Windows (o checkout com CRLF do Windows exercita a restauração byte a byte de `harden-config.js`);
