@@ -8,10 +8,6 @@ function escapeHtml(texto) {
 }
 
 const RoomsData = {
-  montarCodigo(bloco, andar, numero) {
-    return `${bloco}${andar}0${numero}`;
-  },
-
   rotulo(sala) {
     const valor = String(sala ?? "");
     const internaBlocoB2 = valor.match(/^B20(\d{1,2})$/);

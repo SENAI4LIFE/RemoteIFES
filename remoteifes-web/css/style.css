@@ -464,8 +464,6 @@ body {
   .btn-block { margin-top: 14px; }
   #loginForm button { margin-top: 14px; }
   label { margin: 8px 0 4px; }
-  .status-row { padding: 4px 0; }
-  .power-row { margin-bottom: 14px; }
   .portal-welcome { padding: 18px 20px; }
   .portal-options { padding: 6px; }
   .portal-option { padding: 10px 10px; }
@@ -799,15 +797,6 @@ button.btn:disabled {
   color: var(--ifes-green-dark);
 }
 
-.status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-}
-.status-label { color: var(--text-muted); font-size: calc(14px * var(--a11y-font-scale)); }
-.status-value { font-size: calc(15px * var(--a11y-font-scale)); font-weight: 500; }
-
 .status-badge {
   font-size: calc(13px * var(--a11y-font-scale));
   font-weight: 600;
@@ -820,9 +809,6 @@ button.btn:disabled {
 .status-badge.on { background: var(--ifes-green-soft); color: var(--ifes-green-dark); }
 .status-badge.off { background: var(--surface-muted); color: var(--text-muted); }
 .status-badge.inativo { background: #fbefc7; color: #6f560f; }
-
-.power-row { display: flex; gap: 12px; margin-bottom: 20px; }
-.power-row .btn { flex: 1; }
 
 .btn-on { background: var(--ifes-green); color: var(--texto-sobre-destaque); }
 .btn-on:hover { background: var(--ifes-green-dark); }
@@ -1422,8 +1408,6 @@ button.btn:disabled {
   border-top-color: var(--ifes-green);
 }
 .tab-btn.hidden { display: none; }
-
-.senha-area { font-family: monospace; margin-top: 6px; }
 
 .grade-scroll {
   margin-bottom: 12px;
@@ -2924,9 +2908,6 @@ body:has(#mainApp:not(.hidden)) { --fab-base: calc(var(--tabbar-h) + 12px + var(
 }
 .server-status-dot-offline { background: var(--danger); animation: server-status-dot-pulse 1.4s ease-in-out infinite; }
 .server-status-dot-manutencao { background: var(--warn); }
-.server-status-acesso-admin {
-  margin-top: 4px;
-}
 .server-status-title {
   margin: 0 0 8px;
   color: var(--text);
@@ -3273,7 +3254,7 @@ textarea {
   resize: vertical;
 }
 
-.topbar, .topbar-right, .screen-head, .room-name, .status-row, .notif-panel-head {
+.topbar, .topbar-right, .screen-head, .room-name, .notif-panel-head {
   flex-wrap: wrap;
 }
 
