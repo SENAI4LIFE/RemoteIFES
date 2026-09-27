@@ -792,6 +792,7 @@ Faça a instalação pelo fluxo único de [Linux com systemd](#linux-com-systemd
 `install-service.sh`:
 
 - grava `NODE_ENV=production` no `.env` e cria o serviço `remoteifes.service` (`Restart=always`, `After=network-online.target`, início automático no boot, limite de reinícios contra loop de falha);
+- confina o serviço com o que o systemd oferece e o servidor não usa: sem dispositivos, parâmetros e módulos do kernel, log do kernel, relógio, nome do host, namespaces nem arquivos setuid, só sockets `AF_UNIX`/`AF_INET`/`AF_INET6`, e arquivos criados só para o usuário do serviço (`UMask=0077`), além de `NoNewPrivileges`, `PrivateTmp` e `ProtectSystem=full`. O banco fica legível só por esse usuário. Numa instalação existente, rodar `sudo bash install-service.sh` de novo aplica a unidade atual sem tocar nos dados;
 - instala um **watchdog** (`remoteifes-health.timer`) que checa o `/health` a cada 2 minutos e reinicia o serviço após 3 falhas seguidas;
 - pergunta a(s) faixa(s) de IP da rede local a autorizar (veja abaixo).
 
