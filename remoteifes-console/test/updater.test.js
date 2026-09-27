@@ -202,9 +202,31 @@ test("a publication without its attestation installs nothing", async (t) => {
 
   const r = await amb.atualizador.atualizar("2.0.0", { log: () => {} });
   assert.equal(r.ok, false);
-  assert.match(r.erro, /atestação de proveniência/);
+  assert.match(r.erro, /não traz a atestação/);
   assert.ok(!servidor.pedidos.some((p) => p.url.endsWith(".tar.gz")), "the artifact is never even downloaded");
-  assert.equal(JSON.parse(fs.readFileSync(path.join(raiz, "estado-instalacao.json"), "utf8")).versaoAtiva, "1.0.0");
+  assert.equal(amb.atualizador.lerEstadoInstalacao().versaoAtiva, "1.0.0");
+});
+
+test("a genuine older release offered as the newest installs nothing", async (t) => {
+  // Replay: the origin serves a real, correctly attested release that is older than the installed
+  // one. The attestation is genuine; the version policy is what stops it.
+  const servidor = await servidorDeRelease(await publicacao({ versao: "1.5.0" }));
+  const raiz = instalacaoFalsa("2.0.0");
+  const amb = ambienteDeAtualizacao({ base: servidor.base, raizInstalacao: raiz });
+  t.after(async () => {
+    await servidor.fechar();
+    amb.restaurar();
+    fs.rmSync(raiz, { recursive: true, force: true });
+  });
+
+  const publicada = await amb.atualizador.verificarPublicacao();
+  assert.equal(publicada.ok, true, publicada.motivo);
+  assert.equal(amb.release.politicaDeVersao(publicada.manifesto, "2.0.0").ok, false);
+
+  const r = await amb.atualizador.atualizar("1.5.0", { log: () => {} });
+  assert.equal(r.ok, false);
+  assert.ok(!servidor.pedidos.some((p) => p.url.endsWith(".tar.gz")), "nothing downloaded");
+  assert.equal(amb.atualizador.lerEstadoInstalacao().versaoAtiva, "2.0.0");
 });
 
 test("an attested release with no artifact for this system and architecture installs nothing", async (t) => {
@@ -511,6 +533,7 @@ test("the status distinguishes installed, published and stale observation", asyn
 
   const s = await atualizador.situacao({ consultarRede: false });
   assert.equal(s.versaoAtivaRegistrada, "1.0.0");
+  assert.equal(s.consultaAgora, null, "without an explicit check nothing is fetched");
   assert.ok(s.alvo.includes(process.arch));
   assert.match(s.observacaoDeDistribuicao, /independente do commit do RemoteIFES/);
 });
@@ -803,9 +826,10 @@ test("a pending restart is not announced as a version that did not start", async
   const pendente = await atualizador.situacao();
   assert.ok(pendente.divergenciaDeVersao, "the status must still report the mismatch");
   assert.equal(pendente.divergenciaDeVersao.reinicioPendente, true, "but as a pending restart, not as a failure");
-  assert.match(pendente.divergenciaDeVersao.motivo, /reinício está pendente/);
+  assert.match(pendente.divergenciaDeVersao.motivo, /passa a valer quando o console reiniciar/);
 
-  // Old transaction: then it is an activation failure.
+  // A swap from before this process started: the process loaded after the pointer moved and still
+  // runs the previous version, so the new one did not start.
   const velho = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   fs.writeFileSync(
     path.join(raiz, "estado-instalacao.json"),
@@ -819,7 +843,7 @@ test("a pending restart is not announced as a version that did not start", async
   );
   const falha = await atualizador.situacao();
   assert.ok(falha.divergenciaDeVersao);
-  assert.ok(!falha.divergenciaDeVersao.reinicioPendente, "one hour later it is no longer a pending restart");
+  assert.ok(!falha.divergenciaDeVersao.reinicioPendente, "a process started after the swap is not waiting for a restart");
   assert.match(falha.divergenciaDeVersao.motivo, /não subiu/);
 });
 

@@ -1,0 +1,60 @@
+{
+  "esquema": 1,
+  "versao": "0.0.1",
+  "canal": "estavel",
+  "publicadoEm": "2026-09-27T12:44:41.000Z",
+  "commit": "ef9f4b34fd3298f3c1e5af3d528d48ea1f8e6dca",
+  "minimoParaAtualizar": null,
+  "notas": "https://github.com/SENAI4LIFE/RemoteIFES/releases/tag/console-v0.0.1",
+  "artefatos": [
+    {
+      "alvo": "linux-x64",
+      "formato": "tar.gz",
+      "arquivo": "remoteifes-console-0.0.1-linux-x64.tar.gz",
+      "sha256": "db30ad92ea7b85dc5e019e9d79e7baf69fa16fa5b0e0c10dfb9d1ca254d05dc2",
+      "bytes": 535456
+    },
+    {
+      "alvo": "linux-arm64",
+      "formato": "tar.gz",
+      "arquivo": "remoteifes-console-0.0.1-linux-arm64.tar.gz",
+      "sha256": "db30ad92ea7b85dc5e019e9d79e7baf69fa16fa5b0e0c10dfb9d1ca254d05dc2",
+      "bytes": 535456
+    },
+    {
+      "alvo": "linux-arm",
+      "formato": "tar.gz",
+      "arquivo": "remoteifes-console-0.0.1-linux-arm.tar.gz",
+      "sha256": "db30ad92ea7b85dc5e019e9d79e7baf69fa16fa5b0e0c10dfb9d1ca254d05dc2",
+      "bytes": 535456
+    },
+    {
+      "alvo": "windows-x64",
+      "formato": "tar.gz",
+      "arquivo": "remoteifes-console-0.0.1-windows-x64.tar.gz",
+      "sha256": "db30ad92ea7b85dc5e019e9d79e7baf69fa16fa5b0e0c10dfb9d1ca254d05dc2",
+      "bytes": 535456
+    },
+    {
+      "alvo": "windows-arm64",
+      "formato": "tar.gz",
+      "arquivo": "remoteifes-console-0.0.1-windows-arm64.tar.gz",
+      "sha256": "db30ad92ea7b85dc5e019e9d79e7baf69fa16fa5b0e0c10dfb9d1ca254d05dc2",
+      "bytes": 535456
+    },
+    {
+      "alvo": "macos-x64",
+      "formato": "tar.gz",
+      "arquivo": "remoteifes-console-0.0.1-macos-x64.tar.gz",
+      "sha256": "db30ad92ea7b85dc5e019e9d79e7baf69fa16fa5b0e0c10dfb9d1ca254d05dc2",
+      "bytes": 535456
+    },
+    {
+      "alvo": "macos-arm64",
+      "formato": "tar.gz",
+      "arquivo": "remoteifes-console-0.0.1-macos-arm64.tar.gz",
+      "sha256": "db30ad92ea7b85dc5e019e9d79e7baf69fa16fa5b0e0c10dfb9d1ca254d05dc2",
+      "bytes": 535456
+    }
+  ]
+}
