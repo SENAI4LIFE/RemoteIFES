@@ -9,6 +9,8 @@ const path = require("node:path");
 const { classify, selectChecks, verifyResults, parseNameStatus, JOBS } = require("./select-checks");
 
 const ALL_OS = ["ubuntu-latest", "windows-latest", "macos-latest"];
+const SERVER_OS = ["ubuntu-24.04-arm", "windows-latest", "macos-latest"];
+const PACKAGES_OS = [...ALL_OS, "ubuntu-24.04-arm"];
 
 function plan(paths, { fullDepth = false, allScope = false } = {}) {
   return selectChecks({ areas: paths === null ? null : classify(paths), fullDepth, allScope });
@@ -22,28 +24,28 @@ test("console changes select console tests and native package checks only", () =
   const p = plan(["remoteifes-console/src/servidor.js"]);
   assert.deepEqual(selected(p), ["console", "packages", "deployment"]);
   assert.deepEqual(p.jobs.console, ALL_OS);
-  assert.deepEqual(p.jobs.packages, ALL_OS);
+  assert.deepEqual(p.jobs.packages, PACKAGES_OS);
 });
 
 test("firmware changes select the firmware build and the server device contracts", () => {
   const p = plan(["remoteifes-esp32/src/main.ino"]);
   assert.deepEqual(selected(p), ["server", "firmware"]);
-  assert.deepEqual(p.jobs.server, ["ubuntu-latest"]);
+  assert.deepEqual(p.jobs.server, ["ubuntu-24.04-arm"]);
 });
 
 test("web changes select contracts, fast Chromium E2E and dependent mobile packaging", () => {
   const p = plan(["remoteifes-web/css/style.css"]);
   assert.deepEqual(selected(p), ["server", "e2e", "cordova", "android", "ios"]);
-  assert.deepEqual(p.jobs.server, ["ubuntu-latest"]);
+  assert.deepEqual(p.jobs.server, ["ubuntu-24.04-arm"]);
   assert.ok(p.jobs.e2e.every((e) => e.os === "ubuntu-latest" && e.browser === "chromium"));
   assert.equal(p.jobs.e2e.length, 4);
   assert.equal(p.jobs.safari, false);
 });
 
-test("server changes select server on every OS, the console and frontend integration", () => {
+test("server changes select server on every OS (Linux on ARM64), the console and frontend integration", () => {
   const p = plan(["remoteifes-server/src/app.js"]);
   assert.deepEqual(selected(p), ["server", "console", "deployment", "e2e"]);
-  assert.deepEqual(p.jobs.server, ALL_OS);
+  assert.deepEqual(p.jobs.server, SERVER_OS);
 });
 
 test("server lockfile changes are server changes", () => {
@@ -57,7 +59,7 @@ test("Cordova changes select mobile validation and the server app contracts", ()
 test("documentation changes select only the documentation contract tests", () => {
   const p = plan(["README.md", "docs/Projeto_AC.pdf"]);
   assert.deepEqual(selected(p), ["server"]);
-  assert.deepEqual(p.jobs.server, ["ubuntu-latest"]);
+  assert.deepEqual(p.jobs.server, ["ubuntu-24.04-arm"]);
 });
 
 test("E2E spec changes run Chromium; harness or lockfile changes run every browser", () => {

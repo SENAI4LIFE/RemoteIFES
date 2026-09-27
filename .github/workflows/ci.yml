@@ -85,9 +85,11 @@ jobs:
         os: ${{ fromJSON(needs.changes.outputs.server_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The Linux leg runs the minimum Node the project declares (engines: >=22.13.0), so a newer
+      # API cannot slip in unnoticed; the other legs run the newest 22.x.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: ${{ startsWith(matrix.os, 'ubuntu') && '22.13.0' || '22' }}
           cache: npm
           cache-dependency-path: remoteifes-server/package-lock.json
       - run: npm ci
@@ -122,9 +124,10 @@ jobs:
         os: ${{ fromJSON(needs.changes.outputs.console_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # As in the server job: the minimum supported Node on Linux, the newest 22.x elsewhere.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: ${{ startsWith(matrix.os, 'ubuntu') && '22.13.0' || '22' }}
           cache: npm
           cache-dependency-path: |
             remoteifes-server/package-lock.json
@@ -452,11 +455,19 @@ jobs:
   # every step; no ESP32 hardware is involved. The runner is discarded afterwards, which is what
   # makes installing units, nginx and a .deb here acceptable.
   deployment:
-    name: Deployment rehearsal (ubuntu-latest)
+    name: Deployment rehearsal (${{ matrix.os }}, Node ${{ matrix.node }})
     needs: changes
     if: needs.changes.outputs.deployment == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # An older supported host (systemd 249) with the minimum Node, on x64; and a current one
+          # on ARM64, the Raspberry Pi 64-bit architecture, with the newest 22.x.
+          - { os: ubuntu-22.04, node: "22.13.0" }
+          - { os: ubuntu-24.04-arm, node: "22" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -464,7 +475,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
       - name: Rehearse the production installation
         run: sudo env ENSAIO_HOST_DESCARTAVEL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh
 
