@@ -1,18 +1,24 @@
 const FUSO = "America/Sao_Paulo";
 
+// Built once, at load. The first time-zone formatter a process creates loads ICU's time-zone data,
+// which on a cold host takes hundreds of milliseconds; left to the first call, that cost landed on
+// the first client after a restart (the status message built for its connection computes each
+// room's schedule) and showed the connecting screen over a working socket. Reusing the instance
+// also spares every later call from building a new formatter.
+const FORMATADOR_PARTES = new Intl.DateTimeFormat("en-CA", {
+  timeZone: FUSO,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
 function partesAgoraBrasilia(instante = new Date()) {
-  const formatador = new Intl.DateTimeFormat("en-CA", {
-    timeZone: FUSO,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
   const partes = {};
-  for (const { type, value } of formatador.formatToParts(instante)) {
+  for (const { type, value } of FORMATADOR_PARTES.formatToParts(instante)) {
     if (type !== "literal") partes[type] = value;
   }
   return partes;
