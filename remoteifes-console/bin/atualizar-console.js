@@ -8,8 +8,13 @@
 // Usage:
 //   node bin/atualizar-console.js <versao>
 //   node bin/atualizar-console.js --reverter
+//   node bin/atualizar-console.js --importar <pasta-do-release>
 //   node bin/atualizar-console.js --importar <manifesto.json> <atestacao.sigstore.json> <artefato>
+//
+// --importar serves a host without Internet: the release's files arrive on removable media and are
+// verified here exactly as a download would be, without touching the network.
 
+const fs = require("fs");
 const path = require("path");
 
 const raiz = path.join(__dirname, "..");
@@ -33,8 +38,11 @@ async function main() {
   }
 
   if (args[0] === "--importar") {
-    const [, manifesto, atestacao, artefato] = args;
-    const r = await atualizador.importarOffline({ manifesto, atestacao, artefato, log });
+    const [, primeiro, atestacao, artefato] = args;
+    const umaPasta = primeiro && !atestacao && fs.existsSync(primeiro) && fs.statSync(primeiro).isDirectory();
+    const r = await atualizador.importarOffline(
+      umaPasta ? { diretorio: primeiro, log } : { manifesto: primeiro, atestacao, artefato, log }
+    );
     if (!r.ok) {
       console.error(r.erro);
       return 1;
@@ -50,7 +58,10 @@ ${r.resumo}`);
 
   const versao = args[0];
   if (!versao) {
-    console.error("uso: atualizar-console.js <versao> | --reverter | --importar <manifesto.json> <atestacao.sigstore.json> <artefato>");
+    console.error(
+      "uso: atualizar-console.js <versao> | --reverter | --importar <pasta-do-release> | " +
+        "--importar <manifesto.json> <atestacao.sigstore.json> <artefato>"
+    );
     return 2;
   }
 

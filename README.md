@@ -1010,7 +1010,9 @@ Antes de abrir o navegador, o lançador confere a identidade de quem responde na
 
 A versão do console é independente do commit do RemoteIFES implantado, e as duas atualizações não se misturam. Atualizar o console baixa um artefato de release, confere a atestação de proveniência do GitHub e o SHA-256 do artefato, instala a versão nova ao lado da atual e troca o ponteiro. Reverter é trocar o ponteiro de volta, sem rede. O processo não usa `git`, não copia o checkout e não consome o `origin/main` da aplicação.
 
-Toda cópia instalada confere os releases sozinha: instalar, iniciar ou implantar não pede nenhuma etapa de chave ou de confiança. Enquanto não houver release publicado, a aba **Programa** diz que não há publicação, e atualizar o console é reinstalar o pacote.
+O console instalado se atualiza sozinho: verifica em segundo plano duas vezes por dia, instala uma versão nova atestada ao lado da atual e a carrega no próximo início, sem derrubar ninguém. A ação **Atualizar o Console de Operações** faz o mesmo na hora. Instalar, iniciar ou implantar não pede nenhuma etapa de chave ou de confiança. Enquanto não houver release publicado, a aba **Programa** diz que não há publicação.
+
+Sem Internet, isso é um estado normal, não uma falha. Nada local espera pela rede, a versão instalada fica como está, e as tentativas seguintes esperam cada vez mais, até um dia. Quando a rede volta, a próxima tentativa agendada funciona sozinha. Um campus sem Internet recebe a pasta do release em mídia removível e a instala com `node bin/atualizar-console.js --importar <pasta>`, com a mesma verificação.
 
 #### Versão nova que falha depois de subir
 
@@ -1737,7 +1739,7 @@ O **RemoteIFES** não depende da API do GitHub em tempo de execução: nenhuma o
 O **Console de Operações** é a exceção, e é uma exceção deliberada e sob demanda:
 
 - a aba *Aplicativo e CI* consulta a API do GitHub **somente quando alguém clica**, para mostrar o estado das execuções de CI. A credencial fica no estado do console, nunca volta por API e não acompanha redirecionamento para outro host;
-- a atualização do **programa console** busca o manifesto, a atestação e o artefato de release por HTTPS, e a raiz de confiança do Sigstore, **sem enviar credencial alguma** em nenhum salto. Ela só aceita o que a atestação de proveniência do GitHub e o digest confirmarem.
+- a atualização do **programa console** busca o manifesto, a atestação e o artefato de release por HTTPS, e a raiz de confiança do Sigstore, **sem enviar credencial alguma** em nenhum salto. Ela só aceita o que a atestação de proveniência do GitHub e o digest confirmarem. Roda em segundo plano, em horário próprio e com recuo crescente quando não há rede, e nunca dentro de uma página, de uma requisição ou da partida.
 
 Nenhum dos dois é pré-requisito de operação: sem rede, o console continua administrando o host, e a aplicação continua operando o prédio.
 

@@ -362,8 +362,9 @@ const ACOES = [
     rotulo: "Atualizar o Console de Operações",
     grupo: "atualizacao",
     proposito:
-      "Instala uma versão publicada do console: baixa o artefato do release, confere a atestação de proveniência " +
-      "do GitHub e o digest, instala lado a lado e troca a versão ativa. Não usa git nem o checkout do RemoteIFES.",
+      "Instala agora uma versão publicada do console: baixa o artefato do release, confere a atestação de proveniência " +
+      "do GitHub e o digest, instala lado a lado e troca a versão ativa. Não usa git nem o checkout do RemoteIFES. " +
+      "Sem esta ação, o próprio console instala a versão nova sozinho e a carrega no próximo início.",
     impacto:
       "Esta sessão do console cai por alguns segundos e a página reconecta sozinha. O RemoteIFES não é afetado. " +
       "A versão anterior fica guardada e a reversão é uma troca de ponteiro.",

@@ -71,10 +71,12 @@ rollback para revisão anterior ao console **apagaria** este diretório. Por iss
   nenhuma unidade menciona uma versão;
 * o estado fica em `/var/lib/remoteifes-console` (Linux, escopo de sistema), fora do checkout e
   fora do `data/` da aplicação;
-* atualizar o console é uma **ação explícita** que baixa um artefato de release, confere a
-  atestação de proveniência do GitHub (o workflow de publicação deste repositório, para a etiqueta
-  daquela versão) e o digest, instala lado a lado e troca a versão ativa. Não usa git, não copia o
-  checkout e não depende do `origin/main` da aplicação;
+* atualizar o console baixa um artefato de release, confere a atestação de proveniência do
+  GitHub (o workflow de publicação deste repositório, para a etiqueta daquela versão) e o digest,
+  instala lado a lado e troca a versão ativa. O próprio console verifica em segundo plano e ativa
+  a versão nova no próximo início; a ação explícita instala e reinicia na hora. Não usa git, não
+  copia o checkout e não depende do `origin/main` da aplicação, e sem Internet nada disso atrasa
+  ou bloqueia o resto (DISTRIBUICAO.md, seção 5);
 * reverter é trocar o ponteiro de volta para a versão anterior, já verificada, **sem rede**.
 
 Trabalhos longos rodam sob um **supervisor** (`bin/supervisionar.js`) iniciado em grupo de processos

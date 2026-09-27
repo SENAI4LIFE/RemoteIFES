@@ -5,6 +5,7 @@ const http = require("http");
 const crypto = require("crypto");
 const { URL } = require("url");
 const zlib = require("zlib");
+const { pipeline, finished } = require("stream");
 const config = require("./config");
 const estado = require("./estado");
 const release = require("./release");
@@ -40,6 +41,10 @@ const LIMITE_ARTEFATO = 120 * 1024 * 1024;
 // entries.
 const LIMITE_DESCOMPRIMIDO = 400 * 1024 * 1024;
 const LIMITE_ARQUIVOS_PAYLOAD = 5000;
+
+// Hard deadlines for whole transfers, redirects included (see baixar). The manifest and the
+// attestation are small; the artifact gets the time a slow campus link needs.
+const PRAZOS = { consultaMs: 30_000, artefatoMs: 15 * 60 * 1000 };
 
 function raizInstalacao() {
   return config.RAIZ_INSTALACAO;
@@ -190,9 +195,44 @@ function versaoEmExecucao() {
   }
 }
 
+/**
+ * The version a publication must be newer than: the running one or, when the pointer already
+ * names a newer one waiting for the next start, that one. Comparing with the running version alone
+ * would let an older publication move the pointer back while a restart is pending.
+ */
+function versaoDeReferencia() {
+  const emExecucao = versaoEmExecucao();
+  const ativa = lerEstadoInstalacao().versaoAtiva;
+  if (ativa && RE_VERSAO.test(String(ativa)) && (!emExecucao || release.compararVersoes(ativa, emExecucao) > 0)) return ativa;
+  return emExecucao;
+}
+
 // --- Discovery ------------------------------------------------------------------------------
 
-function baixar(url, { destino = null, limiteBytes = LIMITE_ARTEFATO, saltos = 0, timeoutMs = 120_000 } = {}) {
+// Transport failures that mean "the publication cannot be reached now", as opposed to an origin
+// that answered. On a campus without Internet they are the normal state: the check is deferred and
+// reported as its own result, never as a fault of the Console or of RemoteIFES. TLS failures are
+// here too: a captive portal or an intercepting proxy is also "no usable Internet".
+const CODIGOS_DE_REDE = new Set([
+  "ENOTFOUND", "EAI_AGAIN", "EAI_FAIL", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENETUNREACH", "ENETDOWN",
+  "EHOSTUNREACH", "EHOSTDOWN", "EPIPE", "ECONNABORTED", "EPROTO", "ERR_STREAM_PREMATURE_CLOSE",
+]);
+
+function falhaDeRede(erro) {
+  const codigo = (erro && erro.code) || "";
+  return CODIGOS_DE_REDE.has(codigo) || /^(ERR_TLS_|ERR_SSL_|CERT_|UNABLE_TO_|SELF_SIGNED|DEPTH_ZERO)/.test(codigo);
+}
+
+/**
+ * GET with a hard deadline for the WHOLE transfer, redirects included.
+ *
+ * A socket timeout alone does not bound a request: a peer that sends one byte now and then, or a
+ * name lookup that hangs, would keep it open for as long as they like. `prazoMs` closes that.
+ * Returns the body as a Buffer (the manifest is attested as bytes) or writes it to `destino`,
+ * which is removed on any failure: a partial download never stays behind looking like a file.
+ * `rede: true` marks the failures that mean "try again later".
+ */
+function baixar(url, { destino = null, limiteBytes = LIMITE_ARTEFATO, prazoMs = 60_000, saltos = 0, inicio = Date.now() } = {}) {
   let alvo;
   try {
     alvo = new URL(url);
@@ -206,8 +246,28 @@ function baixar(url, { destino = null, limiteBytes = LIMITE_ARTEFATO, saltos = 0
     return Promise.resolve({ ok: false, erro: "download só é aceito por HTTPS" });
   }
   if (saltos > 3) return Promise.resolve({ ok: false, erro: "mais de 3 redirecionamentos" });
+  const restante = prazoMs - (Date.now() - inicio);
+  if (restante <= 0) return Promise.resolve({ ok: false, erro: "tempo esgotado", rede: true });
 
   return new Promise((resolve) => {
+    let concluido = false;
+    let prazo = null;
+    // Never throws: on Windows a file still open by the write stream cannot be removed yet, and the
+    // stream's own end tries again (aoTerminar).
+    const removerParcial = () => {
+      if (!destino) return;
+      try {
+        fs.rmSync(destino, { force: true });
+      } catch {}
+    };
+    const concluir = (resultado) => {
+      if (concluido) return;
+      concluido = true;
+      clearTimeout(prazo);
+      if (!resultado.ok) removerParcial();
+      resolve(resultado);
+    };
+
     const req = transporte.request(
       {
         protocol: alvo.protocol,
@@ -216,58 +276,64 @@ function baixar(url, { destino = null, limiteBytes = LIMITE_ARTEFATO, saltos = 0
         path: `${alvo.pathname}${alvo.search}`,
         method: "GET",
         headers: { "User-Agent": "remoteifes-console", Accept: "*/*" },
-        timeout: timeoutMs,
+        timeout: Math.min(restante, 30_000),
       },
       (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
           const proximo = new URL(res.headers.location, alvo).toString();
-          return resolve(baixar(proximo, { destino, limiteBytes, saltos: saltos + 1, timeoutMs }));
+          clearTimeout(prazo);
+          concluido = true;
+          return resolve(baixar(proximo, { destino, limiteBytes, prazoMs, saltos: saltos + 1, inicio }));
         }
         if (res.statusCode !== 200) {
           res.resume();
-          return resolve({ ok: false, erro: `HTTP ${res.statusCode}`, status: res.statusCode });
+          // 404 is an answer ("nothing published there"); any other status is an origin, proxy or
+          // storage that cannot serve the file now.
+          return concluir({ ok: false, erro: `HTTP ${res.statusCode}`, status: res.statusCode, rede: res.statusCode !== 404 });
         }
         let bytes = 0;
+        let excedeu = false;
+        const partes = [];
+        res.on("data", (d) => {
+          bytes += d.length;
+          if (bytes > limiteBytes) {
+            excedeu = true;
+            res.destroy();
+            return;
+          }
+          if (!destino) partes.push(d);
+        });
+        const aoTerminar = (erro) => {
+          // Already decided (the deadline): the stream is closed now, so the partial file can go.
+          if (concluido) {
+            if (erro || !res.complete) removerParcial();
+            return undefined;
+          }
+          if (excedeu) return concluir({ ok: false, erro: destino ? "download passou do limite de tamanho" : "resposta grande demais" });
+          // `complete` is false when the connection closed before the body the server announced.
+          if (erro || !res.complete) {
+            return concluir({ ok: false, erro: erro && erro.code ? erro.code : "transferência incompleta", rede: true });
+          }
+          return concluir(destino ? { ok: true, arquivo: destino, bytes } : { ok: true, conteudo: Buffer.concat(partes), bytes });
+        };
         if (destino) {
           fs.mkdirSync(path.dirname(destino), { recursive: true });
-          const fluxo = fs.createWriteStream(destino, { mode: 0o600 });
-          let abortado = false;
-          res.on("data", (d) => {
-            bytes += d.length;
-            if (bytes > limiteBytes) {
-              abortado = true;
-              req.destroy();
-              fluxo.destroy();
-              fs.rmSync(destino, { force: true });
-              resolve({ ok: false, erro: "download passou do limite de tamanho" });
-            }
-          });
-          res.pipe(fluxo);
-          fluxo.on("finish", () => {
-            if (!abortado) resolve({ ok: true, arquivo: destino, bytes });
-          });
-          fluxo.on("error", (erro) => resolve({ ok: false, erro: erro.message }));
-          return;
+          pipeline(res, fs.createWriteStream(destino, { mode: 0o600 }), aoTerminar);
+        } else {
+          finished(res, aoTerminar);
         }
-        let texto = "";
-        res.setEncoding("utf8");
-        res.on("data", (d) => {
-          bytes += Buffer.byteLength(d);
-          if (bytes > 2 * 1024 * 1024) {
-            req.destroy();
-            return resolve({ ok: false, erro: "resposta grande demais" });
-          }
-          texto += d;
-        });
-        res.on("end", () => resolve({ ok: true, texto, bytes }));
       }
     );
+    prazo = setTimeout(() => {
+      req.destroy();
+      concluir({ ok: false, erro: "tempo esgotado", rede: true });
+    }, restante);
     req.on("timeout", () => {
       req.destroy();
-      resolve({ ok: false, erro: "tempo esgotado" });
+      concluir({ ok: false, erro: "tempo esgotado", rede: true });
     });
-    req.on("error", (erro) => resolve({ ok: false, erro: erro.code || erro.message }));
+    req.on("error", (erro) => concluir({ ok: false, erro: erro.code || erro.message, rede: falhaDeRede(erro) }));
     req.end();
   });
 }
@@ -284,50 +350,47 @@ function arquivoObservacao() {
 }
 
 /**
- * Queries the current publication. Keeps the last observation with its time, so the interface shows
- * old data as old instead of as current.
+ * Fetches and verifies the current publication: manifest, attestation bundle and a fresh Sigstore
+ * trusted root, then src/atestacao.js. Keeps the last SUCCESSFUL observation with its time, apart
+ * from whatever the latest attempt found, so the interface shows old data as old instead of as
+ * current, and a network failure does not erase what was known.
+ *
+ * Failures come in three kinds, and only one of them is alarming:
+ *   semPublicacao  the origin answered that nothing is published there;
+ *   semRede        the publication or Sigstore could not be reached now (normal without Internet);
+ *   recusado       something was published and it does not prove where it came from.
  */
-async function verificarPublicacao({ forcar = false } = {}) {
+async function verificarPublicacao() {
   const anterior = estado.lerJson(arquivoObservacao(), null);
-  if (!forcar && anterior && Date.now() - Date.parse(anterior.observadoEm) < 15 * 60 * 1000) {
-    return { ok: true, ...anterior, doCache: true };
-  }
-
   const base = baseDeRelease();
-  const manifestoResp = await baixar(`${base}/${atestacao.ARQUIVO_MANIFESTO}`, { timeoutMs: 30_000 });
+  const inacessivel = (o, erro) => ({
+    ok: false,
+    semRede: true,
+    motivo: `${o} não está acessível agora (${erro}); o console segue funcionando e tenta de novo mais tarde`,
+    ultimaObservacao: anterior,
+  });
+
+  const manifestoResp = await baixar(`${base}/${atestacao.ARQUIVO_MANIFESTO}`, { limiteBytes: 2 * 1024 * 1024, prazoMs: PRAZOS.consultaMs });
   if (!manifestoResp.ok && manifestoResp.status === 404) {
-    // The origin answered: there is simply no Console publication there yet.
-    return { ok: false, motivo: `nenhuma publicação do console em ${base}`, semPublicacao: true, ultimaObservacao: anterior };
+    return { ok: false, semPublicacao: true, motivo: `nenhuma publicação do console em ${base}`, ultimaObservacao: anterior };
   }
-  if (!manifestoResp.ok) {
-    return { ok: false, motivo: `não foi possível obter o manifesto (${manifestoResp.erro})`, offline: true, ultimaObservacao: anterior };
+  if (!manifestoResp.ok) return manifestoResp.rede ? inacessivel("a publicação", manifestoResp.erro) : recusarPublicacao(manifestoResp.erro);
+
+  const atestacaoResp = await baixar(`${base}/${atestacao.ARQUIVO_ATESTACAO}`, { limiteBytes: 2 * 1024 * 1024, prazoMs: PRAZOS.consultaMs });
+  if (!atestacaoResp.ok && atestacaoResp.status === 404) {
+    return recusarPublicacao("a publicação não traz a atestação de proveniência");
   }
-  const atestacaoResp = await baixar(`${base}/${atestacao.ARQUIVO_ATESTACAO}`, { timeoutMs: 30_000 });
-  if (!atestacaoResp.ok) {
-    return { ok: false, motivo: `não foi possível obter a atestação de proveniência (${atestacaoResp.erro})`, ultimaObservacao: anterior };
-  }
+  if (!atestacaoResp.ok) return atestacaoResp.rede ? inacessivel("a atestação", atestacaoResp.erro) : recusarPublicacao(atestacaoResp.erro);
 
   let raiz;
   try {
     ({ raiz } = await atestacao.raizDeConfianca({ rede: true }));
   } catch (erro) {
-    return {
-      ok: false,
-      motivo: `não foi possível atualizar a raiz de confiança do Sigstore (${erro.code || erro.message})`,
-      offline: true,
-      ultimaObservacao: anterior,
-    };
+    return inacessivel("a raiz de confiança do Sigstore", (erro && (erro.code || erro.message)) || "erro");
   }
 
-  const verificacao = atestacao.verificarPublicacao({
-    manifesto: Buffer.from(manifestoResp.texto, "utf8"),
-    atestacao: Buffer.from(atestacaoResp.texto, "utf8"),
-    raiz,
-  });
-  if (!verificacao.ok) {
-    estado.auditar("release-manifesto-recusado", { motivo: verificacao.motivo });
-    return { ok: false, motivo: verificacao.motivo, recusado: true };
-  }
+  const verificacao = atestacao.verificarPublicacao({ manifesto: manifestoResp.conteudo, atestacao: atestacaoResp.conteudo, raiz });
+  if (!verificacao.ok) return recusarPublicacao(verificacao.motivo);
 
   const observacao = {
     observadoEm: new Date().toISOString(),
@@ -340,6 +403,10 @@ async function verificarPublicacao({ forcar = false } = {}) {
   };
   estado.gravarJson(arquivoObservacao(), observacao, 0o600);
   return { ok: true, ...observacao, manifesto: verificacao.manifesto };
+}
+
+function recusarPublicacao(motivo) {
+  return { ok: false, recusado: true, motivo: `publicação recusada: ${motivo}. Nada foi instalado.` };
 }
 
 /**
@@ -360,22 +427,26 @@ function divergenciaDeVersao(instaladas, emExecucao, info = {}) {
 
   // A pending restart is NOT divergence.
   //
-  // Between the pointer swap and the restart, the running process is legitimately the previous
-  // version. Alarming here would say the version "did not start" at the exact moment everything is
-  // correct, and a warning that fires on the normal path is one operators learn to ignore.
-  const concluidaAgora =
+  // A process that started before the pointer moved is legitimately still the previous version:
+  // right after an update, and until the next start after an automatic update, which never
+  // restarts a Console in use. Alarming here would say the version "did not start" at the exact
+  // moment everything is correct, and a warning that fires on the normal path is one operators
+  // learn to ignore. A process that started AFTER the swap and still runs the previous version is
+  // the bootstrap's fallback, and that is reported below.
+  const inicioDoProcesso = Date.now() - process.uptime() * 1000;
+  const trocadaDepoisDoInicio =
     info.transacao &&
     info.transacao.etapa === "concluida" &&
     info.transacao.versao === instaladas.ativa &&
-    Date.parse(info.atualizadoEm || info.transacao.em || 0) > Date.now() - 10 * 60 * 1000;
-  if (concluidaAgora && emExecucao === instaladas.anterior) {
+    Date.parse(info.atualizadoEm || info.transacao.em || 0) >= inicioDoProcesso - 2000;
+  if (trocadaDepoisDoInicio && emExecucao === instaladas.anterior) {
     return {
       registrada: instaladas.ativa,
       emExecucao,
       reinicioPendente: true,
       motivo:
-        `a versão ${instaladas.ativa} foi ativada e este processo ainda é o ${emExecucao}: o reinício está ` +
-        "pendente. Feche e reabra o console para carregar a versão nova.",
+        `a versão ${instaladas.ativa} já está instalada e verificada, e este processo ainda é o ${emExecucao}. ` +
+        "Ela passa a valer quando o console reiniciar: sozinho, depois de ficar ocioso, ou ao fechar e reabrir.",
     };
   }
 
@@ -398,12 +469,15 @@ async function situacao({ consultarRede = false } = {}) {
   const observacao = estado.lerJson(arquivoObservacao(), null);
   const idadeS = observacao ? Math.round((Date.now() - Date.parse(observacao.observadoEm)) / 1000) : null;
 
+  // `consultarRede` is the operator's explicit "check now". Everything else here reads local files:
+  // opening the page never reaches GitHub or Sigstore.
   let consulta = null;
-  if (consultarRede) consulta = await verificarPublicacao({ forcar: true });
+  if (consultarRede) consulta = await verificarPublicacao();
 
   const alvo = release.alvoAtual();
   const disponivel = consulta && consulta.ok ? consulta.versao : observacao ? observacao.versao : null;
-  const politica = disponivel && emExecucao ? release.politicaDeVersao({ versao: disponivel }, emExecucao) : null;
+  const referencia = versaoDeReferencia();
+  const politica = disponivel && referencia ? release.politicaDeVersao({ versao: disponivel }, referencia) : null;
 
   return {
     versaoEmExecucao: emExecucao,
@@ -425,6 +499,7 @@ async function situacao({ consultarRede = false } = {}) {
         }
       : null,
     consultaAgora: consulta && !consulta.ok ? consulta : null,
+    verificacaoAutomatica: require("./verificacao-automatica").resumo(),
     disponivel,
     podeAtualizar: !!(politica && politica.ok),
     motivoNaoAtualizar: politica && !politica.ok ? politica.motivo : null,
@@ -618,7 +693,7 @@ function registrarTransacao(versao, etapa) {
  * not differ between them is exactly this part: extraction refused for escaping paths, contents
  * checked, internal version matching the requested one, and only then the rename.
  */
-async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, log = () => {} }) {
+async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, reiniciar = true, log = () => {} }) {
   const destino = path.join(dirVersoes(), versaoAlvo);
   const abortar = (etapa, erro) => {
     limparDescargas();
@@ -675,10 +750,21 @@ async function instalarArtefatoVerificado({ versaoAlvo, conteudo, alvo, origem, 
     reversaoAutomatica: null,
   });
 
-  podarVersoes({ manter: [versaoAlvo, anterior].filter(Boolean) });
+  // The running payload is never pruned, whatever the pointer says.
+  podarVersoes({ manter: [versaoAlvo, anterior, versaoEmExecucao()].filter(Boolean) });
   estado.auditar("atualizacao-console-aplicada", { de: anterior, para: versaoAlvo, alvo, origem });
 
   log(`Versão ativa agora é ${versaoAlvo} (anterior: ${anterior || "nenhuma"}).`);
+  if (!reiniciar) {
+    log("A versão nova passa a valer no próximo início do console.");
+    return {
+      ok: true,
+      versao: versaoAlvo,
+      anterior,
+      reinicio: "no próximo início",
+      resumo: `console ${versaoAlvo} instalado; passa a valer no próximo início, e ${anterior || "a anterior"} fica guardada para reversão`,
+    };
+  }
   log("Reiniciando o console para carregar a nova versão...");
   const reinicio = await plataforma.reiniciarConsole();
   return {
@@ -707,14 +793,14 @@ async function atualizar(versaoAlvo, { log = () => {} } = {}) {
   }
 }
 
-async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
-  const raiz = raizInstalacao();
-  const instaladas = versoesInstaladas();
-  const emExecucao = versaoEmExecucao();
+async function atualizarComTrava(versaoAlvo, { log = () => {}, publicacao: jaVerificada = null, reiniciar = true, origem = "release" } = {}) {
+  const referencia = versaoDeReferencia();
 
-  log("Verificando a publicação...");
-  const publicacao = await verificarPublicacao({ forcar: true });
-  if (!publicacao.ok) return { ok: false, erro: publicacao.motivo };
+  // `jaVerificada` is a publication verificarPublicacao returned moments ago under this same lock
+  // (the automatic check); every other caller verifies here.
+  log("Verificando a publicação e a atestação de proveniência...");
+  const publicacao = jaVerificada || (await verificarPublicacao());
+  if (!publicacao.ok) return { ok: false, erro: publicacao.motivo, semRede: !!publicacao.semRede };
   if (publicacao.versao !== versaoAlvo) {
     // The target was fixed at confirmation: a publication appearing afterwards does not get in by
     // itself.
@@ -724,7 +810,7 @@ async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
     };
   }
 
-  const politica = release.politicaDeVersao(publicacao.manifesto, emExecucao);
+  const politica = release.politicaDeVersao(publicacao.manifesto, referencia);
   if (!politica.ok) return { ok: false, erro: politica.motivo };
 
   const escolha = release.escolherArtefato(publicacao.manifesto);
@@ -746,15 +832,19 @@ async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
   // The download ceiling is the SMALLER of the declared and the absolute: a manifest declaring 100
   // GiB cannot raise the Console's limit.
   const tetoDownload = Math.min(Math.max(artefato.bytes + 4096, 1024), LIMITE_ARTEFATO);
-  const download = await baixar(`${baseDeRelease()}/${artefato.arquivo}`, { destino: arquivoLocal, limiteBytes: tetoDownload });
+  const download = await baixar(`${baseDeRelease()}/${artefato.arquivo}`, {
+    destino: arquivoLocal,
+    limiteBytes: tetoDownload,
+    prazoMs: PRAZOS.artefatoMs,
+  });
   if (!download.ok) {
     limparDescargas();
     registrarTransacao(versaoAlvo, "falhou-download");
     reconciliar();
-    return { ok: false, erro: `download falhou: ${download.erro}` };
+    return { ok: false, erro: `download falhou: ${download.erro}`, semRede: !!download.rede };
   }
 
-  log("Verificando integridade contra o manifesto atestado...");
+  log("Verificando o SHA-256 contra o manifesto atestado...");
   const conferencia = release.conferirArtefato(arquivoLocal, artefato, { limiteBytes: LIMITE_ARTEFATO });
   if (!conferencia.ok) {
     limparDescargas();
@@ -765,7 +855,42 @@ async function atualizarComTrava(versaoAlvo, { log = () => {} } = {}) {
   }
   log(`SHA-256 confere (${conferencia.sha256.slice(0, 16)}…).`);
 
-  return instalarArtefatoVerificado({ versaoAlvo, conteudo: conferencia.conteudo, alvo: artefato.alvo, origem: "release", log });
+  return instalarArtefatoVerificado({ versaoAlvo, conteudo: conferencia.conteudo, alvo: artefato.alvo, origem, reiniciar, log });
+}
+
+/**
+ * The automatic check: discovers, verifies and installs a newer publication, and returns what
+ * happened as a result the scheduler (src/verificacao-automatica.js) can pace itself by.
+ *
+ * It never restarts the Console: the new version is activated side by side and loads at the next
+ * start, so an operator in the middle of something is never cut off. It does nothing, and touches
+ * no network, while the layout is not side by side (a run from source), while a restart is already
+ * pending, or while another version operation holds the lock.
+ */
+async function atualizarAutomaticamente({ log = () => {} } = {}) {
+  const instaladas = versoesInstaladas();
+  if (!instaladas.gerenciadoLadoALado) return { tipo: "fora-do-escopo", motivo: "execução a partir do código-fonte" };
+  const emExecucao = versaoEmExecucao();
+  if (instaladas.ativa && emExecucao && instaladas.ativa !== emExecucao) {
+    return { tipo: "reinicio-pendente", motivo: `a versão ${instaladas.ativa} espera o próximo início` };
+  }
+  const trava = adquirirTrava("verificação automática");
+  if (!trava.ok) return { tipo: "ocupado", motivo: trava.motivo };
+  try {
+    const publicacao = await verificarPublicacao();
+    if (!publicacao.ok) {
+      const tipo = publicacao.semRede ? "sem-rede" : publicacao.semPublicacao ? "sem-publicacao" : "recusado";
+      return { tipo, motivo: publicacao.motivo };
+    }
+    const politica = release.politicaDeVersao(publicacao.manifesto, versaoDeReferencia());
+    if (!politica.ok) return { tipo: "em-dia", versao: publicacao.versao, motivo: politica.motivo };
+
+    const r = await atualizarComTrava(publicacao.versao, { log, publicacao, reiniciar: false, origem: "automatica" });
+    if (r.ok) return { tipo: "atualizado", versao: r.versao, motivo: r.resumo };
+    return { tipo: r.semRede ? "sem-rede" : "recusado", motivo: r.erro };
+  } finally {
+    liberarTrava();
+  }
 }
 
 /**
@@ -825,48 +950,62 @@ function podarVersoes({ manter = [] } = {}) {
 }
 
 /**
- * Offline import: the same verification path, from local files.
+ * Offline import: the same verification, from files carried to a host without Internet.
+ *
+ * Takes the release as published (a directory with manifesto.json, atestacao.sigstore.json and the
+ * payloads) or the three files named one by one. Nothing here touches the network: the Sigstore
+ * trusted root is the last one a refresh verified on this host, or the one the installed Console
+ * carries.
  */
-async function importarOffline({ manifesto, atestacao: arquivoAtestacao, artefato, log = () => {} }) {
-  if (!fs.existsSync(manifesto) || !fs.existsSync(arquivoAtestacao) || !fs.existsSync(artefato)) {
-    return { ok: false, erro: "informe manifesto, atestação e artefato existentes" };
+async function importarOffline({ diretorio = null, manifesto = null, atestacao: arquivoAtestacao = null, artefato = null, log = () => {} }) {
+  if (diretorio) {
+    manifesto = path.join(diretorio, atestacao.ARQUIVO_MANIFESTO);
+    arquivoAtestacao = path.join(diretorio, atestacao.ARQUIVO_ATESTACAO);
   }
+  if (!manifesto || !arquivoAtestacao || !fs.existsSync(manifesto) || !fs.existsSync(arquivoAtestacao)) {
+    return { ok: false, erro: `informe a pasta do release ou ${atestacao.ARQUIVO_MANIFESTO}, ${atestacao.ARQUIVO_ATESTACAO} e o artefato` };
+  }
+  if (!diretorio && (!artefato || !fs.existsSync(artefato))) return { ok: false, erro: "o artefato informado não existe" };
   const trava = adquirirTrava("importar offline");
   if (!trava.ok) return { ok: false, erro: trava.motivo };
   try {
-    return await importarOfflineComTrava({ manifesto, arquivoAtestacao, artefato, log });
+    return await importarOfflineComTrava({ diretorio, manifesto, arquivoAtestacao, artefato, log });
   } finally {
     liberarTrava();
   }
 }
 
-async function importarOfflineComTrava({ manifesto, arquivoAtestacao, artefato, log = () => {} }) {
-  // No network here: the Sigstore trusted root is the last one a refresh verified, or the one the
-  // Console carries.
+function lerPequeno(caminho, limite) {
+  const info = fs.statSync(caminho);
+  if (info.size > limite) throw new Error(`${path.basename(caminho)} tem ${info.size} bytes, acima do esperado`);
+  return fs.readFileSync(caminho);
+}
+
+async function importarOfflineComTrava({ diretorio, manifesto, arquivoAtestacao, artefato, log = () => {} }) {
+  let bytesManifesto;
+  let bytesAtestacao;
   let raiz;
   try {
+    bytesManifesto = lerPequeno(manifesto, 2 * 1024 * 1024);
+    bytesAtestacao = lerPequeno(arquivoAtestacao, 2 * 1024 * 1024);
     ({ raiz } = await atestacao.raizDeConfianca({ rede: false }));
   } catch (erro) {
     return { ok: false, erro: erro.message };
   }
-  const verificacao = atestacao.verificarPublicacao({
-    manifesto: fs.readFileSync(manifesto),
-    atestacao: fs.readFileSync(arquivoAtestacao),
-    raiz,
-  });
-  if (!verificacao.ok) return { ok: false, erro: verificacao.motivo };
+  const verificacao = atestacao.verificarPublicacao({ manifesto: bytesManifesto, atestacao: bytesAtestacao, raiz });
+  if (!verificacao.ok) return { ok: false, erro: recusarPublicacao(verificacao.motivo).motivo };
 
   const escolha = release.escolherArtefato(verificacao.manifesto);
   if (!escolha.ok) return { ok: false, erro: escolha.motivo };
-  if (path.basename(artefato) !== escolha.artefato.arquivo) {
+  const caminhoArtefato = diretorio ? path.join(diretorio, escolha.artefato.arquivo) : artefato;
+  if (path.basename(caminhoArtefato) !== escolha.artefato.arquivo) {
     return { ok: false, erro: `o arquivo informado não é o artefato deste alvo (esperado ${escolha.artefato.arquivo}).` };
   }
-  const conferencia = release.conferirArtefato(artefato, escolha.artefato, { limiteBytes: LIMITE_ARTEFATO });
+  const conferencia = release.conferirArtefato(caminhoArtefato, escolha.artefato, { limiteBytes: LIMITE_ARTEFATO });
   if (!conferencia.ok) return { ok: false, erro: conferencia.motivo };
 
   const versaoAlvo = verificacao.manifesto.versao;
-  const emExecucao = versaoEmExecucao();
-  const politica = release.politicaDeVersao(verificacao.manifesto, emExecucao);
+  const politica = release.politicaDeVersao(verificacao.manifesto, versaoDeReferencia());
   if (!politica.ok) return { ok: false, erro: politica.motivo };
 
   const instaladas = versoesInstaladas();
@@ -882,8 +1021,8 @@ async function importarOfflineComTrava({ manifesto, arquivoAtestacao, artefato, 
     return { ok: false, erro: `a versão ${versaoAlvo} já está presente; remova-a antes de reinstalar.` };
   }
 
-  log(`Manifesto e artefato verificados (SHA-256 ${conferencia.sha256.slice(0, 16)}…).`);
-  estado.auditar("atualizacao-console-offline", { versao: versaoAlvo, alvo: escolha.artefato.alvo });
+  log(`Atestação de proveniência e artefato verificados (${verificacao.identidade.ref}, SHA-256 ${conferencia.sha256.slice(0, 16)}…).`);
+  estado.auditar("atualizacao-console-offline", { versao: versaoAlvo, alvo: escolha.artefato.alvo, commit: verificacao.manifesto.commit });
   return instalarArtefatoVerificado({
     versaoAlvo,
     conteudo: conferencia.conteudo,
@@ -894,6 +1033,7 @@ async function importarOfflineComTrava({ manifesto, arquivoAtestacao, artefato, 
 }
 
 module.exports = {
+  PRAZOS,
   raizInstalacao,
   versoesInstaladas,
   versaoEmExecucao,
@@ -903,6 +1043,7 @@ module.exports = {
   situacao,
   validarAlvo,
   atualizar,
+  atualizarAutomaticamente,
   reverter,
   reconciliar,
   podarVersoes,
@@ -912,4 +1053,5 @@ module.exports = {
   liberarTrava,
   operacaoEmAndamento,
   baixar,
+  falhaDeRede,
 };

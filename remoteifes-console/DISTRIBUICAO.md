@@ -278,7 +278,9 @@ Nenhuma credencial acompanha um download: os releases são públicos e o console
 `Authorization` em nenhum salto.
 
 Downgrade só acontece por ação explícita de reversão, que usa a cópia local já verificada em
-`versoes/` e não a rede.
+`versoes/` e não a rede. A versão de referência é a mais nova entre a que está em execução e a que
+o ponteiro já nomeia, para que uma publicação mais antiga não mova o ponteiro para trás enquanto
+um reinício está pendente.
 
 ### Raiz de confiança do Sigstore
 
@@ -292,6 +294,41 @@ de raiz para ninguém manter.
 Sem rede, a verificação usa a última raiz que uma atualização conferiu neste host ou, se nunca
 houve uma, a embutida. É a verificação offline normal do Sigstore, com o limite de sempre: ela não
 fica sabendo de uma chave revogada depois daquela cópia.
+
+### Atualização automática
+
+O console instalado verifica sozinho, em segundo plano: a primeira verificação acontece dois
+minutos depois de ele subir, e as seguintes a cada doze horas. Uma versão nova atestada é baixada,
+verificada e instalada lado a lado, e passa a valer **no próximo início** do console — que sai
+sozinho quando fica ocioso —, para nunca derrubar um operador no meio de uma tarefa. A camada
+estável ainda a observa nas primeiras partidas (seção 4). A ação **Atualizar o Console de
+Operações** instala e reinicia na hora, e **Verificar publicação** consulta na hora.
+
+Sem Internet, nada disso é falha:
+
+* nada local espera pela rede: iniciar o RemoteIFES ou o console, a prontidão do lançador,
+  `/health`, as páginas, os ESP32, os comandos, os agendamentos, o WebSocket, o banco e os backups
+  funcionam do mesmo jeito;
+* abrir as páginas do console não consulta GitHub nem Sigstore; só a verificação agendada e a
+  consulta explícita do operador fazem isso, e o status do lançador lê apenas o estado local;
+* não há sonda de conectividade: a tentativa agendada é a própria tentativa, e é pela falha dela
+  que o console sabe que não há rede agora;
+* a versão instalada fica intocada, e a aba **Programa** mostra o resultado como "Última consulta",
+  separado da última publicação observada com sucesso, que uma falha não apaga;
+* as novas tentativas esperam cada vez mais — 30 min, 1 h, 2 h e assim por diante até um dia, com
+  variação aleatória de ±20% —, e esse recuo fica no estado, então reiniciar o console não o zera.
+  Quando a rede volta, a próxima tentativa agendada funciona e o ritmo volta ao normal;
+* a auditoria registra só mudanças (a primeira falha, a volta, uma recusa diferente) e nada vai
+  para a saída de erro.
+
+Cada transferência tem prazo total: 30 s para manifesto e atestação, 15 min para o payload e 10 s
+por requisição à raiz do Sigstore, sem nova tentativa imediata. Há um único temporizador, que não
+segura o processo nem adia a saída por ociosidade, e no máximo uma verificação em andamento.
+
+Para se atualizar sozinho, o host precisa alcançar por HTTPS `github.com`, o armazenamento para
+onde os downloads de release redirecionam (`release-assets.githubusercontent.com` e
+`objects.githubusercontent.com`) e `tuf-repo-cdn.sigstore.dev`. Sem isso, a importação offline
+abaixo faz o mesmo trabalho.
 
 ### Publicar um release
 
@@ -323,23 +360,27 @@ etiquetas `console-v*`, no ambiente `console-release` (que só aceita essas etiq
 público, onde toda atestação fica visível. Um comprometimento do próprio GitHub Actions ou do
 Sigstore está fora do alcance do console.
 
-Os testes (`test/release-provenance.test.js`, `test/updater.test.js`, `test/packaging.test.js`)
-usam um Sigstore privado de teste, com as mesmas identidades que o GitHub emite.
+Os testes (`test/release-provenance.test.js`, `test/automatic-update.test.js`,
+`test/offline-operation.test.js`, `test/updater.test.js`, `test/packaging.test.js`) usam um
+Sigstore privado de teste e, uma vez, uma atestação real do GitHub conferida com a raiz real do
+Sigstore.
 
 ### Host sem Internet
 
-Um Pi atrás de uma rede fechada recebe os três arquivos do release à mão (pendrive, `scp`) e
+Um Pi atrás de uma rede fechada recebe os arquivos do release à mão (pendrive, `scp`) — a pasta
+inteira, ou ao menos `manifesto.json`, `atestacao.sigstore.json` e o payload do seu alvo — e
 instala com:
 
 ```bash
-node bin/atualizar-console.js --importar manifesto.json atestacao.sigstore.json <artefato>.tar.gz
+node bin/atualizar-console.js --importar <pasta-do-release>
 ```
 
-O caminho é o mesmo do release baixado — atestação, identidade, alvo, digest, política de versão,
-instalação lado a lado, troca de ponteiro —, sem nenhum acesso à rede: a raiz do Sigstore é a
-local (acima). A metade que instala é uma função só (`instalarArtefatoVerificado`), compartilhada
-pelos dois caminhos: duplicá-la seria duplicar o risco de divergirem justamente nas conferências
-que impedem uma instalação ruim.
+ou, nomeando os arquivos, `--importar manifesto.json atestacao.sigstore.json <payload>.tar.gz`.
+A verificação é a mesma do release baixado — atestação, identidade, alvo, digest, política de
+versão, instalação lado a lado, troca de ponteiro —, sem nenhum acesso à rede: a raiz do Sigstore é
+a local (acima). A metade que instala é uma função só (`instalarArtefatoVerificado`),
+compartilhada pelos dois caminhos: duplicá-la seria duplicar o risco de divergirem justamente nas
+conferências que impedem uma instalação ruim.
 
 ## 6. O que continua sem suporte, e por quê
 
