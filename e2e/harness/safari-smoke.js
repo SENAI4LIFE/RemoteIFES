@@ -138,6 +138,11 @@ const oculto = (seletor) => `const el = document.querySelector(${JSON.stringify(
 const texto = (seletor, esperado) => `const el = document.querySelector(${JSON.stringify(seletor)}); return !!el && el.textContent.trim() === ${JSON.stringify(esperado)};`;
 const ESTADO_DA_PAGINA = `const visiveis = Array.from(document.querySelectorAll("section[id^='screen-'], #mainApp, #navegador-incompativel")).filter((el) => el.getClientRects().length > 0).map((el) => el.id); const ativo = document.activeElement; const campos = Object.fromEntries(Array.from(document.querySelectorAll("#username, #password")).map((el) => [el.id, el.value.length])); const toasts = Array.from(document.querySelectorAll(".toast, [class*='toast']")).map((el) => el.textContent.trim()).filter(Boolean); return { hash: location.hash, visiveis, ativo: ativo ? ativo.tagName + "#" + ativo.id : null, rolagem: [scrollX, scrollY], campos, toasts, erros: window.__errosSmoke || null };`;
 const SEM_ROLAGEM_HORIZONTAL = "return document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1;";
+// The page shows the portal (and, after login, the app) before its status socket is open, and covers
+// it with the connecting screen when the socket takes more than 300 ms. Safari opens the harness's
+// cross-origin socket in about two seconds, so "the connecting screen is hidden" can hold in those
+// first 300 ms and turn false right after. Interacting waits for the socket instead.
+const SERVIDOR_CONECTADO = 'return typeof ServerStatus !== "undefined" && ServerStatus.estaConectado();';
 const COLETOR_DE_ERROS = `window.__errosSmoke = []; addEventListener("error", (e) => window.__errosSmoke.push(String(e.message))); addEventListener("unhandledrejection", (e) => window.__errosSmoke.push(String(e.reason)));`;
 
 async function passo(nome, fn) {
@@ -157,6 +162,7 @@ async function fluxo(s) {
     await s.executar(`localStorage.setItem("remoteifes_server_url", ${JSON.stringify(API_URL)});`);
     await s.ir(`${WEB_URL}/`);
     await s.esperar("portal visível", visivel("#screen-portal"), 20000);
+    await s.esperar("conexão de status aberta", SERVIDOR_CONECTADO, 20000);
     await s.esperar("tela de servidor oculta", oculto("#screen-server-status"));
     await s.esperar("sem aviso de navegador desatualizado", oculto("#navegador-incompativel"));
     await s.executar(COLETOR_DE_ERROS);
@@ -172,6 +178,9 @@ async function fluxo(s) {
     await s.digitar("#password", CONTA.senha);
     await s.clicar("#loginForm button[type=submit]");
     await s.esperar("app principal", visivel("#mainApp"));
+    // Login reopens the status socket with the session token.
+    await s.esperar("conexão de status reaberta", SERVIDOR_CONECTADO, 20000);
+    await s.esperar("tela de servidor oculta após o login", oculto("#screen-server-status"));
     await s.esperar("aba de salas", visivel('.tab-btn[data-tab="salas"]'));
     if (!(await s.executar(SEM_ROLAGEM_HORIZONTAL))) throw new Error("the main app scrolls horizontally");
   });
