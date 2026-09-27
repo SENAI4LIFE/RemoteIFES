@@ -25,6 +25,8 @@ const VIEWPORTS = {
   "tablet-portrait": { width: 820, height: 1180 },
   "tablet-large": { width: 834, height: 1194 },
   "tablet-landscape": { width: 1180, height: 820 },
+  // The project's 10-inch Raspberry Pi panel: wide but short, where fixed bars eat the most height.
+  "pi-display": { width: 1024, height: 600 },
   notebook: { width: 1366, height: 768 },
   "desktop-compact": { width: 1440, height: 900 },
   desktop: { width: 1920, height: 1080 },
