@@ -57,6 +57,26 @@ TimeoutStopSec=15
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
+# Containment the server never needs past: no device nodes, kernel knobs, modules, kernel log,
+# clock, hostname, cgroup tree, namespaces, realtime scheduling or setuid/setgid files, and only
+# the socket families it uses. Files it creates are private to its user (the database keeps its
+# secrets out of other local accounts). Deliberately absent: SystemCallArchitectures=native, which
+# would kill a 32-bit Node under the 64-bit kernel Raspberry Pi OS 32-bit boots, and
+# MemoryDenyWriteExecute, which V8's JIT cannot run under. The deployment rehearsal in CI runs the
+# whole lifecycle under these settings.
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

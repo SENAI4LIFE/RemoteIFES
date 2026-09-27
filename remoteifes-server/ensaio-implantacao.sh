@@ -59,6 +59,14 @@ PRIMEIRA=$(commit_atual)
 
 passo "2. serviço no ar: frontend, /health com o commit, dados e placas simuladas"
 verificar "http://127.0.0.1:$PORTA" --commit "$PRIMEIRA" --frontend --marcar --dispositivos 2
+# The unit's containment is in force (every later step runs under it), and the database the
+# service created holds its secrets away from other local accounts.
+for p in PrivateDevices ProtectKernelTunables ProtectKernelModules ProtectKernelLogs ProtectControlGroups ProtectClock ProtectHostname RestrictSUIDSGID RestrictRealtime LockPersonality; do
+  systemctl show -p "$p" remoteifes.service | grep -qx "$p=yes" || { echo "remoteifes.service sem $p=yes"; exit 1; }
+done
+systemctl show -p UMask remoteifes.service | grep -qx "UMask=0077"
+[ "$(stat -c %a "$SERVIDOR/data/remoteifes.db")" = 600 ] || { echo "banco com modo $(stat -c %a "$SERVIDOR/data/remoteifes.db")"; exit 1; }
+systemd-analyze security remoteifes.service --no-pager 2>/dev/null | tail -n 1 || true
 
 passo "3. reinício, parada e partida: dados e placas voltam"
 systemctl restart remoteifes.service
