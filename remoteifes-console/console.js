@@ -182,6 +182,17 @@ function iniciar() {
     });
   });
 
+  // The automatic update check, only for an installed (side-by-side) Console. It runs on its own
+  // unref'ed timer minutes from now: nothing before this point waited for the network, and no
+  // request, readiness check or idle exit ever will (src/verificacao-automatica.js).
+  app.once("listening", () => {
+    try {
+      if (atualizador.versoesInstaladas().gerenciadoLadoALado) require("./src/verificacao-automatica").iniciar();
+    } catch (erro) {
+      console.error(`aviso: verificação automática de atualização indisponível (${erro.message})`);
+    }
+  });
+
   process.on("SIGTERM", () => encerrar(0));
   process.on("SIGINT", () => encerrar(0));
   process.on("unhandledRejection", (motivo) => {

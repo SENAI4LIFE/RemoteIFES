@@ -11,8 +11,8 @@ const { criarAutoridade, sha256, MINUTO } = require("./support/atestacoes");
 // A release is trusted only as bytes GitHub Actions attested while running this repository's
 // release workflow for that version's tag. These tests hold each link of that chain: the
 // cryptography (delegated to @sigstore/verify, exercised here with a private Sigstore whose keys
-// only these tests trust), the certificate identity, the statement and the binding between
-// manifest, tag and commit.
+// only these tests trust, and once with a real GitHub attestation against the real Sigstore root),
+// the certificate identity, the statement and the binding between manifest, tag and commit.
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
 const OUTRO_COMMIT = "fedcba9876543210fedcba9876543210fedcba98";
@@ -264,6 +264,69 @@ test("extension values are read only as exact DER UTF8Strings", () => {
   assert.equal(atestacao.textoDer(Buffer.from("abc")), null, "raw legacy value");
   const longo = "x".repeat(200);
   assert.equal(atestacao.textoDer(Buffer.concat([Buffer.from([0x0c, 0x81, 200]), Buffer.from(longo)])), longo);
+});
+
+// --- A real attestation ------------------------------------------------------------------------
+
+test("a real release attested by this repository's release workflow is accepted, with no network", async () => {
+  // test/fixtures/console-v0.0.1 holds the manifest and the attestation of a real release of this
+  // repository: console-release.yml built it on Linux and Windows, attested it in the
+  // console-release environment (Rekor log index 2974946141) and published it as a pre-release,
+  // from a throwaway commit made only to rehearse the chain; the pre-release was removed afterwards.
+  // Real Fulcio certificate, real Rekor entry, and the trusted root the Console carries.
+  const dir = path.join(__dirname, "fixtures", "console-v0.0.1");
+  const manifesto = fs.readFileSync(path.join(dir, "manifesto.json"));
+  const bundle = fs.readFileSync(path.join(dir, "atestacao.sigstore.json"));
+  const { raiz, origem } = await atestacao.raizDeConfianca({ rede: false });
+  assert.equal(origem, "embutida");
+
+  const v = atestacao.verificarPublicacao({ manifesto, atestacao: bundle, raiz });
+  assert.equal(v.ok, true, v.motivo);
+  assert.equal(v.manifesto.versao, "0.0.1");
+  assert.equal(v.identidade.assinante, "https://github.com/SENAI4LIFE/RemoteIFES/.github/workflows/console-release.yml@refs/tags/console-v0.0.1");
+  assert.equal(v.identidade.ref, "refs/tags/console-v0.0.1");
+  assert.equal(v.identidade.commit, v.manifesto.commit);
+  assert.equal(v.manifesto.artefatos.length, 7, "one payload per target");
+
+  // The same real attestation vouches for nothing else.
+  const outraVersao = JSON.parse(manifesto.toString("utf8"));
+  outraVersao.versao = "9.9.9";
+  outraVersao.artefatos = outraVersao.artefatos.map((a) => ({ ...a, arquivo: release.nomeDoPayload("9.9.9", a.alvo) }));
+  recusada(atestacao.verificarPublicacao({ manifesto: Buffer.from(JSON.stringify(outraVersao, null, 2) + "\n"), atestacao: bundle, raiz }), "sujeito");
+  const alterado = Buffer.from(manifesto);
+  alterado[alterado.length - 2] ^= 1;
+  recusada(atestacao.verificarPublicacao({ manifesto: alterado, atestacao: bundle, raiz }), "sujeito");
+  // And an attestation from another project, however real, does not vouch for this manifest.
+  const alheia = fs.readFileSync(path.join(__dirname, "fixtures", "proveniencia-cli-cli.sigstore.json"));
+  recusada(atestacao.verificarPublicacao({ manifesto, atestacao: alheia, raiz }), "sujeito");
+});
+
+test("a real GitHub attestation verifies against the real Sigstore root, and the policy refuses it", async () => {
+  // test/fixtures/proveniencia-cli-cli.sigstore.json is the SLSA provenance GitHub Actions made for
+  // gh_2.101.0_linux_armv6.tar.gz of the GitHub CLI (cli/cli, workflow deployment.yml), downloaded
+  // from GitHub's attestation API. Real Fulcio certificate, real Rekor entry. The trusted root is
+  // the one embedded in the Console, read with no network.
+  const bundle = fs.readFileSync(path.join(__dirname, "fixtures", "proveniencia-cli-cli.sigstore.json"));
+  const { raiz, origem } = await atestacao.raizDeConfianca({ rede: false });
+  assert.equal(origem, "embutida");
+
+  const assinatura = atestacao.verificarAssinatura(bundle, raiz);
+  assert.equal(assinatura.ok, true, assinatura.motivo);
+  assert.equal(assinatura.identidade.repositorio, "https://github.com/cli/cli");
+  assert.equal(assinatura.identidade.emissor, "https://token.actions.githubusercontent.com");
+  assert.equal(assinatura.sujeitos.get("gh_2.101.0_linux_armv6.tar.gz"), "dfc12e3fb060c1513abe083839ae26d060487b71fde7bdad3c6e3870e84ec46c");
+
+  // Genuine, and still not ours.
+  const politica = atestacao.conferirIdentidade(assinatura.identidade, { versao: "2.101.0", commit: assinatura.identidade.commit });
+  assert.equal(politica.ok, false);
+  assert.match(politica.motivo, /outro repositório/);
+
+  // One flipped byte in the logged statement and the real bundle no longer verifies.
+  const alterado = JSON.parse(bundle.toString("utf8"));
+  const payload = Buffer.from(alterado.dsseEnvelope.payload, "base64");
+  payload[40] ^= 1;
+  alterado.dsseEnvelope.payload = payload.toString("base64");
+  assert.equal(atestacao.verificarAssinatura(Buffer.from(JSON.stringify(alterado)), raiz).ok, false);
 });
 
 test("without the network, the trusted root is the last verified copy, else the embedded one", async (t) => {

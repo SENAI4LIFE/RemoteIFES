@@ -71,8 +71,8 @@ const OID = Object.freeze({
 });
 
 // Sigstore's public TUF repository, which distributes the trusted root (Fulcio, Rekor, CT and
-// timestamp keys). Timeouts are per request and there is no retry: a failed refresh simply means
-// "not now", and the next check tries again.
+// timestamp keys). Timeouts are per request and there is no retry: the automatic check has its own
+// backoff, and a failed refresh simply means "not now".
 const ESPELHO_TUF = "https://tuf-repo-cdn.sigstore.dev";
 const TEMPO_TUF_MS = 10_000;
 

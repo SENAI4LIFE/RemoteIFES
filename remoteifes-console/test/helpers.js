@@ -10,7 +10,7 @@ const RAIZ = path.join(__dirname, "..");
 
 // Modules exposed for convenience in `ambiente()`. Cache clearing sweeps **all** of src/: a fixed
 // list would leave new modules bound to the configuration of the first test that loaded them.
-const MODULOS = ["config", "estado", "auth", "processos", "execucao", "trava", "coleta", "acoes", "prontidao", "repositorio", "servidor", "rede", "mobile", "github", "terminal", "plataforma", "release", "atestacao", "atualizador", "implantacao", "identidade"];
+const MODULOS = ["config", "estado", "auth", "processos", "execucao", "trava", "coleta", "acoes", "prontidao", "repositorio", "servidor", "rede", "mobile", "github", "terminal", "plataforma", "release", "atestacao", "atualizador", "verificacao-automatica", "implantacao", "identidade"];
 
 function arquivosDoConsole() {
   const arquivos = [];
@@ -120,7 +120,9 @@ function subir(mods) {
 }
 
 /**
- * Raw HTTP client: allows forging Host, Origin, Content-Type and the CSRF header.
+ * Raw HTTP client: allows forging Host, Origin, Content-Type and the CSRF header. `timeoutMs`
+ * serves the pages that probe the host's tools, which on a Windows runner take far longer than
+ * the rest.
  */
 function pedir(porta, caminho, opcoes = {}) {
   const corpo = opcoes.corpo === undefined ? null : JSON.stringify(opcoes.corpo);
@@ -137,7 +139,7 @@ function pedir(porta, caminho, opcoes = {}) {
 
   return new Promise((resolve, reject) => {
     const req = http.request(
-      { host: "127.0.0.1", port: porta, path: caminho, method: opcoes.metodo || "GET", headers: cabecalhos, timeout: 15_000 },
+      { host: "127.0.0.1", port: porta, path: caminho, method: opcoes.metodo || "GET", headers: cabecalhos, timeout: opcoes.timeoutMs || 15_000 },
       (res) => {
         let texto = "";
         res.setEncoding("utf8");

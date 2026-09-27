@@ -264,17 +264,14 @@ test("complete chain: build, attest, publish and actually update", async (t) => 
 
   const servidor = await servirDiretorio(saida);
   t.after(() => servidor.fechar());
-  ambienteConfiando(t, { CONSOLE_RELEASE_BASE: servidor.base, CONSOLE_RAIZ_INSTALACAO: instalacao });
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const amb = ambienteConfiando(t, { CONSOLE_RELEASE_BASE: servidor.base, CONSOLE_RAIZ_INSTALACAO: instalacao });
+  const atualizador = amb.atualizador;
 
   const linhas = [];
   const r = await atualizador.atualizar(NOVA, { log: (l) => linhas.push(l) });
   assert.equal(r.ok, true, r.erro);
   assert.equal(r.versao, NOVA);
-  assert.ok(
-    linhas.some((l) => /SHA-256 confere/.test(l)),
-    "the digest must be checked against the attested manifest"
-  );
+  assert.ok(linhas.some((l) => /SHA-256 confere/.test(l)), "the digest must be checked against the attested manifest");
 
   // The new version is on disk with its verifier, the pointer references it, and the previous one
   // is kept.
@@ -295,9 +292,9 @@ test("complete chain: build, attest, publish and actually update", async (t) => 
   assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1");
 });
 
-test("offline import actually installs, without any network", async (t) => {
-  // A Pi without Internet receives manifest, attestation and artifact on a USB drive, and offline
-  // import must install them without going to the network.
+test("offline import installs the release folder carried on removable media, without any network", async (t) => {
+  // A Pi without Internet receives the release's files on a USB drive: the same verification as a
+  // download, and no network at all.
   const NOVA = "99.9.2";
   const fonte = arvoreNaVersao(NOVA);
   const saida = ajuda.dirTemporario("console-dist-");
@@ -305,30 +302,59 @@ test("offline import actually installs, without any network", async (t) => {
   t.after(() => {
     for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
   });
+  await release(fonte, saida, ["--alvo", "linux-x64,linux-arm64,windows-x64,macos-arm64,linux-arm,windows-arm64,macos-x64"]);
 
-  await release(fonte, saida);
-
-  // No release base configured: any network attempt would fail.
-  const amb = ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao, CONSOLE_RELEASE_BASE: undefined });
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
-  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
+  const amb = ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao, CONSOLE_RELEASE_BASE: "https://publicacao.invalid" });
+  const semInternet = require(path.join(ajuda.RAIZ, "..", "remoteifes-server", "test", "support", "sem-internet.js"));
+  const registro = path.join(amb.estadoDir, "rede.jsonl");
+  semInternet.ativar({ modo: "rota", registro });
+  t.after(() => semInternet.desativar());
 
   const linhas = [];
-  const r = await atualizador.importarOffline({
-    manifesto: path.join(saida, "manifesto.json"),
-    atestacao: path.join(saida, "atestacao.sigstore.json"),
-    artefato: path.join(saida, manifesto.artefatos[0].arquivo),
-    log: (l) => linhas.push(l),
-  });
+  const r = await amb.atualizador.importarOffline({ diretorio: saida, log: (l) => linhas.push(l) });
+  semInternet.desativar();
 
   assert.equal(r.ok, true, r.erro);
   assert.equal(r.versao, NOVA);
   assert.ok(fs.existsSync(path.join(instalacao, "versoes", NOVA, "src", "servidor.js")), "the payload must be installed");
-  const info = atualizador.lerEstadoInstalacao();
+  const info = amb.atualizador.lerEstadoInstalacao();
   assert.equal(info.versaoAtiva, NOVA, "the pointer must reference the imported version");
   assert.equal(info.versaoAnterior, "0.0.1");
   assert.equal(info.transacao.etapa, "concluida");
+  assert.ok(linhas.some((l) => /refs\/tags\/console-v99\.9\.2/.test(l)), "the log names the attested tag");
+  assert.ok(!fs.existsSync(registro), "the import did not try to leave the host");
   assert.deepEqual(amb.atestacao.raizDeConfianca.chamadas, [{ rede: false }], "and asked only for the local trusted root");
+});
+
+test("offline import also takes the three files one by one, and refuses another target's payload", async (t) => {
+  const NOVA = "99.9.5";
+  const fonte = arvoreNaVersao(NOVA);
+  const saida = ajuda.dirTemporario("console-dist-");
+  const instalacao = instalacaoCom("0.0.1");
+  t.after(() => {
+    for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
+  });
+  const alvo = require(path.join(ajuda.RAIZ, "src", "release.js")).alvoAtual();
+  const outro = alvo === "linux-arm64" ? "linux-x64" : "linux-arm64";
+  const manifesto = await release(fonte, saida, ["--alvo", `${alvo},${outro}`, "--formato", "payload"]);
+  const amb = ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao });
+
+  const deOutro = manifesto.artefatos.find((a) => a.alvo === outro).arquivo;
+  const errado = await amb.atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    atestacao: path.join(saida, "atestacao.sigstore.json"),
+    artefato: path.join(saida, deOutro),
+  });
+  assert.equal(errado.ok, false);
+  assert.match(errado.erro, /não é o artefato deste alvo/);
+  assert.equal(amb.atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1");
+
+  const certo = await amb.atualizador.importarOffline({
+    manifesto: path.join(saida, "manifesto.json"),
+    atestacao: path.join(saida, "atestacao.sigstore.json"),
+    artefato: path.join(saida, manifesto.artefatos.find((a) => a.alvo === alvo).arquivo),
+  });
+  assert.equal(certo.ok, true, certo.erro);
 });
 
 test("swapping the artifact after verification does not change what is installed", async (t) => {
@@ -345,21 +371,16 @@ test("swapping the artifact after verification does not change what is installed
   t.after(() => {
     for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
   });
-
   await release(fonte, saida);
 
-  ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao });
-  const release_ = require(path.join(ajuda.RAIZ, "src", "release.js"));
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
-
-  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
-  const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
+  const amb = ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao });
+  const release_ = amb.release;
 
   // As soon as the check passes, the file on disk becomes garbage. If installation re-reads the
   // path, it extracts garbage (or fails); if it extracts the checked buffer, nothing changes.
   const originalConferir = release_.conferirArtefato;
-  release_.conferirArtefato = (caminho, meta) => {
-    const r = originalConferir(caminho, meta);
+  release_.conferirArtefato = (caminho, meta, opcoes) => {
+    const r = originalConferir(caminho, meta, opcoes);
     fs.writeFileSync(caminho, Buffer.from("conteudo-trocado-depois-da-verificacao"));
     return r;
   };
@@ -367,12 +388,7 @@ test("swapping the artifact after verification does not change what is installed
     release_.conferirArtefato = originalConferir;
   });
 
-  const r = await atualizador.importarOffline({
-    manifesto: path.join(saida, "manifesto.json"),
-    atestacao: path.join(saida, "atestacao.sigstore.json"),
-    artefato,
-    log: () => {},
-  });
+  const r = await amb.atualizador.importarOffline({ diretorio: saida, log: () => {} });
 
   assert.equal(r.ok, true, `installation must use the verified bytes: ${r.erro}`);
   const instalado = path.join(instalacao, "versoes", NOVA);
@@ -389,25 +405,15 @@ test("offline import refuses a tampered artifact and installs nothing", async (t
   t.after(() => {
     for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
   });
+  const manifesto = await release(fonte, saida);
+  const alvo = require(path.join(ajuda.RAIZ, "src", "release.js")).alvoAtual();
+  fs.appendFileSync(path.join(saida, manifesto.artefatos.find((a) => a.alvo === alvo).arquivo), "conteudo-extra");
 
-  await release(fonte, saida);
-
-  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
-  const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
-  fs.appendFileSync(artefato, "conteudo-extra");
-
-  ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao });
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
-
-  const r = await atualizador.importarOffline({
-    manifesto: path.join(saida, "manifesto.json"),
-    atestacao: path.join(saida, "atestacao.sigstore.json"),
-    artefato,
-    log: () => {},
-  });
+  const amb = ambienteConfiando(t, { CONSOLE_RAIZ_INSTALACAO: instalacao });
+  const r = await amb.atualizador.importarOffline({ diretorio: saida, log: () => {} });
   assert.equal(r.ok, false);
   assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nothing may be installed with a mismatched digest");
-  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "the pointer does not move");
+  assert.equal(amb.atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "the pointer does not move");
 });
 
 test("offline import of a release the Sigstore root does not vouch for installs nothing", async (t) => {
@@ -418,18 +424,12 @@ test("offline import of a release the Sigstore root does not vouch for installs 
   t.after(() => {
     for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
   });
-  const manifesto = await release(fonte, saida);
+  await release(fonte, saida);
   // No test trust here: the Console's own root (the real Sigstore's) does not know the test CA.
   const amb = ajuda.ambiente({ env: { CONSOLE_RAIZ_INSTALACAO: instalacao } });
   t.after(() => amb.restaurar());
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
 
-  const r = await atualizador.importarOffline({
-    manifesto: path.join(saida, "manifesto.json"),
-    atestacao: path.join(saida, "atestacao.sigstore.json"),
-    artefato: path.join(saida, manifesto.artefatos[0].arquivo),
-    log: () => {},
-  });
+  const r = await amb.atualizador.importarOffline({ diretorio: saida, log: () => {} });
   assert.equal(r.ok, false);
   assert.match(r.erro, /não confere criptograficamente/);
   assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)));
@@ -438,7 +438,6 @@ test("offline import of a release the Sigstore root does not vouch for installs 
 test("a manifest changed after attestation is refused", async (t) => {
   const saida = ajuda.dirTemporario("console-dist-");
   t.after(() => fs.rmSync(saida, { recursive: true, force: true }));
-
   await release(ajuda.RAIZ, saida);
 
   // Changing a digest while keeping the attestation is exactly the attack the attestation exists to
@@ -449,13 +448,13 @@ test("a manifest changed after attestation is refused", async (t) => {
 
   const servidor = await servirDiretorio(saida);
   t.after(() => servidor.fechar());
-  ambienteConfiando(t, { CONSOLE_RELEASE_BASE: servidor.base });
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const amb = ambienteConfiando(t, { CONSOLE_RELEASE_BASE: servidor.base });
 
-  const r = await atualizador.verificarPublicacao({ forcar: true });
+  const r = await amb.atualizador.verificarPublicacao();
   assert.equal(r.ok, false);
   assert.equal(r.recusado, true);
   assert.match(r.motivo, /não é o arquivo que a atestação cobre/);
+  assert.match(r.motivo, /Nada foi instalado/);
 });
 
 test("an artifact swapped on the server does not pass the attested manifest's digest", async (t) => {
@@ -466,24 +465,21 @@ test("an artifact swapped on the server does not pass the attested manifest's di
   t.after(() => {
     for (const d of [fonte, saida, instalacao]) fs.rmSync(d, { recursive: true, force: true });
   });
-
-  await release(fonte, saida);
+  const manifesto = await release(fonte, saida);
 
   // Manifest and attestation remain intact; the served file is what was swapped.
-  const manifesto = JSON.parse(fs.readFileSync(path.join(saida, "manifesto.json"), "utf8"));
-  const artefato = path.join(saida, manifesto.artefatos[0].arquivo);
-  const original = fs.readFileSync(artefato);
-  fs.writeFileSync(artefato, Buffer.concat([original, Buffer.from("conteudo-extra")]));
+  const alvo = require(path.join(ajuda.RAIZ, "src", "release.js")).alvoAtual();
+  const artefato = path.join(saida, manifesto.artefatos.find((a) => a.alvo === alvo).arquivo);
+  fs.writeFileSync(artefato, Buffer.concat([fs.readFileSync(artefato), Buffer.from("conteudo-extra")]));
 
   const servidor = await servirDiretorio(saida);
   t.after(() => servidor.fechar());
-  ambienteConfiando(t, { CONSOLE_RELEASE_BASE: servidor.base, CONSOLE_RAIZ_INSTALACAO: instalacao });
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
+  const amb = ambienteConfiando(t, { CONSOLE_RELEASE_BASE: servidor.base, CONSOLE_RAIZ_INSTALACAO: instalacao });
 
-  const r = await atualizador.atualizar(NOVA, { log: () => {} });
+  const r = await amb.atualizador.atualizar(NOVA, { log: () => {} });
   assert.equal(r.ok, false);
   assert.ok(!fs.existsSync(path.join(instalacao, "versoes", NOVA)), "nothing is installed when the digest does not match");
-  assert.equal(atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "the pointer does not move");
+  assert.equal(amb.atualizador.lerEstadoInstalacao().versaoAtiva, "0.0.1", "the pointer does not move");
 });
 
 test("an installed Console verifies releases with no setup step", (t) => {
@@ -509,12 +505,11 @@ test("before the first publication exists, the Console says there is none", asyn
     amb.restaurar();
     fs.rmSync(vazio, { recursive: true, force: true });
   });
-  const atualizador = require(path.join(ajuda.RAIZ, "src", "atualizador.js"));
 
-  const r = await atualizador.verificarPublicacao({ forcar: true });
+  const r = await amb.atualizador.verificarPublicacao();
   assert.equal(r.ok, false);
   assert.equal(r.semPublicacao, true);
-  assert.equal(r.offline, undefined, "a 404 from the origin is not a network failure");
+  assert.equal(r.semRede, undefined, "a 404 from the origin is not a network failure");
   assert.match(r.motivo, /nenhuma publicação do console/);
 });
 

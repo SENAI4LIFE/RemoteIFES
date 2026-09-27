@@ -1194,8 +1194,18 @@
     } else {
       dado(dl, "Publicação observada", null);
     }
+    // One row for the latest attempt, the operator's or the automatic one. Without Internet it
+    // reads as a result of the update check, not as a fault: the Console and RemoteIFES go on.
     if (p.console.consultaAgora && p.console.consultaAgora.motivo) {
       dado(dl, "Última consulta", p.console.consultaAgora.motivo);
+    } else if (p.console.verificacaoAutomatica && p.console.verificacaoAutomatica.ultimaTentativa) {
+      var va = p.console.verificacaoAutomatica;
+      var t = va.ultimaTentativa;
+      var texto = t.tipo === "em-dia" || t.tipo === "sem-publicacao" || t.tipo === "atualizado"
+        ? (t.motivo || "publicação conferida")
+        : (t.motivo || t.tipo);
+      if (va.proximaEm && t.tipo !== "atualizado") texto += " — próxima verificação automática por volta de " + quando(va.proximaEm);
+      dado(dl, "Última consulta", quando(t.em) + ": " + texto);
     }
     if (p.console.motivoNaoAtualizar) dado(dl, "Por que não atualizar agora", p.console.motivoNaoAtualizar);
     dado(dl, "Escopo da distribuição", p.console.observacaoDeDistribuicao.replace(/\*\*/g, ""));
