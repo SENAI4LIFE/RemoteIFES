@@ -1746,6 +1746,8 @@ A branch `main` é protegida por um ruleset do GitHub (**Settings > Rules > Rule
 
 Todas as actions dos workflows são referenciadas pelo SHA completo do commit (a versão correspondente fica em comentário ao lado), de modo que uma tag movida ou comprometida no repositório da action não altera o que o CI executa. O `.github/dependabot.yml` abre mensalmente um único pull request agrupado com as atualizações dessas actions dentro da mesma versão maior (o que as tags `@vN` anteriores já acompanhavam); ao aceitá-lo, o SHA e o comentário de versão avançam juntos. A troca de versão maior de uma action continua sendo uma decisão manual.
 
+As dependências npm (servidor, console, E2E e Cordova) não recebem atualizações de rotina: os alertas de vulnerabilidade do GitHub e as atualizações de segurança do Dependabot estão ligados, e um pull request só aparece quando uma versão travada no lockfile tem uma vulnerabilidade conhecida com correção. Os releases do console são imutáveis (**Settings > General > Releases**): depois de publicado, nenhum arquivo nem a etiqueta de um release pode ser trocado, o que se soma à atestação de cada arquivo e ao ruleset das etiquetas `console-v*`.
+
 ## Uso da API do GitHub
 
 O **RemoteIFES** não depende da API do GitHub em tempo de execução: nenhuma operação do prédio — salas, agendamentos, contas, ESP32 — consulta a rede externa. O uso do GitHub no projeto se limita à hospedagem do código-fonte, ao workflow opcional `.github/workflows/pages.yml` que publica `remoteifes-web` no GitHub Pages e ao workflow de CI descrito em [Testes e Integração Contínua](#testes-e-integração-contínua). A publicação usa apenas o `GITHUB_TOKEN` efêmero fornecido automaticamente ao workflow, com a permissão mínima `pages: write`/`id-token: write`.
