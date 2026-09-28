@@ -98,7 +98,7 @@ for (const caso of falhasDeTransferencia) {
 
 cenarioOta("OTA com o servidor morto (SIGKILL) no meio do download", {
   inicial: "Placa na versão de produção, conectada; candidato publicado",
-  falha: "o processo do servidor é morto com SIGKILL no meio do download e religado",
+  falha: "o processo do servidor é morto com SIGKILL no meio do download e religado; a conexão do download cai junto, como na queda da máquina (a imagem que o servidor já tinha escrito nos buffers do kernel não chega à placa)",
   exigido: ["a placa abandona o download, mantém a versão atual e volta a conectar quando o servidor retorna", "o servidor, ao voltar, não dá a atualização por concluída"],
   proibido: ["candidato gravado ou iniciado", "ota_0 alterado"],
   recuperacao: "um OTA válido conclui depois do reinício do servidor",
@@ -108,7 +108,11 @@ cenarioOta("OTA com o servidor morto (SIGKILL) no meio do download", {
   const desde = ctx.placa.marca();
   assert.equal((await lab.ofertarOta(ctx.sala)).status, 200);
   await downloadPassou(lab, ctx.via, 600_000);
+  // A killed process still has its kernel send the bytes it had already written, and on loopback that
+  // can be the whole image: the board then installs it, which is a different case (the candidate's own
+  // boot validation decides; see 05c). The machine going down takes the connection with it.
   await lab.servidor.parar("SIGKILL");
+  ctx.via.cortarTudo();
   const m = await ctx.placa.aguardarSerial(/OTA: falhou \(([^)]*)\)/, { desde, limiteMs: 600_000 });
   lab.observar("erroNaPlaca", m[1]);
   assert.equal(reinicios(ctx.placa, desde), 0);
