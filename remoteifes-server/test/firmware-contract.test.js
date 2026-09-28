@@ -264,7 +264,7 @@ test("a temporary setup AP never shares the station's subnet", () => {
   const aplicar = bloco("void aplicarPontoDeAcesso");
   assert.ok(aplicar.indexOf("IPAddress apIP = enderecoDoPontoDeAcesso(manterSta);") < aplicar.indexOf("WiFi.mode("), "the address is chosen from the station before the mode changes");
   assert.match(aplicar, /WiFi\.softAPConfig\(apIP, apIP, IPAddress\(255, 255, 255, 0\)\);/);
-  assert.match(aplicar, /dnsServer\.start\(53, "\*", apIP\)/, "the captive DNS answers with the AP's own address");
+  assert.match(aplicar, /if \(apIniciado\) dnsServer\.stop\(\);\s*dnsServer\.start\(53, "\*", apIP\);/, "the captive DNS answers with the AP's current address, also when a policy change reapplies the AP");
   assert.doesNotMatch(ino, /IPAddress apIP\(192, 168, 4, 1\)/);
   assert.doesNotMatch(ino, /Serial\.println\("[^"]*192\.168\.4\.1/, "messages print the AP's real address");
   assert.match(bloco("bool requisicaoPortalPermitida"), /server\.client\(\)\.localIP\(\) == WiFi\.softAPIP\(\)/);

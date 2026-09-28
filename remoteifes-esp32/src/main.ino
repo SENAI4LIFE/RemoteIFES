@@ -683,7 +683,8 @@ void aplicarPontoDeAcesso(bool manterSta) {
     return;
   }
 
-  if (!apIniciado) dnsServer.start(53, "*", apIP);
+  if (apIniciado) dnsServer.stop();
+  dnsServer.start(53, "*", apIP);
   apIniciado = true;
   apPasswordAtiva = senhaAlvo;
   if (senhaAlvo.length() > 0) {
