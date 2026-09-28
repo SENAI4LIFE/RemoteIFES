@@ -118,6 +118,8 @@ cenario("Rotação ativada e gravação perdida: a placa volta com o segredo ant
   const desde = via.conexoes.length;
   await placa.ligar();
   await lab.aguardar(async () => segredoNaNvs(lab, placa).segredo === b.segredo, { descricao: "B re-delivered and written", limiteMs: 300_000 });
+  // The session opened with A may still be up when B is written; the board then reconnects with B.
+  await lab.aguardar(() => via.conexoesDo("ws", desde).some((c) => c.cabecalhos && c.cabecalhos["x-device-secret"] === b.segredo), { descricao: "a session opened with B", limiteMs: 300_000 });
   await lab.aguardarConectada(sala);
   const apresentados = via.conexoesDo("ws", desde).filter((c) => c.cabecalhos).map((c) => (c.cabecalhos["x-device-secret"] === a.segredo ? "A" : c.cabecalhos["x-device-secret"] === b.segredo ? "B" : "?"));
   lab.observar("segredosApresentados", apresentados);
