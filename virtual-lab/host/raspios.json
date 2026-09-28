@@ -1,0 +1,11 @@
+{
+  "descricao": "Raspberry Pi OS Lite images whose root filesystem the host profiles run as a container. Only the userland is used: no Raspberry Pi kernel, firmware or boot is involved.",
+  "arm64": {
+    "url": "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz",
+    "sha256": "cdf4f3bfac35ae947b46e4e767f935453810549779ac3290e05a6754aee627e5"
+  },
+  "armhf": {
+    "url": "https://downloads.raspberrypi.com/raspios_lite_armhf/images/raspios_lite_armhf-2026-09-15/2026-09-15-raspios-trixie-armhf-lite.img.xz",
+    "sha256": "c766b3fb279b95c12cb4dd22d06f8eab31972c372675d05bd0ca95b060523a7f"
+  }
+}
