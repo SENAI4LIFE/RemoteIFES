@@ -79,7 +79,10 @@ async function preparar() {
   const { construir, VARIANTES } = require("./lib/firmware");
   const emulador = await obterEmulador();
   const builds = {};
-  for (const v of Object.keys(VARIANTES)) builds[v] = (await construir(v)).versao;
+  for (const v of Object.keys(VARIANTES)) {
+    const b = await construir(v);
+    builds[v] = { versao: b.versao, ramEstaticaBytes: b.tamanho && b.tamanho.ram ? b.tamanho.ram.usados : null, flashBytes: b.tamanho && b.tamanho.flash ? b.tamanho.flash.usados : null };
+  }
   console.log(JSON.stringify({ binario: emulador.binario, versao: emulador.versao, cache: ambiente.diretorioCache(), firmware: builds }));
 }
 
@@ -108,7 +111,9 @@ async function main() {
     console.log(`  emulator: ${emulador.versao}`);
     for (const v of Object.keys(VARIANTES)) {
       const b = await construir(v);
-      console.log(`  firmware ${v}: ${b.versao} (source ${b.impressao.slice(0, 12)})`);
+      const t = b.tamanho || {};
+      const uso = t.flash && t.ram ? `, flash ${t.flash.usados} B, static RAM ${t.ram.usados} B` : "";
+      console.log(`  firmware ${v}: ${b.versao} (source ${b.impressao.slice(0, 12)}${uso})`);
     }
     fs.writeFileSync(path.join(saida, "ambiente.json"), JSON.stringify({ emulador: emulador.versao, origem: emulador.origem, manifesto: MANIFESTO.commit, host: `${os.platform()} ${os.release()} ${os.arch()}`, node: process.version }, null, 2));
   }
