@@ -103,6 +103,8 @@ cenario("Failsafe local: transmissão, trava persistente, restauração recusada
   const antes = placa.bordas.length;
   await placa.pressionarBotao(6000);
   await placa.aguardarSerial(/Failsafe OFF transmitido localmente/, { desde });
+  // loop() switches the buzzer off a moment after the frame.
+  await lab.aguardar(() => placa.bordasDe(27, antes).some((b) => b.nivel === 0), { descricao: "buzzer off after the failsafe", limiteMs: 60_000, intervaloMs: 100 });
   const ir = placa.bordasDe(4, antes).length;
   const esperado = bordasEsperadas(RAW_FAILSAFE, 38000);
   lab.observar("failsafe", { bordas: ir, esperado, buzzer: placa.bordasDe(27, antes).map((b) => b.nivel) });
