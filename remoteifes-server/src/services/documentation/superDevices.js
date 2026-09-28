@@ -66,7 +66,7 @@ module.exports = [
       ] },
       { t: "passos", itens: [
         "Em uma placa nova ou após Resetar Wi-Fi, o AP sobe sozinho. Em uma placa já em operação, dê um clique curto no switch físico: o AP abre por dez minutos sem derrubar a conexão com o servidor e fecha sozinho se nada for salvo.",
-        "No equipamento de manutenção, conecte à rede <strong>RemoteIFES-Setup</strong> e abra <code>http://192.168.4.1</code>. Por padrão a rede é aberta; ela só pede a senha padrão do firmware (<strong>remoteifes</strong>) quando a opção global de exigir senha estiver ativada em Configurações.",
+        "No equipamento de manutenção, conecte à rede <strong>RemoteIFES-Setup</strong> e abra <code>http://192.168.4.1</code> (numa placa em operação cuja rede Wi-Fi já seja 192.168.4.x, o AP aberto pelo switch fica em <code>http://192.168.5.1</code>; o portal cativo abre a página sozinho). Por padrão a rede é aberta; ela só pede a senha padrão do firmware (<strong>remoteifes</strong>) quando a opção global de exigir senha estiver ativada em Configurações.",
         "Informe SSID e senha da rede, host e porta do servidor. Escolha HTTPS com CA válida em produção; HTTPS sem validação ou HTTP são opções de desenvolvimento em rede controlada.",
         "Se usar credencial, informe <strong>deviceId</strong> e segredo juntos. Deixar ambos vazios preserva uma credencial já gravada.",
         "Salve. A placa reinicia, encerra o AP, conecta ao Wi-Fi e ao WebSocket do servidor. Confirme detecção, vínculo da sala, IP e versão em <strong>Administração &gt; Dispositivos &gt; Cadastro</strong>.",

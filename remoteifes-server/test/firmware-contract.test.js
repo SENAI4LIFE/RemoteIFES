@@ -253,6 +253,23 @@ test("a transport mode stored in NVS that the firmware does not know means certi
   assert.equal((ino.match(/preferences\.getString\("tls"/g) || []).length, 1, "the stored mode is read in one place only");
 });
 
+// The setup AP is always 192.168.4.1/24. Opened next to a station on a network that is itself
+// 192.168.4.0/24, the board had two interfaces in one subnet: the session already open went on, but no
+// new connection to the server could be made until the AP closed, ten minutes after the last press
+// (virtual board, virtual-lab/ scenario 09, against the same firmware with only the AP moved).
+test("a temporary setup AP never shares the station's subnet", () => {
+  const endereco = bloco("IPAddress enderecoDoPontoDeAcesso");
+  assert.match(endereco, /const bool mesmaSubrede = manterSta && sta\[0\] == 192 && sta\[1\] == 168 && sta\[2\] == 4;/);
+  assert.match(endereco, /return IPAddress\(192, 168, mesmaSubrede \? 5 : 4, 1\);/);
+  const aplicar = bloco("void aplicarPontoDeAcesso");
+  assert.ok(aplicar.indexOf("IPAddress apIP = enderecoDoPontoDeAcesso(manterSta);") < aplicar.indexOf("WiFi.mode("), "the address is chosen from the station before the mode changes");
+  assert.match(aplicar, /WiFi\.softAPConfig\(apIP, apIP, IPAddress\(255, 255, 255, 0\)\);/);
+  assert.match(aplicar, /dnsServer\.start\(53, "\*", apIP\)/, "the captive DNS answers with the AP's own address");
+  assert.doesNotMatch(ino, /IPAddress apIP\(192, 168, 4, 1\)/);
+  assert.doesNotMatch(ino, /Serial\.println\("[^"]*192\.168\.4\.1/, "messages print the AP's real address");
+  assert.match(bloco("bool requisicaoPortalPermitida"), /server\.client\(\)\.localIP\(\) == WiFi\.softAPIP\(\)/);
+});
+
 test("the firmware carries no code comments", () => {
   assert.doesNotMatch(ino, /^\s*\/\//m);
   assert.doesNotMatch(ino, /\/\*/);
