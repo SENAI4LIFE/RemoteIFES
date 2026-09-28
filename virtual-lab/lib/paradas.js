@@ -20,7 +20,11 @@ function ferramenta(nome) {
 
 const linhasPorElf = new Map();
 
-/** Addresses of a line of main.ino, statement starts first, from the ELF's DWARF line table. */
+/**
+ * The entry address of a line of main.ino, from the ELF's DWARF line table: its lowest statement start.
+ * A line holding several statements (a call, a comparison, a return) has several; a breakpoint on each
+ * would count one pass through the line as several occurrences.
+ */
 function enderecosDaLinha(elf, linha) {
   if (!linhasPorElf.has(elf)) {
     const r = spawnSync(ferramenta("objdump"), ["--dwarf=decodedline", elf], { encoding: "utf8", maxBuffer: 1024 * 1024 * 1024 });
@@ -38,7 +42,7 @@ function enderecosDaLinha(elf, linha) {
   }
   const e = linhasPorElf.get(elf).get(linha);
   if (!e) throw new Error(`main.ino:${linha} has no code in ${elf}`);
-  return [...(e.inicio.size ? e.inicio : e.todos)].sort((a, b) => a - b);
+  return [Math.min(...(e.inicio.size ? e.inicio : e.todos))];
 }
 
 /** Entry addresses of a function (every overload), demangled names as nm -C prints them. */

@@ -19,8 +19,13 @@ const { cenario } = require("../lib/laboratorio");
 
 const cenarioOta = (nome, meta, corpo) => cenario(nome, { firmware: ["producao", "candidato"], ...meta }, corpo);
 
+// Firmware downloads cross a 32 KiB/s link: an image then takes about 40 s, so several of the server's
+// 15 s keepalive pings fall inside it, as they do on a busy campus Wi-Fi.
+const RITMO_DOWNLOAD = 32 * 1024;
+
 async function emOperacao(lab) {
   const via = await lab.intermediario();
+  via.ritmoFirmware = RITMO_DOWNLOAD;
   const { placa, sala } = await lab.placaEmOperacao({ via });
   const base = lab.firmware("producao");
   const candidato = lab.firmware("candidato");
@@ -41,9 +46,9 @@ function ultimoBomIntacto(lab, placa, rotulo) {
 }
 
 /**
- * The outcome of the current attempt. A transfer failure is an inference the server revises when the
- * board later presents boot evidence for the same attempt, so it is not final here; every phase seen
- * is kept as evidence.
+ * The outcome of the current attempt. A transfer failure the server only inferred (the socket dropped
+ * or the deadline passed: `presumida`) is revised when the board later presents boot evidence for the
+ * same attempt, so it is not final here; one the board reported is. Every phase seen is kept as evidence.
  */
 async function desfechoOta(lab, sala, limiteMs = 900_000) {
   const historico = [];
@@ -51,9 +56,9 @@ async function desfechoOta(lab, sala, limiteMs = 900_000) {
     const ota = await lab.estadoOta(sala);
     if (!ota) return false;
     const ultimo = historico[historico.length - 1];
-    if (!ultimo || ultimo.fase !== ota.fase || ultimo.causa !== (ota.causa || null)) historico.push({ fase: ota.fase, causa: ota.causa || null });
+    if (!ultimo || ultimo.fase !== ota.fase || ultimo.causa !== (ota.causa || null)) historico.push({ fase: ota.fase, causa: ota.causa || null, presumida: ota.presumida === true });
     if (ota.fase === "concluido") return ota;
-    if (ota.fase === "falhou" && ota.causa !== "transferencia") return ota;
+    if (ota.fase === "falhou" && !(ota.causa === "transferencia" && ota.presumida === true)) return ota;
     return false;
   }, { descricao: `final OTA outcome of ${sala}`, limiteMs });
   return { final, historico };
@@ -61,7 +66,8 @@ async function desfechoOta(lab, sala, limiteMs = 900_000) {
 
 /**
  * The board keeps its WebSocket alive while the image flows: every server ping forwarded during the
- * download is answered. At least one ping must fall in the window, or the check would prove nothing.
+ * download is answered within 10 s, each by its own pong. At least one ping must fall in the window,
+ * or the check would prove nothing.
  */
 function keepaliveDuranteDownload(lab, via, rotulo) {
   const download = via.conexoesDo("firmware").filter((c) => c.corpoInicioEm && c.corpoCompletoEm).pop();

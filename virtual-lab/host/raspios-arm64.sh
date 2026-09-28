@@ -8,6 +8,11 @@
 #
 # Evidence: Raspberry Pi OS packages, systemd and filesystem layout. Not evidence: the Raspberry Pi
 # kernel, firmware, boot, SD card or real Pi performance (the container shares the runner's kernel).
+#
+# Privilege: systemd as the container's init needs --privileged and the host's cgroup tree, which gives
+# the guest root on the runner. The job already has root there through sudo, the runner is discarded
+# afterwards, it holds no secret, and its checkout keeps no token (persist-credentials: false), so the
+# copy of the repository below carries no credential. Never run this on a machine you keep.
 set -euo pipefail
 
 [ "${LAB_HOST_DESCARTAVEL:-}" = "1" ] || { echo "disposable host only (LAB_HOST_DESCARTAVEL=1)"; exit 2; }
@@ -20,12 +25,14 @@ NOME=raspios-arm64-ensaio
 docker rm -f "$NOME" >/dev/null 2>&1 || true
 # Units for a first boot on real Pi hardware with a console (the new-user prompt, SSH key and EEPROM
 # jobs, swap file, consoles) have nothing to do in a container and would keep boot from finishing. The
-# network belongs to Docker: the guest's own network managers (and their wait-online jobs) stay off.
+# network belongs to Docker: the guest's own network managers (and their wait-online jobs) stay off. The
+# image's fstab names the SD card's boot and root partitions, which a container does not have: waiting for
+# them fails local-fs.target and drops systemd into emergency mode, so the container's copy is emptied.
 MASCARAR="userconfig.service systemd-firstboot.service regenerate_ssh_host_keys.service sshswitch.service rpi-eeprom-update.service dphys-swapfile.service rpi-resize.service getty@tty1.service serial-getty@ttyAMA0.service console-setup.service keyboard-setup.service NetworkManager.service NetworkManager-wait-online.service systemd-networkd.service systemd-networkd-wait-online.service"
 docker run -d --name "$NOME" --hostname raspberrypi --privileged --cgroupns=host \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
   --memory=1g --memory-swap=1g --cpus=2 -e MASCARAR="$MASCARAR" \
-  raspios-lite:arm64 /bin/sh -c 'for u in $MASCARAR; do ln -sf /dev/null "/etc/systemd/system/$u"; done; exec /sbin/init' >/dev/null
+  raspios-lite:arm64 /bin/sh -c 'for u in $MASCARAR; do ln -sf /dev/null "/etc/systemd/system/$u"; done; : > /etc/fstab; exec /sbin/init' >/dev/null
 trap 'docker rm -f "$NOME" >/dev/null 2>&1 || true' EXIT
 
 estado=""
@@ -37,6 +44,8 @@ done
 echo "systemd in the container: $estado"
 if [ "$estado" != running ] && [ "$estado" != degraded ]; then
   docker exec "$NOME" systemctl list-jobs --no-pager || true
+  docker exec "$NOME" systemctl --failed --no-pager || true
+  docker exec "$NOME" journalctl -b -p warning --no-pager 2>/dev/null | tail -60 || true
   echo "systemd did not finish booting in the container"
   exit 1
 fi

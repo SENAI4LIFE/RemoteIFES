@@ -2,8 +2,8 @@
 
 // The network between the virtual board and the server, where the lab injects faults.
 //
-// The board is configured (through its own setup portal) to reach the server at 192.168.4.2:<porta
-// of this intermediary>; the emulator's user-mode network delivers that to 127.0.0.1 on the host.
+// The board is configured (through its own setup portal) to reach the server at 192.168.4.9:8080, the
+// one address its restricted network forwards (lib/relay.js) to this intermediary on 127.0.0.1.
 // Everything passes through here unchanged unless a fault is armed.
 //
 // Payload faults (frames injected, firmware bytes altered) exist only for the plaintext transport the
@@ -45,6 +45,10 @@ class Intermediario {
     this.modo = "normal"; // "normal" | "recusar" | "buraco"
     this.atrasoMs = 0;
     this.firmware = {}; // { cortarApos, corromperByte, pararApos, tamanhoDeclarado }
+    // Pace of a firmware download toward the board, bytes per second (null: as fast as it reads). The
+    // loopback socket to the relay buffers megabytes, so without a pace a whole image "leaves" at once
+    // and the time it spends reaching the board is invisible here.
+    this.ritmoFirmware = null;
     this.conexoes = [];
     this.vivas = new Set();
     this.injecoes = [];
@@ -80,7 +84,8 @@ class Intermediario {
     const servidor = net.connect(this.portaDestino, this.hostDestino);
     servidor.on("error", () => cliente.destroy());
     this.vivas.add(servidor);
-    servidor.once("close", () => { this.vivas.delete(servidor); cliente.end(); });
+    // The board's side ends only after everything already queued toward it has been written.
+    servidor.once("close", () => { this.vivas.delete(servidor); enviandoPlaca.then(() => cliente.end()); });
     cliente.once("close", () => servidor.destroy());
     c.cliente = cliente;
 
@@ -113,7 +118,7 @@ class Intermediario {
       if (c.tipo === "ws" && quadrosDaPlaca) {
         let n;
         while (quadrosDaPlaca && (n = tamanhoDoQuadro(quadrosDaPlaca)) > 0) {
-          this.registrarDaPlaca(quadrosDaPlaca.subarray(0, n));
+          this.registrarDaPlaca(quadrosDaPlaca.subarray(0, n), c);
           quadrosDaPlaca = quadrosDaPlaca.subarray(n);
         }
       }
@@ -137,7 +142,22 @@ class Intermediario {
       enviandoPlaca = enviandoPlaca.then(async () => {
         if (this.atrasoMs) await esperar(this.atrasoMs);
         if (cliente.destroyed) return;
-        const cabe = cliente.write(bloco);
+        // Body blocks carry a callback; the body starts when its first byte is written.
+        if (aoEscrever && c.tipo === "firmware" && !c.corpoInicioEm) c.corpoInicioEm = Date.now();
+        const ritmo = c.tipo === "firmware" ? this.ritmoFirmware : null;
+        let cabe = true;
+        if (ritmo) {
+          // A slow link: 2 KiB at a time at `ritmo`, the server read no faster than that.
+          servidor.pause();
+          for (let i = 0; i < bloco.length && !cliente.destroyed; i += 2048) {
+            const pedaco = bloco.subarray(i, i + 2048);
+            cabe = cliente.write(pedaco);
+            await esperar((pedaco.length / ritmo) * 1000);
+          }
+          if (cliente.destroyed) return;
+        } else {
+          cabe = cliente.write(bloco);
+        }
         if (aoEscrever) aoEscrever();
         if (!cabe && c.tipo === "firmware") {
           servidor.pause();
@@ -146,8 +166,8 @@ class Intermediario {
             cliente.once("drain", seguir);
             cliente.once("close", seguir);
           });
-          if (!c.parado && !servidor.destroyed) servidor.resume();
         }
+        if (c.tipo === "firmware" && (ritmo || !cabe) && !c.parado && !c.cortado && !servidor.destroyed) servidor.resume();
       });
     };
     servidor.on("data", (d) => {
@@ -173,7 +193,7 @@ class Intermediario {
         let n;
         while ((n = tamanhoDoQuadro(c.pendente)) > 0) {
           const opcode = c.pendente[0] & 0x0f;
-          if (opcode === 0x09) this.controles.push({ ms: Date.now(), tipo: "ping" });
+          if (opcode === 0x09) this.controles.push({ ms: Date.now(), tipo: "ping", conexao: c.id });
           let depois = null;
           if (opcode === 0x01 && this.aoQuadroDoServidor) {
             let len = c.pendente[1] & 0x7f;
@@ -226,9 +246,9 @@ class Intermediario {
     });
   }
 
-  registrarDaPlaca(quadro) {
+  registrarDaPlaca(quadro, c) {
     const opcode = quadro[0] & 0x0f;
-    if (opcode === 0x0a) this.controles.push({ ms: Date.now(), tipo: "pong" });
+    if (opcode === 0x0a) this.controles.push({ ms: Date.now(), tipo: "pong", conexao: c.id });
     if (opcode !== 1) return;
     let len = quadro[1] & 0x7f;
     let off = 2;
@@ -244,14 +264,25 @@ class Intermediario {
 
   /**
    * Server pings forwarded to the board between `inicioMs` and `fimMs` (host time) and, for each, how
-   * long the board took to answer with a pong (null when it never did).
+   * long the board took to answer (null when it never did). Pongs are paired with pings one to one, in
+   * order, on the same connection, so a single late pong cannot stand for several pings.
    */
   pingsRespondidos(inicioMs, fimMs) {
-    const pings = this.controles.filter((x) => x.tipo === "ping" && x.ms >= inicioMs && x.ms <= fimMs);
-    return pings.map((p) => {
-      const pong = this.controles.find((x) => x.tipo === "pong" && x.ms >= p.ms);
-      return { ping: p.ms, respostaMs: pong ? pong.ms - p.ms : null };
-    });
+    const pares = [];
+    const abertos = new Map();
+    for (const x of this.controles) {
+      if (!abertos.has(x.conexao)) abertos.set(x.conexao, []);
+      const fila = abertos.get(x.conexao);
+      if (x.tipo === "ping") {
+        const par = { ping: x.ms, respostaMs: null };
+        fila.push(par);
+        pares.push(par);
+      } else if (fila.length) {
+        const par = fila.shift();
+        par.respostaMs = x.ms - par.ping;
+      }
+    }
+    return pares.filter((p) => p.ping >= inicioMs && p.ping <= fimMs);
   }
 
   /** Messages the board sent after index `desde` that match `filtro` (an object of expected fields). */

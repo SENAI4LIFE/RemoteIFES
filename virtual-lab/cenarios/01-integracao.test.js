@@ -68,12 +68,14 @@ cenario("Fábrica, portal, Wi-Fi, credencial, comando e confirmação", {
   const confirmado = await lab.aguardarConfirmada("A-103a", { limiteMs: 120_000 });
   const ir = placa.bordasDe(4, antes);
   const buzzer = placa.bordasDe(27, antes);
-  lab.observar("comando", { ultimoComando: confirmado.dispositivo.ultimoComando, bordasIr: ir.length, buzzer: buzzer.map((b) => b.nivel) });
+  lab.observar("comando", { bordasIr: ir.length, buzzer: buzzer.map((b) => b.nivel) });
   assert.ok(ir.length > 1000, `a modulated IR frame on GPIO 4 (${ir.length} edges)`);
   assert.equal(ir.filter((b) => b.nivel === 1).length, ir.filter((b) => b.nivel === 0).length, "the carrier ends low");
   assert.deepEqual(buzzer.map((b) => b.nivel).slice(0, 2), [1, 0], "the buzzer sounds and stops");
-  assert.equal(confirmado.dispositivo.ultimoComando.power, true);
-  assert.equal(confirmado.dispositivo.ultimoComando.protocol, 16);
+  assert.equal(confirmado.dispositivo.estadoConfirmado, true);
+  const { relato } = await lab.aguardarIntencaoAplicada("A-103a", true);
+  lab.observar("relatoDaPlaca", relato);
+  assert.equal(relato.protocol, 16, "the board reports the room's protocol");
 
   // Telemetry without a DHT11 attached: the only sensor claim the lab makes.
   const telemetria = await lab.aguardar(async () => {

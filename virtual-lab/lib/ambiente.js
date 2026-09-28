@@ -102,12 +102,28 @@ function exigirHostDescartavel(acao) {
 // Every child the lab starts, so an interrupted run can still stop exactly those and nothing else.
 const filhos = new Map();
 
+/**
+ * The kernel's start time of `pid` (Linux: field 22 of /proc/<pid>/stat), or null when it cannot be
+ * read. With the PID it identifies one process: a PID the kernel hands out again gets another start
+ * time.
+ */
+function arranqueDoProcesso(pid) {
+  if (process.platform !== "linux") return null;
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19] || null;
+  } catch {
+    return null;
+  }
+}
+
 function registrarProcesso(filho, rotulo) {
   if (!filho || !filho.pid) return filho;
   filhos.set(filho.pid, { filho, rotulo });
   filho.once("exit", () => filhos.delete(filho.pid));
   try {
-    fs.appendFileSync(path.join(diretorioExecucao(), "processos.jsonl"), `${JSON.stringify({ pid: filho.pid, rotulo, inicio: Date.now() })}\n`);
+    const registro = { pid: filho.pid, rotulo, inicio: Date.now(), arranque: arranqueDoProcesso(filho.pid) };
+    fs.appendFileSync(path.join(diretorioExecucao(), "processos.jsonl"), `${JSON.stringify(registro)}\n`);
   } catch {}
   return filho;
 }
@@ -180,7 +196,7 @@ module.exports = {
   diretorioCache,
   removerSeguro,
   exigirHostDescartavel,
-  registrarProcesso,
+  registrarProcesso, arranqueDoProcesso,
   registrarPorta,
   encerrarFilhos,
   nucleoPlatformio,
