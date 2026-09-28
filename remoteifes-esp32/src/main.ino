@@ -213,6 +213,7 @@ const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
 void startAPMode();
 void aplicarPontoDeAcesso(bool manterSta);
+IPAddress enderecoDoPontoDeAcesso(bool manterSta);
 void aplicarPoliticaApDoServidor(JsonDocument& doc);
 bool gravarChaveNvsVerificada(const char* chave, const String& valor);
 void restaurarChaveNvs(const char* chave, const String& valor);
@@ -664,12 +665,18 @@ String escaparHtml(const String& valor) {
   return saida;
 }
 
+IPAddress enderecoDoPontoDeAcesso(bool manterSta) {
+  const IPAddress sta = WiFi.localIP();
+  const bool mesmaSubrede = manterSta && sta[0] == 192 && sta[1] == 168 && sta[2] == 4;
+  return IPAddress(192, 168, mesmaSubrede ? 5 : 4, 1);
+}
+
 void aplicarPontoDeAcesso(bool manterSta) {
   String senhaAlvo = apExigirCredencial ? apPassword : String("");
   if (apIniciado && senhaAlvo == apPasswordAtiva) return;
 
+  IPAddress apIP = enderecoDoPontoDeAcesso(manterSta);
   WiFi.mode(manterSta ? WIFI_AP_STA : WIFI_AP);
-  IPAddress apIP(192, 168, 4, 1);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   if (!WiFi.softAP("RemoteIFES-Setup", senhaAlvo.length() > 0 ? senhaAlvo.c_str() : NULL)) {
     Serial.println("Falha ao abrir o ponto de acesso 'RemoteIFES-Setup'.");
@@ -684,7 +691,7 @@ void aplicarPontoDeAcesso(bool manterSta) {
   } else {
     Serial.println("Ponto de acesso 'RemoteIFES-Setup' ativo sem senha (politica do servidor).");
   }
-  Serial.println("Portal de configuracao em 192.168.4.1 (somente enquanto o ponto de acesso estiver ativo).");
+  Serial.println("Portal de configuracao em " + WiFi.softAPIP().toString() + " (somente enquanto o ponto de acesso estiver ativo).");
 }
 
 void aplicarPoliticaApDoServidor(JsonDocument& doc) {
@@ -724,7 +731,7 @@ void startAPMode() {
   aplicarPontoDeAcesso(false);
   registrarPortal();
   server.begin();
-  Serial.println("Ponto de Acesso 'RemoteIFES-Setup' ativo no IP: 192.168.4.1");
+  Serial.println("Ponto de Acesso 'RemoteIFES-Setup' ativo no IP: " + WiFi.softAPIP().toString());
 }
 
 void abrirApTemporario() {
@@ -739,7 +746,7 @@ void abrirApTemporario() {
   registrarPortal();
   server.begin();
   reportComando("setup_ap", "aberto_pelo_switch");
-  Serial.println("Switch: RemoteIFES-Setup aberto temporariamente em 192.168.4.1; a operacao continua pela rede.");
+  Serial.println("Switch: RemoteIFES-Setup aberto temporariamente em " + WiFi.softAPIP().toString() + "; a operacao continua pela rede.");
 }
 
 void encerrarApTemporario() {
