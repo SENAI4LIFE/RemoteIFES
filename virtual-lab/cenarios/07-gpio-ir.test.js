@@ -175,8 +175,12 @@ cenario("Toque longo com o servidor inalcançável: o failsafe sai sem servidor"
   const antes = placa.bordas.length;
   await placa.pressionarBotao(6000);
   const soltou = await placa.agoraMs();
+  // The timer records the hold at 5 s; loop() transmits when it next runs, which with a silent server
+  // can be a blocking call (at most 2.5 s connect plus 2.5 s read) later.
   await placa.aguardarSerial(/Failsafe OFF transmitido localmente/, { desde, limiteMs: 300_000 });
-  lab.observar("atrasoDoFailsafeAposSoltarMsVirtual", Math.round((await placa.agoraMs()) - soltou));
+  const atraso = Math.round((await placa.agoraMs()) - soltou);
+  lab.observar("atrasoDoFailsafeAposSoltarMsVirtual", atraso);
+  assert.ok(atraso <= 10_000, `the failsafe went out ${atraso} ms of board time after the release`);
   assert.ok(placa.bordasDe(4, antes).length > 0, "the failsafe went out with no server");
   assert.doesNotMatch(placa.serial.slice(desde), /Switch: RemoteIFES-Setup/, "a hold is not taken for a tap");
   assert.equal(reinicios(placa, desde), 0);
