@@ -41,13 +41,16 @@ test("WebSocket traffic passes unchanged; pings are answered; the board's frames
   c.send(JSON.stringify({ tipo: "info", fw: "9.9.9" }));
   await via.injetarTexto(JSON.stringify({ tipo: "injetado" }));
   await esperar(400);
+  // Pings still in flight when the client closes cannot have a pong; judge those sent before.
+  const janela = Date.now() - 200;
   c.close();
   assert.ok(pongs >= 3, `pongs crossed the intermediary (${pongs})`);
   assert.deepEqual(recebidas, [JSON.stringify({ tipo: "info", fw: "9.9.9" })]);
   assert.deepEqual(doServidor.map((m) => m.tipo).sort(), ["injetado", "ola"]);
   assert.deepEqual(via.mensagensDaPlaca({ tipo: "info" }).map((m) => m.fw), ["9.9.9"]);
   assert.equal(via.conexoes[0].cabecalhos["x-device-id"], "esp_1");
-  assert.ok(via.pingsRespondidos(0, Date.now()).every((p) => p.respostaMs !== null));
+  const pings = via.pingsRespondidos(0, janela);
+  assert.ok(pings.length >= 1 && pings.every((p) => p.respostaMs !== null), JSON.stringify(pings));
 });
 
 test("a firmware download is cut, stalled or altered at the exact byte, following the reader's pace", async (t) => {

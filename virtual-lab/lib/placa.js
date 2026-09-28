@@ -141,8 +141,12 @@ class PlacaVirtual extends EventEmitter {
       "-chardev", `socket,id=qt,host=127.0.0.1,port=${qt.porta}`, "-qtest", "chardev:qt", "-qtest-log", "none",
       "-qmp", `tcp:127.0.0.1:${qmp.porta}`,
     ];
-    // Its own process group, so the emulator is stopped together with anything it started.
-    const processo = registrarProcesso(spawn(this.emulador.binario, args, { stdio: ["ignore", "pipe", "pipe"], detached: true }), "qemu");
+    // Its own process group, so the emulator is stopped together with anything it started. Standard
+    // input is a pipe the lab holds open and never writes to: with -nographic the UART shares stdio,
+    // and on Linux an input at end-of-file (/dev/null) closes that shared device, so the board would
+    // run with its serial output silently discarded.
+    const processo = registrarProcesso(spawn(this.emulador.binario, args, { stdio: ["pipe", "pipe", "pipe"], detached: true }), "qemu");
+    processo.stdin.on("error", () => {});
     this.processo = processo;
     try { os.setPriority(processo.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch {}
     const anexar = (d) => {
