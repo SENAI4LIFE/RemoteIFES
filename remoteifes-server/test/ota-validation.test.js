@@ -255,6 +255,7 @@ test("a transfer presumed failed because the socket dropped is completed by the 
   await d.fechar();
   assert.equal(fase("VAL-7"), "falhou");
   assert.equal(otaService.estadoDaSala("VAL-7").causa, "transferencia");
+  assert.equal(otaService.estadoDaSala("VAL-7").presumida, true);
   const novo = await abrirDispositivo("VAL-7", "AA:BB:CC:0A:00:07", VERSAO_NOVA);
   assert.equal(fase("VAL-7"), "falhou", "reconnecting with the target version alone does not complete it");
   novo.enviar({ tipo: "ota_validado", tentativa: "outra", sha256: manifesto.sha256, versao: VERSAO_NOVA });
@@ -267,6 +268,24 @@ test("a transfer presumed failed because the socket dropped is completed by the 
   assert.ok(await ate(() => novo.acks().length === 1), "the board is told to clear its evidence");
   await novo.fechar();
   otaService.limparEstado("VAL-7");
+});
+
+test("a download error the board reported stays final even if evidence for that attempt arrives later", async () => {
+  novaSala("VAL-9", "AA:BB:CC:0A:00:09");
+  const d = await abrirDispositivo("VAL-9", "AA:BB:CC:0A:00:09", VERSAO_ANTIGA);
+  otaService.ofertar("VAL-9");
+  await ate(() => d.ofertas().length === 1);
+  const tentativa = d.ofertas()[0].tentativa;
+  d.enviar({ tipo: "ota_resultado", resultado: "erro", erro: "sha256 divergente" });
+  assert.ok(await ate(() => fase("VAL-9") === "falhou"));
+  assert.equal(otaService.estadoDaSala("VAL-9").causa, "transferencia");
+  assert.notEqual(otaService.estadoDaSala("VAL-9").presumida, true, "a reported error is not an inference");
+  d.enviar({ tipo: "ota_validado", tentativa, sha256: manifesto.sha256, versao: VERSAO_NOVA });
+  await esperar(80);
+  assert.equal(fase("VAL-9"), "falhou", "a delayed or replayed validation does not overturn the board's own error");
+  assert.equal(d.acks().length, 0);
+  await d.fechar();
+  otaService.limparEstado("VAL-9");
 });
 
 test("a rollback or a failed boot validation stays final even if matching evidence arrives later", () => {
