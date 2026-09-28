@@ -130,6 +130,7 @@ jobs:
           - { grupo: ota-rollback, arquivos: "cenarios/05c-ota-rollback.test.js" }
           - { grupo: nvs, arquivos: "cenarios/06-nvs.test.js" }
           - { grupo: gpio-ir, arquivos: "cenarios/07-gpio-ir.test.js" }
+          - { grupo: ap-temporario, arquivos: "cenarios/09-ap-temporario.test.js" }
     env:
       # The runner is discarded after the job: the only kind of host the lab boots a guest on.
       LAB_HOST_DESCARTAVEL: "1"

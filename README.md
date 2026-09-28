@@ -499,7 +499,7 @@ Não existe mais frontend local do ESP32 em operação nem a ação "acessar int
 
 ### Switch físico e buzzer
 
-Cada placa usa um único botão momentâneo normalmente aberto ligado entre o **GPIO 26** e o **GND**. O firmware configura o GPIO 26 como `INPUT_PULLUP` (ativo em nível baixo), portanto não é preciso resistor externo e o botão não deve receber 3,3 V ou 5 V; em um push-button tátil de quatro terminais, use um terminal de cada lado oposto. O debounce é de 40 ms e o botão é lido em todo ciclo do `loop()`, inclusive no modo AP e durante o modo clone.
+Cada placa usa um único botão momentâneo normalmente aberto ligado entre o **GPIO 26** e o **GND**. O firmware configura o GPIO 26 como `INPUT_PULLUP` (ativo em nível baixo), portanto não é preciso resistor externo e o botão não deve receber 3,3 V ou 5 V; em um push-button tátil de quatro terminais, use um terminal de cada lado oposto. O debounce é de 40 ms. Um temporizador do sistema amostra o botão a cada 10 ms, independentemente do `loop()`, que pode ficar segundos preso numa chamada de rede quando o servidor não responde; o `loop()` executa a ação reconhecida, inclusive no modo AP e durante o modo clone. Com a rede travada, o failsafe pode sair alguns segundos depois de completados os 5 s, mas a pressão não se perde.
 
 | Ação | Efeito |
 |---|---|
