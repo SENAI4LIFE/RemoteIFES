@@ -25,7 +25,8 @@ const net = require("net");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
-const { comandoGdb, redigir, registrarProcesso, registrarPorta, exigirHostDescartavel } = require("./ambiente");
+const { redigir, registrarProcesso, registrarPorta, exigirHostDescartavel } = require("./ambiente");
+const { enderecosDaLinha, enderecosDaFuncao, ClienteGdb } = require("./paradas");
 
 const ESPERA_PADRAO_MS = 120_000;
 // The address the board is configured with. It exists only inside the emulator's network.
@@ -212,7 +213,7 @@ class PlacaVirtual extends EventEmitter {
   }
 
   async encerrar() {
-    for (const g of this.gdbs) g.kill("SIGKILL");
+    for (const g of this.gdbs) g.soquete.destroy();
     await this.desligar();
   }
 
@@ -391,37 +392,39 @@ class PlacaVirtual extends EventEmitter {
   async pararEm(trecho, { ocorrencia = 1, acao = "desligar", limiteMs = ESPERA_PADRAO_MS * 3, funcao = null } = {}) {
     if (!["desligar", "resetar"].includes(acao)) throw new Error(`unknown stop action ${acao}`);
     // `funcao` stops at a function of the firmware or its libraries instead of a line of main.ino.
-    if (funcao !== null && !/^[A-Za-z_][A-Za-z0-9_:]*$/.test(funcao)) throw new Error(`invalid function name ${funcao}`);
-    const linha = funcao ? null : this.linhaDoTrecho(trecho);
-    const local = funcao || `main.ino:${linha}`;
+    const local = funcao || `main.ino:${this.linhaDoTrecho(trecho)}`;
+    const enderecos = funcao ? enderecosDaFuncao(this.firmware.elf, funcao) : enderecosDaLinha(this.firmware.elf, this.linhaDoTrecho(trecho));
     // The GDB stub exists only while this stop point is armed, on a loopback port.
     const portaGdb = await portaLivre();
     await this.qmp.executar("human-monitor-command", { "command-line": `gdbserver tcp:127.0.0.1:${portaGdb}` });
-    const args = ["-q", "-nx", "-batch",
-      "-ex", "set pagination off", "-ex", "set confirm off",
-      "-ex", `target remote 127.0.0.1:${portaGdb}`,
-      "-ex", `break ${local}`];
-    if (ocorrencia > 1) args.push("-ex", `ignore 1 ${ocorrencia - 1}`);
-    args.push("-ex", "continue", "-ex", 'printf "LAB-PARADA\\n"');
-    if (acao === "desligar") args.push("-ex", "monitor quit");
-    else args.push("-ex", "monitor system_reset", "-ex", "detach");
-    args.push(this.firmware.elf);
-    return new Promise((resolve, reject) => {
-      const gdb = registrarProcesso(spawn(comandoGdb(), args, { stdio: ["ignore", "pipe", "pipe"] }), "gdb");
-      this.gdbs.add(gdb);
-      let saida = "";
-      gdb.stdout.on("data", (d) => { saida = (saida + d).slice(-20_000); });
-      gdb.stderr.on("data", (d) => { saida = (saida + d).slice(-20_000); });
-      const timer = setTimeout(() => { gdb.kill("SIGKILL"); reject(new Error(`${this.nome}: stop point ${local} not reached within ${limiteMs} ms`)); }, limiteMs);
-      gdb.once("exit", async () => {
-        clearTimeout(timer);
-        this.gdbs.delete(gdb);
-        if (this.processo && this.qmp) await this.qmp.executar("human-monitor-command", { "command-line": "gdbserver none" }).catch(() => {});
-        if (!saida.includes("LAB-PARADA")) return reject(new Error(`${this.nome}: gdb ended before the stop point:\n${saida.slice(-1500)}`));
-        if (acao === "desligar") await Promise.race([this.fim, esperar(15_000)]);
-        resolve({ local, trecho });
-      });
-    });
+    const gdb = await ClienteGdb.conectar(portaGdb);
+    this.gdbs.add(gdb);
+    try {
+      await gdb.preparar();
+      const pontos = [];
+      for (const e of enderecos) pontos.push([await gdb.quebrar(e), e]);
+      const prazo = Date.now() + limiteMs;
+      for (let visto = 0; visto < ocorrencia; visto++) {
+        const resta = prazo - Date.now();
+        if (resta <= 0) throw new Error(`${this.nome}: stop point ${local} reached ${visto} of ${ocorrencia} times within ${limiteMs} ms`);
+        await gdb.continuarAteParar(resta);
+      }
+      // The chip is frozen at the stop point.
+      if (acao === "desligar") {
+        await this.desligar();
+      } else {
+        for (const [tipo, e] of pontos) await gdb.retirar(tipo, e);
+        await this.qmp.executar("system_reset");
+        await gdb.desconectar();
+        const estado = await this.qmp.executar("query-status");
+        if (!estado.running) await this.qmp.executar("cont");
+      }
+      return { local, trecho, enderecos: enderecos.length };
+    } finally {
+      this.gdbs.delete(gdb);
+      if (!gdb.fechado) gdb.soquete.destroy();
+      if (this.processo && this.qmp) await this.qmp.executar("human-monitor-command", { "command-line": "gdbserver none" }).catch(() => {});
+    }
   }
 }
 

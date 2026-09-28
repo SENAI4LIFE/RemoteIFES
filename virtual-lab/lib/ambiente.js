@@ -152,15 +152,6 @@ function comandoPio() {
   throw new Error("PlatformIO not found: install it (pip install platformio) or set LAB_PIO");
 }
 
-/** The Xtensa GDB PlatformIO installs with the ESP32 toolchain, used for deterministic stop points. */
-function comandoGdb() {
-  if (process.env.LAB_GDB) return process.env.LAB_GDB;
-  const nome = process.platform === "win32" ? "xtensa-esp32-elf-gdb.exe" : "xtensa-esp32-elf-gdb";
-  const caminho = path.join(nucleoPlatformio(), "packages", "toolchain-xtensa-esp32", "bin", nome);
-  if (!fs.existsSync(caminho)) throw new Error(`Xtensa GDB not found at ${caminho}; build the firmware once or set LAB_GDB`);
-  return caminho;
-}
-
 // --- Secrets -------------------------------------------------------------------------------------
 
 // Secrets that must never reach a log or an uploaded artifact: device secrets, AP passwords and the
@@ -194,7 +185,6 @@ module.exports = {
   encerrarFilhos,
   nucleoPlatformio,
   comandoPio,
-  comandoGdb,
   registrarSegredo,
   redigir,
 };

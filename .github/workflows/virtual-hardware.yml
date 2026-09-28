@@ -52,9 +52,7 @@ jobs:
   esp32:
     name: Virtual ESP32 (${{ matrix.grupo }})
     if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'esp32' }}
-    # 22.04: the Xtensa GDB PlatformIO installs (used for exact stop points) links libpython2.7, which
-    # later Ubuntu releases no longer ship.
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -110,7 +108,7 @@ jobs:
           key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}
       - run: pip install platformio==6.1.19
       - name: Emulator runtime libraries
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0 libvte-2.91-0 libx11-6 libpython2.7
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0t64 libvte-2.91-0 libx11-6
       - run: npm ci
         working-directory: remoteifes-server
       - name: Prepare the emulator and the firmware variants
@@ -121,7 +119,7 @@ jobs:
           BIN=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).binario)' "$RUNNER_TEMP/preparo.json")
           if ldd "$BIN" | grep "not found"; then echo "the emulator is missing shared libraries"; exit 1; fi
           "$BIN" --version
-          "$HOME/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-gdb" --version | head -1
+          "$HOME/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-objdump" --version | head -1
       - name: Run the scenarios
         shell: bash
         run: |
@@ -141,6 +139,54 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: virtual-lab-${{ matrix.grupo }}
+          path: /tmp/remoteifes-virtual-lab/execucoes/*/resultados
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The real firmware against the production installation (systemd unit, nginx) inside the deployment
+  # rehearsal on a disposable x64 runner (step 6b of remoteifes-server/ensaio-implantacao.sh).
+  implantacao:
+    name: Virtual ESP32 against the production installation (systemd, nginx)
+    if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'esp32' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      LAB_HOST_DESCARTAVEL: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: remoteifes-server/package-lock.json
+      - name: Cache PlatformIO
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.platformio
+          key: pio-lab-${{ runner.os }}-${{ hashFiles('remoteifes-esp32/platformio.ini') }}
+      - name: Cache the lab (pinned emulator, firmware builds)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/remoteifes-virtual-lab/cache
+          key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-
+      - run: pip install platformio==6.1.19
+      - name: Emulator runtime libraries
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0t64 libvte-2.91-0 libx11-6
+      - run: npm ci
+        working-directory: remoteifes-server
+      - run: node virtual-lab/executar.js --preparar
+      - name: Deployment rehearsal with the virtual board
+        run: sudo env ENSAIO_HOST_DESCARTAVEL=1 ENSAIO_PLACA_VIRTUAL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh
+      - name: Upload the evidence (redacted)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virtual-lab-implantacao
           path: /tmp/remoteifes-virtual-lab/execucoes/*/resultados
           if-no-files-found: warn
           retention-days: 14

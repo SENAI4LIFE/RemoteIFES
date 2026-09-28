@@ -34,6 +34,62 @@ const REDE_WIFI = "MasseyWifi";
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 const builds = new Map();
 
+/**
+ * A production installation already running on this disposable host (the deployment rehearsal's:
+ * systemd unit behind nginx), used instead of a throwaway server when LAB_SERVIDOR_BASE is set. Its
+ * service and proxy are controlled only through `sudo -n systemctl` on the fixed units named in
+ * LAB_SERVICO_SYSTEMD and LAB_PROXY_SYSTEMD.
+ */
+function servidorExterno() {
+  const base = process.env.LAB_SERVIDOR_BASE;
+  const senha = process.env.LAB_SERVIDOR_SENHA;
+  const url = new URL(base);
+  if (url.hostname !== "127.0.0.1" || !senha) throw new Error("LAB_SERVIDOR_BASE must be a loopback URL and LAB_SERVIDOR_SENHA set");
+  registrarSegredo(senha);
+  const unidade = (nome) => {
+    const u = process.env[nome];
+    if (!/^[a-z0-9@._-]+\.service$/.test(u || "")) throw new Error(`${nome} must name a systemd service`);
+    return u;
+  };
+  const systemctl = (...args) => {
+    const r = require("child_process").spawnSync("sudo", ["-n", "systemctl", ...args], { encoding: "utf8", timeout: 120_000 });
+    if (r.status !== 0) throw new Error(`systemctl ${args.join(" ")}: ${r.stderr}`);
+  };
+  const servidor = {
+    externo: true,
+    base,
+    porta: Number(url.port || 80),
+    saida: "",
+    token: null,
+    async api(metodo, rota, corpo) {
+      if (!servidor.token) {
+        const login = await fetch(`${base}/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ usuario: "superadmin", senha }) });
+        const dados = await login.json().catch(() => ({}));
+        if (!dados.token) throw new Error(`login on the installation failed (${login.status})`);
+        servidor.token = dados.token;
+      }
+      const r = await fetch(`${base}${rota}`, { method: metodo, headers: { "content-type": "application/json", authorization: `Bearer ${servidor.token}` }, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
+      if (r.status === 401) servidor.token = null;
+      return { status: r.status, corpo: await r.json().catch(() => null) };
+    },
+    async saudavel(limiteMs = 120_000) {
+      const prazo = Date.now() + limiteMs;
+      while (Date.now() < prazo) {
+        try { if ((await (await fetch(`${base}/health`)).json()).ok) { servidor.token = null; return; } } catch {}
+        await esperar(500);
+      }
+      throw new Error("the installation did not become healthy");
+    },
+    servico: (verbo, ...args) => systemctl(verbo, ...args, unidade("LAB_SERVICO_SYSTEMD")),
+    proxy: (verbo) => systemctl(verbo, unidade("LAB_PROXY_SYSTEMD")),
+    async encerrar() {
+      const j = require("child_process").spawnSync("sudo", ["-n", "journalctl", "-u", unidade("LAB_SERVICO_SYSTEMD"), "--no-pager", "-n", "300"], { encoding: "utf8" });
+      servidor.saida = j.stdout || "";
+    },
+  };
+  return servidor;
+}
+
 /** Builds (or reuses from the lab cache) the firmware variants a scenario needs, before any board runs. */
 async function prepararFirmware(variantes) {
   for (const v of variantes) if (!builds.has(v)) builds.set(v, await construir(v));
@@ -67,6 +123,11 @@ class Laboratorio {
     fs.mkdirSync(lab.dir, { recursive: true });
     lab.emulador = await obterEmulador();
     await prepararFirmware(meta.firmware || ["producao"]);
+    if (process.env.LAB_SERVIDOR_BASE) {
+      lab.servidor = servidorExterno();
+      await lab.servidor.saudavel();
+      return lab;
+    }
     const senha = crypto.randomBytes(18).toString("base64url");
     registrarSegredo(senha);
     lab.servidor = await iniciarServidorIsolado({ senha, dirBase: diretorioTrabalho(), aoIniciar: (filho) => registrarProcesso(filho, "servidor") });
@@ -153,6 +214,7 @@ class Laboratorio {
    * transmission and latch.
    */
   async definirFailsafe(sala, { raw, carrierHz = 38000, protocolo = 16 }) {
+    if (this.servidor.externo) throw new Error("definirFailsafe writes the scenario's own database: not available against an installation");
     const { DatabaseSync } = require("node:sqlite");
     const db = new DatabaseSync(this.servidor.caminhoBanco);
     let id;
@@ -213,6 +275,7 @@ class Laboratorio {
 
   /** Runs a production command-line tool of the server against this scenario's data directory. */
   cli(script, args = []) {
+    if (this.servidor.externo) throw new Error("production CLI tools run against the scenario's own server only");
     return new Promise((resolve, reject) => {
       const filho = registrarProcesso(spawn(process.execPath, [script, ...args], { cwd: RAIZ_SERVIDOR, env: this.servidor.ambiente, windowsHide: true }), "cli");
       let saida = "";
@@ -313,8 +376,8 @@ class Laboratorio {
       await p.encerrar().catch(() => {});
       p.salvarSerial(path.join(this.dir, `${n + 1}-${nomeDeArquivo(p.nome)}-serial.log`));
     }
-    const logServidor = redigir(this.servidor.saida || "");
     await this.servidor.encerrar().catch(() => {});
+    const logServidor = redigir(this.servidor.saida || "");
     fs.writeFileSync(path.join(this.dir, "servidor.log"), logServidor);
     for (const a of this.arquivos) removerSeguro(a);
     const registro = {
@@ -337,8 +400,8 @@ class Laboratorio {
  * Declares a scenario. `meta` states the fault test up front (inicial, falha, exigido, proibido,
  * recuperacao); `corpo(lab)` drives it and asserts. Evidence is written whether it passes or not.
  */
-function cenario(nome, meta, corpo, { timeout = 30 * 60 * 1000 } = {}) {
-  test(nome, { timeout }, async () => {
+function cenario(nome, meta, corpo, { timeout = 30 * 60 * 1000, skip = false } = {}) {
+  test(nome, { timeout, skip }, async () => {
     const lab = await Laboratorio.abrir({ cenario: nome, ...meta });
     let falha = null;
     try {
@@ -352,4 +415,4 @@ function cenario(nome, meta, corpo, { timeout = 30 * 60 * 1000 } = {}) {
   });
 }
 
-module.exports = { Laboratorio, cenario, prepararFirmware, MAC_PLACA, REDE_WIFI, esperar };
+module.exports = { Laboratorio, cenario, prepararFirmware, servidorExterno, MAC_PLACA, REDE_WIFI, esperar };
