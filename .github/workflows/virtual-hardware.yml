@@ -49,8 +49,67 @@ jobs:
         working-directory: remoteifes-server
       - run: node virtual-lab/executar.js --unidade
 
+  # Fetches the pinned emulator and builds the firmware variants once; the jobs below restore both
+  # from the cache instead of rebuilding them each.
+  preparar:
+    name: Emulator and firmware builds
+    if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'esp32' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      LAB_HOST_DESCARTAVEL: "1"
+      FIRMWARE_REF: ${{ inputs.firmware_ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: remoteifes-server/package-lock.json
+      - name: Select the firmware source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$FIRMWARE_REF" ]; then
+            COMMIT=$(git rev-parse --verify --quiet "$FIRMWARE_REF^{commit}") || { echo "firmware_ref is not a commit of this repository"; exit 1; }
+            mkdir -p "$RUNNER_TEMP/firmware-ref"
+            git archive "$COMMIT" remoteifes-esp32 | tar -x -C "$RUNNER_TEMP/firmware-ref"
+            echo "LAB_FIRMWARE_DIR=$RUNNER_TEMP/firmware-ref/remoteifes-esp32" >> "$GITHUB_ENV"
+            echo "Firmware under test: remoteifes-esp32 at $COMMIT"
+          else
+            echo "Firmware under test: remoteifes-esp32 at $(git rev-parse HEAD)"
+          fi
+      - name: Cache PlatformIO
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.platformio
+          key: pio-lab-${{ runner.os }}-${{ hashFiles('remoteifes-esp32/platformio.ini') }}
+      - name: Cache the lab (pinned emulator, firmware builds)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/remoteifes-virtual-lab/cache
+          key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}
+      - run: pip install platformio==6.1.19
+      - name: Emulator runtime libraries
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0t64 libvte-2.91-0 libx11-6
+      - name: Prepare the emulator and the firmware variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          node virtual-lab/executar.js --preparar | tee "$RUNNER_TEMP/preparo.json"
+          BIN=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).binario)' "$RUNNER_TEMP/preparo.json")
+          if ldd "$BIN" | grep "not found"; then echo "the emulator is missing shared libraries"; exit 1; fi
+          "$BIN" --version
+          "$HOME/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-objdump" --version | head -1
+
   esp32:
     name: Virtual ESP32 (${{ matrix.grupo }})
+    needs: preparar
     if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'esp32' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -147,6 +206,7 @@ jobs:
   # rehearsal on a disposable x64 runner (step 6b of remoteifes-server/ensaio-implantacao.sh).
   implantacao:
     name: Virtual ESP32 against the production installation (systemd, nginx)
+    needs: preparar
     if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'esp32' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90

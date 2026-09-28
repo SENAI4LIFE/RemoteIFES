@@ -19,8 +19,9 @@ NOME=raspios-arm64-ensaio
 
 docker rm -f "$NOME" >/dev/null 2>&1 || true
 # Units for a first boot on real Pi hardware with a console (the new-user prompt, SSH key and EEPROM
-# jobs, swap file, consoles) have nothing to do in a container and would keep boot from finishing.
-MASCARAR="userconfig.service systemd-firstboot.service regenerate_ssh_host_keys.service sshswitch.service rpi-eeprom-update.service dphys-swapfile.service rpi-resize.service getty@tty1.service serial-getty@ttyAMA0.service console-setup.service keyboard-setup.service"
+# jobs, swap file, consoles) have nothing to do in a container and would keep boot from finishing. The
+# network belongs to Docker: the guest's own network managers (and their wait-online jobs) stay off.
+MASCARAR="userconfig.service systemd-firstboot.service regenerate_ssh_host_keys.service sshswitch.service rpi-eeprom-update.service dphys-swapfile.service rpi-resize.service getty@tty1.service serial-getty@ttyAMA0.service console-setup.service keyboard-setup.service NetworkManager.service NetworkManager-wait-online.service systemd-networkd.service systemd-networkd-wait-online.service"
 docker run -d --name "$NOME" --hostname raspberrypi --privileged --cgroupns=host \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
   --memory=1g --memory-swap=1g --cpus=2 -e MASCARAR="$MASCARAR" \
