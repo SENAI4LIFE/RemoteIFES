@@ -10,6 +10,11 @@ name: Virtual Hardware Validation
 on:
   workflow_dispatch:
     inputs:
+      suite:
+        description: 'What to run'
+        type: choice
+        options: [full, esp32, host]
+        default: full
       firmware_ref:
         description: 'Optional: test remoteifes-esp32 from this commit instead of the checkout (e.g. to reproduce a fixed defect)'
         type: string
@@ -46,7 +51,10 @@ jobs:
 
   esp32:
     name: Virtual ESP32 (${{ matrix.grupo }})
-    runs-on: ubuntu-24.04
+    if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'esp32' }}
+    # 22.04: the Xtensa GDB PlatformIO installs (used for exact stop points) links libpython2.7, which
+    # later Ubuntu releases no longer ship.
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -102,7 +110,7 @@ jobs:
           key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}
       - run: pip install platformio==6.1.19
       - name: Emulator runtime libraries
-        run: sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0t64 libvte-2.91-0 libx11-6
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0 libvte-2.91-0 libx11-6 libpython2.7
       - run: npm ci
         working-directory: remoteifes-server
       - name: Prepare the emulator and the firmware variants
@@ -134,5 +142,69 @@ jobs:
         with:
           name: virtual-lab-${{ matrix.grupo }}
           path: /tmp/remoteifes-virtual-lab/execucoes/*/resultados
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Raspberry Pi OS userland (not its kernel, firmware or boot): the project's deployment rehearsal in a
+  # Raspberry Pi OS Lite arm64 root filesystem run as a systemd container, limited to 1 GiB and two CPUs.
+  host-raspios-arm64:
+    name: Raspberry Pi OS arm64 userland (deployment rehearsal, 1 GiB)
+    if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'host' }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    env:
+      LAB_HOST_DESCARTAVEL: "1"
+      RAIZ_RASPIOS: ${{ github.workspace }}/../raspios
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Cache the pinned image
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/../raspios/arm64/imagem.img.xz
+          key: raspios-${{ hashFiles('virtual-lab/host/raspios.json') }}-arm64
+      - run: bash virtual-lab/host/importar-raspios.sh arm64
+      - run: bash virtual-lab/host/raspios-arm64.sh "$RUNNER_TEMP/resultados"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: virtual-lab-raspios-arm64
+          path: ${{ runner.temp }}/resultados
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The Raspberry Pi 3's 32-bit userland (Raspberry Pi OS Lite armhf) under qemu-user on x64: install
+  # with setup.sh (Node armv7l), the server with simulated boards, backup, restore and restart.
+  host-raspios-armhf:
+    name: Raspberry Pi OS armhf userland (Pi 3, 32-bit)
+    if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'host' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      LAB_HOST_DESCARTAVEL: "1"
+      RAIZ_RASPIOS: ${{ github.workspace }}/../raspios
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Cache the pinned image
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/../raspios/armhf/imagem.img.xz
+          key: raspios-${{ hashFiles('virtual-lab/host/raspios.json') }}-armhf
+      - name: 32-bit ARM user-mode emulation (Ubuntu's qemu-user-static)
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-user-static
+      - run: bash virtual-lab/host/importar-raspios.sh armhf
+      - run: bash virtual-lab/host/raspios-armhf.sh "$RUNNER_TEMP/resultados"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: virtual-lab-raspios-armhf
+          path: ${{ runner.temp }}/resultados
           if-no-files-found: warn
           retention-days: 14
