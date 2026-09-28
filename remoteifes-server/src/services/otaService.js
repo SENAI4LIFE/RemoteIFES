@@ -519,8 +519,16 @@ function registrarValidacao(sala, msg) {
     return false;
   }
   if (estado.fase === "concluido") return true;
-  if (estado.fase !== "validando" && estado.fase !== "gravado" && estado.fase !== "reiniciando") return false;
+  // A transfer failure is recorded when the board's socket closes (or the deadline passes) during the
+  // download, or when the board reports a download error. The first is only an inference: firmware up
+  // to 4.3.0 downloads inside its WebSocket callback and stops answering pings, so a slow download
+  // loses the socket while the board goes on to verify, install and boot the image. Boot evidence for
+  // this very attempt exists only if the image was installed, so it refutes the inference (a reported
+  // download error never produces it). A rollback or a failed boot validation stays final.
+  const transferenciaPresumida = estado.fase === "falhou" && estado.causa === "transferencia";
+  if (!transferenciaPresumida && estado.fase !== "validando" && estado.fase !== "gravado" && estado.fase !== "reiniciando") return false;
   if (estado.identidade && estado.identidade !== identidadeDaSala(sala)) return false;
+  if (transferenciaPresumida) logger.info("ota-transferencia-presumida-desmentida", { sala, versao: estado.versao });
   concluir(sala, estado, "boot");
   return true;
 }

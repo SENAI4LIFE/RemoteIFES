@@ -27,21 +27,29 @@ function portaLivre() {
 /**
  * `sonda: true` loads support/sonda-servidor.js into the server process (with --expose-gc) and opens
  * an IPC channel, so a measuring tool can read the process's own metrics with servidor.metricas().
+ * `dirBase` puts the throwaway data directory under a caller-owned directory instead of the system
+ * temp; `aoIniciar(filho)` is told about every server process started (the virtual lab tracks them).
  */
-async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs = 40_000, sonda = false } = {}) {
+async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs = 40_000, sonda = false, dirBase = os.tmpdir(), aoIniciar = null } = {}) {
   const porta = await portaLivre();
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-isolado-"));
+  const dir = fs.mkdtempSync(path.join(dirBase, "remoteifes-isolado-"));
   const base = `http://127.0.0.1:${porta}`;
+  const herdado = { ...process.env };
+  // Preloads come only from the caller (the offline test passes one on purpose), never from whatever
+  // the parent process happened to inherit.
+  delete herdado.NODE_OPTIONS;
   const ambiente = {
-    ...process.env,
-    PORTA: String(porta),
-    BIND_ADDR: "127.0.0.1",
+    ...herdado,
     NODE_ENV: "development",
     SERVIR_FRONTEND: "false",
-    REMOTEIFES_DATA_DIR: dir,
     SENHA_ADMIN_INICIAL: senha,
     BACKUP_AUTOMATICO: "false",
     ...env,
+    // What keeps the server isolated is set last, so no option can move it off the loopback interface,
+    // off its free port or out of its throwaway data directory.
+    PORTA: String(porta),
+    BIND_ADDR: "127.0.0.1",
+    REMOTEIFES_DATA_DIR: dir,
   };
   delete ambiente.REMOTEIFES_DB_PATH;
   delete ambiente.REMOTEIFES_FIRMWARE_DIR;
@@ -61,6 +69,7 @@ async function iniciarServidorIsolado({ env = {}, senha = SENHA_PADRAO, limiteMs
     });
     servidor.filho = filho;
     servidor.partidas += 1;
+    if (aoIniciar) aoIniciar(filho);
     // One listener dispatches every probe answer by id: concurrent requests (a burst of commands)
     // would otherwise stack a listener each on the child process.
     if (sonda) filho.on("message", (msg) => {

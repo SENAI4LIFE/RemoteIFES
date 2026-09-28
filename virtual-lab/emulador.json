@@ -1,0 +1,24 @@
+{
+  "descricao": "QEMU fork with ESP32 Wi-Fi emulation (open access points on a user-mode network) and GPIO registers. Stock Espressif QEMU has neither, and the prebuilt Arduino core cannot use its Ethernet device.",
+  "projeto": "https://github.com/a159x36/qemu",
+  "versao": "v5.4.1",
+  "commit": "30e858ae2a7f209df8035a147ea9322a9694e3ae",
+  "arquivos": {
+    "linux-x64": {
+      "url": "https://github.com/a159x36/qemu/releases/download/v5.4.1/qemu-xtensa-softmmu-v5.4.1-x86_64-linux-gnu.tar.gz",
+      "sha256": "46913d0c3f6ba56efd086793c50e182096d800dff276380ad4a6dbb922bca9ec"
+    },
+    "win32-x64": {
+      "url": "https://github.com/a159x36/qemu/releases/download/v5.4.1/qemu-xtensa-softmmu-v5.4.1-x86_64-w64-mingw32.tar.gz",
+      "sha256": "5db140b7130f4edd88f7dca9a6e4d4deb6f9c423e754264eb6bd2876799ab847"
+    },
+    "darwin-arm64": {
+      "url": "https://github.com/a159x36/qemu/releases/download/v5.4.1/qemu-xtensa-softmmu-v5.4.1-aarch64-apple-darwin.tar.gz",
+      "sha256": "d9fb3517513edb8955096ff7dd65026fa98ab4134e13c43a0bbd8e2a7f205096"
+    },
+    "darwin-x64": {
+      "url": "https://github.com/a159x36/qemu/releases/download/v5.4.1/qemu-xtensa-softmmu-v5.4.1-x86_64-apple-darwin.tar.gz",
+      "sha256": "ea22f5a74e638c421d65be910c2b8934483909f6939966fedcb1532016ffa9ec"
+    }
+  }
+}

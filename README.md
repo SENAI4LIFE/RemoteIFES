@@ -720,7 +720,7 @@ Para reprovisionar uma placa já configurada, use **Resetar Wi-Fi** no painel ou
 
 #### Versão e partições
 
-A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.3.0`) e é reportada ao servidor na telemetria e no heartbeat.
+A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.3.1`) e é reportada ao servidor na telemetria e no heartbeat.
 
 A partição usa o layout `min_spiffs.csv`, com dois slots de aplicação de cerca de 1,9 MB. O firmware atual ocupa cerca de 76% de um slot, com os modos de malha incluídos, o que reserva um slot ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32) com reversão automática.
 
@@ -1251,7 +1251,7 @@ O firmware do ESP32 pode ser atualizado pela rede, sem ir fisicamente até cada 
 ```bash
 pio run -d ../remoteifes-esp32                         # gera .pio/build/esp32dev/firmware.bin
 npm run firmware                                        # mostra a imagem publicada, se houver
-npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.3.0 "nota opcional"
+npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.3.1 "nota opcional"
 ```
 
 A imagem é validada (byte mágico `0xE9`, tamanho plausível), tem o SHA-256 calculado e é gravada em `<REMOTEIFES_DATA_DIR>/firmware/` junto de um `manifesto.json`. Só uma imagem fica publicada por vez. O número de versão tem de ser o `-DFW_VERSAO` compilado nela, e o servidor não confere isso: com outro número, a placa grava e roda a imagem, mas volta reportando uma versão inesperada e a OTA termina como falha. Uma oferta já enviada continua apontando para a imagem que foi ofertada: publicar outra versão enquanto uma placa ainda está baixando não troca o que ela recebe em `/dispositivo/firmware` (o download resolve pela oferta ativa da sala, com o mesmo SHA-256), e o binário anterior só é removido do disco quando nenhuma oferta em transferência o referencia mais (na publicação seguinte ou na varredura periódica). Republicar o **mesmo** número de versão com outro conteúdo é recusado enquanto uma oferta dessa versão estiver em andamento.

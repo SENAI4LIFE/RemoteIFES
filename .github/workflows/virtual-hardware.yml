@@ -1,0 +1,138 @@
+name: Virtual Hardware Validation
+
+# The real ESP32 firmware on an emulated board (QEMU fork with ESP32 Wi-Fi), against the real server,
+# with injected faults. Manual only: it takes about half an hour on eight runners and belongs to deep
+# validation, not to every change. It runs on ephemeral GitHub-hosted runners because it boots software
+# the lab treats as untrusted (a prebuilt emulator from a personal fork, and the guest it runs); it is
+# not run on developers' machines. No secret is used. virtual-lab/README.md says what each result can
+# and cannot prove; nothing here is evidence about physical hardware.
+
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_ref:
+        description: 'Optional: test remoteifes-esp32 from this commit instead of the checkout (e.g. to reproduce a fixed defect)'
+        type: string
+        default: ''
+      cenarios:
+        description: 'Optional: space-separated scenario files (cenarios/NN-*.test.js); empty runs all'
+        type: string
+        default: ''
+  push:
+    branches: [virtual-lab-validacao]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: virtual-hardware-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unidade:
+    name: Lab unit tests and host-safety guards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: remoteifes-server/package-lock.json
+      - run: npm ci
+        working-directory: remoteifes-server
+      - run: node virtual-lab/executar.js --unidade
+
+  esp32:
+    name: Virtual ESP32 (${{ matrix.grupo }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { grupo: integracao-e-reinicio, arquivos: "cenarios/01-integracao.test.js cenarios/03-reinicio.test.js" }
+          - { grupo: conectividade, arquivos: "cenarios/02-conectividade.test.js" }
+          - { grupo: credencial, arquivos: "cenarios/04-credencial.test.js" }
+          - { grupo: ota-transferencia, arquivos: "cenarios/05a-ota-transferencia.test.js" }
+          - { grupo: ota-recusa-e-energia, arquivos: "cenarios/05b-ota-recusa-e-energia.test.js" }
+          - { grupo: ota-rollback, arquivos: "cenarios/05c-ota-rollback.test.js" }
+          - { grupo: nvs, arquivos: "cenarios/06-nvs.test.js" }
+          - { grupo: gpio-ir, arquivos: "cenarios/07-gpio-ir.test.js" }
+    env:
+      # The runner is discarded after the job: the only kind of host the lab boots a guest on.
+      LAB_HOST_DESCARTAVEL: "1"
+      FIRMWARE_REF: ${{ inputs.firmware_ref }}
+      CENARIOS: ${{ inputs.cenarios }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: remoteifes-server/package-lock.json
+      - name: Select the firmware source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$FIRMWARE_REF" ]; then
+            COMMIT=$(git rev-parse --verify --quiet "$FIRMWARE_REF^{commit}") || { echo "firmware_ref is not a commit of this repository"; exit 1; }
+            mkdir -p "$RUNNER_TEMP/firmware-ref"
+            git archive "$COMMIT" remoteifes-esp32 | tar -x -C "$RUNNER_TEMP/firmware-ref"
+            echo "LAB_FIRMWARE_DIR=$RUNNER_TEMP/firmware-ref/remoteifes-esp32" >> "$GITHUB_ENV"
+            echo "Firmware under test: remoteifes-esp32 at $COMMIT"
+          else
+            echo "Firmware under test: remoteifes-esp32 at $(git rev-parse HEAD)"
+          fi
+      - name: Cache PlatformIO
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.platformio
+          key: pio-lab-${{ runner.os }}-${{ hashFiles('remoteifes-esp32/platformio.ini') }}
+      - name: Cache the lab (pinned emulator, firmware builds)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/remoteifes-virtual-lab/cache
+          key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}
+      - run: pip install platformio==6.1.19
+      - name: Emulator runtime libraries
+        run: sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0t64 libvte-2.91-0 libx11-6
+      - run: npm ci
+        working-directory: remoteifes-server
+      - name: Prepare the emulator and the firmware variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          node virtual-lab/executar.js --preparar | tee "$RUNNER_TEMP/preparo.json"
+          BIN=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).binario)' "$RUNNER_TEMP/preparo.json")
+          if ldd "$BIN" | grep "not found"; then echo "the emulator is missing shared libraries"; exit 1; fi
+          "$BIN" --version
+          "$HOME/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-gdb" --version | head -1
+      - name: Run the scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARQUIVOS="${{ matrix.arquivos }}"
+          if [ -n "$CENARIOS" ]; then
+            SELECIONADOS=""
+            for a in $ARQUIVOS; do case " $CENARIOS " in *" $a "*) SELECIONADOS="$SELECIONADOS $a";; esac; done
+            [ -n "$SELECIONADOS" ] || { echo "no selected scenario in this group"; exit 0; }
+            ARQUIVOS="$SELECIONADOS"
+          fi
+          cd virtual-lab
+          # shellcheck disable=SC2086
+          node executar.js $ARQUIVOS
+      - name: Upload the evidence (redacted)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virtual-lab-${{ matrix.grupo }}
+          path: /tmp/remoteifes-virtual-lab/execucoes/*/resultados
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,4 +1,5 @@
 const fs = require("fs");
+const { pipeline } = require("stream");
 const express = require("express");
 const salasService = require("../services/salasService");
 const otaService = require("../services/otaService");
@@ -96,7 +97,10 @@ router.get("/dispositivo/firmware", (req, res, next) => {
   res.set("Content-Length", String(artefato.tamanho));
   res.set("X-Firmware-Versao", artefato.versao);
   res.set("X-Firmware-Sha256", artefato.sha256);
-  fs.createReadStream(artefato.caminho).pipe(res);
+  // pipeline, not pipe: when a board drops or stalls the download, pipe() leaves the image open (one
+  // leaked descriptor per aborted update, and on Windows the same version cannot be republished
+  // until the server restarts). The OTA state machine reports the failure itself.
+  pipeline(fs.createReadStream(artefato.caminho), res, () => {});
 });
 
 router.post("/dispositivo/heartbeat", autenticarDispositivo, (req, res) => {

@@ -122,12 +122,38 @@ test("the persisted local OFF is only undone by an explicit server command and n
   assert.match(bloco("void enviarInfoDispositivo"), /if \(powerConhecido\) doc\["ligado"\] = lastKnownPower;/);
 });
 
+// ota_oferta arrives inside the WebSocket library's event callback. A download run from there calls
+// wsCliente.loop() re-entrantly, which reads no frames: the board sent progress but never answered the
+// server's pings, so the server closed the socket and recorded the transfer as failed while the board
+// finished and installed the image (virtual board, virtual-lab/ OTA scenarios). The offer is only
+// validated in the callback; the download runs from loop(), where the socket keeps being serviced.
+test("an accepted OTA offer is downloaded from loop(), outside the WebSocket callback", () => {
+  const oferta = bloco("void iniciarOtaOferta");
+  assert.doesNotMatch(oferta, /HTTPClient|Update\.begin|while \(recebido < tamanho\)/, "the callback only validates and records the offer");
+  assert.match(oferta, /otaEmAndamento = true;\s*ofertaOta\.pendente = true;/);
+  assert.match(bloco("void loop"), /if \(ofertaOta\.pendente\) executarOtaPendente\(\);/);
+  assert.match(bloco("void executarOtaPendente"), /^void executarOtaPendente\(\) \{\s*ofertaOta\.pendente = false;/);
+});
+
 test("during OTA the physical switch and buzzer are still serviced and the download has a total deadline", () => {
-  const ota = bloco("void iniciarOtaOferta");
+  const ota = bloco("void executarOtaPendente");
   const laco = ota.slice(ota.indexOf("while (recebido < tamanho)"));
   assert.match(laco, /^\s*while \(recebido < tamanho\) \{\s*processarSwitchAcao\(\);\s*atualizarBuzzer\(\);/);
   assert.match(laco, /OTA_TOTAL_TIMEOUT_MS/);
   assert.match(ino, /const unsigned long OTA_TOTAL_TIMEOUT_MS = 600000;/);
+});
+
+// The Arduino core marks a freshly updated image valid in initArduino(), before setup() runs, unless
+// the sketch overrides the weak C function verifyRollbackLater(). A plain C++ definition compiles but
+// is name-mangled and never replaces it, so the self-test below would never run: the virtual board
+// showed a candidate that could not reach the server staying active (virtual-lab/, OTA scenarios).
+test("a new OTA image stays pending until the firmware's own boot validation accepts or rolls it back", () => {
+  assert.match(ino, /^extern "C" bool verifyRollbackLater\(\) \{\s*return true;\s*\}/m);
+  assert.match(bloco("void setup"), /estadoOta == ESP_OTA_IMG_PENDING_VERIFY\) \{\s*otaPendenteValidacao = true;/);
+  const validar = bloco("void verificarValidacaoOta");
+  assert.match(validar, /esp_ota_mark_app_valid_cancel_rollback\(\)/);
+  assert.match(validar, /esp_ota_mark_app_invalid_rollback_and_reboot\(\)/);
+  assert.match(ino, /const unsigned long OTA_SELFTEST_TIMEOUT_MS = 90000;/);
 });
 
 test("the role comes from the server: only the cloner enters clone or capture mode and the role is not persisted", () => {

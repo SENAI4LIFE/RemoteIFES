@@ -45,7 +45,7 @@ const firmwareUsbErase = congelar(["pio run --target erase"]);
 const firmwareOta = congelar([
   "pio run -d ../remoteifes-esp32",
   "npm run firmware",
-  "npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.3.0 \"nota opcional\"",
+  "npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.3.1 \"nota opcional\"",
 ]);
 
 const credenciaisConsultar = congelar(["npm run credencial -- A-101"]);
