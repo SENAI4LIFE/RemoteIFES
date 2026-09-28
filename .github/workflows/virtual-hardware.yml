@@ -1,8 +1,8 @@
 name: Virtual Hardware Validation
 
 # The real ESP32 firmware on an emulated board (QEMU fork with ESP32 Wi-Fi), against the real server,
-# with injected faults. Manual only: it takes about half an hour on eight runners and belongs to deep
-# validation, not to every change. It runs on ephemeral GitHub-hosted runners because it boots software
+# with injected faults. Manual only: about 30 minutes of wall time and 140 runner-minutes over 14 jobs,
+# deep validation rather than a check for every change. It runs on ephemeral GitHub-hosted runners because it boots software
 # the lab treats as untrusted (a prebuilt emulator from a personal fork, and the guest it runs); it is
 # not run on developers' machines. No secret is used. virtual-lab/README.md says what each result can
 # and cannot prove; nothing here is evidence about physical hardware.
