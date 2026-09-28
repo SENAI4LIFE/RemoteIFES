@@ -120,8 +120,10 @@ cenario("Servidor morto (SIGKILL) e religado com a placa conectada", {
 cenario("Conexão cortada logo depois de o comando chegar à placa", {
   inicial: "Placa conectada e confirmada desligada",
   falha: "a conexão cai no instante seguinte à entrega de um send_known_state (ligar): a placa recebe o comando, a resposta não chega",
-  exigido: ["a placa executa o comando uma vez", "ao reconectar, o servidor e a placa convergem: estado confirmado = intenção (ligado)"],
-  proibido: ["servidor confirmando sem relato da placa", "divergência permanente"],
+  // The IR frame carries the whole state, so the restoration the server sends on the new session repeats
+  // the same state rather than toggling anything; how many times it went out is recorded.
+  exigido: ["a placa transmite o comando", "ao reconectar, o servidor e a placa convergem: estado confirmado = intenção (ligado)"],
+  proibido: ["servidor confirmando sem relato da placa", "divergência permanente", "reinício"],
   recuperacao: "estado confirmado ligado",
 }, async (lab) => {
   const via = await lab.intermediario();
@@ -134,6 +136,7 @@ cenario("Conexão cortada logo depois de o comando chegar à placa", {
     return "cortar";
   };
   const bordas = placa.bordas.length;
+  const marca = placa.marca();
   assert.equal((await lab.api("POST", "/comando", { sala, cmd: "ligar" })).status, 200);
   await lab.aguardar(() => cortou, { descricao: "command frame delivered and connection cut" });
   via.aoQuadroDoServidor = null;
@@ -141,8 +144,10 @@ cenario("Conexão cortada logo depois de o comando chegar à placa", {
   lab.observar("logoAposOCorte", { confirmado: antes.dispositivo.estadoConfirmado, conectado: antes.dispositivo.conectado });
   await lab.aguardarIntencaoAplicada(sala, true);
   const ir = placa.bordasDe(4, bordas).length;
-  lab.observar("bordasIr", ir);
+  const transmissoes = placa.bordasDe(27, bordas).filter((b) => b.nivel === 1).length;
+  lab.observar("transmissoes", { bordasIr: ir, buzzer: transmissoes });
   assert.ok(ir > 1000, "the command was transmitted");
+  assert.equal(reinicios(placa, marca), 0);
 });
 
 cenario("Respostas do servidor atrasadas em 1,5 s", {
