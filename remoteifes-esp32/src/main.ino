@@ -15,6 +15,7 @@
 #include <ArduinoJson.h>
 #include <Update.h>
 #include <esp_ota_ops.h>
+#include <esp_timer.h>
 #include <mbedtls/md.h>
 #include <esp32/rom/crc.h>
 #include <string.h>
@@ -58,6 +59,7 @@ const char AP_PASSWORD_PADRAO[] = "remoteifes";
 const char MESH_ID_PADRAO[] = "52454d494645";
 
 const unsigned long ACTION_SWITCH_DEBOUNCE_MS = 40;
+const uint64_t ACTION_SWITCH_AMOSTRA_US = 10000;
 const unsigned long FAILSAFE_SWITCH_HOLD_MS = 5000;
 const unsigned long AP_TEMPORARIO_TIMEOUT_MS = 600000;
 const unsigned long BUZZER_MIN_MS = 60;
@@ -152,6 +154,10 @@ bool actionSwitchStableActive = false;
 bool actionSwitchLongPressConsumed = false;
 unsigned long actionSwitchLastChangeMs = 0;
 unsigned long actionSwitchPressedSinceMs = 0;
+esp_timer_handle_t timerSwitchAcao = nullptr;
+portMUX_TYPE muxSwitchAcao = portMUX_INITIALIZER_UNLOCKED;
+bool switchToqueCurtoPendente = false;
+bool switchToqueLongoPendente = false;
 unsigned long buzzerDesligarEm = 0;
 RuntimeMode runtimeMode = RUNTIME_OPERATION;
 WifiState estadoWifi = WIFI_ESTADO_DESCONECTADO;
@@ -276,6 +282,8 @@ void enviarStatusFailsafe();
 void preencherStatusFailsafe(JsonDocument& doc);
 void aplicarFailsafeDoServidor(JsonDocument& doc);
 void configurarSwitchAcao();
+void amostrarSwitchAcao(void* arg);
+void sinalizarSwitchAcao(bool longo);
 void processarSwitchAcao();
 
 extern "C" bool verifyRollbackLater() {
@@ -319,6 +327,7 @@ void setup() {
   serverHost = preferences.isKey("host") ? preferences.getString("host", "") : "";
   serverPort = preferences.isKey("porta") ? preferences.getInt("porta", 0) : 0;
   tlsModo = preferences.isKey("tls") ? preferences.getString("tls", "ca") : "ca";
+  if (tlsModo != "ca" && tlsModo != "inseguro" && tlsModo != "off") tlsModo = "ca";
   if (tlsModo != "ca") Serial.println("AVISO DE SEGURANCA: transporte sem validacao de certificado foi selecionado explicitamente.");
   deviceId = preferences.isKey("devId") ? preferences.getString("devId", "") : "";
   deviceSecret = preferences.isKey("devSec") ? preferences.getString("devSec", "") : "";
@@ -1413,9 +1422,19 @@ void configurarSwitchAcao() {
   actionSwitchLongPressConsumed = ativo;
   actionSwitchLastChangeMs = millis();
   actionSwitchPressedSinceMs = ativo ? millis() : 0;
+  esp_timer_create_args_t amostragem = {};
+  amostragem.callback = &amostrarSwitchAcao;
+  amostragem.name = "switch";
+  if (esp_timer_create(&amostragem, &timerSwitchAcao) != ESP_OK) {
+    timerSwitchAcao = nullptr;
+  } else if (esp_timer_start_periodic(timerSwitchAcao, ACTION_SWITCH_AMOSTRA_US) != ESP_OK) {
+    esp_timer_delete(timerSwitchAcao);
+    timerSwitchAcao = nullptr;
+  }
+  if (!timerSwitchAcao) Serial.println("Switch: temporizador de amostragem indisponivel; leitura pelo laco principal.");
 }
 
-void processarSwitchAcao() {
+void amostrarSwitchAcao(void* arg) {
   const unsigned long agora = millis();
   const bool leituraAtiva = digitalRead(ACTION_SWITCH_PIN) == ACTION_SWITCH_ACTIVE_LEVEL;
 
@@ -1436,15 +1455,34 @@ void processarSwitchAcao() {
     const bool foiPressaoLonga = actionSwitchLongPressConsumed;
     actionSwitchPressedSinceMs = 0;
     actionSwitchLongPressConsumed = false;
-    if (!foiPressaoLonga) abrirApTemporario();
+    if (!foiPressaoLonga) sinalizarSwitchAcao(false);
     return;
   }
 
   if (!actionSwitchStableActive || actionSwitchLongPressConsumed || actionSwitchPressedSinceMs == 0) return;
   if (agora - actionSwitchPressedSinceMs >= FAILSAFE_SWITCH_HOLD_MS) {
     actionSwitchLongPressConsumed = true;
-    transmitirFailsafeSalvo();
+    sinalizarSwitchAcao(true);
   }
+}
+
+void sinalizarSwitchAcao(bool longo) {
+  portENTER_CRITICAL(&muxSwitchAcao);
+  if (longo) switchToqueLongoPendente = true;
+  else switchToqueCurtoPendente = true;
+  portEXIT_CRITICAL(&muxSwitchAcao);
+}
+
+void processarSwitchAcao() {
+  if (!timerSwitchAcao) amostrarSwitchAcao(nullptr);
+  portENTER_CRITICAL(&muxSwitchAcao);
+  const bool longo = switchToqueLongoPendente;
+  const bool curto = switchToqueCurtoPendente;
+  switchToqueLongoPendente = false;
+  switchToqueCurtoPendente = false;
+  portEXIT_CRITICAL(&muxSwitchAcao);
+  if (longo) transmitirFailsafeSalvo();
+  if (curto) abrirApTemporario();
 }
 
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency) {

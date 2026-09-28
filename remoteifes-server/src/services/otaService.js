@@ -448,7 +448,7 @@ function aoDesconectarDispositivo(sala) {
   const estado = estados.get(sala);
   if (!estado) return;
   if (estado.fase === "ofertado" || estado.fase === "baixando") {
-    definirEstado(sala, { fase: "falhou", erro: "a conexão do dispositivo caiu durante a transferência do firmware", causa: "transferencia" });
+    definirEstado(sala, { fase: "falhou", erro: "a conexão do dispositivo caiu durante a transferência do firmware", causa: "transferencia", presumida: true });
     logger.warn("ota-conexao-perdida", { sala, versao: estado.versao });
   } else if (estado.fase === "gravado") {
     definirEstado(sala, { fase: "reiniciando" });
@@ -520,12 +520,12 @@ function registrarValidacao(sala, msg) {
   }
   if (estado.fase === "concluido") return true;
   // A transfer failure is recorded when the board's socket closes (or the deadline passes) during the
-  // download, or when the board reports a download error. The first is only an inference: firmware up
-  // to 4.3.0 downloads inside its WebSocket callback and stops answering pings, so a slow download
-  // loses the socket while the board goes on to verify, install and boot the image. Boot evidence for
-  // this very attempt exists only if the image was installed, so it refutes the inference (a reported
-  // download error never produces it). A rollback or a failed boot validation stays final.
-  const transferenciaPresumida = estado.fase === "falhou" && estado.causa === "transferencia";
+  // download, or when the board itself reports a download error. Only the first two are inferences
+  // (presumida): firmware up to 4.3.0 downloads inside its WebSocket callback and stops answering pings,
+  // so a slow download loses the socket while the board goes on to verify, install and boot the image.
+  // Boot evidence for this very attempt exists only if the image was installed, so it refutes the
+  // inference. An error the board reported, a rollback and a failed boot validation stay final.
+  const transferenciaPresumida = estado.fase === "falhou" && estado.causa === "transferencia" && estado.presumida === true;
   if (!transferenciaPresumida && estado.fase !== "validando" && estado.fase !== "gravado" && estado.fase !== "reiniciando") return false;
   if (estado.identidade && estado.identidade !== identidadeDaSala(sala)) return false;
   if (transferenciaPresumida) logger.info("ota-transferencia-presumida-desmentida", { sala, versao: estado.versao });
@@ -552,7 +552,7 @@ function verificarTimeouts() {
       return;
     }
     if ((estado.fase === "ofertado" || estado.fase === "baixando") && idadeMs > OTA_TIMEOUT_TRANSFERENCIA_MS) {
-      definirEstado(sala, { fase: "falhou", erro: "tempo esgotado durante a transferência do firmware", causa: "transferencia" });
+      definirEstado(sala, { fase: "falhou", erro: "tempo esgotado durante a transferência do firmware", causa: "transferencia", presumida: true });
       logger.warn("ota-timeout-transferencia", { sala, versao: estado.versao });
       notificarConcluido(sala, false, `A atualização de firmware da sala ${sala} expirou durante a transferência.`);
     } else if ((estado.fase === "gravado" || estado.fase === "reiniciando") && idadeMs > OTA_TIMEOUT_REINICIO_MS) {

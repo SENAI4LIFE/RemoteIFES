@@ -55,14 +55,34 @@ test("the switch uses the internal pull-up, active low, 40 ms debounce and 5 s f
   assert.match(ino, /const unsigned long FAILSAFE_SWITCH_HOLD_MS = 5000;/);
   assert.match(ino, /pinMode\(ACTION_SWITCH_PIN, INPUT_PULLUP\)/);
   assert.match(ino, /digitalRead\(ACTION_SWITCH_PIN\) == ACTION_SWITCH_ACTIVE_LEVEL/);
-  const processar = bloco("void processarSwitchAcao");
-  assert.match(processar, /agora - actionSwitchLastChangeMs < ACTION_SWITCH_DEBOUNCE_MS\) return;/);
-  assert.match(processar, /if \(!foiPressaoLonga\) abrirApTemporario\(\);/, "releasing after the failsafe must not open the AP");
-  assert.match(processar, /actionSwitchLongPressConsumed = true;\s*transmitirFailsafeSalvo\(\);/, "the failsafe fires once per press");
-  assert.match(processar, /if \(!actionSwitchStableActive \|\| actionSwitchLongPressConsumed \|\| actionSwitchPressedSinceMs == 0\) return;/);
-  assert.match(ino, /void loop\(\) \{\s*processarSwitchAcao\(\);/, "the switch is read every cycle, including in AP mode");
+  const amostrar = bloco("void amostrarSwitchAcao");
+  assert.match(amostrar, /agora - actionSwitchLastChangeMs < ACTION_SWITCH_DEBOUNCE_MS\) return;/);
+  assert.match(amostrar, /if \(!foiPressaoLonga\) sinalizarSwitchAcao\(false\);/, "releasing after the failsafe must not open the AP");
+  assert.match(amostrar, /actionSwitchLongPressConsumed = true;\s*sinalizarSwitchAcao\(true\);/, "the failsafe fires once per press");
+  assert.match(amostrar, /if \(!actionSwitchStableActive \|\| actionSwitchLongPressConsumed \|\| actionSwitchPressedSinceMs == 0\) return;/);
+  assert.doesNotMatch(amostrar, /transmitirFailsafeSalvo|abrirApTemporario|Serial\./, "the sampler only records the press; the loop acts on it");
+  assert.match(ino, /void loop\(\) \{\s*processarSwitchAcao\(\);/, "presses are acted on every cycle, including in AP mode");
   const configurar = bloco("void configurarSwitchAcao");
   assert.match(configurar, /actionSwitchLongPressConsumed = ativo;/, "a button held at boot fires neither the AP nor the failsafe");
+});
+
+// The switch was sampled only between loop() iterations. With the server accepting connections but
+// never answering, HTTP and WebSocket calls block for seconds at a time: short taps were lost and a
+// 6 s hold never reached the 5 s failsafe (virtual board, virtual-lab/ scenario "Switch com o servidor
+// inalcancavel"). A periodic timer now samples it; the loop acts on what it recorded.
+test("the switch is sampled by a periodic timer, so blocking network calls cannot hide a press", () => {
+  assert.match(ino, /#include <esp_timer\.h>/);
+  assert.match(ino, /const uint64_t ACTION_SWITCH_AMOSTRA_US = 10000;/);
+  const configurar = bloco("void configurarSwitchAcao");
+  assert.match(configurar, /amostragem\.callback = &amostrarSwitchAcao;/);
+  assert.match(configurar, /esp_timer_start_periodic\(timerSwitchAcao, ACTION_SWITCH_AMOSTRA_US\)/);
+  assert.ok(configurar.indexOf("actionSwitchLongPressConsumed = ativo;") < configurar.indexOf("esp_timer_create"), "the state is ready before the timer starts");
+  const processar = bloco("void processarSwitchAcao");
+  assert.match(processar, /if \(!timerSwitchAcao\) amostrarSwitchAcao\(nullptr\);/, "without the timer the loop samples as before");
+  assert.match(processar, /portENTER_CRITICAL\(&muxSwitchAcao\);[\s\S]*switchToqueLongoPendente = false;\s*switchToqueCurtoPendente = false;\s*portEXIT_CRITICAL\(&muxSwitchAcao\);/, "presses are taken atomically");
+  assert.match(processar, /if \(longo\) transmitirFailsafeSalvo\(\);\s*if \(curto\) abrirApTemporario\(\);/);
+  const sinalizar = bloco("void sinalizarSwitchAcao");
+  assert.match(sinalizar, /portENTER_CRITICAL\(&muxSwitchAcao\);/);
 });
 
 test("the failsafe OFF is persisted in NVS, compared before rewriting and transmitted without the server", () => {
@@ -225,6 +245,12 @@ test("the credential changes only in RAM and reconnects only after being written
   assert.match(gravar, /return preferences\.getString\(chave, ""\) == valor;/, "the write is reread from NVS");
   const restaurar = bloco("void restaurarChaveNvs");
   assert.match(restaurar, /else if \(preferences\.isKey\(chave\)\) preferences\.remove\(chave\);/, "without a previous value the key is removed instead of left empty");
+});
+
+test("a transport mode stored in NVS that the firmware does not know means certificate validation, never an unvalidated connection", () => {
+  assert.match(bloco("void setup"), /tlsModo = preferences\.isKey\("tls"\) \? preferences\.getString\("tls", "ca"\) : "ca";\s*if \(tlsModo != "ca" && tlsModo != "inseguro" && tlsModo != "off"\) tlsModo = "ca";/);
+  assert.match(bloco("void handleSaveSetup"), /if \(newTls != "ca" && newTls != "inseguro" && newTls != "off"\) newTls = "ca";/, "the portal applies the same rule before saving");
+  assert.equal((ino.match(/preferences\.getString\("tls"/g) || []).length, 1, "the stored mode is read in one place only");
 });
 
 test("the firmware carries no code comments", () => {
