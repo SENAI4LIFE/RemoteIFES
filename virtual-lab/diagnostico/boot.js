@@ -27,6 +27,7 @@ function ouvir() {
 
 function linhas(soquete, aoLinha) {
   let buf = "";
+  soquete.on("error", (e) => aoLinha(`(socket error ${e.code})`));
   soquete.on("data", (d) => {
     buf += d.toString("latin1");
     let i;
@@ -59,6 +60,8 @@ async function variante(nome, emu, flash, { rede, controle = true, icount = true
       Promise.all([controle ? qt.conexao : Promise.resolve(null), qmp.conexao]),
       esperar(20_000).then(() => { throw new Error("control channels did not connect"); }),
     ]);
+    if (cq) cq.on("error", () => {});
+    cm.on("error", () => {});
     const qmpResp = [];
     linhas(cm, (l) => { if (l.trim()) qmpResp.push(l.trim()); });
     const qmpCmd = async (obj) => { const n = qmpResp.length; cm.write(`${JSON.stringify(obj)}\n`); for (let i = 0; i < 100 && qmpResp.length === n; i++) await esperar(50); return qmpResp.slice(n).join(" | "); };
@@ -93,6 +96,7 @@ async function variante(nome, emu, flash, { rede, controle = true, icount = true
   return resultado;
 }
 
+process.on("uncaughtException", (e) => console.log(`uncaught: ${e.stack}`));
 (async () => {
   exigirHostDescartavel("probing the emulator");
   const emu = await obterEmulador();
