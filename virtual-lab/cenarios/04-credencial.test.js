@@ -157,7 +157,7 @@ cenario("Credencial malformada entregue pela conexão não é gravada", {
 
 cenario("Provisionamento pela conexão interrompido entre as duas gravações da NVS", {
   inicial: "Migração: credencial não obrigatória, placa conectada só pelo MAC, sala sem credencial",
-  falha: "o administrador provisiona a credencial; a placa grava devId e perde energia no início da gravação de devSec",
+  falha: "o administrador provisiona a credencial; a placa grava devId, e perde energia enquanto o relê, antes de gravar devSec",
   exigido: ["a placa volta a operar sem intervenção no local, ou continua alcançável e recuperável pelo servidor"],
   proibido: ["placa que não autentica mais e só volta com visita ao local"],
   recuperacao: "a placa conecta com uma credencial válida",
@@ -170,7 +170,8 @@ cenario("Provisionamento pela conexão interrompido entre as duas gravações da
   await placa.ligar();
   await lab.configurarPeloPortal(placa, { credencial: null });
   await lab.aguardarConectada("A-103a", { limiteMs: 240_000 });
-  const parada = placa.pararEm("if (preferences.putString(chave, valor) != valor.length()) return false;", { ocorrencia: 2, acao: "desligar" });
+  // The read-back of the first key: devId is written, devSec is not yet.
+  const parada = placa.pararEm('return preferences.getString(chave, "") == valor;', { ocorrencia: 1, acao: "desligar" });
   await new Promise((r) => setTimeout(r, 1500));
   const prov = await lab.api("POST", "/admin/esp32/A-103a/credencial");
   assert.equal(prov.status, 200, JSON.stringify(prov.corpo));
@@ -178,6 +179,8 @@ cenario("Provisionamento pela conexão interrompido entre as duas gravações da
   await parada;
   const naNvs = segredoNaNvs(lab, placa);
   lab.observar("nvsAposCorte", { devId: naNvs.deviceId === prov.corpo.deviceId ? "novo" : naNvs.deviceId ? "outro" : "ausente", devSec: naNvs.segredo === prov.corpo.segredo ? "novo" : naNvs.segredo ? "outro" : "ausente" });
+  assert.equal(naNvs.deviceId, prov.corpo.deviceId, "the cut landed after devId was written");
+  assert.equal(naNvs.segredo, undefined, "the cut landed before devSec was written");
   const desde = via.conexoes.length;
   await placa.ligar();
   let recuperou = true;

@@ -53,6 +53,22 @@ test("WebSocket traffic passes unchanged; pings are answered; the board's frames
   assert.ok(pings.length >= 1 && pings.every((p) => p.respostaMs !== null), JSON.stringify(pings));
 });
 
+test("each pong answers one ping, on its own connection and in order", () => {
+  const via = new Intermediario({ portaDestino: 1 });
+  via.controles = [
+    { ms: 0, tipo: "ping", conexao: 1 },
+    { ms: 15_000, tipo: "ping", conexao: 1 },
+    { ms: 16_000, tipo: "ping", conexao: 2 },
+    { ms: 16_500, tipo: "pong", conexao: 2 },
+    { ms: 17_000, tipo: "pong", conexao: 1 },
+    { ms: 18_000, tipo: "pong", conexao: 3 },
+  ];
+  // The late pong on connection 1 answers its first ping; nothing answers the second. The pong on
+  // connection 2 is not credited to connection 1, and an unsolicited pong answers nothing.
+  assert.deepEqual(via.pingsRespondidos(0, 20_000).map((p) => p.respostaMs), [17_000, null, 500]);
+  assert.deepEqual(via.pingsRespondidos(10_000, 15_500).map((p) => p.respostaMs), [null]);
+});
+
 test("a firmware download is cut, stalled or altered at the exact byte, following the reader's pace", async (t) => {
   const corpo = Buffer.alloc(2_000_000);
   for (let i = 0; i < corpo.length; i++) corpo[i] = i % 251;
@@ -87,6 +103,27 @@ test("a firmware download is cut, stalled or altered at the exact byte, followin
   b = await baixar();
   assert.equal(b.length, 500_000, "nothing past the stall point");
   assert.ok(via.conexoesDo("firmware").pop().parado);
+});
+
+test("a paced firmware download takes the time its pace implies and arrives intact", async (t) => {
+  const corpo = Buffer.alloc(96 * 1024);
+  for (let i = 0; i < corpo.length; i++) corpo[i] = i % 253;
+  const srv = http.createServer((q, r) => { r.writeHead(200, { "Content-Length": corpo.length }); r.end(corpo); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  t.after(() => new Promise((r) => srv.close(r)));
+  const via = await new Intermediario({ portaDestino: srv.address().port }).iniciar();
+  t.after(() => via.encerrar());
+  via.ritmoFirmware = 64 * 1024;
+  const s = net.connect(via.porta, "127.0.0.1");
+  const partes = [];
+  s.on("data", (d) => partes.push(d));
+  s.write("GET /dispositivo/firmware?sala=x HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+  await new Promise((r) => { s.once("close", r); setTimeout(() => { s.destroy(); r(); }, 5000); });
+  const tudo = Buffer.concat(partes);
+  assert.ok(tudo.subarray(tudo.indexOf("\r\n\r\n") + 4).equals(corpo));
+  const c = via.conexoesDo("firmware").pop();
+  const duracao = c.corpoCompletoEm - c.corpoInicioEm;
+  assert.ok(duracao >= 1000, `96 KiB at 64 KiB/s spread over ${duracao} ms`);
 });
 
 test("refused and silent modes", async (t) => {

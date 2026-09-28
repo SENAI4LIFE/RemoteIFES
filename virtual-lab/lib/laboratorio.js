@@ -273,6 +273,36 @@ class Laboratorio {
     }, { descricao: `${sala} confirmed`, ...opcoes });
   }
 
+  /** The room's persisted intent, as the server's room list reports it. */
+  async intencao(sala) {
+    const r = await this.api("GET", "/salas");
+    const s = r.status === 200 && Array.isArray(r.corpo) ? r.corpo.find((x) => x.sala === sala) : null;
+    if (!s) throw new Error(`room ${sala} is not in the room list (HTTP ${r.status})`);
+    return { ligado: s.ligado };
+  }
+
+  /**
+   * The intent holds end to end: the server still wants `ligado`, the board's echoed state version is
+   * the current intent's (estadoConfirmado), and, when the board is expected to transmit, a telemetry
+   * report it sends after this call names that command. The board's last command only travels in
+   * telemetry and starts empty on every new connection, so a confirmation alone says nothing about it.
+   */
+  async aguardarIntencaoAplicada(sala, ligado, { limiteMs = 300_000, relatoDaPlaca = ligado } = {}) {
+    const desde = Date.now();
+    const estado = await this.aguardarConfirmada(sala, { limiteMs });
+    const intencao = await this.intencao(sala);
+    if (intencao.ligado !== ligado) {
+      throw new Error(`the persisted intent of ${sala} is ${intencao.ligado ? "on" : "off"}, expected ${ligado ? "on" : "off"}`);
+    }
+    if (!relatoDaPlaca) return { estado, intencao, relato: null };
+    const relato = await this.aguardar(async () => {
+      const uc = (await this.estado(sala)).dispositivo.ultimoComando;
+      if (uc && uc.tipo === "known_state" && Date.parse(uc.recebidoEm) >= desde && uc.power === ligado) return uc;
+      throw new Error(`last command reported: ${JSON.stringify(uc)}`);
+    }, { descricao: `${sala}: a telemetry report naming the command (power ${ligado})`, limiteMs: 180_000 });
+    return { estado, intencao, relato };
+  }
+
   /** Runs a production command-line tool of the server against this scenario's data directory. */
   cli(script, args = []) {
     if (this.servidor.externo) throw new Error("production CLI tools run against the scenario's own server only");
@@ -353,6 +383,9 @@ class Laboratorio {
   /**
    * A board in normal operation: factory image, configured through the portal with a fresh credential
    * for `sala`, connected over the WebSocket. `via` is an Intermediario when faults will be injected.
+   * With a protocol assigned, the server restores the room's state by IR right after the session opens;
+   * the board is handed over only after it confirmed that restoration, so what a scenario observes
+   * afterwards (edges, buzzer, serial) is its own doing.
    */
   async placaEmOperacao({ sala = "A-103a", via = null, variante = "producao", protocolo = 16, nome = "placa" } = {}) {
     const credencial = await this.prepararSala(sala, { protocolo });
@@ -360,7 +393,11 @@ class Laboratorio {
     const placa = this.novaPlaca({ nome, variante, via: rede });
     await placa.ligar();
     await this.configurarPeloPortal(placa, { credencial });
-    const estado = await this.aguardarConectada(sala, { limiteMs: 240_000 });
+    let estado = await this.aguardarConectada(sala, { limiteMs: 240_000 });
+    if (protocolo !== null && protocolo !== undefined) {
+      estado = await this.aguardarConfirmada(sala, { limiteMs: 240_000 });
+      await placa.aguardarVirtual(500);
+    }
     return { placa, sala, credencial, estado, via: rede };
   }
 

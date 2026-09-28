@@ -14,10 +14,9 @@ function reinicios(placa, desde = 0) {
 /** After a reset the board reconnects once and the server confirms the current intent again. */
 async function recupera(lab, placa, sala, desde, { ligado }) {
   await placa.aguardarSerial(/--- RemoteIFES IR System Initializing/, { desde });
-  const e = await lab.aguardarConfirmada(sala, { limiteMs: 300_000 });
-  assert.equal(Boolean(e.dispositivo.ultimoComando && e.dispositivo.ultimoComando.power), ligado, "the confirmed state is the intent");
+  const { estado } = await lab.aguardarIntencaoAplicada(sala, ligado);
   assert.equal(reinicios(placa, desde), 1, "one reset, no loop");
-  return e;
+  return estado;
 }
 
 const pontos = [

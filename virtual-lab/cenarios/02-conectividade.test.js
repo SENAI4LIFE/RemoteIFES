@@ -84,8 +84,7 @@ cenario("Servidor some com a placa conectada e volta; cortes repetidos", {
   assert.ok(taxa.porMinuto <= 20, `${taxa.porMinuto.toFixed(1)} attempts per minute of board time`);
   assert.ok(taxa.porMinuto >= 3);
   via.modo = "normal";
-  const confirmada = await lab.aguardarConfirmada(sala, { limiteMs: 300_000 });
-  assert.equal(confirmada.dispositivo.ultimoComando.power, true, "the intent given during the outage reached the board");
+  await lab.aguardarIntencaoAplicada(sala, true); // the intent given during the outage reached the board
   for (let i = 0; i < 3; i++) {
     via.cortarTudo();
     await placa.aguardarVirtual(1500);
@@ -113,9 +112,8 @@ cenario("Servidor morto (SIGKILL) e religado com a placa conectada", {
   await lab.servidor.parar("SIGKILL");
   await placa.aguardarSerial(/WS servidor: desconectado/, { desde: marca });
   await lab.servidor.subir();
-  const e = await lab.aguardarConfirmada(sala, { limiteMs: 300_000 });
-  lab.observar("aposReinicioDoServidor", { ligado: e.dispositivo.ultimoComando && e.dispositivo.ultimoComando.power, versao: e.dispositivo.versaoEstadoReportada });
-  assert.equal(e.dispositivo.ultimoComando.power, true);
+  const { estado, relato } = await lab.aguardarIntencaoAplicada(sala, true);
+  lab.observar("aposReinicioDoServidor", { relato, versao: estado.dispositivo.versaoEstadoReportada });
   assert.equal(reinicios(placa, marca), 0);
 });
 
@@ -141,8 +139,7 @@ cenario("Conexão cortada logo depois de o comando chegar à placa", {
   via.aoQuadroDoServidor = null;
   const antes = await lab.estado(sala);
   lab.observar("logoAposOCorte", { confirmado: antes.dispositivo.estadoConfirmado, conectado: antes.dispositivo.conectado });
-  const e = await lab.aguardarConfirmada(sala, { limiteMs: 300_000 });
-  assert.equal(e.dispositivo.ultimoComando.power, true);
+  await lab.aguardarIntencaoAplicada(sala, true);
   const ir = placa.bordasDe(4, bordas).length;
   lab.observar("bordasIr", ir);
   assert.ok(ir > 1000, "the command was transmitted");
@@ -230,7 +227,6 @@ cenario("Quadros malformados e fora dos limites vindos do servidor", {
   const nvs = lab.nvs(placa);
   assert.equal(nvs.chaves.fsRec, undefined, "no failsafe was stored");
   assert.equal((await lab.api("POST", "/comando", { sala, cmd: "ligar" })).status, 200);
-  const e = await lab.aguardarConfirmada(sala, { limiteMs: 300_000 });
-  assert.equal(e.dispositivo.ultimoComando.power, true);
+  await lab.aguardarIntencaoAplicada(sala, true);
   lab.observar("sessoesWs", via.conexoesDo("ws").length);
 });

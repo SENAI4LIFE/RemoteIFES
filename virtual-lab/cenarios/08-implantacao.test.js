@@ -42,8 +42,7 @@ cenario("Firmware real contra a instalação de produção: nginx, reinício, pr
   const recuperar = async (rotulo) => {
     const t0 = await placa.agoraMs();
     await lab.servidor.saudavel();
-    const e = await lab.aguardarConfirmada(sala, { limiteMs: 300_000 });
-    assert.equal(e.dispositivo.ultimoComando.power, true, `${rotulo}: the intent survived`);
+    await lab.aguardarIntencaoAplicada(sala, true);
     passos.push({ rotulo, reconexaoMsVirtual: Math.round((await placa.agoraMs()) - t0) });
   };
 

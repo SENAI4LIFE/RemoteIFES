@@ -52,6 +52,15 @@ function vivo(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
+/**
+ * A recorded process is still the one the run started only when its PID is alive with the start time
+ * recorded for it. Anything else (an exited child whose PID the kernel reused, or a host where the
+ * start time cannot be read) is not the run's to signal.
+ */
+function aindaDoLab(p) {
+  return vivo(p.pid) && !!p.arranque && ambiente.arranqueDoProcesso(p.pid) === p.arranque;
+}
+
 function porQueRecusar(opcoes) {
   if (seguranca.elevado()) return "running elevated (administrator/root): the lab never needs it and refuses to run with it";
   const livre = seguranca.espacoLivreBytes();
@@ -128,7 +137,7 @@ async function main() {
   }
   const processos = lerJsonl(path.join(dirExecucao, "processos.jsonl"));
   for (const p of processos) {
-    if (!vivo(p.pid)) continue;
+    if (!aindaDoLab(p)) continue;
     try { process.kill(-p.pid, "SIGKILL"); } catch { try { process.kill(p.pid, "SIGKILL"); } catch {} }
     limpeza.terminados.push(`${p.rotulo}:${p.pid}`);
   }
@@ -140,7 +149,10 @@ async function main() {
     }
   }
   await new Promise((r) => setTimeout(r, 1000));
-  for (const p of processos) if (vivo(p.pid)) limpeza.problemas.push(`process still running: ${p.rotulo} ${p.pid}`);
+  for (const p of processos) {
+    if (aindaDoLab(p)) limpeza.problemas.push(`process still running: ${p.rotulo} ${p.pid}`);
+    else if (vivo(p.pid) && !p.arranque) limpeza.problemas.push(`process ${p.rotulo} ${p.pid} may still be running; its identity cannot be verified here, so it was not signalled`);
+  }
   const portas = lerJsonl(path.join(dirExecucao, "portas.jsonl"));
   for (const { porta, rotulo } of portas) {
     const aberta = await new Promise((r) => {

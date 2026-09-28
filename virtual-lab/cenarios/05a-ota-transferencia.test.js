@@ -65,6 +65,7 @@ for (const caso of falhasDeTransferencia) {
     await lab.publicarFirmware(ctx.candidato.app, ctx.candidato.versao);
     caso.armar(ctx.via, ctx.candidato);
     const desde = ctx.placa.marca();
+    const msgs = ctx.via.daPlaca.length;
     const oferta = await lab.ofertarOta(ctx.sala);
     assert.equal(oferta.status, 200, JSON.stringify(oferta.corpo));
     let inicioParada = null;
@@ -72,9 +73,16 @@ for (const caso of falhasDeTransferencia) {
       await lab.aguardar(() => ctx.via.conexoesDo("firmware").some((c) => c.parado), { descricao: "download stalled", limiteMs: 300_000, intervaloMs: 100 });
       inicioParada = await ctx.placa.agoraMs();
     }
-    const m = await ctx.placa.aguardarSerial(/OTA: falhou \(([^)]*)\)\. Firmware atual mantido\./, { desde, limiteMs: 600_000 });
-    lab.observar("erroNaPlaca", m[1]);
-    assert.match(m[1], caso.erro);
+    // A failure inside the download loop is logged on the serial console; one detected before it (the
+    // declared size) is only reported to the server. Either is the board's own account.
+    const erroNaPlaca = await lab.aguardar(() => {
+      const m = /OTA: falhou \(([^)]*)\)\. Firmware atual mantido\./.exec(ctx.placa.serial.slice(desde));
+      if (m) return m[1];
+      const r = ctx.via.mensagensDaPlaca({ tipo: "ota_resultado", resultado: "erro" }, msgs)[0];
+      return r ? r.erro : false;
+    }, { descricao: "the board's own OTA error", limiteMs: 600_000, intervaloMs: 200 });
+    lab.observar("erroNaPlaca", erroNaPlaca);
+    assert.match(erroNaPlaca, caso.erro);
     if (inicioParada !== null) {
       const esperaMs = (await ctx.placa.agoraMs()) - inicioParada;
       lab.observar("esperaAteDesistirMsVirtual", Math.round(esperaMs));
