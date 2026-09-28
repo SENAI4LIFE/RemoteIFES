@@ -23,6 +23,8 @@ on:
         description: 'Optional: space-separated scenario files (cenarios/NN-*.test.js); empty runs all'
         type: string
         default: ''
+  # TEMPORARY, while the lab is developed on branch virtual-lab (a manual dispatch needs the workflow on
+  # the default branch first). Removed before this is merged into main.
   push:
     branches: [virtual-lab]
 
@@ -249,7 +251,7 @@ jobs:
         working-directory: remoteifes-server
       - run: node virtual-lab/executar.js --preparar
       - name: Deployment rehearsal with the virtual board
-        run: sudo env ENSAIO_HOST_DESCARTAVEL=1 ENSAIO_PLACA_VIRTUAL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh
+        run: sudo env ENSAIO_HOST_DESCARTAVEL=1 ENSAIO_PLACA_VIRTUAL=1 LAB_HOST_DESCARTAVEL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh
       - name: Upload the evidence (redacted)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

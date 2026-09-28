@@ -134,8 +134,10 @@ verificar "http://127.0.0.1" --commit "$PRIMEIRA" --exigir-marca --frontend --di
 # emulated ESP32 against this installation, through nginx, while the service is restarted and killed
 # (virtual-lab/cenarios/08-implantacao.test.js). It runs as the service's user, never as root.
 if [ "${ENSAIO_PLACA_VIRTUAL:-}" = "1" ]; then
+  # Booting the emulator and its guest is the lab's own decision: it needs its own declaration.
+  [ "${LAB_HOST_DESCARTAVEL:-}" = "1" ] || { echo "ENSAIO_PLACA_VIRTUAL=1 exige também LAB_HOST_DESCARTAVEL=1: o laboratório virtual só roda em host descartável."; exit 1; }
   passo "6b. placa virtual: firmware real num ESP32 emulado, pelo nginx, com o serviço reiniciado e derrubado"
-  como_usuario env LAB_HOST_DESCARTAVEL=1 LAB_SERVIDOR_BASE="http://127.0.0.1" LAB_SERVIDOR_SENHA="$SENHA" \
+  como_usuario env LAB_HOST_DESCARTAVEL="$LAB_HOST_DESCARTAVEL" LAB_SERVIDOR_BASE="http://127.0.0.1" LAB_SERVIDOR_SENHA="$SENHA" \
     LAB_SERVICO_SYSTEMD=remoteifes.service LAB_PROXY_SYSTEMD=nginx.service \
     node "$ORIGEM/virtual-lab/executar.js" cenarios/08-implantacao.test.js
   verificar "http://127.0.0.1" --commit "$PRIMEIRA" --exigir-marca --dispositivos 1
