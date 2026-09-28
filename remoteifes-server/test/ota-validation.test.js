@@ -242,6 +242,51 @@ test("validation survives a server restart and board reconnection and completes 
   otaService.limparEstado("VAL-3");
 });
 
+test("a transfer presumed failed because the socket dropped is completed by the board's boot evidence for that attempt", async () => {
+  novaSala("VAL-7", "AA:BB:CC:0A:00:07");
+  const d = await abrirDispositivo("VAL-7", "AA:BB:CC:0A:00:07", VERSAO_ANTIGA);
+  otaService.ofertar("VAL-7");
+  await ate(() => d.ofertas().length === 1);
+  const tentativa = d.ofertas()[0].tentativa;
+  d.enviar({ tipo: "ota_progresso", recebido: 65536, total: manifesto.tamanho });
+  await ate(() => fase("VAL-7") === "baixando");
+  // Firmware up to 4.3.0 stops answering pings while it downloads: the server loses the socket, but the
+  // board completes the image, installs it and boots it.
+  await d.fechar();
+  assert.equal(fase("VAL-7"), "falhou");
+  assert.equal(otaService.estadoDaSala("VAL-7").causa, "transferencia");
+  const novo = await abrirDispositivo("VAL-7", "AA:BB:CC:0A:00:07", VERSAO_NOVA);
+  assert.equal(fase("VAL-7"), "falhou", "reconnecting with the target version alone does not complete it");
+  novo.enviar({ tipo: "ota_validado", tentativa: "outra", sha256: manifesto.sha256, versao: VERSAO_NOVA });
+  novo.enviar({ tipo: "ota_validado", tentativa, sha256: "0".repeat(64), versao: VERSAO_NOVA });
+  await esperar(80);
+  assert.equal(fase("VAL-7"), "falhou", "evidence for another attempt or another image changes nothing");
+  novo.enviar({ tipo: "ota_validado", tentativa, sha256: manifesto.sha256, versao: VERSAO_NOVA });
+  assert.ok(await ate(() => fase("VAL-7") === "concluido"));
+  assert.equal(otaService.estadoDaSala("VAL-7").evidencia, "boot");
+  assert.ok(await ate(() => novo.acks().length === 1), "the board is told to clear its evidence");
+  await novo.fechar();
+  otaService.limparEstado("VAL-7");
+});
+
+test("a rollback or a failed boot validation stays final even if matching evidence arrives later", () => {
+  const resultado = emProcessoNovo(`
+    const fs = require('fs');
+    const base = { tentativa: 't-8', sha256: ${JSON.stringify(manifesto.sha256)}, versao: ${JSON.stringify(VERSAO_NOVA)}, versaoAnterior: ${JSON.stringify(VERSAO_ANTIGA)}, atualizadoEm: new Date().toISOString() };
+    const r = {};
+    for (const causa of ['validacao', 'rollback']) {
+      fs.writeFileSync(ota.ARQUIVO_ESTADOS, JSON.stringify({ 'VAL-8': { ...base, fase: 'falhou', causa } }));
+      delete require.cache[require.resolve(${JSON.stringify(path.join(__dirname, "../src/services/otaService"))})];
+      const novo = require(${JSON.stringify(path.join(__dirname, "../src/services/otaService"))});
+      r[causa] = { aceita: novo.registrarValidacao('VAL-8', { tentativa: 't-8', sha256: ${JSON.stringify(manifesto.sha256)}, versao: ${JSON.stringify(VERSAO_NOVA)} }), fase: novo.estadoDaSala('VAL-8').fase };
+    }
+    fs.writeFileSync(ota.ARQUIVO_ESTADOS, JSON.stringify({}));
+    return r;
+  `, "VAL-8", "AA:BB:CC:0A:00:08");
+  assert.deepEqual(resultado.validacao, { aceita: false, fase: "falhou" });
+  assert.deepEqual(resultado.rollback, { aceita: false, fase: "falhou" });
+});
+
 test("an identity replaced after flashing cannot validate the attempt", async () => {
   novaSala("VAL-5", "AA:BB:CC:0A:00:05");
   const outro = await abrirDispositivo("VAL-5", "AA:BB:CC:0A:00:05", VERSAO_ANTIGA);

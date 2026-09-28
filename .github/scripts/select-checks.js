@@ -24,6 +24,10 @@ const ZERO_SHA = /^0+$/;
 
 // First match wins.
 const PATH_RULES = [
+  // The virtual hardware lab is development-only and has its own manual workflow; nothing it contains
+  // ships or changes what this CI builds.
+  [/^\.github\/workflows\/virtual-hardware\.yml$/, "none"],
+  [/^virtual-lab\//, "none"],
   [/^\.github\/(workflows|scripts)\//, "ci"],
   [/^\.github\/dependabot\.yml$/, "none"],
   [/^remoteifes-server\//, "server"],

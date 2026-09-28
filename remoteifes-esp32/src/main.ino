@@ -184,6 +184,17 @@ unsigned long otaValidacaoLimite = 0;
 bool otaEmAndamento = false;
 bool credencialAlterada = false;
 
+struct OfertaOta {
+  bool pendente = false;
+  String versao;
+  String sha256;
+  size_t tamanho = 0;
+  String caminho;
+  String tentativa;
+};
+
+OfertaOta ofertaOta;
+
 String salaId;
 String serverHost;
 int serverPort = 0;
@@ -235,6 +246,7 @@ void agendarReinicio(unsigned long esperaMs);
 void verificarValidacaoOta();
 void aplicarCredencial(JsonDocument& doc);
 void iniciarOtaOferta(JsonDocument& doc);
+void executarOtaPendente();
 void reportarOtaResultado(bool ok, const String& erro);
 void reportarOtaProgresso(size_t recebido, size_t total);
 void reportarOtaValidado();
@@ -265,6 +277,10 @@ void preencherStatusFailsafe(JsonDocument& doc);
 void aplicarFailsafeDoServidor(JsonDocument& doc);
 void configurarSwitchAcao();
 void processarSwitchAcao();
+
+extern "C" bool verifyRollbackLater() {
+  return true;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -390,6 +406,7 @@ void loop() {
   }
 
   if (otaPendenteValidacao) verificarValidacaoOta();
+  if (ofertaOta.pendente) executarOtaPendente();
 
   if (isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE) {
     handleIRCapture();
@@ -1686,6 +1703,21 @@ void iniciarOtaOferta(JsonDocument& doc) {
   }
 
   otaEmAndamento = true;
+  ofertaOta.pendente = true;
+  ofertaOta.versao = versao;
+  ofertaOta.sha256 = shaEsperado;
+  ofertaOta.tamanho = tamanho;
+  ofertaOta.caminho = caminho;
+  ofertaOta.tentativa = tentativa;
+}
+
+void executarOtaPendente() {
+  ofertaOta.pendente = false;
+  const String versao = ofertaOta.versao;
+  const String shaEsperado = ofertaOta.sha256;
+  const size_t tamanho = ofertaOta.tamanho;
+  const String caminho = ofertaOta.caminho;
+  const String tentativa = ofertaOta.tentativa;
   Serial.printf("OTA: iniciando atualizacao para %s (%u bytes).\n", versao.c_str(), (unsigned)tamanho);
 
   String url = urlServidor((caminho + "?sala=" + salaId).c_str());
