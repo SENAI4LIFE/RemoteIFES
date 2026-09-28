@@ -52,20 +52,10 @@ function abortarNoBoot(dir) {
   fs.writeFileSync(ino, substituirUmaVez(texto, "void setup() {", "void setup() {\n  abort();", "main.ino"));
 }
 
-function apEmOutraSubrede(dir) {
-  const ino = path.join(dir, "src", "main.ino");
-  const texto = fs.readFileSync(ino, "utf8");
-  // Only the temporary AP opened next to a connected station moves; the factory setup AP stays where
-  // the lab's portal forward reaches it.
-  fs.writeFileSync(ino, substituirUmaVez(texto, "IPAddress apIP(192, 168, 4, 1);", "IPAddress apIP(192, 168, manterSta ? 5 : 4, 1);", "main.ino"));
-}
-
 const VARIANTES = {
   producao: [],
   candidato: [elevarVersao],
   candidatoQueAborta: [elevarVersao, abortarNoBoot],
-  // Diagnostic: the temporary setup AP outside the lab network's 192.168.4.0/24 (see cenarios/09).
-  apEmOutraSubrede: [apEmOutraSubrede],
 };
 
 function arquivosDaFonte(dir) {

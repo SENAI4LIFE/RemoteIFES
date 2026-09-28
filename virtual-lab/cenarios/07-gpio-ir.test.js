@@ -190,9 +190,9 @@ cenario("Toques curtos com o servidor inalcançável: nenhum se perde", {
   falha: "o servidor passa a aceitar conexões sem responder; oito toques de 300 ms, a cada 12 s (tempo da placa)",
   exigido: ["cada toque é reconhecido: o primeiro abre o RemoteIFES-Setup e cada um dos outros prorroga a janela"],
   proibido: ["toque perdido enquanto a placa espera a rede", "reinício"],
-  recuperacao: "não verificada aqui: com o AP temporário aberto, esta rede de laboratório não permite uma conexão nova (cenarios/09)",
+  recuperacao: "a placa reconecta quando o servidor volta, com o AP temporário ainda aberto",
 }, async (lab) => {
-  const { placa, via } = await lab.placaEmOperacao();
+  const { placa, sala, via } = await lab.placaEmOperacao();
   via.modo = "buraco";
   via.cortarTudo();
   await placa.aguardarVirtual(10_000);
@@ -207,4 +207,7 @@ cenario("Toques curtos com o servidor inalcançável: nenhum se perde", {
   assert.equal(abertos, 1);
   assert.equal(prorrogados, 7, "every later tap extended the window");
   assert.equal(reinicios(placa, desde), 0);
+  via.modo = "normal";
+  via.cortarTudo();
+  await lab.aguardarConectada(sala, { limiteMs: 300_000 });
 });
