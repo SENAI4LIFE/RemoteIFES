@@ -66,6 +66,8 @@ cenario("Fábrica, portal, Wi-Fi, credencial, comando e confirmação", {
   const cmd = await lab.api("POST", "/comando", { sala: "A-103a", cmd: "ligar" });
   assert.equal(cmd.status, 200, JSON.stringify(cmd.corpo));
   const confirmado = await lab.aguardarConfirmada("A-103a", { limiteMs: 120_000 });
+  // The board reports right after the IR frame; the buzzer is switched off by loop() a moment later.
+  await lab.aguardar(() => placa.bordasDe(27, antes).some((b) => b.nivel === 0), { descricao: "buzzer off after the transmission", limiteMs: 60_000, intervaloMs: 100 });
   const ir = placa.bordasDe(4, antes);
   const buzzer = placa.bordasDe(27, antes);
   lab.observar("comando", { bordasIr: ir.length, buzzer: buzzer.map((b) => b.nivel) });
