@@ -503,7 +503,7 @@ Cada placa usa um único botão momentâneo normalmente aberto ligado entre o **
 
 | Ação | Efeito |
 |---|---|
-| **Clique curto** (solto antes de 5 s) | abre o `RemoteIFES-Setup` por dez minutos, mantendo a conexão com o servidor (AP+STA); um novo clique prorroga a janela e o AP fecha sozinho se nada for salvo. Em uma placa sem configuração o AP já está no ar e o clique não faz nada. |
+| **Clique curto** (solto antes de 5 s) | abre o `RemoteIFES-Setup` por dez minutos, mantendo a conexão com o servidor (AP+STA); um novo clique prorroga a janela e o AP fecha sozinho se nada for salvo. O portal fica em `192.168.4.1`, ou em `192.168.5.1` quando a própria rede Wi-Fi da placa já é `192.168.4.x` (o portal cativo abre a página nos dois casos). Em uma placa sem configuração o AP já está no ar e o clique não faz nada. |
 | **Manter pressionado por 5 s** | transmite **uma única vez** o failsafe OFF gravado na NVS, sem depender de servidor, Internet ou Wi-Fi; soltar o botão depois disso **não** abre o AP. Para um novo disparo é preciso soltar e pressionar de novo. Sem failsafe gravado, a pressão é reconhecida mas nada é transmitido. |
 
 O failsafe OFF fica na NVS como **um único registro versionado** (cabeçalho com magia, versão, quantidade de pulsos, portadora, id do protocolo e CRC32, seguido do RAW), gravado em uma única operação: uma queda de energia durante a atualização deixa o registro anterior ou o novo, nunca metadados de um com o RAW do outro, e um registro com CRC inválido é ignorado até o servidor reenviar. Placas com o formato anterior (quatro chaves separadas) migram sozinhas no primeiro boot do firmware 4.2.0. A duração total de qualquer RAW (failsafe ou `send_raw`) é limitada a 2 s; o servidor aplica o mesmo limite ao salvar protocolos.
@@ -906,7 +906,8 @@ Suportado não é o mesmo que executado na CI. O que a CI instala e roda, e o qu
 | Linux x64 | **instalado e executado** | testes do console, pacotes, o servidor sob os testes E2E e o ensaio de implantação num Ubuntu 22.04 com o Node mínimo |
 | Windows x64, macOS arm64 | **instalado e executado** | testes do servidor e do console, instalação e execução dos pacotes |
 | Linux armv7, Windows arm64, macOS x64 | construído, **não executado** | o payload é o mesmo JavaScript das outras arquiteturas; só o Node do host muda |
-| Raspberry Pi físico com Raspberry Pi OS | **não executado** | nenhum runner é um Pi; o ARM64 da CI é Ubuntu em servidor ARM |
+| Userland do Raspberry Pi OS Lite (64 e 32 bits) | **executado sob demanda** | workflow manual *Virtual Hardware Validation*: o ensaio de implantação completo no userland de 64 bits num runner ARM64 nativo (contêiner com systemd, 1 GiB, 2 CPUs), e `setup.sh`, servidor, backup e restauração no userland de 32 bits (armhf, armv7) sob emulação de userland; o kernel é sempre o do runner |
+| Raspberry Pi físico com Raspberry Pi OS | **não executado** | nenhum runner é um Pi: kernel, boot, cartão SD, energia e desempenho de um Pi não são exercidos |
 
 O Node mínimo declarado (22.13.0) roda nos testes Linux do servidor e do console e no ensaio de implantação mais antigo; os demais usam o 22.x mais recente.
 
@@ -1176,7 +1177,7 @@ Reinstalar o console não toca no `remoteifes.service` nem no banco. Para remov�
 
 ## Hospedagem em Raspberry Pi
 
-Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é suficiente para rodar `remoteifes-server`: o `node:sqlite` usado pelo projeto é nativo do próprio Node.js, então não há dependências compiladas nem ferramentas de build a instalar no dispositivo. A CI executa a instalação completa em Linux ARM64, a mesma arquitetura de um Pi de 64 bits, mas não num Pi físico nem em ARMv7 (veja [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados)).
+Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é suficiente para rodar `remoteifes-server`: o `node:sqlite` usado pelo projeto é nativo do próprio Node.js, então não há dependências compiladas nem ferramentas de build a instalar no dispositivo. A CI executa a instalação completa em Linux ARM64, a mesma arquitetura de um Pi de 64 bits, mas não num Pi físico; o workflow manual *Virtual Hardware Validation* repete o ensaio no userland do Raspberry Pi OS de 64 bits e exercita o de 32 bits (ARMv7) sob emulação, o que também não é um Pi físico (veja [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados)).
 
 Clone o repositório e siga somente [Linux com systemd](#linux-com-systemd); se quiser Nginx, continue em [Proxy reverso](#proxy-reverso). Cadastre redes adicionais depois com `npm run redes -- 10.10.0.0/16`.
 
@@ -1465,7 +1466,7 @@ Um nó informa a quantidade de saltos e o sinal do enlace com o pai, mas nomeia 
 
 O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Do lado do servidor, testes com gateways e nós simulados cobrem várias topologias, troca de gateway, reinícios, gerações de credencial, quadros adulterados, truncados ou repetidos, os limites e um gateway que se comporta mal (`test/mesh-adversarial.test.js`). Nada disso envolve rádio: alcance, interferência, eleição real de pai e raiz, recuperação do rádio após perda do pai ou da raiz, estabilidade em vários saltos, latência de RF e a rotação de credencial pela malha em placas reais continuam pendentes.
 
-A escolha da tecnologia de rádio, o protocolo, os limites e o que falta estão em [`remoteifes-esp32/MESH.md`](remoteifes-esp32/MESH.md). O roteiro de aceitação em hardware, para a malha e para o resto da placa (IR, GPIO, switch, buzzer, DHT11, NVS com queda de energia, flash, OTA A/B no ESP32 real, Wi-Fi, alcance, latência de RF e heap em longa duração), está em [`remoteifes-esp32/HARDWARE-ACCEPTANCE.md`](remoteifes-esp32/HARDWARE-ACCEPTANCE.md); nenhum desses itens foi validado ainda.
+A escolha da tecnologia de rádio, o protocolo, os limites e o que falta estão em [`remoteifes-esp32/MESH.md`](remoteifes-esp32/MESH.md). O roteiro de aceitação em hardware, para a malha e para o resto da placa (IR, GPIO, switch, buzzer, DHT11, NVS com queda de energia, flash, OTA A/B no ESP32 real, Wi-Fi, alcance, latência de RF e heap em longa duração), está em [`remoteifes-esp32/HARDWARE-ACCEPTANCE.md`](remoteifes-esp32/HARDWARE-ACCEPTANCE.md); nenhum desses itens foi validado em hardware ainda. Cada item diz que evidência de software existe hoje: testes no host, o laboratório virtual ([`virtual-lab/`](virtual-lab/README.md), o firmware real num ESP32 emulado, que prova a lógica do firmware e nada elétrico ou de rádio) ou CI em ARM64 nativo.
 
 
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
@@ -1725,6 +1726,7 @@ O contrato do `GET /health`, usado pelo CI, pelo watchdog e pelas implantações
 | `e2e/specs/` | end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
 | `e2e/` (harness, configuração, lockfile) | end-to-end em todos os navegadores; Safari nativo | — |
 | `README.md`, `docs/`, scripts Git da raiz | testes de contrato da documentação (servidor, Linux ARM64) | — |
+| `virtual-lab/`, `.github/workflows/virtual-hardware.yml` | nenhum job (o laboratório tem o próprio workflow manual, abaixo) | — |
 | `.github/workflows/`, `.github/scripts/`, caminho não mapeado ou diff indeterminável | validação completa de tudo | — |
 
 Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também contam. As regras ficam em `.github/scripts/select-checks.js`, testadas por `select-checks.test.js` no próprio job de seleção. Uma execução nova no mesmo pull request ou ramo cancela a anterior; um **Run workflow** nunca é cancelado por um push posterior, e o deploy do GitHub Pages nunca é interrompido no meio.
@@ -1739,6 +1741,8 @@ O que cada job cobre:
 - validação de configuração Cordova em Ubuntu e Windows (o checkout com CRLF do Windows exercita a restauração byte a byte de `harden-config.js`);
 - build do firmware ESP32;
 - Android (`android.yml`) e iOS (`ios.yml`), chamados pelo CI como workflows reutilizáveis.
+
+`.github/workflows/virtual-hardware.yml` (**Virtual Hardware Validation**) só roda por **Run workflow**, nunca a cada commit: são 14 jobs em paralelo, cerca de meia hora de relógio e 140 minutos de runner. Ele executa o firmware real (`remoteifes-esp32`, com a mesma configuração do PlatformIO) num ESP32 emulado contra o servidor real, com falhas injetadas na rede, na flash, nos GPIO e em instruções exatas do firmware; o mesmo firmware contra a instalação de produção (systemd e nginx) dentro do ensaio de implantação; e os userlands do Raspberry Pi OS descritos em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados). O emulador e o sistema convidado são tratados como não confiáveis: rodam só em runners descartáveis, nunca na máquina de quem desenvolve, e nada disso entra na instalação. O que cada cenário prova e não prova está em [`virtual-lab/README.md`](virtual-lab/README.md); localmente só rodam os testes unitários do laboratório (`node virtual-lab/executar.js --unidade`).
 
 `.github/workflows/ios.yml` (macOS) prepara a plataforma iOS com o `cordova-ios` travado no lockfile, compila o app para o iOS Simulator com o Xcode do runner e executa `npm run test-ios`; veja [iOS e recursos visuais](#ios-e-recursos-visuais) para o que essa execução comprova. Nenhum token adicional é necessário.
 
