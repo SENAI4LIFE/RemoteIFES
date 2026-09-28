@@ -55,14 +55,16 @@ function abortarNoBoot(dir) {
 function apEmOutraSubrede(dir) {
   const ino = path.join(dir, "src", "main.ino");
   const texto = fs.readFileSync(ino, "utf8");
-  fs.writeFileSync(ino, substituirUmaVez(texto, "IPAddress apIP(192, 168, 4, 1);", "IPAddress apIP(192, 168, 5, 1);", "main.ino"));
+  // Only the temporary AP opened next to a connected station moves; the factory setup AP stays where
+  // the lab's portal forward reaches it.
+  fs.writeFileSync(ino, substituirUmaVez(texto, "IPAddress apIP(192, 168, 4, 1);", "IPAddress apIP(192, 168, manterSta ? 5 : 4, 1);", "main.ino"));
 }
 
 const VARIANTES = {
   producao: [],
   candidato: [elevarVersao],
   candidatoQueAborta: [elevarVersao, abortarNoBoot],
-  // Diagnostic: the setup AP outside the lab network's 192.168.4.0/24 (see cenarios/09).
+  // Diagnostic: the temporary setup AP outside the lab network's 192.168.4.0/24 (see cenarios/09).
   apEmOutraSubrede: [apEmOutraSubrede],
 };
 
@@ -100,7 +102,7 @@ function executar(pio, args, cwd) {
     filho.once("error", reject);
     filho.once("exit", (codigo, sinal) => {
       clearTimeout(limite);
-      if (codigo === 0) resolve();
+      if (codigo === 0) resolve(saida);
       else reject(new Error(`pio ${args.join(" ")} failed in ${cwd} (${codigo ?? sinal}):\n${saida.slice(-4000)}`));
     });
   });
@@ -146,7 +148,7 @@ async function construir(variante) {
   if (!valido()) await comTrava(destino, async () => {
     if (valido()) return;
     fs.mkdirSync(destino, { recursive: true });
-    for (const sub of ["src", "include", "data", "platformio.ini", ".fonte"]) removerSeguro(path.join(destino, sub));
+    for (const sub of ["src", "include", "data", "platformio.ini", ".fonte", ".tamanho"]) removerSeguro(path.join(destino, sub));
     for (const rel of arquivosDaFonte(origem)) {
       fs.mkdirSync(path.dirname(path.join(destino, rel)), { recursive: true });
       fs.copyFileSync(path.join(origem, rel), path.join(destino, rel));
@@ -158,10 +160,18 @@ async function construir(variante) {
     const libsDestino = path.join(destino, ".pio", "libdeps");
     if (!fs.existsSync(libsDestino) && fs.existsSync(libsOrigem)) fs.cpSync(libsOrigem, libsDestino, { recursive: true });
     const pio = comandoPio();
-    await executar(pio, ["run"], destino);
+    const saida = await executar(pio, ["run"], destino);
+    // PlatformIO's own RAM and flash lines: the footprint of this exact build, kept with it.
+    const uso = (rotulo) => {
+      const m = new RegExp(`${rotulo}:.*used (\\d+) bytes from (\\d+) bytes`).exec(saida);
+      return m ? { usados: Number(m[1]), total: Number(m[2]) } : null;
+    };
+    fs.writeFileSync(path.join(destino, ".tamanho"), JSON.stringify({ ram: uso("RAM"), flash: uso("Flash") }));
     await executar(pio, ["run", "-t", "buildfs"], destino);
     fs.writeFileSync(marca, impressao);
   });
+  let tamanho = null;
+  try { tamanho = JSON.parse(fs.readFileSync(path.join(destino, ".tamanho"), "utf8")); } catch {}
   const bootApp0 = path.join(nucleoPlatformio(), "packages", "framework-arduinoespressif32", "tools", "partitions", "boot_app0.bin");
   return {
     variante,
@@ -175,6 +185,7 @@ async function construir(variante) {
     elf: path.join(build, "firmware.elf"),
     littlefs: path.join(build, "littlefs.bin"),
     bootApp0,
+    tamanho,
   };
 }
 

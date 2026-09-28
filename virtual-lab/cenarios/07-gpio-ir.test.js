@@ -23,10 +23,13 @@ function bordasEsperadas(raw, hz) {
 
 const RAW_FAILSAFE = [9000, 4500, 560, 560, 560, 1690, 560, 560, 560, 1690, 560, 1690, 560];
 
+// The portal opened by a short press is reached by joining the setup AP. While the board is a station,
+// this emulator's radio carries no second link for a device joined to the AP, so the portal's answer
+// during operation is left to physical hardware (see cenarios/09 and HARDWARE-ACCEPTANCE.md).
 cenario("Toque curto abre o RemoteIFES-Setup sem interromper a operação", {
   inicial: "Placa em operação, conectada",
   falha: "toque de 300 ms (tempo da placa) no switch; depois um segundo toque",
-  exigido: ["o ponto de acesso temporário abre e o portal responde", "a sessão com o servidor continua", "o segundo toque prorroga a janela em vez de reabrir"],
+  exigido: ["o ponto de acesso temporário abre", "a sessão com o servidor continua", "o segundo toque prorroga a janela em vez de reabrir"],
   proibido: ["reinício", "queda da sessão", "failsafe disparado por um toque curto"],
   recuperacao: "não se aplica (a janela fecha sozinha em 10 minutos; esse prazo não é esperado aqui)",
 }, async (lab) => {
@@ -36,8 +39,6 @@ cenario("Toque curto abre o RemoteIFES-Setup sem interromper a operação", {
   const ms = await placa.pressionarBotao(300);
   lab.observar("toqueMsVirtual", Math.round(ms));
   await placa.aguardarSerial(/Switch: RemoteIFES-Setup aberto temporariamente/, { desde });
-  const r = await fetch(`http://127.0.0.1:${placa.portaPortal}/`, { signal: AbortSignal.timeout(30_000) });
-  assert.equal(r.status, 200, "the portal answers during operation");
   await placa.aguardarVirtual(2000);
   await placa.pressionarBotao(300);
   await placa.aguardarSerial(/janela do RemoteIFES-Setup prorrogada/, { desde });
@@ -154,11 +155,14 @@ cenario("Portadora do RAW chega ao pino: 38 kHz e 56 kHz", {
   assert.ok(Math.abs(razao - 56 / 38) < 0.12, `edge ratio ${razao.toFixed(3)} for a carrier ratio of ${(56 / 38).toFixed(3)}`);
 });
 
-cenario("Switch com o servidor inalcançável", {
+// A server that accepts connections and never answers keeps the firmware inside blocking HTTP and
+// WebSocket calls (2.5 s connect and 2.5 s read timeouts) for most of each loop() pass. The switch is
+// sampled by a 10 ms timer outside the loop, so neither a hold nor a tap may be lost to that.
+cenario("Toque longo com o servidor inalcançável: o failsafe sai sem servidor", {
   inicial: "Placa em operação com failsafe gravado",
-  falha: "o servidor passa a aceitar conexões sem responder; toques curtos e um toque longo são dados nesse período",
-  exigido: ["o toque longo (failsafe OFF) funciona sem servidor", "a proporção de toques curtos reconhecidos fica registrada (a placa atende o switch dentro do laço principal)"],
-  proibido: ["failsafe indisponível sem servidor", "reinício"],
+  falha: "o servidor passa a aceitar conexões sem responder; o switch é mantido por 6 s (tempo da placa) nesse período",
+  exigido: ["o failsafe OFF é transmitido sem servidor", "a placa reconecta quando o servidor volta"],
+  proibido: ["failsafe perdido enquanto a placa espera a rede", "reinício"],
   recuperacao: "a placa reconecta quando o servidor volta",
 }, async (lab) => {
   const { placa, sala, via } = await lab.placaEmOperacao();
@@ -166,21 +170,41 @@ cenario("Switch com o servidor inalcançável", {
   await lab.aguardar(async () => (await lab.estado(sala)).dispositivo.failsafe.configurado === true, { descricao: "failsafe stored" });
   via.modo = "buraco";
   via.cortarTudo();
+  await placa.aguardarVirtual(10_000);
   const desde = placa.marca();
-  let reconhecidos = 0;
-  for (let i = 0; i < 8; i++) {
-    const antes = placa.marca();
-    await placa.pressionarBotao(300);
-    await placa.aguardarVirtual(4000);
-    if (/Switch: RemoteIFES-Setup (aberto|janela)|prorrogada/.test(placa.serial.slice(antes))) reconhecidos += 1;
-  }
-  lab.observar("toquesCurtosReconhecidosSemServidor", `${reconhecidos}/8`);
   const antes = placa.bordas.length;
   await placa.pressionarBotao(6000);
+  const soltou = await placa.agoraMs();
   await placa.aguardarSerial(/Failsafe OFF transmitido localmente/, { desde, limiteMs: 300_000 });
+  lab.observar("atrasoDoFailsafeAposSoltarMsVirtual", Math.round((await placa.agoraMs()) - soltou));
   assert.ok(placa.bordasDe(4, antes).length > 0, "the failsafe went out with no server");
+  assert.doesNotMatch(placa.serial.slice(desde), /Switch: RemoteIFES-Setup/, "a hold is not taken for a tap");
   assert.equal(reinicios(placa, desde), 0);
   via.modo = "normal";
   via.cortarTudo();
   await lab.aguardarConectada(sala, { limiteMs: 300_000 });
+});
+
+cenario("Toques curtos com o servidor inalcançável: nenhum se perde", {
+  inicial: "Placa em operação",
+  falha: "o servidor passa a aceitar conexões sem responder; oito toques de 300 ms, a cada 12 s (tempo da placa)",
+  exigido: ["cada toque é reconhecido: o primeiro abre o RemoteIFES-Setup e cada um dos outros prorroga a janela"],
+  proibido: ["toque perdido enquanto a placa espera a rede", "reinício"],
+  recuperacao: "não verificada aqui: com o AP temporário aberto, esta rede de laboratório não permite uma conexão nova (cenarios/09)",
+}, async (lab) => {
+  const { placa, via } = await lab.placaEmOperacao();
+  via.modo = "buraco";
+  via.cortarTudo();
+  await placa.aguardarVirtual(10_000);
+  const desde = placa.marca();
+  for (let i = 0; i < 8; i++) {
+    await placa.pressionarBotao(300);
+    await placa.aguardarVirtual(12_000);
+  }
+  const abertos = placa.contarSerial(/Switch: RemoteIFES-Setup aberto temporariamente/, desde);
+  const prorrogados = placa.contarSerial(/Switch: janela do RemoteIFES-Setup prorrogada/, desde);
+  lab.observar("toquesReconhecidos", { abertos, prorrogados });
+  assert.equal(abertos, 1);
+  assert.equal(prorrogados, 7, "every later tap extended the window");
+  assert.equal(reinicios(placa, desde), 0);
 });
