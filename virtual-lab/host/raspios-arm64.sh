@@ -18,10 +18,13 @@ mkdir -p "$SAIDA"
 NOME=raspios-arm64-ensaio
 
 docker rm -f "$NOME" >/dev/null 2>&1 || true
+# Units for a first boot on real Pi hardware with a console (the new-user prompt, SSH key and EEPROM
+# jobs, swap file, consoles) have nothing to do in a container and would keep boot from finishing.
+MASCARAR="userconfig.service systemd-firstboot.service regenerate_ssh_host_keys.service sshswitch.service rpi-eeprom-update.service dphys-swapfile.service rpi-resize.service getty@tty1.service serial-getty@ttyAMA0.service console-setup.service keyboard-setup.service"
 docker run -d --name "$NOME" --hostname raspberrypi --privileged --cgroupns=host \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
-  --memory=1g --memory-swap=1g --cpus=2 \
-  raspios-lite:arm64 /sbin/init >/dev/null
+  --memory=1g --memory-swap=1g --cpus=2 -e MASCARAR="$MASCARAR" \
+  raspios-lite:arm64 /bin/sh -c 'for u in $MASCARAR; do ln -sf /dev/null "/etc/systemd/system/$u"; done; exec /sbin/init' >/dev/null
 trap 'docker rm -f "$NOME" >/dev/null 2>&1 || true' EXIT
 
 estado=""
@@ -31,10 +34,15 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 echo "systemd in the container: $estado"
+if [ "$estado" != running ] && [ "$estado" != degraded ]; then
+  docker exec "$NOME" systemctl list-jobs --no-pager || true
+  echo "systemd did not finish booting in the container"
+  exit 1
+fi
 docker exec "$NOME" systemctl --failed --no-legend --no-pager > "$SAIDA/unidades-com-falha-no-boot.txt" 2>&1 || true
 docker exec "$NOME" bash -c 'grep -E "^(PRETTY_NAME|VERSION_CODENAME)=" /etc/os-release; uname -m; systemctl --version | head -1; free -m' | tee "$SAIDA/sistema.txt"
 
-docker exec "$NOME" bash -euc 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y -qq git curl ca-certificates sudo >/dev/null'
+docker exec "$NOME" bash -euc 'export DEBIAN_FRONTEND=noninteractive; apt-get -o Acquire::Retries=5 update -qq; apt-get -o Acquire::Retries=5 install -y -qq git curl ca-certificates sudo >/dev/null'
 docker exec "$NOME" bash -euc 'useradd -m -s /bin/bash ensaio; echo "ensaio ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ensaio; chmod 440 /etc/sudoers.d/ensaio'
 # The checkout belongs to the account that runs the service: git refuses a repository owned by another.
 docker cp "$RAIZ_REPO" "$NOME:/home/ensaio/RemoteIFES"

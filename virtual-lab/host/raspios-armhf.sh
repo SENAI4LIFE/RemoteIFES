@@ -19,7 +19,11 @@ SAIDA="$(cd "$SAIDA" && pwd)"
 docker run --rm --platform linux/arm/v7 --memory=1g --memory-swap=1g \
   -v "$RAIZ_REPO:/src:ro" -v "$SAIDA:/saida" raspios-lite:armhf bash -euo pipefail -c '
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -qq && apt-get install -y -qq git curl ca-certificates xz-utils >/dev/null
+    faltam=""
+    for c in curl xz tar; do command -v "$c" >/dev/null || faltam="$faltam $c"; done
+    if [ -n "$faltam" ]; then
+      apt-get -o Acquire::Retries=5 update -qq && apt-get -o Acquire::Retries=5 install -y -qq curl ca-certificates xz-utils >/dev/null
+    fi
     { grep -E "^(PRETTY_NAME|VERSION_CODENAME)=" /etc/os-release; uname -m; getconf LONG_BIT; } | tee /saida/sistema.txt
     cp -a /src /opt/RemoteIFES
     cd /opt/RemoteIFES/remoteifes-server

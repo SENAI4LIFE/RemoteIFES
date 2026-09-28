@@ -14,6 +14,8 @@
 #   5. backup with the service running; restore with it stopped; start and verify
 #   6. reverse proxy (lan-setup.sh): nginx -t, WebSocket headers, the server bound to loopback, boards
 #      through the proxy
+#  6b. only with ENSAIO_PLACA_VIRTUAL=1 (the Virtual Hardware Validation workflow): the real firmware on
+#      an emulated ESP32 through the proxy, with the service restarted and killed (virtual-lab/)
 #   7. HTTPS configuration (https-setup.sh) with a .env saved with CRLF, up to certificate issuance,
 #      which needs a public domain and is NOT exercised: certbot is replaced by a stub that refuses
 #   8. Operations Console .deb against this installation: socket activation, loopback-only listener,
@@ -127,6 +129,17 @@ ESCUTAS=$(ss -ltnH "sport = :$PORTA" | awk '{print $4}')
 echo "escutas na porta $PORTA: $ESCUTAS"
 [ -n "$ESCUTAS" ] && ! echo "$ESCUTAS" | grep -qvE "^127\.0\.0\.1:$PORTA$" || { echo "o servidor escuta fora do loopback atrás do proxy"; exit 1; }
 verificar "http://127.0.0.1" --commit "$PRIMEIRA" --exigir-marca --frontend --dispositivos 2
+
+# Only in the Virtual Hardware Validation workflow (ENSAIO_PLACA_VIRTUAL=1): the real firmware on an
+# emulated ESP32 against this installation, through nginx, while the service is restarted and killed
+# (virtual-lab/cenarios/08-implantacao.test.js). It runs as the service's user, never as root.
+if [ "${ENSAIO_PLACA_VIRTUAL:-}" = "1" ]; then
+  passo "6b. placa virtual: firmware real num ESP32 emulado, pelo nginx, com o serviço reiniciado e derrubado"
+  como_usuario env LAB_HOST_DESCARTAVEL=1 LAB_SERVIDOR_BASE="http://127.0.0.1" LAB_SERVIDOR_SENHA="$SENHA" \
+    LAB_SERVICO_SYSTEMD=remoteifes.service LAB_PROXY_SYSTEMD=nginx.service \
+    node "$ORIGEM/virtual-lab/executar.js" cenarios/08-implantacao.test.js
+  verificar "http://127.0.0.1" --commit "$PRIMEIRA" --exigir-marca --dispositivos 1
+fi
 
 passo "7. configuração HTTPS sem domínio público (a emissão do certificado não é exercida)"
 sed -i 's/$/\r/' .env
