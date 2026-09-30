@@ -70,9 +70,6 @@ function redeAutorizada(req) {
 
 function montarSalas(usuario, contexto) {
   const { salas, agendadas } = contexto;
-  const controlaTodas = !!usuario.isAdmin;
-  const controlaLivres = !controlaTodas && !!usuario.podeControlar;
-  const acessos = controlaLivres && salas.some((s) => s.acessoRestrito) ? contexto.acessosDe(usuario.id) : null;
   return salas.map((s) => ({
     sala: s.sala,
     nome: s.nome,
@@ -84,7 +81,7 @@ function montarSalas(usuario, contexto) {
     latitude: s.latitude,
     longitude: s.longitude,
     acessoRestrito: !!s.acessoRestrito,
-    podeControlarEsta: controlaTodas || (controlaLivres && (!s.acessoRestrito || acessos.has(s.sala))),
+    podeControlarEsta: salasService.usuarioPodeControlarSala(usuario, s.sala, contexto),
   }));
 }
 
