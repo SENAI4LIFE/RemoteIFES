@@ -4,7 +4,7 @@ name: Virtual Hardware Validation
 # with injected faults. Manual only: about 30 minutes of wall time and 140 runner-minutes over 14 jobs,
 # deep validation rather than a check for every change. It runs on ephemeral GitHub-hosted runners because it boots software
 # the lab treats as untrusted (a prebuilt emulator from a personal fork, and the guest it runs); it is
-# not run on developers' machines. No secret is used. virtual-lab/README.md says what each result can
+# not run on developers' machines. No secret is used. The root README ("Laboratório de hardware virtual") says what each result can
 # and cannot prove; nothing here is evidence about physical hardware.
 
 on:

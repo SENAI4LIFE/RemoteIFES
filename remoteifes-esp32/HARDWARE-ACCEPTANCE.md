@@ -9,7 +9,7 @@ hardware.** Every row says which software evidence exists today, under one of th
   `remoteifes-server/test/firmware-contract.test.js`), and the mesh protocol compiled for the host.
 - **Virtual hardware**: the production firmware image (same source, same PlatformIO configuration) on
   an emulated ESP32 against the real server, with faults injected (workflow *Virtual Hardware
-  Validation*, [`virtual-lab/`](../virtual-lab/README.md)); and the Raspberry Pi OS 32-bit userland under
+  Validation*, [`virtual-lab/`](../README.md#laboratório-de-hardware-virtual)); and the Raspberry Pi OS 32-bit userland under
   user-mode emulation. It proves how the firmware's logic behaves: boot, the setup portal, NVS, OTA
   through the real bootloader and partition table, the device protocol, and levels and edges at the
   pins. It proves nothing electrical, optical or radio, nothing about a flash sector half-written by a

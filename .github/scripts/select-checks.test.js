@@ -87,7 +87,7 @@ test("dependabot configuration alone selects nothing", () => {
 
 test("the virtual hardware lab and its manual workflow select nothing here", () => {
   assert.deepEqual(selected(plan(["virtual-lab/executar.js", "virtual-lab/cenarios/06-nvs.test.js", ".github/workflows/virtual-hardware.yml"])), []);
-  assert.equal(plan(["virtual-lab/README.md", "remoteifes-esp32/src/main.ino"]).jobs.firmware, true, "a firmware change next to it still selects the firmware job");
+  assert.equal(plan(["virtual-lab/lib/placa.js", "remoteifes-esp32/src/main.ino"]).jobs.firmware, true, "a firmware change next to it still selects the firmware job");
 });
 
 test("full depth on affected scope widens browsers but not subsystems", () => {

@@ -10,8 +10,15 @@ const ler = (rel) => fs.readFileSync(path.join(RAIZ, rel), "utf8").replace(/\r\n
 const existe = (rel) => fs.existsSync(path.join(RAIZ, rel));
 
 const README = ler("README.md");
-const NOTA = ler("docs/readme-assets/README.md");
 const ASSETS = "docs/readme-assets";
+// The README section that documents how its own figures and screenshots are made.
+const SECAO_FIGURAS = "## Figuras e capturas do README";
+const NOTA = (() => {
+  const inicio = README.indexOf(`\n${SECAO_FIGURAS}\n`);
+  assert.ok(inicio >= 0, `README section missing: ${SECAO_FIGURAS}`);
+  const fim = README.indexOf("\n## ", inicio + 1);
+  return README.slice(inicio, fim < 0 ? undefined : fim);
+})();
 // Code blocks hold commands and folder trees, not links.
 const semCodigo = (texto) => texto.replace(/```[\s\S]*?```/g, "");
 
@@ -88,10 +95,10 @@ test("composed figures exist in light and dark, and the README picks the dark on
   }
 });
 
-test("the asset note documents every screenshot, and capturar.js produces the ones it claims", () => {
+test("the README figures section documents every screenshot, and capturar.js produces the ones it claims", () => {
   const capturas = fs.readdirSync(path.join(RAIZ, ASSETS, "screenshots")).filter((f) => f.endsWith(".png"));
   for (const png of capturas) {
-    assert.ok(NOTA.includes(`\`${png}\``), `screenshot not documented in docs/readme-assets/README.md: ${png}`);
+    assert.ok(NOTA.includes(`\`${png}\``), `screenshot not documented in the README section "${SECAO_FIGURAS}": ${png}`);
   }
   for (const [, png] of NOTA.matchAll(/^\| `([\w-]+\.png)` \|/gm)) {
     assert.ok(capturas.includes(png), `documented screenshot does not exist: ${png}`);
@@ -104,19 +111,17 @@ test("the asset note documents every screenshot, and capturar.js produces the on
   }
 });
 
-test("repository paths cited by the asset note and the README exist", () => {
-  const prefixos = /^(remoteifes-(server|web|console|esp32|cordova)|e2e|docs|\.github)\//;
+test("repository paths cited by the README exist", () => {
+  const prefixos = /^(remoteifes-(server|web|console|esp32|cordova)|e2e|docs|virtual-lab|\.github)\//;
   // Created at run time or by a build, and ignored by Git.
   const gerados = /\/(data|www|platforms|plugins|build|node_modules|\.pio)\//;
   // Files the operator creates: the server's .env and the optional GitHub Pages custom domain.
   const doOperador = new Set(["remoteifes-server/.env", "remoteifes-web/CNAME"]);
   const citados = new Set();
-  for (const texto of [README, NOTA]) {
-    for (const [, token] of semCodigo(texto).matchAll(/`([^`\s]+)`/g)) {
-      const caminho = token.replace(/[.,;:]+$/, "");
-      if (!prefixos.test(caminho) || /[<>*{}]/.test(caminho) || gerados.test(`/${caminho}`) || doOperador.has(caminho)) continue;
-      citados.add(caminho);
-    }
+  for (const [, token] of semCodigo(README).matchAll(/`([^`\s]+)`/g)) {
+    const caminho = token.replace(/[.,;:]+$/, "");
+    if (!prefixos.test(caminho) || /[<>*{}]/.test(caminho) || gerados.test(`/${caminho}`) || doOperador.has(caminho)) continue;
+    citados.add(caminho);
   }
   assert.ok(citados.size > 10);
   const faltando = [...citados].filter((c) => !existe(c));
@@ -124,17 +129,14 @@ test("repository paths cited by the asset note and the README exist", () => {
 });
 
 test("README relative links and heading anchors resolve", () => {
-  for (const [nome, texto] of [["README.md", README], ["docs/readme-assets/README.md", NOTA]]) {
-    const base = path.dirname(nome);
-    const validas = ancoras(texto);
-    for (const [, alvo] of semCodigo(texto).matchAll(/\]\(([^)\s]+)\)/g)) {
-      if (/^(https?:|mailto:)/.test(alvo)) continue;
-      const [arquivo, ancora] = alvo.split("#");
-      if (arquivo) {
-        assert.ok(existe(path.join(base, decodeURI(arquivo))), `${nome}: broken link ${alvo}`);
-      } else if (ancora) {
-        assert.ok(validas.has(decodeURIComponent(ancora)), `${nome}: broken anchor #${ancora}`);
-      }
+  const validas = ancoras(README);
+  for (const [, alvo] of semCodigo(README).matchAll(/\]\(([^)\s]+)\)/g)) {
+    if (/^(https?:|mailto:)/.test(alvo)) continue;
+    const [arquivo, ancora] = alvo.split("#");
+    if (arquivo) {
+      assert.ok(existe(decodeURI(arquivo)), `README.md: broken link ${alvo}`);
+    } else if (ancora) {
+      assert.ok(validas.has(decodeURIComponent(ancora)), `README.md: broken anchor #${ancora}`);
     }
   }
 });
