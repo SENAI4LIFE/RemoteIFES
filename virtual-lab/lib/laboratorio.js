@@ -10,7 +10,7 @@
 //   proibido    what must not happen
 //   recuperacao the condition that shows the system recovered
 //
-// Nothing here is hardware evidence. See virtual-lab/README.md for what each result can and cannot say.
+// Nothing here is hardware evidence. The root README ("Laboratório de hardware virtual") says what each result can and cannot say.
 
 const crypto = require("crypto");
 const fs = require("fs");
