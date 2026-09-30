@@ -234,12 +234,17 @@ function salasComAcessoDoUsuario(usuarioId) {
   return new Set(db.prepare(`SELECT sala FROM sala_acessos WHERE usuarioId = ?`).all(usuarioId).map((r) => r.sala));
 }
 
+function salasDoDonoSet(usuarioId) {
+  return new Set(db.prepare(`SELECT sala FROM sala_donos WHERE usuarioId = ?`).all(usuarioId).map((r) => r.sala));
+}
+
 function contextoBroadcast() {
   const cfg = configuracoesService.obter();
   const salas = listar({});
   const porSala = new Map(salas.map((s) => [s.sala, s]));
   const agendadas = require("./agendamentosService").salasComAgendamentoAtivo();
   const acessos = new Map();
+  const donos = new Map();
   return {
     cfg,
     salas,
@@ -250,12 +255,19 @@ function contextoBroadcast() {
       if (!acessos.has(usuarioId)) acessos.set(usuarioId, salasComAcessoDoUsuario(usuarioId));
       return acessos.get(usuarioId);
     },
+    salasDoDono(usuarioId) {
+      if (!donos.has(usuarioId)) donos.set(usuarioId, salasDoDonoSet(usuarioId));
+      return donos.get(usuarioId);
+    },
     precarregarAcessos(usuarioIds) {
-      const pendentes = [...new Set(usuarioIds.filter((id) => Number.isInteger(id) && !acessos.has(id)))];
-      if (!pendentes.length) return;
-      for (const id of pendentes) acessos.set(id, new Set());
-      const linhas = db.prepare(`SELECT usuarioId, sala FROM sala_acessos WHERE usuarioId IN (${pendentes.map(() => "?").join(", ")})`).all(...pendentes);
-      for (const linha of linhas) acessos.get(linha.usuarioId).add(linha.sala);
+      const ids = [...new Set(usuarioIds.filter((id) => Number.isInteger(id)))];
+      for (const [tabela, mapa] of [["sala_acessos", acessos], ["sala_donos", donos]]) {
+        const pendentes = ids.filter((id) => !mapa.has(id));
+        if (!pendentes.length) continue;
+        for (const id of pendentes) mapa.set(id, new Set());
+        const linhas = db.prepare(`SELECT usuarioId, sala FROM ${tabela} WHERE usuarioId IN (${pendentes.map(() => "?").join(", ")})`).all(...pendentes);
+        for (const linha of linhas) mapa.get(linha.usuarioId).add(linha.sala);
+      }
     },
   };
 }
@@ -315,7 +327,9 @@ function usuarioPodeControlarSala(usuario, sala, contexto = null) {
   if (!salaRow) return false;
   if (!salaRow.acessoRestrito) return true;
 
-  return contexto ? contexto.acessosDe(usuario.id).has(sala) : usuarioTemAcessoSala(usuario.id, sala);
+  // An owner counts as authorized for their own room, exactly like an explicitly granted user.
+  if (contexto) return contexto.acessosDe(usuario.id).has(sala) || contexto.salasDoDono(usuario.id).has(sala);
+  return usuarioTemAcessoSala(usuario.id, sala) || usuarioEhDonoDaSala(usuario.id, sala);
 }
 
 function definirLimitesTemperatura(sala, { minima, maxima }) {

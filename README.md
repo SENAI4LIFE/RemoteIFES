@@ -186,7 +186,7 @@ Além da permissão geral "pode controlar" (nível de usuário), existem dois me
 
 Em `Administração > Dispositivos > Cadastro` (ou em `Administração > Gestão > Usuários > Proprietários de sala`), o superadministrador pode marcar uma sala como **acesso restrito**:
 
-1. Isso impede que qualquer usuário comum a controle, mesmo com a permissão geral ativa — exceto os usuários explicitamente autorizados para aquela sala.
+1. Isso impede que qualquer usuário comum a controle, mesmo com a permissão geral ativa — exceto os usuários explicitamente autorizados para aquela sala e os proprietários dela.
 2. Usuários autorizados são concedidos/revogados individualmente, por sala.
 3. Administradores (níveis 2 e 3) sempre podem controlar qualquer sala, independentemente de restrição.
 
@@ -198,11 +198,12 @@ Qualquer administrador pode tornar um usuário comum **proprietário** de uma sa
 
 - Ganha acesso a uma aba própria ("Config.", intitulada "Configurações de sala") onde vê apenas as salas das quais é dono.
 - Pode, nessa aba, conceder e revogar o acesso de controle de outros usuários comuns à(s) sua(s) sala(s) — sem precisar de privilégios administrativos e sem enxergar o restante do painel de administração.
+- Controla a própria sala mesmo com acesso restrito, como um usuário autorizado, sem precisar constar na lista de acessos; a permissão geral "pode controlar" e as reservas de outras pessoas continuam valendo.
 - Só tem efeito prático se a sala estiver marcada como **acesso restrito**; caso contrário, todos os usuários com permissão geral já controlam a sala normalmente e a tela do proprietário mostra um aviso lembrando disso.
 
 Um administrador pode remover um proprietário a qualquer momento (o usuário perde o acesso imediatamente) e também pode revogar diretamente qualquer acesso concedido por ele. Administradores não podem ser tornados proprietários de sala, pois já têm acesso total.
 
-<img src="docs/readme-assets/flows/room-control-access.svg" width="800" alt="Após autenticação e as verificações gerais da API, o usuário comum precisa ter a permissão pode controlar, encontrar a sala sem restrição ou estar na lista de autorizados, e não haver reserva ativa de outra pessoa. Se qualquer condição falhar, o servidor recusa. Administradores dispensam essas três condições. A aprovação de acesso segue para a validação do comando, valor e limites. Ser proprietário permite gerir a lista de acessos daquela sala e não dispensa as verificações de controle.">
+<img src="docs/readme-assets/flows/room-control-access.svg" width="800" alt="Após autenticação e as verificações gerais da API, o usuário comum precisa ter a permissão pode controlar, encontrar a sala sem restrição, estar na lista de autorizados ou ser proprietário da sala, e não haver reserva ativa de outra pessoa. Se qualquer condição falhar, o servidor recusa. Administradores dispensam essas três condições. A aprovação de acesso segue para a validação do comando, valor e limites. O proprietário conta como autorizado na própria sala e também gere a lista de acessos dela; a permissão geral e a reserva de outra pessoa continuam valendo para ele.">
 
 ## Agendamentos
 
