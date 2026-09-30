@@ -49,7 +49,6 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Restrição de Rede](#restrição-de-rede)
 - [Segurança](#segurança)
 - [Tempo Real (WebSocket)](#tempo-real-websocket)
-- [Painel dos ESP32, Protocolos IR e Failsafe (Administração > Dispositivos)](#painel-dos-esp32-protocolos-ir-e-failsafe-administração--dispositivos)
 - [Acessibilidade](#acessibilidade)
 - [Ajuda e Manual no App](#ajuda-e-manual-no-app)
 - [Requisitos](#requisitos)
@@ -61,6 +60,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal)
 - [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
 - [Domínio Próprio e HTTPS](#domínio-próprio-e-https)
+- [Painel dos ESP32, Protocolos IR e Failsafe (Administração > Dispositivos)](#painel-dos-esp32-protocolos-ir-e-failsafe-administração--dispositivos)
 - [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)
 - [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)
 - [Monitoramento Operacional](#monitoramento-operacional)
@@ -130,7 +130,7 @@ No celular o hub vira uma lista de cartões de toque em coluna única. Ele não 
 
 ### Organização da Administração
 
-A aba **Admin** organiza suas funções em três grupos, sempre em dois níveis (`Administração > Grupo > Função`), na mesma barra de navegação lateral (ou rolável, em telas estreitas) usada antes. Cada grupo responde a uma pergunta diferente:
+A aba **Admin** organiza suas funções em três grupos, sempre em dois níveis (`Administração > Grupo > Função`), numa barra lateral (rolável em telas estreitas):
 
 | Grupo | Conceito | Funções |
 | --- | --- | --- |
@@ -138,9 +138,7 @@ A aba **Admin** organiza suas funções em três grupos, sempre em dois níveis 
 | **Dispositivos** | administração dos ESP32 e os avisos operacionais que eles geram | Cadastro, Firmware / OTA, Protocolos IR, Alertas |
 | **Sistema** | o que está acontecendo agora, o que já aconteceu e como o sistema é configurado | Logs, Status, Configurações |
 
-Dentro de **Sistema**, a separação é entre tempo presente e passado: **Status** concentra a informação **corrente/ao vivo** e **Logs** concentra a informação **persistida/histórica**. **Configurações** é a configuração do sistema.
-
-Três funções se desdobram em **abas internas**, dentro da própria tela, sem criar mais um nível na navegação de Administração:
+Em **Sistema**, **Status** é o que acontece agora e **Logs** é o histórico persistido. Três funções têm **abas internas**, dentro da própria tela:
 
 | Função | Abas internas |
 | --- | --- |
@@ -148,11 +146,9 @@ Três funções se desdobram em **abas internas**, dentro da própria tela, sem 
 | **Sistema > Logs** | **Comandos** · **Acessos** · **Dispositivos** · **Sessões** · **Auditoria** |
 | **Sistema > Status** | **Usuários ativos** · **Mapa** · **Sistema** · **Topologia** |
 
-O agrupamento é apenas de apresentação: cada função e cada aba interna mantêm a permissão que já tinham, e um grupo cujas funções estejam todas fora do nível do usuário não é exibido. `Alertas` é o mesmo painel de notificações de dispositivo do sino — só o rótulo visível mudou; a fila, os dados e as APIs são os mesmos.
+A permissão vale **por aba interna**: o administrador comum vê **Dispositivos** só com Alertas, **Logs** sem Auditoria e **Status** sem Sistema e Topologia; as abas exclusivas do superadministrador nem aparecem, e o servidor recusa as chamadas de qualquer forma. Um grupo sem nenhuma função ao alcance do usuário não é exibido. `Alertas` é a mesma fila de notificações de dispositivo do sino.
 
-A permissão vale **por aba interna**, não pela tela que a contém. **Status** é aberto a qualquer administrador por causa de *Usuários ativos* e *Mapa*, mas as abas *Sistema* (o diagnóstico técnico) e *Topologia* continuam exclusivas do superadministrador; do mesmo modo, **Logs** é aberto ao admin comum, mas a aba *Auditoria* não. As abas exclusivas nem aparecem para quem não tem nível, e o servidor recusa as chamadas correspondentes de qualquer forma. Para um administrador comum, **Dispositivos** mostra apenas Alertas (Cadastro, Firmware / OTA e Protocolos IR são do superadministrador) e **Sistema** mostra Logs (sem Auditoria) e Status (sem Sistema e Topologia).
-
-Os endereços acompanham a hierarquia: `#/admin/<função>` para a função e `#/admin/<função>/<aba>` para uma aba interna que não seja a primeira — `#/admin/usuarios/proprietarios`, `#/admin/logs/sessoes`, `#/admin/status/mapa`. Os endereços das funções que mudaram de lugar continuam válidos como apelidos e resolvem para o novo local, sem manter tela nem código duplicado: `#/admin/proprietarios`, `#/admin/sessoes`, `#/admin/dispositivos`, `#/admin/acessos`, `#/admin/ativos`, `#/admin/mapa`, `#/admin/auditoria` e `#/admin/monitoramento`.
+Os endereços seguem a hierarquia: `#/admin/<função>` e, para uma aba interna que não seja a primeira, `#/admin/<função>/<aba>` (`#/admin/usuarios/proprietarios`, `#/admin/logs/sessoes`, `#/admin/status/mapa`). Endereços antigos continuam como apelidos do novo local: `#/admin/proprietarios`, `#/admin/sessoes`, `#/admin/dispositivos`, `#/admin/acessos`, `#/admin/ativos`, `#/admin/mapa`, `#/admin/auditoria` e `#/admin/monitoramento`.
 
 ### Formas de chegar a uma sala
 
@@ -174,17 +170,11 @@ Qualquer usuário autenticado pode visualizar o estado de todas as salas — iss
 
 ### Endereço, refresh e histórico
 
-O frontend reflete a tela atual no endereço da página como um **fragmento** (`#/inicio`, `#/salas`, `#/sala/A-108`, `#/salas/planta/a-terreo`, `#/agenda`, `#/admin`, `#/admin/esp32`, `#/admin/logs/sessoes`, `#/admin/status/sistema`, `#/admin/relatos`, `#/relatos`, `#/ajuda`, `#/ajuda/ota`…). Um endereço vazio equivale a `#/inicio`. Isso dá o comportamento de um site tradicional:
+A tela atual fica no endereço como um **fragmento** (`#/inicio`, `#/sala/A-108`, `#/salas/planta/a-terreo`, `#/admin/logs/sessoes`, `#/ajuda/ota`…; vazio equivale a `#/inicio`). Recarregar mantém a tela, a aba e a sala abertas; **voltar/avançar** percorrem as seções visitadas (trocar só um filtro, como sala ou data na Agenda, não gera entrada); e qualquer seção abre por link direto, inclusive o **Abrir no manual** das ajudas e o `Ver no app` do manual. Apelidos curtos do manual são resolvidos (`#/ajuda/ota` → `#/ajuda/ota-credenciais`).
 
-- recarregar a página mantém onde você estava (aba, subtela, sub-aba de Administração, aba interna dessa sub-aba, sala aberta, seção do mapa);
-- **voltar/avançar do navegador** percorrem as seções visitadas (cada navegação entre seções gera uma entrada de histórico; trocar apenas um filtro — sala ou data na Grade/Agenda — não gera);
-- qualquer seção pode ser aberta direto pela URL, e links do sistema e da documentação podem apontar para uma seção específica (o botão **Abrir no manual** de cada ajuda e o `Ver no app` do manual usam esse mesmo endereçamento). Apelidos curtos de seção do manual são resolvidos (`#/ajuda/ota` → `#/ajuda/ota-credenciais`).
+O **hash routing** foi escolhido no lugar da History API porque funciona igual, sem regra de reescrita, no servidor Node, atrás de proxy, na PWA, no GitHub Pages e no Cordova (`file://`), inclusive offline.
 
-A estratégia é **hash routing** (fragmento), não History API, por ser a única que funciona igual — e sem nenhuma regra de reescrita por implantação — no servidor Node local, atrás de proxy reverso, na PWA, no GitHub Pages usado para demonstração e no app Cordova (`file://`), inclusive **offline** (o app-shell e o manual vêm do cache do service worker). Um caminho real (`/admin/esp32`) exigiria um _catch-all_ no Express, regras no proxy, um truque de `404.html` no GitHub Pages e não sobreviveria a um reload em `file://`.
-
-A versão canônica do frontend fica em `remoteifes-web/version.json` e também é exposta pelo meta `remoteifes-version` e por `window.REMOTEIFES_FRONTEND_VERSION`. HTML, scripts, estilos e imagens usam essa versão na URL. O service worker instala o novo app-shell de forma atômica, usa rede primeiro para navegações, remove somente caches RemoteIFES obsoletos e mantém o shell novo para uso offline. Toda alteração publicada em `remoteifes-web` deve avançar essa versão nos pontos validados por `remoteifes-server/test/frontend-version.test.js`; o teste falha se HTML, manifesto, JavaScript ou worker ficarem desencontrados.
-
-Ao restaurar uma rota, a aba/subtela só é aberta se a permissão do usuário alcança (deny-by-default): rota de Administração sem ser admin cai em Salas; sub-aba exclusiva do superadministrador sem esse nível cai em `Administração > Gestão > Usuários`, e aba interna exclusiva sem esse nível cai na primeira aba autorizada da mesma função; sala inexistente cai em Salas. O endereço **nunca** concede acesso a uma função protegida — ele só escolhe a tela; cada operação continua autorizada no servidor. Nada além da localização de navegação (nenhuma senha, token, credencial de ESP32, conteúdo de formulário ou estado de permissão) é guardado no endereço; formulários e operações incompletas não são restaurados. Sair limpa o endereço.
+A restauração é deny-by-default: rota de Administração sem ser admin cai em Salas, sub-aba ou aba interna exclusiva cai na primeira autorizada, e sala inexistente cai em Salas. O endereço só escolhe a tela, nunca concede acesso, e não guarda senha, token, credencial nem conteúdo de formulário. Sair limpa o endereço.
 
 As 86 salas cadastradas por padrão vêm diretamente da planta baixa fornecida (`remoteifes-server/src/db/salasCampus.js`); ajuste esse arquivo se a planta do campus mudar (novas salas, renomeações, etc.) antes da primeira execução do servidor — o seed só roda quando o banco está vazio. Um código de sala pode representar duas salas físicas controladas pelo mesmo ESP32 (ex.: `B-105-B-106`); nesse caso a interface exibe as duas etiquetas empilhadas no mesmo bloco do mapa.
 
@@ -212,6 +202,8 @@ Qualquer administrador pode tornar um usuário comum **proprietário** de uma sa
 
 Um administrador pode remover um proprietário a qualquer momento (o usuário perde o acesso imediatamente) e também pode revogar diretamente qualquer acesso concedido por ele. Administradores não podem ser tornados proprietários de sala, pois já têm acesso total.
 
+<img src="docs/readme-assets/flows/room-control-access.svg" width="800" alt="Após autenticação e as verificações gerais da API, o usuário comum precisa ter a permissão pode controlar, encontrar a sala sem restrição ou estar na lista de autorizados, e não haver reserva ativa de outra pessoa. Se qualquer condição falhar, o servidor recusa. Administradores dispensam essas três condições. A aprovação de acesso segue para a validação do comando, valor e limites. Ser proprietário permite gerir a lista de acessos daquela sala e não dispensa as verificações de controle.">
+
 ## Agendamentos
 
 Agendamentos são **diários**: cada agendamento vale para uma única data (sem recorrência semanal), sempre o dia atual no fuso horário de Brasília (`America/Sao_Paulo`), independentemente do fuso configurado no servidor. Apenas administradores podem criar, listar e gerenciar agendamentos — usuários comuns não têm acesso a essa funcionalidade, nem na interface nem na API.
@@ -231,21 +223,13 @@ Os três modos num mesmo dia, na Agenda da sala e na [Grade](#grade-de-horários
   <img src="docs/readme-assets/screenshots/schedule-grid.png" width="390" align="top" alt="Grade do mesmo dia da sala A-107, por período de aula de 07:00 a 22:10: verde onde o ar-condicionado liga, amarelo onde a sala só está reservada, das 09:20 às 10:10 e das 13:00 às 14:50, e vermelho claro nos períodos livres; cada período ocupado mostra quem agendou.">
 </p>
 
-O agendador do servidor verifica agendamentos ativos a cada minuto e não repete uma mesma ação, ligar ou desligar, mais de uma vez no mesmo dia. O período é fechado no início e aberto no fim (`[horaInicio, horaFim)`): no minuto exato de `horaFim` a reserva já não vale e o desligamento agendado é aplicado. Uma reserva seguinte que comece nesse minuto assume a sala sem intervalo.
+Regras do agendador, que verifica os agendamentos ativos a cada minuto:
 
-Criado ou reativado com o intervalo de ligar em andamento, o agendamento liga o ar-condicionado na próxima verificação, em até um minuto, e o desliga no fim. O desligamento só é executado por um agendamento que ligou o ar-condicionado naquele dia.
-
-Um agendamento que não chegou a ligá-lo não liga nem desliga nada, e em particular não desliga um aparelho ligado manualmente. É o caso de um agendamento criado depois de o intervalo de ligar terminar, ou perdido inteiro numa queda do servidor. A reserva, enquanto vigente, continua bloqueando a sala.
-
-Um ajuste manual do autor ou de um administrador dentro do período não cancela o desligamento do fim. Um agendamento desativado permanece salvo, mas não é executado, e o autor ou qualquer outro administrador pode ativá-lo, desativá-lo ou removê-lo.
-
-Desativar ou remover um agendamento em curso libera a reserva e cancela o desligamento que ele faria no fim. O ar-condicionado que ele já ligou continua ligado até um comando manual ou outro agendamento.
-
-Usuários comuns não veem a Agenda nem a Grade. Para eles a reserva aparece só como indicação na sala, com contorno na lista e na planta e um aviso no painel, e o servidor recusa seus comandos em uma sala reservada por outra pessoa.
-
-Se o servidor parar depois de ligar e só voltar no dia seguinte, o desligamento pendente é aplicado uma única vez na primeira passagem do agendador. Essa passagem é feita ao iniciar e antes de qualquer ESP32 reconectar, então a reconexão recebe o OFF e não o "ligado" expirado. A exceção é uma intenção mais nova, como um comando manual, outro agendamento ou um OFF local, surgida depois da hora em que o desligamento era devido. Agendamentos desativados não são recuperados, e uma execução já registrada nunca se repete.
-
-A reativação é recusada se houver conflito com outra reserva ativa na mesma sala e data; o agendamento permanece desativado até que o conflito seja resolvido.
+- **Período `[horaInicio, horaFim)`**: no minuto de `horaFim` a reserva já não vale e o desligamento é aplicado; uma reserva seguinte que comece nesse minuto assume a sala sem intervalo. Nenhuma ação (ligar ou desligar) se repete no mesmo dia.
+- **Só desliga quem ligou**: criado ou reativado com o intervalo de ligar em andamento, o agendamento liga em até um minuto e desliga no fim. Um agendamento que não chegou a ligar (criado depois do intervalo, ou perdido inteiro numa queda do servidor) não liga nem desliga nada, e nunca desliga um aparelho ligado à mão; sua reserva continua bloqueando a sala.
+- **Ajustes e desativação**: um ajuste manual dentro do período não cancela o desligamento do fim. Desativar ou remover um agendamento em curso libera a reserva e cancela esse desligamento, mas o que ele já ligou continua ligado. Um agendamento desativado fica salvo; o autor ou qualquer administrador pode reativá-lo, o que é recusado se houver conflito com outra reserva ativa na mesma sala e data.
+- **Queda do servidor**: se ele parar depois de ligar e só voltar no dia seguinte, o desligamento pendente é aplicado uma única vez ao iniciar, antes de qualquer ESP32 reconectar, a menos que uma intenção mais nova (comando manual, outro agendamento ou OFF local) tenha surgido depois da hora devida. Agendamentos desativados não são recuperados e nenhuma execução registrada se repete.
+- **Usuários comuns** não veem Agenda nem Grade: a reserva aparece como contorno na lista e na planta e como aviso no painel, e o servidor recusa seus comandos numa sala reservada por outra pessoa.
 
 ## Grade de Horários
 
@@ -255,7 +239,7 @@ A aba **Grade** (visível apenas para administradores) mostra, para uma sala e d
 
 O controlador possui somente as ações fixas necessárias: diminuir temperatura à esquerda, ligar/desligar ao centro, aumentar temperatura à direita e Turbo abaixo do botão de energia. A disposição não pode ser arrastada nem editada.
 
-**Auto-ON** é uma opção global do sistema (`Administração > Sistema > Configurações`, exclusiva do superadministrador), **ativada por padrão** em instalações novas e preservada no banco entre reinícios e atualizações do servidor. Com Auto-ON ativo, um ajuste de temperatura em um aparelho desligado o liga já com o novo alvo, e ativar o Turbo em um aparelho desligado o liga com o Turbo; nenhum usuário precisa configurar nada. Com Auto-ON desativado, a temperatura alvo é apenas guardada (o aparelho continua desligado) e o Turbo só pode ser alterado com o aparelho ligado — o painel desabilita o botão nesse caso. Em qualquer configuração, desativar o Turbo (`turbo=false`) nunca liga um aparelho desligado, e o único comando que desliga continua sendo o Power. Quando o acionamento é automático, `Logs > Comandos` registra um `ligar` com valor `automatico` antes do ajuste; a mudança da opção é auditada como as demais configurações globais e os painéis abertos recebem o novo estado pelo WebSocket sem recarregar.
+**Auto-ON** é uma opção global (`Administração > Sistema > Configurações`, só do superadministrador), **ativada por padrão**. Ativa, ajustar a temperatura ou ligar o Turbo num aparelho desligado o liga já com o novo estado, e `Logs > Comandos` registra antes um `ligar` com valor `automatico`. Desativada, a temperatura só fica guardada e o Turbo só muda com o aparelho ligado. Desativar o Turbo nunca liga o aparelho, e só o Power desliga. A mudança da opção é auditada e chega aos painéis abertos pelo WebSocket.
 
 O superadministrador configura os limites globais de temperatura, inicialmente 23 °C e 25 °C. Cada sala pode substituir apenas o mínimo, apenas o máximo ou os dois em `Administração > Dispositivos > Cadastro`; um campo deixado vazio herda seu valor global correspondente. Os limites efetivos são aplicados aos comandos manuais, agendamentos e testes de infravermelho. Ao estreitar um intervalo, temperaturas alvo e agendadas existentes são ajustadas para o novo intervalo.
 
@@ -286,17 +270,9 @@ O topo da interface tem dois indicadores com significados distintos, cada um com
 
 ## Relatos de Problema
 
-Qualquer usuário autenticado pode abrir o painel do ícone de inseto no topo e enviar um **relato de problema**. O formulário estilizado (não usa `prompt()`/`alert()` do navegador) pede um título curto, uma categoria, opcionalmente a sala relacionada e uma descrição do que aconteceu. Junto do relato o servidor registra automaticamente apenas contexto não sensível: usuário que enviou, data/hora, página em uso, tamanho da tela, `User-Agent` e idioma do navegador. Senhas, tokens e segredos nunca são coletados; todo o conteúdo é validado, limitado em tamanho e sanitizado no backend, e cliques repetidos no botão de envio não geram relatos duplicados.
+Qualquer usuário autenticado envia um **relato de problema** pelo ícone de inseto no topo: título, categoria, sala opcional e descrição. O servidor anexa só contexto não sensível (autor, horário, página, tamanho da tela, `User-Agent` e idioma), valida e limita o conteúdo, e ignora cliques repetidos no envio. O mesmo painel mostra os **próprios** relatos e o status de cada um.
 
-Cada relato guarda: id único, usuário (com nome/login preservados mesmo se a conta for removida depois), data de criação e de última atualização, categoria, sala/página, contexto técnico, status e a resposta/anotação da equipe.
-
-**Envio e gestão são separados.** Qualquer usuário — inclusive o superadministrador — envia relatos pelo painel do ícone de inseto, que mostra também os **próprios** relatos e o status de cada um; esse painel nunca contém a fila de gestão. A gestão fica em **`Administração > Gestão > Relatos de problemas`**, uma sub-aba exclusiva do superadministrador com contadores por situação, filtros (novos, abertos, em análise, resolvidos), abertura de cada relato com autor, horário e detalhes, e as ações de marcar em análise, resolver ou reabrir, com uma resposta opcional que fica visível ao autor. Abrir um relato ainda `novo` o marca automaticamente como `aberto`. Essa sub-aba trata apenas relatos **já enviados** pelos usuários; não há formulário de envio nela. Tanto o ícone de inseto quanto a própria sub-aba exibem um contador discreto com a quantidade de relatos novos ainda não vistos; o painel de envio do superadmin traz um atalho para essa sub-aba.
-
-Dentro da janela de detalhe, o superadministrador pode ainda **excluir permanentemente** um relato. A exclusão fica atrás de uma confirmação em duas etapas dentro da própria janela (não usa `confirm()` do navegador), avisa que a ação não pode ser desfeita e remove a descrição, a resposta e o histórico de revisão. O backend expõe `DELETE /superadmin/relatos/:id` sob `exigirSuperAdmin` e registra apenas metadados no log (`relato-removido`: id, status anterior, quem removeu) — nunca o texto.
-
-A lista global, os relatos de terceiros e a exclusão são bloqueados no backend (`exigirSuperAdmin`), não apenas escondidos na interface — um usuário comum recebe `403` ao tentar acessá-los diretamente.
-
-A tabela `relatos` é criada automaticamente na inicialização do servidor (`CREATE TABLE IF NOT EXISTS`), tanto em instalações novas quanto nas já existentes; não é preciso rodar nenhuma migração manual.
+A gestão fica em **`Administração > Gestão > Relatos de problemas`**, exclusiva do superadministrador: contadores e filtros por situação (novos, abertos, em análise, resolvidos), detalhes de cada relato, as ações de marcar em análise, resolver ou reabrir com uma resposta visível ao autor, e a **exclusão permanente** atrás de uma confirmação em duas etapas. Abrir um relato `novo` o marca como `aberto`. `DELETE /superadmin/relatos/:id` registra só metadados (`relato-removido`), nunca o texto. A lista global, os relatos de terceiros e a exclusão exigem `exigirSuperAdmin` no backend; um usuário comum recebe `403`.
 
 ## Sessões e Tempo de Inatividade
 
@@ -309,18 +285,17 @@ O servidor encerra sessões sem atividade e continua sendo a autoridade sobre o 
 
 ## Auditoria (Logs, Dispositivos e Acessos)
 
-O histórico operacional do sistema fica reunido nas abas internas de **`Administração > Sistema > Logs`**, todas filtráveis por data; **Comandos**, **Acessos** e **Sessões** oferecem ainda a exclusão de registros (ação irreversível), enquanto **Dispositivos** é somente consulta. Os registros são gravados em UTC, mas exibidos, filtrados e excluídos pelo **dia de Brasília**: um registro mostrado às 22:30 de um dia pertence a esse dia no filtro e em "excluir data", não ao dia UTC seguinte (o mesmo vale para a auditoria e a conectividade em `Administração > Sistema > Status`):
+O histórico fica nas abas internas de **`Administração > Sistema > Logs`**, todas filtráveis por data. Os registros são gravados em UTC, mas exibidos, filtrados e excluídos pelo **dia de Brasília** (um registro das 22:30 pertence àquele dia, não ao dia UTC seguinte); o mesmo vale para a auditoria e a conectividade em `Administração > Sistema > Status`.
 
-- **`Administração > Sistema > Logs > Comandos`**: cada comando de ligar, desligar ou ajustar temperatura enviado a uma sala, com o usuário responsável (ou `sistema`, quando não houve uma conta por trás: agendamento ou registro da própria placa) e a origem (`manual`, `agendamento` ou `esp32_local`, quando o registro parte do próprio dispositivo — por exemplo, o failsafe OFF disparado pelo switch físico ou a abertura do ponto de acesso pelo switch).
-- **`Administração > Sistema > Logs > Dispositivos`**: eventos de conexão — sempre que um ESP32 fica online ou offline. O fechamento do WebSocket do dispositivo é a informação autoritativa: a sala é marcada offline **na hora**, sem esperar prazo nenhum. Uma perda silenciosa (o aparelho some sem fechar a conexão) é detectada pelo ping/pong do servidor a cada 15 segundos e derruba a conexão em até 30 segundos, o que dispara a mesma transição imediata. O prazo de 90 segundos sem heartbeat continua valendo apenas como rede de segurança para dispositivos que estejam usando o heartbeat HTTP em vez do WebSocket.
-- **`Administração > Sistema > Logs > Acessos`**: registros de acesso à antiga interface web local dos ESP32, com o IP de origem. O firmware atual não serve página local em operação, então a aba preserva apenas o histórico já gravado e continua aceitando registros de placas com firmware anterior.
-- **`Administração > Sistema > Logs > Sessões`**: o histórico de login/logout descrito em [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade).
+| Aba | O que registra | Exclusão |
+|---|---|---|
+| `Administração > Sistema > Logs > Comandos` | cada ligar, desligar ou ajuste de temperatura: quem pediu (ou `sistema`, sem conta por trás) e a origem, `manual`, `agendamento` ou `esp32_local` (registro da própria placa, como o failsafe OFF ou a abertura do AP pelo switch) | sim |
+| `Administração > Sistema > Logs > Acessos` | acessos à antiga interface web local dos ESP32, com o IP. O firmware atual não serve página local; a aba guarda o histórico e aceita registros de firmware anterior | sim |
+| `Administração > Sistema > Logs > Dispositivos` | cada ESP32 que fica online ou offline (veja abaixo) | não |
+| `Administração > Sistema > Logs > Sessões` | logins e logouts ([Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade)) | sim |
+| `Administração > Sistema > Logs > Auditoria` | só superadministrador, paginada: contas, papéis, configurações (inclusive Auto-ON), clonador e modo clone, protocolos IR e failsafe OFF, e os intervalos de indisponibilidade de cada controlador. Só metadados, nunca senhas, tokens ou segredos | retenção de 7 dias, ajustável de 1 a 365 |
 
-O superadministrador dispõe ainda de **`Administração > Sistema > Logs > Auditoria`**, uma visão paginada e filtrável das ações administrativas importantes. Ela cobre criação, alteração e exclusão de contas, mudanças de papel e de configuração, inclusive Auto-ON, e as operações relevantes sobre ESP32: definição do clonador, entrada e saída do modo clone, criação, renomeação, exclusão, transmissão e aplicação de protocolos IR, e configuração ou remoção do failsafe OFF.
-
-Os registros contêm apenas metadados concisos, nunca senhas, tokens ou segredos de dispositivo. A mesma área apresenta intervalos de indisponibilidade dos controladores, com uma única ocorrência aberta durante a queda e a duração calculada quando há reconexão.
-
-Interface e APIs exigem `superadmin`. A retenção padrão é de 7 dias, configurável entre 1 e 365 dias em Administração.
+O fechamento do WebSocket de um ESP32 marca a sala offline **na hora**. Se a conexão cair sem fechamento, o ping/pong do servidor (a cada 15 s) a derruba em até 30 s, com a mesma transição. O prazo de 90 s sem heartbeat só vale para placas no heartbeat HTTP.
 
 ### Manutenção automática do banco
 
@@ -341,53 +316,45 @@ O histórico de monitoramento segue a mesma rotina. `monitoramento_amostras` gua
 
 Usuários, salas, agendamentos do dia atual, configurações e relatos de problema não resolvidos nunca são removidos por essa rotina. A retenção de relatos resolvidos vem desligada e só apaga relatos já marcados como `resolvido` quando `RETENCAO_DIAS_RELATOS_RESOLVIDOS` recebe um número de dias. Notificações não lidas sobrevivem a `RETENCAO_DIAS_LOGS`, mas não a `RETENCAO_DIAS_NOTIFICACOES` (365 dias por padrão), para que uma caixa esquecida não cresça sem limite.
 
-As tabelas de histórico têm índices por data e hora, para que a limpeza e as consultas de faixa de tempo do monitoramento e das listas administrativas continuem baratas mesmo com o banco cheio. O espaço liberado dentro do arquivo principal do SQLite fica disponível para reutilização pelo próprio banco, e após uma limpeza o servidor também trunca o WAL para impedir que o arquivo auxiliar permaneça grande.
+As tabelas de histórico têm índices por data e hora, então a limpeza e as consultas por faixa de tempo continuam baratas com o banco cheio. Depois de uma limpeza o servidor trunca o WAL.
 
 ### Limites de crescimento e hardware mínimo
 
-O servidor foi pensado para rodar por anos em hardware modesto (classe **Raspberry Pi 3**: 1 GB de RAM, quatro núcleos ARM, cartão SD). Os pontos que poderiam crescer sem limite estão contidos:
+O servidor foi pensado para rodar por anos em hardware classe **Raspberry Pi 3** (1 GB de RAM, quatro núcleos ARM, cartão SD). O que poderia crescer sem limite está contido:
 
-- **Banco**: todas as tabelas de histórico têm retenção por tempo (acima) e índices por data; a rotina de limpeza trunca o WAL ao final.
-- **Agendamentos**: o agendador só carrega, a cada minuto, os agendamentos **do dia**, independentemente do tamanho da tabela; agendamentos passados são apagados pela retenção e há um teto por usuário (`AGENDAMENTOS_MAX_ATIVOS_POR_USUARIO`).
-- **Notificações de ESP32 offline**: uma nova notificação para a mesma sala é suprimida se já existe uma não lida na última hora, evitando enxurrada por um dispositivo instável.
-- **Estado de OTA em memória e em `estados-ota.json`**: entradas em fase terminal (`concluído`, `falhou`) são descartadas após 7 dias; só uma imagem de firmware `.bin` é mantida por vez.
-- **Backups e pré-restaurações**: rotacionados por contagem (`BACKUP_RETENCAO`, 14; pré-restaurações, 5); temporários órfãos são varridos após 10 minutos.
-- **APK de produção**: apenas o release publicado em `data/releases/mobile/` é servido; a publicação remove os APKs superados e nada é acumulado.
-- **Estado em memória**: mapas por sala (conexões de dispositivo, última reconexão, capturas de IR — no máximo 20 por sala) e por conexão WebSocket (`WeakMap`, limpos no `close`); o limitador de taxa expira entradas por janela. As listas administrativas usam `LIMIT` no servidor (300–500 linhas) e nunca devolvem a tabela inteira.
-- **Transmissão para os navegadores**: a lista de salas só é retransmitida quando muda algo que ela mostra (uma sala fica online/offline, liga ou desliga). A telemetria periódica de temperatura vai apenas para quem está com aquela sala aberta, e o rebroadcast de segurança continua a cada 30 s. Sem esse cuidado, cada quadro de telemetria custaria uma retransmissão da lista inteira para todos os navegadores conectados, e o custo cresceria com o produto salas × navegadores.
-- **Logs**: o servidor escreve em `stdout`/`stderr`; a rotação é do coletor (o `journald` do systemd, com seus próprios limites de tamanho, quando instalado via `install-service.sh`).
+- **Banco e agendador**: retenção por tempo e índices por data (acima); o agendador só carrega os agendamentos **do dia**, e há um teto por usuário (`AGENDAMENTOS_MAX_ATIVOS_POR_USUARIO`).
+- **Notificações de ESP32 offline**: suprimidas se a mesma sala já tem uma não lida na última hora.
+- **OTA**: estados terminais saem de `estados-ota.json` depois de 7 dias, e só uma imagem `.bin` fica publicada.
+- **Backups**: rotação por contagem (`BACKUP_RETENCAO`, 14; pré-restaurações, 5); temporários órfãos são varridos em 10 minutos.
+- **APK**: só o release publicado em `data/releases/mobile/` fica em disco.
+- **Memória**: mapas por sala (no máximo 20 capturas de IR por sala) e por conexão (`WeakMap`, limpos no `close`); as listas administrativas usam `LIMIT` (300–500 linhas).
+- **Navegadores**: a lista de salas só é retransmitida quando muda algo que ela mostra, e a telemetria vai só para quem está com a sala aberta; sem isso, o custo cresceria com salas × navegadores. O reforço de 30 s continua.
+- **Logs**: vão para `stdout`/`stderr`, e a rotação é do `journald` quando instalado por `install-service.sh`.
 
-Para conferir o dimensionamento no seu próprio hardware, `npm run carga` sobe uma instância isolada (banco temporário, descartado ao final — nunca toca no banco de produção), conecta ESP32 simulados pelo protocolo real e relata memória, latência, tráfego por navegador e entrega de comandos: `npm run carga -- --salas 86 --minutos 2`. Use-o depois de mudanças no servidor para confirmar que a operação do campus continua cabendo no equipamento.
+Três ferramentas sobem uma instância isolada, com banco temporário e placas simuladas pelo protocolo real, sem tocar no banco de produção. Medem o servidor e o protocolo, não as placas nem o rádio:
 
-Para procurar crescimento sem limite, `npm run ensaio` roda ciclos repetidos com placas simuladas diretas e atrás de gateways da malha: telemetria, comandos pela API, quedas abruptas com reconexão, saída e reentrada de nós e mudanças de rota. Depois de cada ciclo, e de novo depois de desconectar tudo, uma sonda carregada só no processo do ensaio lê a memória, o atraso do laço de eventos, sockets, sessões, handshakes e filas da malha e o crescimento do banco. O ensaio falha se algo não volta à linha de base ou se o heap sobe a cada ciclo: `npm run ensaio -- --diretas 50 --gateways 2 --nos-por-gateway 8 --ciclos 10 --ciclo-s 30 --json resultado.json`. Acima das 86 salas da planta, cria salas sintéticas na instância isolada. Mede o servidor e o protocolo, não as placas: não é um ensaio de longa duração de ESP32.
+| Comando | Para que serve |
+|---|---|
+| `npm run carga -- --salas 86 --minutos 2` | dimensionar no seu hardware: memória, latência, tráfego por navegador e entrega de comandos |
+| `npm run ensaio -- --diretas 50 --gateways 2 --nos-por-gateway 8 --ciclos 10 --ciclo-s 30 --json resultado.json` | procurar crescimento sem limite: ciclos de telemetria, comandos, quedas e mudanças de rota na malha; falha se memória, sockets, sessões, filas ou banco não voltam à linha de base |
+| `npm run latencia -- --dispositivos 1,10,50,100 --amostras 60` | cronometrar cada etapa de um comando (mediana, p95, p99, máximo) em regime estável, em rajada e na reconexão. São números de loopback; a etapa dominante é o commit durável da intenção no SQLite, feito antes de o quadro sair, para que um comando confirmado sobreviva a uma queda de energia |
 
-Para medir a latência do caminho de software de um comando, `npm run latencia` sobe uma instância isolada com placas simuladas diretas e nós atrás de gateways, e cronometra cada etapa: do pedido HTTP até o comando entrar no servidor, daí até o quadro ir ao canal, até a placa simulada recebê-lo e até o servidor registrar a confirmação dela. Mede o regime estável (um comando por vez), uma rajada simultânea e, nas placas diretas, o tempo da reconexão até o estado restaurado ser confirmado. Imprime mediana, p95, p99 e máximo por etapa e grava JSON com `--json`: `npm run latencia -- --dispositivos 1,10,50,100 --amostras 60`. São números de loopback num único host, sem Wi-Fi nem rádio: não preveem a latência física nem a de RF. A etapa dominante no servidor é o commit durável da intenção no SQLite, feito antes de o quadro sair para a placa, de propósito: um comando confirmado ao usuário sobrevive a uma queda de energia do servidor.
-
-**Rodar o servidor em um ESP32-S3 não é viável e não faz parte da arquitetura.** Microcontroladores ESP32 são o alvo do *firmware* (`remoteifes-esp32/`, compilado para a placa `esp32dev`), não do servidor central. O servidor depende de Node.js + V8 (que não têm porte para o Xtensa LX7), do módulo nativo `node:sqlite`, de dois `WebSocketServer` simultâneos e de TLS por software para dezenas de conexões — cada uma dessas peças sozinha excede a RAM interna (~512 KB) e o armazenamento (8–16 MB de flash) do chip, sem contar que backups e a imagem de OTA já não caberiam. A fronteira correta já é a atual: dispositivo fino no ESP32, servidor em um host Linux pequeno. O piso prático abaixo do Pi 3 é algo como um Raspberry Pi Zero 2 W (mesma RAM, ainda roda Node); abaixo disso o servidor não cabe.
+**O servidor não roda num ESP32.** Os ESP32 são o alvo do *firmware* (`remoteifes-esp32/`, placa `esp32dev`). O servidor depende de Node.js e V8, do `node:sqlite`, de dois `WebSocketServer` e de TLS por software para dezenas de conexões; nem um ESP32-S3 (cerca de 512 KB de RAM interna e 8–16 MB de flash) comporta isso, sem falar de backups e da imagem de OTA. O piso prático é algo como um Raspberry Pi Zero 2 W.
 
 ### Backup e restauração do banco
 
-O banco inteiro fica em um único arquivo SQLite (`remoteifes-server/data/remoteifes.db`). O servidor faz cópias de segurança consistentes desse arquivo sem parar e sem risco de copiar um estado parcial. Cada backup é gerado por `VACUUM INTO`, que produz um arquivo `.db` autônomo, compactado e transacionalmente íntegro, com o conteúdo do WAL já incluído e sem `-wal` ou `-shm` ao lado.
+O banco inteiro é um único arquivo SQLite (`remoteifes-server/data/remoteifes.db`). Cada backup é gerado com o servidor no ar por `VACUUM INTO`: um `.db` autônomo e transacionalmente íntegro, com o WAL incluído. Em seguida ele é reaberto somente-leitura e validado (`PRAGMA integrity_check`, `PRAGMA foreign_key_check` e as tabelas essenciais); um backup reprovado é descartado.
 
-Logo depois de gravado, o arquivo é reaberto somente-leitura e validado com `PRAGMA integrity_check`, `PRAGMA foreign_key_check` e uma checagem das tabelas essenciais. Um backup que não passa nessa verificação é descartado e nunca entra na rotação.
+- **Automático** (ligado por padrão só em produção; fora dela, `BACKUP_AUTOMATICO=true`): na partida e a cada `BACKUP_INTERVALO_HORAS`, em `BACKUP_DIR`, mantendo os `BACKUP_RETENCAO` mais recentes. `data/` está no `.gitignore`.
+- **Manual**: em `remoteifes-server`, `npm run backup` grava um backup verificado e imprime o caminho; aceita um rótulo, `npm run backup -- pre-migracao`.
+- **Restauração**: normalmente pelo [Console de Operações](#console-de-operações), em **Dados e recuperação**, que para o serviço, restaura e religa. Pelo terminal, com o servidor parado, `npm run restore` lista os backups e `npm run restore -- <arquivo>` restaura um deles (nome em `BACKUP_DIR` ou caminho completo; `--sim` pula a confirmação). O comando recusa se o servidor ainda responder, verifica o backup, guarda uma cópia do banco atual (`pre-restauracao-<data>.db`) e revalida o resultado.
+- **Banco atual corrompido**: a restauração normal é recusada sem tocar em nada; use `npm run restore -- <arquivo> --recuperar-corrompido`. O banco danificado e seus `-wal` e `-shm` são renomeados para `remoteifes.db.corrompido-<data>-<id>`, nunca apagados, e um banco íntegro nunca vai para quarentena.
 
-**Backup automático** (em produção, ligado por padrão): a cada `BACKUP_INTERVALO_HORAS` (24 por padrão) e uma vez logo após a inicialização, o servidor grava um novo backup em `BACKUP_DIR` (`data/backups/` por padrão) e mantém apenas os `BACKUP_RETENCAO` mais recentes (14 por padrão), removendo os excedentes. Fora de produção o backup automático começa desligado; ligue-o com `BACKUP_AUTOMATICO=true`. Como `data/` já está no `.gitignore`, os backups não são versionados.
+Durante a troca, o aviso `remoteifes.db.restauracao`, com o PID da restauração, impede qualquer processo do RemoteIFES de abrir o banco: um servidor que suba nesse intervalo termina com "restauração do banco em andamento" e o serviço volta sozinho depois. Um aviso órfão (processo inexistente ou mais de 30 minutos) é ignorado. Pelo console, a restauração também confirma pelo lock exclusivo do SQLite que nenhum escritor está aberto.
 
-**Backup manual:** dentro de `remoteifes-server`, `npm run backup` grava um backup imediato (verificado e já sujeito à rotação) e imprime o caminho. Aceita um rótulo opcional: `npm run backup -- pre-migracao`.
+As credenciais dos ESP32 estão no banco. Uma restauração anterior a uma rotação, substituição ou revogação pode deixar a NVS da placa e o banco em versões diferentes; nesse caso, emita uma credencial de substituição e informe-a no portal de setup da placa. O atualizador (`deploy.sh`, `rollback.sh`) nunca restaura o banco: faz o backup pré-atualização e, se preciso, reverte só o código.
 
-**Restauração.** O caminho normal é o [Console de Operações](#console-de-operações), em **Dados e recuperação**, que para o serviço, restaura e religa. Pelo terminal, com o servidor parado, `npm run restore` lista os backups disponíveis e `npm run restore -- <arquivo>` restaura o indicado, por nome dentro de `BACKUP_DIR` ou por caminho completo. Se o servidor ainda responder no endereço e na porta configurados, o comando recusa e pede para pará-lo antes: trocar o arquivo sob um servidor em execução perderia tudo o que ele gravasse até o próximo reinício. Use `--sim` para pular a confirmação interativa em scripts e reinicie o servidor depois.
-
-Antes de sobrescrever, o script verifica o backup candidato, diagnostica o banco atual em modo somente-leitura, faz uma cópia de segurança consistente dele (`pre-restauracao-<data>.db` em `BACKUP_DIR`) e, depois da troca, revalida o arquivo restaurado.
-
-Durante a troca, tanto pelo terminal quanto pelo console, a restauração grava ao lado do banco o aviso `remoteifes.db.restauracao` com o número do seu processo. Enquanto esse processo existir, nenhum processo do RemoteIFES abre o banco: um servidor iniciado nesse intervalo termina com "restauração do banco em andamento" e o serviço volta sozinho depois. Um aviso deixado por uma restauração interrompida, com processo inexistente ou mais de 30 minutos, é ignorado. Pelo console, a restauração ainda prova com o lock exclusivo do SQLite que nenhum escritor está aberto antes da troca.
-
-**Banco atual corrompido.** Se o arquivo em uso não passa em `PRAGMA integrity_check`, a restauração normal é recusada sem tocar em nada, porque não existe cópia de segurança verificável de um banco danificado. Nesse caso use `npm run restore -- <arquivo> --recuperar-corrompido`.
-
-O banco danificado e seus `-wal` e `-shm` são renomeados para `remoteifes.db.corrompido-<data>-<id>`, nunca apagados, para análise posterior. O backup verificado é instalado atomicamente e revalidado com `integrity_check` e `foreign_key_check`. Um banco íntegro nunca vai para quarentena, mesmo com a opção ligada.
-
-As credenciais dos ESP32 fazem parte do banco e entram normalmente no backup. Se a restauração voltar para antes de uma rotação, substituição ou revogação, a NVS do dispositivo e o banco podem ficar em versões diferentes; nesse caso, emita uma credencial de substituição e informe-a no portal de setup do controlador afetado.
-
-**Simulado de recuperação.** `npm run ensaio-recuperacao` comprova o caminho inteiro numa instância isolada, com os mesmos `backup-db.js` e `restore-backup.js` de produção. Ele monta um sistema em funcionamento, com contas, salas, credenciais de ESP32, configurações, agendamento e comandos. Depois faz o backup e percorre os cenários: banco apagado; banco corrompido, recusado sem a opção e quarentenado com ela; nove tipos de backup inválido recusados com o banco atual intacto; e o aviso de restauração impedindo o servidor de abrir o banco, sem que um aviso órfão o mantenha fora do ar. Em cada restauração ele reinicia o servidor, confere o `/health` e os dados, entra com as contas e conecta uma placa com a credencial restaurada. A CI roda o mesmo simulado (`test/recovery-drill.test.js`), e `test/recovery-failure-injection.test.js` injeta falhas de disco e de troca de arquivo em cada etapa da restauração e do backup. O atualizador (`deploy.sh`, `rollback.sh`) nunca restaura nem substitui o banco: ele faz o backup pré-atualização e, se a nova versão não subir, reverte só o código. Voltar ao backup é sempre um passo explícito do operador.
+`npm run ensaio-recuperacao` percorre o caminho inteiro numa instância isolada, com os mesmos `backup-db.js` e `restore-backup.js` de produção: banco apagado, banco corrompido (recusado sem a opção, em quarentena com ela), nove tipos de backup inválido e o aviso de restauração, reiniciando o servidor e conferindo `/health`, dados, contas e a credencial de uma placa a cada vez. A CI roda o mesmo simulado (`test/recovery-drill.test.js`), e `test/recovery-failure-injection.test.js` injeta falhas de disco e de troca de arquivo em cada etapa.
 
 | Variável | Padrão | Descrição |
 |---|---|---|
@@ -398,151 +365,39 @@ As credenciais dos ESP32 fazem parte do banco e entram normalmente no backup. Se
 
 ## Restrição de Rede
 
-Em produção (`NODE_ENV=production`), o acesso à API é restrito a faixas de IP autorizadas da rede do IFES, em CIDR IPv4 como `10.0.0.0/8`. Existe também um modo de teste, que permite acesso de fora da rede autorizada. Ele é útil durante testes e homologação e vem desativado por padrão em uma instalação nova de produção.
+Em produção (`NODE_ENV=production`), a API e o WebSocket só aceitam as faixas de IP autorizadas da rede do IFES, em CIDR IPv4 como `10.0.0.0/8`. O **modo de teste** libera o acesso de fora dessas faixas para homologação e vem desativado numa instalação nova. Em `NODE_ENV=development` a restrição não se aplica.
 
-Fora do ambiente de produção (`NODE_ENV=development`) essa restrição não é aplicada. Ela vale igualmente para as conexões WebSocket, não apenas para a API HTTP.
+As faixas e o modo de teste decidem quem alcança o site, então são infraestrutura e não se editam pelo site: o caminho normal é o [Console de Operações](#console-de-operações), em **Rede e domínio › Acesso à aplicação**; sem o console, `npm run redes` no terminal ([Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal)).
 
-**Onde se altera.** As faixas e o modo de teste decidem quem alcança o site, por isso são configuração de infraestrutura e não são editados pelo site. O caminho normal é o [Console de Operações](#console-de-operações), em **Rede e domínio › Acesso à aplicação**. Quando o console não está instalado, use `npm run redes` no terminal do servidor, descrito em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal).
-
-A operação pelo console exige reautenticação, é serializada com implantação e restauração, grava as duas chaves e o evento de auditoria numa única transação e confere o resultado relendo o banco. O evento aparece na auditoria da aplicação como `configuracao_alterada`, com o autor `console:<operador>`. O console não passa pela restrição de rede da aplicação, então continua disponível para desfazer uma faixa errada.
-
-Em `Administração > Sistema > Configurações` o superadministrador apenas **consulta** os valores vigentes. O servidor recusa com `403` qualquer requisição do site que tente mudá-los; um frontend antigo em cache que reenvie os valores atuais continua salvando as demais configurações normalmente. A mudança vale na requisição seguinte, sem reiniciar o serviço.
+Pelo console, a mudança exige reautenticação, é serializada com implantação e restauração, grava as duas chaves e o evento de auditoria numa transação (`configuracao_alterada`, autor `console:<operador>`) e vale na requisição seguinte, sem reiniciar. O console não passa pela restrição de rede da aplicação, então continua disponível para desfazer uma faixa errada. Em `Administração > Sistema > Configurações` o superadministrador só **consulta** esses valores; o servidor recusa com `403` qualquer tentativa do site de mudá-los, sem afetar as demais configurações.
 
 ## Segurança
 
-Resumo das principais medidas de segurança implementadas no servidor central (detalhes específicos já aparecem nas seções acima):
+Resumo das medidas do servidor central; os detalhes ficam nas seções indicadas.
 
-- **Senhas**: armazenadas como hash `bcrypt` (nunca em texto puro); mínimo de 8 caracteres.
-- **Sessões**: o token de sessão retornado no login é aleatório (`crypto.randomBytes`), mas o valor gravado no banco (`sessoes.token`) é o hash SHA-256 do token, não o token em si — um vazamento do banco de dados não permite sequestrar sessões ativas diretamente. Cada sessão expira por inatividade e, em qualquer caso, 12 horas depois do login (veja [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade)).
-- **Autorização**: todos os papéis (usuário, administrador, superadministrador) e as permissões pontuais (proprietário de sala, acesso restrito) são checados no backend em cada rota, nunca apenas escondidos na interface.
-- **Dispositivos (ESP32)**: a associação é feita pelo MAC. Um dispositivo ainda não vinculado só pode se registrar como detectado; depois que o superadministrador associa seu MAC a uma sala em `Administração > Dispositivos > Cadastro`, heartbeat, WebSocket e registros dessa sala exigem exatamente o mesmo MAC. Cada sala pode ainda ter uma **credencial exclusiva de dispositivo** (`deviceId` + segredo de 256 bits; o segredo em si nunca é guardado, só o hash SHA-256 e a chave da malha derivada dele): quando provisionada, ela passa a ser exigida no lugar do MAC; uma opção global torna a credencial obrigatória para todos os ESP32. Rotação em duas fases (o segredo novo só é ativado quando a placa prova possuí-lo; o anterior entra então em tolerância de 24 h), revogação imediata e substituição para troca de placa (preservando a associação da sala). Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). Como endereços MAC podem ser imitados, mantenha o servidor e os dispositivos em uma rede administrada, prefira a credencial por dispositivo em produção e use HTTPS quando o tráfego sair da rede local.
-- **Atualização de firmware (OTA)**: a imagem publicada no servidor é verificada por SHA-256 pelo ESP32 antes de ser instalada; a gravação usa um segundo slot de aplicação e o bootloader reverte sozinho se o novo firmware não passar no autoteste pós-boot. OTA concorrente para a mesma sala é recusada e a gravação por USB continua como caminho de recuperação. Veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32).
-- **Administração do ESP32**: os comandos de configuração, captura e reset são autorizados pela sessão do superadministrador no servidor. O dispositivo não guarda nem recebe uma senha administrativa própria. O papel de **clonador** também é decidido pelo servidor e vinculado ao MAC e à credencial da placa no momento da definição: o firmware não persiste esse papel, ignora ordens de captura quando não é o clonador, e o servidor descarta capturas vindas de qualquer outra placa, de uma placa fora do modo clone ou de um ESP32 que tenha sido trocado ou tido a credencial substituída depois da definição.
-- **Ponto de acesso de configuração**: a rede `RemoteIFES-Setup` é criada apenas no modo AP de provisionamento — quando o ESP32 não tem configuração válida de Wi-Fi e servidor, depois de um **Resetar Wi-Fi** ou por até dez minutos após um **clique curto no switch físico** (GPIO 26). Após salvar e reiniciar, o ESP32 opera em modo STA, encerra o AP e não serve frontend local durante a operação normal; no AP aberto pelo switch, a conexão com o servidor é mantida (AP+STA) e o ponto de acesso fecha sozinho se nada for salvo. A exigência de senha é decidida pela opção global **Exigir senha na rede de configuração dos ESP32** em `Administração > Sistema > Configurações`: **desativada por padrão**, deixando a rede de configuração aberta enquanto existir; quando ativada, o ponto de acesso passa a usar a senha padrão do firmware, `remoteifes`, também exibida no console serial físico. As rotas que exibem ou salvam o provisionamento só aceitam requisições recebidas pela interface desse ponto de acesso. Com a rede aberta, qualquer pessoa ao alcance do rádio pode abrir o portal e reprovisionar o dispositivo: ative a exigência de senha onde o acesso físico à área não for controlado.
-- **Transporte ESP32 → servidor**: o firmware suporta HTTPS (com validação de certificado usando a cadeia pública da Let's Encrypt, ou sem validação para certificados autoassinados em redes locais) além do HTTP tradicional, configurável no portal de setup de cada dispositivo (modo "Conexão com o servidor"). Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
-- **Rate limiting**: comandos manuais (`/comando`), envio de relatos (`/relatos`) e chamadas dos dispositivos (`/dispositivo/*`) são limitados **por usuário ou dispositivo autenticado** (60 comandos/min por usuário, 120 chamadas/min por dispositivo, 15 relatos/10 min por usuário), com um teto adicional por IP vinte vezes maior que protege contra abuso vindo de um único endereço sem que um campus inteiro atrás de um NAT esgote um orçamento pequeno; o login mantém a proteção contra força bruta por IP (20 falhas em 15 min), mas logins bem-sucedidos não consomem esse orçamento; conexões WebSocket autenticadas também têm um limite de mensagens por janela de tempo (encerrando a conexão em caso de flood) e um limite de tamanho por frame (8 KiB no canal dos navegadores, 256 KiB no canal dos dispositivos) — frames maiores são recusados antes de qualquer processamento. O firmware do ESP32 também aplica um intervalo mínimo entre comandos de ar-condicionado aceitos, para não sobrecarregar o compressor com toggles rápidos.
-- **Relatos de problema**: o conteúdo enviado pelos usuários é validado, limitado em tamanho e tem caracteres de controle removidos no backend antes de gravar (consultas parametrizadas); na interface ele é sempre renderizado como texto (`textContent`), nunca como HTML, evitando XSS armazenado. As rotas de leitura e gestão da caixa global exigem `exigirSuperAdmin`; um usuário comum só alcança os próprios relatos. Os logs do servidor registram apenas metadados do relato (id, autor, categoria, status), nunca o texto do relato ou da resposta.
-- **Cabeçalhos HTTP**: todas as respostas incluem `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy`; em produção, `Strict-Transport-Security` também é enviado nas respostas HTTPS.
-- **CORS**: em produção, a própria origem é aceita automaticamente; origens externas precisam ser listadas em `CORS_ORIGIN`.
-- **Erros**: respostas de erro nunca incluem stack trace nem detalhes internos; exceções não tratadas são registradas apenas no log do servidor.
-- **Restrição de rede** e **modo de teste**: veja a seção [Restrição de Rede](#restrição-de-rede) acima.
-- **Rede mesh opcional**: cada placa atrás de um gateway se autentica com a própria credencial e o tráfego vai cifrado de ponta a ponta; veja [Rede Mesh Opcional e Topologia](#rede-mesh-opcional-e-topologia).
+- **Senhas e sessões**: senhas com hash `bcrypt` (mínimo de 8 caracteres). O token de sessão é aleatório (`crypto.randomBytes`) e o banco guarda só o hash SHA-256 dele (`sessoes.token`), então um vazamento do banco não sequestra sessões. Veja [Sessões e Tempo de Inatividade](#sessões-e-tempo-de-inatividade).
+- **Autorização**: papéis e permissões pontuais (proprietário, acesso restrito) são checados no backend em cada rota.
+- **ESP32**: sem vínculo, uma placa só se registra como detectada; vinculada a uma sala em `Administração > Dispositivos > Cadastro`, ela precisa do mesmo MAC ou, se a sala tiver uma, da **credencial exclusiva**, obrigatória em instalações novas. Como MACs podem ser imitados, prefira a credencial, mantenha servidor e placas numa rede administrada e use HTTPS fora dela. Veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração) e [HTTPS entre o ESP32 e o servidor](#https-entre-o-esp32-e-o-servidor).
+- **Administração do ESP32**: configuração, captura e reset são autorizados pela sessão do superadministrador no servidor; a placa não tem senha administrativa. O papel de clonador é decidido pelo servidor e vinculado ao MAC e à credencial da placa ([Protocolos IR](#administração--dispositivos--protocolos-ir)).
+- **Ponto de acesso de configuração**: a rede `RemoteIFES-Setup` é criada apenas no modo AP de provisionamento ou por dez minutos depois de um **clique curto no switch físico**. Após salvar e reiniciar, o ESP32 opera em modo STA, encerra o AP e não serve frontend local durante a operação normal. As rotas do portal só atendem pela interface do AP. A rede é aberta por padrão; onde o acesso físico não é controlado, ligue **Exigir senha na rede de configuração dos ESP32**. Veja [Provisionamento e reprovisionamento](#provisionamento-e-reprovisionamento).
+- **OTA**: SHA-256 conferido pela placa, gravação no slot ocioso e reversão pelo bootloader ([Atualização de Firmware por OTA](#atualização-de-firmware-por-ota-esp32)).
+- **Limites de taxa**: por usuário ou dispositivo autenticado (60 comandos/min por usuário, 120 chamadas/min por dispositivo, 15 relatos/10 min), com um teto por IP vinte vezes maior, para que um campus atrás de NAT não esgote um orçamento pequeno. O login tem proteção contra força bruta por IP (20 falhas em 15 min; logins bem-sucedidos não contam). O WebSocket tem limite de mensagens por janela e de tamanho por frame (8 KiB para navegadores, 256 KiB para dispositivos). O firmware também impõe um intervalo mínimo entre comandos ao ar-condicionado.
+- **Relatos**: validados, limitados e sem caracteres de controle no backend; exibidos sempre como texto (`textContent`), nunca como HTML; os logs guardam só metadados.
+- **HTTP**: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Content-Security-Policy` e `Permissions-Policy` em todas as respostas, e `Strict-Transport-Security` nas respostas HTTPS em produção. Erros nunca expõem stack trace.
+- **CORS**: em produção, só a própria origem e as listadas em `CORS_ORIGIN`.
+- **Rede**: [Restrição de Rede](#restrição-de-rede); na [malha](#rede-mesh-opcional-e-topologia), cada placa se autentica com a própria credencial e o tráfego vai cifrado de ponta a ponta.
 
 ## Tempo Real (WebSocket)
 
-O servidor expõe um endpoint WebSocket em `/ws`. Quando o cliente já está autenticado, o token de sessão é enviado pelo campo padrão `Sec-WebSocket-Protocol` do handshake, e não por query string. Isso evita que o token fique registrado em logs de acesso de proxies reversos, que costumam gravar a URL completa da requisição.
+Os navegadores usam o WebSocket `/ws`, uma conexão por aba. O token de sessão vai no campo `Sec-WebSocket-Protocol` do handshake, nunca na URL, para não ficar nos logs de acesso de um proxy.
 
-Ao conectar autenticado, o cliente recebe a lista de salas e pode observar uma sala específica para receber atualizações do status assim que qualquer mudança ocorrer, seja um comando manual, um agendamento ou o heartbeat do ESP32, sem recarregar a tela. O estado também é retransmitido a cada 30 segundos como reforço, e o frontend reconecta automaticamente com espera crescente caso a conexão caia.
+- **Salas**: o cliente recebe a lista de salas e o status da sala que observa a cada mudança (comando, agendamento ou relato da placa), com um reforço a cada 30 s. Esse canal alimenta o assistente, a lista, a planta e o painel da sala.
+- **Administração**: gravar o vínculo de um MAC com uma sala envia o estado já persistido a todas as sessões administrativas, e `Administração > Dispositivos > Cadastro` se atualiza sem recarregar.
+- **Reconexão**: o frontend reconecta com espera crescente. Como um aparelho que suspende ou troca de rede pode deixar o socket aberto e mudo, ao voltar ao primeiro plano (ou se o reforço de 30 s não chegar) ele pede uma prova de vida e recicla a conexão que não responde, em vez de exibir o último estado como atual.
 
-Um aparelho que suspende ou troca de rede pode deixar o socket aberto sem tráfego e sem evento de fechamento. Por isso, ao voltar ao primeiro plano, e enquanto a tela estiver visível se o reforço de 30 segundos não chegar, o frontend pede uma prova de vida pelo próprio canal e recicla a conexão quando ela não responde. Ele não segue exibindo o último estado recebido como se fosse o atual.
+Toda chamada REST do frontend (`js/api.js`, compartilhado com o Cordova) tem prazo de 15 s até o corpo da resposta, e 120 s no download do APK. Uma consulta sem resposta é só uma falha de leitura. Uma mutação sem resposta, ou com corpo perdido ou inválido (`respostaIncompleta`), tem **desfecho desconhecido**: a mensagem pede para conferir antes de repetir, e o painel da sala relê o estado autoritativo em vez de repetir o comando. Só um 4xx do próprio servidor conta como recusa, e nenhuma mutação é repetida automaticamente.
 
-Esse canal alimenta o assistente simples, a lista de salas, o mapa da planta baixa e o painel de controle de cada sala.
-
-Esse mesmo canal transporta as mudanças administrativas que precisam ser vistas na hora: ao gravar o vínculo de um MAC com uma sala, o servidor emite o estado autoritativo daquele cadastro para as sessões de nível administrativo conectadas, e `Administração > Dispositivos > Cadastro` se atualiza sem recarregar, em qualquer sessão aberta. O broadcast parte sempre do estado já persistido no servidor, nunca de uma suposição do navegador.
-
-Toda chamada REST do frontend (`js/api.js`, compartilhado com o app Cordova) tem prazo de 15 s do envio até o corpo da resposta lido, e 120 s no download do APK. Sem esse prazo, uma conexão que emudece deixava a tela presa em "enviando".
-
-Uma consulta sem resposta é apenas uma falha de leitura. Uma mutação sem resposta, como um comando, um agendamento ou uma alteração administrativa, tem desfecho desconhecido: a mensagem diz que o pedido pode ter sido aplicado e pede para conferir antes de repetir. O painel da sala refaz a consulta do estado autoritativo em vez de repetir o comando ou de dá-lo como não feito, e se nem a consulta responder os botões voltam a ficar utilizáveis.
-
-O mesmo vale quando os cabeçalhos chegam mas o corpo se perde ou não é JSON (`respostaIncompleta`). Uma mutação aceita (2xx) ou barrada por um intermediário (5xx) continua com desfecho desconhecido, e só um 4xx do próprio servidor é tratado como recusa. Nenhuma mutação é repetida automaticamente. O tratamento de sessão expirada (401) e de manutenção (503) não muda.
-
-O frontend mantém uma única conexão WebSocket por aba (compartilhada entre a tela de status do servidor e o canal de salas/status), em vez de abrir conexões redundantes. O servidor também limita a quantidade de mensagens que uma conexão autenticada pode enviar em uma janela de tempo curta, encerrando a conexão em caso de flood.
-
-Se você configurar um proxy reverso manualmente, garanta que ele propague os cabeçalhos `Upgrade` e `Connection` do handshake WebSocket — sem isso, `/ws` não funciona atrás do proxy. `lan-setup.sh` e `https-setup.sh` já geram a configuração de Nginx correta para isso.
-
-## Painel dos ESP32, Protocolos IR e Failsafe (Administração > Dispositivos)
-
-O firmware separa o **provisionamento local** (portal `RemoteIFES-Setup`, só no modo AP) da **administração operacional**, feita inteiramente pelo servidor. Cada placa tem um **papel** decidido pelo servidor e enviado pelo WebSocket a cada conexão:
-
-| Papel | Quem | O que faz |
-|---|---|---|
-| **Transmissor IR** (`transmitter`) | todo ESP32 de sala | envia comandos pelo LED infravermelho (GPIO 4), reporta telemetria e guarda o failsafe OFF na NVS; nunca captura sinais |
-| **Clonador IR** (`cloner`) | a única placa com receptor infravermelho (GPIO 15), definida pelo superadministrador em `Administração > Dispositivos > Protocolos IR` | além de transmitir, entra no **modo clone** (`config_clone`) para capturar em tempo real os sinais do controle original |
-
-O tipo da placa não é escolhido no `RemoteIFES-Setup` nem gravado no firmware. Só existe **um clonador oficial ativo por vez**; o servidor guarda, junto com a sala, o MAC e a credencial da placa no momento da definição e recusa capturas de qualquer outra sala, de uma placa fora do modo clone ou de um ESP32 que tenha sido substituído (novo MAC em `Cadastro`, credencial substituída ou revogada) — nesse caso a tela avisa e o superadministrador precisa confirmar a clonadora novamente.
-
-### Administração > Dispositivos > Firmware / OTA
-
-Painel operacional de cada ESP32 com MAC cadastrado, visível apenas ao superadministrador:
-
-- Mostra separadamente se o dispositivo está **online na rede Wi-Fi** e se está **conectado ao servidor** (dois estados distintos e independentes), o papel atual (transmissor ou clonador), o modo (`operation`, `config_idle`, `config_clone`), a última leitura de temperatura e umidade, o sinal Wi-Fi (RSSI), o protocolo IR da sala (com o registro da biblioteca, quando aplicado a partir dela), se há **failsafe OFF gravado na NVS** da placa e o **último comando infravermelho transmitido** (estado conhecido, sinal bruto ou failsafe local pelo switch), tudo em tempo real.
-- Um botão de **reset de Wi-Fi** remoto apaga a rede e o endereço do servidor, preserva a credencial exclusiva e o failsafe gravado, e reinicia a placa no ponto de acesso `RemoteIFES-Setup` para reprovisionamento no local.
-- Mostra a **versão do firmware** instalada e a publicada, com **atualização por OTA** e a **distribuição em etapas** para vários ESP32 (veja [Atualização de Firmware por OTA (ESP32)](#atualização-de-firmware-por-ota-esp32)).
-- Gerencia a **credencial exclusiva do dispositivo** (provisionar, rotacionar, substituir, revogar), com o segredo exibido uma única vez (veja [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)).
-
-<img src="docs/readme-assets/screenshots/firmware-ota.png" width="800" alt="Cartão do ESP32 da sala A-107 em Firmware / OTA: Wi-Fi e servidor conectados, modo operação, papel transmissor IR; temperatura 23,4 °C, umidade 54 %, sinal de -57 dBm, protocolo IR 15 vindo da biblioteca, failsafe OFF gravado na NVS com 12 pulsos, último comando IR 23 °C ligado e estado desejado confirmado pela placa; firmware 4.2.0 com a 4.3.0 publicada e o botão Atualizar firmware (OTA); credencial ativa com Rotacionar, Substituir e Revogar; e Resetar Wi-Fi do dispositivo. Captura de um ambiente de teste com placas simuladas.">
-
-Essa aba não tem controles de captura: o modo clone é controlado exclusivamente em Protocolos IR.
-
-### Administração > Dispositivos > Protocolos IR
-
-O caminho de um sinal, do controle original ao ar-condicionado da sala:
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/ir-cloning-dark.png">
-  <img src="docs/readme-assets/composed/ir-cloning-light.png" width="800" alt="Caminho de um sinal infravermelho. O controle original do aparelho transmite para a ESP32 clonadora, a única com receptor IR, que no modo clone captura sem parar e envia cada captura ao servidor. A biblioteca IR, na tabela protocolos_ir do servidor, guarda as 20 capturas recentes da clonadora; salvar dá um nome à captura, e o navegador manda só o id dela, nunca o RAW; o failsafe OFF é a captura do botão de desligar, anexada ao protocolo; e só protocolo reconhecido vira protocolo da sala. Aplicado a uma sala, o protocolo vai à ESP32 da sala, que guarda o failsafe OFF na NVS e transmite por infravermelho ao ar-condicionado, que não é medido. Notas: segurar o botão da placa por 5 s transmite o failsafe OFF da NVS sem servidor nem Wi-Fi; a clonagem só funciona pelo Wi-Fi direto, nunca pela malha.">
-</picture>
-
-Biblioteca central de sinais infravermelhos, persistida na tabela `protocolos_ir` do SQLite e exclusiva do superadministrador:
-
-- **Clonador oficial**: escolha a ESP32 equipada com receptor IR e salve. O servidor passa a tratá-la como clonadora (e todas as demais como transmissoras) e envia o papel à placa na hora. A definição, a troca e a remoção do clonador são auditadas.
-- **Modo clone**: um único botão entra e sai do modo. Ao entrar, o receptor IR fica em captura contínua; a placa recusa OTA enquanto estiver nesse modo. Ao sair, volta à operação normal. Firmware anterior a 4.1.0 recebe a sequência compatível de comandos, mas só a versão atual entende o papel enviado pelo servidor.
-- **Captura em tempo real**: cada sinal recebido pela clonadora aparece em "Última captura" com o protocolo reconhecido pela biblioteca `IRremoteESP8266` (ou como sinal RAW genérico), o código hexadecimal, o número de pulsos e a portadora. A captura pode ser **testada** pela ESP32 de destino antes de ser guardada. O servidor mantém um histórico limitado (20) das capturas recentes da clonadora, que sobrevive a uma reconexão da placa; ao salvar, o navegador referencia a captura pelo identificador desse histórico, nunca envia o RAW.
-- **Salvar com nome**: o label tem de 2 a 80 caracteres, é normalizado (espaços repetidos, Unicode NFKC) e é único sem diferenciar maiúsculas de minúsculas. O RAW aceita de 1 a 1024 pulsos com valores de 0 a 65535 e portadora entre 20 e 60 kHz (padrão 38 kHz). Sinais RAW genéricos também são guardados e podem ser testados e retransmitidos, mas não viram protocolo operacional de sala.
-- **Lista**: para cada protocolo, **transmitir** pela ESP32 de destino (`send_raw`), **aplicar** como protocolo operacional de uma sala (somente protocolos reconhecidos: grava `irProtocolo` e o registro da biblioteca na sala, reenvia o estado desejado e sincroniza o failsafe), **configurar/recapturar o failsafe OFF**, **remover o failsafe**, **renomear** e **excluir**. Excluir um protocolo mantém o protocolo operacional já gravado nas salas, mas apaga o failsafe vinculado dos ESP32.
-- **Failsafe OFF (opcional)**: com a clonadora em modo clone, use "configurar failsafe OFF" no protocolo e transmita ao receptor **somente o botão de desligar** do controle original; a próxima captura fica anexada ao protocolo como RAW de desligamento em vez de virar um novo protocolo. Quando o protocolo é aplicado a uma sala, o servidor envia `failsafe_raw_set` ao ESP32 transmissor, que grava o RAW na NVS (o registro único `fsRec`, descrito em [Switch físico e buzzer](#switch-físico-e-buzzer)) e confirma com `failsafe_status`. A sincronização é refeita **a cada reconexão** da placa, ao definir ou remover o failsafe do protocolo e ao excluí-lo; aplicar um protocolo sem failsafe, ou trocar o protocolo da sala por um que não veio da biblioteca, envia `failsafe_raw_clear` para que um código de outro equipamento não fique na placa. O firmware compara o RAW recebido com o gravado e só regrava a NVS quando há diferença.
-
-<img src="docs/readme-assets/screenshots/ir-protocols.png" width="800" alt="Tela Protocolos IR. Clonador oficial: A-108 conectado, em modo clone, com o botão Sair do modo clone. Última captura: protocolo reconhecido COOLIX, 10 pulsos a 38 kHz, recebida de A-108, com testar na ESP32 de destino, descartar e o campo para salvar na biblioteca com um nome. Protocolos salvos: Split COOLIX dos laboratórios, reconhecido, capturado por A-108 e aplicado em A-107, com failsafe OFF de 12 pulsos e as ações transmitir, aplicar, recapturar ou remover o failsafe, renomear e excluir. Captura de um ambiente de teste com placas simuladas.">
-
-Essa comunicação usa um canal WebSocket dedicado (`/ws/dispositivo`, distinto do `/ws` usado pelos navegadores) pelo qual o próprio ESP32 se conecta ao servidor como cliente. A conexão é associada à sala pelo MAC cadastrado ou pela credencial do dispositivo e é reaproveitada para telemetria, comandos administrativos, papel, failsafe e OTA, sem abrir portas adicionais no dispositivo nem exigir que o servidor alcance o ESP32 diretamente. O ESP32 reconecta automaticamente caso a conexão caia, e o servidor reaplica o papel, o failsafe e o estado desejado depois da reconexão.
-
-Não existe mais frontend local do ESP32 em operação nem a ação "acessar interface do ESP32" em `Cadastro`: a informação de conferência (sala, MAC, IP, servidor, versão, papel, failsafe) está no painel central, e a recuperação continua garantida pelo monitor serial, pelo clique no switch físico (abre o `RemoteIFES-Setup` sem derrubar a operação), por **Resetar Wi-Fi** no painel e pela gravação USB.
-
-### Switch físico e buzzer
-
-Cada placa usa um único botão momentâneo normalmente aberto ligado entre o **GPIO 26** e o **GND**. O firmware configura o GPIO 26 como `INPUT_PULLUP` (ativo em nível baixo), portanto não é preciso resistor externo e o botão não deve receber 3,3 V ou 5 V; em um push-button tátil de quatro terminais, use um terminal de cada lado oposto. O debounce é de 40 ms. Um temporizador do sistema amostra o botão a cada 10 ms, independentemente do `loop()`, que pode ficar segundos preso numa chamada de rede quando o servidor não responde; o `loop()` executa a ação reconhecida, inclusive no modo AP e durante o modo clone. Se o temporizador não puder ser criado no boot, o firmware registra isso no console serial e passa a ler o botão pelo `loop()`, sem essa garantia. Com a rede travada, o failsafe pode sair alguns segundos depois de completados os 5 s, mas a pressão não se perde.
-
-| Ação | Efeito |
-|---|---|
-| **Clique curto** (solto antes de 5 s) | abre o `RemoteIFES-Setup` por dez minutos, mantendo a conexão com o servidor (AP+STA); um novo clique prorroga a janela e o AP fecha sozinho se nada for salvo. O portal fica em `192.168.4.1`, ou em `192.168.5.1` quando a própria rede Wi-Fi da placa já é `192.168.4.x` (o portal cativo abre a página nos dois casos). Em uma placa sem configuração o AP já está no ar e o clique não faz nada. |
-| **Manter pressionado por 5 s** | transmite **uma única vez** o failsafe OFF gravado na NVS, sem depender de servidor, Internet ou Wi-Fi; soltar o botão depois disso **não** abre o AP. Para um novo disparo é preciso soltar e pressionar de novo. Sem failsafe gravado, a pressão é reconhecida mas nada é transmitido. |
-
-O failsafe OFF fica na NVS como **um único registro versionado** (cabeçalho com magia, versão, quantidade de pulsos, portadora, id do protocolo e CRC32, seguido do RAW), gravado em uma única operação: uma queda de energia durante a atualização deixa o registro anterior ou o novo, nunca metadados de um com o RAW do outro, e um registro com CRC inválido é ignorado até o servidor reenviar. Placas com o formato anterior (quatro chaves separadas) migram sozinhas no primeiro boot do firmware 4.2.0. A duração total de qualquer RAW (failsafe ou `send_raw`) é limitada a 2 s; o servidor aplica o mesmo limite ao salvar protocolos.
-
-O disparo local também grava uma trava na NVS. Até chegar um comando explícito do servidor (`send_known_state` ou `send_raw`), a placa continua reportando `ligado=false` e `failsafeLatched=true` mesmo depois de reiniciar.
-
-Ao reconectá-la, o servidor não reenvia o estado "ligado" que ainda guardava: ele adota o desligamento local, registrado como `failsafe_off_local` de origem `esp32_local` e valor `mantido_na_reconexao`, e avisa os painéis. O cartão do dispositivo em `Firmware / OTA` mostra "OFF local em vigor até o próximo comando".
-
-Qualquer comando de controle limpa a trava, então a placa nunca fica presa nesse estado. Firmware anterior (4.1.0) não reporta a trava e continua recebendo o estado do servidor logo após se apresentar, como antes. Durante um download de OTA o botão e o buzzer continuam sendo atendidos a cada bloco recebido.
-
-O estado reaplicado na reconexão vai marcado como `restauracao: true`. A partir do firmware **4.3.0** a placa não trata essa restauração como comando explícito: se estiver travada em OFF local, ignora-a, não limpa a trava e responde com `failsafe_status`, que o servidor adota como desligamento local (`adotado_em_operacao`) — mesmo quando o `info` chega depois da espera de 3 s. No servidor, uma sincronização por tempo esgotado só ocorre depois de processar qualquer `info` já recebido no socket, para que uma pausa longa do event loop não a antecipe. O firmware 4.2.0 não distingue a restauração de um comando: nele, um `info` que chegue depois da espera de 3 s ainda recebe o estado guardado; atualize a frota por OTA para fechar essa janela.
-
-Um **buzzer ativo** no **GPIO 27** soa a cada transmissão infravermelha (comando do servidor, teste, retransmissão ou failsafe): ele é ligado imediatamente antes do envio e desligado pelo `loop()` após um mínimo de 60 ms, sem nenhum `delay()` adicional antes do sinal.
-
-### Do pedido ao ar-condicionado
-
-<img src="docs/readme-assets/flows/command-state-flow.svg" width="800" alt="Cinco etapas de um comando. 1, pedido: painel da sala, agendamento ou desligamento diário. 2, estado desejado: gravado no banco e com a versão da sala avançada; a resposta é ok: true. 3, envio: ao socket da placa ou, na malha, ao gateway; sem canal, o estado fica salvo e vai na reconexão; o campo é enviadoAoDispositivo. 4, a placa executa: transmite o infravermelho e ecoa a versão recebida, o que marca dispositivoConfirmou; uma seta volta da placa ao servidor com esse eco. 5, o aparelho: o sistema não mede se ele recebeu o sinal, então não há prova física.">
-
-Presença, canal de comandos, estado desejado, envio e confirmação são coisas distintas:
-
-- **Presença.** `online` no status de uma sala quer dizer que a placa foi vista há pouco, pelo WebSocket ou só pelo heartbeat HTTP, que o firmware usa enquanto o WebSocket está caído. Não diz que a sala é controlável.
-- **Canal de comandos.** `canalComandos` diz se há um socket de comandos aberto para a sala; só por ele um comando chega à placa. Uma sala `online` sem canal aparece no painel como "online, sem comandos".
-- **Estado desejado.** `POST /comando` responde `ok: true` quando a intenção foi **persistida**. Cada mudança de intenção avança `salas.estadoVersao`.
-- **Envio.** `enviadoAoDispositivo` diz se a mensagem foi **submetida ao socket** da placa, não se ela a executou, e a resposta repete `canalComandos` para dizer por que nada foi submetido. Sem canal, o comando recebe o aviso de que **não foi entregue**; o estado fica salvo e é restaurado quando a placa reconectar. Na malha, "enviado" quer dizer entregue ao gateway.
-- **Confirmação.** Todo `send_known_state` leva a versão como `versao`. O firmware 4.3.0 ecoa essa versão em `info`, `telemetria` e `failsafe_status`, e o `status` da sala traz `dispositivoConfirmou`: `true`, `false` ou `null` sem placa ou protocolo, conforme a placa conectada já tenha **reportado** o estado vigente. O painel mostra reticências até a confirmação e avisa se ela passar de 12 s.
-- **Aparelho.** Nem a confirmação da placa prova que o ar-condicionado recebeu o sinal infravermelho.
-
-Um relato atrasado nunca sobrescreve a intenção. É atrasado o relato que ecoa uma versão anterior ou, no firmware 4.2.0, cujo último comando IR relatado não bate com a intenção. O `ligado` da telemetria e do heartbeat é só o eco do último comando processado e não é gravado como estado desejado.
-
-A trava de failsafe relatada em operação só é adotada quando o relato comprovadamente reflete a intenção vigente: versão ecoada igual à atual ou, sem eco, depois que a mesma conexão confirmou a intenção. Um comando explícito enviado logo após a conexão, antes de o `info` inicial chegar, prevalece. Esse `info` descreve a placa de antes do comando, não adota a trava, não apaga a intenção nova e dispensa a restauração.
-
-Os testes IR administrativos (`teste/estado`, `teste/raw` e transmitir um protocolo da biblioteca) não alteram a intenção nem a versão, mas invalidam a confirmação até uma intenção nova ser enviada: o eco da versão anterior ao teste deixa de contar. Alterações de configuração que mudam o estado IR (limites globais de temperatura, função extra do turbo) e os limites por sala avançam a versão na mesma transação que ajusta o alvo, e nada é submetido à placa antes do commit. O agendador grava a execução de um agendamento na mesma transação da mudança de estado, então uma falha entre os dois nunca repete o comando no minuto seguinte.
-
-### Detecção automática de ESP32 na rede
-
-Todo ESP32 consulta o servidor com seu MAC após entrar na rede. Mesmo sem vínculo com uma sala, ele é registrado automaticamente como detectado. Em `Administração > Dispositivos > Cadastro`, a seção "ESP32 detectados na rede" lista esses dispositivos (MAC, IP, última vez visto) — os 100 vistos mais recentemente; uma placa ainda sem sala se reapresenta a cada 15 s, então está sempre entre eles — e permite vincular cada um a uma sala existente com um único clique. O dispositivo recebe a associação na próxima consulta, sem reconfiguração ou reinicialização. Um seletor de planta baixa com zoom e um campo de busca ajudam a localizar a sala.
-
-Assim que o servidor grava o vínculo, ele avisa pelo próprio WebSocket todas as sessões administrativas conectadas: o cadastro passa a constar imediatamente em `Administração > Dispositivos > Cadastro` — inclusive em uma segunda sessão autorizada aberta ao mesmo tempo — **sem recarregar a página nem reabrir a aba**. Um cadastro que o servidor recusa não aparece. Cadastrado e online continuam sendo estados distintos: cada sala mostra um selo de cadastro e outro de conexão, e um ESP32 recém-cadastrado costuma aparecer offline até estabelecer sua própria conexão.
+Um proxy reverso configurado à mão precisa propagar os cabeçalhos `Upgrade` e `Connection`; `lan-setup.sh` e `https-setup.sh` já fazem isso.
 
 ## Acessibilidade
 
@@ -578,7 +433,7 @@ A divisão entre os dois documentos é deliberada: este README é a referência 
 - Navegador ou WebView com Chromium 108+, Safari 15.4+ (iOS 15.4+) ou Firefox 121+ para o frontend (site, PWA e aplicativo Cordova); abaixo disso a página mostra **Navegador desatualizado** em vez de carregar — veja [Cordova (Android/iOS)](#cordova-androidios)
 - Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental) — em Linux (incluindo Raspberry Pi OS), `remoteifes-server/setup.sh` instala automaticamente a versão correta caso não esteja presente, sem depender do pacote do sistema
 - [PlatformIO](https://platformio.org/) (Core CLI ou a extensão para VS Code), com a plataforma `espressif32`, para compilar e gravar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do PlatformIO Core (prefere `pipx`, com fallback para `pip --user`) e chama `pio run` para compilar, gravar o sistema de arquivos `data/` (LittleFS) e o firmware
-- Bibliotecas (resolvidas automaticamente pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini`, sem instalação manual, com as versões fixadas nas que foram testadas: plataforma `espressif32@7.0.1`, [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) 2.9.0 (inclui os módulos `IRrecv`, `IRsend`, `IRutils` e `IRac`), `WebSockets` (Links2004) 2.7.3, `ArduinoJson` 7.4.3, `DHT sensor library` 1.4.7 e `Adafruit Unified Sensor` 1.1.15; o servidor só aceita atribuir a uma sala os identificadores numéricos de protocolo que o `IRac` dessa versão sabe transmitir, e uma captura reconhecida pela placa com um identificador fora dessa lista é guardada como sinal RAW genérico) — `Preferences`/`DNSServer`/LittleFS já vêm inclusas no core ESP32 do PlatformIO
+- Bibliotecas do firmware, resolvidas pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini` com versões fixadas: plataforma `espressif32@7.0.1`, [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) 2.9.0, `WebSockets` (Links2004) 2.7.3, `ArduinoJson` 7.4.3, `DHT sensor library` 1.4.7 e `Adafruit Unified Sensor` 1.1.15. O servidor só atribui a uma sala os protocolos que o `IRac` dessa versão sabe transmitir; uma captura com outro identificador fica como sinal RAW genérico
 
 ### Hardware
 
@@ -596,11 +451,9 @@ npm run setup
 npm start
 ```
 
-Abra **`http://localhost:8080`** no próprio servidor. De outro dispositivo na mesma rede, abra **`http://IP_DO_SERVIDOR:8080`**. Este é o fluxo normal integrado de desenvolvimento e teste: o Node/Express entrega o frontend do RemoteIFES, a API e o WebSocket juntos na porta 8080 e na mesma origem.
+Abra **`http://localhost:8080`** no próprio servidor ou **`http://IP_DO_SERVIDOR:8080`** de outro dispositivo da rede: o Node/Express entrega o frontend, a API e o WebSocket na mesma origem, sem etapa de build e sem Live Server.
 
-O VS Code Live Server **não é necessário** nesse fluxo. Ele cria outra origem e só deve ser usado intencionalmente no desenvolvimento isolado do frontend, conforme [Frontend em origem separada](#frontend-em-origem-separada-desenvolvimento-opcional). Produção não depende de `localhost` fixado no código: use a origem do servidor/proxy ou configure explicitamente a origem separada.
-
-`npm run setup` verifica o Node.js instalado e, em Linux (x64, ARM64 ou ARMv7 — cobre qualquer Raspberry Pi) ou macOS (via Homebrew), instala automaticamente a versão 22.13+ quando necessário; em seguida instala as dependências e cria o arquivo `.env` a partir de `.env.example` (caso ainda não exista). Rodar `npm run setup` novamente não sobrescreve um `.env` já existente. Os fluxos definitivos de desenvolvimento, produção, `systemd`, proxy reverso e frontend separado ficam somente na [referência canônica de inicialização e implantação](#inicialização-e-implantação-referência-canônica).
+`npm run setup` instala o Node.js 22.13+ quando falta (Linux x64, ARM64 ou ARMv7, o que cobre qualquer Raspberry Pi, e macOS via Homebrew), instala as dependências e cria o `.env` a partir de `.env.example` sem sobrescrever um existente. Produção, `systemd`, proxy reverso e frontend separado ficam na [referência canônica de inicialização e implantação](#inicialização-e-implantação-referência-canônica).
 
 **Windows (PowerShell/CMD):**
 
@@ -621,32 +474,22 @@ npm start
 
 ## Inicialização e implantação (referência canônica)
 
-Esta é a referência canônica de startup. Se a arquitetura de inicialização mudar, atualize esta seção; a [Instalação Rápida](#instalação-rápida), [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) e [Deploy](#deploy) apenas resumem ou detalham operações posteriores.
+Esta é a referência canônica de startup; [Instalação Rápida](#instalação-rápida), [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) e [Deploy](#deploy) apontam para cá.
 
 ### Desenvolvimento integrado
 
-Primeira instalação (uma vez):
-
-```bash
-cd remoteifes-server
-npm run setup
-npm start
-```
-
-Startup normal (todas as vezes seguintes):
+Depois da primeira instalação, o startup normal é só:
 
 ```bash
 cd remoteifes-server
 npm start
 ```
 
-`npm run setup` só é necessário na primeira instalação ou quando as dependências mudam; não o rode antes de cada reinício. Com `SERVIR_FRONTEND=true` (padrão), abra `http://localhost:8080` ou `http://IP_DO_SERVIDOR:8080`. Express serve `remoteifes-web`, API e `/ws` na mesma origem. `npm run dev` oferece o mesmo conjunto integrado com reinício automático do processo ao alterar arquivos do servidor. O frontend não tem etapa de build.
-
-O que `npm run setup` faz (e a alternativa manual no Windows) está em [Instalação Rápida](#instalação-rápida). Banco e migrações são aplicados automaticamente no primeiro startup; não há comando separado de migração. `npm start` e `npm run dev` são alternativas, não uma sequência: não deixe os dois rodando sobre o mesmo banco.
+Rode `npm run setup` de novo apenas quando as dependências mudarem. `npm run dev` é a alternativa com reinício automático ao alterar o servidor; não deixe os dois rodando sobre o mesmo banco. Banco e migrações são aplicados na partida, sem comando separado.
 
 ### Produção
 
-Antes do primeiro startup, revise `.env`, defina `NODE_ENV=production`, mantenha `SERVIR_FRONTEND=true`, defina `SENHA_ADMIN_INICIAL` e cadastre as redes autorizadas. Inicie manualmente com `npm start` apenas para validação ou operação supervisionada. A aplicação usa a URL pela qual foi aberta; portanto, uma implantação normal same-origin nunca depende de `localhost` hardcoded. Veja [Configuração](#configuração) e as rotinas operacionais em [Deploy](#deploy).
+Antes do primeiro startup, revise o `.env`: `NODE_ENV=production`, `SERVIR_FRONTEND=true`, `SENHA_ADMIN_INICIAL` e as redes autorizadas. `npm start` à mão serve só para validação ou operação supervisionada; o frontend usa a URL pela qual foi aberto, então nada depende de `localhost`. Veja [Configuração](#configuração) e [Deploy](#deploy).
 
 ### Linux com systemd
 
@@ -656,17 +499,15 @@ npm run setup
 sudo bash install-service.sh
 ```
 
-Esse é o startup persistente canônico para Linux/Raspberry Pi: instala e habilita `remoteifes.service` e o watchdog. O instalador configura produção e pergunta as redes autorizadas. Depois disso o serviço, os registros e a saúde são acompanhados pelo [Console de Operações](#console-de-operações); os comandos `systemctl` e `journalctl` equivalentes ficam em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal). Os detalhes de atualização, backup e recuperação ficam em [Deploy](#deploy).
+É o startup persistente canônico para Linux e Raspberry Pi: instala e habilita `remoteifes.service` e o watchdog, grava a configuração de produção e pergunta as redes autorizadas. Depois disso o dia a dia é pelo [Console de Operações](#console-de-operações); os comandos `systemctl` e `journalctl` equivalentes ficam em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal).
 
 ### Proxy reverso
 
-Para LAN na porta 80, depois do serviço `systemd`, rode `sudo bash lan-setup.sh`. Para HTTPS com domínio, rode `sudo bash https-setup.sh <dominio> <email>`. Ambos mantêm frontend, API e WebSocket na mesma origem, encaminham o upgrade WebSocket e ajustam `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1`. Não exponha simultaneamente a porta interna 8080. Veja [Proxy reverso na porta 80](#proxy-reverso-na-porta-80-rede-local-sem-internet) e [HTTPS com domínio próprio](#https-com-domínio-próprio-opcional) para os efeitos operacionais dos scripts.
+Depois do serviço, `sudo bash lan-setup.sh` coloca o Nginx na porta 80 da rede local, sem Certbot nem DNS; `sudo bash https-setup.sh <dominio> <email>` faz o mesmo com HTTPS e um certificado Let's Encrypt, e só é necessário para expor o sistema fora da rede local ou instalar a PWA. Os dois scripts instalam o Nginx se preciso (via `apt`), assumem um host dedicado (o site padrão na porta 80), encaminham tudo a `127.0.0.1:<PORTA>` com o upgrade de `/ws` e `/ws/dispositivo`, e gravam `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1` no `.env`, para que a `PORTA` interna não seja alcançada diretamente nem se falsifique `X-Forwarded-For`. O `https-setup.sh` também liga a renovação automática (`certbot.timer`).
 
 ### Frontend em origem separada (desenvolvimento opcional)
 
-O Live Server é suportado somente como modo intencional de desenvolvimento isolado. Primeiro mantenha a API/WebSocket em `http://localhost:8080`; depois sirva `remoteifes-web` pelo Live Server em `localhost`. Nesse caso `js/config.js` resolve explicitamente o backend local na porta 8080 e o CORS aberto de `NODE_ENV=development` aceita a origem do Live Server. Se o frontend separado não estiver em `localhost`, sua URL de servidor precisa ser configurada deliberadamente para o ambiente e, em produção, a origem exata precisa constar em `CORS_ORIGIN`. Não use Live Server para validar a implantação integrada, PWA de produção, proxy ou ESP32.
-
-Para voltar ao modo normal, pare o Live Server e acesse `http://localhost:8080`. Não grave um `localhost` fixo para produção. O Cordova recebe a origem de produção por `REMOTEIFES_SERVER_URL` durante o build; não edite `js/config.js` manualmente para o fluxo integrado ou Cordova.
+O Live Server serve só para desenvolver o frontend isolado: mantenha a API em `http://localhost:8080` e sirva `remoteifes-web` pelo Live Server em `localhost`, e `js/config.js` resolve o backend local sozinho, aceito pelo CORS aberto de `NODE_ENV=development`. Fora de `localhost`, configure a URL do servidor deliberadamente e, em produção, inclua a origem em `CORS_ORIGIN`. Não use esse modo para validar a implantação integrada, a PWA, o proxy ou os ESP32, e não edite `js/config.js` para o fluxo integrado nem para o Cordova, que recebe a origem por `REMOTEIFES_SERVER_URL` no build.
 
 ### Firmware ESP32
 
@@ -686,11 +527,9 @@ cd remoteifes-esp32
 bash flash.sh
 ```
 
-`flash.sh` instala o PlatformIO Core caso esteja ausente, compila o firmware, grava o sistema de arquivos `data/` e depois o firmware no ESP32 conectado por USB. Não é preciso abrir a Arduino IDE nem a extensão do VS Code. Para instalar o PlatformIO ele usa `pipx`, recomendado no Ubuntu 24.04 e nos demais sistemas com Python gerenciado, e cai para `pip --user` quando `pipx` não existe.
+`flash.sh` instala o PlatformIO Core se faltar (por `pipx`, ou `pip --user` sem ele), compila e grava o sistema de arquivos `data/` e o firmware no ESP32 conectado por USB. Com mais de uma porta serial, informe-a: `bash flash.sh /dev/ttyUSB0` no Linux e no Raspberry Pi, ou `bash flash.sh /dev/cu.usbserial-XXXX` no macOS.
 
-A porta serial costuma ser detectada pelo PlatformIO. Com mais de um dispositivo serial conectado, informe a porta: `bash flash.sh /dev/ttyUSB0` no Linux e no Raspberry Pi, ou `bash flash.sh /dev/cu.usbserial-XXXX` no macOS.
-
-Os mesmos passos manualmente, com o PlatformIO Core ou a extensão do VS Code:
+Os mesmos passos à mão, com o PlatformIO Core ou os alvos Build, Upload Filesystem Image, Upload e Monitor da extensão do VS Code:
 
 ```bash
 cd remoteifes-esp32
@@ -700,11 +539,9 @@ pio run --target upload       # grava o firmware
 pio device monitor -b 115200  # acompanha os logs de série do ESP32 (Ctrl+C para sair)
 ```
 
-Na extensão do VS Code, abra a pasta `remoteifes-esp32/` e use os alvos equivalentes na barra de tarefas do PlatformIO: Build, Upload Filesystem Image, Upload e Monitor.
+O monitor serial mostra o boot, o IP, a conexão com o servidor e os erros em tempo real; com mais de uma porta, `pio device monitor -b 115200 -p /dev/ttyUSB0` (ou `-p /dev/cu.usbserial-XXXX` no macOS), e `pio device list` lista as portas.
 
-O monitor serial usa a mesma taxa configurada pelo firmware e serve para acompanhar o boot, o IP obtido, o estado da conexão com o servidor e mensagens de erro em tempo real. Com mais de uma porta conectada, informe-a: `pio device monitor -b 115200 -p /dev/ttyUSB0` no Linux ou `-p /dev/cu.usbserial-XXXX` no macOS. `pio device list` lista as portas disponíveis.
-
-Apagar toda a flash é uma operação à parte e destrutiva. Ela remove Wi-Fi, servidor, credencial do dispositivo, configuração da malha e failsafe gravados na NVS, e a placa volta ao `RemoteIFES-Setup`. Use-a só de propósito, com os dados de reprovisionamento em mãos, antes de gravar firmware e `data/` de novo:
+Apagar a flash é destrutivo: remove Wi-Fi, servidor, credencial, configuração da malha e failsafe da NVS, e a placa volta ao `RemoteIFES-Setup`. Faça-o só de propósito, com os dados de reprovisionamento em mãos, antes de gravar firmware e `data/` de novo:
 
 ```bash
 cd remoteifes-esp32
@@ -713,19 +550,17 @@ pio run --target erase
 
 #### Provisionamento e reprovisionamento
 
-O mesmo firmware serve para qualquer sala, para o clonador e para os modos de malha: nenhum dado é fixado em tempo de compilação. Sem configuração válida, o ESP32 sobe o ponto de acesso `RemoteIFES-Setup` e serve o portal em `192.168.4.1`. Ali ele recebe as credenciais da rede, o endereço do servidor central, a credencial exclusiva do dispositivo quando já provisionada e a rede do módulo, descrita em [Rede Mesh Opcional e Topologia](#rede-mesh-opcional-e-topologia).
+O mesmo firmware serve para qualquer sala, para o clonador e para os modos de malha: nada é fixado na compilação. O portal `RemoteIFES-Setup` recebe a rede Wi-Fi, o endereço do servidor, a credencial do dispositivo quando já provisionada e a [rede do módulo](#rede-mesh-opcional-e-topologia):
 
-Depois de salvar, a placa reinicia, encerra o ponto de acesso e o portal local e passa a ser administrada pelo servidor, que detecta o MAC para o superadministrador vinculá-lo à sala em `Administração > Dispositivos > Cadastro`. Em falhas de Wi-Fi, o firmware tenta reconectar a cada 30 segundos sem bloquear o restante da operação.
+<img src="docs/readme-assets/flows/esp32-provisioning.svg" width="800" alt="No Wi-Fi direto, sem SSID salvo ou host/porta válidos a placa abre o portal RemoteIFES-Setup em 192.168.4.1. Salvar dados válidos reinicia. Em operação, um clique curto abre AP + STA por dez minutos, prorrogáveis por novo clique; usa 192.168.5.1 se a STA já está em 192.168.4.x. Expirar fecha o AP; salvar reinicia. Resetar Wi-Fi apaga a rede e reinicia. Na malha, expirar também reinicia, e Resetar Wi-Fi preserva o modo: um nó não necessariamente volta ao portal. O AP usa a senha salva quando exigida, com padrão remoteifes. Segurar cinco segundos transmite o failsafe OFF se salvo, sem abrir o AP.">
 
-Para reprovisionar uma placa já configurada, dê um clique curto no switch físico: o portal reabre por dez minutos sem derrubar a operação. **Resetar Wi-Fi**, no painel, é diferente: apaga a rede e o endereço do servidor (preservando a credencial e o failsafe) e reinicia a placa no `RemoteIFES-Setup`, fora de operação até ser reprovisionada no local.
+Depois de salvar, o servidor detecta o MAC para o superadministrador vinculá-lo à sala em `Administração > Dispositivos > Cadastro`. Em falhas de Wi-Fi o firmware tenta reconectar a cada 30 segundos, sem reiniciar. Para reprovisionar uma placa em operação, prefira o clique curto no switch, que não derruba a operação; **Resetar Wi-Fi** apaga a rede e o endereço do servidor (preservando a credencial, o failsafe e o modo da malha) e reinicia a placa: no Wi-Fi direto ou num gateway ela volta ao portal e fica fora de operação até ser reprovisionada no local, mas um nó da malha volta direto à malha. A senha padrão do AP, quando exigida, também aparece no console serial.
 
 #### Versão e partições
 
 A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.3.1`) e é reportada ao servidor na telemetria e no heartbeat.
 
-A partição usa o layout `min_spiffs.csv`, com dois slots de aplicação de cerca de 1,9 MB. O firmware atual ocupa cerca de 76% de um slot, com os modos de malha incluídos, o que reserva um slot ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32) com reversão automática.
-
-A gravação por USB continua sendo o caminho de recuperação: ela regrava o slot ativo e não depende do estado do OTA.
+A partição `min_spiffs.csv` tem dois slots de aplicação de cerca de 1,9 MB; o firmware ocupa cerca de 76% de um, com a malha incluída, e o outro fica ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32). A gravação por USB é o caminho de recuperação: regrava o slot ativo sem depender do estado do OTA.
 
 
 ## Configuração
@@ -738,11 +573,11 @@ A gravação por USB continua sendo o caminho de recuperação: ela regrava o sl
 | `PORTA` | Porta HTTP (e WebSocket, no mesmo servidor) do servidor (padrão 8080) |
 | `SERVIR_FRONTEND` | Servir o `remoteifes-web` pelo próprio servidor, na mesma origem da API (operação same-origin). Padrão: ligado em desenvolvimento e produção. Desative apenas no desenvolvimento intencional do frontend em outra origem. Com o frontend servido assim, `CORS_ORIGIN` deixa de ser necessário |
 | `FRONTEND_DIR` | Caminho da pasta do frontend a servir (padrão: `../remoteifes-web` relativo ao projeto do servidor) |
-| `REMOTEIFES_DATA_DIR` | Diretório dos dados persistentes (banco, backups, imagem de firmware para OTA, versões e log de deploy). Padrão: `data/` dentro do projeto do servidor; `deploy.sh`, `rollback.sh` e `install-service.sh` resolvem o valor pelo mesmo `src/config/paths.js` do servidor. Aponte para fora do checkout do Git (ex.: `/var/lib/remoteifes`) para que atualizações de código nunca toquem nos dados. `REMOTEIFES_DB_PATH`, `BACKUP_DIR` e `REMOTEIFES_FIRMWARE_DIR` continuam disponíveis para sobrescrever caminhos individuais |
+| `REMOTEIFES_DATA_DIR` | Dados persistentes: banco, backups, imagem de firmware, versões e log de deploy. Padrão `data/` no projeto do servidor; aponte para fora do checkout (ex.: `/var/lib/remoteifes`) para que atualizações de código nunca toquem nos dados. Scripts e servidor resolvem o valor pelo mesmo `src/config/paths.js`; `REMOTEIFES_DB_PATH`, `BACKUP_DIR` e `REMOTEIFES_FIRMWARE_DIR` sobrescrevem caminhos individuais |
 | `CORS_ORIGIN` | Lista de origens permitidas, separadas por vírgula, quando `NODE_ENV=production` — necessária **apenas** quando o frontend é servido de outra origem (ex.: GitHub Pages). Vale tanto para a API HTTP quanto para as conexões WebSocket |
 | `SENHA_ADMIN_INICIAL` | Opcional; define a senha do usuário `superadmin` criado no primeiro boot. Quando vazia, usa `admin` e mostra ao superadministrador um aviso persistente para alterá-la |
 | `SESSAO_MAX_HORAS` | Opcional. Duração máxima de uma sessão desde o login, mesmo com uso contínuo (padrão `12`, de 1 a 168 horas); o tempo de inatividade continua em `Administração > Sistema > Configurações` |
-| `TRUST_PROXY` | Quantos "saltos" de proxy reverso confiar ao ler o IP real do cliente (cabeçalho `X-Forwarded-For`); **padrão `0`** (não confia em nenhum proxy). O `https-setup.sh` e o `lan-setup.sh` alteram este valor para `1` ao configurar o Nginx, que é o valor correto quando há exatamente um proxy reverso na frente. Só use um valor maior que `0` quando existir de fato um proxy confiável imediatamente à frente do servidor — confiar em saltos que não existem permite que um cliente falsifique o IP de origem via `X-Forwarded-For` e contorne o limite de tentativas de login e a restrição de rede |
+| `TRUST_PROXY` | Quantos proxies reversos confiar ao ler o IP real em `X-Forwarded-For`; **padrão `0`**. `lan-setup.sh` e `https-setup.sh` gravam `1`, o valor certo para um único Nginx na frente. Um valor maior que o número real de proxies deixa o cliente falsificar o IP e contornar o limite de login e a restrição de rede |
 | `RETENCAO_DIAS_LOGS` / `RETENCAO_DIAS_SESSOES` / `RETENCAO_DIAS_EXECUCOES` / `RETENCAO_DIAS_DETECCOES` | Opcionais. Dias de retenção das tabelas de histórico antes da limpeza automática (padrões: 180 / 90 / 90 / 30). Veja [Manutenção automática do banco](#manutenção-automática-do-banco) |
 | `RETENCAO_DIAS_NOTIFICACOES` / `RETENCAO_DIAS_AGENDAMENTOS` | Opcionais. Dias até descartar qualquer notificação (mesmo não lida) e até apagar agendamentos com data já passada e suas execuções (padrões: 365 / 90) |
 | `RETENCAO_DIAS_RELATOS_RESOLVIDOS` | Opcional. **Desligado por padrão (`0`).** Quando recebe um número de dias, a rotina apaga relatos **já resolvidos** mais antigos que esse prazo; relatos não resolvidos nunca são tocados |
@@ -760,15 +595,15 @@ Estas configurações são armazenadas no banco (tabela `configuracoes`). A aba 
 | Limite de temperatura | 23 °C a 25 °C | Intervalo permitido para qualquer comando de temperatura, manual ou agendado (aceita de 16 a 30 °C) |
 | Função adicional do Turbo | nenhuma | Opcionalmente ativa também a oscilação vertical enquanto o Turbo estiver ligado |
 | Desligamento diário automático | **desativado** | Horário diário (Brasília) e escopo (todas as salas ou salas selecionadas) em que o servidor desliga uma vez os aparelhos ainda ligados; religar depois do horário vale até o dia seguinte (veja [Desligamento Diário Automático](#desligamento-diário-automático)) |
-| Auto-ON | **ativado** | Ajustar a temperatura ou ativar o Turbo em um aparelho desligado o liga e aplica o ajuste. Desativado, a temperatura alvo é apenas guardada e o Turbo só pode ser alterado com o aparelho ligado. Desativar o Turbo nunca liga o aparelho. O valor é gravado no banco e sobrevive a reinícios e atualizações; instalações existentes que ainda não têm a chave assumem o padrão ativado (veja [Limites de Temperatura e Turbo](#limites-de-temperatura-e-turbo)) |
+| Auto-ON | **ativado** | Ajustar a temperatura ou ativar o Turbo num aparelho desligado o liga; instalações que ainda não têm a chave assumem ativado (veja [Limites de Temperatura e Turbo](#limites-de-temperatura-e-turbo)) |
 | Modo de teste | desativado em produção nova | Quando ativo, desliga a restrição de rede do IFES em produção, permitindo acessar o sistema de qualquer rede para fins de teste; deve permanecer desativado na operação definitiva. **Somente leitura no site**: altere no Console de Operações ou pelo terminal (veja [Restrição de Rede](#restrição-de-rede)) |
 | Redes autorizadas | vazia | Lista de faixas de IP em CIDR (ex.: `10.0.0.0/8`) liberadas quando o modo de teste está desativado. **Somente leitura no site**: altere no Console de Operações ou com `npm run redes` |
 | Tempo de inatividade de usuários | 60 minutos | Limite de inatividade aplicado pelo servidor a usuários normais |
 | Tempo de inatividade administrativo | 720 minutos | Limite de inatividade aplicado a administradores e superadministrador |
 | Aviso de logout automático | 60 segundos | Duração da contagem regressiva exibida antes do logout por inatividade |
 | Limiar de presença online | 5 minutos | Minutos sem uso após os quais um usuário com sessão aberta passa de "online" para "inativo" na aba Ativos |
-| Exigir senha na rede de configuração dos ESP32 | **desativado** | Controla apenas a rede Wi-Fi local `RemoteIFES-Setup` **enquanto o ponto de acesso de configuração estiver ativo** (placa sem configuração, após Resetar Wi-Fi ou após o clique no switch); em operação normal o AP fica desligado. Desativado, a rede de configuração é aberta; ativado, passa a exigir a senha padrão do firmware (`remoteifes`). A mudança é propagada pelo WebSocket aos ESP32 conectados e aplicada quando o portal voltar a ser aberto. **Não tem relação com a autenticação do ESP32 no servidor**, que é a opção seguinte. |
-| Exigir credencial por dispositivo em todos os ESP32 | ativado em instalações normais novas | Nenhum ESP32 se conecta apenas pelo MAC enquanto esta opção estiver ativa — toda sala precisa de uma credencial provisionada. Para um controlador novo, provisione a credencial da sala no painel e informe `deviceId` e segredo junto com o Wi-Fi no portal `RemoteIFES-Setup`; em uma migração de controladores antigos, siga o fluxo gradual da seção [Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração). O ambiente automatizado de testes começa com a opção desativada para exercitar também o modo legado. |
+| Exigir senha na rede de configuração dos ESP32 | **desativado** | Só vale para a rede `RemoteIFES-Setup` enquanto o [portal de provisionamento](#provisionamento-e-reprovisionamento) está aberto: aberta quando desativado, com a senha padrão do firmware (`remoteifes`) quando ativado. Chega aos ESP32 conectados pelo WebSocket e vale na próxima abertura do portal. **Não tem relação com a autenticação do ESP32 no servidor**, a opção seguinte |
+| Exigir credencial por dispositivo em todos os ESP32 | ativado em instalações normais novas | Nenhum ESP32 se conecta só pelo MAC: provisione a credencial da sala no painel e informe `deviceId` e segredo no portal junto com o Wi-Fi. Para controladores antigos, veja a [migração](#credenciais-por-dispositivo-e-migração). Os testes automatizados começam com a opção desativada, para exercitar também o modo legado |
 
 ### ESP32 por MAC e limites por sala (via `Administração > Dispositivos > Cadastro`)
 
@@ -782,70 +617,43 @@ Na mesma tela, o administrador também define se uma sala tem **acesso restrito*
 
 ## Deploy
 
-A operação de produção é **local, na rede da instituição, e não depende da Internet nem do GitHub Pages**. O navegador ou a PWA chega ao servidor pela rede local, passando por um proxy reverso quando há um, e o servidor fala com o SQLite e com os ESP32 (veja a [Visão Geral](#visão-geral)).
-
-O próprio servidor Node entrega o `remoteifes-web` na **mesma origem** da API quando `NODE_ENV=production` (ou `SERVIR_FRONTEND=true`). Assim não há CORS entre frontend e backend, o WebSocket usa a mesma origem da página, e o `remoteifes-web` não precisa ser publicado em lugar nenhum.
+A produção é **local, na rede da instituição, e não depende da Internet nem do GitHub Pages**: o servidor Node entrega o `remoteifes-web` na **mesma origem** da API, sem CORS entre os dois, e o WebSocket usa a origem da página.
 
 ### Servidor central
 
-Faça a instalação pelo fluxo único de [Linux com systemd](#linux-com-systemd). Esta seção descreve os efeitos e a operação posterior, sem redefinir os comandos de startup.
+A instalação é a de [Linux com systemd](#linux-com-systemd). O `install-service.sh`:
 
-`install-service.sh`:
+- grava `NODE_ENV=production` e cria `remoteifes.service` (`Restart=always`, `After=network-online.target`, partida no boot, limite de reinícios contra laço de falha);
+- confina o serviço ao que o servidor usa: sem dispositivos, parâmetros e módulos do kernel, log do kernel, relógio, nome do host, namespaces nem setuid; só sockets `AF_UNIX`/`AF_INET`/`AF_INET6`; `UMask=0077`, `NoNewPrivileges`, `PrivateTmp` e `ProtectSystem=full`. O banco fica legível só pelo usuário do serviço. Rodar `sudo bash install-service.sh` de novo aplica a unidade atual sem tocar nos dados;
+- instala o **watchdog** `remoteifes-health.timer`, que checa o `/health` a cada 2 minutos e reinicia o serviço depois de 3 falhas seguidas;
+- pergunta as faixas de IP da rede local a autorizar.
 
-- grava `NODE_ENV=production` no `.env` e cria o serviço `remoteifes.service` (`Restart=always`, `After=network-online.target`, início automático no boot, limite de reinícios contra loop de falha);
-- confina o serviço com o que o systemd oferece e o servidor não usa: sem dispositivos, parâmetros e módulos do kernel, log do kernel, relógio, nome do host, namespaces nem arquivos setuid, só sockets `AF_UNIX`/`AF_INET`/`AF_INET6`, e arquivos criados só para o usuário do serviço (`UMask=0077`), além de `NoNewPrivileges`, `PrivateTmp` e `ProtectSystem=full`. O banco fica legível só por esse usuário. Numa instalação existente, rodar `sudo bash install-service.sh` de novo aplica a unidade atual sem tocar nos dados;
-- instala um **watchdog** (`remoteifes-health.timer`) que checa o `/health` a cada 2 minutos e reinicia o serviço após 3 falhas seguidas;
-- pergunta a(s) faixa(s) de IP da rede local a autorizar (veja abaixo).
-
-Depois disso o sistema já responde em `http://<ip-do-servidor>:<PORTA>/` (padrão 8080) para os navegadores da rede local e em `/ws` e `/ws/dispositivo` para o tempo real e os ESP32 — tudo na mesma porta.
-
-**Liberar o acesso da rede local.** Em produção, com o modo de teste desligado, o acesso é bloqueado até que as faixas de IP da rede local sejam cadastradas. O `install-service.sh` pergunta as faixas na instalação. Depois disso elas mudam no Console de Operações, em `Rede e domínio › Acesso à aplicação`, ou, sem o console, com `npm run redes` ([Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal)).
-
-As rotas `/dispositivo/*`, usadas pelos ESP32, e o acesso por `localhost`, útil para um túnel SSH, nunca dependem dessa lista. Para uma rede local isolada e confiável o modo de teste pode ser deixado ligado na mesma tela do console, mas o cadastro das faixas é a opção recomendada.
-
-### Proxy reverso na porta 80 (rede local, sem Internet)
-
-Use o comando da referência canônica em [Proxy reverso](#proxy-reverso). `lan-setup.sh` coloca o Nginx na frente do servidor na porta 80, sem Certbot nem DNS.
-
-Ele cria um site Nginx que encaminha tudo (inclusive `Upgrade`/`Connection` para `/ws` e `/ws/dispositivo`) para `127.0.0.1:<PORTA>`, grava `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1` no `.env` (assim o Node passa a escutar **só em localhost**, atrás do proxy — impede que alguém alcance a `PORTA` diretamente e falsifique `X-Forwarded-For`) e passa a atender em `http://<ip-do-servidor>/`. O Nginx precisa já estar instalado (ou o script o instala via `apt`, quando disponível). O script assume um host dedicado ao RemoteIFES (assume o site padrão do Nginx na porta 80).
-
-### HTTPS com domínio próprio (opcional)
-
-Quando houver um domínio público e acesso à Internet, use o comando canônico de [Proxy reverso](#proxy-reverso). `remoteifes-server/https-setup.sh` configura o proxy e emite um certificado Let's Encrypt com Certbot.
-
-O script instala Nginx e Certbot se necessário, cria um site apontando para `127.0.0.1:<PORTA>`, emite o certificado, ativa a renovação automática (`certbot.timer`) e ajusta `TRUST_PROXY=1` e `BIND_ADDR=127.0.0.1` no `.env`. É o caminho para expor o sistema fora da rede local e para PWA/HTTPS em domínio próprio; a operação local não precisa dele.
+O sistema passa a responder em `http://<ip-do-servidor>:<PORTA>/` (padrão 8080), com `/ws` e `/ws/dispositivo` na mesma porta, ou atrás do [proxy reverso](#proxy-reverso). Com o modo de teste desligado, o acesso fica bloqueado até as faixas serem cadastradas ([Restrição de Rede](#restrição-de-rede)); as rotas `/dispositivo/*` dos ESP32 e o acesso por `localhost` (útil num túnel SSH) nunca dependem delas. Numa rede isolada e confiável o modo de teste pode ficar ligado, mas cadastrar as faixas é o recomendado.
 
 ### Atualização, versões e reversão
 
 <img src="docs/readme-assets/flows/update-recovery.svg" width="800" alt="Três faixas. 1, instalar, pelo terminal e uma vez: npm run setup, sudo bash install-service.sh e o instalador do Console de Operações com o primeiro operador. 2, operar pelo Console de Operações: nas abas Serviço, Atualizações e Dados e recuperação; a atualização faz backup verificado, aplica o código novo com npm ci só se o package mudou, reinicia o serviço e exige que o /health informe o commit em até 40 s. Se sim, a implantação fica verificada em deploy.log; se não, há reversão automática à versão anterior com a mesma verificação. Restaurar o banco é outra decisão, com o serviço parado e nunca automática. 3, sem o console, no terminal de desenvolvimento ou emergência: bash deploy.sh, bash rollback.sh e npm run restore, os mesmos scripts e a mesma trava .deploy-lock do console.">
 
-A atualização de rotina é feita pelo [Console de Operações](#console-de-operações), em **Atualizações**, no próprio host. O GitHub continua sendo a origem do código, mas a atualização não depende de Actions nem do GitHub Pages. Os comandos equivalentes de terminal ficam em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal) e continuam válidos quando o console não estiver disponível.
+A atualização de rotina é pelo [Console de Operações](#console-de-operações), em **Atualizações**. O GitHub é a origem do código, mas nada depende de Actions nem do Pages; os comandos de terminal equivalentes estão em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal).
 
 <img src="docs/readme-assets/screenshots/console-updates.png" width="700" alt="Aba Atualizações do Console de Operações, em Situação das versões: commit do processo em execução, HEAD e descrição do checkout, ramo local main, upstream origin/main, checkout limpo, remoto origin no GitHub, último origin/main observado com a hora, comparação indicando que o checkout está no commit observado e última implantação verificada.">
 
-O console mostra separadamente cinco coisas que um único número de versão esconde: o commit do processo em execução, lido do `/health` e não do disco; o HEAD do checkout e se há alterações locais; o ramo e o upstream; o último `origin/main` observado, com a hora da observação; e a última implantação verificada, registrada em `deploy.log`.
+O console mostra separadamente o que um número de versão esconderia: o commit do processo em execução (lido do `/health`, não do disco), o HEAD do checkout e se há alterações locais, o ramo e o upstream, o último `origin/main` observado e a última implantação verificada em `deploy.log`.
 
-O que a implantação garante é o mesmo pelo console e pelo terminal, porque os dois usam os mesmos `deploy.sh` e `rollback.sh` e a mesma trava `.deploy-lock`:
+Console e terminal dão as mesmas garantias, porque usam os mesmos `deploy.sh`, `rollback.sh` e `verificar-versao.sh` e a mesma trava `.deploy-lock`:
 
-- recusa prosseguir se houver alterações locais não commitadas, e o console nunca usa `--force`;
-- resolve o diretório de dados e o caminho do banco com o mesmo `src/config/paths.js` que o servidor usa;
-- cria um backup verificado do banco (`pre-update`) antes de mexer no código;
-- aplica o código e roda `npm ci --omit=dev` apenas se `package.json` ou `package-lock.json` mudaram. Se o `npm ci` falhar, a atualização é considerada inválida e revertida, mesmo havendo um `node_modules` antigo ou parcial;
-- reinicia o serviço e exige que o `/health` fique saudável e informe, em `commit`, exatamente o commit implantado;
-- se isso não acontecer em 40 s, reverte sozinho para a versão anterior, reinstala as dependências dela e exige a mesma confirmação;
-- grava `previous-version` e `current-version` em `<REMOTEIFES_DATA_DIR>` e registra a operação, com sucesso ou falha, em `deploy.log`.
+- recusam alterações locais não commitadas (o console nunca usa `--force`) e resolvem dados e banco pelo mesmo `src/config/paths.js` do servidor;
+- gravam um backup verificado (`pre-update`) antes de mexer no código;
+- rodam `npm ci --omit=dev` só se `package.json` ou `package-lock.json` mudaram, e tratam uma falha dele como atualização inválida;
+- reiniciam o serviço e exigem, em até 40 s, um `/health` saudável que informe em `commit` exatamente o commit implantado. Um processo antigo que sobreviveu a um reinício falho não conta; uma versão alvo anterior ao campo `commit` só é aceita se `uptimeSegundos` mostrar um processo que subiu depois do reinício, e o `deploy.log` registra `identidade não confirmada`;
+- sem essa confirmação, voltam sozinhos à versão anterior, com a mesma verificação;
+- gravam `previous-version` e `current-version` em `<REMOTEIFES_DATA_DIR>` e o desfecho em `deploy.log`.
 
-Um `/health` saudável de um processo antigo que sobreviveu a um `systemctl restart` que falhou não conta como sucesso. A verificação é a mesma nos dois scripts (`verificar-versao.sh`).
+Com o HEAD já no alvo (atualização interrompida, `git pull` manual, `--no-restart`), o processo em execução é consultado antes de responder "nada a fazer". A interrupção é curta mas existe: a partida encerra as sessões dos usuários e os ESP32 reconectam.
 
-Uma versão alvo anterior ao campo `commit` do `/health` não consegue confirmar a própria identidade, porque a árvore dela não tem `src/config/release.js`. Ela só é aceita quando o `/health` saudável mostra, em `uptimeSegundos`, um processo que subiu depois do `systemctl restart`. Um processo antigo sem identidade que sobreviveu a um reinício falho tem tempo de vida maior que o decorrido e é recusado, e o registro em `deploy.log` diz explicitamente `identidade não confirmada`. Um processo que não informa o commit nunca é aceito como uma versão alvo que o informaria.
+Reverter troca só o código. Se a versão revertida migrou o esquema (`src/db/schema.js` pode adicionar e remover colunas e tabelas), a anterior pode não funcionar com o banco migrado; restaurar o backup `pre-update` é então uma decisão explícita, nunca automática.
 
-HEAD igual ao alvo não é conclusão. Se o código já está na versão pedida, por uma atualização interrompida, um `git pull` manual ou um `--no-restart` anterior, o processo em execução é consultado antes de responder "nada a fazer".
-
-A interrupção é curta, mas existe. As sessões dos usuários são encerradas, porque o servidor encerra as sessões ativas na partida, e os ESP32 precisam reconectar. Não é implantação sem indisponibilidade.
-
-Reverter troca apenas o código. Se a atualização revertida alterou o esquema do banco, e as migrações em `src/db/schema.js` podem adicionar e remover colunas e tabelas, a versão anterior pode não funcionar com o banco já migrado. Nesse caso, restaurar o backup `pre-update` é uma decisão separada e explícita, nunca automática. É por isso que a atualização sempre grava esse backup antes de mexer no código.
-
-Marcar uma versão continua sendo trabalho da máquina de desenvolvimento, não do host de produção: é autoria de versão, não implantação.
+Marcar uma versão é trabalho da máquina de desenvolvimento, não do host de produção:
 
 ```bash
 cd remoteifes-server
@@ -854,15 +662,9 @@ bash release.sh 3.1.0        # ajusta a versão no package.json, cria o commit e
 
 ### Recuperação e verificação de saúde
 
-**Estado do servidor.** `GET /health` informa banco, tempo de processo e o commit que o processo carregou, sem autenticação. Responde `200` com `{"ok":true,...}` quando o banco responde e `503` quando não. Nenhum ESP32 afeta o resultado: um dispositivo offline não muda nada. Pela linha de comando, `npm run health` checa `127.0.0.1:<PORTA>/health`.
+**`GET /health`**, sem autenticação, informa o banco, o tempo de processo e o commit carregado: `200` com `{"ok":true,...}` quando o banco responde e `503` quando não; nenhum ESP32 afeta o resultado. `npm run health` checa `127.0.0.1:<PORTA>/health`. O `commit` é lido do `.git` uma vez, na partida (`src/config/release.js`), então identifica o código em execução mesmo depois de o checkout mudar; é `null` sem repositório.
 
-O campo `commit` é lido do `.git` uma única vez ao iniciar o processo (`src/config/release.js`), por isso identifica o código realmente em execução mesmo depois de o checkout ter sido trocado por um deploy. Ele é `null` quando o repositório não está disponível.
-
-**Reinício após queda.** O `remoteifes.service` tem `Restart=always`. O watchdog `remoteifes-health.timer` roda `health-watchdog.sh`, como o usuário do serviço, a cada 2 minutos e, após 3 falhas seguidas do `/health`, aciona o `remoteifes-recover.service`. Essa é uma unidade `root` cujo único comando é `systemctl restart remoteifes.service`, e nenhum script do checkout roda como root.
-
-**Reinício após reboot do host.** `install-service.sh` habilita o serviço, que sobe sozinho no boot. Mantenha o `REMOTEIFES_DATA_DIR` em disco persistente.
-
-**Restauração do banco.** É feita pelo console, em **Dados e recuperação**. Pelo terminal, `npm run restore` lista os backups de `<REMOTEIFES_DATA_DIR>/backups/` e restaura um deles, criando antes uma cópia de segurança verificada do banco atual. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
+**Reinícios.** `remoteifes.service` tem `Restart=always` e sobe no boot (mantenha `REMOTEIFES_DATA_DIR` em disco persistente). O `remoteifes-health.timer` roda `health-watchdog.sh` como o usuário do serviço a cada 2 minutos e, depois de 3 falhas seguidas, aciona `remoteifes-recover.service`, uma unidade `root` cujo único comando é `systemctl restart remoteifes.service`; nenhum script do checkout roda como root. A restauração do banco está em [Backup e restauração do banco](#backup-e-restauração-do-banco).
 
 
 ## Console de Operações
@@ -874,21 +676,13 @@ O **Console de Operações** (`remoteifes-console/`) é um serviço local, separ
   <img src="docs/readme-assets/composed/management-boundaries-light.png" width="800" alt="Quem altera o quê. O Site RemoteIFES opera o prédio, por papel de usuário: salas e ar-condicionado, agendamentos e grade, usuários, papéis e proprietários, ESP32 com cadastro, credenciais, OTA e IR, monitoramento, alertas e topologia, relatos, logs e auditoria e configurações da aplicação. O Console de Operações opera o host e o software, com operador próprio: serviço e registros do host, atualizar e reverter a aplicação, backup, restauração e senha do superadmin, acesso de rede da aplicação, que o site só exibe, programa do console e reinício do host. Em modo somente leitura, o console consulta rede, proxy, DNS e TLS e também aplicativo e CI. Fora das duas interfaces, no terminal do servidor, ficam a instalação do servidor, o proxy com HTTPS e a recuperação de emergência. Cada valor tem um único dono.">
 </picture>
 
-A exceção é a política de acesso de rede, com o modo de teste e as faixas autorizadas. Ela decide quem alcança o site, então é editada só aqui e no terminal do servidor. Veja [Restrição de Rede](#restrição-de-rede).
-
-**Rede e domínio** só diagnostica interfaces, rotas, DNS, proxy e certificado. `lan-setup.sh` e `https-setup.sh` instalam pacotes, reescrevem o site do Nginx e alteram o `.env`, então continuam como procedimento de terminal, com decisão humana ([Proxy reverso](#proxy-reverso)). **Aplicativo e CI** também só consulta.
-
-Abrir o console informa o estado atual do servidor e não o inicia nem o reinicia. Instalar o programa, registrar o serviço, abrir o console, subir o servidor e reiniciar o servidor são cinco coisas distintas, e o console só reinicia a aplicação quando a operação exige e o operador aceita o impacto.
+A política de acesso de rede (modo de teste e faixas autorizadas) é a exceção: decide quem alcança o site, então só se edita aqui e no terminal ([Restrição de Rede](#restrição-de-rede)). **Rede e domínio** e **Aplicativo e CI** só consultam; `lan-setup.sh` e `https-setup.sh` continuam como procedimento de terminal, com decisão humana, porque instalam pacotes e reescrevem o Nginx e o `.env`. Abrir o console não inicia nem reinicia o servidor: ele só reinicia a aplicação quando a operação exige e o operador aceita o impacto.
 
 ### Por que é um serviço separado
 
-A aplicação encerra todas as sessões a cada reinício, a autenticação dela vive no SQLite e o banco pode ser justamente o que quebrou. Uma ferramenta de recuperação embutida na aplicação não estaria disponível quando fosse necessária. Além disso, administrar a aplicação não pode conceder acesso irrestrito ao host.
+A aplicação encerra as sessões a cada reinício, a autenticação dela vive no SQLite e o banco pode ser justamente o que quebrou: uma ferramenta de recuperação embutida nela não estaria disponível quando necessária. E administrar a aplicação não pode dar acesso irrestrito ao host.
 
-O console também não fica residente. No Linux ele é ativado por socket do systemd: enquanto ninguém o usa, nenhum processo dele existe e o systemd apenas mantém a porta. Na primeira conexão o serviço sobe e, depois de `CONSOLE_OCIOSIDADE_S` (padrão 900 s) sem uso, sai sozinho. Num Raspberry Pi 3 de 1 GiB isso troca RAM ociosa permanente por uma partida de processo na primeira requisição.
-
-No Windows e no macOS não existe socket de sistema equivalente, e o modelo é o mesmo por outro caminho: o lançador sobe o console sob demanda e o processo sai sozinho ao ficar ocioso. No macOS quem sobe o processo é o launchd, acionado pelo lançador com `launchctl kickstart` sem `-k`. Assim o status, o reinício depois de uma atualização e a desinstalação agem sobre o mesmo processo, e nunca há um segundo console iniciado por fora.
-
-No Linux o serviço do sistema roda como o dono do checkout, e o instalador recusa `root` como usuário do serviço. O único caminho privilegiado é o auxiliar de verbos fixos descrito em [Modelo de segurança do console](#modelo-de-segurança-do-console).
+O console também não fica residente. No Linux ele é ativado por socket do systemd: sobe na primeira conexão e sai sozinho depois de `CONSOLE_OCIOSIDADE_S` (padrão 900 s) sem uso, o que num Pi 3 de 1 GiB troca RAM ociosa por uma partida de processo. No Windows e no macOS, sem socket equivalente, o lançador sobe o console sob demanda (no macOS pelo launchd, com `launchctl kickstart` sem `-k`), então status, reinício e desinstalação agem sempre sobre o mesmo processo. No Linux o serviço roda como o dono do checkout, nunca `root`; o único caminho privilegiado é o auxiliar descrito em [Modelo de segurança do console](#modelo-de-segurança-do-console).
 
 ### Sistemas e arquiteturas suportados
 
@@ -912,11 +706,7 @@ Suportado não é o mesmo que executado na CI. O que a CI instala e roda, e o qu
 
 O Node mínimo declarado (22.13.0) roda nos testes Linux do servidor e do console e no ensaio de implantação mais antigo; os demais usam o 22.x mais recente.
 
-Onde uma capacidade não existe, o console diz por quê. "Não instalado", "sem permissão", "indisponível", "não se aplica" e "não suportado aqui" são estados distintos, visíveis na aba **Programa**. O servidor recusa a operação de verdade: botão desabilitado não é controle de acesso.
-
-A arquitetura não é decidida por `uname -m`. Um Raspberry Pi 3 pode ter hardware e kernel de 64 bits com userland de 32 bits, e quem decide o artefato é `process.arch`, a arquitetura do runtime que de fato vai executar. O console classifica hardware, kernel, userland e runtime separadamente e mostra os quatro.
-
-Um Pi 3 com sistema de 32 bits (armv7/armhf) segue suportado enquanto o Node 22 tiver suporte, que termina em **2027-04-30**. Depois disso a recomendação é migrar o Pi para um sistema de 64 bits. O console exibe esse horizonte em vez de deixar a surpresa para a atualização que quebrar.
+Onde uma capacidade falta, a aba **Programa** diz por quê ("não instalado", "sem permissão", "indisponível", "não se aplica" ou "não suportado aqui"), e o servidor do console recusa a operação de verdade. O artefato é escolhido por `process.arch`, não por `uname -m`: um Pi 3 pode ter kernel de 64 bits e userland de 32, e o console mostra hardware, kernel, userland e runtime separados. Um Pi 3 com sistema de 32 bits (armv7/armhf) segue suportado enquanto o Node 22 tiver suporte, até **2027-04-30**; depois, migre para 64 bits. O console exibe esse horizonte.
 
 ### Onde a instalação mora
 
@@ -940,11 +730,7 @@ O layout é o mesmo nos três sistemas:
 
 ### Instalar
 
-O instalador é o mesmo nos três sistemas e não exige compilador, SDK nem pacote npm global. O único requisito é o Node 22.13+ que o RemoteIFES já pede.
-
-No **Windows**, use o instalador `remoteifes-console-<versão>-windows-<arco>-instalador.exe`. Ele é um instalador comum: duplo clique, escolha da pasta, atalho opcional na área de trabalho, entrada em Programas e Recursos e uma janela que mostra o progresso real. A instalação é por usuário e não pede elevação, porque a tarefa que abre o console na entrada do usuário não exige Administrador. Executá-lo sobre uma instalação existente repara a instalação.
-
-Para instalar em silêncio, ou para instalar para todos os usuários, use as linhas de comando abaixo. O `.zip` portátil continua disponível e instala o mesmo programa.
+O instalador é o mesmo nos três sistemas e só exige o Node 22.13+ que o RemoteIFES já pede. No **Windows**, `remoteifes-console-<versão>-windows-<arco>-instalador.exe` é um instalador comum, por usuário e sem elevação (com atalho opcional e entrada em Programas e Recursos); executá-lo de novo repara a instalação. Para instalar em silêncio ou para todos os usuários, ou pelo `.zip` portátil:
 
 ```powershell
 remoteifes-console-<versão>-windows-x64-instalador.exe /S /D=C:\Programas\RemoteIFES Console
@@ -960,11 +746,7 @@ sudo node instalacao/instalar.js --escopo sistema     # Linux com systemd
 node instalacao/instalar.js                           # macOS, ou Linux por usuário
 ```
 
-O instalador mostra o progresso por etapas reais, com o peso de cada uma: pré-requisitos, programa, estado e primeiro acesso, integração com o sistema e verificação. Nada avança por temporizador. Ele termina carregando o lançador instalado pela camada estável, e se o programa instalado não carrega a instalação falha e mostra o comando de reparo.
-
-A cada abertura, o lançador confere apenas o que é barato: a versão do Node e a identidade do processo na porta. Nada é reinstalado a cada vez.
-
-No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket` e `.service`. Em qualquer sistema ele cria o atalho de aplicativo e gera um segredo de instalação de uso único, gravado em `bootstrap-token` no diretório de estado, legível só por quem administra o host.
+O progresso segue etapas reais (pré-requisitos, programa, estado e primeiro acesso, integração, verificação), e a instalação só termina depois de carregar o lançador instalado; se ele não carrega, ela falha e mostra o comando de reparo. No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket` e `.service`. Em todos os sistemas cria o atalho e um segredo de instalação de uso único, `bootstrap-token`, no diretório de estado, legível só por quem administra o host.
 
 #### Pelo pacote `.deb`
 
@@ -978,38 +760,34 @@ Sem o checkout, a instalação prepara estado e segredo e imprime o único coman
 
 #### Primeiro operador
 
-Nenhum segredo precisa ser copiado à mão. Com interface gráfica, abra o console pelo atalho do sistema usando a conta que administra o host. O lançador lê o segredo, troca-o por um convite de uso único válido por 10 minutos e abre o navegador direto no formulário de primeiro acesso. O convite chega por uma página privada, num arquivo legível só por você, nunca por argumento de processo, e sai da barra de endereço e do histórico antes de ser usado.
-
-Sem interface gráfica, o caso normal de um Pi acessado por SSH, crie o operador no próprio host. Nome e senha são pedidos no terminal e nunca passam como argumento:
+Com interface gráfica, abra o console pelo atalho, com a conta que administra o host: o lançador troca o segredo por um convite de uso único, válido por 10 minutos, e abre o navegador no formulário de primeiro acesso, sem que o convite passe por argumento de processo ou fique no histórico. Sem interface gráfica, o caso normal de um Pi por SSH, crie o operador no próprio host; nome e senha são pedidos no terminal:
 
 ```bash
 sudo node /opt/remoteifes-console/launcher-bootstrap.js --criar-operador
 ```
 
-A tela de primeiro acesso também aceita o segredo digitado, lido de `bootstrap-token`. Criado o operador, o segredo e qualquer convite pendente deixam de valer. Reparar ou reinstalar preserva os operadores existentes. A instalação manual, fora do pacote, ainda exibe o segredo uma vez no terminal.
+A tela de primeiro acesso também aceita o segredo digitado de `bootstrap-token`, e a instalação manual, fora do pacote, o exibe uma vez no terminal. Criado o operador, segredo e convites deixam de valer; reparar ou reinstalar preserva os operadores.
 
 #### Remover
 
-No Windows, use Programas e Recursos. Nos outros sistemas, chame o desinstalador do console.
+No Windows, use Programas e Recursos; nos outros sistemas, o desinstalador, que infere raiz, estado e escopo da própria instalação:
 
 ```bash
 node instalacao/desinstalar.js --simular   # mostra o que sairia, sem mutar nada
 node instalacao/desinstalar.js --sim
 ```
 
-Sem `--apagar-estado`, operadores, auditoria e histórico são preservados. A remoção encerra o console em execução antes de apagar o programa, e o que autoriza encerrar é a prova de identidade, não o PID, que é reciclado. Ela recusa qualquer caminho que não prove ser uma instalação do console e nunca toca no checkout do RemoteIFES. Raiz, estado e escopo são inferidos da instalação, então o comando funciona sem argumentos.
+Sem `--apagar-estado`, operadores, auditoria e histórico ficam. A remoção encerra o console em execução pela prova de identidade (não pelo PID, que é reciclado), recusa qualquer caminho que não prove ser uma instalação do console e nunca toca no checkout do RemoteIFES.
 
 ### Acessar
 
-Abra o console pelo atalho do sistema. Ele escuta apenas em loopback, então de outra máquina é preciso um túnel SSH: o `localhost` do seu computador não é o do Pi. `CONSOLE_BIND` só escolhe entre `127.0.0.1` e `::1`; com qualquer outro endereço o console não sobe.
+O console escuta só em loopback (`CONSOLE_BIND` aceita apenas `127.0.0.1` ou `::1`), então de outra máquina é preciso um túnel SSH: o `localhost` do seu computador não é o do Pi.
 
 ```bash
 ssh -L 8099:127.0.0.1:8099 <usuario>@<host-do-pi>
 ```
 
-Feito o túnel, abra `http://127.0.0.1:8099` no seu navegador. Num host sem interface gráfica não há navegador para abrir e nada além do túnel é necessário, porque o socket do systemd já sobe o console na primeira conexão. O primeiro operador é criado no próprio host, como descrito em [Primeiro operador](#primeiro-operador).
-
-O lançador serve quando não há atalho disponível ou quando o host é administrado por linha de comando:
+Feito o túnel, abra `http://127.0.0.1:8099`; o socket do systemd sobe o console na primeira conexão. No próprio host, use o atalho ou o lançador:
 
 ```bash
 node <raiz>/launcher-bootstrap.js            # abre o console no navegador padrão
@@ -1017,33 +795,17 @@ node <raiz>/launcher-bootstrap.js --iniciar  # sobe o console e sai, sem abrir n
 node <raiz>/launcher-bootstrap.js --status   # estado do console, da aplicação e da versão do programa
 ```
 
-`--iniciar` é o que serve um host sem interface gráfica, e é o caminho que a CI exercita para provar que o lançador instalado sobe o console, e não outra cópia de si mesmo.
-
-Antes de abrir o navegador, o lançador confere a identidade de quem responde na porta esperada. Ele envia um desafio e exige a resposta HMAC derivada do segredo que só o console em execução conhece. Se outro processo tiver tomado a porta, o navegador não é aberto. Nenhuma credencial reutilizável viaja em URL, argumento de processo ou atalho.
+`--iniciar` serve um host sem interface gráfica e é o caminho que a CI exercita. Antes de abrir o navegador, o lançador desafia quem responde na porta e exige a resposta HMAC derivada do segredo que só o console em execução conhece; se outro processo tomou a porta, nada é aberto. Nenhuma credencial reutilizável viaja em URL, argumento ou atalho.
 
 ### Atualizar o programa
 
-A versão do console é independente do commit do RemoteIFES implantado, e as duas atualizações não se misturam. Atualizar o console baixa um artefato de release, confere a atestação de proveniência do GitHub e o SHA-256 do artefato, instala a versão nova ao lado da atual e troca o ponteiro. Reverter é trocar o ponteiro de volta, sem rede. O processo não usa `git`, não copia o checkout e não consome o `origin/main` da aplicação.
+A versão do console é independente do commit do RemoteIFES. O console se atualiza sozinho, em segundo plano, duas vezes por dia (ou na hora, por **Atualizar o Console de Operações**): baixa o release, confere a atestação de proveniência do GitHub e o SHA-256, instala ao lado da versão atual e troca o ponteiro, que vale no próximo início. Reverter é voltar o ponteiro, sem rede. Nada disso usa `git` nem o checkout da aplicação.
 
-O console instalado se atualiza sozinho: verifica em segundo plano duas vezes por dia, instala uma versão nova atestada ao lado da atual e a carrega no próximo início, sem derrubar ninguém. A ação **Atualizar o Console de Operações** faz o mesmo na hora. Instalar, iniciar ou implantar não pede nenhuma etapa de chave ou de confiança. Enquanto não houver release publicado, a aba **Programa** diz que não há publicação.
+Sem Internet, a versão instalada fica como está e as tentativas se espaçam até uma por dia; um campus isolado importa a pasta do release de uma mídia com `node bin/atualizar-console.js --importar <pasta>`, com a mesma verificação.
 
-Sem Internet, isso é um estado normal, não uma falha. Nada local espera pela rede, a versão instalada fica como está, e as tentativas seguintes esperam cada vez mais, até um dia. Quando a rede volta, a próxima tentativa agendada funciona sozinha. Um campus sem Internet recebe a pasta do release em mídia removível e a instala com `node bin/atualizar-console.js --importar <pasta>`, com a mesma verificação.
+Uma versão que nem carrega é descartada na hora. Uma que carrega e cai fica em observação até se manter 20 s no ar; se iniciar duas vezes sem confirmar, a terceira partida volta à anterior e a aba **Programa** mostra "Atualização revertida automaticamente". Uma versão saudável interrompida duas vezes por reinícios do host também seria revertida, e depois de confirmada uma falha é relatada, não revertida.
 
-#### Versão nova que falha depois de subir
-
-Uma versão que nem carrega é descartada na hora e a camada estável cai para a anterior. Uma versão que carrega e depois cai, por exemplo ao atender a primeira requisição, fica em observação até confirmar que se manteve no ar por 20 s. Se ela iniciar duas vezes sem confirmar, a terceira partida volta sozinha para a versão anterior e a aba **Programa** mostra "Atualização revertida automaticamente".
-
-O limite é deliberado e não é uma ativação em duas fases. Uma versão saudável interrompida duas vezes antes de confirmar, por reinícios seguidos do host, também seria revertida. E depois da confirmação uma falha é relatada, não revertida. A contagem vive na camada estável, que a autoatualização não reescreve, então instalações anteriores passam a tê-la ao reinstalar ou atualizar o pacote.
-
-#### Proveniência dos releases
-
-Nenhuma chave de assinatura existe. Um release do console é aceito porque o GitHub Actions, executando o workflow de publicação deste repositório (`.github/workflows/console-release.yml`) para a etiqueta `console-v<versão>`, atestou os bytes exatos de cada arquivo com uma atestação de artefato do GitHub, sem chave, pelo Sigstore. O console confere a atestação com `@sigstore/verify` e exige, a partir do certificado, o repositório e o dono (por nome e identificador numérico), esse workflow, a etiqueta da versão do manifesto, o commit do manifesto, o gatilho `push`, um executor hospedado pelo GitHub e o ambiente `console-release`. Sem atestação válida, nada é instalado.
-
-Publicar um release é subir a versão em `remoteifes-console/package.json` na `main` e enviar a etiqueta `console-v<versão>`. O workflow testa, constrói em Linux e em Windows e exige resultados idênticos, atesta, confere como um console instalado conferiria e publica. Não há chave para guardar, copiar ou trocar.
-
-Ainda não há certificado de assinatura de código do Windows nem conta de desenvolvedor Apple para notarização. Os executáveis se declaram `assinaturaDeCodigo: false` em `proveniencia.json`, e no Windows o SmartScreen avisa ao abrir o instalador. A origem deles é provada pela atestação do release.
-
-O modelo completo, o que ele não cobre e o procedimento sem Internet estão em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md#5-confiança-da-atualização), junto com os detalhes de empacotamento e a matriz de sistemas.
+**Proveniência.** Não existe chave de assinatura. Um release é aceito porque o workflow `.github/workflows/console-release.yml`, na etiqueta `console-v<versão>`, atestou os bytes de cada arquivo pelo Sigstore; o console confere com `@sigstore/verify` o repositório e o dono, o workflow, a etiqueta, o commit do manifesto, o gatilho `push`, o executor hospedado e o ambiente `console-release`. Publicar é subir a versão em `remoteifes-console/package.json` na `main` e enviar a etiqueta; o workflow testa, constrói em Linux e Windows exigindo resultados idênticos, atesta, confere e publica. Os executáveis ainda não têm assinatura de código Windows nem notarização Apple (`assinaturaDeCodigo: false` em `proveniencia.json`), então o SmartScreen avisa ao abrir o instalador. O modelo completo está em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md#5-confiança-da-atualização).
 
 ### O que o console faz
 
@@ -1058,15 +820,11 @@ O modelo completo, o que ele não cobre e o procedimento sem Internet estão em 
 | **Programa** | versão do próprio console, atualização e reversão do programa, capacidades da plataforma com o motivo de cada indisponibilidade, e onde a instalação mora |
 | **Avançado** | elevação, auditoria do console, histórico de operações e Terminal Expert |
 
-Antes de qualquer operação que interrompa o serviço, o console avalia o impacto. Ele bloqueia quando há OTA em andamento, em qualquer fase ativa inclusive `validando`, rollout ativo, outra manutenção em curso ou disco insuficiente. Quando a atividade dos ESP32 não pode ser observada, ele avisa em vez de assumir que é zero. A avaliação é refeita no instante da execução.
+Antes de uma operação que interrompa o serviço, o console avalia o impacto, de novo no instante da execução: bloqueia com OTA em qualquer fase ativa (inclusive `validando`), rollout ativo, outra manutenção ou disco insuficiente, e avisa quando não consegue observar a atividade dos ESP32 em vez de supor que é zero.
 
 ### Operações longas
 
-Operações longas não dependem do navegador nem do próprio processo do console. Cada uma roda sob um supervisor próprio, em grupo de processos separado, que guarda a saída em arquivo, aplica o prazo máximo da operação, mantém a trava de manutenção em seu nome e grava o código de saída ao terminar.
-
-Se o console cair, sair por ociosidade, for atualizado ou reiniciado no meio de uma restauração ou implantação, a operação continua, porque a unidade do systemd usa `KillMode=process`. O console seguinte acompanha o supervisor ainda vivo até o fim, ou lê o desfecho gravado.
-
-Uma operação que terminou sem ninguém acompanhando aparece com o código de saída real e com o aviso de que o efeito não foi verificado automaticamente. Só um trabalho cujo supervisor desapareceu sem gravar desfecho fica registrado como desfecho desconhecido, nunca como sucesso presumido.
+Cada operação longa roda sob um supervisor próprio, em grupo de processos separado, que guarda a saída em arquivo, aplica o prazo máximo, mantém a trava de manutenção e grava o código de saída. Se o console cair, sair por ociosidade ou for atualizado no meio de uma restauração ou implantação, a operação continua (`KillMode=process`), e o console seguinte a acompanha ou lê o desfecho gravado. Um supervisor que sumiu sem gravar desfecho fica como desfecho desconhecido, nunca como sucesso.
 
 ### Modelo de segurança do console
 
@@ -1081,11 +839,7 @@ Um operador autorizado que use `sudo` tem o alcance que o host lhe der, inclusiv
 
 ### Terminal Expert
 
-O terminal do console tem destravamento explícito, reautenticação, autorização de curta duração, relock automático, limite de sessões simultâneas, limpeza da árvore de processos e auditoria sem transcrição, apenas com metadados.
-
-O pseudoterminal em si depende do módulo nativo `node-pty`, que não é instalado por padrão. Sem ele o console declara o terminal indisponível e mostra como habilitá-lo, e nenhum substituto é oferecido. Um terminal sem PTY real quebra silenciosamente em `vim`, `less` e `htop`, e um campo de texto ligado a um endpoint genérico de execução seria risco disfarçado de recurso. Enquanto o módulo não estiver instalado, o acesso a shell continua sendo por SSH, o que não é a mesma coisa, e o console diz isso.
-
-A saída do terminal não é filtrada em busca de segredos. Se o operador abrir um arquivo com credenciais, elas aparecem na tela. A proteção de segredos do console vale para suas próprias APIs e registros, não para o que um shell autorizado decide exibir.
+O terminal do console exige destravamento explícito e reautenticação, tem autorização curta, relock automático, limite de sessões e limpeza da árvore de processos, e é auditado só por metadados, sem transcrição. Ele depende do módulo nativo `node-pty`, que não vem instalado: sem ele, o console declara o terminal indisponível e mostra como habilitá-lo, sem oferecer substituto (um terminal sem PTY real quebra em `vim`, `less` e `htop`), e o shell continua sendo por SSH. A saída não é filtrada: um arquivo com credenciais aberto no terminal aparece na tela.
 
 ### Custo de recursos e testes
 
@@ -1178,35 +932,25 @@ Reinstalar o console não toca no `remoteifes.service` nem no banco. Para remov�
 
 ## Hospedagem em Raspberry Pi
 
-Um Raspberry Pi (3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits) é suficiente para rodar `remoteifes-server`: o `node:sqlite` usado pelo projeto é nativo do próprio Node.js, então não há dependências compiladas nem ferramentas de build a instalar no dispositivo. A CI executa a instalação completa em Linux ARM64, a mesma arquitetura de um Pi de 64 bits, mas não num Pi físico; o workflow manual *Virtual Hardware Validation* repete o ensaio no userland do Raspberry Pi OS de 64 bits e exercita o de 32 bits (ARMv7) sob emulação, o que também não é um Pi físico (veja [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados)).
+Um Raspberry Pi 3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits, basta para o servidor: o `node:sqlite` é nativo do Node.js, então nada é compilado no Pi, e `npm run setup` instala o Node.js 22.13+ dos binários oficiais (ARM64 ou ARMv7) quando o do sistema falta ou é antigo. Nenhum runner de CI é um Pi físico; o que a CI e o workflow manual cobrem está em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados).
 
-Clone o repositório e siga somente [Linux com systemd](#linux-com-systemd); se quiser Nginx, continue em [Proxy reverso](#proxy-reverso). Redes adicionais são cadastradas depois pelo [Console de Operações](#console-de-operações) ou, sem ele, com `npm run redes -- 10.10.0.0/16`.
-
-No Pi, `npm run setup` detecta a arquitetura (ARM64 ou ARMv7) e instala o Node.js 22.13+ direto dos binários oficiais quando a versão do sistema é insuficiente ou inexistente, sem depender do pacote da distribuição, que costuma estar desatualizado.
-
-`install-service.sh` dispensa `pm2` e uma sessão de terminal aberta, e o servidor passa a entregar o `remoteifes-web` na mesma origem da API. Para manter os dados fora do checkout do Git, o recomendado, defina `REMOTEIFES_DATA_DIR=/var/lib/remoteifes` no `.env` antes do primeiro boot.
-
-Depois de instalado, a operação de rotina é feita pelo [Console de Operações](#console-de-operações). Os comandos de `systemd` equivalentes, para quando o console não estiver disponível, ficam em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal).
-
-Reinicie o serviço sempre que editar `remoteifes-server/.env`, pelo console (**Serviço**) ou com `systemctl restart`. Atualizações e reversões seguem [Atualização, versões e reversão](#atualização-versões-e-reversão), que funciona igual no Raspberry Pi, inclusive sem rede (`--offline`). Para expor o Pi fora da rede local com HTTPS em um domínio próprio, necessário para PWA/Cordova em domínio público, use `https-setup.sh`, que funciona da mesma forma no Pi.
-
-Cada sala continua com seu próprio ESP32 fazendo a ponte com o ar-condicionado (veja [Firmware ESP32](#firmware-esp32)); o Raspberry Pi hospeda apenas o servidor central que os agrega.
+Clone o repositório e siga [Linux com systemd](#linux-com-systemd) e, se quiser Nginx, [Proxy reverso](#proxy-reverso). Defina `REMOTEIFES_DATA_DIR=/var/lib/remoteifes` no `.env` antes do primeiro boot, para manter os dados fora do checkout. Depois, a rotina é pelo [Console de Operações](#console-de-operações): redes autorizadas, reinício após editar o `.env` (ou `systemctl restart`), e [atualizações e reversões](#atualização-versões-e-reversão), que funcionam também sem rede (`--offline`). O Pi hospeda só o servidor; cada sala continua com o próprio ESP32.
 
 ### Antes de deixar o Pi exposto sem supervisão
 
-Uma Pi acessível pela internet e sem alguém observando ativamente é um alvo permanente. Confira estes pontos antes de deixá-la assim:
+Um Pi alcançável pela Internet e sem ninguém observando é um alvo permanente. Antes de deixá-lo assim:
 
-- **Defina `SENHA_ADMIN_INICIAL`** no `.env` antes de criar o banco. Sem ela a conta inicial é `superadmin`/`admin`, com um aviso persistente até a troca: troque a senha antes de expor a Pi.
-- **Mantenha o modo de teste desativado** (Console de Operações › `Rede e domínio › Acesso à aplicação`) e cadastre as faixas de IP autorizadas para restringir o acesso à rede autorizada; em uma instalação nova de produção o modo de teste começa desativado.
-- **Exponha apenas a porta do proxy** (80 no `lan-setup.sh`, 443 no `https-setup.sh`), nunca a porta do Node (`PORTA`, padrão 8080) diretamente — configure isso no firewall do roteador/Pi (`ufw allow 80` ou `ufw allow 443`, sem regra para a `PORTA` interna). Acessar a `PORTA` diretamente contorna o TLS e a checagem de `TRUST_PROXY`.
-- **Mantenha o sistema operacional da Pi atualizado sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` aplica patches de segurança do Raspberry Pi OS automaticamente, sem depender de alguém logar para atualizar.
-- **Troque a senha padrão do usuário do sistema operacional** (`pi`/`raspberry`, se ainda for a padrão) e prefira acesso SSH por chave pública em vez de senha.
-- **Vincule cada ESP32 à sua sala assim que possível** (`Administração > Dispositivos > Cadastro`), com a credencial exclusiva, que uma instalação nova já exige; controladores antigos que ainda entram só pelo MAC seguem a [migração](#credenciais-por-dispositivo-e-migração). As rotas `/dispositivo/*` não passam pela restrição de rede porque os controladores precisam alcançá-las. Sem vínculo, o dispositivo aparece apenas como detectado e não controla uma sala; com o MAC vinculado, as chamadas precisam corresponder ao cadastro; com credencial provisionada, o MAC sozinho deixa de autenticar aquela sala.
-- **Confirme que os backups estão sendo gravados** em `<REMOTEIFES_DATA_DIR>/backups/` (`data/backups/` por padrão; em produção o backup automático já vem ligado, e `deploy.sh`/`rollback.sh` também geram um antes de cada troca de versão) e copie essa pasta para fora da Pi periodicamente. Teste a restauração ao menos uma vez com `npm run restore` num ambiente separado — um backup nunca verificado não é um backup. Veja [Backup e restauração do banco](#backup-e-restauração-do-banco).
+- **Defina `SENHA_ADMIN_INICIAL`** antes de criar o banco; sem ela a conta inicial é `superadmin`/`admin`.
+- **Mantenha o modo de teste desativado** e as faixas autorizadas cadastradas (Console › `Rede e domínio › Acesso à aplicação`).
+- **Exponha só a porta do proxy** (80 com `lan-setup.sh`, 443 com `https-setup.sh`), nunca a `PORTA` do Node, que contornaria o TLS e o `TRUST_PROXY`: `ufw allow 80` ou `ufw allow 443`, sem regra para a `PORTA`.
+- **Atualize o sistema sozinho**: `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades`.
+- **Troque a senha do usuário do sistema** (`pi`/`raspberry`, se ainda for a padrão) e prefira SSH por chave pública.
+- **Vincule cada ESP32 à sua sala com a credencial exclusiva** (`Administração > Dispositivos > Cadastro`): as rotas `/dispositivo/*` não passam pela restrição de rede, porque os controladores precisam alcançá-las.
+- **Confira os backups** em `<REMOTEIFES_DATA_DIR>/backups/`, copie a pasta para fora do Pi periodicamente e teste a restauração ao menos uma vez num ambiente separado ([Backup e restauração do banco](#backup-e-restauração-do-banco)).
 
 ### Frontend no GitHub Pages (opcional, para demonstração)
 
-Na operação de produção descrita em [Deploy](#deploy) **o próprio servidor entrega o `remoteifes-web`** na mesma origem da API — o GitHub Pages não é necessário e a operação local não depende dele. A publicação no GitHub Pages é útil apenas como vitrine/demonstração pública e usa o workflow `.github/workflows/pages.yml`, porque a publicação direta a partir de uma branch aceita somente a raiz ou `/docs`, não a subpasta `/remoteifes-web`. Passo a passo:
+Em produção o próprio servidor entrega o `remoteifes-web`; o GitHub Pages serve só como vitrine pública, publicada pelo workflow `.github/workflows/pages.yml` (a publicação direta de uma branch só aceita a raiz ou `/docs`). Passo a passo:
 
 1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
 2. O frontend fala com a origem da própria página (`servidorPadraoDoNavegador()` em `remoteifes-web/js/config.js`), que no GitHub Pages é o endereço `github.io`, não o servidor. Para a demonstração, troque na linha `const serverUrl = …` esse valor pela origem HTTPS do servidor central e inclua a origem do Pages em `CORS_ORIGIN`. O mesmo arquivo é entregue pelo servidor em produção, então aponte-o só para o próprio servidor e avance a versão do frontend.
@@ -1214,24 +958,20 @@ Na operação de produção descrita em [Deploy](#deploy) **o próprio servidor 
 4. No repositório, vá em **Settings > Pages**.
 5. Em "Build and deployment", campo "Source", selecione **GitHub Actions**.
 6. Abra **Actions > Pages**, execute o workflow manualmente se necessário e acompanhe a implantação. Depois disso, cada push em `main` que alterar `remoteifes-web` ou o próprio workflow republica o site.
-7. Quando a publicação terminar, o endereço público aparece em **Settings > Pages**, no formato `https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`.
-
-Esse é o link que você compartilha com os usuários para acessar o sistema pelo navegador. Sempre que `remoteifes-web` for alterado, faça commit e push — o workflow republica o site automaticamente.
+7. Quando a publicação terminar, o endereço aparece em **Settings > Pages** (`https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`). Cada push que altere `remoteifes-web` o republica.
 
 ## Domínio Próprio e HTTPS
 
-Para servir o frontend em um domínio próprio (em vez do endereço `github.io` padrão) via GitHub Pages:
+O servidor central ganha HTTPS com domínio próprio pelo `https-setup.sh` ([Proxy reverso](#proxy-reverso)). Como o WebSocket herda o esquema da página (`wss://` sob `https://`), o tempo real não pede configuração extra. Para a vitrine do GitHub Pages num domínio próprio:
 
-1. Crie um arquivo `remoteifes-web/CNAME` contendo apenas o domínio desejado (ex.: `remoteifes.ifes.edu.br`), ou configure o campo "Custom domain" em **Settings > Pages**.
-2. Aponte um registro `CNAME` (ou `A`, se for domínio raiz) do seu DNS para o GitHub Pages, conforme a [documentação oficial do GitHub](https://docs.github.com/pages/configuring-a-custom-domain-for-your-github-pages-site).
-3. Ative "Enforce HTTPS" em **Settings > Pages** assim que o certificado for emitido — isso é obrigatório para funcionar corretamente em navegadores móveis (iOS/Android bloqueiam conteúdo misto HTTP a partir de uma página HTTPS).
-4. Garanta que o servidor central também esteja em HTTPS (com domínio ou IP fixo, via `https-setup.sh` ou configuração equivalente) e que `CORS_ORIGIN` inclua o domínio do frontend.
-
-Com o frontend e o servidor central ambos em HTTPS e domínios próprios, o sistema funciona normalmente em navegadores de celular, incluindo ao adicionar a página como atalho na tela inicial. Como o WebSocket herda o esquema da página (`wss://` quando a página é `https://`), nenhuma configuração adicional é necessária para o tempo real funcionar sob HTTPS.
+1. Crie `remoteifes-web/CNAME` só com o domínio (ex.: `remoteifes.ifes.edu.br`), ou preencha "Custom domain" em **Settings > Pages**.
+2. Aponte um registro `CNAME` (ou `A`, num domínio raiz) para o GitHub Pages, conforme a [documentação do GitHub](https://docs.github.com/pages/configuring-a-custom-domain-for-your-github-pages-site).
+3. Ative "Enforce HTTPS" em **Settings > Pages** assim que o certificado sair: navegadores móveis bloqueiam chamadas HTTP a partir de uma página HTTPS.
+4. Mantenha o servidor central também em HTTPS e inclua o domínio do frontend em `CORS_ORIGIN`.
 
 ### HTTPS entre o ESP32 e o servidor
 
-O firmware do ESP32 também pode se conectar ao servidor central via HTTPS, além do HTTP tradicional. Essa opção é escolhida no portal de configuração de cada dispositivo (a rede Wi-Fi `RemoteIFES-Setup`, disponível apenas enquanto o ponto de acesso de configuração estiver ativo), no campo "Conexão com o servidor":
+O transporte de cada placa é escolhido no campo "Conexão com o servidor" do [portal de provisionamento](#provisionamento-e-reprovisionamento):
 
 - **HTTPS com certificado válido (recomendado)**: valida o certificado do servidor contra a cadeia raiz pública da Let's Encrypt (embarcada no firmware); use quando o servidor estiver atrás do `https-setup.sh` (Nginx + Certbot) ou de qualquer outro certificado emitido por essa autoridade.
 - **HTTPS sem validar certificado — desenvolvimento**: criptografa a conexão mas não confirma a identidade do servidor; use apenas de forma explícita em uma rede local controlada com certificado autoassinado.
@@ -1239,9 +979,95 @@ O firmware do ESP32 também pode se conectar ao servidor central via HTTPS, alé
 
 Configurações ausentes ou inválidas usam o modo CA validado; não há downgrade automático. Um modo inseguro previamente escolhido é preservado por compatibilidade e gera aviso no console serial até o dispositivo ser reconfigurado.
 
+## Painel dos ESP32, Protocolos IR e Failsafe (Administração > Dispositivos)
+
+O firmware separa o **provisionamento local** (portal `RemoteIFES-Setup`, só no modo AP) da **administração operacional**, feita inteiramente pelo servidor. Cada placa tem um **papel** decidido pelo servidor e enviado pelo WebSocket a cada conexão:
+
+| Papel | Quem | O que faz |
+|---|---|---|
+| **Transmissor IR** (`transmitter`) | todo ESP32 de sala | envia comandos pelo LED infravermelho (GPIO 4), reporta telemetria e guarda o failsafe OFF na NVS; nunca captura sinais |
+| **Clonador IR** (`cloner`) | a única placa com receptor infravermelho (GPIO 15), definida pelo superadministrador em `Administração > Dispositivos > Protocolos IR` | além de transmitir, entra no **modo clone** (`config_clone`) para capturar em tempo real os sinais do controle original |
+
+O tipo da placa não é escolhido no `RemoteIFES-Setup` nem gravado no firmware. Só existe **um clonador oficial ativo por vez**; o servidor guarda, junto com a sala, o MAC e a credencial da placa no momento da definição e recusa capturas de qualquer outra sala, de uma placa fora do modo clone ou de um ESP32 que tenha sido substituído (novo MAC em `Cadastro`, credencial substituída ou revogada) — nesse caso a tela avisa e o superadministrador precisa confirmar a clonadora novamente.
+
+### Administração > Dispositivos > Firmware / OTA
+
+Um cartão por ESP32 com MAC cadastrado, só para o superadministrador, atualizado em tempo real:
+
+- **estado**: Wi-Fi e conexão com o servidor (independentes), papel, modo (`operation`, `config_idle`, `config_clone`), temperatura e umidade, RSSI, protocolo IR da sala, **failsafe OFF gravado na NVS** e o último comando IR transmitido;
+- **Resetar Wi-Fi** ([provisionamento](#provisionamento-e-reprovisionamento));
+- **versão** instalada e publicada, com a [OTA](#atualização-de-firmware-por-ota-esp32) avulsa e a distribuição em etapas;
+- **credencial** exclusiva: provisionar, rotacionar, substituir e revogar ([Credenciais por Dispositivo e Migração](#credenciais-por-dispositivo-e-migração)).
+
+<img src="docs/readme-assets/screenshots/firmware-ota.png" width="800" alt="Cartão do ESP32 da sala A-107 em Firmware / OTA: Wi-Fi e servidor conectados, modo operação, papel transmissor IR; temperatura 23,4 °C, umidade 54 %, sinal de -57 dBm, protocolo IR 15 vindo da biblioteca, failsafe OFF gravado na NVS com 12 pulsos, último comando IR 23 °C ligado e estado desejado confirmado pela placa; firmware 4.2.0 com a 4.3.0 publicada e o botão Atualizar firmware (OTA); credencial ativa com Rotacionar, Substituir e Revogar; e Resetar Wi-Fi do dispositivo. Captura de um ambiente de teste com placas simuladas.">
+
+Essa aba não tem controles de captura: o modo clone é controlado exclusivamente em Protocolos IR.
+
+### Administração > Dispositivos > Protocolos IR
+
+O caminho de um sinal, do controle original ao ar-condicionado da sala:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/ir-cloning-dark.png">
+  <img src="docs/readme-assets/composed/ir-cloning-light.png" width="800" alt="Caminho de um sinal infravermelho. O controle original do aparelho transmite para a ESP32 clonadora, a única com receptor IR, que no modo clone captura sem parar e envia cada captura ao servidor. A biblioteca IR, na tabela protocolos_ir do servidor, guarda as 20 capturas recentes da clonadora; salvar dá um nome à captura, e o navegador manda só o id dela, nunca o RAW; o failsafe OFF é a captura do botão de desligar, anexada ao protocolo; e só protocolo reconhecido vira protocolo da sala. Aplicado a uma sala, o protocolo vai à ESP32 da sala, que guarda o failsafe OFF na NVS e transmite por infravermelho ao ar-condicionado, que não é medido. Notas: segurar o botão da placa por 5 s transmite o failsafe OFF da NVS sem servidor nem Wi-Fi; a clonagem só funciona pelo Wi-Fi direto, nunca pela malha.">
+</picture>
+
+Biblioteca central de sinais infravermelhos, persistida na tabela `protocolos_ir` do SQLite e exclusiva do superadministrador:
+
+- **Clonador oficial**: escolha a ESP32 equipada com receptor IR e salve. O servidor passa a tratá-la como clonadora (e todas as demais como transmissoras) e envia o papel à placa na hora. A definição, a troca e a remoção do clonador são auditadas.
+- **Modo clone**: um único botão entra e sai do modo. Ao entrar, o receptor IR fica em captura contínua; a placa recusa OTA enquanto estiver nesse modo. Ao sair, volta à operação normal. Firmware anterior a 4.1.0 recebe a sequência compatível de comandos, mas só a versão atual entende o papel enviado pelo servidor.
+- **Captura em tempo real**: cada sinal recebido pela clonadora aparece em "Última captura" com o protocolo reconhecido pela biblioteca `IRremoteESP8266` (ou como sinal RAW genérico), o código hexadecimal, o número de pulsos e a portadora. A captura pode ser **testada** pela ESP32 de destino antes de ser guardada. O servidor mantém um histórico limitado (20) das capturas recentes da clonadora, que sobrevive a uma reconexão da placa; ao salvar, o navegador referencia a captura pelo identificador desse histórico, nunca envia o RAW.
+- **Salvar com nome**: o label tem de 2 a 80 caracteres, é normalizado (espaços repetidos, Unicode NFKC) e é único sem diferenciar maiúsculas de minúsculas. O RAW aceita de 1 a 1024 pulsos com valores de 0 a 65535 e portadora entre 20 e 60 kHz (padrão 38 kHz). Sinais RAW genéricos também são guardados e podem ser testados e retransmitidos, mas não viram protocolo operacional de sala.
+- **Lista**: para cada protocolo, **transmitir** pela ESP32 de destino (`send_raw`), **aplicar** como protocolo operacional de uma sala (somente protocolos reconhecidos: grava `irProtocolo` e o registro da biblioteca na sala, reenvia o estado desejado e sincroniza o failsafe), **configurar/recapturar o failsafe OFF**, **remover o failsafe**, **renomear** e **excluir**. Excluir um protocolo mantém o protocolo operacional já gravado nas salas, mas apaga o failsafe vinculado dos ESP32.
+- **Failsafe OFF (opcional)**: com a clonadora em modo clone, use "configurar failsafe OFF" no protocolo e transmita ao receptor **somente o botão de desligar** do controle original; a próxima captura fica anexada ao protocolo como RAW de desligamento em vez de virar um novo protocolo. Quando o protocolo é aplicado a uma sala, o servidor envia `failsafe_raw_set` ao ESP32 transmissor, que grava o RAW na NVS (o registro único `fsRec`, descrito em [Switch físico e buzzer](#switch-físico-e-buzzer)) e confirma com `failsafe_status`. A sincronização é refeita **a cada reconexão** da placa, ao definir ou remover o failsafe do protocolo e ao excluí-lo; aplicar um protocolo sem failsafe, ou trocar o protocolo da sala por um que não veio da biblioteca, envia `failsafe_raw_clear` para que um código de outro equipamento não fique na placa. O firmware compara o RAW recebido com o gravado e só regrava a NVS quando há diferença.
+
+<img src="docs/readme-assets/screenshots/ir-protocols.png" width="800" alt="Tela Protocolos IR. Clonador oficial: A-108 conectado, em modo clone, com o botão Sair do modo clone. Última captura: protocolo reconhecido COOLIX, 10 pulsos a 38 kHz, recebida de A-108, com testar na ESP32 de destino, descartar e o campo para salvar na biblioteca com um nome. Protocolos salvos: Split COOLIX dos laboratórios, reconhecido, capturado por A-108 e aplicado em A-107, com failsafe OFF de 12 pulsos e as ações transmitir, aplicar, recapturar ou remover o failsafe, renomear e excluir. Captura de um ambiente de teste com placas simuladas.">
+
+Tudo isso passa pelo WebSocket dos dispositivos, `/ws/dispositivo`, que o próprio ESP32 abre como cliente: a conexão, associada à sala pelo MAC ou pela credencial, leva telemetria, comandos, papel, failsafe e OTA sem abrir portas na placa. Depois de cada reconexão o servidor reaplica o papel, o failsafe e o estado desejado. A placa não serve página local em operação; a recuperação é pelo monitor serial, pelo clique curto no switch, por **Resetar Wi-Fi** e pela gravação USB.
+
+### Switch físico e buzzer
+
+Cada placa usa um único botão momentâneo normalmente aberto ligado entre o **GPIO 26** e o **GND**. O firmware configura o GPIO 26 como `INPUT_PULLUP` (ativo em nível baixo), portanto não é preciso resistor externo e o botão não deve receber 3,3 V ou 5 V; em um push-button tátil de quatro terminais, use um terminal de cada lado oposto. O debounce é de 40 ms. Um temporizador do sistema amostra o botão a cada 10 ms, independentemente do `loop()`, que pode ficar segundos preso numa chamada de rede quando o servidor não responde; o `loop()` executa a ação reconhecida, inclusive no modo AP e durante o modo clone. Se o temporizador não puder ser criado no boot, o firmware registra isso no console serial e passa a ler o botão pelo `loop()`, sem essa garantia. Com a rede travada, o failsafe pode sair alguns segundos depois de completados os 5 s, mas a pressão não se perde.
+
+| Ação | Efeito |
+|---|---|
+| **Clique curto** (solto antes de 5 s) | abre o AP temporário `RemoteIFES-Setup` por dez minutos sem derrubar a operação ([provisionamento](#provisionamento-e-reprovisionamento)); numa placa sem configuração o AP já está no ar e o clique não faz nada |
+| **Manter pressionado por 5 s** | transmite **uma única vez** o failsafe OFF gravado na NVS, sem servidor nem Wi-Fi, e soltar depois disso **não** abre o AP; um novo disparo exige soltar e pressionar de novo. Sem failsafe gravado, nada é transmitido |
+
+O failsafe OFF fica na NVS como **um único registro versionado** (magia, versão, pulsos, portadora, id do protocolo e CRC32, seguidos do RAW), gravado de uma vez: uma queda de energia deixa o registro anterior ou o novo, nunca uma mistura, e um CRC inválido é ignorado até o servidor reenviar. O formato antigo, de quatro chaves, migra sozinho no primeiro boot do firmware 4.2.0. Qualquer RAW (failsafe ou `send_raw`) dura no máximo 2 s, limite que o servidor também aplica ao salvar.
+
+**Trava do OFF local.** O disparo pelo switch grava uma trava na NVS: até um comando explícito do servidor (`send_known_state` ou `send_raw`), a placa reporta `ligado=false` e `failsafeLatched=true`, mesmo depois de reiniciar. Na reconexão, o servidor adota o desligamento local em vez de reenviar o "ligado" que guardava (`failsafe_off_local`, origem `esp32_local`, valor `mantido_na_reconexao`), e o cartão em `Firmware / OTA` mostra "OFF local em vigor até o próximo comando". Qualquer comando de controle limpa a trava. O estado reaplicado na reconexão vai marcado `restauracao: true`, e a partir do firmware **4.3.0** a placa travada o ignora e responde com `failsafe_status`, que o servidor adota (`adotado_em_operacao`), mesmo se o `info` chegar depois da espera de 3 s; o servidor só sincroniza por tempo esgotado depois de processar qualquer `info` já recebido. No firmware 4.2.0 um `info` atrasado ainda recebe o estado guardado, e o 4.1.0 não reporta a trava: atualize a frota por OTA. Durante um download de OTA o botão e o buzzer continuam atendidos a cada bloco.
+
+Um **buzzer ativo** no **GPIO 27** soa a cada transmissão infravermelha (comando, teste, retransmissão ou failsafe): liga logo antes do envio e o `loop()` o desliga depois de no mínimo 60 ms, sem `delay()` antes do sinal.
+
+### Do pedido ao ar-condicionado
+
+<img src="docs/readme-assets/flows/command-state-flow.svg" width="800" alt="Cinco etapas de um comando. 1, pedido: painel da sala, agendamento ou desligamento diário. 2, estado desejado: gravado no banco e com a versão da sala avançada; a resposta é ok: true. 3, envio: ao socket da placa ou, na malha, ao gateway; sem canal, o estado fica salvo e vai na reconexão; o campo é enviadoAoDispositivo. 4, a placa executa: transmite o infravermelho e ecoa a versão recebida, o que marca dispositivoConfirmou; uma seta volta da placa ao servidor com esse eco. 5, o aparelho: o sistema não mede se ele recebeu o sinal, então não há prova física.">
+
+Presença, canal de comandos, estado desejado, envio e confirmação são coisas distintas:
+
+- **Presença.** `online` no status de uma sala quer dizer que a placa foi vista há pouco, pelo WebSocket ou só pelo heartbeat HTTP, que o firmware usa enquanto o WebSocket está caído. Não diz que a sala é controlável.
+- **Canal de comandos.** `canalComandos` diz se há um socket de comandos aberto para a sala; só por ele um comando chega à placa. Uma sala `online` sem canal aparece no painel como "online, sem comandos".
+- **Estado desejado.** `POST /comando` responde `ok: true` quando a intenção foi **persistida**. Cada mudança de intenção avança `salas.estadoVersao`.
+- **Envio.** `enviadoAoDispositivo` diz se a mensagem foi **submetida ao socket** da placa, não se ela a executou, e a resposta repete `canalComandos` para dizer por que nada foi submetido. Sem canal, o comando recebe o aviso de que **não foi entregue**; o estado fica salvo e é restaurado quando a placa reconectar. Na malha, "enviado" quer dizer entregue ao gateway.
+- **Confirmação.** Todo `send_known_state` leva a versão como `versao`. O firmware 4.3.0 ecoa essa versão em `info`, `telemetria` e `failsafe_status`, e o `status` da sala traz `dispositivoConfirmou`: `true`, `false` ou `null` sem placa ou protocolo, conforme a placa conectada já tenha **reportado** o estado vigente. O painel mostra reticências até a confirmação e avisa se ela passar de 12 s.
+- **Aparelho.** Nem a confirmação da placa prova que o ar-condicionado recebeu o sinal infravermelho.
+
+Um relato atrasado nunca sobrescreve a intenção. É atrasado o relato que ecoa uma versão anterior ou, no firmware 4.2.0, cujo último comando IR relatado não bate com a intenção. O `ligado` da telemetria e do heartbeat é só o eco do último comando processado e não é gravado como estado desejado.
+
+A trava de failsafe relatada em operação só é adotada quando o relato comprovadamente reflete a intenção vigente: versão ecoada igual à atual ou, sem eco, depois que a mesma conexão confirmou a intenção. Um comando explícito enviado logo após a conexão, antes de o `info` inicial chegar, prevalece. Esse `info` descreve a placa de antes do comando, não adota a trava, não apaga a intenção nova e dispensa a restauração.
+
+Os testes IR administrativos (`teste/estado`, `teste/raw` e transmitir um protocolo da biblioteca) não alteram a intenção nem a versão, mas invalidam a confirmação até uma intenção nova ser enviada: o eco da versão anterior ao teste deixa de contar. Alterações de configuração que mudam o estado IR (limites globais de temperatura, função extra do turbo) e os limites por sala avançam a versão na mesma transação que ajusta o alvo, e nada é submetido à placa antes do commit. O agendador grava a execução de um agendamento na mesma transação da mudança de estado, então uma falha entre os dois nunca repete o comando no minuto seguinte.
+
+### Detecção automática de ESP32 na rede
+
+Todo ESP32 se apresenta ao servidor pelo MAC ao entrar na rede e, mesmo sem sala, é registrado como detectado. Em `Administração > Dispositivos > Cadastro`, "ESP32 detectados na rede" lista os 100 vistos mais recentemente (MAC, IP, última vez visto; uma placa sem sala se reapresenta a cada 15 s) e vincula cada um a uma sala com um clique, com busca e seletor de planta. A placa recebe o vínculo na próxima consulta, sem reconfiguração.
+
+O vínculo gravado aparece em todas as sessões administrativas abertas **sem recarregar a página nem reabrir a aba**; um cadastro recusado não aparece. Cadastrado e online são estados distintos, com selos separados: um ESP32 recém-cadastrado costuma aparecer offline até abrir a própria conexão.
+
 ## Atualização de Firmware por OTA (ESP32)
 
-O firmware do ESP32 pode ser atualizado pela rede, sem ir fisicamente até cada equipamento. O modelo é **A/B com reversão automática**: a partição `min_spiffs.csv` tem dois slots de aplicação; a imagem nova é gravada no slot ocioso e só passa a ser o slot de boot depois de gravada e verificada por hash. Após reiniciar, o novo firmware roda um autoteste (LittleFS montado, Wi-Fi ou malha e canal com o servidor aberto) dentro de 90 s; se passar, ele se marca como válido; se não, marca a imagem como inválida e reinicia, e o bootloader volta à versão anterior.
+O firmware é atualizado pela rede no modelo **A/B com reversão automática**: a imagem nova vai para o slot ocioso, só vira o slot de boot depois de conferida por hash, e roda um autoteste em até 90 s; se ele falhar, o bootloader volta à versão anterior.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/esp32-ota-dark.png">
@@ -1256,47 +1082,30 @@ npm run firmware                                        # mostra a imagem public
 npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.3.1 "nota opcional"
 ```
 
-A imagem é validada (byte mágico `0xE9`, tamanho plausível), tem o SHA-256 calculado e é gravada em `<REMOTEIFES_DATA_DIR>/firmware/` junto de um `manifesto.json`. Só uma imagem fica publicada por vez. O número de versão tem de ser o `-DFW_VERSAO` compilado nela, e o servidor não confere isso: com outro número, a placa grava e roda a imagem, mas volta reportando uma versão inesperada e a OTA termina como falha. Uma oferta já enviada continua apontando para a imagem que foi ofertada: publicar outra versão enquanto uma placa ainda está baixando não troca o que ela recebe em `/dispositivo/firmware` (o download resolve pela oferta ativa da sala, com o mesmo SHA-256), e o binário anterior só é removido do disco quando nenhuma oferta em transferência o referencia mais (na publicação seguinte ou na varredura periódica). Republicar o **mesmo** número de versão com outro conteúdo é recusado enquanto uma oferta dessa versão estiver em andamento.
+A imagem é validada (byte mágico `0xE9`, tamanho plausível) e gravada com seu SHA-256 em `<REMOTEIFES_DATA_DIR>/firmware/`, com um `manifesto.json`; só uma fica publicada. O número de versão tem de ser o `-DFW_VERSAO` compilado nela, e o servidor não confere isso: com outro número, a placa roda a imagem mas volta com uma versão inesperada e a OTA termina como falha. Uma oferta em andamento continua servindo a imagem ofertada em `/dispositivo/firmware`, mesmo que outra versão seja publicada no meio; o binário antigo só sai do disco quando nenhuma transferência o usa. Republicar a **mesma** versão com outro conteúdo é recusado durante uma oferta dela.
 
-**Enviar a atualização a uma sala:** em `Administração > Dispositivos > Firmware / OTA`, cada dispositivo online mostra a versão instalada, a versão publicada e um botão **Atualizar firmware (OTA)** com barra de progresso. Também é possível pela API: `POST /admin/esp32/:sala/ota` (apenas superadministrador).
+**Atualizar uma sala:** em `Administração > Dispositivos > Firmware / OTA`, o botão **Atualizar firmware (OTA)** de cada dispositivo online, com barra de progresso, ou `POST /admin/esp32/:sala/ota` (superadministrador). Garantias:
 
-O que o processo garante:
-
-- **Validação antes de instalar:** o ESP32 baixa a imagem de `/dispositivo/firmware` (autenticada por MAC ou credencial), confere o SHA-256 e o tamanho contra a oferta e só então confirma a gravação. Hash divergente, download interrompido ou imagem maior que o slot abortam sem tocar no firmware em execução. O servidor entrega a essa rota exatamente a imagem da oferta ativa da sala; se ela tiver sumido do disco, responde 409 em vez de servir outro firmware.
-- **Sem OTA concorrente:** o servidor recusa uma segunda oferta para a mesma sala enquanto uma está em andamento e limita o total de atualizações simultâneas; o firmware ignora uma oferta se já estiver atualizando ou se estiver em modo de configuração.
-- **Interrupções são seguras:** um erro de download relatado pela placa é definitivo, e ela continua na versão atual. Se a conexão cai durante a transferência, ou o tempo-limite de transferência ou de reinício passa, o servidor marca a OTA como falha e permite reofertar. Essa falha é só presumida: até o firmware 4.3.0 o download roda dentro do callback do WebSocket, então um download lento pode perder o socket enquanto a placa segue gravando. Se depois a placa provar pelo boot que instalou a imagem dessa tentativa (evidência descrita abaixo), a falha é desmentida e a OTA conclui.
-- **Reinício do servidor é recuperável:** o andamento é salvo em `<REMOTEIFES_DATA_DIR>/firmware/estados-ota.json`; depois que o backend volta, a reconexão e a versão reportada pelo ESP32 concluem ou registram a reversão, e estados sem retorno expiram pelo mesmo tempo-limite.
-- **Validação de boot comprovada (firmware 4.2.0+):** a oferta carrega um identificador de tentativa que a placa guarda na NVS ao gravar a imagem. Depois de reiniciar, reportar a versão nova coloca a OTA em `validando`; ela só passa a `concluida` quando a placa, após o autoteste (`esp_ota_mark_app_valid_cancel_rollback`), envia `ota_validado` com a mesma tentativa, o SHA-256 da imagem e a versão — relatórios repetidos são confirmados de novo (`ota_validacao_ok`) para a placa apagar a evidência, relatórios de outra tentativa ou de um dispositivo substituído são ignorados, e sem evidência em 4 minutos a tentativa falha (`validacao`). Se a placa voltar com a versão anterior durante a validação ou mesmo depois de concluída, isso é registrado como reversão comprovada. Firmware anterior a 4.2.0 não envia essa evidência: para ele a versão reportada continua concluindo a OTA, como antes.
-- **Configuração preservada:** OTA grava apenas a aplicação — as credenciais de Wi-Fi/servidor/dispositivo na NVS e a associação da sala (feita no servidor) não são tocadas.
-- **Recuperação:** a gravação por USB regrava o slot ativo e ignora o estado do OTA; é o caminho para um dispositivo que, por qualquer motivo, não aceite mais OTA.
+- **Validação antes de instalar:** a placa baixa de `/dispositivo/firmware`, autenticada, e confere SHA-256 e tamanho contra a oferta; divergência, interrupção ou imagem maior que o slot abortam sem tocar no firmware em uso. Se a imagem da oferta sumiu do disco, a rota responde 409 em vez de servir outra.
+- **Sem concorrência:** uma segunda oferta para a mesma sala é recusada e o total de atualizações simultâneas é limitado; a placa ignora ofertas durante outra atualização ou em modo de configuração.
+- **Interrupções:** um erro relatado pela placa é definitivo, e ela fica na versão atual. Queda de conexão ou tempo esgotado marca uma falha só **presumida**, que permite reofertar: até o firmware 4.3.0 o download roda dentro do callback do WebSocket e pode perder o socket enquanto a placa segue gravando, então uma evidência de boot posterior dessa tentativa desmente a falha e conclui a OTA.
+- **Reinício do servidor:** o andamento fica em `<REMOTEIFES_DATA_DIR>/firmware/estados-ota.json`; a reconexão e a versão reportada concluem ou registram a reversão, e estados sem retorno expiram pelo mesmo prazo.
+- **Evidência de boot (firmware 4.2.0+):** a oferta leva um identificador de tentativa que a placa guarda ao gravar. Reportar a versão nova põe a OTA em `validando`, e ela só conclui quando a placa, depois do autoteste (`esp_ota_mark_app_valid_cancel_rollback`), envia `ota_validado` com a mesma tentativa, o SHA-256 e a versão; o servidor reconfirma relatórios repetidos (`ota_validacao_ok`), ignora os de outra tentativa ou placa e, sem evidência em 4 minutos, falha a tentativa (`validacao`). Voltar com a versão anterior, mesmo depois de concluída, é registrado como reversão comprovada. Antes do 4.2.0, a versão reportada conclui a OTA.
+- **Configuração preservada:** a OTA grava só a aplicação; NVS e vínculo da sala não mudam. A gravação por USB continua sendo a recuperação de uma placa que não aceite mais OTA.
 
 ### Distribuição em etapas para vários ESP32
 
-Atualizar uma sala por vez continua sendo o caminho simples e não mudou. Para atualizar um conjunto de dispositivos, o mesmo painel `Administração > Dispositivos > Firmware / OTA` traz **Distribuição em etapas**, também exclusiva do superadministrador. Ela orquestra a OTA que já existia em vez de duplicá-la: cada sala passa exatamente pela mesma oferta, download autenticado, conferência de SHA-256, gravação no slot ocioso e validação por reconexão.
+Para atualizar um conjunto de salas, o mesmo painel traz **Distribuição em etapas**, também só do superadministrador. Ela orquestra a OTA avulsa, sem duplicá-la, sem mudar o protocolo do ESP32 (`ota_oferta`, `ota_progresso`, `ota_resultado` e a versão de `telemetria`/`info`) e sem exigir firmware novo:
 
-O fluxo é: seleção → verificação de compatibilidade → canário → lotes controlados → conclusão.
+<img src="docs/readme-assets/flows/ota-rollout.svg" width="800" alt="Até 50 salas são avaliadas; um canário apto precisa terminar validado antes dos lotes de 1 a 5, padrão 2. O servidor limita a duas OTAs simultâneas, inclusive avulsas. Dispositivos offline, em configuração ou com OTA em curso são reavaliados na sua vez por até dois minutos; os não aptos ficam como não atualizados. Só validado conta como sucesso; dispositivos com capacidade de validação de boot precisam enviar a evidência. Falha, reversão, resultado indeterminado, mudança do firmware publicado ou canário não validado param novas ofertas após as tentativas em curso. Pausa e cancelamento também aguardam essas tentativas. Os pendentes não recebem oferta e os já validados não são revertidos coletivamente.">
 
-- **Verificação de compatibilidade:** antes de começar, cada sala selecionada é avaliada com o que o dispositivo já reporta. Quem está na versão publicada ou reporta uma versão maior (downgrade) entra como *não atualizado*, com o motivo registrado. Quem está apenas desconectado, em modo de configuração ou com uma OTA avulsa em andamento continua na fila e é reavaliado na sua vez.
-- **Canário:** um único dispositivo é atualizado primeiro — por padrão o primeiro apto da seleção, e o superadministrador pode escolher outro. Os lotes só começam depois que o canário volta **validado** — com firmware 4.2.0+ isso exige a evidência de validação de boot, não apenas reconectar reportando a versão nova. Canário que falha, reverte, não volta ou que não pôde ser atualizado interrompe a distribuição; uma reversão comprovada em qualquer dispositivo, mesmo já validado, também interrompe a distribuição em andamento, e uma reversão depois de a distribuição terminar fica registrada nela (`reversoesTardias`) em vez de deixá-la marcada como sucesso.
-- **Lotes:** os demais dispositivos são divididos em lotes de 1 a 5 (padrão 2). Um lote só começa quando o anterior terminou por completo e, dentro do lote, vale o mesmo teto de duas atualizações simultâneas do OTA avulso — a distribuição não cria paralelismo extra.
-- **Parada automática:** qualquer falha real em um lote (falhou, reverteu ou ficou sem confirmação) interrompe a distribuição, e o restante da frota permanece na versão anterior.
-- **Um dispositivo que continua offline** quando chega a sua vez espera dois minutos e então é registrado como *não atualizado*, nunca como atualizado.
+- **Canário:** por padrão o primeiro apto da seleção, ou outro escolhido. Canário que falha, reverte, não volta ou não pôde ser atualizado interrompe tudo; uma reversão comprovada em qualquer dispositivo, mesmo já validado, também interrompe, e uma reversão depois do fim fica registrada (`reversoesTardias`) em vez de a distribuição constar como sucesso.
+- **Lotes:** dentro de um lote vale o mesmo teto de duas atualizações simultâneas da OTA avulsa, e um lote só começa quando o anterior terminou.
+- **Pausar** impede que novos dispositivos comecem, mas quem já baixa ou grava segue até o fim; **retomar** segue do lote seguinte; **cancelar** marca só o que não começou e acompanha o resto até o desfecho.
+- **Estados:** `na fila`, `atualizando`, `reiniciando para validar`, `validando o boot`, `validado`, `falhou` (erro, conexão perdida ou prazo na transferência), `revertido` (volta comprovada à versão anterior), `sem confirmação` (sem retorno, versão inesperada sem evidência de boot ou prazo de validação esgotado), `não atualizado` e `cancelado`. Download concluído ou gravação confirmada não bastam.
+- **Reinício do servidor:** o andamento fica em `<REMOTEIFES_DATA_DIR>/firmware/rollout-ota.json`. Ao voltar, o servidor reconcilia cada dispositivo pelo estado de OTA persistido: quem gravava segue acompanhado, quem não tinha recebido a oferta volta à fila e quem a recebeu sem desfecho registrado fica `sem confirmação`. Ninguém recebe uma segunda oferta porque a memória do processo se perdeu.
 
-**Pausar, retomar e cancelar:**
-
-- **Pausar** impede que novos dispositivos comecem; quem já está baixando ou gravando segue até o fim, porque interromper uma gravação é o que mais arrisca o equipamento.
-- **Retomar** continua do ponto em que parou, no lote seguinte.
-- **Cancelar** marca como cancelado apenas o que ainda não começou; o que estiver em andamento é acompanhado até o desfecho e registrado normalmente.
-
-**Estado de cada dispositivo:** `na fila`, `atualizando`, `reiniciando para validar`, `validando o boot` (firmware 4.2.0+ reportou a versão nova e ainda não confirmou o autoteste), `validado`, `falhou` (erro reportado, conexão perdida ou timeout durante a transferência), `revertido` (a placa voltou comprovadamente à versão anterior), `sem confirmação` (retorno ausente, versão inesperada em firmware sem evidência de boot, prazo de validação esgotado ou registro da tentativa indisponível), `não atualizado` (inapto, offline além da espera) e `cancelado`. Só `validado` conta como sucesso: download concluído ou gravação confirmada não bastam, e em firmware 4.2.0+ nem a versão reportada basta sem a evidência de boot.
-
-**Compatibilidade:** a distribuição não altera o protocolo do ESP32 e não exige firmware novo. Ela usa as mensagens que o firmware em campo já entende (`ota_oferta`, `ota_progresso`, `ota_resultado`) e a versão que o dispositivo já reporta em `telemetria`/`info`. Um servidor atualizado continua operando a frota existente sem regravar nada, e a OTA avulsa permanece como caminho de exceção.
-
-**Reinício do servidor:** o andamento fica em `<REMOTEIFES_DATA_DIR>/firmware/rollout-ota.json`, ao lado do estado por dispositivo. Ao voltar, o servidor reconcilia cada dispositivo pelo estado de OTA persistido em vez de repetir a oferta: quem estava gravando ou reiniciando continua sendo acompanhado pelos mesmos tempos-limite; quem ainda não tinha recebido a oferta volta para a fila; quem já a recebeu e não deixou registro do desfecho fica como `sem confirmação`, para conferência manual. Nenhum dispositivo recebe uma segunda oferta apenas porque a memória do processo foi perdida.
-
-**O que a reversão garante e o que não garante:** a reversão é feita pelo próprio ESP32, pelo esquema A/B descrito acima. O servidor não guarda a imagem anterior e não consegue reinstalá-la — o que ele garante é detectar e registrar o desfecho de cada dispositivo, distinguindo falha antes de gravar, reversão confirmada e retorno indeterminado, e parar a distribuição antes de espalhar uma imagem ruim. Uma versão publicada com defeito não é desfeita pelo servidor: corrija, publique uma versão maior e rode uma nova distribuição, ou regrave por USB os dispositivos que não voltarem.
-
-Pela API, apenas para o superadministrador:
+A reversão é feita pela própria placa; o servidor não guarda a imagem anterior. Ele detecta e registra o desfecho de cada dispositivo e para antes de espalhar uma imagem ruim. Uma versão defeituosa se corrige publicando uma versão maior e rodando outra distribuição, ou regravando por USB quem não voltou. Pela API, só para o superadministrador:
 
 ```text
 GET  /admin/esp32/rollout                 estado atual, limites e aptidão de cada dispositivo
@@ -1306,7 +1115,7 @@ POST /admin/esp32/rollout/retomar
 POST /admin/esp32/rollout/cancelar
 ```
 
-O modelo atual evita adulteração acidental e publicação inconsistente por SHA-256, metadados restritos, autenticação do dispositivo e controle exclusivo do superadministrador. Assinatura assimétrica de firmware permanece uma opção de alta garantia para instalações que considerem comprometimento do próprio servidor de releases; ela não é obrigatória porque acrescentaria geração, proteção, rotação e recuperação de chaves ao fluxo normal de implantação.
+O modelo evita adulteração acidental e publicação inconsistente com SHA-256, autenticação do dispositivo e controle exclusivo do superadministrador. Assinatura assimétrica de firmware continua uma opção para quem considere comprometido o próprio servidor, fora do fluxo normal porque exigiria gerar, proteger, rotacionar e recuperar chaves.
 
 ## Credenciais por Dispositivo e Migração
 
@@ -1322,32 +1131,28 @@ npm run credencial -- A-101 --revogar       # invalida a credencial e derruba a 
 npm run credencial -- A-101                 # mostra o estado (sem expor o segredo)
 ```
 
-O ESP32 envia a credencial no cabeçalho (`X-Device-Id` / `X-Device-Secret`) no handshake do WebSocket e nas rotas `/dispositivo/*`. Ela pode ser informada no portal de setup (`RemoteIFES-Setup`) ou, para um dispositivo já conectado por MAC, **enviada pelo próprio servidor pela conexão existente** ao provisionar/rotacionar — o dispositivo grava na NVS e reconecta já autenticado, sem visita ao local. Há uma exceção conhecida e não corrigida: se a energia cair entre as duas gravações na NVS de uma credencial provisionada por uma conexão só por MAC, a placa é recusada ao voltar, porque uma sala com credencial provisionada não aceita mais conexão só por MAC. A recuperação exige uma visita ao local com a credencial exibida ao superadministrador. Resetar ou reconfigurar apenas Wi-Fi/servidor preserva essa credencial; deixar os dois campos de dispositivo vazios no portal também preserva o valor existente.
+O ESP32 envia a credencial nos cabeçalhos `X-Device-Id` e `X-Device-Secret`, no handshake do WebSocket e nas rotas `/dispositivo/*`. Ela é informada no portal de setup ou, numa placa já conectada por MAC, **enviada pelo servidor pela própria conexão** ao provisionar ou rotacionar: a placa grava na NVS e reconecta autenticada, sem visita ao local. Há uma exceção conhecida e não corrigida: se a energia cair entre as duas gravações na NVS de uma credencial provisionada por uma conexão só por MAC, a placa é recusada ao voltar, porque a sala já exige a credencial, e a recuperação exige uma visita ao local com a credencial exibida ao superadministrador. Resetar Wi-Fi, reconfigurar Wi-Fi e servidor ou deixar vazios os campos de dispositivo no portal preserva a credencial.
 
-**A rotação acontece em duas fases.** Rotacionar cria uma geração **pendente** enquanto o segredo atual continua plenamente válido, sem prazo. O novo segredo é entregue à placa conectada ou, se ela estiver offline, guardado apenas em memória e entregue quando ela reconectar com a credencial atual (o painel mostra "rotação pendente: será entregue quando a placa conectar"). A geração nova só é **ativada** quando a placa prova possuí-la — conectando pelo WebSocket ou fazendo um heartbeat com o novo segredo; nesse momento o segredo anterior entra na tolerância de 24 h e, ao fim dela, qualquer conexão ainda autenticada com ele é encerrada. Uma placa que perdeu a entrega nunca fica inacessível: sua credencial atual vale até a nova ser provada. O segredo pendente nunca é persistido em texto, então depois de um reinício do servidor ele não pode mais ser reentregue — o painel avisa e uma nova rotação o substitui. Substituir ou revogar descartam a geração pendente. O firmware 4.1.0 já grava o segredo recebido e reconecta com ele, portanto o mecanismo não exige atualização de firmware.
+**A rotação tem duas fases.** Rotacionar cria uma geração **pendente**, e o segredo atual continua valendo, sem prazo. O novo segredo vai à placa conectada ou fica só em memória até ela reconectar com o atual ("rotação pendente: será entregue quando a placa conectar"). A geração só é **ativada** quando a placa a usa, por WebSocket ou heartbeat; aí o segredo anterior ganha 24 h de tolerância e, ao fim delas, as conexões ainda autenticadas com ele caem. Como o pendente nunca é persistido em texto, um reinício do servidor impede a reentrega: o painel avisa e basta rotacionar de novo. Substituir ou revogar descarta o pendente. O firmware 4.1.0 já suporta o mecanismo.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/credential-rotation-dark.png">
   <img src="docs/readme-assets/composed/credential-rotation-light.png" width="800" alt="Rotação de credencial entre o servidor e o ESP32. 1, o servidor cria a geração pendente, com só o hash no banco e o segredo só na memória, e a credencial atual continua valendo, sem prazo; ele envia credencial_rotacionar pela conexão aberta ou quando a placa reconecta com a atual. 2, a placa grava deviceId e segredo na NVS e, a partir do firmware 4.3.0, só passa a usar o segredo novo e reconecta depois de conferir a releitura; ela conecta com o segredo novo, por WebSocket ou heartbeat. 3, o servidor ativa a geração nova; o segredo anterior vale por mais 24 horas e, ao fim, as conexões autenticadas com ele são encerradas. Se a gravação falha, a placa desfaz, segue com a credencial atual e relata credencial=falha_nvs, e a geração pendente continua pendente e é entregue de novo na próxima conexão. Notas: uma placa que volta com o segredo anterior dentro das 24 horas recebe o atual de novo pela própria conexão; reiniciar o servidor apaga da memória o segredo pendente, e é preciso rotacionar de novo com a placa conectada.">
 </picture>
 
-**Ativar significa que a placa apresentou o novo segredo, não que ele sobreviveu a um reinício.** A partir do firmware 4.3.0 a placa só troca a credencial em uso — e só reconecta com ela — depois de gravar as duas chaves na NVS e relê-las com o valor esperado; uma gravação recusada ou parcial é desfeita, a credencial atual continua em uso e a placa reporta `credencial=falha_nvs` (visível em `Logs > Comandos`, origem `esp32_local`), de modo que a geração pendente permanece pendente e reentregável. Para cobrir firmware anterior e a perda de energia entre a gravação e o próximo boot, o servidor guarda em memória o segredo já ativado enquanto a geração anterior está na tolerância: uma placa que reconecta com a credencial anterior recebe o segredo atual de novo pela própria conexão (`atualReentregavel` no estado da credencial). Depois de um reinício do servidor essa reentrega deixa de ser possível e vale o comportamento anterior — rotacione de novo com a placa conectada. A durabilidade real da NVS em queda de energia não é verificada por software.
+**Ativar prova que a placa apresentou o segredo, não que ele sobreviveu a um reinício.** Desde o firmware 4.3.0 a placa só troca de credencial depois de gravar as duas chaves na NVS e relê-las; uma gravação falha é desfeita, a credencial atual segue em uso e a placa reporta `credencial=falha_nvs` (em `Logs > Comandos`, origem `esp32_local`), deixando a geração pendente reentregável. Para firmware anterior e para uma queda de energia antes do próximo boot, o servidor guarda em memória o segredo ativado durante a tolerância e o reentrega a uma placa que volte com o anterior (`atualReentregavel`); depois de um reinício do servidor, rotacione de novo com a placa conectada. A durabilidade real da NVS em queda de energia não é verificada por software.
 
-Revogar mantém a exigência de credencial na sala, mesmo com a opção global desligada: o MAC sozinho não recupera o acesso. Para reconectar, provisione ou substitua a credencial e informe o novo valor no setup do dispositivo.
+**Revogar** mantém a exigência de credencial na sala, mesmo com a opção global desligada: o MAC sozinho não recupera o acesso, e é preciso provisionar ou substituir. **Substituir** (troca de placa) nunca envia a nova credencial à conexão da placa antiga: o servidor invalida o `deviceId` anterior, encerra a sessão e mostra o novo par uma vez, para o portal da placa nova.
 
-**Substituição de hardware é deliberadamente diferente:** a nova credencial nunca é enviada à conexão da placa antiga. O servidor invalida o `deviceId` anterior, encerra sua sessão e mostra o novo par uma vez para ser informado no portal da placa substituta.
+**Migração de controladores que ainda entram só pelo MAC.** Uma instalação nova já exige a credencial em todos os ESP32 ([Configurações globais](#configurações-globais-banco-de-dados-via-administração--sistema--configurações)). Para migrar controladores antigos sem desligá-los:
 
-**Migração de controladores que ainda entram só pelo MAC:** uma instalação nova já começa exigindo a credencial em todos os ESP32 (veja [Configurações globais](#configurações-globais-banco-de-dados-via-administração--sistema--configurações)). Para migrar controladores antigos sem desligá-los, use o modo brando:
-
-1. Enquanto a opção global **Exigir credencial por dispositivo em todos os ESP32** (em `Administração > Sistema > Configurações`) está desligada, uma sala **sem** credencial provisionada continua aceitando conexão só por MAC, exatamente como antes. Uma sala **com** credencial provisionada já passa a exigi-la.
-2. Provisione a credencial de cada sala (o painel marca as que ainda estão "só MAC"; o resumo aparece também em `GET /admin/esp32/migracao` e no [Status](#monitoramento-operacional)).
-3. Quando todas estiverem provisionadas e verdes, ligue a opção global para recusar conexões só por MAC em qualquer sala. A mudança é reversível.
-
-Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma recomendada em produção; mantenha o tráfego ESP32 ↔ servidor em rede administrada ou sob HTTPS.
+1. Com **Exigir credencial por dispositivo em todos os ESP32** desligada, uma sala **sem** credencial aceita conexão só por MAC, e uma sala **com** credencial já a exige.
+2. Provisione cada sala; o painel marca as que ainda estão "só MAC", e o resumo aparece em `GET /admin/esp32/migracao` e no [Status](#monitoramento-operacional).
+3. Com todas provisionadas, ligue a opção global. A mudança é reversível.
 
 ## Monitoramento Operacional
 
-`Administração > Sistema > Status > Sistema` (visível apenas ao superadministrador; `GET /admin/monitoramento` também exige nível de superadministrador) reúne, a partir de fontes **locais e baratas**, um retrato da saúde da instalação — sem serviços externos e sem afetar o `/health`, que mantém o mesmo contrato de antes. Cada bloco exibe um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
+`Administração > Sistema > Status > Sistema` (e `GET /admin/monitoramento`), só do superadministrador, reúne a saúde da instalação a partir de fontes **locais e baratas**, sem serviços externos e sem mudar o `/health`. Cada bloco tem um selo de estado (disponível, temporariamente indisponível, desativado por configuração ou falha):
 
 - **Serviço:** ambiente, tempo no ar, memória (RSS), carga de 1 minuto, versão do Node e PID.
 - **Banco de dados:** se responde e em quanto tempo, tamanho do arquivo e do WAL.
@@ -1355,15 +1160,13 @@ Como endereços MAC podem ser imitados, a credencial por dispositivo é a forma 
 - **Backups:** se o backup automático está ligado, quantos existem, o nome e a idade do último frente ao intervalo configurado.
 - **ESP32:** quantos têm MAC cadastrado, quantos estão online, quantos com WebSocket ativo, quantos com MAC mas offline, reconexões na última hora (com alerta para salas que "piscam"), OTA em andamento e OTA com falha pendente.
 - **Credenciais:** provisionadas, ainda só por MAC, revogadas, e se a exigência global está ligada.
-- **Contadores de falha desde a inicialização** (em memória, zerados a cada reinício): comandos **não entregues ao ESP32** (`comandoNaoEntregue`: o servidor não conseguiu entregar o estado ao socket do dispositivo, por ele estar desconectado ou por falha de envio), persistência de telemetria, tarefas do agendador e execução de agendamentos, falhas de OTA, credenciais inválidas e reconexões anormais de dispositivo. Entrega ao ESP32 **não** significa execução no ar-condicionado: `HTTP ok` e `ws.send()` bem-sucedido comprovam apenas que o comando chegou ao socket da placa; não há confirmação fim a fim de que o sinal infravermelho foi emitido e aceito pelo aparelho.
+- **Contadores de falha desde a partida** (em memória): comandos **não entregues ao ESP32** (`comandoNaoEntregue`: sem socket ou falha de envio), persistência de telemetria, agendador e agendamentos, OTA, credenciais inválidas e reconexões anormais. Entregue ao socket não quer dizer executado pelo ar-condicionado ([Do pedido ao ar-condicionado](#do-pedido-ao-ar-condicionado)).
 
-A cada 5 minutos o servidor reavalia esses indicadores e, para cada condição de alerta ativa, gera uma **notificação** (`tipo` `monitoramento`, no sino do administrador), sem repetir o mesmo alerta dentro de 6 horas. O endpoint bruto é `GET /admin/monitoramento`; o payload traz ainda `esp32.otaPorFase` (contagem por fase de OTA) e `servico.pm2`.
-
-Quando o servidor roda sob **PM2**, o cartão *Serviço* mostra nome, id, modo e contagem de reinícios informados pelo gerenciador — lidos das variáveis de ambiente que o próprio PM2 injeta ao iniciar o processo (`pm_id`, `name`, `exec_mode`, `restart_time`, `unstable_restarts`, `pm_uptime`), sem dependência nem chamada ao PM2. Fora do PM2 o campo é `null` e nada é exibido; os gráficos não dependem dele.
+A cada 5 minutos o servidor reavalia os indicadores e gera uma **notificação** (`tipo` `monitoramento`, no sino) por condição de alerta ativa, sem repeti-la em 6 horas. O payload traz ainda `esp32.otaPorFase` e `servico.pm2`: sob **PM2**, o cartão *Serviço* mostra nome, id, modo e reinícios lidos das variáveis de ambiente que o PM2 injeta, sem chamar o PM2; fora dele o campo é `null`.
 
 ### Histórico e gráficos
 
-Abaixo dos cartões, a seção recolhível **Histórico e gráficos** transforma o status em um painel operacional leve. Os cartões continuam sendo a leitura exata (atualizada a cada 20 s); os gráficos mostram a evolução e são desenhados em SVG pelo próprio frontend (`js/charts.js`, sem biblioteca externa nem CDN, incluído no shell da PWA e no Cordova). A preferência de manter a seção recolhida fica no navegador e, recolhida, nada é consultado nem desenhado.
+Abaixo dos cartões (a leitura exata, atualizada a cada 20 s), a seção recolhível **Histórico e gráficos** mostra a evolução, desenhada em SVG pelo próprio frontend (`js/charts.js`, sem biblioteca externa, também na PWA e no Cordova). Recolhida, nada é consultado nem desenhado.
 
 <img src="docs/readme-assets/screenshots/system-monitoring.png" width="800" alt="Seção Histórico e gráficos, faixa de 24 horas. ESP32 conectados: as linhas de MAC cadastrado, online e conectados por WebSocket, com quedas curtas, uma lacuna sem amostras e o marcador de reinício do serviço. Abaixo, reconexões e quedas de ESP32 por intervalo de 15 minutos e falhas por período empilhadas por telemetria, credencial, agendador, banco e OTA, cada gráfico com o total e o link para a tabela de valores. Histórico de teste gerado pelo harness.">
 
@@ -1378,17 +1181,17 @@ Abaixo dos cartões, a seção recolhível **Histórico e gráficos** transforma
 | ESP32 online × offline, credenciais de dispositivo, OTA por fase | roscas (composição atual) | payload corrente de `/admin/monitoramento` |
 | Uso dos históricos com limite | barras horizontais | payload corrente (`banco.tabelas`) |
 
-**Amostragem e retenção.** O agendador grava **uma amostra por minuto** (`monitoramento_amostras`: RSS, CPU do processo em % de um núcleo, carga, latência e tamanho do banco/WAL, disco livre/total, ESP32 com MAC/online/WebSocket e os **deltas** dos contadores de telemetria, credencial, agendador e banco no intervalo), sempre fora do caminho de comandos, telemetria e WebSocket e sem operações caras de integridade do SQLite. A cada minuto as horas fechadas são consolidadas em `monitoramento_horas` (média, pico/mínimo, somas e reinícios por hora). A retenção mantém **48 h de amostras brutas** e **30 dias de horas consolidadas** (limites de 6 000 e 1 000 linhas), integrada à rotina de retenção existente, que consolida antes de apagar; o crescimento das duas tabelas aparece no cartão *Históricos com limite* e no gráfico de uso. Em disco isso fica abaixo de 1 MB.
+**Amostragem e retenção.** O agendador grava **uma amostra por minuto** em `monitoramento_amostras` (RSS, CPU, carga, latência e tamanho do banco e do WAL, disco, ESP32 com MAC, online e por WebSocket, e os **deltas** dos contadores de falha), fora do caminho de comandos e telemetria. As horas fechadas são consolidadas em `monitoramento_horas`. A retenção mantém **48 h de amostras** e **30 dias de horas** (6 000 e 1 000 linhas no máximo), consolidando antes de apagar; tudo fica abaixo de 1 MB.
 
-**Faixas.** `GET /admin/monitoramento/historico?faixa=3h|24h|7d|30d` (superadministrador; `faixa` inválida responde 400) devolve séries já agregadas no servidor em uma grade completa: 3 h com 3 min por ponto e 24 h com 15 min vêm das amostras; 7 dias com 1 h e 30 dias com 6 h vêm das horas consolidadas mais a hora corrente crua. Nunca mais de 168 pontos por faixa, com cache de 30 s por faixa. Intervalos sem amostra chegam como `null` e ficam em branco no gráfico (sem interpolação); contagens de eventos persistidos chegam como zero. Cada início de processo dentro da janela vem em `reinicios` (instante exato nas faixas curtas, aproximado à hora nas longas) e vira um marcador; `cobertura` informa desde quando há histórico e se a janela está completa, e a tela avisa quando o período pedido começa antes da primeira amostra.
+**Faixas.** `GET /admin/monitoramento/historico?faixa=3h|24h|7d|30d` devolve séries já agregadas no servidor numa grade completa: 3 h (pontos de 3 min) e 24 h (15 min) vêm das amostras; 7 dias (1 h) e 30 dias (6 h), das horas consolidadas mais a hora corrente. No máximo 168 pontos, com cache de 30 s. Intervalos sem amostra chegam como `null` e ficam em branco, sem interpolação; `reinicios` marca cada partida do processo e `cobertura` diz desde quando há histórico. `faixa` inválida responde 400.
 
-**Leitura acessível.** Toda figura tem título, legenda para mais de uma série, resumo em texto (último, mínimo, máximo ou totais), leitura por teclado (setas, Home, End, Esc), por toque e por ponteiro (região `role="status"`), e uma tabela de valores sob demanda; o alto contraste troca a paleta das séries. Os gráficos são responsivos (coluna única no celular, duas colunas no desktop com os gráficos principais em largura total), respeitam a fonte máxima de acessibilidade, agrupam intervalos quando as colunas ficariam mais estreitas do que o legível e não redesenham no refresh de 20 s dos cartões: só quando a faixa muda, ao pedir *Atualizar* ou quando a composição atual realmente muda.
+**Leitura acessível.** Cada gráfico tem título, legenda, resumo em texto, leitura por teclado (setas, Home, End, Esc), toque e ponteiro, e uma tabela de valores sob demanda; o alto contraste troca a paleta. São responsivos, respeitam a fonte máxima de acessibilidade e só redesenham quando a faixa ou a composição muda, ou ao pedir *Atualizar*.
 
 ## Mapa de Calor Operacional
 
-Dentro de `Administração > Sistema > Status > Sistema`, a seção recolhível **Mapa de calor operacional** compara as salas em uma métrica de operação sobre a mesma planta baixa usada no restante do sistema. É exclusiva do superadministrador (`GET /admin/heatmap` exige nível de superadministrador) e é analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
+Em `Administração > Sistema > Status > Sistema`, a seção recolhível **Mapa de calor operacional** compara as salas numa métrica, sobre a mesma planta baixa. É só do superadministrador (`GET /admin/heatmap`) e só analítica: não liga, desliga nem reconfigura nada. Consumo e energia estimada **não** fazem parte do sistema.
 
-**Métricas** (`metrica=`), todas derivadas de históricos que o sistema já retém, nunca de dados inventados:
+**Métricas** (`metrica=`), todas derivadas de históricos que o sistema já retém:
 
 | Métrica | Fonte | Sentido |
 | --- | --- | --- |
@@ -1403,11 +1206,9 @@ Dentro de `Administração > Sistema > Status > Sistema`, a seção recolhível 
 
 **Períodos** (`periodo=`): `24h`, `7d` e `30d`.
 
-**Cálculo sob demanda.** Nada é agregado enquanto a seção está fechada: a consulta só roda quando o superadministrador abre a seção ou troca métrica/período. Cada consulta é uma agregação SQL sobre os índices por data/hora que já existem (`idx_esp_indisp_sala_offline`, `idx_comandos_log_criado`, `idx_ag_execucoes_executado`, `idx_relatos_criado`), devolve um resumo por sala (`{sala, nome, valor}` mais `quedas`/`minutosOffline` nas métricas de conectividade) e nunca envia o histórico bruto ao navegador. Um cache em memória de 60 segundos evita repetir a mesma consulta. O recurso **não cria tabelas, escritas nem retenção novas**; a proteção de crescimento do banco permanece exatamente a mesma.
+**Sob demanda.** A consulta só roda ao abrir a seção ou trocar métrica ou período: uma agregação SQL sobre os índices por data que já existem, com cache de 60 s, que devolve só um resumo por sala, nunca o histórico bruto. Não há tabela, escrita nem retenção novas.
 
-**Leitura das cores.** A escala vai do frio ao quente (`azul → ciano → amarelo → laranja → vermelho`) e o quente é sempre o extremo pior. Em `disponibilidade`, onde maior é melhor, a inversão é aplicada: pouca disponibilidade fica vermelha. A cor nunca é o único canal — cada sala mostra o valor numérico, a legenda nomeia os extremos, o mapa expõe `aria-label`/tooltip por sala e a tabela abaixo repete tudo em texto, ordenada da pior para a melhor.
-
-**`Sem dados`.** Sala sem fonte confiável para a métrica (por exemplo, sem MAC cadastrado em uma métrica de conectividade) aparece hachurada como `Sem dados`, nunca como zero. Como o histórico de indisponibilidade segue a retenção de auditoria, escolher um período maior que ela exibe um aviso na própria seção informando quanto do período está de fato coberto.
+**Cores.** A escala vai do frio ao quente (`azul → ciano → amarelo → laranja → vermelho`), e o quente é sempre o pior; em `disponibilidade` a escala se inverte. A cor nunca é o único canal: cada sala mostra o valor, o mapa tem `aria-label` e tooltip, e uma tabela repete tudo, da pior para a melhor. Uma sala sem fonte confiável (por exemplo, sem MAC numa métrica de conectividade) aparece hachurada como `Sem dados`, nunca como zero. Como a indisponibilidade segue a retenção da auditoria, um período maior que ela avisa quanto está de fato coberto.
 
 ## Rede Mesh Opcional e Topologia
 
@@ -1416,19 +1217,11 @@ Dentro de `Administração > Sistema > Status > Sistema`, a seção recolhível 
   <img src="docs/readme-assets/composed/device-networking-light.png" width="800" alt="O servidor RemoteIFES autentica cada placa pela credencial dela, venha direto ou pelo gateway. À esquerda, o Wi-Fi direto, padrão: três ESP32 de salas diferentes, cada um com Wi-Fi, WebSocket e credencial próprios e uma linha própria até o servidor. À direita, a mesh opcional: um ESP32 gateway, raiz da malha e também placa de uma sala, com credencial e WebSocket próprios, repassa sem ler; abaixo dele, sem cobertura de Wi-Fi, nós a um e a dois saltos ligados pelo rádio mesh, cada um com credencial própria. Uma faixa marca a sessão cifrada de um nó, que atravessa o gateway até o servidor. Avisos: OTA e clonagem de IR só pelo Wi-Fi direto; com o gateway fora do ar, os nós atrás dele ficam offline.">
 </picture>
 
-O transporte padrão dos ESP32 continua sendo o Wi-Fi direto: cada placa abre o próprio WebSocket com o servidor. O servidor aceita também, de forma opcional e misturada na mesma instalação, placas que chegam por uma rede mesh através de uma placa gateway, que tem acesso direto ao servidor e retransmite o tráfego das demais.
-
-Use a malha apenas onde não há cobertura de Wi-Fi. Uma instalação só com Wi-Fi direto não precisa configurar nada. O modo mesh ainda não foi validado com placas reais; veja [O que ainda não foi validado](#o-que-ainda-não-foi-validado).
+O padrão é o Wi-Fi direto: cada placa abre o próprio WebSocket com o servidor. Onde não há cobertura, placas podem chegar, na mesma instalação, por uma rede mesh através de uma placa **gateway**, que tem acesso direto ao servidor e retransmite o tráfego das demais. Uma instalação só com Wi-Fi direto não configura nada. A malha ainda não foi validada com placas reais ([O que ainda não foi validado](#o-que-ainda-não-foi-validado)).
 
 ### Configurar
 
-A malha é escolhida no portal local da placa, em `RemoteIFES-Setup`, no campo **Rede do módulo**. O padrão é o Wi-Fi direto, e uma placa que nunca foi mudada se comporta exatamente como antes.
-
-O **gateway** precisa do Wi-Fi da instituição, do endereço do servidor e da credencial provisionada no painel. Ele mantém o WebSocket próprio e passa a ser a raiz da malha. O **nó** precisa somente da credencial provisionada e da configuração da malha; ele não usa o endereço do servidor, porque chega até ele pelo gateway.
-
-Os dois modos pedem o identificador da malha, com 12 dígitos hexadecimais, e a senha da malha, com 8 a 63 caracteres. Os dois valores são os mesmos em todas as placas da malha. A senha protege o rádio e não identifica nenhuma placa: cada uma continua se autenticando com o próprio segredo.
-
-Abrir o portal de configuração substitui o ponto de acesso que a malha usa para as placas filhas. Por isso, num gateway ou num nó, fechar a janela do portal reinicia a placa para restabelecer a malha. Numa placa no Wi-Fi direto o ponto de acesso simplesmente é desligado.
+A malha é escolhida no campo **Rede do módulo** do [portal de provisionamento](#provisionamento-e-reprovisionamento). O **gateway** precisa do Wi-Fi da instituição, do endereço do servidor e da credencial provisionada; ele mantém o próprio WebSocket e vira a raiz da malha. O **nó** precisa só da credencial e da configuração da malha, porque chega ao servidor pelo gateway. Os dois pedem o identificador da malha (12 dígitos hexadecimais) e a senha da malha (8 a 63 caracteres), iguais em todas as placas dela; a senha protege o rádio, e cada placa continua se autenticando com o próprio segredo. Num gateway ou nó, o portal ocupa o ponto de acesso da malha, então fechá-lo reinicia a placa.
 
 ### Segurança
 
@@ -1472,9 +1265,9 @@ A escolha da tecnologia de rádio, o protocolo, os limites e o que falta estão 
 
 ## Empacotamento como PWA e Aplicativo Nativo (Cordova)
 
-Usuários autenticados podem abrir `#/aplicativo` pelo menu da conta ou pela Ajuda. A página é escrita para quem nunca instalou um aplicativo fora da loja: ela abre com um **cartão de estado** que responde "o que eu preciso fazer agora", seguido do botão de instalação, do passo a passo e do que é preciso para o aplicativo funcionar. O APK só aparece quando existe uma publicação válida em `remoteifes-server/data/releases/mobile/release.json` **e** o `serverOrigin` gravado nesse arquivo coincide com a origem pela qual o servidor está sendo acessado; o download exige a sessão RemoteIFES e é servido pelo próprio servidor com `Cache-Control: private, no-store`.
+O mesmo `remoteifes-web`, sem reescrever nada, pode ser instalado como **PWA** pelo navegador ou empacotado como **app Android/iOS** pelo projeto `remoteifes-cordova/`.
 
-O cartão de estado tem quatro situações, e só o **aplicativo empacotado** afirma o que está instalado — a versão instalada é gravada no bundle pelo mesmo build que gera o APK, sem plugin nenhum:
+A página `#/aplicativo` (menu da conta ou Ajuda) guia quem nunca instalou um app fora da loja. Ela abre com um **cartão de estado**, e só o app empacotado afirma o que está instalado, porque o build grava a versão no bundle:
 
 | Situação | Quando aparece | O que a página diz |
 | --- | --- | --- |
@@ -1483,17 +1276,9 @@ O cartão de estado tem quatro situações, e só o **aplicativo empacotado** af
 | **Versão instalada indisponível** | app empacotado sem a versão gravada | oferece instalar por cima, sem afirmar o que está instalado |
 | **Versão disponível** | site ou PWA no navegador | mostra a versão publicada e diz explicitamente que não dá para saber a instalada |
 
-Quando há um APK publicado, a página mostra o botão **Baixar aplicativo** (ou **Baixar atualização**), a versão, a data de publicação, o tamanho, as novidades da versão, o passo a passo de instalação — incluindo como liberar **Permitir desta fonte** só para o aplicativo que abre o arquivo — e um bloco recolhido de **Problemas comuns**. O SHA-256 do arquivo e do certificado, a compatibilidade e a origem do servidor ficam em **Detalhes técnicos**, recolhidos, fora do fluxo de quem só quer instalar. Ao baixar, o próprio navegador recalcula o SHA-256 dos bytes recebidos e **cancela o salvamento** se ele não bater com o hash anunciado — o arquivo só é entregue ao usuário depois de confirmada a integridade. Enquanto não há APK, a mensagem de "não publicado" aparece e o cartão da PWA é marcado como recomendado; o item continua visível no menu rápido de ajuda.
-
-Nada é instalado em segundo plano: a atualização é sempre um download que o usuário confirma no instalador do Android, e a página só a considera concluída quando o sistema instala o pacote. A versão publicada é relida ao abrir a página e quando o aparelho volta ao primeiro plano com ela aberta — não há sondagem periódica —, e `/mobile-app/info` responde com `Cache-Control: no-store`, então nenhum cache de navegador esconde uma versão nova.
-
-O servidor valida novamente o SHA-256 do arquivo antes de anunciar ou entregar a versão. Na ausência de um APK de produção assinado e de metadados coerentes, a interface informa que o download não foi publicado. APKs `debug`, não assinados ou copiados apenas de `platforms/android/app/build/outputs/` não devem ser colocados nesse diretório. Atrás de proxy reverso HTTPS, defina `TRUST_PROXY=1` para que a origem calculada (`https://…`) confira com o `serverOrigin` publicado.
-
-Além de aberto no navegador, o `remoteifes-web` pode ser instalado como **PWA** diretamente do navegador, e o mesmo frontend pode ser empacotado como **app nativo Android/iOS** pelo projeto `remoteifes-cordova/`. Nenhuma das duas formas exige reescrever ou duplicar a lógica da aplicação — ambas reaproveitam os arquivos de `remoteifes-web` como estão.
+O APK só aparece quando há uma publicação válida em `remoteifes-server/data/releases/mobile/release.json` **e** o `serverOrigin` dela coincide com a origem pela qual o servidor está sendo acessado (atrás de proxy HTTPS, defina `TRUST_PROXY=1`). O servidor reconfere o SHA-256 antes de anunciar ou entregar, exige a sessão e serve o arquivo com `Cache-Control: private, no-store`; APKs `debug`, não assinados ou copiados de `platforms/android/app/build/outputs/` não entram nesse diretório. A página mostra versão, data, tamanho, novidades, o passo a passo (inclusive **Permitir desta fonte** só para o app que abre o arquivo) e, recolhidos, **Problemas comuns** e **Detalhes técnicos** (SHA-256 do arquivo e do certificado, compatibilidade, origem). Ao baixar, o navegador recalcula o SHA-256 e **cancela o salvamento** se ele não bater. Nada é instalado em segundo plano: a atualização é sempre confirmada no instalador do Android. A versão publicada é relida ao abrir a página e ao voltar ao primeiro plano, sem sondagem, e `/mobile-app/info` responde com `Cache-Control: no-store`. Sem APK publicado, a PWA aparece como recomendada.
 
 ### PWA (Progressive Web App)
-
-`remoteifes-web` já inclui os arquivos necessários:
 
 | Arquivo | Função |
 |---|---|
@@ -1501,40 +1286,27 @@ Além de aberto no navegador, o `remoteifes-web` pode ser instalado como **PWA**
 | `version.json` | Versão canônica do frontend, replicada no meta `remoteifes-version`, em `js/version.js`, nas URLs `?v=` dos ativos e em `sw.js` |
 | `sw.js` | Service worker: instala o app-shell versionado de forma atômica, serve navegação com rede primeiro (cache como reserva offline), remove apenas caches `remoteifes-shell-*` antigos e assume o controle das abas abertas |
 
-O `sw.js` só intercepta carregamentos de arquivos estáticos do próprio domínio — chamadas à API (`serverUrl`), inclusive em uma implantação same-origin, e a conexão WebSocket continuam exigindo rede normalmente. O registro do service worker acontece automaticamente no `index.html`, sem configuração adicional.
+O `sw.js` só intercepta arquivos estáticos do próprio domínio: API e WebSocket continuam exigindo rede. O navegador só oferece a instalação em HTTPS (no Chrome/Edge, um ícone na barra de endereço; no Safari do iOS, Compartilhar > Adicionar à Tela de Início), e o servidor central também precisa de HTTPS para não ser bloqueado como conteúdo misto ([Domínio Próprio e HTTPS](#domínio-próprio-e-https)).
 
-O botão de instalação só aparece no navegador quando o frontend é servido por HTTPS, o que o GitHub Pages já atende.
-
-O servidor central também precisa usar HTTPS para o aplicativo instalado funcionar contra ele a partir de uma página HTTPS; caso contrário, o navegador bloqueia as chamadas como conteúdo misto. Veja [Domínio Próprio e HTTPS](#domínio-próprio-e-https).
-
-No Chrome/Edge (Android ou desktop) aparece um ícone de instalação na barra de endereço; no Safari (iOS), o caminho é Compartilhar > Adicionar à Tela de Início.
-
-Sempre que algum arquivo estático de `remoteifes-web` for alterado, avance a versão em `remoteifes-web/version.json` e nos pontos que a replicam (`index.html`, `js/version.js`, `manifest.webmanifest` e `sw.js`). O teste `remoteifes-server/test/frontend-version.test.js` falha se algum deles ficar desencontrado, evitando que HTML antigo se misture com JS/CSS novo. Com a versão avançada, a PWA instalada se atualiza sozinha na primeira abertura com rede: o novo app-shell é instalado, o service worker antigo é substituído, os caches `remoteifes-shell-*` obsoletos são removidos (caches de outras origens/aplicações não são tocados) e as abas abertas recarregam já na versão nova. Não é necessário desregistrar o service worker, limpar o armazenamento, usar janela anônima nem recarregar várias vezes.
+Toda alteração em arquivo estático de `remoteifes-web` avança a versão em `remoteifes-web/version.json` e nos pontos que a replicam (`index.html`, `js/version.js`, `manifest.webmanifest` e `sw.js`); `remoteifes-server/test/frontend-version.test.js` falha se algum ficar desencontrado. Com a versão avançada, a PWA se atualiza sozinha na primeira abertura com rede: instala o novo app-shell, troca o service worker, remove só os caches `remoteifes-shell-*` obsoletos e recarrega as abas. Não é preciso desregistrar o worker nem limpar o armazenamento.
 
 ### Cordova (Android/iOS)
 
-O fonte é `remoteifes-web/`. `sync-www.js` recria `remoteifes-cordova/www/`, exclui `sw.js`, `manifest.webmanifest` e `.nojekyll`, e insere `cordova.js`. Cordova prepara a plataforma a partir de `config.xml`; Gradle compila o manifesto, os recursos, o plugin StatusBar e os assets dentro do APK. A WebView instalada carrega esses assets e usa API e WebSocket do servidor configurado no build.
-
-`www/`, `platforms/`, `plugins/`, `build/`, APKs, keystores e `.signing/` são locais e ignorados pelo Git. Não edite a plataforma gerada nem copie um frontend antigo para ela.
+`sync-www.js` recria `remoteifes-cordova/www/` a partir de `remoteifes-web/`, sem `sw.js`, `manifest.webmanifest` e `.nojekyll` e com `cordova.js`; o Cordova prepara a plataforma a partir de `config.xml` e o Gradle gera o APK. `www/`, `platforms/`, `plugins/`, `build/`, APKs, keystores e `.signing/` são locais e ignorados pelo Git; não edite a plataforma gerada.
 
 #### Pré-requisitos
 
 - Node compatível com o Cordova travado em `package-lock.json` (CI: Node 22).
 - JDK 17, com `JAVA_HOME` ou `CORDOVA_JAVA_HOME` apontando para ele.
-- Android SDK: Platform 36, Build Tools 36.0.0, Platform Tools/ADB, Command-line Tools (`apkanalyzer`) e Emulator.
+- Android SDK: Platform 36, Build Tools 36.0.0, Platform Tools/ADB, Command-line Tools (`apkanalyzer`) e Emulator, com `ANDROID_HOME` apontando para ele (sem gravar caminhos da máquina no repositório).
 - Gradle 8.14.2 no `PATH` para inicializar o wrapper gerado pelo Cordova.
-- `ANDROID_HOME` apontando para o SDK. Não grave caminhos da máquina no repositório.
-- Emuladores/dispositivos de teste preparados separadamente. O doctor não instala componentes, aceita licenças nem modifica o sistema.
+- Emuladores e aparelhos de teste preparados à parte: o doctor não instala componentes nem aceita licenças.
 
-Referência: [guia oficial Cordova Android](https://cordova.apache.org/docs/en/latest/guide/platforms/android/). A plataforma Cordova Android 15 declara Android 7.0/API 24 a Android 16/API 36. Isso é o intervalo de SDK suportado; não significa que toda a matriz de execução já foi aprovada.
-
-O WebView instalado também precisa atender ao mínimo do frontend: **Android System WebView (Chromium) 108 ou mais recente** — o mesmo limite vale para Chrome 108+, Safari 15.4+ e Firefox 121+ no site e na PWA. O limite vem do próprio código, não do `minSdk`: a sintaxe ES2020 (`?.`/`??`), `Element.replaceChildren`, o seletor CSS `:has()` (Chromium 105) e as unidades `dvh` (Chromium 108) do layout. A validação de setembro/2026 mediu isso com o mesmo frontend: os WebViews de fábrica das imagens API 24 (53) e API 29 (74) falham com erros de sintaxe; Chromium 86 e 104 executam o JavaScript, mas perdem as regras de largura com `:has()`; Chromium 105–107 perdem as alturas em `dvh` (14 testes de layout falham); Chromium 108 passa a bateria de layout completa, e API 34/WebView 113 e API 36/WebView 133 passam no smoke nativo e nos testes de interface.
-
-Abaixo desse mínimo o `index.html` não deixa o app carregar pela metade: um script inicial (escrito em ES5, para ser interpretado por qualquer motor) detecta esses recursos e, se algum faltar, mostra a tela **Navegador desatualizado** — com a orientação de atualizar o Android System WebView/Chrome pela Play Store ou o navegador — e impede a execução do restante da página. O usuário nunca vê a página em branco nem a mensagem enganosa de "sem conexão com o servidor" que um WebView antigo produzia. `minSdk=24` sozinho não garante compatibilidade do runtime: o aparelho precisa de um WebView atualizado pelos canais oficiais.
+O Cordova Android 15 declara de Android 7.0/API 24 a Android 16/API 36 ([guia oficial](https://cordova.apache.org/docs/en/latest/guide/platforms/android/)), mas o limite real é o do frontend: **Android System WebView (Chromium) 108 ou mais recente**, como Chrome 108+, Safari 15.4+ e Firefox 121+ no site. Ele vem do código (ES2020, `Element.replaceChildren`, `:has()` e unidades `dvh`), e a validação de setembro/2026 o confirmou: os WebViews de fábrica das imagens API 24 (53) e API 29 (74) falham na sintaxe, Chromium 86–104 perdem as larguras com `:has()`, 105–107 perdem as alturas em `dvh`, e 108 passa a bateria de layout; API 34/WebView 113 e API 36/WebView 133 passam no smoke nativo e nos testes de interface. Abaixo do mínimo, um script inicial em ES5 mostra a tela **Navegador desatualizado**, com a orientação de atualizar o WebView ou o navegador, em vez de uma página em branco ou de um falso "sem conexão".
 
 #### Fluxo curto
 
-Execute em `remoteifes-cordova/` (Cordova e plataformas são instalados localmente pelo lockfile):
+Em `remoteifes-cordova/` (Cordova e plataformas vêm do lockfile):
 
 ```sh
 npm ci
@@ -1544,9 +1316,9 @@ npm run build-android
 npm run inspect-apk -- platforms/android/app/build/outputs/apk/debug/app-debug.apk debug
 ```
 
-`prepare-android` adiciona Android somente quando ausente e propaga qualquer erro, inclusive no Windows. Para desenvolvimento sem origem embutida, o aplicativo mostra a configuração inicial do servidor. `http://localhost` dentro da WebView é a origem dos assets, não o servidor central. No emulador padrão, `10.0.2.2` acessa o host.
+`prepare-android` só adiciona o Android quando falta e propaga qualquer erro. Sem origem embutida, o app mostra a configuração inicial do servidor; dentro da WebView, `http://localhost` é a origem dos assets, e no emulador `10.0.2.2` alcança o host.
 
-Para release, carregue no ambiente, a partir do mecanismo seguro da equipe:
+Para o release, carregue do mecanismo seguro da equipe, nunca da linha de comando, do Git ou de logs:
 
 | Variável | Uso |
 |---|---|
@@ -1557,37 +1329,22 @@ Para release, carregue no ambiente, a partir do mecanismo seguro da equipe:
 | `REMOTEIFES_ANDROID_STORE_PASSWORD` | Senha do keystore |
 | `REMOTEIFES_ANDROID_KEY_PASSWORD` | Senha da chave |
 
-Não coloque valores secretos na linha de comando, no Git ou em logs. Não use a chave temporária de validação para distribuição. Preserve e faça backup seguro da identidade de produção: mudar a assinatura impede a atualização normal.
+Faça backup seguro da identidade de produção: mudar a assinatura impede a atualização normal.
 
 ```sh
 npm run doctor -- --release
 npm run build-android-release
 ```
 
-Esse comando prepara a plataforma, sincroniza o frontend, injeta origem e versão somente no bundle, restringe a configuração nativa, faz um clean/build, verifica o APK e restaura o `config.xml` original e o bundle neutro. A configuração temporária de assinatura é removida no `finally`. Em encerramento forçado da máquina/processo, revise e remova sobras temporárias de assinatura antes de retomar.
-
-Sem credenciais, `npm run build-android-release -- --unsigned` exercita o mesmo build de produção e a inspeção estática, mas gera um APK **não instalável/publicável** até ser assinado. A origem continua obrigatória. O CI usa uma origem de exemplo, nunca uma implantação real.
-
-O verificador inspeciona manifesto e recursos do APK com `apkanalyzer`/`aapt2` e a assinatura com `apksigner`: pacote, versão, versionCode, SDKs, permissões, depuração, cleartext, origem embutida, versão no JavaScript e configuração de navegação. Ele resolve os nomes de recursos otimizados do release. Registra tamanho, SHA-256 e certificado. Não é um scanner completo de segredos nem uma prova de funcionamento em runtime.
-
-Os executáveis são encontrados a partir de `ANDROID_HOME`. Para instalações diferentes, há overrides `ANDROID_APKANALYZER`, `ANDROID_APKSIGNER`, `ANDROID_AAPT2`, `ANDROID_ADB` e `ANDROID_EMULATOR`.
+O build de release prepara a plataforma, injeta origem e versão só no bundle, restringe a configuração nativa, compila do zero, verifica o APK e restaura o `config.xml` e o bundle neutro, removendo a assinatura temporária no `finally` (depois de um encerramento forçado, remova as sobras à mão). `npm run build-android-release -- --unsigned` faz o mesmo sem credenciais e gera um APK **não instalável** até ser assinado; o CI usa uma origem de exemplo. O verificador (`apkanalyzer`/`aapt2` e `apksigner`) confere pacote, versão, versionCode, SDKs, permissões, depuração, cleartext, origem embutida, versão no JavaScript e navegação, e registra tamanho, SHA-256 e certificado; não é um scanner de segredos nem prova de runtime. As ferramentas vêm de `ANDROID_HOME`, com overrides `ANDROID_APKANALYZER`, `ANDROID_APKSIGNER`, `ANDROID_AAPT2`, `ANDROID_ADB` e `ANDROID_EMULATOR`.
 
 #### Origem e segurança
 
-O build HTTPS usa `https://localhost` e bloqueia cleartext. HTTP usa `http://localhost` e permite cleartext para compatibilidade com a implantação local existente. A permissão Android de cleartext é global ao aplicativo; não é uma regra de domínio de `network_security_config`. A configuração Cordova restringe navegação/rede à origem informada. Nenhum bypass de certificado TLS é adicionado.
-
-Para inspecionar a configuração manualmente (o release automatiza isso), use `npm run harden-config -- https://remoteifes.ifes.edu.br` ou `npm run harden-config -- http://192.168.1.50:8080`; depois restaure com `npm run dev-config`.
-
-Servidor indisponível deve levar à recuperação de conexão, sem reconfiguração da infraestrutura pelo usuário normal. Mudanças HTTP ↔ HTTPS alteram a origem da WebView e podem separar o armazenamento/sessão anterior; trate isso como migração e teste antes de distribuir. Confira CORS para a origem efetiva da WebView e o handshake WebSocket no servidor.
+O build HTTPS usa `https://localhost` e bloqueia cleartext; o HTTP usa `http://localhost` e permite cleartext (uma permissão global do app, não por domínio), para a implantação local. A configuração restringe navegação e rede à origem informada, sem nenhum bypass de TLS. Trocar entre HTTP e HTTPS muda a origem da WebView e pode separar armazenamento e sessão: trate como migração e teste antes de distribuir, conferindo CORS e o handshake WebSocket. Para inspecionar a configuração à mão (o release já faz isso), use `npm run harden-config -- https://remoteifes.ifes.edu.br` ou `npm run harden-config -- http://192.168.1.50:8080`, e restaure com `npm run dev-config`.
 
 #### Versão e publicação
 
-- Pacote: `widget id` de `config.xml`.
-- Versão/build: `android-release.json`, propagado para `config.xml` pelo comando abaixo.
-- Origem: `REMOTEIFES_SERVER_URL`, usada no build e conferida contra os bytes na publicação.
-- Assinatura: keystore/alias existentes; a publicação compara o certificado com `release.json` anterior.
-
-O Android admite reinstalação da mesma versão com `adb install -r`; a política do RemoteIFES exige versionCode crescente para **um novo artefato publicado**. Republicar exatamente o mesmo SHA-256 é idempotente. O versionName pode permanecer igual quando `--rebuild` aumenta versionCode. Não edite manualmente os dois arquivos de versão.
+O pacote é o `widget id` de `config.xml`; a versão vem de `android-release.json`, propagada ao `config.xml` pelo comando abaixo (não edite os dois à mão); a origem é `REMOTEIFES_SERVER_URL`, conferida contra os bytes na publicação; e a publicação compara o certificado com o `release.json` anterior. Um novo artefato exige versionCode crescente; republicar o mesmo SHA-256 é idempotente, e `--rebuild` sobe o versionCode mantendo o versionName.
 
 ```sh
 npm run android-version                     # consultar
@@ -1596,11 +1353,7 @@ npm run android-version -- --rebuild         # mesmo nome, novo versionCode
 npm run android-version -- --verificar       # conferir consistência
 ```
 
-Após validar o runtime, defina `REMOTEIFES_ANDROID_APK` e `REMOTEIFES_MOBILE_RELEASE_DIR`, mantenha a mesma origem do build e execute `npm run publish-android-release`. O script recusa inconsistências antes de copiar o APK. A publicação não executa automaticamente os testes de runtime. A primeira publicação requer conferência humana da identidade correta; assinatura criptograficamente válida não identifica, sozinha, a chave de produção.
-
-O destino padrão do servidor é `remoteifes-server/data/releases/mobile/` (`MOBILE_APP_RELEASE_DIR`). O servidor só anuncia o APK quando `release.json.serverOrigin` corresponde à origem da requisição. Para outra implantação, gere outro APK com a origem correspondente. A versão Android é independente de `remoteifes-web/version.json`.
-
-Exemplo Bash de publicação, com overrides opcionais de ferramentas:
+Depois de validar o runtime, `npm run publish-android-release` copia o APK para o destino (`MOBILE_APP_RELEASE_DIR`, padrão `remoteifes-server/data/releases/mobile/`), recusando inconsistências antes. Ele não roda os testes de runtime, e a primeira publicação exige conferência humana da identidade: uma assinatura válida não prova, sozinha, que é a chave de produção. Cada implantação precisa de um APK com a própria origem, e a versão Android é independente de `remoteifes-web/version.json`. Exemplo Bash, com overrides opcionais de ferramentas:
 
 ```sh
 REMOTEIFES_ANDROID_APK=platforms/android/app/build/outputs/apk/release/app-release.apk \
@@ -1613,7 +1366,7 @@ npm run publish-android-release
 
 #### Smoke e repetição
 
-Use um dispositivo dedicado. `test-android` exige `ANDROID_SERIAL`, instala com `-r`, faz cold start, rotações, background/resume e force-stop/restart. Não desinstala nem limpa dados automaticamente. Restaura as configurações de rotação; grava relatório JSON, meminfo por ciclo, logcat, hierarquia UI e screenshot em `build/android-test-*/`. Logs/screenshots podem conter dados da conta de teste; revise antes de compartilhar.
+Num aparelho dedicado, `test-android` (com `ANDROID_SERIAL`) instala com `-r` e repete cold start, rotações, background/resume e force-stop/restart, sem desinstalar nem limpar dados, gravando relatório JSON, meminfo, logcat, hierarquia de UI e screenshot em `build/android-test-*/` (revise antes de compartilhar):
 
 ```sh
 adb devices -l
@@ -1623,23 +1376,17 @@ export ANDROID_TEST_CYCLES=10
 npm run test-android -- <caminho-do-apk-assinado>
 ```
 
-Sem `--webview`, o teste comprova somente instalação/processo/lifecycle. Processo vivo não prova que a tela ou a rede estejam corretas.
-
-Logo após o cold start, o teste lê a versão do WebView do aparelho e a hierarquia de UI. Em um WebView abaixo de 108 ele exige que a tela **Navegador desatualizado** esteja visível (e que sobreviva aos ciclos de lifecycle); em um WebView 108+ exige que ela **não** apareça. Qualquer combinação diferente falha com a causa explícita, em vez do antigo "WebView errors require review". O modo `--webview` só roda em WebView 108+.
-
-No modo `--webview`, `ANDROID_TEST_SCREENS=0` permite repetir somente os ciclos; por padrão também são capturadas as telas em seis tamanhos e combinações de fontes/contraste. Alterações de densidade reiniciam a Activity nesse diagnóstico: as capturas não comprovam continuidade de estado durante a mudança.
-
-Para diagnosticar o **debug APK realmente instalado**, instale também as dependências existentes de `e2e/` e `remoteifes-server/` com `npm ci`, inicie `node e2e/harness/api-server.js` na raiz em outro terminal e execute:
+Sem `--webview`, ele prova só instalação, processo e ciclo de vida, e confere a tela **Navegador desatualizado**: visível num WebView abaixo de 108, ausente a partir dele. Para exercitar o **debug APK** instalado, instale as dependências de `e2e/` e `remoteifes-server/` com `npm ci`, suba `node e2e/harness/api-server.js` na raiz e rode:
 
 ```sh
 npm run test-android -- <apk-debug> --webview
 ```
 
-Usa Playwright Android contra a WebView, sem navegador desktop. O harness tem banco temporário e dispositivo simulado; não opera o ESP32 real. Origem padrão: `http://10.0.2.2:8791`, conta de teste do harness. Overrides: `ANDROID_TEST_ORIGIN`, `ANDROID_TEST_USER`, `ANDROID_TEST_PASSWORD`. Não aponte esse modo para produção. Exercita login/logout, sala A-108, Admin/Status, Firmware, rotação, background/resume e interrupção/latência emulada por CDP. Registra requests cumulativos, sockets observados, heap JS, nós e listeners. Esses contadores não constituem, isoladamente, prova de vazamento. A instrumentação exige debug; não habilite depuração no release para fazê-la passar.
+O modo `--webview` (só em WebView 108+) usa Playwright Android contra o harness (`http://10.0.2.2:8791`, banco temporário, placa simulada; overrides `ANDROID_TEST_ORIGIN`, `ANDROID_TEST_USER` e `ANDROID_TEST_PASSWORD`; nunca produção): login e logout, sala A-108, Admin/Status, Firmware, rotação, background/resume e latência emulada, com contadores de requests, sockets, heap, nós e listeners, que sozinhos não provam vazamento. Por padrão captura também seis tamanhos de tela e combinações de fonte e contraste (`ANDROID_TEST_SCREENS=0` repete só os ciclos). A instrumentação exige debug; nunca a habilite no release.
 
 #### Matriz de aceitação manual
 
-Registre APK/SHA-256, API, versão Android, ABI, WebView, resolução/densidade, escala de fonte, conta/servidor e duração em cada execução. Mínimo: APIs 24, 29, 34 e 36; aparelho real quando disponível. Nas imagens de emulador de fábrica, APIs 24 e 29 (WebView 53 e 74) só validam a tela de incompatibilidade; os fluxos abaixo exigem um WebView 108+ (imagens API 34+ ou aparelho atualizado).
+Registre APK/SHA-256, API, versão Android, ABI, WebView, resolução/densidade, escala de fonte, conta/servidor e duração em cada execução. Mínimo: APIs 24, 29, 34 e 36, e aparelho real quando houver. Nas imagens de fábrica, as APIs 24 e 29 só validam a tela de incompatibilidade; os fluxos abaixo exigem WebView 108+.
 
 | Grupo | Procedimento e critério |
 |---|---|
@@ -1653,13 +1400,11 @@ Registre APK/SHA-256, API, versão Android, ABI, WebView, resolução/densidade,
 | Lifecycle | Bloquear/desbloquear tela, repetir home/retorno, rotacionar, matar processo, sessão expirada; recuperação sem reset de dados |
 | Soak | Repetir fluxo por duração suficiente; observar crashes/ANRs/renderer, sockets simultâneos, requests por ciclo, listeners/timers e memória após aquecimento |
 
-`adb install -r` preserva dados conforme a [documentação Android](https://developer.android.com/tools/adb). Teste cada migração real; não assuma preservação se mudar pacote, assinatura ou origem WebView.
+`adb install -r` preserva dados ([documentação Android](https://developer.android.com/tools/adb)), mas teste cada migração real: mudar pacote, assinatura ou origem da WebView não preserva.
 
 #### CI e regeneração
 
-`ci.yml` mantém a validação Cordova e chama `android.yml` (build limpo, inspeção de APK e smoke nativo na API 36) sempre que o frontend ou o Cordova mudam. `android.yml` também pode ser disparado sozinho; `broad_matrix=true` (ou `android_broad_matrix` no **Run workflow** do CI) amplia para 24/29/34/36: nas imagens 24 e 29 o smoke valida a tela de incompatibilidade do WebView de fábrica; em 34 e 36, o app. Runners descartáveis provisionam o SDK; o doctor local não instala nada. Os artefatos do CI são de validação, não releases de produção. A matriz manual de UI/rede/acessibilidade continua necessária.
-
-Para regeneração limpa, com o aplicativo de teste parado, remova **somente** `remoteifes-cordova/platforms/`, `plugins/` e `www/` após conferir os caminhos absolutos. Execute `npm ci`, `npm run prepare-android` e o build. Nunca remova `.signing/` junto com os gerados. Não versione APKs ou caminhos de SDK.
+`ci.yml` roda a validação Cordova e chama `android.yml` (build limpo, inspeção do APK e smoke nativo na API 36) quando o frontend ou o Cordova mudam. `android.yml` também roda sozinho, e `broad_matrix=true` (ou `android_broad_matrix` no **Run workflow** do CI) amplia para as APIs 24, 29, 34 e 36. Os artefatos do CI são de validação, não releases, e a matriz manual continua necessária. Para regenerar do zero, com o app de teste parado, remova **somente** `remoteifes-cordova/platforms/`, `plugins/` e `www/` (nunca `.signing/`) e rode `npm ci`, `npm run prepare-android` e o build.
 
 #### Diagnóstico
 
@@ -1673,49 +1418,42 @@ Para regeneração limpa, com o aplicativo de teste parado, remova **somente** `
 
 #### iOS e recursos visuais
 
-No macOS, instale o Xcode (com os simuladores de iOS) e as Command Line Tools. `npm run prepare-ios` sincroniza o frontend, adiciona a plataforma iOS com o `cordova-ios` instalado pelo lockfile somente quando ela ainda não existe e propaga qualquer erro (o `|| true` anterior escondia falhas do `platform add`); em seguida `npm run build-ios -- --emulator` compila sem assinatura para o simulador, `npm run test-ios` instala o build em um iPhone simulado, abre o app, o encerra e reabre, tira capturas de tela e lê o log unificado do processo, e `npm run run-ios` abre o app interativamente. Para distribuição, abra `platforms/ios/App.xcworkspace` no Xcode.
+No macOS, com o Xcode (e seus simuladores) e as Command Line Tools: `npm run prepare-ios` sincroniza o frontend e adiciona a plataforma iOS do lockfile quando falta, propagando qualquer erro; `npm run build-ios -- --emulator` compila sem assinatura para o simulador; `npm run test-ios` instala num iPhone simulado, abre, encerra e reabre o app, captura telas (em `build/ios-test-*/`, publicadas pelo CI) e lê o log do processo; `npm run run-ios` abre o app interativamente. Para distribuir, abra `platforms/ios/App.xcworkspace` no Xcode.
 
-`test-ios` comprova a casca nativa: instalação, cold start, sobrevivência ao terminate/relaunch, início do motor WKWebView pelo cordova-ios e ausência de falhas de carregamento e de relatórios de crash; as capturas ficam em `build/ios-test-*/` (o CI as publica como artefato). Ele **não** inspeciona o conteúdo da página — no iOS não há inspetor scriptável sem ferramentas externas. O caminho previsto para validar o frontend no WebKit do iOS (o mesmo motor da WKWebView) é o smoke do Safari no iOS Simulator (`cd e2e && SAFARI_PLATFORM=ios npm run test:safari`), mas nos runners hospedados ele ainda não passou do carregamento do portal — veja [Testes e Integração Contínua](#testes-e-integração-contínua). Até lá, a interface no iOS continua validada apenas manualmente, em um iPhone físico ou no Simulator.
-
-O `deployment-target` do iOS em `config.xml` é 15.4 porque a WKWebView usa o WebKit do próprio sistema e o frontend exige Safari/WebKit 15.4 (veja [Cordova (Android/iOS)](#cordova-androidios)); um iOS anterior recusa a instalação em vez de instalar um app que só mostraria a tela de navegador desatualizado. Os fontes de ícone/splash ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732); o preparo gera os recursos nativos. Variantes personalizadas podem ser copiadas com `cordova-res`, instalado separadamente.
+`test-ios` prova a casca nativa (instalação, cold start, terminate/relaunch, partida da WKWebView, nenhuma falha de carregamento ou crash), não o conteúdo da página. O caminho previsto para o frontend no WebKit do iOS é o smoke do Safari no iOS Simulator (`cd e2e && SAFARI_PLATFORM=ios npm run test:safari`), que nos runners hospedados ainda não passou do portal ([Testes e Integração Contínua](#testes-e-integração-contínua)); por ora, a interface no iOS é validada à mão, num iPhone ou no Simulator. O `deployment-target` é 15.4, o mínimo do frontend, para que um iOS anterior recuse a instalação. Os fontes de ícone e splash ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732); o preparo gera os recursos nativos, e variantes podem ser copiadas com `cordova-res`, instalado à parte.
 
 ## Scripts Auxiliares
 
-Três scripts Python na raiz do projeto auxiliam o fluxo de trabalho com Git (executados a partir da raiz do repositório com Python 3, com `git` instalado e disponível no `PATH`):
+Três scripts Python 3 na raiz auxiliam o fluxo com Git (com `git` no `PATH`):
 
 | Comando | Função |
 |---|---|
 | `python3 export.py` | Adiciona todas as alterações (`git add -A`), pede uma mensagem de commit (ou usa `update` como padrão) e envia (`git push origin main`) |
 | `python3 import.py` | Atualiza a cópia local a partir do remoto (`git pull origin main`) |
-| `python3 clear.py` | Recria o histórico do repositório do zero em um único commit (`checkout --orphan`) e, mediante confirmação explícita, sobrescreve o histórico remoto (`push -f`) — apaga permanentemente todo o histórico de commits anterior; use apenas se isso for intencional. O ruleset de `main` no GitHub bloqueia push forçado, então esse `push -f` só passa se um administrador desativar temporariamente a regra em **Settings > Rules > Rulesets** |
+| `python3 clear.py` | Recria o histórico num único commit (`checkout --orphan`) e, com confirmação explícita, sobrescreve o remoto (`push -f`), apagando todo o histórico anterior. Como o ruleset de `main` bloqueia push forçado, só passa se um administrador desativar a regra temporariamente em **Settings > Rules > Rulesets** |
 
-O repositório inclui um `.gitignore` na raiz que já ignora `remoteifes-server/.env` e `remoteifes-server/data/` (onde fica o banco SQLite), para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco de dados — veja o aviso sobre esse cenário em [Solução de Problemas](#solução-de-problemas). Se você clonou uma cópia antiga do repositório em que esse arquivo não existia e chegou a commitar `.env` ou o banco, rode `git rm --cached` nesses arquivos antes de publicar o repositório.
+O `.gitignore` da raiz já ignora `remoteifes-server/.env` e `remoteifes-server/data/`, para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco. Numa cópia antiga em que `.env` ou o banco chegaram a ser commitados, rode `git rm --cached` neles antes de publicar.
 
 ## Testes e Integração Contínua
 
-O repositório traz uma bateria de verificação de regressão. Todos os comandos rodam a partir da raiz do projeto, salvo indicação em contrário.
+Todos os comandos rodam a partir da raiz do projeto, salvo indicação em contrário.
 
-| Alvo | Comando | Observações |
+| Alvo | Comando | O que cobre |
 |---|---|---|
-| Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test` nativo; sem dependências extras. Cobre sessão/login, permissões, `/comando`, limites de temperatura, notificações, WebSocket, backup/restauração, o `/health`, o desligamento diário automático (`test/daily-shutdown.test.js`), a atualização de firmware por OTA (`test/ota.test.js`), as credenciais por dispositivo (`test/esp32-credentials.test.js`), o monitoramento operacional (`test/monitoring.test.js`) e seu histórico de amostras, consolidação, retenção, faixas e reinícios (`test/monitoring-history.test.js`), a biblioteca de protocolos IR com clonador vinculado à identidade da placa, failsafe e reconexão (`test/ir-protocols-service.test.js`, `test/ir-protocols.test.js`), o Auto-ON global (`test/auto-on-control.test.js`), a recusa de mudanças do acesso de rede vindas do site (`test/network-access-ownership.test.js`), o transporte mesh por gateway com autenticação por placa, quadros cifrados, repetição recusada e limites (`test/mesh-transport.test.js`), a injeção de falhas com placas simuladas no nível do protocolo — conexão atrasada, muda ou derrubada, tempestade de reconexão, confirmação atrasada, duplicada ou ausente, quadros malformados, gerações de credencial, OTA interrompida, revertida ou sem validação, encaminhamento atrasado ou repetido na malha e reinício do processo do servidor (`test/device-fault-injection.test.js`, `test/device-restart.test.js`, com a bancada em `test/support/bancada-dispositivos.js`), que valida o servidor e o protocolo, não o hardware, uma rodada curta do ensaio de crescimento com placas simuladas (`test/device-soak-smoke.test.js`; a rodada longa é `npm run ensaio`), a migração do esquema (`test/schema-migration.test.js`) e o contrato do firmware — GPIOs, switch, buzzer, NVS, AP (`test/firmware-contract.test.js`). |
-| Ensaio de implantação | `sudo env ENSAIO_HOST_DESCARTAVEL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh` | Só num Linux **descartável** com systemd (a CI usa um runner novo a cada execução): o ensaio instala unidades do systemd, o nginx e o pacote do console, e altera `/etc`. Percorre a instalação de produção a partir de um clone limpo: `setup.sh`, `.env` de produção e `install-service.sh`. Com placas simuladas conectadas em cada etapa, confere: serviço no ar com frontend, `/health` e o commit em execução; reinício, parada e partida com os dados preservados; uma atualização; uma atualização cuja versão cai ao iniciar, que esgota o limite de partidas do systemd, é revertida e deixa o serviço de pé na versão anterior; `rollback.sh`; backup com o serviço no ar e restauração com ele parado. Depois configura o proxy reverso (`lan-setup.sh`) com `nginx -t`, os cabeçalhos de WebSocket, o servidor preso ao loopback e as placas atravessando o proxy. Roda também a configuração HTTPS (`https-setup.sh`) com um `.env` gravado em CRLF até a emissão do certificado. A emissão exige um domínio público e **não é exercida**: um substituto do certbot a recusa. Por fim instala o `.deb` do console apontado para essa instalação e confere a ativação por socket, a escuta só no loopback, o reinício, o `--status` do lançador vendo a aplicação saudável, a remoção preservando o estado e o purge. Nenhuma placa ESP32 real é usada. |
-| Frontend end-to-end | `cd remoteifes-server && npm ci && cd ../e2e && npm ci && npx playwright install chromium && npx playwright test` | O harness roda o código real do servidor, por isso as dependências de `remoteifes-server` também são instaladas. A instalação do pacote npm não baixa o navegador automaticamente; `npx playwright install chromium` instala a versão compatível. Em uma imagem Ubuntu mínima que ainda não tenha as bibliotecas do Chromium, use uma vez `sudo npx playwright install-deps chromium`. Para usar um canal do sistema, defina `E2E_BROWSER_CHANNEL` (por exemplo, `chrome` ou `msedge`). Por padrão roda só no Chromium; `E2E_BROWSERS=chromium,firefox,webkit` (após `npx playwright install firefox webkit`) repete a bateria nos motores Gecko e WebKit — no projeto WebKit o service worker fica bloqueado, porque nesse motor o Playwright não intercepta (`page.route`) as chamadas de uma página controlada pelo worker, e por isso os dois testes que dependem do cache da PWA são pulados ali. Sobe a API real, um servidor estático do `remoteifes-web` e um ESP32 simulado; exercita layouts de celular, tablet, notebook, desktop e desktop largo, retrato e paisagem, autenticação, permissões, seleção de sala, operação do controlador, diálogo de troca de senha, relatos de problema, notificações do administrador, queda/retorno de WebSocket, navegação por endereço — reload, link direto, voltar/avançar, apelidos de rota, fallback de permissão, caminho estilo Cordova (`/index.html#/...`) e manual offline pelo cache do PWA (`navigation.spec.js`) —, o manual completo (`manual.spec.js`), o hub de início por papel com navegação e faixa de saúde (`home.spec.js`), o gate do Status por superadministrador, a planta baixa do cadastro de ESP32 sem rolagem horizontal em telas estreitas, o clonador, a captura em tempo real, a biblioteca e o failsafe em `Protocolos IR` — inclusive em celular e com acessibilidade máxima (`ir-protocols.spec.js`) — e o Auto-ON no painel de controle e nas Configurações (`auto-on.spec.js`), e a tela **Navegador desatualizado** de um motor sem os recursos mínimos, sem executar o restante do app (`compat-guard.spec.js`). O ESP32 simulado responde a papel, modo clone, capturas, `send_raw` e failsafe. |
-| Safari nativo (macOS) | `cd e2e && npm run test:safari` | Só no macOS, com `safaridriver --enable` feito uma vez (`sudo`). Sobe os servidores do harness se não estiverem no ar e dirige o Safari instalado pelo WebDriver: portal, login pela interface (`SAFARI_TEST_USER`/`SAFARI_TEST_PASSWORD`, padrão superadmin), sala A-108 com o ESP32 simulado online por WebSocket, ligar/desligar, `Administração > Sistema > Status`, logout, sem rolagem horizontal e sem erros de JavaScript. `SAFARI_PLATFORM=ios` repete o fluxo no Safari de um iPhone do iOS Simulator: o script liga o simulador mais recente disponível (ou o nome dado em `SAFARI_IOS_DEVICE`), abre o Simulator.app e cria a sessão com até três tentativas. No simulador, o "Element Click" do safaridriver não chega à página e o "Element Send Keys" não digita, então os toques são feitos pela Actions API (toque, com o teclado dispensado antes) e os campos de login são preenchidos pelo DOM. Nos runners hospedados do GitHub esse modo foi intermitente (pareamento e toques) e nunca passou do portal; trate-o como diagnóstico para um Mac com o Simulator aberto, não como evidência de suporte ao iOS. Imprime um relatório JSON e sai com erro no primeiro passo que falhar. |
-| App iOS no simulador | `cd remoteifes-cordova && npm run prepare-ios && npm run build-ios -- --emulator && npm run test-ios` | Só no macOS com Xcode. Veja [iOS e recursos visuais](#ios-e-recursos-visuais) para o escopo exato do que é comprovado. |
-| Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | Não precisa do SDK do Android. Confere a estrutura do `config.xml`, a coerência entre `config.xml` e `android-release.json`, a geração e a monotonia do `versionCode`, as recusas de publicação inconsistente, a reversibilidade de `harden-config.js` (produção ↔ desenvolvimento, byte a byte) e a saída de `sync-www.js`. |
-| Firmware ESP32 | `cd remoteifes-esp32 && pio run` | Compila o firmware com o PlatformIO (partição `min_spiffs.csv`, dois slots de aplicação para OTA). |
-| ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | Requer `pyserial` e uma placa conectada. Reinicia o ESP32 pela linha serial e confirma que o firmware inicializa (imprimindo a versão), entra na rotina de rede e, quando aplicável, conclui a autovalidação de OTA. Independe do servidor central estar no ar. |
+| Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test`, sem dependências extras: sessões e permissões, `/comando`, limites, agendamentos e desligamento diário, notificações, WebSocket, backup e restauração, `/health`, OTA, credenciais, monitoramento, protocolos IR, Auto-ON, acesso de rede, transporte da malha, injeção de falhas e reinício com placas simuladas no nível do protocolo (`test/device-fault-injection.test.js`, `test/device-restart.test.js`), uma rodada curta do ensaio de crescimento (`test/device-soak-smoke.test.js`), migração do esquema, contratos do frontend, do Cordova e da documentação, e o contrato do firmware (`test/firmware-contract.test.js`: GPIOs, switch, buzzer, NVS, AP). Valida servidor e protocolo, não o hardware |
+| Ensaio de implantação | `sudo env ENSAIO_HOST_DESCARTAVEL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh` | só num Linux **descartável** com systemd, porque instala unidades, nginx e o pacote do console e altera `/etc`. A partir de um clone limpo, com placas simuladas: `setup.sh`, `install-service.sh`, reinício, parada e partida com dados preservados, uma atualização, uma atualização que cai ao iniciar e é revertida, `rollback.sh`, backup no ar e restauração parada, `lan-setup.sh` com as placas atravessando o proxy, `https-setup.sh` até a emissão do certificado (que **não é exercida**, por exigir domínio público) e o `.deb` do console, da ativação por socket ao purge |
+| Frontend end-to-end | `cd remoteifes-server && npm ci && cd ../e2e && npm ci && npx playwright install chromium && npx playwright test` | Playwright contra a API real, o frontend estático e um ESP32 simulado: layouts de celular a desktop largo, autenticação e permissões, salas e controlador, relatos, notificações, queda de WebSocket, navegação por endereço (`navigation.spec.js`), manual (`manual.spec.js`), hub (`home.spec.js`), Protocolos IR (`ir-protocols.spec.js`), Auto-ON (`auto-on.spec.js`) e a tela de navegador desatualizado (`compat-guard.spec.js`) |
+| Safari nativo (macOS) | `cd e2e && npm run test:safari` | só no macOS, com `safaridriver --enable` feito uma vez: dirige o Safari pelo WebDriver no portal, login, sala A-108 com o ESP32 simulado, ligar/desligar, `Administração > Sistema > Status` e logout, sem rolagem horizontal nem erros de JavaScript |
+| App iOS no simulador | `cd remoteifes-cordova && npm run prepare-ios && npm run build-ios -- --emulator && npm run test-ios` | só no macOS com Xcode; o escopo está em [iOS e recursos visuais](#ios-e-recursos-visuais) |
+| Configuração Cordova | `cd remoteifes-cordova && npm ci && npm run validate` | sem SDK Android: `config.xml` e `android-release.json` coerentes, `versionCode` monotônico, recusas de publicação inconsistente, `harden-config.js` reversível byte a byte e a saída de `sync-www.js` |
+| Firmware ESP32 | `cd remoteifes-esp32 && pio run` | compila o firmware (partição `min_spiffs.csv`) |
+| ESP32 real (opcional) | `python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0` | com `pyserial` e uma placa na serial: reinicia o ESP32 e confirma boot, versão, rotina de rede e, quando for o caso, a autovalidação de OTA, sem depender do servidor |
 
-### Health check do servidor central
-
-O contrato do `GET /health`, usado pelo CI, pelo watchdog e pelas implantações, está em [Recuperação e verificação de saúde](#recuperação-e-verificação-de-saúde). Ele não depende de nenhum ESP32.
+No end-to-end, `npx playwright install chromium` baixa o navegador (numa imagem Ubuntu mínima, rode uma vez `sudo npx playwright install-deps chromium`), `E2E_BROWSER_CHANNEL` (`chrome` ou `msedge`) usa um navegador do sistema, e `E2E_BROWSERS=chromium,firefox,webkit`, depois de `npx playwright install firefox webkit`, repete a bateria no Gecko e no WebKit. No WebKit o service worker fica bloqueado, porque o Playwright não intercepta (`page.route`) as chamadas de uma página controlada por ele, e os dois testes do cache da PWA são pulados. No Safari, `SAFARI_TEST_USER`/`SAFARI_TEST_PASSWORD` escolhem a conta (padrão superadmin), e `SAFARI_PLATFORM=ios` repete o fluxo num iPhone do iOS Simulator (`SAFARI_IOS_DEVICE`), com toques pela Actions API e login preenchido pelo DOM, porque o safaridriver do simulador não clica nem digita. Nos runners hospedados esse modo nunca passou do portal: é diagnóstico para um Mac com o Simulator aberto, não evidência de suporte ao iOS.
 
 ### CI
 
-`.github/workflows/ci.yml` roda em cada pull request, em cada push para `main` e sob demanda em **Actions > CI > Run workflow**. O primeiro job (*Select checks*) compara os arquivos alterados pelo evento e escolhe o que precisa rodar; o último (*CI result*) sempre roda e só fica verde se todo job escolhido passou e todo job não escolhido foi de fato pulado, então é ele que deve ser exigido caso um status check obrigatório seja configurado. Há dois níveis:
-
-- **Validação rápida** (pull requests): só os subsistemas afetados, com o end-to-end apenas no Chromium do Ubuntu, dividido em quatro shards paralelos;
-- **Validação completa**: todos os navegadores e sistemas dos subsistemas afetados em cada push para `main` (que é o que vai para produção), e de **todos** os subsistemas no **Run workflow**. O campo opcional `expected_sha` faz a execução falhar se o ramo tiver avançado para outro commit, garantindo que o resultado vale exatamente para o SHA escolhido.
+`.github/workflows/ci.yml` roda em cada pull request, em cada push para `main` e em **Actions > CI > Run workflow**. O primeiro job (*Select checks*) escolhe o que rodar pelos arquivos alterados; o último (*CI result*) só fica verde se todo job escolhido passou e todo job não escolhido foi de fato pulado, e é ele que um status check obrigatório deve exigir. Pull requests têm **validação rápida** (só os subsistemas afetados, end-to-end só no Chromium do Ubuntu, em quatro shards); cada push para `main` tem **validação completa** dos subsistemas afetados em todos os navegadores e sistemas, e o **Run workflow** valida tudo (o campo `expected_sha` falha se o ramo tiver avançado para outro commit).
 
 | Mudança em | Validação rápida | Validação completa acrescenta |
 |---|---|---|
@@ -1730,28 +1468,23 @@ O contrato do `GET /health`, usado pelo CI, pelo watchdog e pelas implantações
 | `virtual-lab/`, `.github/workflows/virtual-hardware.yml` | nenhum job (o laboratório tem o próprio workflow manual; veja [Laboratório de hardware virtual](#laboratório-de-hardware-virtual)) | — |
 | `.github/workflows/`, `.github/scripts/`, caminho não mapeado ou diff indeterminável | validação completa de tudo | — |
 
-Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também contam. As regras ficam em `.github/scripts/select-checks.js`, testadas por `select-checks.test.js` no próprio job de seleção. Uma execução nova no mesmo pull request ou ramo cancela a anterior; um **Run workflow** nunca é cancelado por um push posterior, e o deploy do GitHub Pages nunca é interrompido no meio.
+Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também. As regras ficam em `.github/scripts/select-checks.js`, testadas por `select-checks.test.js` no próprio job de seleção. Uma execução nova no mesmo ramo cancela a anterior, mas um **Run workflow** nunca é cancelado por um push, e o deploy do GitHub Pages nunca é interrompido no meio.
 
-O que cada job cobre:
+| Job | Onde roda |
+|---|---|
+| Servidor (`npm test` + health check), com os contratos do frontend, do Cordova, do firmware e da documentação | Linux ARM64 com o Node mínimo (22.13.0); Windows e macOS com o 22.x mais recente |
+| Console de Operações (`npm test` + medição de recursos) | Ubuntu (Node 22.13.0), Windows e macOS |
+| Pacote do console: build, procedência, instalação do artefato, execução pelo lançador sem ferramentas de desenvolvimento, `.deb`, desinstalação preservando o estado | Linux x64 e ARM64, Windows e macOS |
+| Ensaio de implantação (`ensaio-implantacao.sh`) | Ubuntu 22.04 x64 com o Node mínimo e Ubuntu 24.04 ARM64 |
+| End-to-end (Playwright), em shards com harness próprio | Ubuntu com Chromium, Firefox e WebKit; Windows com o Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox; macOS com o Chrome do sistema |
+| Safari nativo (`e2e/harness/safari-smoke.js`, pelo `safaridriver`, sem dependência npm; o WebKit do Playwright não conta como Safari). O smoke no iOS Simulator só roda com `ios_safari` no **Run workflow**, como diagnóstico | macOS |
+| Validação Cordova (o checkout CRLF do Windows exercita a restauração byte a byte de `harden-config.js`) | Ubuntu e Windows |
+| Build do firmware ESP32 | Ubuntu |
+| Android (`android.yml`) e iOS (`ios.yml`, que compila para o iOS Simulator e roda `npm run test-ios`), workflows reutilizáveis | Ubuntu e macOS |
 
-- servidor (`npm test` + health check) em Linux ARM64 com o Node mínimo declarado (22.13.0) e em Windows e macOS com o 22.x mais recente; os testes do servidor incluem os contratos do frontend, do app Cordova, do firmware e da documentação;
-- Console de Operações (`npm test` + medição de recursos) em Ubuntu (Node 22.13.0), Windows e macOS, e pacote instalável (build, procedência, instalação a partir do artefato, execução pelo lançador sem ferramentas de desenvolvimento no PATH, `.deb` no Linux, desinstalação preservando o estado) em Linux x64 e ARM64, Windows e macOS;
-- ensaio de implantação (`ensaio-implantacao.sh`: instalação pelo systemd com o confinamento da unidade, atualização, reversão, backup e restauração, proxy reverso e o `.deb` do console) num Ubuntu 22.04 x64 com o Node mínimo e num Ubuntu 24.04 ARM64;
-- frontend end-to-end (Playwright) em Ubuntu com Chromium, Firefox e WebKit, em Windows com o Microsoft Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox, e em macOS com o Google Chrome do sistema, cada combinação dividida em shards independentes (cada shard sobe seu próprio harness);
-- Safari nativo: `e2e/harness/safari-smoke.js` dirige o Safari do macOS pelo `safaridriver` (WebDriver, sem dependência npm), contra os mesmos servidores do harness — portal, login pela interface, sala com ESP32 simulado por WebSocket, ligar/desligar, administração, logout, ausência de rolagem horizontal e de erros de JavaScript. O WebKit do Playwright não é usado como evidência de Safari. O mesmo smoke no Safari de um iPhone do iOS Simulator só roda sob demanda (**Run workflow** com `ios_safari`), porque nos runners hospedados o pareamento do `safaridriver` com o simulador e a entrega dos toques foram intermitentes; ele é um diagnóstico, não uma evidência exigida;
-- validação de configuração Cordova em Ubuntu e Windows (o checkout com CRLF do Windows exercita a restauração byte a byte de `harden-config.js`);
-- build do firmware ESP32;
-- Android (`android.yml`) e iOS (`ios.yml`), chamados pelo CI como workflows reutilizáveis.
+`.github/workflows/virtual-hardware.yml` (**Virtual Hardware Validation**) só roda por **Run workflow**, nunca a cada commit; veja [Laboratório de hardware virtual](#laboratório-de-hardware-virtual).
 
-`.github/workflows/virtual-hardware.yml` (**Virtual Hardware Validation**) só roda por **Run workflow**, nunca a cada commit; é descrito em [Laboratório de hardware virtual](#laboratório-de-hardware-virtual).
-
-`.github/workflows/ios.yml` (macOS) prepara a plataforma iOS com o `cordova-ios` travado no lockfile, compila o app para o iOS Simulator com o Xcode do runner e executa `npm run test-ios`; veja [iOS e recursos visuais](#ios-e-recursos-visuais) para o que essa execução comprova. Nenhum token adicional é necessário.
-
-A branch `main` é protegida por um ruleset do GitHub (**Settings > Rules > Rulesets**, regra `main`) que bloqueia a exclusão da branch e qualquer push que não seja fast-forward (`push -f`, rebase publicado), sem exceção para administradores. Pushes normais, `export.py` e `import.py` continuam iguais; um erro do tipo `non-fast-forward` ou `deletion` vindo do GitHub indica a regra, não um problema local. Como o fluxo do projeto é de push direto em `main`, a regra não exige pull request nem status checks — exigir checks bloquearia todo push direto.
-
-Todas as actions dos workflows são referenciadas pelo SHA completo do commit (a versão correspondente fica em comentário ao lado), de modo que uma tag movida ou comprometida no repositório da action não altera o que o CI executa. O `.github/dependabot.yml` abre mensalmente um único pull request agrupado com as atualizações dessas actions dentro da mesma versão maior (o que as tags `@vN` anteriores já acompanhavam); ao aceitá-lo, o SHA e o comentário de versão avançam juntos. A troca de versão maior de uma action continua sendo uma decisão manual.
-
-As dependências npm (servidor, console, E2E e Cordova) não recebem atualizações de rotina: os alertas de vulnerabilidade do GitHub e as atualizações de segurança do Dependabot estão ligados, e um pull request só aparece quando uma versão travada no lockfile tem uma vulnerabilidade conhecida com correção. Os releases do console são imutáveis (**Settings > General > Releases**): depois de publicado, nenhum arquivo nem a etiqueta de um release pode ser trocado, o que se soma à atestação de cada arquivo e ao ruleset das etiquetas `console-v*`.
+**Proteções do repositório.** O ruleset `main` (**Settings > Rules > Rulesets**) bloqueia a exclusão da branch e qualquer push que não seja fast-forward, sem exceção para administradores; um erro `non-fast-forward` ou `deletion` vindo do GitHub é essa regra. Como o fluxo é de push direto em `main`, ela não exige pull request nem status checks. As actions são referenciadas pelo SHA completo, com a versão em comentário, e o `.github/dependabot.yml` abre por mês um pull request agrupado com as atualizações dentro da mesma versão maior. As dependências npm só recebem atualizações de segurança do Dependabot, quando uma versão travada tem vulnerabilidade conhecida com correção. Os releases do console são imutáveis (**Settings > General > Releases**), o que se soma à atestação de cada arquivo e ao ruleset das etiquetas `console-v*`.
 
 ### Laboratório de hardware virtual
 
@@ -1763,21 +1496,13 @@ server.js real ── intermediário (falhas) ── relay ══ 192.168.4.9:80
                                                                                           flash, GPIO, relógio
 ```
 
-**Onde roda.** Os cenários (`virtual-lab/cenarios/`: emulador, builds do firmware e rede do convidado) só rodam num Linux **descartável**, e se recusam a iniciar sem `LAB_HOST_DESCARTAVEL=1` ou fora do Linux. O caminho normal é o workflow `.github/workflows/virtual-hardware.yml` (**Virtual Hardware Validation**), em runners efêmeros: são 14 jobs em paralelo, cerca de meia hora de relógio e 140 minutos de runner. Uma VM Linux descartável sob seu controle também pode definir a variável. O emulador é um binário pré-compilado de um fork pessoal do QEMU da Espressif, fixado por sha256 em `virtual-lab/emulador.json`, e o convidado aciona uma pilha de rede no host: o laboratório trata os dois como não confiáveis e não os executa na máquina de quem desenvolve. Na máquina de desenvolvimento, em Linux ou Windows, rodam só os testes unitários do próprio laboratório (leitor da flash, intermediário, relay e guardas de segurança do host): `node virtual-lab/executar.js --unidade`.
+**Onde roda.** Os cenários (`virtual-lab/cenarios/`) só rodam num Linux **descartável** e se recusam a iniciar sem `LAB_HOST_DESCARTAVEL=1` ou fora do Linux. O caminho normal é o workflow `.github/workflows/virtual-hardware.yml` (**Virtual Hardware Validation**), em runners efêmeros: 14 jobs em paralelo, cerca de meia hora de relógio e 140 minutos de runner; uma VM Linux descartável sob seu controle também serve. O emulador (um binário de um fork pessoal do QEMU da Espressif, fixado por sha256 em `virtual-lab/emulador.json`) e a rede do convidado são tratados como não confiáveis e nunca rodam na máquina de quem desenvolve; nela, em Linux ou Windows, rodam só os testes unitários do laboratório: `node virtual-lab/executar.js --unidade`. O mesmo workflow roda o firmware contra a instalação de produção dentro do ensaio de implantação (`08-implantacao`) e os userlands do Raspberry Pi OS de [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados) (`virtual-lab/host/`).
 
-Além dos cenários, o workflow roda o firmware contra a instalação de produção (systemd e nginx) dentro do ensaio de implantação (`08-implantacao`) e os userlands do Raspberry Pi OS descritos em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados) (`virtual-lab/host/`).
+Cada execução passa só se passarem os três veredictos: **validação funcional**; **limpeza do host** (nenhum processo, porta ou arquivo da execução deixado para trás); e **segurança do host**, que compara, com consultas somente leitura, adaptadores de rede, rota padrão, DNS, proxies, serviços e tarefas agendadas (e os perfis de firewall no Windows) antes e depois.
 
-Cada execução imprime três veredictos e só passa se os três passarem: **validação funcional**; **limpeza do host** (nenhum processo, porta em escuta ou arquivo da execução deixado para trás); e **segurança do host**, que compara o estado do host antes e depois com consultas somente leitura e sem privilégio: adaptadores de rede, rota padrão, DNS, proxies, serviços e tarefas agendadas, mais os perfis de firewall no Windows, e as portas em escuta atribuídas à execução fechadas.
+**Contenção.** Fora o ensaio de implantação, que instala serviços e altera `/etc` no runner descartável, os cenários do ESP32 não mexem no host: a rede do convidado é libslirp com `restrict=on`, e seu único endereço alcançável (192.168.4.9:8080) é encaminhado a cada conexão por `virtual-lab/lib/relay.js` ao intermediário em 127.0.0.1; os canais de controle (qtest, QMP, stub do GDB) escutam só em loopback; nada é ligado em ponte nem roda elevado. O estado fica em `<temp>/remoteifes-virtual-lab/` (`cache/` e `execucoes/<execução>/{trabalho,resultados}`), `trabalho/` é apagado ao fim por uma única remoção recursiva (`removerSeguro`) que recusa caminhos fora dessa raiz, e cada processo filho é encerrado pelo PID ou pelo grupo. As credenciais são geradas por execução e nunca entram em logs nem na evidência.
 
-**Contenção dos cenários do ESP32.** O ensaio de implantação (`08-implantacao`) é a exceção: instala serviços e o nginx e altera `/etc` dentro do runner descartável, como descrito em [Testes e Integração Contínua](#testes-e-integração-contínua).
-
-- A rede do convidado é libslirp com `restrict=on`, sem rota para o host nem além. O único endereço alcançável (192.168.4.9:8080) é encaminhado, a cada conexão, para `virtual-lab/lib/relay.js`, que o liga ao intermediário do laboratório em 127.0.0.1. O portal de setup é encaminhado só para uma porta de loopback.
-- Todo canal de controle (qtest, QMP e o stub do GDB enquanto há um ponto de parada armado) escuta só em loopback. Nada é ligado em ponte, e nenhum adaptador, driver, rota, DNS, proxy ou regra de firewall é criado. O executor se recusa a rodar elevado.
-- O estado da execução fica em `<temp>/remoteifes-virtual-lab/`: `cache/` (emulador e builds do firmware) e `execucoes/<execução>/{trabalho,resultados}`; o PlatformIO usa o próprio cache. `trabalho/` (imagens de flash, banco do servidor, certificado de teste) é apagado ao final, e `resultados/` guarda a evidência sem segredos. A única remoção recursiva (`removerSeguro`) resolve links e recusa qualquer caminho fora dessa raiz.
-- Cada processo filho é registrado e encerrado pelo PID exato ou pelo próprio grupo de processos; no Linux, um relay que sobre é procurado pela linha de comando que inclui o identificador da execução. Os logs em memória têm limite.
-- As credenciais são geradas a cada execução, removidas de todo log e nunca entram na evidência.
-
-**Execução e evidência.** Em **Actions > Virtual Hardware Validation > Run workflow**, `suite` escolhe o que rodar (`full`, `esp32` ou `host`, os userlands do Raspberry Pi OS). `firmware_ref` e `cenarios` valem para os cenários do ESP32: o primeiro testa `remoteifes-esp32` de outro commit (para reproduzir um defeito já corrigido) e o segundo escolhe os arquivos. A evidência sobe por grupo (`virtual-lab-<grupo>`): um diretório por cenário com `evidencia.json` (estado inicial, falha, o que era exigido e proibido, recuperação, o que foi observado e o resultado), o log serial da placa e o log do servidor, tudo sem segredos, mais `resumo.json` com os três veredictos.
+**Execução e evidência.** Em **Actions > Virtual Hardware Validation > Run workflow**, `suite` escolhe `full`, `esp32` ou `host` (os userlands do Raspberry Pi OS); `firmware_ref` (testar `remoteifes-esp32` de outro commit, para reproduzir um defeito corrigido) e `cenarios` (os arquivos) valem para os cenários do ESP32. A evidência sobe por grupo (`virtual-lab-<grupo>`): por cenário, `evidencia.json` (estado inicial, falha, o exigido e o proibido, recuperação, o observado e o resultado), o log serial da placa e o do servidor, sem segredos, mais `resumo.json` com os três veredictos.
 
 **O que um cenário prova.** O comportamento da lógica do firmware: boot, portal de setup, associação Wi-Fi e DHCP como o firmware os conduz, o protocolo do dispositivo sobre HTTP e WebSocket reais, o conteúdo da NVS, o caminho de OTA pelo bootloader e pela tabela de partições reais, níveis e bordas de GPIO nos pinos e a recuperação de resets e cortes de energia em instruções exatas. As asserções de tempo usam o relógio da própria placa (um temporizador que o firmware não usa), porque o chip emulado roda cerca de três vezes mais devagar que o relógio real.
 
@@ -1814,6 +1539,9 @@ As figuras, os fluxos e as capturas deste README ficam em `docs/readme-assets/`,
 | `composed/device-networking-{light,dark}.png` | [Rede Mesh Opcional e Topologia](#rede-mesh-opcional-e-topologia) | PNG composto | `remoteifes-esp32/MESH.md`, `remoteifes-server/src/services/meshService.js` |
 | `flows/command-state-flow.svg` | [Do pedido ao ar-condicionado](#do-pedido-ao-ar-condicionado) | SVG | `remoteifes-server/src/services/salasService.js` (`aplicarComando`), `remoteifes-server/src/services/deviceHub.js` (`estadoConfirmado`), `remoteifes-esp32/MESH.md` |
 | `flows/update-recovery.svg` | [Atualização, versões e reversão](#atualização-versões-e-reversão) | SVG | `remoteifes-server/deploy.sh`, `remoteifes-server/rollback.sh`, `remoteifes-server/verificar-versao.sh` |
+| `flows/esp32-provisioning.svg` | [Provisionamento e reprovisionamento](#provisionamento-e-reprovisionamento) | SVG | `remoteifes-esp32/src/main.ino` (`startAPMode`, `abrirApTemporario`, `encerrarApTemporario`, `enderecoDoPontoDeAcesso`, `AP_TEMPORARIO_TIMEOUT_MS`, `AP_PASSWORD_PADRAO`, `reset_wifi`) |
+| `flows/ota-rollout.svg` | [Distribuição em etapas](#distribuição-em-etapas-para-vários-esp32) | SVG | `remoteifes-server/src/services/otaRolloutService.js` (`MAX_DISPOSITIVOS`, `LOTE_MIN`, `LOTE_MAX`, `LOTE_PADRAO`, `GRACA_ESPERA_MS`), `remoteifes-server/src/services/otaService.js` (`MAX_SIMULTANEOS`) |
+| `flows/room-control-access.svg` | [Controle de Acesso e Proprietários de Sala](#controle-de-acesso-e-proprietários-de-sala) | SVG | `remoteifes-server/src/middlewares/auth.js` (`exigirPermissao`), `remoteifes-server/src/routes/comandoRoutes.js`, `remoteifes-server/src/services/salasService.js` (`usuarioPodeControlarSala`, `aplicarComando`, `concederDono`) |
 | `composed/esp32-hardware-{light,dark}.png` | [Firmware ESP32](#firmware-esp32) | PNG composto | `remoteifes-esp32/src/main.ino` (`DHTPIN`, `DHTTYPE`, `IR_SEND_PIN`, `IR_RECV_PIN`, `BUZZER_PIN`, `ACTION_SWITCH_PIN` com `INPUT_PULLUP`), `remoteifes-esp32/platformio.ini` (`board`) |
 | `composed/ir-cloning-{light,dark}.png` | [Protocolos IR](#administração--dispositivos--protocolos-ir) | PNG composto | `remoteifes-server/src/routes/protocolosIrRoutes.js`, `remoteifes-server/src/services/protocolosIrService.js` (`isKnown`), `remoteifes-server/src/services/deviceHub.js` (`MAX_CAPTURAS_ARMAZENADAS`), `remoteifes-esp32/src/main.ino` (failsafe na NVS, botão de 5 s) |
 | `composed/esp32-ota-{light,dark}.png` | [Atualização de Firmware por OTA](#atualização-de-firmware-por-ota-esp32) | PNG composto | `remoteifes-esp32/src/main.ino` (`iniciarOtaOferta`, `verificarValidacaoOta`, `OTA_SELFTEST_TIMEOUT_MS`), `remoteifes-server/src/services/otaService.js` (fases e `OTA_TIMEOUT_*`) |
@@ -1910,135 +1638,60 @@ Nenhum dos dois é pré-requisito de operação: sem rede, o console continua ad
 ## Estrutura de Pastas
 
 ```
-remoteifes-server/
-  setup.sh          instalação e configuração automatizadas (Node.js, dependências, .env)
-  install-service.sh configura o serviço systemd + watchdog de saúde (auto-start no boot, ex.: Raspberry Pi)
-  lan-setup.sh       proxy reverso Nginx na porta 80 para a rede local (sem Internet/Certbot)
-  https-setup.sh     configuração automatizada de HTTPS (Nginx + Certbot) para domínio público
-  deploy.sh          atualização protegida (backup pré-update, health check, auto-rollback) — npm run deploy
-  rollback.sh        volta para a versão anterior ou uma tag, com backup do banco — npm run rollback
-  verificar-versao.sh  verificação da versão em execução compartilhada por deploy.sh e rollback.sh
-  release.sh         marca uma versão (package.json + commit + tag vX.Y.Z) — npm run release
-  healthcheck.sh     checa o /health local — npm run health
-  health-watchdog.sh usado pelo remoteifes-health.timer para reiniciar o serviço se o /health falhar
-  redes-autorizadas.js  define/lista as faixas de IP autorizadas da rede local — npm run redes
-  reset-admin-senha.js  redefine a senha do superadministrador sem apagar dados
-  backup-db.js       gera um backup verificado do banco SQLite agora (npm run backup)
-  restore-backup.js  lista e restaura backups, com verificação e cópia de segurança (npm run restore)
-  firmware-esp32.js  publica/mostra a imagem de firmware do ESP32 para OTA (npm run firmware)
-  credencial-esp32.js  provisiona/rotaciona/substitui/revoga a credencial de uma sala (npm run credencial)
-  server.js          ponto de entrada: sobe o HTTP server, o WebSocket e o agendador
-  data/              conteúdo de REMOTEIFES_DATA_DIR (padrão); ignorado pelo Git
-    remoteifes.db    banco SQLite (criado na primeira execução)
-    backups/         backups automáticos, manuais e de pré-atualização do banco
-    firmware/        imagem publicada, manifesto.json e estados-ota.json do fluxo OTA
-    previous-version / current-version / deploy.log   estado gravado por deploy.sh/rollback.sh
-  src/
-    app.js            monta o Express app e registra as rotas
-    config/           conexão com o banco SQLite e caminhos de dados/backup (paths.js)
-    db/                schema, seed e a lista de salas reais do campus (salasCampus.js)
-    middlewares/       autenticação, permissões, restrição de rede
-    routes/            rotas HTTP (login, documentação por papel, aplicativo móvel/APK, salas, comandos, agendamentos, admin, dispositivo,
-                        painel dos ESP32 (esp32AdminRoutes), Protocolos IR (protocolosIrRoutes), relatos)
-    services/          regras de negócio (usuários, salas, agendamentos, configurações, notificações,
-                        relatos de problema, sessões/tokens, status em tempo real, backup do banco,
-                        OTA de firmware (otaService) e sua distribuição em etapas (otaRolloutService),
-                        biblioteca de protocolos IR, clonador oficial e failsafe (protocolosIrService),
-                        credenciais de dispositivo (esp32CredenciaisService),
-                        monitoramento operacional com amostragem e histórico consolidado por hora (monitoramentoService),
-                        documentação administrativa por papel (documentationService))
-    scheduler/         verificação periódica de agendamentos, timeouts de ESP32 e de OTA, sessões abandonadas, monitoramento, amostra de histórico a cada minuto e backup
-    utils/             funções auxiliares (data/hora em fuso de Brasília, rate limiting, faixas de rede)
-  test/               testes de regressão do servidor (node:test) — API, permissões, WebSocket, /health, backup, OTA, credenciais de dispositivo, monitoramento,
-                        Protocolos IR e clonador (ir-protocols*.test.js), Auto-ON (auto-on-control.test.js), contrato do firmware (firmware-contract.test.js)
+remoteifes-server/        servidor central (Node.js + Express + SQLite)
+  server.js               ponto de entrada: HTTP, os dois WebSocket (/ws e /ws/dispositivo) e o agendador
+  setup.sh, install-service.sh, lan-setup.sh, https-setup.sh     instalação, systemd e proxy reverso
+  deploy.sh, rollback.sh, verificar-versao.sh, release.sh        atualização, reversão e marcação de versão
+  healthcheck.sh, health-watchdog.sh                            /health e o watchdog do systemd
+  backup-db.js, restore-backup.js, reset-admin-senha.js, redes-autorizadas.js    npm run backup | restore | reset-admin | redes
+  firmware-esp32.js, credencial-esp32.js                        npm run firmware | credencial
+  carga-esp32.js, ensaio-dispositivos.js, latencia-comandos.js, ensaio-recuperacao.js, ensaio-implantacao.sh    ensaios
+  src/app.js              monta o Express e registra as rotas
+  src/config/             banco e caminhos de dados (paths.js), commit em execução (release.js)
+  src/db/                 esquema, migrações, seed e as salas do campus (salasCampus.js)
+  src/middlewares/        autenticação, permissões e restrição de rede
+  src/routes/             rotas HTTP (salas, comandos, agendamentos, administração, ESP32, Protocolos IR, relatos, documentação, aplicativo)
+  src/services/           regras de negócio (deviceHub, salas, OTA e distribuição, credenciais, protocolos IR, malha, monitoramento, documentação por papel...)
+  src/scheduler/          tarefas periódicas: agendamentos, timeouts, retenção, monitoramento e backup
+  src/utils/              data e hora de Brasília, limites de taxa, faixas de rede
+  test/                   testes de regressão (node:test) e contratos do frontend, do firmware e da documentação
+  data/                   REMOTEIFES_DATA_DIR padrão, ignorado pelo Git: banco, backups/, firmware/, versões e deploy.log
 
-remoteifes-web/        frontend estático; em produção é servido pelo Express na mesma origem da API
-  manifest.webmanifest  manifesto da PWA (nome, ícones, cor de tema)
-  sw.js                 service worker: cache do app shell para instalação/uso offline parcial
-  assets/icons/         ícones gerados para PWA, favicon e tela inicial (iOS/Android)
-  js/
-    app.js             inicialização geral da página
-    api.js             chamadas HTTP à API central
-    config.js          resolve o endereço do servidor central (origem da PWA, override em localStorage ou valor fixo para o build empacotado)
-    state.js           estado da sessão atual no navegador
-    nav.js             troca de abas e telas
-    router.js          roteador por fragmento (#/...): reflete a navegação no endereço e a restaura no reload, no link direto e no voltar/avançar, respeitando a permissão
-    account-menu.js    menu da conta (avatar com iniciais): identificação, atalho para o aplicativo móvel, sair
-    rtstatus.js        cliente WebSocket para status em tempo real
-    idle-timer.js      timeout de inatividade e aviso de logout automático
-    a11y.js            widget de acessibilidade (fonte, contraste, espaçamento etc.), persiste no localStorage
-    ui-dialog.js       modais/diálogos estilizados do sistema (confirmação, texto, troca de senha) — substituem prompt()/confirm()/alert()
-    ui-status.js       selo reutilizável de estado de função (disponível, temporariamente indisponível, desativado por configuração, falha etc.)
-    floorplan.js        componente reutilizável de planta baixa com zoom (usado na tela de salas e no admin)
-    help.js            ajuda contextual dos modais (parte comum embutida; textos de administração vêm de /documentation após validar a sessão), com atalho para a seção do manual
-    manual-content.js  seções comuns do manual (papel "todos") e diagramas SVG, carregadas sob demanda; as seções de administração e do superadministrador são entregues por /documentation e não ficam nos assets públicos
-    tempo.js           formatação de datas/horas no fuso de Brasília
-    charts.js          gráficos SVG leves do monitoramento (linhas/área, colunas, barras horizontais e rosca) com leitura por teclado/toque, resumo e tabela
-    rooms-data.js       utilitário auxiliar de composição de código de sala
-    screens/           lógica de cada tela:
-                        inicio.js (hub de início: cartões das ações principais adaptados ao papel, faixa de saúde do sistema para o superadministrador),
-                        simple.js (assistente simples), location.js e rooms.js (navegação tradicional),
-                        floorplan.js (planta baixa), panel.js (painel de controle de uma sala),
-                        schedule.js (agendamentos), grade.js (grade de horários),
-                        propriedade.js (config. de salas para proprietários),
-                        notifications.js (painel do sino, notificações de dispositivos),
-                        relatos.js (ícone de inseto: envio de relatos e lista dos próprios; a gestão fica em admin.js, sub-aba Relatos de problemas),
-                        login.js (portal e sessão),
-                        portal-funcoes.js (vitrine de funcionalidades na tela inicial), admin.js (painel administrativo),
-                        esp32-admin.js (painel avançado de cada ESP32 — status, papel, failsafe, OTA e credenciais —
-                        em Dispositivos > Firmware / OTA, restrito ao superadministrador),
-                        protocolos-ir-admin.js (clonador oficial, modo clone, capturas com nome, biblioteca e failsafe OFF —
-                        em Dispositivos > Protocolos IR, restrito ao superadministrador),
-                        monitoramento.js (aba "Status > Sistema" do painel administrativo, restrita ao superadministrador: cartões, histórico e gráficos),
-                        manual.js (sobreposição do manual completo: sumário, busca, navegação e foco),
-                        mobile-app.js (página #/aplicativo: estado da versão instalada, instalação guiada, atualização e download do APK verificado)
+remoteifes-web/           frontend estático, sem build, servido pelo Express na mesma origem da API
+  index.html, manifest.webmanifest, sw.js, version.json    app-shell, PWA e versão do frontend
+  js/                     núcleo: api, config, state, router, nav, rtstatus, idle-timer, a11y, charts, help, manual...
+  js/screens/             uma tela por arquivo: inicio, simple, rooms, location, floorplan, panel, schedule, grade,
+                          propriedade, notifications, relatos, admin, esp32-admin, protocolos-ir-admin, monitoramento,
+                          heatmap, topologia, manual, mobile-app, login, portal-funcoes
+  css/, assets/           estilos (tokens de cor e tons dos ícones) e ícones
 
-remoteifes-esp32/         projeto PlatformIO (framework Arduino, placa esp32dev, partição min_spiffs.csv para OTA)
-  platformio.ini           configuração do projeto, versão do firmware (-DFW_VERSAO) e dependências
-  src/main.ino              firmware principal (Wi-Fi, papel transmissor/clonador recebido do servidor, modo
-                            operação/clone, IR, failsafe OFF na NVS, switch físico, buzzer, DHT, WebSocket cliente com o
-                            servidor, portal AP de provisionamento, OTA A/B com autovalidação e reversão, credencial por dispositivo)
-  src/mesh*.cpp             modos gateway e nó da rede mesh opcional (veja MESH.md)
-  include/root_ca.h         certificado raiz (Let's Encrypt) usado quando o firmware se conecta ao servidor via HTTPS
-  data/                     arquivos gravados no sistema de arquivos LittleFS do dispositivo
-    setup.html               formulário do portal de provisionamento (rede e servidor)
-    restart.html             página de confirmação exibida após salvar a configuração
-  tools/serial-smoke.py     smoke test de hardware: reinicia o ESP32 pela serial e confere o boot e a rotina de rede
-  flash.sh                  instala o PlatformIO Core (se necessário) e compila/grava firmware + sistema de arquivos
+remoteifes-esp32/         firmware PlatformIO (placa esp32dev, partição min_spiffs.csv)
+  platformio.ini          configuração, versão (-DFW_VERSAO) e bibliotecas fixadas
+  src/main.ino            firmware da sala: Wi-Fi, WebSocket, IR, failsafe, switch, buzzer, DHT, portal, OTA, credencial
+  src/mesh*.cpp           modos gateway e nó da malha (veja MESH.md)
+  include/root_ca.h       raiz Let's Encrypt para o modo HTTPS
+  data/                   portal de provisionamento gravado no LittleFS
+  tools/serial-smoke.py   smoke de hardware pela serial
+  flash.sh                instala o PlatformIO e grava firmware e data/
 
-remoteifes-cordova/     empacotamento nativo Android/iOS (veja Empacotamento como PWA e Aplicativo Nativo)
-  config.xml             configuração do app (id, nome, ícone, splash, permissões de rede) — modo de desenvolvimento por padrão
-  harden-config.js       reescreve config.xml para produção (origem única) ou de volta para desenvolvimento (--dev)
-  validate-config.js     valida config.xml, a reversibilidade de harden-config.js e a saída de sync-www.js (npm run validate)
-  android-release.json    fonte única da versão Android publicável (versionName, versionCode, data, notas)
-  android-version.js      define a versão, avança o versionCode e propaga para o config.xml
-  package.json            scripts de sync/build/run/harden-config/android-version e plugins Cordova do projeto
-  sync-www.js             copia remoteifes-web para www/ antes de cada build (não editar www/ manualmente)
-  resources/              imagens-fonte (icon.png, splash.png) usadas por cordova-res
-  www/                    cópia gerada de remoteifes-web; ignorada pelo Git
+remoteifes-cordova/       empacotamento Android/iOS do mesmo frontend
+  config.xml, android-release.json     configuração do app e versão Android publicável
+  sync-www.js, harden-config.js, validate-config.js, android-version.js    npm run validate | harden-config | android-version
+  build-android-release.js, inspect-apk.js, publish-android-release.js     release, inspeção e publicação do APK
+  test-android.js, test-android-webview.js, test-ios.js, doctor.js         smoke nativo e diagnóstico do ambiente
+  resources/              ícone e splash de origem; www/ é gerado e ignorado pelo Git
 
-remoteifes-console/      Console de Operações: servidor local, lançador, instalador e empacotamento (veja Console de Operações)
+remoteifes-console/       Console de Operações: servidor local, lançador, instalador e empacotamento (ARQUITETURA.md, DISTRIBUICAO.md)
 
-virtual-lab/             laboratório de hardware virtual, só de desenvolvimento (veja Laboratório de hardware virtual)
-  executar.js            executor: checagens prévias, preparo, testes, limpeza e veredictos de segurança do host
-  emulador.json          release fixada do emulador (URL e sha256 do arquivo por host, commit do fork)
-  lib/placa.js           uma placa virtual: energia, reset, serial, GPIO, relógio virtual, pontos de parada
-  lib/firmware.js        compila as variantes producao, candidato (versão + 1) e candidatoQueAborta a partir do fonte
-  lib/flash.js           leitor/editor da tabela de partições, do otadata e da NVS de uma imagem de flash
-  lib/rede.js            intermediário: recusa, buraco negro, atraso, corte/travamento/corrupção de downloads, injeção de quadros, TLS
-  lib/relay.js           liga cada conexão da placa ao intermediário
-  lib/laboratorio.js     o mundo de um cenário: servidor, placas, chamadas à API do operador, evidência
-  lib/seguranca.js       retrato do host antes e depois da execução, e a comparação
-  cenarios/              os cenários
-  host/                  userlands do Raspberry Pi OS (arm64 com systemd, armhf sob qemu-user)
-  test/                  testes unitários do laboratório (--unidade)
+virtual-lab/              laboratório de hardware virtual, só de desenvolvimento
+  executar.js, emulador.json     executor com os três veredictos e a release fixada do emulador
+  lib/                    placa virtual, firmware, flash, rede com falhas, relay, laboratório e segurança do host
+  cenarios/, host/, test/        cenários, userlands do Raspberry Pi OS e testes unitários
 
-e2e/                     testes end-to-end de navegador (Playwright) — specs, harness (API + estático + ESP32 simulado)
-.github/workflows/       ci.yml (testes e validações; chama android.yml e ios.yml), pages.yml (demonstração no GitHub Pages),
-                         console-release.yml (releases do console) e virtual-hardware.yml (laboratório de hardware virtual)
-docs/                    material de apoio do projeto (imagens, documento acadêmico)
-  readme-assets/         figuras e capturas deste README, com as fontes editáveis (veja Figuras e capturas do README)
-export.py / import.py / clear.py   scripts auxiliares de Git (veja Scripts Auxiliares)
+e2e/                      testes end-to-end (Playwright): specs/ e harness/ (API real, estático, ESP32 simulado, smoke do Safari)
+.github/workflows/        ci.yml (chama android.yml e ios.yml), pages.yml, console-release.yml e virtual-hardware.yml
+docs/                     material de apoio; readme-assets/ tem as figuras deste README e suas fontes
+export.py, import.py, clear.py   scripts auxiliares de Git
 ```
 
 ## Solução de Problemas
