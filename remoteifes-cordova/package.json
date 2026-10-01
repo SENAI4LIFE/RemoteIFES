@@ -37,5 +37,10 @@
     "cordova-android": "^15.1.0",
     "cordova-ios": "^8.1.1",
     "cordova-plugin-statusbar": "^4.0.0"
+  },
+  "overrides": {
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
   }
 }
