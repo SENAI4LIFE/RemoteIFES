@@ -18,7 +18,7 @@ function criarJanelas(janelaMs) {
     return registro;
   }
 
-  return { obter };
+  return { obter, tamanho: () => registros.size };
 }
 
 function ipDe(req) {
@@ -36,16 +36,20 @@ function criarLimitador({ janelaMs, maxTentativas, chave = null, tetoPorIp = nul
   const porIp = criarJanelas(janelaMs);
   const tetoIp = tetoPorIp === null ? maxTentativas * FATOR_TETO_IP_PADRAO : tetoPorIp;
 
-  return function limitar(req, res, next) {
+  function limitar(req, res, next) {
     const agora = Date.now();
     const ip = ipDe(req);
     const principal = typeof chave === "function" ? chave(req) : null;
 
+    const temPrincipal = principal !== null && principal !== undefined;
     const registroIp = porIp.obter(ip, agora);
-    const registroPrincipal = principal !== null && principal !== undefined ? principais.obter(`${principal}`, agora) : null;
-    const limiteIp = registroPrincipal ? tetoIp : maxTentativas;
+    const limiteIp = temPrincipal ? tetoIp : maxTentativas;
 
+    // The address is admitted before the identity's window exists: the identity comes from the
+    // request (a device header), so creating its window first would let refused requests keep
+    // allocating one per invented value.
     if (registroIp.contagem >= limiteIp) return recusar(res, registroIp, janelaMs, agora);
+    const registroPrincipal = temPrincipal ? principais.obter(`${principal}`, agora) : null;
     if (registroPrincipal && registroPrincipal.contagem >= maxTentativas) return recusar(res, registroPrincipal, janelaMs, agora);
 
     registroIp.contagem += 1;
@@ -58,7 +62,11 @@ function criarLimitador({ janelaMs, maxTentativas, chave = null, tetoPorIp = nul
       });
     }
     next();
-  };
+  }
+
+  // Identity windows currently held (tests check that refused requests do not add any).
+  limitar.identidadesEmJanela = () => principais.tamanho();
+  return limitar;
 }
 
 module.exports = { criarLimitador };

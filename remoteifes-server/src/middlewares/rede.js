@@ -1,5 +1,6 @@
 const configuracoesService = require("../services/configuracoesService");
-const { ipAutorizado } = require("../utils/rede");
+const { ipAutorizado, proxyLocalNaoDeclarado } = require("../utils/rede");
+const { saltosDeProxy } = require("../config/proxy");
 
 function restringirRedeIFES(req, res, next) {
   if ((process.env.NODE_ENV || "development") !== "production") return next();
@@ -7,7 +8,8 @@ function restringirRedeIFES(req, res, next) {
   const { modoTeste, redesAutorizadas } = configuracoesService.acessoRestritoAtivo();
   if (modoTeste) return next();
 
-  if (ipAutorizado(req.ip, redesAutorizadas)) {
+  const loopback = !proxyLocalNaoDeclarado(req.headers, req.socket && req.socket.remoteAddress, saltosDeProxy());
+  if (ipAutorizado(req.ip, redesAutorizadas, { loopback })) {
     return next();
   }
 

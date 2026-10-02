@@ -163,3 +163,84 @@ test("the list of detected ESP32 boards is capped to the most recent, keeping th
   assert.equal(lista.corpo.length, 100);
   assert.equal(lista.corpo[0].mac, "02:00:00:00:00:00", "the identity that just announced itself comes first");
 });
+
+test("unauthenticated discovery keeps a bounded number of unbound announcements and never evicts a board bound to a room", () => {
+  const salasService = require("../src/services/salasService");
+  db.prepare("DELETE FROM esp_detectados").run();
+  const macVinculado = "0A:00:00:00:00:01";
+  db.prepare("UPDATE salas SET mac = ? WHERE sala = 'A-110'").run(macVinculado);
+  try {
+    db.prepare("INSERT INTO esp_detectados (mac, ip, sala, ultimaDeteccao) VALUES (?, '10.0.0.9', 'A-110', datetime('now', '-20 days'))").run(macVinculado);
+    let ultimo;
+    for (let i = 0; i < 620; i += 1) {
+      ultimo = `06:00:00:00:${(i >> 8).toString(16).padStart(2, "0")}:${(i & 255).toString(16).padStart(2, "0")}`.toUpperCase();
+      salasService.identificarDispositivo(ultimo, "10.0.0.2");
+    }
+    const naoVinculados = db.prepare("SELECT COUNT(*) n FROM esp_detectados d LEFT JOIN salas s ON s.mac = d.mac WHERE s.mac IS NULL").get().n;
+    assert.equal(naoVinculados, 500);
+    assert.ok(db.prepare("SELECT 1 FROM esp_detectados WHERE mac = ?").get(macVinculado), "the bound board's row stays");
+    assert.ok(db.prepare("SELECT 1 FROM esp_detectados WHERE mac = ?").get(ultimo), "the newest announcement stays");
+    assert.equal(db.prepare("SELECT 1 FROM esp_detectados WHERE mac = '06:00:00:00:00:00'").get(), undefined, "the oldest are evicted first");
+  } finally {
+    db.prepare("UPDATE salas SET mac = NULL WHERE sala = 'A-110'").run();
+    db.prepare("DELETE FROM esp_detectados").run();
+  }
+});
+
+test("the retention cycle trims a discovery table that was already above the cap, as an upgraded database may be", () => {
+  const retencao = require("../src/services/retencaoService");
+  db.prepare("DELETE FROM esp_detectados").run();
+  const inserir = db.prepare("INSERT INTO esp_detectados (mac, ip, ultimaDeteccao) VALUES (?, '10.0.0.1', datetime('now', ?))");
+  for (let i = 0; i < 700; i += 1) {
+    inserir.run(`0C:00:00:00:${(i >> 8).toString(16).padStart(2, "0")}:${(i & 255).toString(16).padStart(2, "0")}`.toUpperCase(), `-${700 - i} minutes`);
+  }
+  try {
+    const resumo = retencao.executarLimpezaRetencao();
+    assert.equal(resumo.esp_detectados_excedente, 200);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM esp_detectados").get().n, 500);
+    assert.ok(db.prepare("SELECT 1 FROM esp_detectados WHERE mac = '0C:00:00:00:02:BB'").get(), "the newest stay");
+  } finally {
+    db.prepare("DELETE FROM esp_detectados").run();
+  }
+});
+
+test("over the device WebSocket, an access record keeps only a reported IP literal and a bounded userAgent", () => {
+  const deviceHub = require("../src/services/deviceHub");
+  const entrada = { ip: "10.0.0.5" };
+  deviceHub.processarMensagem("A-111", entrada, { tipo: "acesso", ip: "z".repeat(60 * 1024), userAgent: "u".repeat(10_000) }, null);
+  deviceHub.processarMensagem("A-111", entrada, { tipo: "acesso", ip: "10.20.30.41" }, null);
+  const [comLixo, valido] = db.prepare("SELECT ip, userAgent FROM esp_acessos WHERE sala = 'A-111' ORDER BY id DESC LIMIT 2").all().reverse();
+  assert.equal(comLixo.ip, "10.0.0.5", "an oversized value falls back to the connection's address");
+  assert.equal(comLixo.userAgent.length, 500);
+  assert.equal(valido.ip, "10.20.30.41");
+});
+
+test("a device-reported address is stored only when it is an IP literal; userAgent is bounded on the HTTP route too", async () => {
+  const identificar = (mac, ip) => chamar("/dispositivo/identificar", { method: "POST", body: { mac, ip } });
+  assert.equal((await identificar("0E:00:00:00:00:01", "x".repeat(60 * 1024))).status, 202);
+  assert.equal((await identificar("0E:00:00:00:00:02", "10.20.30.40")).status, 202);
+  assert.equal((await identificar("0E:00:00:00:00:03", "fe80::1")).status, 202);
+  assert.equal((await identificar("0E:00:00:00:00:04", "servidor.example")).status, 202);
+  const ipDe = (mac) => db.prepare("SELECT ip FROM esp_detectados WHERE mac = ?").get(mac).ip;
+  assert.match(ipDe("0E:00:00:00:00:01"), /127\.0\.0\.1$/, "an oversized value falls back to the socket's address");
+  assert.equal(ipDe("0E:00:00:00:00:02"), "10.20.30.40");
+  assert.equal(ipDe("0E:00:00:00:00:03"), "fe80::1");
+  assert.match(ipDe("0E:00:00:00:00:04"), /127\.0\.0\.1$/, "a host name is not an address");
+
+  const mac = "0E:00:00:00:00:10";
+  db.prepare("UPDATE salas SET mac = ? WHERE sala = 'A-111'").run(mac);
+  try {
+    const heartbeat = await chamar("/dispositivo/heartbeat", { method: "POST", body: { sala: "A-111", mac, ligado: false, ip: "y".repeat(10_000) } });
+    assert.equal(heartbeat.status, 200);
+    assert.match(db.prepare("SELECT ipEsp32 FROM salas WHERE sala = 'A-111'").get().ipEsp32, /127\.0\.0\.1$/);
+
+    const acesso = await chamar("/dispositivo/acesso", { method: "POST", body: { sala: "A-111", mac, ip: "z".repeat(10_000), userAgent: "u".repeat(10_000) } });
+    assert.equal(acesso.status, 200);
+    const linha = db.prepare("SELECT ip, userAgent FROM esp_acessos WHERE sala = 'A-111' ORDER BY id DESC LIMIT 1").get();
+    assert.match(linha.ip, /127\.0\.0\.1$/);
+    assert.equal(linha.userAgent.length, 500);
+  } finally {
+    db.prepare("UPDATE salas SET mac = NULL WHERE sala = 'A-111'").run();
+    db.prepare("DELETE FROM esp_detectados").run();
+  }
+});

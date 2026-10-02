@@ -19,14 +19,10 @@ popularBanco();
 const app = express();
 app.disable("x-powered-by");
 
-const TRUST_PROXY_HOPS = process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : "0";
-app.set("trust proxy", /^\d+$/.test(TRUST_PROXY_HOPS) ? Number(TRUST_PROXY_HOPS) : TRUST_PROXY_HOPS);
+app.set("trust proxy", require("./config/proxy").saltosDeProxy());
 
 const NODE_ENV = process.env.NODE_ENV || "development";
-const origensPermitidas = (process.env.CORS_ORIGIN || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const origensPermitidas = require("./config/cors").origensPermitidas();
 
 const SERVIR_FRONTEND =
   String(process.env.SERVIR_FRONTEND ?? "true").toLowerCase() === "true";
@@ -63,15 +59,14 @@ function resolverCorsProducao(req, callback) {
   callback(null, { origin: true, credentials: false });
 }
 
-app.use(NODE_ENV === "production" ? cors(resolverCorsProducao) : cors());
-app.use(express.json({ limit: "100kb" }));
-
 app.use((req, res, next) => {
   req.id = crypto.randomUUID();
   res.set("X-Request-Id", req.id);
   next();
 });
 
+// Before CORS and the body parser, so the responses they end early (origin refused, malformed or
+// oversized body) carry the same headers as every other response.
 app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
@@ -83,6 +78,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(NODE_ENV === "production" ? cors(resolverCorsProducao) : cors());
+app.use(express.json({ limit: "100kb" }));
 
 app.get("/health", (req, res) => {
   let banco = "ok";

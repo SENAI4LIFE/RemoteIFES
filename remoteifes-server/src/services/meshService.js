@@ -312,12 +312,21 @@ function concluirHandshake(salaGateway, entradaGateway, no, quadro) {
     quadro: { t: "aceito", prova: b64(hmac(chaveSessao, `aceito|${no.deviceId}`)) },
   });
 
+  // A session proven with the previous generation lives only until that generation's grace period
+  // ends, as a direct connection does; a newer generation carries no deadline.
+  const credencialGrace = usada.geracao === "anterior" ? usada.expiraEm || null : null;
   const entradaAtual = hub().conexaoDaSala(no.sala);
   const reaproveitavel = anterior && entradaAtual && entradaAtual.canal.transporte === "mesh" && entradaAtual.canal.deviceId === no.deviceId;
   if (reaproveitavel) {
     // Re-keyed session of an already connected board (a route change or a reboot of the node): the
-    // logical device stays; the channel keeps pointing at the node.
+    // logical device stays; the channel keeps pointing at the node. The re-key proved a generation
+    // again, so the deadline follows it, and the credential delivery is the one a fresh connection
+    // gets: a node back on the previous secret receives the current one again, otherwise a pending
+    // rotation not yet delivered goes out.
     entradaAtual.mesh.gateway = salaGateway;
+    entradaAtual.credencialExpiraEm = credencialGrace;
+    if (credencialGrace) credenciais().reentregarAtual(no.sala);
+    else credenciais().entregarPendente(no.sala);
     return;
   }
   hub().conectarDispositivo({
@@ -326,6 +335,7 @@ function concluirHandshake(salaGateway, entradaGateway, no, quadro) {
     viaCredencial: true,
     deviceId: no.deviceId,
     ip: null,
+    credencialGrace,
     canal: canalMesh(no),
     mesh: { gateway: salaGateway, saltos: no.saltos, rssi: no.rssi, pai: no.pai },
   });

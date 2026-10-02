@@ -277,6 +277,86 @@ test("credential generations over the mesh: only the pending key's proof activat
   await ate(() => semSessao.recusado === "credencial");
 });
 
+test("a mesh session proven with the previous credential ends with its grace period, like a direct connection", async (t) => {
+  const b = bancada(t);
+  const { gateway, nos } = await malha(b, 1);
+  const [no] = nos;
+  const id = no.credencial.deviceId;
+  const rotacao = credenciais.rotacionar(no.sala);
+  await ate(() => no.ref.novoSegredo === rotacao.segredo, { descricao: "sealed rotation received" });
+  const comNovo = gateway.no({ deviceId: id, segredo: rotacao.segredo });
+  gateway.anunciar(comNovo);
+  await ate(() => comNovo.sessao && credenciais.estado(no.sala).rotacaoPendente === false, { descricao: "pending activated by proof" });
+  assert.equal(deviceHub.conexaoDaSala(no.sala).credencialExpiraEm, null, "the current generation has no deadline");
+
+  // 1. Re-key of the live connection with the previous secret (the new one did not survive in NVS).
+  const comAnterior = gateway.no({ deviceId: id, segredo: no.credencial.segredo });
+  gateway.anunciar(comAnterior);
+  await ate(() => comAnterior.sessao && deviceHub.conexaoDaSala(no.sala).credencialExpiraEm, { descricao: "re-keyed session carries the deadline" });
+  await ate(() => comAnterior.novoSegredo === rotacao.segredo, { descricao: "current secret delivered again through the session" });
+  const prazo = new Date(deviceHub.conexaoDaSala(no.sala).credencialExpiraEm).getTime();
+  assert.equal(deviceHub.encerrarCredenciaisExpiradas(), 0, "inside the grace period nothing is closed");
+
+  // A re-key with the current secret clears the deadline; going back to the previous one sets it again.
+  const comAtual = gateway.no({ deviceId: id, segredo: rotacao.segredo });
+  gateway.anunciar(comAtual);
+  await ate(() => comAtual.sessao && deviceHub.conexaoDaSala(no.sala).credencialExpiraEm === null, { descricao: "current generation clears the deadline" });
+  const outraVezAnterior = gateway.no({ deviceId: id, segredo: no.credencial.segredo });
+  gateway.anunciar(outraVezAnterior);
+  await ate(() => outraVezAnterior.sessao && deviceHub.conexaoDaSala(no.sala).credencialExpiraEm, { descricao: "previous generation sets it again" });
+  assert.equal(new Date(deviceHub.conexaoDaSala(no.sala).credencialExpiraEm).getTime(), prazo);
+  let fechou = desconectada(no.sala);
+  assert.equal(comRelogio(t, prazo - Date.now() + 1000, () => deviceHub.encerrarCredenciaisExpiradas()), 1);
+  await fechou;
+  gateway.telemetriaDoNo(outraVezAnterior);
+  await gateway.drenar();
+  assert.equal(deviceHub.estadoPublico(no.sala).conectado, false, "traffic on the closed session does not bring it back");
+
+  // 2. A fresh session opened with the previous secret, still inside the grace period.
+  const deNovo = gateway.no({ deviceId: id, segredo: no.credencial.segredo });
+  gateway.anunciar(deNovo);
+  await ate(() => deNovo.sessao && deviceHub.estadoPublico(no.sala).conectado, { descricao: "fresh session with the previous generation" });
+  assert.equal(new Date(deviceHub.conexaoDaSala(no.sala).credencialExpiraEm).getTime(), prazo);
+  fechou = desconectada(no.sala);
+  assert.equal(comRelogio(t, prazo - Date.now() + 1000, () => deviceHub.encerrarCredenciaisExpiradas()), 1);
+  await fechou;
+  assert.notEqual(topo(id).estado, "conectado");
+});
+
+test("successive activations through another channel close a mesh session left on a dropped generation", async (t) => {
+  const b = bancada(t);
+  const { nos } = await malha(b, 1);
+  const [no] = nos;
+  const id = no.credencial.deviceId;
+
+  const g1 = credenciais.rotacionar(no.sala);
+  assert.ok(credenciais.verificar(id, g1.segredo), "G1 activated outside this session (as an HTTP heartbeat would)");
+  assert.ok(deviceHub.conexaoDaSala(no.sala).credencialExpiraEm, "the open mesh session on G0 gets the deadline");
+
+  const fechou = desconectada(no.sala);
+  const g2 = credenciais.rotacionar(no.sala);
+  assert.ok(credenciais.verificar(id, g2.segredo), "G2 activated: G0 is dropped");
+  await fechou;
+  assert.notEqual(topo(id).estado, "conectado");
+});
+
+test("a mesh re-key with the current secret delivers a pending rotation, as a fresh connection does", async (t) => {
+  const b = bancada(t);
+  const { gateway, nos } = await malha(b, 1);
+  const [no] = nos;
+  const id = no.credencial.deviceId;
+  const rotacao = credenciais.rotacionar(no.sala);
+  await ate(() => no.ref.novoSegredo === rotacao.segredo, { descricao: "first delivery" });
+
+  // The node re-keys (route change or reboot) still on the current secret: same logical device.
+  const reiniciado = gateway.no({ deviceId: id, segredo: no.credencial.segredo });
+  gateway.anunciar(reiniciado);
+  await ate(() => reiniciado.sessao, { descricao: "re-keyed session" });
+  assert.equal(deviceHub.conexaoDaSala(no.sala).canal.deviceId, id);
+  await ate(() => reiniciado.novoSegredo === rotacao.segredo, { descricao: "pending rotation delivered again on the re-keyed session" });
+  assert.equal(credenciais.estado(no.sala).rotacaoPendente, true, "delivery activates nothing by itself");
+});
+
 test("an expired challenge is refused", async (t) => {
   const b = bancada(t);
   const { gw, gateway, nos } = await malha(b, 1, { anunciar: false });

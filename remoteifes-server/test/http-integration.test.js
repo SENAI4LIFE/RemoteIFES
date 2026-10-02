@@ -172,6 +172,37 @@ test("device identification depends on the MAC binding and rejects a mismatched 
   });
 });
 
+test("the room list gives board MAC and address to the superadministrator only", async () => {
+  const loginSuperAdmin = await login("superadmin", "superSenha123");
+  assert.equal(loginSuperAdmin.status, 200);
+  const loginAdmin = await login("teste-admin-http-15", "senhaSegura123");
+  assert.equal(loginAdmin.status, 200);
+  const sala = "A-109";
+  db.prepare("UPDATE salas SET mac = 'AA:BB:CC:0F:0F:01', ipEsp32 = '10.9.8.7' WHERE sala = ?").run(sala);
+  try {
+    const doSuper = await (await authFetch("/admin/salas", loginSuperAdmin.corpo.token)).json();
+    const linhaSuper = doSuper.find((s) => s.sala === sala);
+    assert.equal(linhaSuper.mac, "AA:BB:CC:0F:0F:01");
+    assert.equal(linhaSuper.ipEsp32, "10.9.8.7");
+
+    const respAdmin = await authFetch("/admin/salas", loginAdmin.corpo.token);
+    assert.equal(respAdmin.status, 200, "level 2 still lists the rooms (log filters, room owners)");
+    const doAdmin = await respAdmin.json();
+    assert.equal(doAdmin.length, doSuper.length);
+    for (const linha of doAdmin) {
+      assert.equal("mac" in linha, false, `${linha.sala}: no MAC for level 2`);
+      assert.equal("ipEsp32" in linha, false, `${linha.sala}: no board address for level 2`);
+    }
+    const linhaAdmin = doAdmin.find((s) => s.sala === sala);
+    assert.deepEqual(
+      Object.keys(linhaAdmin).sort(),
+      Object.keys(linhaSuper).filter((k) => k !== "mac" && k !== "ipEsp32").sort()
+    );
+  } finally {
+    db.prepare("UPDATE salas SET mac = NULL, ipEsp32 = NULL WHERE sala = ?").run(sala);
+  }
+});
+
 test("a malformed JSON body returns 400, not 500", async () => {
   const resp = await fetch(`${baseUrl}/login`, {
     method: "POST",

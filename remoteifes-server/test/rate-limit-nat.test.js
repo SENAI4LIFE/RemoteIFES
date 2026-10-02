@@ -121,3 +121,15 @@ test("the command limit applies per authenticated user: 60 commands from each of
   assert.equal((await post("/comando", { sala: "A-108", cmd: "ligar" }, tokenService.gerarToken(c.id))).status, 200);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM comandos_log WHERE sala = 'A-108'").get().n >= 121, true);
 });
+
+test("requests refused by the address ceiling do not allocate a window for the identity they declare", () => {
+  const limitar = criarLimitador({ janelaMs: 60_000, maxTentativas: 120, chave: (req) => req.headers["x-device-id"] || null });
+  let recusadas = 0;
+  for (let i = 0; i < 3000; i += 1) {
+    const res = respostaFalsa();
+    limitar(requisicaoFalsa("203.0.113.7", { headers: { "x-device-id": `inventado-${i}` } }), res, () => {});
+    if (res.codigo === 429) recusadas += 1;
+  }
+  assert.equal(recusadas, 600, "the address ceiling (20 x 120) still applies");
+  assert.equal(limitar.identidadesEmJanela(), 2400, "only admitted requests hold an identity window");
+});

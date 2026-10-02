@@ -257,27 +257,33 @@ function salaSemDispositivo() {
   return sala.sala;
 }
 
-test("registering a room's MAC notifies every administrative session in real time", async () => {
+test("registering a room's MAC notifies every superadministrator session in real time, and no one else", async () => {
   const salasService = require("../src/services/salasService");
   const sala = salaSemDispositivo();
 
   const superadmin = await clienteAutenticado("super", 3);
+  const outraSessaoSuper = await clienteAutenticado("super-2", 3);
   const admin = await clienteAutenticado("admin", 2);
   const comum = await clienteAutenticado("comum", 1);
 
   try {
     const doSuper = coletarPor(superadmin, 500);
+    const daOutraSessao = coletarPor(outraSessaoSuper, 500);
     const doAdmin = coletarPor(admin, 500);
     const doComum = coletarPor(comum, 500);
 
     salasService.cadastrarMac(sala, "AA:BB:CC:11:22:33");
 
     const avisosSuper = (await doSuper).filter((m) => m.tipo === "dispositivo_cadastro");
+    const avisosOutraSessao = (await daOutraSessao).filter((m) => m.tipo === "dispositivo_cadastro");
     const avisosAdmin = (await doAdmin).filter((m) => m.tipo === "dispositivo_cadastro");
     const avisosComum = (await doComum).filter((m) => m.tipo === "dispositivo_cadastro");
 
     assert.equal(avisosSuper.length, 1, "the session that registered receives exactly one notification");
-    assert.equal(avisosAdmin.length, 1, "a second authorized session receives the same notification");
+    assert.equal(avisosOutraSessao.length, 1, "a second superadministrator session receives the same notification");
+    // Registration (MAC, board address) is the superadministrator's; in a MAC-only room the MAC is
+    // what admits the board.
+    assert.equal(avisosAdmin.length, 0, "a level-2 administrator does not receive device registration data");
     assert.equal(avisosComum.length, 0, "a regular user does not receive device registration data");
 
     const aviso = avisosSuper[0];
@@ -285,9 +291,10 @@ test("registering a room's MAC notifies every administrative session in real tim
     assert.equal(aviso.cadastro.sala, sala);
     assert.equal(aviso.cadastro.mac, "AA:BB:CC:11:22:33");
     assert.equal(aviso.cadastro.online, false, "registered does not imply online");
-    assert.deepEqual(avisosAdmin[0], aviso);
+    assert.deepEqual(avisosOutraSessao[0], aviso);
   } finally {
     superadmin.ws.close();
+    outraSessaoSuper.ws.close();
     admin.ws.close();
     comum.ws.close();
   }

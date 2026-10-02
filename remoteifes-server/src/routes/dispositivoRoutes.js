@@ -5,6 +5,7 @@ const salasService = require("../services/salasService");
 const otaService = require("../services/otaService");
 const credenciaisService = require("../services/esp32CredenciaisService");
 const { criarLimitador } = require("../utils/rateLimiter");
+const { ipDeclarado } = require("../utils/rede");
 
 const router = express.Router();
 
@@ -51,7 +52,7 @@ function autenticarDispositivo(req, res, next) {
 
 router.post("/dispositivo/identificar", (req, res) => {
   try {
-    const ip = typeof req.body?.ip === "string" && req.body.ip ? req.body.ip : req.ip;
+    const ip = ipDeclarado(req.body?.ip, req.ip);
     const deviceId = req.headers["x-device-id"];
     const segredo = req.headers["x-device-secret"];
 
@@ -124,7 +125,7 @@ router.post("/dispositivo/heartbeat", autenticarDispositivo, (req, res) => {
     const estadoReportado = {};
     if (temperatura !== undefined) estadoReportado.temperatura = temperatura;
 
-    const ipReportado = typeof ip === "string" && ip ? ip : req.ip;
+    const ipReportado = ipDeclarado(ip, req.ip);
     const resultado = salasService.heartbeatDispositivo(sala, estadoReportado, mac, ipReportado, {
       viaCredencial: !!req.deviceAuth?.viaCredencial,
     });
@@ -145,8 +146,8 @@ router.post("/dispositivo/acesso", autenticarDispositivo, (req, res) => {
   }
 
   try {
-    const ip = req.body.ip && typeof req.body.ip === "string" ? req.body.ip : req.ip;
-    salasService.registrarAcessoEsp(sala, { ip, userAgent });
+    const ip = ipDeclarado(req.body.ip, req.ip);
+    salasService.registrarAcessoEsp(sala, { ip, userAgent: userAgent === undefined ? undefined : userAgent.slice(0, 500) });
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ ok: false, erro: err.message });

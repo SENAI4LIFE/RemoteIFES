@@ -192,6 +192,46 @@ test("a socket authenticated with the previous generation is closed when the gra
   atual.ws.close();
 });
 
+test("a session left open with the old secret when another channel activates the rotation ends with the grace period", async (t) => {
+  sala("ROT-9", "AA:CC:11:00:00:09");
+  const antiga = credenciais.provisionar("ROT-9");
+  const aberta = await conectar(antiga.deviceId, antiga.segredo);
+  assert.equal(aberta.aberto, true);
+  const nova = credenciais.rotacionar("ROT-9");
+  assert.equal(deviceHub.conexaoDaSala("ROT-9").credencialExpiraEm, null, "before activation the open session has no deadline");
+
+  // The new generation is proven over HTTP while the socket opened with the old one stays up.
+  assert.equal((await heartbeat(nova.deviceId, nova.segredo, "ROT-9")).status, 200);
+  assert.equal(linha("ROT-9").segredoHashPendente, null, "activated");
+  const prazo = deviceHub.conexaoDaSala("ROT-9").credencialExpiraEm;
+  assert.ok(prazo, "the session opened with the now-previous secret received its deadline");
+  assert.equal(deviceHub.encerrarCredenciaisExpiradas(), 0, "inside the grace period it stays");
+
+  t.mock.timers.enable({ apis: ["Date"], now: new Date(prazo).getTime() + 1000 });
+  try {
+    assert.equal(deviceHub.encerrarCredenciaisExpiradas(), 1);
+  } finally {
+    t.mock.timers.reset();
+  }
+  assert.ok(await ate(() => aberta.fechamento() === 4001), "closed like any connection on an expired generation");
+});
+
+test("a session left on a generation that a second rotation drops is closed at once", async () => {
+  sala("ROT-10", "AA:CC:11:00:00:10");
+  const g0 = credenciais.provisionar("ROT-10");
+  const aberta = await conectar(g0.deviceId, g0.segredo);
+  assert.equal(aberta.aberto, true);
+
+  const g1 = credenciais.rotacionar("ROT-10");
+  assert.equal((await heartbeat(g1.deviceId, g1.segredo, "ROT-10")).status, 200);
+  assert.ok(deviceHub.conexaoDaSala("ROT-10").credencialExpiraEm, "first activation: G0 is the previous generation, with its deadline");
+
+  const g2 = credenciais.rotacionar("ROT-10");
+  assert.equal((await heartbeat(g2.deviceId, g2.segredo, "ROT-10")).status, 200);
+  assert.equal(credenciais.verificar(g0.deviceId, g0.segredo), null, "G0 no longer authenticates");
+  assert.ok(await ate(() => aberta.fechamento() === 4001), "the session still on G0 does not wait for its old deadline");
+});
+
 test("replace and revoke discard the pending generation", async () => {
   sala("ROT-6", "AA:CC:11:00:00:06");
   credenciais.provisionar("ROT-6");

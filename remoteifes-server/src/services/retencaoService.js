@@ -122,6 +122,12 @@ function executarLimpezaRetencao() {
       logger.warn("retencao-limite-falhou", { tabela, mensagem: erro.message });
     }
   }
+  try {
+    const removidos = require("./salasService").podarDetectados();
+    if (removidos > 0) { resumo.esp_detectados_excedente = removidos; algoRemovido = true; }
+  } catch (erro) {
+    logger.warn("retencao-limite-falhou", { tabela: "esp_detectados", mensagem: erro.message });
+  }
   if (algoRemovido) logger.info("retencao-concluida", resumo);
   if (algoRemovido) cacheEstatisticas = null;
   manutencaoLeve(algoRemovido);
