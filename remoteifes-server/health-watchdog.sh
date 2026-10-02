@@ -12,9 +12,20 @@ mkdir -p "$DATA_DIR"
 ESTADO="$DATA_DIR/.health-falhas"
 LOCK="$DATA_DIR/.deploy-lock"
 
-# A deployment holds the lock: restarting now would fight it. Only a lock younger than 30 minutes
-# counts (the scripts discard older ones as left over); find -mmin is portable across find variants.
-if [ -f "$LOCK" ] && [ -n "$(find "$LOCK" -mmin -30 2>/dev/null)" ]; then
+# The lock holds "<pid> <date>". Whether its process is alive: kill -0, then /proc (a process of
+# another user answers kill with EPERM), then ps. A PID that cannot be read counts as alive, so an
+# uncertain lock is kept rather than taken over.
+trava_viva() {
+  local pid
+  pid=$(awk 'NR == 1 { print $1 }' "$LOCK" 2>/dev/null)
+  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+  kill -0 "$pid" 2>/dev/null || [ -d "/proc/$pid" ] || ps -p "$pid" >/dev/null 2>&1
+}
+
+# A deployment holds the lock: restarting now would fight it. A lock counts while it is younger than
+# 30 minutes or its process is alive, the same rule the scripts use before taking one over; find
+# -mmin is portable across find variants.
+if [ -f "$LOCK" ] && { [ -n "$(find "$LOCK" -mmin -30 2>/dev/null)" ] || trava_viva; }; then
   exit 0
 fi
 
