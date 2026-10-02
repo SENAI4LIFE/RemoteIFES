@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawn } = require("child_process");
 const ajuda = require("./helpers");
 
 // Managed execution: path containment, argument validation, maintenance lock shared with the CLI,
@@ -159,6 +160,26 @@ test("the documentation command catalog is not an executable registry", (t) => {
 
 // --- Maintenance lock ----------------------------------------------------------------------
 
+// The identity recorded with the PID where /proc has it (Linux): boot and process start time.
+const BOOT_ID = (() => {
+  try {
+    return fs.readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+})();
+
+function identidadeDe(pid) {
+  const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+  return `${BOOT_ID}:${stat.slice(stat.lastIndexOf(") ") + 2).split(" ")[19]}`;
+}
+
+function processoVivoQualquer() {
+  const filho = spawn(process.execPath, ["-e", "setTimeout(() => {}, 300000)"], { stdio: "ignore" });
+  filho.unref();
+  return filho;
+}
+
 test("the Console lock uses the same file and format as the CLI", (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
@@ -230,7 +251,73 @@ test("a dead process's lock is reconciled and taken over", (t) => {
   trava.liberar();
 });
 
-test("taking over a dead lock waits for a reclamation in progress; a mutex left behind is reported, never discarded by age", (t) => {
+test("taking over a dead lock waits for a live reclamation however old, and takes over one whose holder is gone", (t) => {
+  const checkout = checkoutFalso();
+  const amb = ajuda.ambiente({ checkout });
+  const vivo = processoVivoQualquer();
+  t.after(() => {
+    vivo.kill();
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
+  const mutex = `${arquivo}.reclamacao`;
+  const morta = "4194303 2026-01-01T00:00:00Z\n";
+  const envelhecer = (minutos) => {
+    const quando = new Date(Date.now() - minutos * 60_000);
+    fs.utimesSync(mutex, quando, quando);
+  };
+  const adquirir = () => amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
+  const restos = () => fs.readdirSync(path.dirname(arquivo)).filter((n) => n.includes(".reclamacao"));
+
+  // Another reclaimer (the Console or deploy.sh/rollback.sh) holds the mutex right now, recorded as
+  // "<pid> <identidade|-> <nonce>": it is waited for, however old.
+  fs.writeFileSync(arquivo, morta);
+  fs.mkdirSync(mutex);
+  fs.writeFileSync(path.join(mutex, "dono"), `${vivo.pid} - a1b2c3\n`);
+  envelhecer(60);
+  assert.throws(adquirir, /reconciliando/);
+  assert.equal(fs.readFileSync(arquivo, "utf8"), morta, "the dead lock is left to the reclaimer holding the mutex");
+  assert.equal(amb.trava.removerResiduo("op").ok, false);
+  // A live holder that took over from a dead one is the end of the chain, and is waited for too.
+  fs.writeFileSync(path.join(mutex, "dono"), "4194303 - a1b2c3\n");
+  fs.writeFileSync(path.join(mutex, "sucessor.a1b2c3"), `${vivo.pid} - d4e5f6\n`);
+  assert.throws(adquirir, /reconciliando/);
+  // Without a record (an older version holding it right now) it is waited for while recent.
+  fs.rmSync(mutex, { recursive: true });
+  fs.mkdirSync(mutex);
+  envelhecer(8);
+  assert.throws(adquirir, /reconciliando/);
+  assert.ok(fs.existsSync(mutex));
+
+  // After 10 minutes without a record, and at once when the recorded holder (the last in its chain of
+  // takeovers) is gone, it is taken over: the dead lock is reconciled and the mutex released.
+  const preparos = [
+    () => envelhecer(15),
+    () => {
+      fs.mkdirSync(mutex);
+      fs.writeFileSync(path.join(mutex, "dono"), "4194303 - a1b2c3\n");
+    },
+    () => {
+      fs.mkdirSync(mutex);
+      fs.writeFileSync(path.join(mutex, "dono"), "4194303 - a1b2c3\n");
+      fs.writeFileSync(path.join(mutex, "sucessor.a1b2c3"), "4194299 - d4e5f6\n");
+      // A release interrupted after moving the directory aside leaves it under another name.
+      fs.mkdirSync(`${mutex}.lixo.0badc0de`);
+    },
+  ];
+  for (const preparar of preparos) {
+    fs.writeFileSync(arquivo, morta);
+    preparar();
+    const trava = adquirir();
+    assert.equal(Number(fs.readFileSync(arquivo, "utf8").split(/\s+/)[0]), process.pid);
+    assert.deepEqual(restos(), [], "the mutex is released and nothing is left behind");
+    trava.liberar();
+  }
+});
+
+test("a reclamation left behind by a holder that died does not hold up the release of the Console's lock", (t) => {
   const checkout = checkoutFalso();
   const amb = ajuda.ambiente({ checkout });
   t.after(() => {
@@ -240,25 +327,72 @@ test("taking over a dead lock waits for a reclamation in progress; a mutex left 
 
   const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
   const mutex = `${arquivo}.reclamacao`;
-  fs.writeFileSync(arquivo, "4194303 2026-01-01T00:00:00Z\n");
-
-  // Another reclaimer (the Console or deploy.sh/rollback.sh) holds the mutex right now.
-  fs.mkdirSync(mutex);
-  assert.throws(() => amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" }), /reconciliando/);
-  assert.equal(fs.readFileSync(arquivo, "utf8"), "4194303 2026-01-01T00:00:00Z\n", "the dead lock is left to the reclaimer holding the mutex");
-  assert.equal(amb.trava.removerResiduo("op").ok, false);
-
-  // Even an old one is not removed automatically (that would race one level up): the refusal names
-  // it for the operator; once removed, the dead lock is taken over.
-  const antigo = new Date(Date.now() - 60 * 60 * 1000);
-  fs.utimesSync(mutex, antigo, antigo);
-  assert.throws(() => amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" }), /reclamacao/);
-  assert.ok(fs.existsSync(mutex));
-  fs.rmdirSync(mutex);
   const trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
-  assert.equal(Number(fs.readFileSync(arquivo, "utf8").split(/\s+/)[0]), process.pid);
-  assert.equal(fs.existsSync(mutex), false, "the mutex is released");
+  fs.mkdirSync(mutex);
+  fs.writeFileSync(path.join(mutex, "dono"), "4194303 - a1b2c3\n");
   trava.liberar();
+  assert.equal(fs.existsSync(arquivo), false, "released at once");
+  assert.equal(fs.existsSync(mutex), false);
+});
+
+test("the Console records itself in the reclamation mutex in the format the scripts read", (t) => {
+  const checkout = checkoutFalso();
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
+  fs.writeFileSync(arquivo, "4194303 2026-01-01T00:00:00Z\n");
+  // Read while the mutex is held: the reconciliation is audited inside it.
+  let registro = null;
+  const auditar = amb.estado.auditar;
+  amb.estado.auditar = (evento, dados) => {
+    if (evento === "trava-residual-reconciliada") registro = fs.readFileSync(path.join(`${arquivo}.reclamacao`, "dono"), "utf8");
+    return auditar(evento, dados);
+  };
+  try {
+    amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" }).liberar();
+  } finally {
+    amb.estado.auditar = auditar;
+  }
+  const identidade = BOOT_ID ? identidadeDe(process.pid) : "-";
+  assert.match(registro, new RegExp(`^${process.pid} ${identidade} [0-9a-f]{16}\\n$`));
+});
+
+test("a PID now used by another process does not hold the lock: the identity recorded with it must match", { skip: BOOT_ID ? false : "needs /proc (Linux)" }, (t) => {
+  const checkout = checkoutFalso();
+  const amb = ajuda.ambiente({ checkout });
+  const filho = processoVivoQualquer();
+  t.after(() => {
+    filho.kill();
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
+  const identidade = identidadeDe(process.pid);
+  const adquirir = () => amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
+
+  // This live process with its own identity: the same process, kept.
+  fs.writeFileSync(arquivo, `${process.pid} 2026-01-01T00:00:00Z ${identidade}\n`);
+  assert.equal(amb.trava.situacao().ocupada, true);
+  assert.throws(adquirir, /andamento/);
+  // The same PID with another start time or from another boot: a reused PID, left over.
+  for (const outra of [`${BOOT_ID}:1`, `00000000-0000-0000-0000-000000000000:${identidade.split(":")[1]}`]) {
+    fs.writeFileSync(arquivo, `${process.pid} 2026-01-01T00:00:00Z ${outra}\n`);
+    assert.equal(amb.trava.situacao().residuo, true, outra);
+    adquirir().liberar();
+  }
+
+  // The Console records its own identity, and the supervisor's when it hands the lock over.
+  const trava = adquirir();
+  assert.equal(fs.readFileSync(arquivo, "utf8").trim().split(/\s+/)[2], identidade);
+  trava.transferirPara(filho.pid);
+  assert.equal(fs.readFileSync(arquivo, "utf8").trim().split(/\s+/)[2], identidadeDe(filho.pid));
+  trava.liberar();
+  assert.equal(fs.existsSync(arquivo), false);
 });
 
 test("a lock whose PID is not written yet is never taken over, and the Console's own lock appears already holding its PID", (t) => {
@@ -297,12 +431,16 @@ test("releasing checks ownership under the reclamation mutex, waits for it, and 
   const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
   const mutex = `${arquivo}.reclamacao`;
 
-  // Another operation took the lock over: releasing leaves it alone.
-  let trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
-  fs.writeFileSync(arquivo, "4194301 2026-01-01T00:00:00Z\n");
-  trava.liberar();
-  assert.equal(fs.readFileSync(arquivo, "utf8"), "4194301 2026-01-01T00:00:00Z\n");
-  fs.rmSync(arquivo);
+  // Another operation took the lock over: releasing leaves it alone, even with the same PID (PIDs are
+  // reused; ownership is the exact content this process wrote).
+  let trava;
+  for (const outra of ["4194301 2026-01-01T00:00:00Z\n", `${process.pid} 2026-01-01T00:00:00Z\n`]) {
+    trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
+    fs.writeFileSync(arquivo, outra);
+    trava.liberar();
+    assert.equal(fs.readFileSync(arquivo, "utf8"), outra);
+    fs.rmSync(arquivo);
+  }
 
   // A reclamation in progress: releasing does not race it, and it is not given up either. The lock
   // still names this live process, so it is released as soon as the mutex is free.

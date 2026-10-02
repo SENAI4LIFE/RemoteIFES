@@ -46,14 +46,48 @@ fi
 
 mkdir -p "$DATA_DIR"
 LOCK="$DATA_DIR/.deploy-lock"
-# The lock holds "<pid> <date>". Whether its process is alive: kill -0, then /proc (a process of
-# another user answers kill with EPERM), then ps. A PID that cannot be read counts as alive, so an
-# uncertain lock is kept rather than taken over.
+# The lock holds "<pid> <date> [<identity>]". The PID is the one the Console checks too: under Git
+# Bash (MSYS/Cygwin), $$, kill -0 and ps -p belong to the emulation and do not see the Console's
+# Windows processes, so the Windows PID is recorded there and looked up in the Windows process list.
+# The identity, where /proc has it (Linux), is the boot and the process's start time: after a crash
+# or a reboot the PID may belong to another process, which then does not pass for the owner.
+if [ -r "/proc/$$/winpid" ]; then
+  MEU_PID=$(cat "/proc/$$/winpid")
+  pid_existe() {
+    local lista
+    # A list that cannot be read counts the process as alive.
+    lista=$(ps -W 2>/dev/null) && [ -n "$lista" ] || return 0
+    printf '%s\n' "$lista" | awk -v p="$1" 'NR > 1 { w = ($1 ~ /^[0-9]+$/) ? $4 : $5; if (w == p) achou = 1 } END { exit !achou }'
+  }
+else
+  MEU_PID=$$
+  # kill -0, then /proc (a process of another user answers kill with EPERM), then ps.
+  pid_existe() { kill -0 "$1" 2>/dev/null || [ -d "/proc/$1" ] || ps -p "$1" >/dev/null 2>&1; }
+fi
+identidade_de() {
+  local boot stat
+  boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) && stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 0
+  # Field 22 is the start time; the command name (field 2) may contain spaces and parentheses.
+  set -- ${stat##*") "}
+  case "${20:-}" in ''|*[!0-9]*) return 0 ;; esac
+  printf '%s:%s' "$boot" "${20}"
+}
+# Alive unless certainly gone. A PID that cannot be read counts as alive, so an uncertain owner is
+# kept rather than taken over; an identity recorded in another boot, or different from the running
+# process's, means the PID now belongs to another process.
+processo_vivo() {
+  local boot atual
+  case "${1:-}" in ''|*[!0-9]*) return 0 ;; esac
+  pid_existe "$1" || return 1
+  case "${2:-}" in *:*) ;; *) return 0 ;; esac
+  boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 0
+  [ "${2%%:*}" = "$boot" ] || return 1
+  atual=$(identidade_de "$1")
+  [ -z "$atual" ] || [ "$atual" = "$2" ]
+}
 trava_viva() {
-  local pid
-  pid=$(awk 'NR == 1 { print $1 }' "$LOCK" 2>/dev/null)
-  case "$pid" in ''|*[!0-9]*) return 0 ;; esac
-  kill -0 "$pid" 2>/dev/null || [ -d "/proc/$pid" ] || ps -p "$pid" >/dev/null 2>&1
+  set -- $(awk 'NR == 1 { print $1, $3 }' "$LOCK" 2>/dev/null)
+  processo_vivo "${1:-}" "${2:-}"
 }
 
 # A lock older than 30 minutes is left over only when its process is gone: a run stuck in git fetch
@@ -65,18 +99,87 @@ trava_residual() {
 
 # Taking over a left-over lock is serialized by a directory created with mkdir (atomic), the same one
 # the Console uses, and the lock is judged again while holding it: a reclaimer that paused between
-# its first look and the removal cannot delete the lock another operation has just taken over. The
-# directory is never removed by age (that would race the same way one level up): one left behind by a
-# reclaimer that died inside these few lines stops automatic takeover until someone removes it.
+# its first look and the removal cannot delete the lock another operation has just taken over.
+#
+# The holder records itself in the directory as "<pid> <identity|-> <nonce>": in `dono`, or, when it
+# took over from a holder that died, in `sucessor.<that holder's nonce>`; the current holder is the
+# end of that chain. Each record is hard-linked into place, which fails if the name exists, so only
+# one process takes over from a given holder, and one that judged a directory since released and
+# created again lands outside the chain and backs off. Nothing is removed by age, so one level up
+# does not race the same way: a holder that died is taken over at once, and a directory without a
+# record (an older version never writes one; this one writes it microseconds after the mkdir) after
+# 10 minutes. Release moves the directory aside first, so it disappears in one step.
 MUTEX_RECLAMACAO="$LOCK.reclamacao"
-if trava_residual && mkdir "$MUTEX_RECLAMACAO" 2>/dev/null; then
-  trava_residual && rm -f "$LOCK"
+MINHA_IDENTIDADE=$(identidade_de "$$")
+MEU_NONCE=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n') || MEU_NONCE=""
+[ -n "$MEU_NONCE" ] || MEU_NONCE="$MEU_PID$RANDOM$RANDOM"
+MEU_REGISTRO="$MEU_PID ${MINHA_IDENTIDADE:--} $MEU_NONCE"
+mutex_dono() {
+  local registro nonce n=0
+  registro=$(cat "$MUTEX_RECLAMACAO/dono" 2>/dev/null) || return 0
+  while [ "$n" -lt 100 ]; do
+    nonce=$(printf '%s\n' "$registro" | awk 'NR == 1 { print $3 }')
+    case "$nonce" in ''|*[!0-9A-Za-z]*) break ;; esac
+    [ -f "$MUTEX_RECLAMACAO/sucessor.$nonce" ] || break
+    registro=$(cat "$MUTEX_RECLAMACAO/sucessor.$nonce" 2>/dev/null) || break
+    n=$((n + 1))
+  done
+  printf '%s' "$registro"
+}
+mutex_adquirir() {
+  local alvo dono temp criado=0
+  rm -rf "$MUTEX_RECLAMACAO".lixo.* 2>/dev/null || true
+  if mkdir "$MUTEX_RECLAMACAO" 2>/dev/null; then
+    alvo="$MUTEX_RECLAMACAO/dono"
+    criado=1
+  else
+    [ -d "$MUTEX_RECLAMACAO" ] || return 1
+    dono=$(mutex_dono)
+    if [ -z "$dono" ]; then
+      [ -n "$(find "$MUTEX_RECLAMACAO" -prune -mmin +10 2>/dev/null)" ] || return 1
+      alvo="$MUTEX_RECLAMACAO/dono"
+    else
+      set -- $dono
+      case "${3:-}" in ''|*[!0-9A-Za-z]*) return 1 ;; esac
+      # A record with this process's PID is not another live holder's.
+      [ "${1:-}" = "$MEU_PID" ] || ! processo_vivo "${1:-}" "${2:-}" || return 1
+      alvo="$MUTEX_RECLAMACAO/sucessor.$3"
+    fi
+  fi
+  temp="$MUTEX_RECLAMACAO/.novo.$MEU_NONCE"
+  if printf '%s\n' "$MEU_REGISTRO" > "$temp" 2>/dev/null; then
+    # Without hard links (FAT, exFAT): exclusive creation, the record written right after.
+    ln "$temp" "$alvo" 2>/dev/null || ( set -o noclobber; printf '%s\n' "$MEU_REGISTRO" > "$alvo" ) 2>/dev/null || true
+    rm -f "$temp"
+    [ "$(mutex_dono)" = "$MEU_REGISTRO" ] && return 0
+    [ "$(cat "$alvo" 2>/dev/null)" = "$MEU_REGISTRO" ] && rm -f "$alvo"
+  fi
+  # A directory this run created and could not record itself in is removed if still empty (rmdir
+  # leaves it to whoever recorded itself there instead).
+  [ "$criado" -eq 1 ] && rmdir "$MUTEX_RECLAMACAO" 2>/dev/null
+  return 1
+}
+mutex_liberar() {
+  local registro
+  [ "$(mutex_dono)" = "$MEU_REGISTRO" ] || return 0
+  if mv "$MUTEX_RECLAMACAO" "$MUTEX_RECLAMACAO.lixo.$MEU_NONCE" 2>/dev/null; then
+    rm -rf "$MUTEX_RECLAMACAO.lixo.$MEU_NONCE" 2>/dev/null || true
+    return 0
+  fi
+  # Could not move it aside: this process gives up its place, and the rest is taken over as left over.
+  for registro in "$MUTEX_RECLAMACAO"/dono "$MUTEX_RECLAMACAO"/sucessor.*; do
+    [ "$(cat "$registro" 2>/dev/null)" = "$MEU_REGISTRO" ] && rm -f "$registro"
+  done
   rmdir "$MUTEX_RECLAMACAO" 2>/dev/null || true
+}
+if trava_residual && mutex_adquirir; then
+  trava_residual && rm -f "$LOCK"
+  mutex_liberar
 fi
-MINHA_TRAVA="$$ $(date -Iseconds)"
+MINHA_TRAVA="$MEU_PID $(date -Iseconds)${MINHA_IDENTIDADE:+ $MINHA_IDENTIDADE}"
 if ! ( set -o noclobber; echo "$MINHA_TRAVA" > "$LOCK" ) 2>/dev/null; then
   echo "outra atualização/rollback parece estar em andamento ($LOCK). Aguarde ou remova o arquivo se for resíduo."
-  [ -d "$MUTEX_RECLAMACAO" ] && echo "Há também $MUTEX_RECLAMACAO: se nenhuma operação de manutenção estiver rodando, é resíduo; remova com rmdir."
+  [ -d "$MUTEX_RECLAMACAO" ] && echo "Há também $MUTEX_RECLAMACAO, de uma retomada em andamento ou interrompida. Uma interrompida é assumida automaticamente: de imediato quando o processo registrado nela não existe mais, ou após 10 minutos quando não há registro. Tente de novo."
   exit 1
 fi
 # Only this run's lock is released: if another operation took over the file, it stays.

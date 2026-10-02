@@ -496,28 +496,68 @@ test("rollback.sh with the code already at the target restarts and confirms inst
 
 // --- Deployment lock and the database ------------------------------------------------------------
 
-// PIDs as the scripts' bash sees them (under Git Bash, Windows PIDs are not visible to kill -0).
+// PIDs as the scripts record and check them: the operating system's, which is what a process started
+// by Node reports. Under Git Bash that is the Windows PID, the one the Console checks too.
 function pidMorto(dir) {
+  // Windows PIDs are multiples of 4: an odd one never belongs to a process there.
+  if (process.platform === "win32") return 4194301;
   const r = sh(dir, "true & p=$!; wait $p; echo $p");
   return Number(r.stdout.trim());
 }
 
-function pidVivo(dir) {
-  const r = sh(dir, "sleep 300 >/dev/null 2>&1 & echo $!");
-  return Number(r.stdout.trim());
+function pidVivo() {
+  const filho = spawn(process.execPath, ["-e", "setTimeout(() => {}, 300000)"], { stdio: "ignore" });
+  filho.unref();
+  return filho.pid;
 }
 
 function encerrarPid(dir, pid) {
-  sh(dir, `kill ${pid} 2>/dev/null || true`);
+  try {
+    process.kill(pid);
+  } catch {}
 }
 
-function travaEm(dir, idadeMin, pid = pidMorto(dir)) {
+// The identity recorded with the PID where /proc has it (Linux): boot and process start time.
+const BOOT_ID = (() => {
+  try {
+    return fs.readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+})();
+
+function identidadeDe(pid) {
+  const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+  return `${BOOT_ID}:${stat.slice(stat.lastIndexOf(") ") + 2).split(" ")[19]}`;
+}
+
+function travaEm(dir, idadeMin, pid = pidMorto(dir), identidade = null) {
   const trava = path.join(dir, "data", ".deploy-lock");
   fs.mkdirSync(path.dirname(trava), { recursive: true });
-  fs.writeFileSync(trava, `${pid} em-andamento\n`);
+  fs.writeFileSync(trava, `${pid} em-andamento${identidade ? ` ${identidade}` : ""}\n`);
   const quando = new Date(Date.now() - idadeMin * 60_000);
   fs.utimesSync(trava, quando, quando);
   return trava;
+}
+
+// The reclamation mutex as the scripts and the Console leave it: a directory with the holder's record
+// ("<pid> <identity|-> <nonce>") in `dono`, then `sucessor.<previous nonce>` for each takeover.
+function mutexEm(trava, registros, idadeMin = 0) {
+  const mutex = `${trava}.reclamacao`;
+  fs.mkdirSync(mutex);
+  registros.forEach((registro, i) => {
+    const nome = i === 0 ? "dono" : `sucessor.${registros[i - 1].split(" ")[2]}`;
+    fs.writeFileSync(path.join(mutex, nome), `${registro}\n`);
+  });
+  if (idadeMin) {
+    const quando = new Date(Date.now() - idadeMin * 60_000);
+    fs.utimesSync(mutex, quando, quando);
+  }
+  return mutex;
+}
+
+function restosDaReclamacao(dir) {
+  return fs.readdirSync(path.join(dir, "data")).filter((n) => n.includes(".reclamacao"));
 }
 
 // A `stat` without GNU's -c (BSD and macOS): the lock's age must not depend on it.
@@ -601,23 +641,184 @@ test("two runs started together on a left-over lock: exactly one takes it over",
   }
 });
 
-test("a left-over lock is not taken over while another reclamation holds the mutex", { skip: !disponivel }, () => {
+test("a left-over lock is not taken over while a live process holds the reclamation mutex, however old", { skip: !disponivel }, () => {
   const { dir, shaA, shaB } = prepararRepo();
+  const pid = pidVivo();
   try {
     const trava = travaEm(dir, 45);
     const conteudo = fs.readFileSync(trava, "utf8");
-    fs.mkdirSync(`${trava}.reclamacao`);
-    // Even an old one is never removed by age; the refusal names it.
-    const antigo = new Date(Date.now() - 60 * 60_000);
-    fs.utimesSync(`${trava}.reclamacao`, antigo, antigo);
+    const mutex = mutexEm(trava, [`${pid} - a1b2c3`], 60);
     for (const comando of [`bash deploy.sh ${shaB} --offline --no-restart`, `bash rollback.sh ${shaA} --offline --no-restart`]) {
       const r = sh(dir, comando);
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
-      assert.match(r.stdout, /reclamacao: se nenhuma operação de manutenção estiver rodando/);
+      assert.match(r.stdout, /reclamacao, de uma retomada em andamento ou interrompida/);
       assert.equal(fs.readFileSync(trava, "utf8"), conteudo);
-      assert.ok(fs.existsSync(`${trava}.reclamacao`));
+      assert.equal(fs.readFileSync(path.join(mutex, "dono"), "utf8"), `${pid} - a1b2c3\n`);
     }
+    // A holder that died took over and recorded itself after it: the live successor holds it.
+    fs.rmSync(mutex, { recursive: true });
+    mutexEm(trava, [`${pidMorto(dir)} - a1b2c3`, `${pid} - d4e5f6`]);
+    const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+    assert.equal(fs.readFileSync(trava, "utf8"), conteudo);
+    assert.equal(fs.readFileSync(path.join(mutex, "sucessor.a1b2c3"), "utf8"), `${pid} - d4e5f6\n`);
+  } finally {
+    encerrarPid(dir, pid);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a reclamation mutex left by a process that died is taken over at once, following the chain to its end", { skip: !disponivel }, () => {
+  const { dir, shaB } = prepararRepo();
+  try {
+    for (const registros of [[`${pidMorto(dir)} - a1b2c3`], [`${pidMorto(dir)} - a1b2c3`, `${pidMorto(dir)} - d4e5f6`]]) {
+      const trava = travaEm(dir, 45);
+      const mutex = mutexEm(trava, registros, 1);
+      // The deploy gets past the lock and then fails at npm ci; it leaves neither the mutex nor a lock.
+      const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: npmFalso(dir) });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.doesNotMatch(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+      assert.match(r.stdout + r.stderr, /npm/);
+      assert.equal(fs.existsSync(mutex), false, "the mutex taken over is released");
+      assert.equal(fs.existsSync(trava), false);
+      assert.deepEqual(restosDaReclamacao(dir), []);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a reclamation mutex without a record is taken over only after 10 minutes, and an interrupted release is cleaned up", { skip: !disponivel }, () => {
+  const { dir, shaA, shaB } = prepararRepo();
+  try {
+    const trava = travaEm(dir, 45);
+    const conteudo = fs.readFileSync(trava, "utf8");
+    // An older version never records itself; this one records itself microseconds after the mkdir.
+    const mutex = mutexEm(trava, [], 8);
+    for (const comando of [`bash deploy.sh ${shaB} --offline --no-restart`, `bash rollback.sh ${shaA} --offline --no-restart`]) {
+      const r = sh(dir, comando);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+      assert.equal(fs.readFileSync(trava, "utf8"), conteudo);
+      assert.ok(fs.existsSync(mutex));
+    }
+    // A release interrupted after moving the directory aside leaves it under another name.
+    fs.mkdirSync(`${mutex}.lixo.0badc0de`);
+    fs.writeFileSync(path.join(`${mutex}.lixo.0badc0de`, "dono"), "1 - 0badc0de\n");
+    const antigo = new Date(Date.now() - 15 * 60_000);
+    fs.utimesSync(mutex, antigo, antigo);
+    const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: npmFalso(dir) });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+    assert.match(r.stdout + r.stderr, /npm/);
+    assert.equal(fs.existsSync(trava), false);
+    assert.deepEqual(restosDaReclamacao(dir), []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the lock deploy.sh writes names a PID the Console sees alive, with its identity where /proc has it", { skip: !disponivel }, () => {
+  const { dir, shaB } = prepararRepo();
+  try {
+    // Checked from Node, as the Console checks it, while the deploy holds the lock (npm ci runs).
+    fs.writeFileSync(path.join(dir, "conferir-trava.js"), [
+      'const fs = require("fs");',
+      'const [pid, , identidade] = fs.readFileSync("data/.deploy-lock", "utf8").trim().split(/\\s+/);',
+      'let visto = "vivo";',
+      "try {",
+      "  process.kill(Number(pid), 0);",
+      "} catch (erro) {",
+      "  visto = `morto (${erro.code})`;",
+      "}",
+      "let boot = null;",
+      "try {",
+      '  boot = fs.readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim();',
+      "} catch {}",
+      "if (boot) {",
+      "  const stat = fs.readFileSync(`/proc/${pid}/stat`, \"utf8\");",
+      "  const esperada = `${boot}:${stat.slice(stat.lastIndexOf(\") \") + 2).split(\" \")[19]}`;",
+      "  if (identidade !== esperada) visto += ` identidade ${identidade} != ${esperada}`;",
+      "}",
+      'fs.writeFileSync("trava-vista.txt", visto);',
+      "",
+    ].join("\n"));
+    const bin = path.join(dir, "bin-conferir");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "npm"), '#!/usr/bin/env bash\nnode conferir-trava.js\nexit 1\n');
+    fs.chmodSync(path.join(bin, "npm"), 0o755);
+    const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.equal(fs.readFileSync(path.join(dir, "trava-vista.txt"), "utf8"), "vivo");
+    assert.equal(fs.existsSync(path.join(dir, "data", ".deploy-lock")), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a PID that now belongs to another process holds neither the lock, the mutex nor the watchdog", { skip: !disponivel || !BOOT_ID ? "needs /proc (Linux)" : false }, () => {
+  const { dir, shaB } = prepararRepo();
+  const pid = pidVivo();
+  try {
+    const identidade = identidadeDe(pid);
+    const outras = [`${BOOT_ID}:1`, `00000000-0000-0000-0000-000000000000:${identidade.split(":")[1]}`];
+    const deploy = () => sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: npmFalso(dir) });
+
+    // The PID with the identity recorded with it: the same process, kept however old.
+    let trava = travaEm(dir, 45, pid, identidade);
+    let r = deploy();
+    assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+    assert.equal(fs.readFileSync(trava, "utf8"), `${pid} em-andamento ${identidade}\n`);
+    // The same PID with another start time or from another boot: a reused PID, so left over.
+    for (const outra of outras) {
+      trava = travaEm(dir, 45, pid, outra);
+      r = deploy();
+      assert.doesNotMatch(r.stdout, /outra atualização\/rollback parece estar em andamento/, outra);
+      assert.equal(fs.existsSync(trava), false);
+    }
+
+    // The mutex follows the same rule.
+    trava = travaEm(dir, 45);
+    let mutex = mutexEm(trava, [`${pid} ${identidade} a1b2c3`]);
+    r = deploy();
+    assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+    assert.ok(fs.existsSync(mutex));
+    fs.rmSync(mutex, { recursive: true });
+    mutex = mutexEm(trava, [`${pid} ${outras[0]} a1b2c3`]);
+    r = deploy();
+    assert.doesNotMatch(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+    assert.deepEqual(restosDaReclamacao(dir), []);
+
+    // The watchdog: an old lock whose PID was reused does not silence it; the real owner's does.
+    fs.copyFileSync(path.join(RAIZ, "health-watchdog.sh"), path.join(dir, "health-watchdog.sh"));
+    fs.writeFileSync(path.join(dir, "healthcheck.sh"), "#!/usr/bin/env bash\nexit 1\n");
+    travaEm(dir, 40, pid, identidade);
+    sh(dir, "bash health-watchdog.sh");
+    assert.equal(fs.existsSync(path.join(dir, "data", ".health-falhas")), false);
+    travaEm(dir, 40, pid, outras[0]);
+    sh(dir, "bash health-watchdog.sh");
+    assert.equal(fs.readFileSync(path.join(dir, "data", ".health-falhas"), "utf8").trim(), "1");
+  } finally {
+    encerrarPid(dir, pid);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("under Git Bash, a Windows process list that cannot be read keeps the lock", { skip: !disponivel || process.platform !== "win32" ? "Git Bash on Windows" : false }, () => {
+  const { dir, shaB } = prepararRepo();
+  try {
+    const trava = travaEm(dir, 45);
+    const conteudo = fs.readFileSync(trava, "utf8");
+    const bin = path.join(dir, "bin-ps");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "ps"), "#!/usr/bin/env bash\nexit 1\n");
+    fs.chmodSync(path.join(bin, "ps"), 0o755);
+    const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+    assert.equal(fs.readFileSync(trava, "utf8"), conteudo);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -651,7 +852,7 @@ test("the health watchdog stays quiet while a recent deployment lock exists, and
       assert.equal(r.status, 0, r.stdout + r.stderr);
       assert.equal(fs.existsSync(path.join(dir, "data", ".health-falhas")), false, "no failure is counted during a deployment");
     }
-    const pid = pidVivo(dir);
+    const pid = pidVivo();
     try {
       travaEm(dir, 40, pid);
       assert.equal(sh(dir, "bash health-watchdog.sh").status, 0);
