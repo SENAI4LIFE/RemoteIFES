@@ -4,7 +4,7 @@
 // sequence.
 const congelar = (lista) => Object.freeze(lista);
 
-const instalacao = congelar(["cd remoteifes-server", "npm run setup", "npm start"]);
+const instalacao = congelar(["cd remoteifes-server", "bash setup.sh", "npm start"]);
 const iniciar = congelar(["cd remoteifes-server", "npm start"]);
 const desenvolvimento = congelar(["npm run dev"]);
 
@@ -52,7 +52,10 @@ const credenciaisConsultar = congelar(["npm run credencial -- A-101"]);
 const credenciaisEmitir = congelar(["npm run credencial -- A-101 --provisionar", "npm run credencial -- A-101 --rotacionar"]);
 const credenciaisDerrubar = congelar(["npm run credencial -- A-101 --substituir", "npm run credencial -- A-101 --revogar"]);
 
-const recuperacaoConta = congelar(["npm run reset-admin -- umaSenhaEscolhida", "npm run reset-admin"]);
+const recuperacaoConta = congelar([
+  "read -rsp 'Nova senha: ' SENHA && echo && printf '%s' \"$SENHA\" | npm run reset-admin -- --stdin; unset SENHA",
+  "npm run reset-admin",
+]);
 const carga = congelar(["npm run carga -- --salas 86 --minutos 2"]);
 
 const androidPreparo = congelar(["cd remoteifes-cordova", "npm ci", "npm run validate"]);

@@ -1,9 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="374" viewBox="0 0 800 374" role="img" aria-labelledby="t d">
   <title id="t">Instalar, operar, atualizar e reverter</title>
-  <desc id="d">A instalação é feita uma vez pelo terminal. A rotina passa pelo Console de Operações: a atualização grava um backup verificado, aplica o código, reinicia o serviço e exige que o /health informe o commit implantado em até 40 segundos; sem essa confirmação, volta sozinha para a versão anterior. Restaurar o banco é uma decisão separada. Sem o console, os mesmos scripts rodam pelo terminal.</desc>
+  <desc id="d">A instalação é feita uma vez pelo terminal. A rotina passa pelo Console de Operações: a atualização grava um backup verificado, aplica o código, reinicia o serviço e consulta o /health até 20 vezes, com 2 segundos entre as consultas, até ele informar o commit implantado; sem essa confirmação, volta sozinha para a versão anterior. Restaurar o banco é uma decisão separada. Sem o console, deploy.sh e rollback.sh fazem o mesmo pelo terminal, com a mesma trava, backup, recusa de alterações locais e confirmação pelo /health; npm run restore restaura o banco com o serviço parado.</desc>
   <!-- Theme-neutral: text sits on opaque cards or pills; lines are mid-tones that keep 3:1 on white
-       and on GitHub dark. Source of truth: remoteifes-server/deploy.sh, rollback.sh, verificar-versao.sh
-       and remoteifes-console/src/acoes.js. -->
+       and on GitHub dark. Source of truth: remoteifes-console/src/implantacao.js (the Console's own
+       implementation) and remoteifes-server/deploy.sh, rollback.sh, verificar-versao.sh (the terminal
+       path), with remoteifes-console/src/acoes.js. -->
   <style>
     text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: #1f2b23; }
     .cartao { fill: #ffffff; stroke: #cfd6d1; stroke-width: 1; }
@@ -23,7 +24,7 @@
   <g>
     <rect class="pilula" x="6" y="4" width="226" height="20" rx="10"/>
     <text class="faixa" x="119" y="18" text-anchor="middle">1 · INSTALAR · TERMINAL, UMA VEZ</text>
-    <rect class="cartao" x="6" y="32" width="150" height="28" rx="8"/><text class="mono" x="81" y="50" text-anchor="middle">npm run setup</text>
+    <rect class="cartao" x="6" y="32" width="150" height="28" rx="8"/><text class="mono" x="81" y="50" text-anchor="middle">bash setup.sh</text>
     <path class="linha" d="M158 46 H168"/><path class="seta" d="M176 46 l-8 -4 v8 z"/>
     <rect class="cartao" x="178" y="32" width="230" height="28" rx="8"/><text class="mono" x="293" y="50" text-anchor="middle">sudo bash install-service.sh</text>
     <path class="linha" d="M410 46 H420"/><path class="seta" d="M428 46 l-8 -4 v8 z"/>
@@ -47,7 +48,7 @@
     <text class="titulo" x="18" y="228">Dados e recuperação</text>
     <text class="corpo" x="18" y="243">backup e restauração</text>
 
-    <!-- Update pipeline (deploy.sh) -->
+    <!-- Update pipeline (the Console's implantacao.js; deploy.sh does the same from the terminal) -->
     <path class="linha" d="M182 182 H192"/><path class="seta" d="M200 182 l-8 -4 v8 z"/>
 
     <rect class="cartao" x="202" y="116" width="136" height="72" rx="10"/>
@@ -75,7 +76,7 @@
     <circle cx="671" cy="134" r="9" fill="#1c6b3c"/><text class="num" x="671" y="138" text-anchor="middle">4</text>
     <text class="titulo" x="685" y="139">Verificação</text>
     <text class="corpo" x="664" y="160">/health informa o</text>
-    <text class="corpo" x="664" y="175">commit em até 40 s</text>
+    <text class="corpo" x="664" y="175">commit; 20 consultas</text>
 
     <!-- Outcomes -->
     <path class="linha" d="M760 190 V224"/><path class="seta" d="M760 232 l-4 -8 h8 z"/>
@@ -106,6 +107,6 @@
     <rect class="cartao" x="140" y="332" width="136" height="28" rx="8"/><text class="mono" x="208" y="350" text-anchor="middle">bash rollback.sh</text>
     <rect class="cartao" x="284" y="332" width="136" height="28" rx="8"/><text class="mono" x="352" y="350" text-anchor="middle">npm run restore</text>
     <rect class="pilula" x="430" y="332" width="364" height="28" rx="14"/>
-    <text class="corpo" x="612" y="350" text-anchor="middle">os mesmos scripts e a mesma trava .deploy-lock do console</text>
+    <text class="corpo" x="612" y="350" text-anchor="middle">deploy e rollback: mesma trava, backup e /health</text>
   </g>
 </svg>
