@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="tema.css">
 <style>
   /* Source: remoteifes-server/src/routes/protocolosIrRoutes.js (clonador, modo clone, salvar,
-     failsafe, aplicar), services/deviceHub.js (MAX_CAPTURAS_ARMAZENADAS), services/
+     failsafe, aplicar), services/deviceHub.js (MAX_CAPTURAS_ARMAZENADAS, em memória), services/
      protocolosIrService.js (isKnown), remoteifes-esp32/src/main.ino (captura, failsafe na NVS). */
   .fluxo { display: grid; grid-template-columns: 188px 212px 1fr; grid-template-rows: auto auto; column-gap: 62px; row-gap: 34px; align-items: center; }
   .placa { padding: 6px 10px 6px 6px; gap: 6px; }
@@ -56,11 +56,11 @@
     <div class="cartao tom-verde" id="biblioteca">
       <div class="cabeca">
         <img class="modulo" src="../modules/database.png" alt="">
-        <div><div class="titulo">Biblioteca IR</div><div class="sub">no servidor, tabela protocolos_ir</div></div>
+        <div><div class="titulo">Biblioteca IR</div><div class="sub">no servidor; o que é salvo fica na tabela protocolos_ir</div></div>
       </div>
       <ul>
-        <li>guarda as <b>20 capturas</b> recentes da clonadora</li>
-        <li><b>salvar</b> dá nome à captura; o navegador manda o id, nunca o RAW</li>
+        <li>guarda <b>em memória</b> as <b>20 capturas</b> recentes da clonadora</li>
+        <li><b>salvar</b> dá nome à captura e a grava no banco; o navegador manda o id, nunca o RAW</li>
         <li><b>failsafe OFF</b>: a captura do botão de desligar, anexada ao protocolo</li>
         <li>só protocolo <b>reconhecido</b> vira protocolo da sala; RAW genérico é só testado e retransmitido</li>
       </ul>
