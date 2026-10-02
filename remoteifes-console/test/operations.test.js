@@ -230,6 +230,113 @@ test("a dead process's lock is reconciled and taken over", (t) => {
   trava.liberar();
 });
 
+test("taking over a dead lock waits for a reclamation in progress; a mutex left behind is reported, never discarded by age", (t) => {
+  const checkout = checkoutFalso();
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
+  const mutex = `${arquivo}.reclamacao`;
+  fs.writeFileSync(arquivo, "4194303 2026-01-01T00:00:00Z\n");
+
+  // Another reclaimer (the Console or deploy.sh/rollback.sh) holds the mutex right now.
+  fs.mkdirSync(mutex);
+  assert.throws(() => amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" }), /reconciliando/);
+  assert.equal(fs.readFileSync(arquivo, "utf8"), "4194303 2026-01-01T00:00:00Z\n", "the dead lock is left to the reclaimer holding the mutex");
+  assert.equal(amb.trava.removerResiduo("op").ok, false);
+
+  // Even an old one is not removed automatically (that would race one level up): the refusal names
+  // it for the operator; once removed, the dead lock is taken over.
+  const antigo = new Date(Date.now() - 60 * 60 * 1000);
+  fs.utimesSync(mutex, antigo, antigo);
+  assert.throws(() => amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" }), /reclamacao/);
+  assert.ok(fs.existsSync(mutex));
+  fs.rmdirSync(mutex);
+  const trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
+  assert.equal(Number(fs.readFileSync(arquivo, "utf8").split(/\s+/)[0]), process.pid);
+  assert.equal(fs.existsSync(mutex), false, "the mutex is released");
+  trava.liberar();
+});
+
+test("a lock whose PID is not written yet is never taken over, and the Console's own lock appears already holding its PID", (t) => {
+  const checkout = checkoutFalso();
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
+  // deploy.sh creates the file (noclobber) and writes "<pid> <date>" right after: in between it is empty.
+  fs.writeFileSync(arquivo, "");
+  const antigo = new Date(Date.now() - 60 * 60 * 1000);
+  fs.utimesSync(arquivo, antigo, antigo);
+  assert.equal(amb.trava.situacao().ocupada, true, "uncertain counts as alive");
+  assert.throws(() => amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" }), /andamento/);
+  assert.equal(amb.trava.removerResiduo("op").ok, false);
+  assert.equal(fs.readFileSync(arquivo, "utf8"), "");
+
+  fs.rmSync(arquivo);
+  const trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
+  assert.match(fs.readFileSync(arquivo, "utf8"), new RegExp(`^${process.pid} `));
+  assert.deepEqual(fs.readdirSync(path.dirname(arquivo)).filter((n) => n.endsWith(".novo")), [], "no temporary file left behind");
+  trava.liberar();
+});
+
+test("releasing checks ownership under the reclamation mutex, waits for it, and never removes a lock another operation took over", async (t) => {
+  const checkout = checkoutFalso();
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+
+  const arquivo = path.join(checkout, "remoteifes-server", "data", ".deploy-lock");
+  const mutex = `${arquivo}.reclamacao`;
+
+  // Another operation took the lock over: releasing leaves it alone.
+  let trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t1", operador: "op" });
+  fs.writeFileSync(arquivo, "4194301 2026-01-01T00:00:00Z\n");
+  trava.liberar();
+  assert.equal(fs.readFileSync(arquivo, "utf8"), "4194301 2026-01-01T00:00:00Z\n");
+  fs.rmSync(arquivo);
+
+  // A reclamation in progress: releasing does not race it, and it is not given up either. The lock
+  // still names this live process, so it is released as soon as the mutex is free.
+  trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t2", operador: "op" });
+  fs.mkdirSync(mutex);
+  trava.liberar();
+  assert.equal(fs.existsSync(arquivo), true, "not removed while another reclamation holds the mutex");
+  fs.rmdirSync(mutex);
+  const limite = Date.now() + 5000;
+  while (fs.existsSync(arquivo) && Date.now() < limite) await new Promise((r) => setTimeout(r, 50));
+  assert.equal(fs.existsSync(arquivo), false, "released once the mutex is free");
+  amb.trava.adquirir({ acao: "teste", trabalhoId: "t3", operador: "op" }).liberar();
+  assert.equal(fs.existsSync(arquivo), false);
+
+  // A filesystem error during the release (the lock cannot be read) does not count as released.
+  trava = amb.trava.adquirir({ acao: "teste", trabalhoId: "t4", operador: "op" });
+  const lerOriginal = fs.readFileSync;
+  fs.readFileSync = (alvo, ...resto) => {
+    if (alvo === arquivo) throw Object.assign(new Error("EIO simulado"), { code: "EIO" });
+    return lerOriginal(alvo, ...resto);
+  };
+  try {
+    trava.liberar();
+  } finally {
+    fs.readFileSync = lerOriginal;
+  }
+  assert.equal(fs.existsSync(arquivo), true, "kept while the release could not be confirmed");
+  trava.transferirPara(4194300);
+  assert.match(fs.readFileSync(arquivo, "utf8"), new RegExp(`^${process.pid} `), "no transfer after release started");
+  const limite2 = Date.now() + 5000;
+  while (fs.existsSync(arquivo) && Date.now() < limite2) await new Promise((r) => setTimeout(r, 50));
+  assert.equal(fs.existsSync(arquivo), false, "released by the retry once the error is gone");
+});
+
 // --- Job engine ---------------------------------------------------------------------------
 
 function esperarFim(execucao, id, timeoutMs = 20_000) {

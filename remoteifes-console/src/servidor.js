@@ -441,11 +441,19 @@ async function rotear(req, res, url, params) {
 
   if (caminho === "/api/sessao/senha" && metodo === "POST") {
     const corpo = await lerCorpo(req);
+    // Confirming the current password here draws on the same failure budget as elevation: otherwise
+    // a session that is not elevated could guess the password without the limit /api/sessao/elevar
+    // applies, and then elevate.
+    const chave = `elevar:${sessao.operador}`;
+    const espera = auth.bloqueado(chave);
+    if (espera > 0) return responderJson(res, 429, { ok: false, erro: `muitas tentativas; tente novamente em ${espera}s` });
     try {
       auth.trocarSenha(sessao.operador, String(corpo.atual || ""), String(corpo.nova || ""));
     } catch (erro) {
+      if (erro.senhaAtualIncorreta) auth.registrarFalha(chave);
       return responderErro(res, 400, erro.message);
     }
+    auth.limparTentativas(chave);
     limparCookieSessao(res);
     return responderJson(res, 200, { ok: true, reautenticar: true });
   }

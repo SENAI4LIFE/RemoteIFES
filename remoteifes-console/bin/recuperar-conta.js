@@ -75,23 +75,38 @@ async function main() {
   }
 
   try {
-    // The account is chosen by level, not by login name: the default login may have been renamed by
-    // the operator.
-    const conta =
-      db.prepare("SELECT id, usuario FROM usuarios WHERE nivel = 3 ORDER BY id LIMIT 1").get() ||
-      db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'superadmin'").get() ||
-      db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'admin'").get();
-
-    if (!conta) {
-      console.error("Nenhuma conta de superadministrador encontrada neste banco.");
-      console.error("Inicie o RemoteIFES uma vez (npm start) para que ela seja criada.");
+    if (Number(db.prepare("SELECT COUNT(*) n FROM usuarios").get().n) === 0) {
+      console.error("Nenhuma conta neste banco.");
+      console.error("Inicie o RemoteIFES uma vez (npm start) para que o superadministrador seja criado.");
       return 1;
     }
 
+    // The account is chosen by level, not by login name: the default login may have been renamed by
+    // the operator. With accounts but none at level 3, the `superadmin` login is promoted back, or
+    // created when it does not exist; an `admin` login is never touched (after the automatic
+    // admin -> superadmin migration it belongs to someone else). Same rule as reset-admin-senha.js.
     const hash = bcrypt.hashSync(senha, 10);
-    db.prepare("UPDATE usuarios SET senhaHash = ? WHERE id = ?").run(hash, conta.id);
+    let conta = db.prepare("SELECT id, usuario FROM usuarios WHERE nivel = 3 ORDER BY id LIMIT 1").get();
+    let restabelecida = false;
+    if (conta) {
+      db.prepare("UPDATE usuarios SET senhaHash = ? WHERE id = ?").run(hash, conta.id);
+    } else {
+      restabelecida = true;
+      const existente = db.prepare("SELECT id, usuario FROM usuarios WHERE usuario = 'superadmin'").get();
+      if (existente) {
+        db.prepare("UPDATE usuarios SET senhaHash = ?, nivel = 3, isAdmin = 1, ativo = 1 WHERE id = ?").run(hash, existente.id);
+        conta = existente;
+      } else {
+        const criada = db.prepare(`
+          INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
+          VALUES ('superadmin', ?, 'Superadministrador', 1, 3, 1, 1)
+        `).run(hash);
+        conta = { id: Number(criada.lastInsertRowid), usuario: "superadmin" };
+      }
+    }
     const sessoes = db.prepare("UPDATE sessoes SET logout = datetime('now') WHERE usuarioId = ? AND logout IS NULL").run(conta.id);
 
+    if (restabelecida) console.log(`Não havia conta de nível 3: a conta "${conta.usuario}" voltou a ser o superadministrador.`);
     console.log(`Senha redefinida para a conta "${conta.usuario}" (nível 3).`);
     console.log(`Sessões encerradas desta conta: ${sessoes.changes}.`);
     console.log("As sessões das demais contas continuam válidas; um reinício do serviço encerraria todas.");

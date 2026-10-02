@@ -397,6 +397,29 @@ test("the application URL comes from the real configuration, not a fixed port", 
   amb2.restaurar();
 });
 
+test("the origins the old server .env.example shipped are never the application's address or domain", (t) => {
+  const checkout = ajuda.dirTemporario("console-url-modelo-");
+  fs.mkdirSync(path.join(checkout, "remoteifes-server"), { recursive: true });
+  fs.writeFileSync(path.join(checkout, "remoteifes-server", "package.json"), JSON.stringify({ version: "3.0.0" }));
+  // The active line installations copied from the old template still have.
+  fs.writeFileSync(path.join(checkout, "remoteifes-server", ".env"), "PORTA=9090\nCORS_ORIGIN=https://exemplo.com,https://outro-exemplo.com\n");
+  const amb = ajuda.ambiente({ checkout });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(checkout, { recursive: true, force: true });
+  });
+  const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
+  const rede = require(path.join(ajuda.RAIZ, "src", "rede.js"));
+
+  assert.equal(launcher.urlDaAplicacao(), "http://127.0.0.1:9090/", "the link and --abrir-app do not open a third-party domain");
+  assert.ok(!["exemplo.com", "outro-exemplo.com"].includes(rede.dominioConfigurado()), "the diagnostics do not probe it as the configured domain");
+
+  fs.writeFileSync(path.join(checkout, "remoteifes-server", ".env"), "PORTA=9090\nCORS_ORIGIN=https://exemplo.com, https://remoteifes.ifes.edu.br\n");
+  const amb2 = ajuda.ambiente({ checkout });
+  assert.equal(require(path.join(ajuda.RAIZ, "launcher.js")).urlDaAplicacao(), "https://remoteifes.ifes.edu.br", "a real origin listed after them is still used");
+  amb2.restaurar();
+});
+
 test("the launcher status separates Console, application and program version", async (t) => {
   const amb = ajuda.ambiente();
   t.after(() => amb.restaurar());
