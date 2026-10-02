@@ -208,6 +208,33 @@ test("the session cookie is HttpOnly, SameSite=Strict and cleared on logout", as
   assert.equal(depois.status, 401, "the revoked cookie must no longer be valid");
 });
 
+test("changing the password draws on elevation's failure budget, so it cannot be used to guess the current one", async (t) => {
+  const amb = ajuda.ambiente();
+  const s = await ajuda.subir(amb);
+  t.after(async () => {
+    await s.fechar();
+    amb.restaurar();
+  });
+
+  const sessao = await ajuda.autenticar(amb, s.porta);
+  const trocar = (atual, nova = "nova-senha-de-teste-67890") =>
+    ajuda.pedir(s.porta, "/api/sessao/senha", { metodo: "POST", corpo: { atual, nova }, cookie: sessao.cookie, csrf: sessao.csrf, origem: s.base });
+
+  // A weak new password is not a guess of the current one: refused, not counted.
+  for (let i = 0; i < 10; i += 1) assert.equal((await trocar(sessao.senha, "curta")).status, 400);
+
+  // Eight wrong current passwords (MAX_POR_CHAVE in src/auth.js) exhaust the budget.
+  for (let i = 0; i < 8; i += 1) {
+    const r = await trocar(`tentativa-errada-${i}-abcdef`);
+    assert.equal(r.status, 400);
+    assert.match(r.json.erro, /senha atual incorreta/);
+  }
+  const certaMasBloqueada = await trocar(sessao.senha);
+  assert.equal(certaMasBloqueada.status, 429, "while blocked even the right password is refused");
+  assert.equal((await ajuda.elevar(amb, s.porta, sessao)).status, 429, "elevation shares the same budget");
+  assert.equal(amb.auth.autenticar("operador", sessao.senha) !== null, true, "the password did not change");
+});
+
 test("an unexpected content-type in a POST is refused", async (t) => {
   const amb = ajuda.ambiente();
   const s = await ajuda.subir(amb);

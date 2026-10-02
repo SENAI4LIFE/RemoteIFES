@@ -110,17 +110,25 @@ function lerEnvServidor() {
   return valores;
 }
 
+// Origins the old remoteifes-server/.env.example carried as an active CORS_ORIGIN line. Installations
+// created from it still have them; they are nobody's application address (the server ignores them
+// too, src/config/cors.js), so the Console never links to them or probes them as "the domain".
+const ORIGENS_DO_MODELO_ANTIGO = new Set(["https://exemplo.com", "https://outro-exemplo.com"]);
+
+function origensConfiguradas(env = lerEnvServidor()) {
+  return String(env.CORS_ORIGIN || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((origem) => origem && !ORIGENS_DO_MODELO_ANTIGO.has(origem));
+}
+
 /**
  * Address at which a browser can actually reach the application. The origin configured in
  * CORS_ORIGIN is the one users use; only when there is none does it fall back to loopback with the
  * configured port. Never an assumed fixed port.
  */
 function urlDaAplicacao() {
-  const env = lerEnvServidor();
-  const origens = String(env.CORS_ORIGIN || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const origens = origensConfiguradas();
   for (const origem of origens) {
     try {
       const u = new URL(origem);
@@ -214,6 +222,7 @@ const config = {
   enderecoLoopback,
   lerEnvServidor,
   caminhosDaAplicacao,
+  origensConfiguradas,
   urlDaAplicacao,
 };
 

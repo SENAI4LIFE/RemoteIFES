@@ -97,7 +97,11 @@ function trocarSenha(nome, senhaAtual, novaSenha) {
   const dados = lerOperadores();
   const operador = dados.operadores.find((o) => o.nome === nome);
   if (!operador) throw new Error("operador não encontrado");
-  if (!conferirSenha(senhaAtual, operador.senhaHash)) throw new Error("senha atual incorreta");
+  if (!conferirSenha(senhaAtual, operador.senhaHash)) {
+    const erro = new Error("senha atual incorreta");
+    erro.senhaAtualIncorreta = true;
+    throw erro;
+  }
   const problema = validarForcaDaSenha(novaSenha);
   if (problema) throw new Error(problema);
   if (conferirSenha(novaSenha, operador.senhaHash)) throw new Error("a nova senha é igual à atual");

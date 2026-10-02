@@ -206,10 +206,9 @@ function dominioConfigurado() {
     const nome = conf.serverNames.flatMap((n) => n.split(/\s+/)).find((n) => n && n !== "_" && !/^\d+\.\d+\.\d+\.\d+$/.test(n));
     if (nome) return nome;
   }
-  const env = config.lerEnvServidor();
-  for (const origem of (env.CORS_ORIGIN || "").split(",")) {
+  for (const origem of config.origensConfiguradas()) {
     try {
-      const url = new URL(origem.trim());
+      const url = new URL(origem);
       if (url.hostname && url.hostname !== "localhost") return url.hostname;
     } catch {}
   }
