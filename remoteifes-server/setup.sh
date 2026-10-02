@@ -35,8 +35,26 @@ resolve_latest_node_version() {
     | sed -E 's/node-v([0-9.]+)-linux-x64\.tar\.xz/\1/'
 }
 
+# The archive is checked against the SHA-256 the release publishes in SHASUMS256.txt before anything
+# is extracted with elevated privileges: a truncated, corrupted or substituted download stops here.
+# A checksum that cannot be fetched or computed is a failure too, never a skipped check.
+verify_node_archive() {
+  local version="$1" file="$2" archive="$3" sums expected actual
+  sums=$(curl -fsSL "$NODE_DIST_BASE/v$version/SHASUMS256.txt") || return 1
+  expected=$(printf '%s\n' "$sums" | awk -v f="$file" '$2 == f { print $1; exit }')
+  [ -n "$expected" ] || return 1
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "$archive" | awk '{print $1}')
+  elif command -v shasum >/dev/null 2>&1; then
+    actual=$(shasum -a 256 "$archive" | awk '{print $1}')
+  else
+    return 1
+  fi
+  [ "$actual" = "$expected" ]
+}
+
 install_node_linux() {
-  local node_arch version tmp_dir dest_dir sudo_cmd bin
+  local node_arch version tmp_dir dest_dir sudo_cmd bin file
 
   node_arch=$(resolve_node_arch)
   if [ -z "$node_arch" ]; then
@@ -53,7 +71,13 @@ install_node_linux() {
   [ "$EUID" -ne 0 ] && [ ! -w /usr/local/lib ] && sudo_cmd="sudo"
 
   tmp_dir=$(mktemp -d)
-  curl -fsSL "$NODE_DIST_BASE/v$version/node-v$version-linux-$node_arch.tar.xz" -o "$tmp_dir/node.tar.xz"
+  file="node-v$version-linux-$node_arch.tar.xz"
+  curl -fsSL "$NODE_DIST_BASE/v$version/$file" -o "$tmp_dir/node.tar.xz"
+  if ! verify_node_archive "$version" "$file" "$tmp_dir/node.tar.xz"; then
+    rm -rf "$tmp_dir"
+    echo "O Node.js baixado não confere com o SHA-256 publicado em $NODE_DIST_BASE/v$version/SHASUMS256.txt (ou a soma não pôde ser obtida). Nada foi instalado; tente de novo ou instale manualmente: https://nodejs.org/en/download"
+    exit 1
+  fi
 
   dest_dir="/usr/local/lib/nodejs/node-v$version"
   $sudo_cmd mkdir -p "$dest_dir"

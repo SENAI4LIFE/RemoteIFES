@@ -109,6 +109,27 @@ test("rollback.sh with a failing npm ci exits with an error and does not pretend
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("rollback.sh refuses uncommitted local changes like deploy.sh, and --force goes past the refusal", { skip: !disponivel }, () => {
+  const { dir, shaA, shaB } = prepararRepo();
+  try {
+    git(dir, "reset", "-q", "--hard", shaB);
+    fs.appendFileSync(path.join(dir, ".gitignore"), "ajuste-local\n");
+    const recusado = sh(dir, `bash rollback.sh ${shaA} --offline --no-restart`, { PATH: npmFalso(dir) });
+    assert.equal(recusado.status, 1, recusado.stdout + recusado.stderr);
+    assert.match(recusado.stdout, /alterações locais não commitadas/);
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaB, "the code is not touched");
+    assert.match(fs.readFileSync(path.join(dir, ".gitignore"), "utf8"), /ajuste-local/, "the local change survives");
+    assert.ok(!fs.existsSync(path.join(dir, "data", ".deploy-lock")), "the lock is released");
+
+    // With --force the rollback moves the code (and then stops at the simulated npm ci failure).
+    const forcado = sh(dir, `bash rollback.sh ${shaA} --offline --no-restart --force`, { PATH: npmFalso(dir) });
+    assert.doesNotMatch(forcado.stdout, /alterações locais não commitadas/);
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaA);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("deploy.sh with unchanged dependencies skips npm ci and applies the new version", { skip: !disponivel }, () => {
   const { dir, shaA } = prepararRepo();
   fs.writeFileSync(path.join(dir, "README.txt"), "nova versão");
@@ -475,10 +496,25 @@ test("rollback.sh with the code already at the target restarts and confirms inst
 
 // --- Deployment lock and the database ------------------------------------------------------------
 
-function travaEm(dir, idadeMin) {
+// PIDs as the scripts' bash sees them (under Git Bash, Windows PIDs are not visible to kill -0).
+function pidMorto(dir) {
+  const r = sh(dir, "true & p=$!; wait $p; echo $p");
+  return Number(r.stdout.trim());
+}
+
+function pidVivo(dir) {
+  const r = sh(dir, "sleep 300 >/dev/null 2>&1 & echo $!");
+  return Number(r.stdout.trim());
+}
+
+function encerrarPid(dir, pid) {
+  sh(dir, `kill ${pid} 2>/dev/null || true`);
+}
+
+function travaEm(dir, idadeMin, pid = pidMorto(dir)) {
   const trava = path.join(dir, "data", ".deploy-lock");
   fs.mkdirSync(path.dirname(trava), { recursive: true });
-  fs.writeFileSync(trava, "4242 em-andamento\n");
+  fs.writeFileSync(trava, `${pid} em-andamento\n`);
   const quando = new Date(Date.now() - idadeMin * 60_000);
   fs.utimesSync(trava, quando, quando);
   return trava;
@@ -498,11 +534,12 @@ test("a recent deployment lock is respected by deploy.sh and rollback.sh, and su
   try {
     for (const ambiente of [{}, statSemGnu(dir)]) {
       const trava = travaEm(dir, 5);
+      const conteudo = fs.readFileSync(trava, "utf8");
       for (const comando of [`bash deploy.sh ${shaB} --offline --no-restart`, `bash rollback.sh ${shaA} --offline --no-restart`]) {
         const r = sh(dir, comando, ambiente);
         assert.equal(r.status, 1, r.stdout + r.stderr);
         assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
-        assert.equal(fs.readFileSync(trava, "utf8"), "4242 em-andamento\n", "the other operation's lock is not touched");
+        assert.equal(fs.readFileSync(trava, "utf8"), conteudo, "the other operation's lock is not touched");
       }
     }
     assert.equal(git(dir, "rev-parse", "HEAD"), shaA);
@@ -526,6 +563,82 @@ test("a lock older than 30 minutes is taken as left over, and a failed deploy re
   }
 });
 
+test("an old lock whose process is still alive is kept: a long deploy is not taken over by age", { skip: !disponivel }, () => {
+  const { dir, shaA, shaB } = prepararRepo();
+  const pid = pidVivo(dir);
+  try {
+    const trava = travaEm(dir, 45, pid);
+    const conteudo = fs.readFileSync(trava, "utf8");
+    for (const comando of [`bash deploy.sh ${shaB} --offline --no-restart`, `bash rollback.sh ${shaA} --offline --no-restart`]) {
+      const r = sh(dir, comando);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+      assert.equal(fs.readFileSync(trava, "utf8"), conteudo, "the live operation keeps its lock");
+    }
+    assert.equal(git(dir, "rev-parse", "HEAD"), shaA);
+  } finally {
+    encerrarPid(dir, pid);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("two runs started together on a left-over lock: exactly one takes it over", { skip: !disponivel }, () => {
+  const { dir, shaB } = prepararRepo();
+  try {
+    travaEm(dir, 45);
+    // An npm that holds the run for a while and then fails, so both runs overlap.
+    const bin = path.join(dir, "bin-lento");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "npm"), "#!/usr/bin/env bash\nsleep 3\nexit 1\n");
+    fs.chmodSync(path.join(bin, "npm"), 0o755);
+    const comando = `bash deploy.sh ${shaB} --offline --no-restart`;
+    sh(dir, `(${comando} > saida-1.txt 2>&1) & (${comando} > saida-2.txt 2>&1) & wait`, { PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+    const saidas = ["saida-1.txt", "saida-2.txt"].map((f) => fs.readFileSync(path.join(dir, f), "utf8"));
+    const recusadas = saidas.filter((s) => /outra atualização\/rollback parece estar em andamento/.test(s)).length;
+    assert.equal(recusadas, 1, saidas.join("\n---\n"));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a left-over lock is not taken over while another reclamation holds the mutex", { skip: !disponivel }, () => {
+  const { dir, shaA, shaB } = prepararRepo();
+  try {
+    const trava = travaEm(dir, 45);
+    const conteudo = fs.readFileSync(trava, "utf8");
+    fs.mkdirSync(`${trava}.reclamacao`);
+    // Even an old one is never removed by age; the refusal names it.
+    const antigo = new Date(Date.now() - 60 * 60_000);
+    fs.utimesSync(`${trava}.reclamacao`, antigo, antigo);
+    for (const comando of [`bash deploy.sh ${shaB} --offline --no-restart`, `bash rollback.sh ${shaA} --offline --no-restart`]) {
+      const r = sh(dir, comando);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
+      assert.match(r.stdout, /reclamacao: se nenhuma operação de manutenção estiver rodando/);
+      assert.equal(fs.readFileSync(trava, "utf8"), conteudo);
+      assert.ok(fs.existsSync(`${trava}.reclamacao`));
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a run releases only its own lock: one another operation took over stays", { skip: !disponivel }, () => {
+  const { dir, shaB } = prepararRepo();
+  try {
+    // An npm that, while the deploy runs, sees the lock replaced by another operation and then fails.
+    const bin = path.join(dir, "bin-tomada");
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, "npm"), '#!/usr/bin/env bash\necho "9999 outra-operacao" > data/.deploy-lock\nexit 1\n');
+    fs.chmodSync(path.join(bin, "npm"), 0o755);
+    const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.equal(fs.readFileSync(path.join(dir, "data", ".deploy-lock"), "utf8"), "9999 outra-operacao\n");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the health watchdog stays quiet while a recent deployment lock exists, and not for a left-over one", { skip: !disponivel }, () => {
   const { dir } = prepararRepo();
   try {
@@ -537,6 +650,14 @@ test("the health watchdog stays quiet while a recent deployment lock exists, and
       const r = sh(dir, "bash health-watchdog.sh", ambiente);
       assert.equal(r.status, 0, r.stdout + r.stderr);
       assert.equal(fs.existsSync(path.join(dir, "data", ".health-falhas")), false, "no failure is counted during a deployment");
+    }
+    const pid = pidVivo(dir);
+    try {
+      travaEm(dir, 40, pid);
+      assert.equal(sh(dir, "bash health-watchdog.sh").status, 0);
+      assert.equal(fs.existsSync(path.join(dir, "data", ".health-falhas")), false, "an old lock whose process is alive still holds the watchdog back");
+    } finally {
+      encerrarPid(dir, pid);
     }
     travaEm(dir, 40);
     sh(dir, "bash health-watchdog.sh");
