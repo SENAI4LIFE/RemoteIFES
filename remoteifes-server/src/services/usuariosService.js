@@ -1,7 +1,7 @@
-const bcrypt = require("bcryptjs");
 const db = require("../config/database");
 const { removerSessoesDoUsuario } = require("./tokenService");
 const logger = require("../utils/logger");
+const senhas = require("../utils/senhas");
 
 const NIVEL_USUARIO = 1;
 const NIVEL_ADMIN = 2;
@@ -76,7 +76,7 @@ function buscarPorId(id) {
 function senhaPadraoAtiva(usuario) {
   return !!usuario
     && usuario.nivel === NIVEL_SUPERADMIN
-    && bcrypt.compareSync("admin", usuario.senhaHash);
+    && senhas.conferir("admin", usuario.senhaHash);
 }
 
 function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
@@ -93,7 +93,7 @@ function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
   validarSenha(senha);
 
   const nivel = isAdmin ? NIVEL_ADMIN : NIVEL_USUARIO;
-  const senhaHash = bcrypt.hashSync(senha, 10);
+  const senhaHash = senhas.gerarHash(senha);
   const info = db.prepare(`
     INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
     VALUES (?, ?, ?, ?, ?, ?, 1)
@@ -205,7 +205,7 @@ function trocarSenha(id, novaSenha, requisitante) {
   if (usuario.nivel === NIVEL_SUPERADMIN && novaSenha === "admin") {
     throw new Error("escolha uma senha diferente da credencial padrao");
   }
-  const senhaHash = bcrypt.hashSync(novaSenha, 10);
+  const senhaHash = senhas.gerarHash(novaSenha);
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE id = ?`).run(senhaHash, id);
   removerSessoesDoUsuario(id);
   logger.info("usuario-senha-alterada", { alvo: id, por: requisitante ? requisitante.id : null });

@@ -55,9 +55,17 @@ async function main() {
     return 2;
   }
 
-  let bcrypt;
+  // The server's own hashing, which counts every byte of a password longer than bcrypt's 72; an older
+  // server without it verifies plain bcrypt, which is then what it gets.
+  let gerarHash;
   try {
-    bcrypt = require(path.join(config.DIR_SERVIDOR, "node_modules", "bcryptjs"));
+    const senhasDoServidor = path.join(config.DIR_SERVIDOR, "src", "utils", "senhas.js");
+    if (fs.existsSync(senhasDoServidor)) {
+      ({ gerarHash } = require(senhasDoServidor));
+    } else {
+      const bcrypt = require(path.join(config.DIR_SERVIDOR, "node_modules", "bcryptjs"));
+      gerarHash = (texto) => bcrypt.hashSync(texto, 10);
+    }
   } catch (erro) {
     console.error("bcryptjs não está instalado no servidor; rode 'npm ci --omit=dev' em remoteifes-server.");
     return 1;
@@ -85,7 +93,7 @@ async function main() {
     // the operator. With accounts but none at level 3, the `superadmin` login is promoted back, or
     // created when it does not exist; an `admin` login is never touched (after the automatic
     // admin -> superadmin migration it belongs to someone else). Same rule as reset-admin-senha.js.
-    const hash = bcrypt.hashSync(senha, 10);
+    const hash = gerarHash(senha);
     let conta = db.prepare("SELECT id, usuario FROM usuarios WHERE nivel = 3 ORDER BY id LIMIT 1").get();
     let restabelecida = false;
     if (conta) {
