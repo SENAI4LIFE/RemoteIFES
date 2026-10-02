@@ -811,11 +811,8 @@ test("under Git Bash, a Windows process list that cannot be read keeps the lock"
   try {
     const trava = travaEm(dir, 45);
     const conteudo = fs.readFileSync(trava, "utf8");
-    const bin = path.join(dir, "bin-ps");
-    fs.mkdirSync(bin, { recursive: true });
-    fs.writeFileSync(path.join(bin, "ps"), "#!/usr/bin/env bash\nexit 1\n");
-    fs.chmodSync(path.join(bin, "ps"), 0o755);
-    const r = sh(dir, `bash deploy.sh ${shaB} --offline --no-restart`, { PATH: `${bin}${path.delimiter}${process.env.PATH}` });
+    // An exported function rather than a stand-in on PATH: Git's bin/bash.exe puts /usr/bin first.
+    const r = sh(dir, `ps() { return 1; }; export -f ps; bash deploy.sh ${shaB} --offline --no-restart`);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /outra atualização\/rollback parece estar em andamento/);
     assert.equal(fs.readFileSync(trava, "utf8"), conteudo);
