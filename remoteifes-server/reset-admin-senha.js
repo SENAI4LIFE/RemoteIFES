@@ -1,5 +1,5 @@
 const fs = require("fs");
-const bcrypt = require("bcryptjs");
+const senhas = require("./src/utils/senhas");
 
 // npm run reset-admin                    -> back to the public default "admin" (change it at once)
 // npm run reset-admin -- <senha>         -> that password (it stays in shell history and in `ps`)
@@ -55,7 +55,7 @@ if ((senhaFornecida && novaSenha.length < 8) || novaSenha.length > 128) {
 // The database is opened only now, after the input was accepted: a refused input touches nothing.
 const db = require("./src/config/database");
 require("./src/db/schema").criarSchema();
-const senhaHash = bcrypt.hashSync(novaSenha, 10);
+const senhaHash = senhas.gerarHash(novaSenha);
 
 if (Number(db.prepare("SELECT COUNT(*) n FROM usuarios").get().n) === 0) {
   console.log("Nenhuma conta neste banco — inicie o servidor uma vez (npm start) para criar o superadministrador.");

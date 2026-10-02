@@ -80,3 +80,18 @@ test("account recovery resets the level-3 account and restores one when none is 
     { nivel: 2, senhaHash: "de-outra-pessoa" },
   ], "the admin login is left alone");
 });
+
+test("account recovery hashes with the server's own password module when the server has one", (t) => {
+  const { checkout, banco } = checkoutComBanco();
+  t.after(() => fs.rmSync(checkout, { recursive: true, force: true }));
+
+  // A server that counts every byte of a password longer than bcrypt's 72 ships src/utils/senhas.js;
+  // the runner uses it, and plain bcrypt only with an older server (the test above).
+  const utils = path.join(checkout, "remoteifes-server", "src", "utils");
+  fs.mkdirSync(utils, { recursive: true });
+  fs.writeFileSync(path.join(utils, "senhas.js"), "module.exports = { gerarHash: (s) => `servidor:${s}` };\n");
+  const longa = "frase-longa-".repeat(7);
+  const r = recuperar(checkout, longa);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(consultar(banco, "SELECT senhaHash FROM usuarios WHERE nivel = 3"), [{ senhaHash: `servidor:${longa}` }]);
+});

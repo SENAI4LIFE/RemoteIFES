@@ -1,6 +1,6 @@
-const bcrypt = require("bcryptjs");
 const db = require("../config/database");
 const logger = require("../utils/logger");
+const senhas = require("../utils/senhas");
 
 const SALAS_CAMPUS = require("./salasCampus");
 
@@ -44,7 +44,7 @@ function popularAdmin() {
 
   const senhaConfigurada = String(process.env.SENHA_ADMIN_INICIAL || "").trim();
   const senhaInicial = senhaConfigurada || "admin";
-  const senhaHash = bcrypt.hashSync(senhaInicial, 10);
+  const senhaHash = senhas.gerarHash(senhaInicial);
   db.prepare(`
     INSERT INTO usuarios (usuario, senhaHash, nome, isAdmin, nivel, podeControlar, ativo)
     VALUES ('superadmin', ?, 'Superadministrador', 1, ?, 1, 1)

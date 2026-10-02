@@ -1,5 +1,4 @@
 const express = require("express");
-const bcrypt = require("bcryptjs");
 const usuariosService = require("../services/usuariosService");
 const salasService = require("../services/salasService");
 const configuracoesService = require("../services/configuracoesService");
@@ -7,11 +6,12 @@ const { gerarToken, validarToken, removerToken } = require("../services/tokenSer
 const { exigirLogin } = require("../middlewares/auth");
 const { criarLimitador } = require("../utils/rateLimiter");
 const logger = require("../utils/logger");
+const senhas = require("../utils/senhas");
 
 const router = express.Router();
 
 const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 20, contarApenasFalhas: true });
-const HASH_COMPARACAO_INVALIDA = bcrypt.hashSync("credencial-invalida-para-comparacao", 10);
+const HASH_COMPARACAO_INVALIDA = senhas.gerarHash("credencial-invalida-para-comparacao");
 
 router.post("/login", limitarLogin, (req, res) => {
   const { usuario, senha } = req.body || {};
@@ -20,12 +20,12 @@ router.post("/login", limitarLogin, (req, res) => {
     return res.status(400).json({ ok: false, erro: "usuário e senha são obrigatórios" });
   }
   if (usuario.length > usuariosService.LOGIN_MAX || senha.length > usuariosService.SENHA_MAX) {
-    bcrypt.compareSync("credencial-invalida", HASH_COMPARACAO_INVALIDA);
+    senhas.conferir("credencial-invalida", HASH_COMPARACAO_INVALIDA);
     return res.status(401).json({ ok: false, erro: "usuario ou senha invalidos" });
   }
 
   const registro = usuariosService.buscarPorUsuario(usuario);
-  const senhaValida = bcrypt.compareSync(senha, registro ? registro.senhaHash : HASH_COMPARACAO_INVALIDA);
+  const senhaValida = senhas.conferir(senha, registro ? registro.senhaHash : HASH_COMPARACAO_INVALIDA);
   if (!registro || !registro.ativo || !senhaValida) {
     logger.warn("login-falhou", { usuario, ip: req.ip });
     return res.status(401).json({ ok: false, erro: "usuário ou senha inválidos" });
