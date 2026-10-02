@@ -10,6 +10,7 @@ const eventos = new EventEmitter();
 const COMANDOS_VALIDOS = ["ligar", "desligar", "temperatura", "turbo"];
 const TIMEOUT_OFFLINE_MS = 90 * 1000;
 const DETECTADOS_MAX = 100;
+const DETECTADOS_RETIDOS_MAX = 500;
 
 function listar({ bloco, andar } = {}) {
   let query = "SELECT * FROM salas WHERE 1=1";
@@ -53,7 +54,25 @@ function registrarDeteccaoEsp(mac, ip, sala = null) {
     db.prepare(`
       INSERT INTO esp_detectados (mac, ip, sala) VALUES (?, ?, ?)
     `).run(macLimpo, ip || null, sala);
+    podarDetectados();
   }
+}
+
+// Discovery is unauthenticated: anyone who reaches /dispositivo can announce a MAC. The listing shows
+// the most recent DETECTADOS_MAX; storage keeps at most DETECTADOS_RETIDOS_MAX announcements not tied
+// to a room (oldest out first), so a stream of invented MACs cannot grow the table until the 30-day
+// retention. Runs on each new announcement and in the retention cycle, which also trims a database
+// that was already above the cap.
+function podarDetectados() {
+  return Number(db.prepare(`
+    DELETE FROM esp_detectados WHERE mac IN (
+      SELECT d.mac FROM esp_detectados d
+      LEFT JOIN salas s ON s.mac = d.mac
+      WHERE s.mac IS NULL
+      ORDER BY d.ultimaDeteccao DESC, d.rowid DESC
+      LIMIT -1 OFFSET ?
+    )
+  `).run(DETECTADOS_RETIDOS_MAX).changes);
 }
 
 function identificarDispositivo(mac, ip) {
@@ -872,6 +891,7 @@ module.exports = {
   usuarioEhDonoDeAlgumaSala,
   listarSalasDeDono,
   registrarDeteccaoEsp,
+  podarDetectados,
   listarDetectados,
   removerDetectado,
   heartbeatDispositivo,

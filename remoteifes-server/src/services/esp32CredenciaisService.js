@@ -181,7 +181,7 @@ function rotacionar(sala) {
   return { deviceId: linha.deviceId, segredo, enviadoAoDispositivo, pendente: true };
 }
 
-function ativarPendente(linha) {
+function ativarPendente(linha, { porMesh = false } = {}) {
   const expira = new Date(Date.now() + GRACE_ROTACAO_MS).toISOString().slice(0, 19).replace("T", " ");
   db.prepare(`
     UPDATE esp_credenciais SET
@@ -197,6 +197,13 @@ function ativarPendente(linha) {
       rotacionadoEm = datetime('now')
     WHERE deviceId = ? AND segredoHashPendente IS NOT NULL
   `).run(expira, linha.deviceId);
+  // A session already open with the generation that just became the previous one (the activation
+  // came through another channel, such as an HTTP heartbeat) ends with the grace period as well.
+  try {
+    require("./deviceHub").prazoParaSessaoDaGeracaoAnterior(linha.sala, linha.deviceId, new Date(expira.replace(" ", "T") + "Z").toISOString(), { porMesh });
+  } catch (erro) {
+    logger.warn("credencial-prazo-sessao-anterior-falhou", { sala: linha.sala, mensagem: erro.message });
+  }
   const guardado = segredosPendentesEmMemoria.get(linha.sala);
   limparPendente(linha.sala);
   if (guardado && guardado.deviceId === linha.deviceId) segredosAtivadosEmMemoria.set(linha.sala, guardado);
@@ -307,7 +314,11 @@ function chavesMeshPara(deviceId) {
   if (linha.chaveMeshPendente) chaves.push({ geracao: "pendente", chave: Buffer.from(linha.chaveMeshPendente, "hex") });
   if (linha.chaveMeshAnterior && linha.anteriorExpiraEm) {
     const expiraMs = new Date(linha.anteriorExpiraEm.replace(" ", "T") + "Z").getTime();
-    if (Number.isFinite(expiraMs) && expiraMs > Date.now()) chaves.push({ geracao: "anterior", chave: Buffer.from(linha.chaveMeshAnterior, "hex") });
+    // The deadline travels with the key: a mesh session opened with it must end when the grace period
+    // does, exactly like a direct connection (deviceHub closes it once `expiraEm` passes).
+    if (Number.isFinite(expiraMs) && expiraMs > Date.now()) {
+      chaves.push({ geracao: "anterior", chave: Buffer.from(linha.chaveMeshAnterior, "hex"), expiraEm: new Date(expiraMs).toISOString() });
+    }
   }
   return { sala: linha.sala, deviceId, chaves };
 }
@@ -315,7 +326,7 @@ function chavesMeshPara(deviceId) {
 /** A board proved the pending generation through a gateway: same effect as presenting it directly. */
 function ativarPendentePorMesh(deviceId) {
   const linha = db.prepare(`SELECT * FROM esp_credenciais WHERE deviceId = ? AND revogadoEm IS NULL`).get(deviceId);
-  if (linha && linha.segredoHashPendente) ativarPendente(linha);
+  if (linha && linha.segredoHashPendente) ativarPendente(linha, { porMesh: true });
 }
 
 function registrarUsoMesh(deviceId) {

@@ -238,7 +238,12 @@ router.delete("/admin/acessos", (req, res) => {
 });
 
 router.get("/admin/salas", (req, res) => {
-  res.json(salasService.listarAdministrativo());
+  const salas = salasService.listarAdministrativo();
+  if (req.usuario.nivel === usuariosService.NIVEL_SUPERADMIN) return res.json(salas);
+  // MAC and board address belong to device registration, which is the superadministrator's: in a
+  // room still on MAC-only authentication the MAC is what admits the board. Level 2 uses this list
+  // for room names (log filters, room owners) and gets it without them.
+  res.json(salas.map(({ mac, ipEsp32, ...sala }) => sala));
 });
 
 router.get("/admin/esp32/detectados", exigirSuperAdmin, (req, res) => {

@@ -2,6 +2,7 @@ const EventEmitter = require("events");
 const salasService = require("./salasService");
 const logger = require("../utils/logger");
 const monitoramentoService = require("./monitoramentoService");
+const { ipDeclarado } = require("../utils/rede");
 
 const PING_MS = 15 * 1000;
 const MAX_CAPTURAS_ARMAZENADAS = 20;
@@ -535,7 +536,7 @@ function processarMensagem(sala, entrada, msg, salaAtual) {
     registrarCaptura(sala, entrada, msg, salaAtual);
   } else if (msg.tipo === "acesso") {
     salasService.registrarAcessoEsp(sala, {
-      ip: typeof msg.ip === "string" ? msg.ip : entrada.ip,
+      ip: ipDeclarado(msg.ip, entrada.ip),
       userAgent: typeof msg.userAgent === "string" ? msg.userAgent.slice(0, 500) : null,
     });
   } else if (msg.tipo === "comando") {
@@ -703,6 +704,27 @@ function encerrarSeCredencialExpirou(sala, entrada) {
   return true;
 }
 
+// A rotation was activated through another channel. An open session of this device without a
+// deadline was authenticated with the generation that has just become the previous one: it gets that
+// generation's deadline. A session that already had a deadline was on the generation now dropped,
+// which no longer authenticates at all: it is closed at once. A connection that activates is a new
+// one and replaces this entry; a mesh handshake that activates (`porMesh`) re-keys this same session,
+// and meshService sets its deadline from the generation it proved.
+function prazoParaSessaoDaGeracaoAnterior(sala, deviceId, expiraEm, { porMesh = false } = {}) {
+  const entrada = conexoes.get(sala);
+  if (!entrada || !entrada.viaCredencial || entrada.deviceId !== deviceId) return false;
+  if (porMesh && entrada.canal.transporte === "mesh") return false;
+  if (entrada.credencialExpiraEm) {
+    logger.info("device-credencial-geracao-descartada", { sala });
+    try {
+      entrada.canal.fechar(4001, "credencial substituída por uma rotação mais nova; reconecte com a credencial atual");
+    } catch (erro) {}
+    return true;
+  }
+  entrada.credencialExpiraEm = expiraEm;
+  return true;
+}
+
 function encerrarCredenciaisExpiradas() {
   let encerradas = 0;
   conexoes.forEach((entrada, sala) => {
@@ -756,6 +778,7 @@ module.exports = {
   limparCapturas,
   enviarAtualizacaoCredencial,
   encerrarCredenciaisExpiradas,
+  prazoParaSessaoDaGeracaoAnterior,
   difundirPoliticaAp,
   dispositivoConectado,
   desconectarSala,

@@ -2,7 +2,8 @@ const salasService = require("./salasService");
 const configuracoesService = require("./configuracoesService");
 const deviceHub = require("./deviceHub");
 const { validarToken, validarTokens } = require("./tokenService");
-const { ipAutorizado, resolverIpCliente } = require("../utils/rede");
+const { ipAutorizado, resolverIpCliente, proxyLocalNaoDeclarado } = require("../utils/rede");
+const { origensPermitidas } = require("../config/cors");
 
 const REBROADCAST_MS = 30 * 1000;
 const PING_MS = 30 * 1000;
@@ -30,7 +31,7 @@ function limiteDeMensagensExcedido(ws) {
   return janela.contagem > MAX_MENSAGENS_POR_JANELA;
 }
 
-const TRUST_PROXY_HOPS = process.env.TRUST_PROXY !== undefined ? process.env.TRUST_PROXY : "0";
+const TRUST_PROXY_HOPS = require("../config/proxy").saltosDeProxy();
 
 function protocoloDaRequisicao(req) {
   const hops = Number(TRUST_PROXY_HOPS);
@@ -45,11 +46,7 @@ function origemPermitida(req) {
   if ((process.env.NODE_ENV || "development") !== "production") return true;
   const origin = req.headers.origin;
   if (!origin) return true;
-  const origensPermitidas = (process.env.CORS_ORIGIN || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (origensPermitidas.includes(origin)) return true;
+  if (origensPermitidas().includes(origin)) return true;
   try {
     return !!req.headers.host && new URL(origin).origin === `${protocoloDaRequisicao(req)}://${req.headers.host}`;
   } catch (erro) {
@@ -65,7 +62,8 @@ function redeAutorizada(req) {
   if ((process.env.NODE_ENV || "development") !== "production") return true;
   const { modoTeste, redesAutorizadas } = configuracoesService.acessoRestritoAtivo();
   if (modoTeste) return true;
-  return ipAutorizado(ipDoRequest(req), redesAutorizadas);
+  const loopback = !proxyLocalNaoDeclarado(req.headers, req.socket.remoteAddress, TRUST_PROXY_HOPS);
+  return ipAutorizado(ipDoRequest(req), redesAutorizadas, { loopback });
 }
 
 function montarSalas(usuario, contexto) {
@@ -152,18 +150,20 @@ function notificarObservadoresDaSala({ sala }) {
   });
 }
 
-function notificarAdministradores(payload) {
+function notificarSuperAdministradores(payload) {
   if (!wss) return;
   wss.clients.forEach((ws) => {
     if (!revalidarCliente(ws)) return;
-    if (ws.usuario && ws.usuario.nivel >= NIVEL_ADMIN) enviar(ws, payload);
+    if (ws.usuario && ws.usuario.nivel === NIVEL_SUPERADMIN) enviar(ws, payload);
   });
 }
 
+// Device registration (MAC, board address) is the superadministrator's: only the Cadastro screen
+// listens for it, and level 2 does not see MACs anywhere else (GET /admin/salas omits them).
 function notificarCadastroDeDispositivo({ sala }) {
   const cadastro = salasService.buscarAdministrativo(sala);
   if (!cadastro) return;
-  notificarAdministradores({ tipo: "dispositivo_cadastro", sala, cadastro });
+  notificarSuperAdministradores({ tipo: "dispositivo_cadastro", sala, cadastro });
 }
 
 function notificarStatusServidorParaTodos() {
@@ -201,6 +201,15 @@ function iniciar(server) {
   });
 
   wss.on("connection", (ws, req) => {
+    // First, before any rejection: a refused socket stays open while it closes, and a malformed
+    // frame from the client in that window emits "error". Without a listener that is an uncaught
+    // exception, and server.js exits on those, so anyone who can reach /ws could stop the server.
+    ws.on("error", () => {
+      try {
+        ws.terminate();
+      } catch (erro) {}
+    });
+
     if (!origemPermitida(req) || !redeAutorizada(req)) {
       ws.close(4003, "acesso não permitido");
       return;
@@ -217,11 +226,6 @@ function iniciar(server) {
     ws.isAlive = true;
     ws.on("pong", () => {
       ws.isAlive = true;
-    });
-    ws.on("error", () => {
-      try {
-        ws.terminate();
-      } catch (erro) {}
     });
 
     ws.on("message", (dados) => {
