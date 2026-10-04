@@ -200,7 +200,6 @@ test("a session left open with the old secret when another channel activates the
   const nova = credenciais.rotacionar("ROT-9");
   assert.equal(deviceHub.conexaoDaSala("ROT-9").credencialExpiraEm, null, "before activation the open session has no deadline");
 
-  // The new generation is proven over HTTP while the socket opened with the old one stays up.
   assert.equal((await heartbeat(nova.deviceId, nova.segredo, "ROT-9")).status, 200);
   assert.equal(linha("ROT-9").segredoHashPendente, null, "activated");
   const prazo = deviceHub.conexaoDaSala("ROT-9").credencialExpiraEm;
@@ -230,6 +229,27 @@ test("a session left on a generation that a second rotation drops is closed at o
   assert.equal((await heartbeat(g2.deviceId, g2.segredo, "ROT-10")).status, 200);
   assert.equal(credenciais.verificar(g0.deviceId, g0.segredo), null, "G0 no longer authenticates");
   assert.ok(await ate(() => aberta.fechamento() === 4001), "the session still on G0 does not wait for its old deadline");
+});
+
+test("a second rotation is refused while the board holds a delivered pending secret, so the board is not locked out", async () => {
+  sala("ROT-DUPLA", "AA:CC:11:00:00:2D");
+  const g0 = credenciais.provisionar("ROT-DUPLA");
+  const placa = await conectar(g0.deviceId, g0.segredo);
+  assert.equal(placa.aberto, true);
+  const g1 = credenciais.rotacionar("ROT-DUPLA");
+  assert.ok(await ate(() => placa.pushes().length === 1));
+  assert.ok(linha("ROT-DUPLA").pendenteEntregueEm);
+  const pendente = linha("ROT-DUPLA").segredoHashPendente;
+
+  assert.throws(() => credenciais.rotacionar("ROT-DUPLA"), (erro) => erro.conflito === true);
+  assert.equal(linha("ROT-DUPLA").segredoHashPendente, pendente, "the delivered pending secret is kept");
+
+  placa.ws.close();
+  const nova = await conectar(g1.deviceId, g1.segredo);
+  assert.equal(nova.aberto, true, "the board reconnects with the secret it stored");
+  assert.equal(credenciais.estado("ROT-DUPLA").rotacaoPendente, false);
+  const g2 = credenciais.rotacionar("ROT-DUPLA");
+  assert.equal(g2.pendente, true, "after activation a new rotation is accepted again");
 });
 
 test("replace and revoke discard the pending generation", async () => {

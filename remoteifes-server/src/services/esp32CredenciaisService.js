@@ -6,10 +6,6 @@ const configuracoesService = require("./configuracoesService");
 const RE_DEVICE_ID = /^esp_[0-9a-f]{16}$/;
 const GRACE_ROTACAO_MS = 24 * 60 * 60 * 1000;
 const segredosPendentesEmMemoria = new Map();
-// Secret already activated by rotation, kept in memory only while the previous generation is within
-// its grace period: a board that reconnects with the previous one (the NVS write did not survive a
-// reboot) receives the current secret again instead of becoming unreachable when the grace period
-// ends.
 const segredosAtivadosEmMemoria = new Map();
 
 function gerarDeviceId() {
@@ -24,11 +20,6 @@ function hash(segredo) {
   return crypto.createHash("sha256").update(String(segredo)).digest("hex");
 }
 
-// Key a board uses to authenticate itself through a mesh gateway (src/services/meshService.js). It
-// is derived from the board's own secret, so the gateway that relays the traffic never holds it; the
-// server keeps it because a challenge-response needs the key, not just a hash of the secret. A
-// credential created before mesh support gets its key the next time the board connects directly
-// with its current secret.
 const ROTULO_CHAVE_MESH = "remoteifes-mesh-v1";
 
 function chaveMeshDe(segredo) {
@@ -166,6 +157,11 @@ function rotacionar(sala) {
   if (!linha || linha.revogadoEm) {
     throw new Error("não há credencial ativa para rotacionar — provisione uma primeiro");
   }
+  if (linha.segredoHashPendente && linha.pendenteEntregueEm) {
+    const erro = new Error("a placa já recebeu a credencial rotacionada e ainda não se conectou com ela: aguarde a reconexão ou use substituir/revogar");
+    erro.conflito = true;
+    throw erro;
+  }
   const segredo = gerarSegredo();
   db.prepare(`
     UPDATE esp_credenciais SET
@@ -197,8 +193,6 @@ function ativarPendente(linha, { porMesh = false } = {}) {
       rotacionadoEm = datetime('now')
     WHERE deviceId = ? AND segredoHashPendente IS NOT NULL
   `).run(expira, linha.deviceId);
-  // A session already open with the generation that just became the previous one (the activation
-  // came through another channel, such as an HTTP heartbeat) ends with the grace period as well.
   try {
     require("./deviceHub").prazoParaSessaoDaGeracaoAnterior(linha.sala, linha.deviceId, new Date(expira.replace(" ", "T") + "Z").toISOString(), { porMesh });
   } catch (erro) {
@@ -281,8 +275,6 @@ function verificar(deviceId, segredo) {
     ativarPendente(linha);
     ok = true;
   }
-  // The current secret was presented: its mesh key is derived here when missing (credentials
-  // created before mesh support), so the board can later join through a gateway.
   if (ok) {
     const chave = chaveMeshDe(segredo);
     db.prepare(`UPDATE esp_credenciais SET chaveMesh = ? WHERE deviceId = ? AND segredoHash = ? AND (chaveMesh IS NULL OR chaveMesh <> ?)`)
@@ -301,10 +293,6 @@ function verificar(deviceId, segredo) {
   return { sala: linha.sala, grace, expiraEm };
 }
 
-/**
- * Mesh keys a board may prove, newest generation first: current, pending (a rotation the board may
- * already have stored) and previous during its grace period. Null when revoked or unknown.
- */
 function chavesMeshPara(deviceId) {
   if (typeof deviceId !== "string" || !RE_DEVICE_ID.test(deviceId)) return null;
   const linha = db.prepare(`SELECT * FROM esp_credenciais WHERE deviceId = ? AND revogadoEm IS NULL`).get(deviceId);
@@ -314,8 +302,6 @@ function chavesMeshPara(deviceId) {
   if (linha.chaveMeshPendente) chaves.push({ geracao: "pendente", chave: Buffer.from(linha.chaveMeshPendente, "hex") });
   if (linha.chaveMeshAnterior && linha.anteriorExpiraEm) {
     const expiraMs = new Date(linha.anteriorExpiraEm.replace(" ", "T") + "Z").getTime();
-    // The deadline travels with the key: a mesh session opened with it must end when the grace period
-    // does, exactly like a direct connection (deviceHub closes it once `expiraEm` passes).
     if (Number.isFinite(expiraMs) && expiraMs > Date.now()) {
       chaves.push({ geracao: "anterior", chave: Buffer.from(linha.chaveMeshAnterior, "hex"), expiraEm: new Date(expiraMs).toISOString() });
     }
@@ -323,7 +309,6 @@ function chavesMeshPara(deviceId) {
   return { sala: linha.sala, deviceId, chaves };
 }
 
-/** A board proved the pending generation through a gateway: same effect as presenting it directly. */
 function ativarPendentePorMesh(deviceId) {
   const linha = db.prepare(`SELECT * FROM esp_credenciais WHERE deviceId = ? AND revogadoEm IS NULL`).get(deviceId);
   if (linha && linha.segredoHashPendente) ativarPendente(linha, { porMesh: true });
