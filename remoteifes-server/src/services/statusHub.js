@@ -16,6 +16,7 @@ const MAX_PAYLOAD_BYTES = 8 * 1024;
 let wss = null;
 let intervaloPing = null;
 let intervaloRebroadcast = null;
+let difusaoPendente = null;
 const salaObservadaPorCliente = new WeakMap();
 const dispositivosObservadosPorCliente = new WeakMap();
 const janelaMensagensPorCliente = new WeakMap();
@@ -135,6 +136,14 @@ function notificarTodos() {
     [...validadas.values()].filter((u) => u && !u.isAdmin && u.podeControlar).map((u) => u.id)
   );
   destinatarios.forEach((ws) => notificarCliente(ws, contexto, validadas));
+}
+
+function agendarNotificarTodos() {
+  if (difusaoPendente) return;
+  difusaoPendente = setImmediate(() => {
+    difusaoPendente = null;
+    notificarTodos();
+  });
 }
 
 function notificarObservadoresDaSala({ sala }) {
@@ -295,7 +304,7 @@ function iniciar(server) {
   intervaloRebroadcast = setInterval(notificarTodos, REBROADCAST_MS);
   intervaloRebroadcast.unref();
 
-  salasService.eventos.on("mudanca", notificarTodos);
+  salasService.eventos.on("mudanca", agendarNotificarTodos);
   salasService.eventos.on("mudanca-sala", notificarObservadoresDaSala);
   salasService.eventos.on("cadastro-dispositivo", notificarCadastroDeDispositivo);
   configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
@@ -310,7 +319,11 @@ function encerrar() {
     clearInterval(intervaloRebroadcast);
     intervaloRebroadcast = null;
   }
-  salasService.eventos.removeListener("mudanca", notificarTodos);
+  if (difusaoPendente) {
+    clearImmediate(difusaoPendente);
+    difusaoPendente = null;
+  }
+  salasService.eventos.removeListener("mudanca", agendarNotificarTodos);
   salasService.eventos.removeListener("mudanca-sala", notificarObservadoresDaSala);
   salasService.eventos.removeListener("cadastro-dispositivo", notificarCadastroDeDispositivo);
   configuracoesService.eventos.removeListener("mudanca-manutencao", notificarStatusServidorParaTodos);

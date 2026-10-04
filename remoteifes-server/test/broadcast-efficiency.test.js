@@ -54,6 +54,19 @@ function contarConsultas(fn) {
   return n;
 }
 
+async function contarConsultasComDifusao(fn) {
+  const preparar = db.prepare.bind(db);
+  let n = 0;
+  db.prepare = (...a) => { n += 1; return preparar(...a); };
+  try {
+    fn();
+    await new Promise((r) => setImmediate(r));
+  } finally {
+    db.prepare = preparar;
+  }
+  return n;
+}
+
 function superadmin() {
   const registro = usuariosService.buscarPorId(db.prepare("SELECT id FROM usuarios WHERE nivel = 3").get().id);
   return { ...registro, isAdmin: true };
@@ -85,10 +98,11 @@ test("the query cost of a rebroadcast does not grow with the number of connected
     conexoes.push(await cliente(tokenService.gerarToken(u.id), i % 2 ? "A-108" : "A-106"));
   }
   const supervisor = await cliente(tokenService.gerarToken(superadmin().id), "A-108");
+  assert.ok(await ate(() => [...conexoes, supervisor].every((c) => c.mensagens.some((m) => m.tipo === "status"))));
   const contexto = { usuario: superadmin(), origem: "manual" };
 
-  const comUm = contarConsultas(() => salasService.aplicarComando("A-108", "temperatura", 23, contexto));
-  const comTodos = contarConsultas(() => salasService.aplicarComando("A-108", "temperatura", 24, contexto));
+  const comUm = await contarConsultasComDifusao(() => salasService.aplicarComando("A-108", "temperatura", 23, contexto));
+  const comTodos = await contarConsultasComDifusao(() => salasService.aplicarComando("A-108", "temperatura", 24, contexto));
   assert.ok(comTodos <= 20, `rebroadcast to 13 clients cost ${comTodos} queries`);
   assert.ok(Math.abs(comTodos - comUm) <= 2, `the cost must be independent of the number of clients (${comUm} vs ${comTodos})`);
   assert.ok(await ate(() => conexoes.every((c) => c.ultimaLista() && c.ultimaLista().salas.length > 0)));
@@ -134,6 +148,21 @@ test("a session ended elsewhere is dropped by batch validation and the others ke
   assert.ok(await ate(() => ca.fechamento() === 4001));
   assert.ok(await ate(() => cb.ultimaLista()));
   assert.equal(cb.fechamento(), null);
+});
+
+test("changes to many rooms in the same tick reach each browser as a single room list", async () => {
+  const u = usuariosService.criar({ usuario: "rajada-1", senha: "SenhaFanout123", nome: "Rajada", podeControlar: true }, SUPER);
+  const c = await cliente(tokenService.gerarToken(u.id));
+  await esperar(50);
+  const antes = c.mensagens.filter((m) => m.tipo === "salas").length;
+  const salas = ["A-201a", "A-201b", "A-201c", "A-202", "A-203", "A-204", "A-205", "A-206", "A-207", "A-209"];
+  for (const sala of salas) salasService.aplicarComando(sala, "ligar", undefined, { usuario: null, origem: "agendamento" });
+  assert.ok(await ate(() => c.mensagens.filter((m) => m.tipo === "salas").length > antes));
+  await esperar(100);
+  const listas = c.mensagens.filter((m) => m.tipo === "salas");
+  assert.equal(listas.length - antes, 1);
+  const ultima = listas.at(-1).salas;
+  assert.ok(salas.every((sala) => ultima.find((s) => s.sala === sala).ligado));
 });
 
 test("device telemetry costs no query for browsers that do not observe that device", async () => {
