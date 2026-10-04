@@ -13,6 +13,17 @@ const ENDERECO = process.env.BIND_ADDR || "0.0.0.0";
 const server = http.createServer(app);
 statusHub.iniciar(server);
 deviceHub.iniciar(server);
+server.on("upgrade", (req, socket) => {
+  let pathname;
+  try {
+    ({ pathname } = new URL(req.url, "http://localhost"));
+  } catch (erro) {
+    return;
+  }
+  if (pathname === "/ws" || pathname === "/ws/dispositivo") return;
+  socket.once("finish", () => socket.destroy());
+  socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+});
 
 server.on("error", (erro) => {
   if (erro.code === "EADDRINUSE") {
