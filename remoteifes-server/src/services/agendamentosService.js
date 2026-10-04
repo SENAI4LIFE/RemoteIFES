@@ -95,6 +95,7 @@ function validarConflito(sala, novoAg, ignorarId = null) {
 }
 
 function criar({ sala, usuarioId, data, horaInicio, horaFim, temperatura, modo, ligarInicio, ligarFim }) {
+  if (typeof sala !== "string") throw new Error("sala inválida");
   const salaRow = buscarSala(sala);
   if (!salaRow) throw new Error("sala não encontrada");
 
@@ -201,8 +202,6 @@ function jaExecutadoHoje(agendamentoId, tipo, dataISO) {
   return !!linha;
 }
 
-// Previous-day schedules that turned the air conditioner on and whose shutdown never ran (the
-// server stopped before the interval ended and only came back after midnight).
 function listarDesligamentosPendentesDeOntem(dataISO = dataAtualBrasiliaISO()) {
   return db.prepare(`
     SELECT a.*
