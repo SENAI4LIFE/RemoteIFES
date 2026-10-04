@@ -19,13 +19,6 @@ let wss = null;
 let intervaloPing = null;
 let proximoIdCaptura = 1;
 
-// --- Transport boundary -------------------------------------------------------------------------
-//
-// A connection entry is the logical device: room, identity, desired-state confirmation, telemetry,
-// firmware and command status. How frames reach it is its channel: a direct WebSocket (the default)
-// or a mesh session relayed by a gateway board (meshService). Everything in this module talks to the
-// channel; only the direct channel knows about a socket.
-
 function canalDireto(ws) {
   return {
     transporte: "direto",
@@ -123,15 +116,11 @@ function estadoPublico(sala) {
   };
 }
 
-// A command socket is open for the room (in-memory state only: "online" through an HTTP heartbeat
-// is not enough to deliver a command).
 function canalDeComandos(sala) {
   const entrada = conexoes.get(sala);
   return canalAberto(entrada);
 }
 
-// true/false: the connected board has (or has not) reported the current desired state; null: no
-// board or no IR.
 function estadoConfirmado(salaRow, entrada = conexoes.get(salaRow?.sala)) {
   if (!salaRow || !entrada || !Number.isInteger(salaRow.irProtocolo)) return null;
   return entrada.versaoConfirmada === salaRow.estadoVersao;
@@ -207,10 +196,6 @@ function enviarComando(sala, payload) {
   return true;
 }
 
-// An administrative IR test (send_raw, send_known_state without version) changes the appliance
-// state without going through intent: a version the board echoes afterwards no longer proves it is
-// in the desired state until newer intent is sent. Firmware <= 4.3.0 keeps echoing the last
-// received version after a test, so the invalidation lives on the server.
 function enviarTesteIR(sala, payload) {
   if (!enviarComando(sala, payload)) return false;
   const entrada = conexoes.get(sala);
@@ -286,8 +271,6 @@ function atualizarFailsafeReportado(entrada, msg) {
   return true;
 }
 
-// Firmware without version echo (<= 4.2.0): the last reported IR command matches the current
-// intent.
 function relatoCondizComIntencao(salaRow, ultimoComando) {
   if (!ultimoComando || typeof ultimoComando !== "object" || ultimoComando.tipo !== "known_state") return false;
   return ultimoComando.protocol === salaRow.irProtocolo
@@ -296,13 +279,6 @@ function relatoCondizComIntencao(salaRow, ultimoComando) {
     && !!ultimoComando.turbo === !!salaRow.turboAtivo;
 }
 
-// Reconciles a board report (info, telemetry or failsafe_status) with the persisted intent. A
-// report only affects intent when it provably reflects the current version: through the echoed
-// version (firmware >= 4.3.0) or, without echo, when this connection has already confirmed the
-// current version (message order on the socket guarantees the report is later). The local OFF latch
-// reported in the connection's info is always adopted, as before, unless an explicit command
-// already left on this connection before it (see sincronizarEstadoInicial). Returns true when
-// confirmation changed.
 function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
   let salaRow = salasService.buscar(sala);
   if (!salaRow) return false;
@@ -336,20 +312,14 @@ function sincronizarEstadoInicial(sala, entrada, info) {
   }
   if (entrada.estadoInicialSincronizado || conexoes.get(sala) !== entrada || !canalAberto(entrada)) return;
   entrada.estadoInicialSincronizado = true;
-  // An explicit command already left on this connection before the info (or the wait): the info
-  // describes the board before that command, so it must not adopt a latch or erase the newer
-  // intent, and restoration would be redundant because the current intent was already sent with its
-  // version.
   if (entrada.versaoEnviada !== null) {
     if (info && reconciliarRelato(sala, entrada, info)) salasService.eventos.emit("mudanca-sala", { sala });
     return;
   }
   if (info) {
-    reconciliarRelato(sala, entrada, info, { inicial: true });
+    if (reconciliarRelato(sala, entrada, info, { inicial: true })) salasService.eventos.emit("mudanca-sala", { sala });
     if (info.failsafeLatched === true) return;
   }
-  // Automatic restoration is flagged so the firmware does not treat it as an explicit command (a
-  // board latched in local OFF ignores it and answers with failsafe_status).
   const comandoInicial = salasService.comandoEstadoIR(salasService.buscar(sala));
   if (comandoInicial) {
     try {
@@ -428,10 +398,6 @@ function registrarCaptura(sala, entrada, msg, salaRow) {
   eventos.emit("captura", { sala, captura });
 }
 
-/**
- * Registers an authenticated device on its channel. Shared by the direct WebSocket and by a mesh
- * session: the logical device is the same, only the channel differs.
- */
 function conectarDispositivo({ sala, mac, viaCredencial, deviceId, ip, credencialGrace = null, canal, mesh = null }) {
   const agora = new Date().toISOString();
 
@@ -481,8 +447,6 @@ function conectarDispositivo({ sala, mac, viaCredencial, deviceId, ip, credencia
   } catch (erro) {
     logger.warn("device-ws-sincronizacao-inicial-falhou", { sala, mensagem: erro.message });
   }
-  // setImmediate: after a long event-loop pause, an info already received on the socket is
-  // processed (I/O phase) before this timeout-driven synchronization.
   entrada.sincronizacaoInicial = setTimeout(() => setImmediate(() => sincronizarEstadoInicial(sala, entrada, null)), ESPERA_INFO_INICIAL_MS);
   entrada.sincronizacaoInicial.unref();
   if (viaCredencial) {
@@ -502,9 +466,6 @@ function conectarDispositivo({ sala, mac, viaCredencial, deviceId, ip, credencia
   return entrada;
 }
 
-/**
- * Handles one message from a device, whatever channel carried it.
- */
 function processarMensagem(sala, entrada, msg, salaAtual) {
   if (msg.tipo === "telemetria") {
     registrarTelemetria(sala, entrada, msg);
@@ -571,8 +532,6 @@ function desconectarDispositivo(sala, entrada, code, motivo) {
     logger.warn("device-ws-ota-desconectar-falhou", { sala, mensagem: erro.message });
   }
   if (entrada.canal.transporte === "direto") {
-    // A gateway that goes away takes its mesh sessions with it: gateway availability never proved
-    // the boards behind it, and their absence is now certain.
     try {
       require("./meshService").aoDesconectarGateway(sala);
     } catch (erro) {
@@ -582,8 +541,6 @@ function desconectarDispositivo(sala, entrada, code, motivo) {
   eventos.emit("conexao", { sala, conectado: false });
 }
 
-// A gateway's socket carries the traffic of the boards behind it, so its message budget grows with
-// the authenticated nodes it serves, within a hard ceiling.
 function limiteDeMensagens(sala) {
   let nos = 0;
   try {
@@ -663,7 +620,6 @@ function iniciar(server) {
         return;
       }
       if (!msg || typeof msg.tipo !== "string") return;
-      // Frames a gateway relays for the boards behind it. They never reach the room's own handling.
       if (msg.tipo === "mesh" || msg.tipo === "mesh_evento") {
         require("./meshService").doGateway(sala, entrada, msg);
         return;
@@ -679,7 +635,6 @@ function iniciar(server) {
   intervaloPing = setInterval(() => {
     conexoes.forEach((entrada, sala) => {
       if (encerrarSeCredencialExpirou(sala, entrada)) return;
-      // Mesh sessions have their own liveness (meshService); only sockets are pinged here.
       if (entrada.canal.transporte !== "direto") return;
       const ws = entrada.canal.ws;
       if (!ws.isAlive) {
@@ -704,12 +659,6 @@ function encerrarSeCredencialExpirou(sala, entrada) {
   return true;
 }
 
-// A rotation was activated through another channel. An open session of this device without a
-// deadline was authenticated with the generation that has just become the previous one: it gets that
-// generation's deadline. A session that already had a deadline was on the generation now dropped,
-// which no longer authenticates at all: it is closed at once. A connection that activates is a new
-// one and replaces this entry; a mesh handshake that activates (`porMesh`) re-keys this same session,
-// and meshService sets its deadline from the generation it proved.
 function prazoParaSessaoDaGeracaoAnterior(sala, deviceId, expiraEm, { porMesh = false } = {}) {
   const entrada = conexoes.get(sala);
   if (!entrada || !entrada.viaCredencial || entrada.deviceId !== deviceId) return false;
