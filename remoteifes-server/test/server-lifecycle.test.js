@@ -145,3 +145,28 @@ test("a second instance started by mistake leaves the running server's sessions 
     fs.rmSync(dados, { recursive: true, force: true });
   }
 });
+
+test("an upgrade request to an unknown path is answered and closed instead of held open", async () => {
+  const porta = await portaLivre();
+  const servidor = iniciar(porta);
+  try {
+    assert.ok(await esperar(() => saudavel(porta)), "the server should answer on /health");
+    for (const caminho of ["/x", "/ws/outro", "/wsx?a=1"]) {
+      const resultado = await new Promise((resolve) => {
+        const socket = net.connect(porta, "127.0.0.1", () => {
+          socket.write(`GET ${caminho} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n`);
+        });
+        let resposta = "";
+        socket.on("data", (d) => { resposta += d; });
+        socket.on("close", () => resolve({ fechado: true, resposta }));
+        socket.on("error", () => {});
+        setTimeout(() => { socket.destroy(); resolve({ fechado: false, resposta }); }, 3000);
+      });
+      assert.equal(resultado.fechado, true, `${caminho} must not stay open`);
+      assert.match(resultado.resposta, /^HTTP\/1\.1 404/, caminho);
+    }
+  } finally {
+    servidor.filho.send({ encerrar: "SIGTERM" });
+    await servidor.encerrado;
+  }
+});
