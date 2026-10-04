@@ -10,8 +10,6 @@ const logger = require("./src/utils/logger");
 const PORTA = process.env.PORTA || 8080;
 const ENDERECO = process.env.BIND_ADDR || "0.0.0.0";
 
-encerrarSessoesAtivasNoInicio();
-
 const server = http.createServer(app);
 statusHub.iniciar(server);
 deviceHub.iniciar(server);
@@ -37,6 +35,7 @@ server.on("error", (erro) => {
 });
 
 server.listen(PORTA, ENDERECO, () => {
+  encerrarSessoesAtivasNoInicio();
   logger.info("startup", { porta: PORTA, endereco: ENDERECO, ambiente: process.env.NODE_ENV || "development" });
   console.log(`Servidor RemoteIFES rodando em http://localhost:${PORTA}`);
   iniciarScheduler();
@@ -73,8 +72,6 @@ function encerrarComGraciosidade(sinal) {
     }
     process.exit(0);
   });
-  // Drops remaining keep-alive/WebSocket connections so the port is released immediately, without
-  // waiting for the safety timeout below.
   if (typeof server.closeAllConnections === "function") server.closeAllConnections();
   setTimeout(() => process.exit(0), 5000).unref();
 }

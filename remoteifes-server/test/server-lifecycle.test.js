@@ -1,6 +1,3 @@
-// Server process lifecycle: startup, graceful shutdown on signal and port in use. POSIX signal
-// delivery does not exist on Windows, so the test triggers the same handler inside the child
-// process (process.emit); the shutdown path exercised is the real one.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
@@ -20,9 +17,7 @@ fs.writeFileSync(
 test.after(() => {
   try {
     fs.rmSync(PRELOAD, { force: true });
-  } catch (erro) {
-    /* temporary file already removed */
-  }
+  } catch (erro) {}
 });
 
 function portaLivre() {
@@ -98,7 +93,6 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
     );
     assert.doesNotMatch(servidor.texto(), /uncaught-exception/);
 
-    // The port must actually be released for an immediate new startup.
     const liberada = await ocupar(porta);
     await new Promise((r) => liberada.close(r));
 
@@ -121,5 +115,33 @@ test("a port in use produces a clear error, without an unhandled exception stack
     assert.doesNotMatch(texto, /at Server\.|Error: listen EADDRINUSE/);
   } finally {
     await new Promise((r) => bloqueio.close(r));
+  }
+});
+
+test("a second instance started by mistake leaves the running server's sessions alone", async () => {
+  const porta = await portaLivre();
+  const dados = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-lifecycle-"));
+  const extras = { REMOTEIFES_DATA_DIR: dados, SENHA_ADMIN_INICIAL: "ciclo-de-vida-senha-teste" };
+  const servidor = iniciar(porta, extras);
+  try {
+    assert.ok(await esperar(() => saudavel(porta)), "the server should answer on /health");
+    const login = await fetch(`http://127.0.0.1:${porta}/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ usuario: "superadmin", senha: extras.SENHA_ADMIN_INICIAL }),
+    });
+    const { token } = await login.json();
+    assert.ok(token, "login should return a token");
+
+    const segunda = iniciar(porta, extras);
+    assert.equal(await segunda.encerrado, 1, segunda.texto());
+    assert.match(segunda.texto(), new RegExp(`Porta ${porta} já está em uso`));
+
+    const me = await fetch(`http://127.0.0.1:${porta}/me`, { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(me.status, 200, "the running instance's session must survive the failed second start");
+  } finally {
+    servidor.filho.send({ encerrar: "SIGTERM" });
+    await servidor.encerrado;
+    fs.rmSync(dados, { recursive: true, force: true });
   }
 });
