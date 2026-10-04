@@ -13,6 +13,7 @@ const deviceHub = require("../src/services/deviceHub");
 const salasService = require("../src/services/salasService");
 const usuariosService = require("../src/services/usuariosService");
 const tokenService = require("../src/services/tokenService");
+const configuracoesService = require("../src/services/configuracoesService");
 
 let server;
 let porta;
@@ -134,6 +135,44 @@ test("authorization stays fresh: revoking access or disabling the account takes 
   salasService.eventos.emit("mudanca");
   assert.ok(await ate(() => c.fechamento() !== null));
   assert.equal(c.fechamento(), 4001, "a disabled account's session is closed by batch validation");
+});
+
+test("granting, revoking and restricting reach open browsers without waiting for the periodic rebroadcast", async () => {
+  const u = usuariosService.criar({ usuario: "fanout-imediato", senha: "SenhaFanout123", nome: "Imediato", podeControlar: true }, SUPER);
+  const c = await cliente(tokenService.gerarToken(u.id));
+  const podeA105 = () => c.ultimaLista().salas.find((s) => s.sala === "A-105").podeControlarEsta;
+  assert.equal(podeA105(), true);
+  salasService.definirAcessoRestrito("A-105", true);
+  assert.ok(await ate(() => podeA105() === false, 1000));
+  salasService.concederAcesso("A-105", u.id);
+  assert.ok(await ate(() => podeA105() === true, 1000));
+  salasService.revogarAcesso("A-105", u.id);
+  assert.ok(await ate(() => podeA105() === false, 1000));
+  salasService.concederDono("A-105", u.id);
+  assert.ok(await ate(() => podeA105() === true, 1000));
+  salasService.revogarDono("A-105", u.id);
+  assert.ok(await ate(() => podeA105() === false, 1000));
+  salasService.definirAcessoRestrito("A-105", false);
+  assert.ok(await ate(() => podeA105() === true, 1000));
+  usuariosService.atualizarPermissoes(u.id, { podeControlar: false }, { id: 0, nivel: 3 });
+  assert.ok(await ate(() => podeA105() === false, 1000));
+});
+
+test("during maintenance a level-1 socket receives only the server status, and the room list returns when it ends", async () => {
+  const u = usuariosService.criar({ usuario: "fanout-manutencao", senha: "SenhaFanout123", nome: "Manutenção", podeControlar: true }, SUPER);
+  const c = await cliente(tokenService.gerarToken(u.id), "A-110");
+  configuracoesService.validarEAtualizar({ modoManutencao: true }, { id: 0, nivel: 3 });
+  try {
+    assert.ok(await ate(() => c.mensagens.some((m) => m.tipo === "servidor" && m.manutencao === true)));
+    await esperar(50);
+    c.mensagens.length = 0;
+    salasService.aplicarComando("A-110", "ligar", undefined, { usuario: null, origem: "agendamento" });
+    await esperar(150);
+    assert.deepEqual(c.mensagens.filter((m) => m.tipo === "salas" || m.tipo === "status"), []);
+  } finally {
+    configuracoesService.validarEAtualizar({ modoManutencao: false }, { id: 0, nivel: 3 });
+  }
+  assert.ok(await ate(() => c.mensagens.some((m) => m.tipo === "salas")));
 });
 
 test("a session ended elsewhere is dropped by batch validation and the others keep receiving", async () => {

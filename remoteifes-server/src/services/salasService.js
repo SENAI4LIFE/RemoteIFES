@@ -58,11 +58,6 @@ function registrarDeteccaoEsp(mac, ip, sala = null) {
   }
 }
 
-// Discovery is unauthenticated: anyone who reaches /dispositivo can announce a MAC. The listing shows
-// the most recent DETECTADOS_MAX; storage keeps at most DETECTADOS_RETIDOS_MAX announcements not tied
-// to a room (oldest out first), so a stream of invented MACs cannot grow the table until the 30-day
-// retention. Runs on each new announcement and in the retention cycle, which also trims a database
-// that was already above the cap.
 function podarDetectados() {
   return Number(db.prepare(`
     DELETE FROM esp_detectados WHERE mac IN (
@@ -83,8 +78,6 @@ function identificarDispositivo(mac, ip) {
   return salaRow || null;
 }
 
-// Most recent only: a board without a room re-announces itself every 15 s, so it is always among
-// the first, and the list does not grow with spurious identities kept by retention.
 function listarDetectados() {
   return db.prepare(`
     SELECT d.* FROM esp_detectados d
@@ -132,9 +125,6 @@ function marcarOnline(sala, estadoReportado = {}, mac = null, ip = null, opcoes 
     logger.warn("esp32-indisponibilidade-fechamento-falhou", { sala, mensagem: erro.message });
   }
 
-  // "ligado" reported by the board echoes the last command it processed, never the intent: a late
-  // report cannot undo a command already persisted (the local OFF latch is adopted explicitly in
-  // adotarDesligamentoLocal, only from provably current reports).
   const temTemperatura = Object.prototype.hasOwnProperty.call(estadoReportado, "temperatura");
 
   db.prepare(`
@@ -214,6 +204,7 @@ function definirAcessoRestrito(sala, restrito) {
     sala
   );
   logger.info("sala-acesso-restrito-alterado", { sala, restrito: !!restrito });
+  eventos.emit("mudanca");
   return buscar(sala);
 }
 
@@ -236,11 +227,13 @@ function concederAcesso(sala, usuarioId) {
   if (!salaRow) throw new Error("sala não encontrada");
   exigirUsuario(usuarioId);
   db.prepare(`INSERT OR IGNORE INTO sala_acessos (sala, usuarioId) VALUES (?, ?)`).run(sala, usuarioId);
+  eventos.emit("mudanca");
   return listarUsuariosComAcesso(sala);
 }
 
 function revogarAcesso(sala, usuarioId) {
   db.prepare(`DELETE FROM sala_acessos WHERE sala = ? AND usuarioId = ?`).run(sala, usuarioId);
+  eventos.emit("mudanca");
   return listarUsuariosComAcesso(sala);
 }
 
@@ -306,11 +299,13 @@ function concederDono(sala, usuarioId) {
   if (!salaRow) throw new Error("sala não encontrada");
   exigirUsuario(usuarioId);
   db.prepare(`INSERT OR IGNORE INTO sala_donos (sala, usuarioId) VALUES (?, ?)`).run(sala, usuarioId);
+  eventos.emit("mudanca");
   return listarDonos(sala);
 }
 
 function revogarDono(sala, usuarioId) {
   db.prepare(`DELETE FROM sala_donos WHERE sala = ? AND usuarioId = ?`).run(sala, usuarioId);
+  eventos.emit("mudanca");
   return listarDonos(sala);
 }
 
@@ -346,7 +341,6 @@ function usuarioPodeControlarSala(usuario, sala, contexto = null) {
   if (!salaRow) return false;
   if (!salaRow.acessoRestrito) return true;
 
-  // An owner counts as authorized for their own room, exactly like an explicitly granted user.
   if (contexto) return contexto.acessosDe(usuario.id).has(sala) || contexto.salasDoDono(usuario.id).has(sala);
   return usuarioTemAcessoSala(usuario.id, sala) || usuarioEhDonoDaSala(usuario.id, sala);
 }
@@ -533,8 +527,6 @@ function comandoEstadoIR(salaAtualizada) {
   };
 }
 
-// Resends the current desired state to every board; the version was already advanced in the
-// transaction that changed the intent (see configuracoesService.validarEAtualizar).
 function reenviarEstadoIRParaTodas() {
   const deviceHub = require("./deviceHub");
   for (const salaRow of listar()) {
@@ -694,10 +686,6 @@ function apagarLogs({ data } = {}) {
   }
 }
 
-// The local OFF latched on the board becomes the server's intent. The state version does not
-// advance:
-// the board is already in the adopted state, and only an explicit command (which advances the
-// version) clears the latch.
 function adotarDesligamentoLocal(sala, { naReconexao = true } = {}) {
   const salaRow = buscar(sala);
   if (!salaRow) throw new Error("sala não encontrada");
@@ -799,8 +787,6 @@ function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = nu
   return atualizada;
 }
 
-// Did the room's intent change (manual or scheduled command, adopted local OFF) after the given
-// instant (UTC in SQLite datetime('now') format)?
 function intencaoAlteradaDesde(sala, instanteUtcSqlite) {
   return !!db.prepare(`
     SELECT 1 FROM comandos_log
