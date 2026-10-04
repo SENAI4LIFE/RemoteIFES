@@ -136,6 +136,30 @@ test("a session ended elsewhere is dropped by batch validation and the others ke
   assert.equal(cb.fechamento(), null);
 });
 
+test("device telemetry costs no query for browsers that do not observe that device", async () => {
+  const ociosos = [];
+  for (let i = 0; i < 12; i += 1) {
+    const u = usuariosService.criar({ usuario: `telemetria-${i}`, senha: "SenhaFanout123", nome: `Telemetria ${i}`, podeControlar: true }, SUPER);
+    ociosos.push(await cliente(tokenService.gerarToken(u.id), "A-201a"));
+  }
+  const tokenSuper = tokenService.gerarToken(superadmin().id);
+  const observador = await cliente(tokenSuper);
+  const doDispositivo = (c) => c.mensagens.filter((m) => m.tipo === "dispositivo_status" && m.sala === "A-110");
+  observador.ws.send(JSON.stringify({ tipo: "observar_dispositivo", sala: "A-110" }));
+  assert.ok(await ate(() => doDispositivo(observador).length === 1));
+
+  const evento = { sala: "A-110", estado: { conectado: true } };
+  const consultas = contarConsultas(() => deviceHub.eventos.emit("telemetria", evento));
+  assert.ok(consultas <= 3, `one telemetry frame cost ${consultas} queries with idle browsers connected`);
+  assert.ok(await ate(() => doDispositivo(observador).length === 2));
+  assert.ok(ociosos.every((c) => doDispositivo(c).length === 0));
+
+  tokenService.removerToken(tokenSuper);
+  deviceHub.eventos.emit("telemetria", evento);
+  assert.ok(await ate(() => observador.fechamento() === 4001));
+  assert.equal(doDispositivo(observador).length, 2, "an ended session receives nothing more");
+});
+
 test("the IR state goes to the board before the rebroadcast to browsers", (t) => {
   const ordem = [];
   t.mock.method(deviceHub, "enviarComando", () => { ordem.push("esp32"); return true; });
