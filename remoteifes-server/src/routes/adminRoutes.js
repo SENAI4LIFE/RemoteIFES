@@ -240,9 +240,6 @@ router.delete("/admin/acessos", (req, res) => {
 router.get("/admin/salas", (req, res) => {
   const salas = salasService.listarAdministrativo();
   if (req.usuario.nivel === usuariosService.NIVEL_SUPERADMIN) return res.json(salas);
-  // MAC and board address belong to device registration, which is the superadministrator's: in a
-  // room still on MAC-only authentication the MAC is what admits the board. Level 2 uses this list
-  // for room names (log filters, room owners) and gets it without them.
   res.json(salas.map(({ mac, ipEsp32, ...sala }) => sala));
 });
 
@@ -261,8 +258,9 @@ router.delete("/admin/esp32/detectados/:mac", exigirSuperAdmin, (req, res) => {
 });
 
 router.patch("/admin/salas/:sala/acesso-restrito", exigirSuperAdmin, (req, res) => {
+  if (typeof req.body?.restrito !== "boolean") return res.status(400).json({ ok: false, erro: "restrito deve ser verdadeiro ou falso" });
   try {
-    const sala = salasService.definirAcessoRestrito(req.params.sala, !!req.body.restrito);
+    const sala = salasService.definirAcessoRestrito(req.params.sala, req.body.restrito);
     auditar({ tipo: "sala_acesso_alterado", ator: req.usuario, alvoTipo: "sala", alvoId: sala.sala, alvoRotulo: sala.sala, descricao: `Restricao de acesso da sala ${sala.sala} alterada`, camposAlterados: ["acessoRestrito"] });
     res.json({ ok: true, sala });
   } catch (err) {

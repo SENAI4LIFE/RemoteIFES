@@ -69,6 +69,11 @@ function buscarPorUsuario(usuario) {
   return db.prepare(`SELECT * FROM usuarios WHERE usuario = ?`).get(usuario);
 }
 
+function loginEmUso(login, ignorarId = null) {
+  const linha = db.prepare(`SELECT id FROM usuarios WHERE usuario = ? COLLATE NOCASE AND id != ?`).get(login, ignorarId ?? 0);
+  return !!linha;
+}
+
 function buscarPorId(id) {
   return db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(id);
 }
@@ -80,11 +85,12 @@ function senhaPadraoAtiva(usuario) {
 }
 
 function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {
+  booleanoOpcional(podeControlar, "podeControlar");
+  booleanoOpcional(isAdmin, "isAdmin");
   const loginLimpo = limparLogin(usuario);
   const nomeLimpo = limparNome(nome);
 
-  const existente = buscarPorUsuario(loginLimpo);
-  if (existente) throw new Error("já existe um usuário com esse login");
+  if (loginEmUso(loginLimpo)) throw new Error("já existe um usuário com esse login");
 
   if (isAdmin && (!requisitante || requisitante.nivel !== NIVEL_SUPERADMIN)) {
     throw new Error("apenas o superadministrador pode conceder privilégios de administrador");
@@ -190,8 +196,7 @@ function trocarLogin(id, novoLogin, requisitante) {
   exigirPermissaoSobreAlvo(usuario, requisitante);
 
   const loginLimpo = limparLogin(novoLogin);
-  const existente = buscarPorUsuario(loginLimpo);
-  if (existente && existente.id !== id) throw new Error("já existe um usuário com esse login");
+  if (loginEmUso(loginLimpo, id)) throw new Error("já existe um usuário com esse login");
 
   db.prepare(`UPDATE usuarios SET usuario = ? WHERE id = ?`).run(loginLimpo, id);
   return paraSaida(buscarPorId(id));
@@ -215,6 +220,7 @@ function remover(id, requisitante) {
   const usuario = buscarPorId(id);
   if (!usuario) throw new Error("usuário não encontrado");
   if (usuario.nivel === NIVEL_SUPERADMIN) throw new Error("não é possível remover o superadministrador");
+  if (requisitante && requisitante.id === id) throw new Error("não é possível remover a própria conta");
   exigirPermissaoSobreAlvo(usuario, requisitante);
 
   db.exec("BEGIN");

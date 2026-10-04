@@ -9,6 +9,7 @@ const db = require("../src/config/database");
 const app = require("../src/app");
 const usuariosService = require("../src/services/usuariosService");
 const agendamentos = require("../src/services/agendamentosService");
+const configuracoesService = require("../src/services/configuracoesService");
 const { dataAtualBrasiliaISO } = require("../src/utils/tempo");
 
 let server;
@@ -288,4 +289,55 @@ test("a command answer carries the board's MAC and address only for the superadm
   } finally {
     db.prepare("UPDATE salas SET mac = NULL, ipEsp32 = NULL WHERE sala = 'A-107'").run();
   }
+});
+
+test("flags that grant or restrict access accept only real booleans", async () => {
+  for (const campo of ["isAdmin", "podeControlar"]) {
+    const resp = await chamar("/admin/usuarios", { method: "POST", token: tokenSuper, body: { usuario: `norm-flag-${campo}`, senha: "senhaSegura123", nome: "Flag", [campo]: "false" } });
+    assert.equal(resp.status, 400, campo);
+    assert.equal(usuariosService.buscarPorUsuario(`norm-flag-${campo}`), undefined);
+  }
+  for (const campo of ["modoManutencao", "autoLigar", "espCredenciaisObrigatorias", "espApExigirCredencial"]) {
+    const antes = configuracoesService.obter()[campo];
+    const resp = await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { [campo]: "false" } });
+    assert.equal(resp.status, 400, campo);
+    assert.equal(configuracoesService.obter()[campo], antes, campo);
+  }
+  const restrito = await chamar("/admin/salas/A-105/acesso-restrito", { method: "PATCH", token: tokenSuper, body: { restrito: "false" } });
+  assert.equal(restrito.status, 400);
+  assert.equal(db.prepare("SELECT acessoRestrito FROM salas WHERE sala = 'A-105'").get().acessoRestrito, 0);
+  assert.equal((await chamar("/admin/salas/A-105/acesso-restrito", { method: "PATCH", token: tokenSuper, body: { restrito: false } })).status, 200);
+});
+
+test("idle timeouts are bounded so a save cannot end every session within seconds", async () => {
+  for (const valor of [0.05, 0.4, true, [5], 1e12, 10081]) {
+    const resp = await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { timeoutInatividadeAdminMinutos: valor } });
+    assert.equal(resp.status, 400, JSON.stringify(valor));
+  }
+  assert.equal((await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { popupAvisoSegundos: 5 } })).status, 400);
+  assert.equal((await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { limiarOnlineMinutos: 0.5 } })).status, 400);
+  assert.equal(configuracoesService.obter().timeoutInatividadeAdminMinutos, 720);
+  assert.equal((await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { timeoutInatividadeMinutos: 1 } })).status, 200);
+  assert.equal((await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { timeoutInatividadeMinutos: 60 } })).status, 200);
+});
+
+test("an administrator cannot remove their own account", async () => {
+  const conta = usuariosService.criar({ usuario: "norm-auto-remocao", senha: "senhaSegura123", nome: "Auto", podeControlar: true, isAdmin: true }, { nivel: 3 });
+  const token = (await login("norm-auto-remocao", "senhaSegura123")).corpo.token;
+  const resp = await chamar(`/admin/usuarios/${conta.id}`, { method: "DELETE", token });
+  assert.equal(resp.status, 400);
+  assert.ok(usuariosService.buscarPorId(conta.id));
+  assert.equal((await chamar(`/admin/usuarios/${conta.id}`, { method: "DELETE", token: tokenSuper })).status, 200);
+});
+
+test("a login that differs from an existing one only in letter case is refused", async () => {
+  const original = usuariosService.criar({ usuario: "norm-caixa", senha: "senhaSegura123", nome: "Caixa" }, { nivel: 3 });
+  const outro = usuariosService.criar({ usuario: "norm-outro", senha: "senhaSegura123", nome: "Outro" }, { nivel: 3 });
+  const criar = await chamar("/admin/usuarios", { method: "POST", token: tokenSuper, body: { usuario: "Norm-Caixa", senha: "senhaSegura123", nome: "Imitação" } });
+  assert.equal(criar.status, 400);
+  const renomear = await chamar(`/admin/usuarios/${outro.id}/login`, { method: "PATCH", token: tokenSuper, body: { novoLogin: "NORM-CAIXA" } });
+  assert.equal(renomear.status, 400);
+  const propria = await chamar(`/admin/usuarios/${original.id}/login`, { method: "PATCH", token: tokenSuper, body: { novoLogin: "Norm-Caixa" } });
+  assert.equal(propria.status, 200);
+  assert.equal(usuariosService.buscarPorId(original.id).usuario, "Norm-Caixa");
 });
