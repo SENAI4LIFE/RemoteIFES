@@ -368,3 +368,14 @@ test("a schedule with a non-text room and a relato with non-text fields are refu
   assert.equal(relato.status, 200);
   assert.equal(relato.corpo.relato.titulo, "a".repeat(139), "a character is never cut in half");
 });
+
+test("a value stored before the bounds existed does not block saving the rest of the settings form", async () => {
+  db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('timeoutInatividadeMinutos', '20000') ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor").run();
+  try {
+    const resp = await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { timeoutInatividadeMinutos: 20000, autoLigar: true } });
+    assert.equal(resp.status, 200);
+    assert.equal((await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { timeoutInatividadeMinutos: 20001 } })).status, 400);
+  } finally {
+    assert.equal((await chamar("/admin/configuracoes", { method: "PATCH", token: tokenSuper, body: { timeoutInatividadeMinutos: 60 } })).status, 200);
+  }
+});

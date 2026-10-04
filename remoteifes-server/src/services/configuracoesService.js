@@ -209,7 +209,7 @@ function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {})
         throw new Error(`${chave} deve ser um número maior que zero`);
       }
       const [minimo, maximo] = LIMITES_NUMERICOS[chave] || [0, Infinity];
-      if (n < minimo || n > maximo) {
+      if (n !== Number(atual[chave]) && (n < minimo || n > maximo)) {
         throw new Error(maximo === Infinity ? `${chave} deve ser no mínimo ${minimo}` : `${chave} deve estar entre ${minimo} e ${maximo}`);
       }
       proximo[chave] = n;
