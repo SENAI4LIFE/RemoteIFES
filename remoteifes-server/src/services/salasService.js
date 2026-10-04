@@ -787,12 +787,12 @@ function aplicarInicioAgendamento(sala, temperatura, { registrarNaTransacao = nu
   return atualizada;
 }
 
-function intencaoAlteradaDesde(sala, instanteUtcSqlite) {
+function intencaoAlteradaDesde(sala, instanteUtcSqlite, { incluirAgendamentos = true } = {}) {
   return !!db.prepare(`
     SELECT 1 FROM comandos_log
-    WHERE sala = ? AND criadoEm > ? AND (origem IN ('manual', 'agendamento', 'desligamento_diario') OR cmd = 'failsafe_off_local')
+    WHERE sala = ? AND criadoEm > ? AND (origem IN ('manual', 'desligamento_diario') OR (? AND origem = 'agendamento') OR cmd = 'failsafe_off_local')
     LIMIT 1
-  `).get(sala, instanteUtcSqlite);
+  `).get(sala, instanteUtcSqlite, incluirAgendamentos ? 1 : 0);
 }
 
 function registrarAcessoEsp(sala, { ip, userAgent } = {}) {
