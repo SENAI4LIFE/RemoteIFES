@@ -49,7 +49,6 @@ async function conectar(codigo, mac) {
     mensagens,
     enviar: (m) => ws.send(JSON.stringify(m)),
     estados: () => mensagens.filter((m) => m.tipo === "send_known_state"),
-    // Waits for the server-side close (entry removed), not only for the socket in CLOSING.
     fechar: async () => { ws.close(); await ate(() => !deviceHub.estadoPublico(codigo).conectado); },
   };
 }
@@ -146,6 +145,22 @@ test("confirmation by the board is exposed to the panel and notifies only room o
   assert.ok(await ate(() => status("REL-3").dispositivoConfirmou === true));
   await d.fechar();
   assert.equal(status("REL-3").dispositivoConfirmou, null);
+});
+
+test("a board that reconnects already holding the current version notifies the room's observers", async (t) => {
+  sala("REL-RECON", "AA:BB:CC:E1:00:7F", false);
+  const primeira = await conectar("REL-RECON", "AA:BB:CC:E1:00:7F");
+  primeira.enviar({ tipo: "info", fw: "4.3.0", failsafeConfigurado: false, failsafeLatched: false });
+  assert.ok(await ate(() => primeira.estados().length === 1));
+  const versao = primeira.estados()[0].versao;
+  await primeira.fechar();
+
+  const d = await conectar("REL-RECON", "AA:BB:CC:E1:00:7F");
+  const mudancas = ouvirMudancasDeSala(t, "REL-RECON");
+  d.enviar({ tipo: "info", fw: "4.3.0", versao, failsafeConfigurado: false, failsafeLatched: false });
+  assert.ok(await ate(() => status("REL-RECON").dispositivoConfirmou === true));
+  assert.ok(await ate(() => mudancas.valor === 1), "the confirmation reached by the initial info notifies the room's observers");
+  await d.fechar();
 });
 
 test("firmware without version echo confirms through the last reported command", async () => {
