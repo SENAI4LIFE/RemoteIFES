@@ -17,7 +17,6 @@ const scheduler = require("../src/scheduler/schedulerService");
 const { dataAtualBrasiliaISO } = require("../src/utils/tempo");
 
 const ADMIN = { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true, nivel: 3 }, origem: "manual" };
-// 2026-09-06 19:59 in Brasília; the schedule turns on at 20:00 and should turn off at 23:30.
 const VESPERA_1959 = new Date("2026-09-06T22:59:00Z");
 const DIA_SEGUINTE_0010 = new Date("2026-09-07T03:10:00Z");
 
@@ -41,15 +40,11 @@ function superadmin() {
   return db.prepare("SELECT * FROM usuarios WHERE nivel = 3").get();
 }
 
-// The SQLite clock (datetime('now')) is not simulated by mock timers: previous-day records are
-// given the instant they would have been written explicitly.
 function datarRegistrosDaVespera(codigo, instanteUtc = "2026-09-06 23:00:00") {
   db.prepare("UPDATE comandos_log SET criadoEm = ? WHERE sala = ?").run(instanteUtc, codigo);
   db.prepare("UPDATE agendamentos_execucoes SET executadoEm = ? WHERE agendamentoId IN (SELECT id FROM agendamentos WHERE sala = ?)").run(instanteUtc, codigo);
 }
 
-// The scheduler turns the room on at 20:00 the day before and the server stops before 23:30
-// (crash), coming back at the given time the next day with the scheduler's initial pass.
 function simularQuedaAntesDoDesligar(t, codigo, criar, { retorno = DIA_SEGUINTE_0010 } = {}) {
   t.mock.timers.enable({ apis: ["Date", "setInterval", "setTimeout"], now: VESPERA_1959 });
   t.after(() => scheduler.pararScheduler());
@@ -111,11 +106,8 @@ test("recovery respects newer intent after the due time, but not an adjustment m
     return agendamentos.criar({ sala: "VD-2", usuarioId, data: dataAtualBrasiliaISO(), temperatura: 24, horaInicio: "20:00", horaFim: "22:00", modo: "ligar_intervalo", ligarInicio: "20:00", ligarFim: "21:30" });
   });
   datarRegistrosDaVespera("VD-3");
-  // VD-2: a manual adjustment at 21:00 (inside the interval, before the 21:30 due time) does not
-  // count as new intent.
   salasService.aplicarComando("VD-2", "temperatura", 25, ADMIN);
   db.prepare("UPDATE comandos_log SET criadoEm = '2026-09-07 00:00:00' WHERE sala = 'VD-2' AND origem = 'manual'").run();
-  // VD-3: someone turned the room on manually at 23:45, after the OFF was due.
   salasService.aplicarComando("VD-3", "ligar", undefined, ADMIN);
   db.prepare("UPDATE comandos_log SET criadoEm = '2026-09-07 02:45:00' WHERE sala = 'VD-3' AND origem = 'manual'").run();
 
@@ -181,4 +173,28 @@ test("on reconnecting after the restart, the board receives the recovered OFF, n
   assert.equal(estado.restauracao, true);
   assert.equal(estado.versao, linha("VD-7").estadoVersao);
   ws.close();
+});
+
+test("a manual command sent after the window ended, before the scheduler's tick, is not overridden by the schedule's OFF", (t) => {
+  sala("VD-MESMO-DIA");
+  sala("VD-CONTROLE");
+  t.mock.timers.enable({ apis: ["Date", "setInterval", "setTimeout"], now: VESPERA_1959 });
+  t.after(() => scheduler.pararScheduler());
+  const usuarioId = superadmin().id;
+  agendamentos.criar({ sala: "VD-MESMO-DIA", usuarioId, data: dataAtualBrasiliaISO(), temperatura: 24, horaInicio: "20:00", horaFim: "20:30" });
+  agendamentos.criar({ sala: "VD-CONTROLE", usuarioId, data: dataAtualBrasiliaISO(), temperatura: 24, horaInicio: "20:00", horaFim: "20:30" });
+  scheduler.iniciarScheduler();
+  t.mock.timers.tick(60000);
+  assert.equal(linha("VD-MESMO-DIA").ligado, 1);
+  datarRegistrosDaVespera("VD-MESMO-DIA");
+  datarRegistrosDaVespera("VD-CONTROLE");
+
+  t.mock.timers.setTime(new Date("2026-09-06T23:30:03Z").getTime());
+  salasService.aplicarComando("VD-MESMO-DIA", "ligar", undefined, ADMIN);
+  db.prepare("UPDATE comandos_log SET criadoEm = '2026-09-06 23:30:03' WHERE sala = 'VD-MESMO-DIA' AND origem = 'manual'").run();
+  t.mock.timers.tick(60000);
+  t.mock.timers.tick(60000);
+  assert.equal(linha("VD-MESMO-DIA").ligado, 1, "the newer manual intent prevails");
+  assert.deepEqual(logs("VD-MESMO-DIA"), ["ligar:agendamento", "temperatura:agendamento", "ligar:manual"]);
+  assert.equal(linha("VD-CONTROLE").ligado, 0, "without newer intent the schedule still turns the room off");
 });

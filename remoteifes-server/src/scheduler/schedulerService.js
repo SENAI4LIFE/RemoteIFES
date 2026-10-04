@@ -27,15 +27,11 @@ const BACKUP_AUTOMATICO = String(
 ).toLowerCase() === "true";
 const BACKUP_INTERVALO_MS = normalizarInteiro(process.env.BACKUP_INTERVALO_HORAS, 24, 1, 8760) * 60 * 60 * 1000;
 
-// aoIniciar: first pass, run before any board reconnects. The desired state is only persisted
-// (reconnection delivers it), so a pending scheduled OFF wins over restoration.
 function verificarAgendamentos({ aoIniciar = false } = {}) {
   const hora = horaAtualBrasilia();
   const dataISO = dataAtualBrasiliaISO();
   const enviarAoDispositivo = !aoIniciar;
 
-  // The daily shutdown runs first: its cutoff is older than any schedule decision made in this
-  // pass, and a schedule turning a room on afterwards is newer intent in either order.
   try {
     desligamentoDiarioService.verificar({ enviarAoDispositivo });
   } catch (erro) {
@@ -43,9 +39,6 @@ function verificarAgendamentos({ aoIniciar = false } = {}) {
     monitoramentoService.registrar("schedulerFalha", { tarefa: "desligamento-diario" });
   }
 
-  // A scheduled shutdown left pending across midnight is applied exactly once, unless newer intent
-  // (manual command, another schedule, local OFF) appeared after the time it was due; otherwise the
-  // air conditioner would stay on until someone noticed.
   for (const ag of listarDesligamentosPendentesDeOntem(dataISO)) {
     try {
       const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
@@ -71,16 +64,11 @@ function verificarAgendamentos({ aoIniciar = false } = {}) {
       const inicioLigar = ag.modo === "ligar_intervalo" ? ag.ligarInicio : ag.horaInicio;
       const fimLigar = ag.modo === "ligar_intervalo" ? ag.ligarFim : ag.horaFim;
 
-      // The execution record is written in the same transaction as the state change: both persist
-      // or neither does, so a failure (or server crash) between them does not repeat the command on
-      // the next tick.
       if (estaNaJanelaDeLigar(hora, inicioLigar, fimLigar) && !jaExecutadoHoje(ag.id, "ligar", dataISO)) {
         aplicarInicioAgendamento(ag.sala, ag.temperatura, { registrarNaTransacao: () => registrarExecucao(ag.id, "ligar", dataISO), enviarAoDispositivo });
       }
-      // The OFF belongs only to a schedule that actually turned the room on today: created or
-      // re-enabled after the window (or missed entirely during an outage), it has no intent of its
-      // own to end.
-      if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO) && jaExecutadoHoje(ag.id, "ligar", dataISO)) {
+      if (hora >= fimLigar && !jaExecutadoHoje(ag.id, "desligar", dataISO) && jaExecutadoHoje(ag.id, "ligar", dataISO)
+        && !intencaoAlteradaDesde(ag.sala, brasiliaParaUtcSqlite(dataISO, fimLigar), { incluirAgendamentos: false })) {
         aplicarComando(ag.sala, "desligar", undefined, {
           usuario: null,
           origem: "agendamento",
