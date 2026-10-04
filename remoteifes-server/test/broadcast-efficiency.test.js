@@ -102,8 +102,9 @@ test("the query cost of a rebroadcast does not grow with the number of connected
   assert.ok(await ate(() => [...conexoes, supervisor].every((c) => c.mensagens.some((m) => m.tipo === "status"))));
   const contexto = { usuario: superadmin(), origem: "manual" };
 
-  const comUm = await contarConsultasComDifusao(() => salasService.aplicarComando("A-108", "temperatura", 23, contexto));
-  const comTodos = await contarConsultasComDifusao(() => salasService.aplicarComando("A-108", "temperatura", 24, contexto));
+  db.prepare("UPDATE salas SET ligado = 1 WHERE sala = 'A-108'").run();
+  const comUm = await contarConsultasComDifusao(() => salasService.aplicarComando("A-108", "desligar", undefined, contexto));
+  const comTodos = await contarConsultasComDifusao(() => salasService.aplicarComando("A-108", "ligar", undefined, contexto));
   assert.ok(comTodos <= 20, `rebroadcast to 13 clients cost ${comTodos} queries`);
   assert.ok(Math.abs(comTodos - comUm) <= 2, `the cost must be independent of the number of clients (${comUm} vs ${comTodos})`);
   assert.ok(await ate(() => conexoes.every((c) => c.ultimaLista() && c.ultimaLista().salas.length > 0)));
@@ -204,6 +205,21 @@ test("changes to many rooms in the same tick reach each browser as a single room
   assert.ok(salas.every((sala) => ultima.find((s) => s.sala === sala).ligado));
 });
 
+test("a temperature change that leaves the room list unchanged reaches only that room's observers", async () => {
+  const u = usuariosService.criar({ usuario: "fanout-temperatura", senha: "SenhaFanout123", nome: "Temperatura", podeControlar: true }, SUPER);
+  const observador = await cliente(tokenService.gerarToken(u.id), "A-109");
+  const outro = await cliente(tokenService.gerarToken(u.id), "A-201a");
+  db.prepare("UPDATE salas SET ligado = 1, temperaturaAlvo = 23 WHERE sala = 'A-109'").run();
+  await esperar(50);
+  observador.mensagens.length = 0;
+  outro.mensagens.length = 0;
+  salasService.aplicarComando("A-109", "temperatura", 24, { usuario: superadmin(), origem: "manual" });
+  assert.ok(await ate(() => observador.mensagens.some((m) => m.tipo === "status" && m.status.temperaturaAlvo === 24)));
+  await esperar(100);
+  assert.deepEqual(outro.mensagens.filter((m) => m.tipo === "salas" || m.tipo === "status"), []);
+  assert.deepEqual(observador.mensagens.filter((m) => m.tipo === "salas"), []);
+});
+
 test("device telemetry costs no query for browsers that do not observe that device", async () => {
   const ociosos = [];
   for (let i = 0; i < 12; i += 1) {
@@ -233,7 +249,11 @@ test("the IR state goes to the board before the rebroadcast to browsers", (t) =>
   t.mock.method(deviceHub, "enviarComando", () => { ordem.push("esp32"); return true; });
   const ouvinte = () => ordem.push("navegadores");
   salasService.eventos.on("mudanca", ouvinte);
-  t.after(() => salasService.eventos.removeListener("mudanca", ouvinte));
+  salasService.eventos.on("mudanca-sala", ouvinte);
+  t.after(() => {
+    salasService.eventos.removeListener("mudanca", ouvinte);
+    salasService.eventos.removeListener("mudanca-sala", ouvinte);
+  });
   db.prepare("UPDATE salas SET irProtocolo = 16 WHERE sala = 'A-108'").run();
   salasService.aplicarComando("A-108", "ligar", undefined, { usuario: superadmin(), origem: "manual" });
   assert.deepEqual(ordem, ["esp32", "navegadores"]);
