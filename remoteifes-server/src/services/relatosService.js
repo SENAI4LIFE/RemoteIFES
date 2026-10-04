@@ -32,12 +32,17 @@ function limparControle(valor) {
   return String(valor == null ? "" : valor).replace(CONTROLE_REGEX, "");
 }
 
+function cortar(texto, max) {
+  const cortado = texto.slice(0, max);
+  return /[\uD800-\uDBFF]$/.test(cortado) ? cortado.slice(0, -1) : cortado;
+}
+
 function limparLinhaUnica(valor, max) {
-  return limparControle(valor).replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, max);
+  return cortar(limparControle(valor).replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim(), max);
 }
 
 function limparMultilinha(valor, max) {
-  return limparControle(valor).replace(/\r\n?/g, "\n").replace(/\n{4,}/g, "\n\n\n").trim().slice(0, max);
+  return cortar(limparControle(valor).replace(/\r\n?/g, "\n").replace(/\n{4,}/g, "\n\n\n").trim(), max);
 }
 
 function salaExiste(sala) {
@@ -121,6 +126,9 @@ function paraSaidaDoUsuario(linha) {
 
 function criar(dadosBrutos, requisitante, req) {
   const dados = dadosBrutos && typeof dadosBrutos === "object" ? dadosBrutos : {};
+  if (typeof dados.titulo !== "string" || typeof dados.descricao !== "string") {
+    throw new Error("título e descrição devem ser texto");
+  }
 
   const titulo = limparLinhaUnica(dados.titulo, LIMITES.titulo.max);
   if (titulo.length < LIMITES.titulo.min) {

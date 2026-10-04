@@ -353,3 +353,18 @@ test("the command log keeps only the validated value, never an arbitrary client 
   const valores = db.prepare("SELECT cmd, valor FROM comandos_log WHERE sala = 'A-104' AND origem = 'manual' ORDER BY id").all().map((l) => `${l.cmd}=${l.valor}`);
   assert.deepEqual(valores, ["ligar=null", "desligar=null", "ligar=automatico", "temperatura=24", "turbo=true"]);
 });
+
+test("a schedule with a non-text room and a relato with non-text fields are refused with their own message", async () => {
+  const agendamento = await chamar("/agendamentos", { method: "POST", token: tokenSuper, body: { sala: ["A-110"], data: dataAtualBrasiliaISO(), horaInicio: "10:00", horaFim: "11:00", temperatura: 24 } });
+  assert.equal(agendamento.status, 400);
+  assert.deepEqual(agendamento.corpo, { ok: false, erro: "sala inválida" });
+  for (const corpo of [{ titulo: {}, descricao: "descrição suficiente" }, { titulo: "Título válido", descricao: ["descrição suficiente"] }]) {
+    const relato = await chamar("/relatos", { method: "POST", token: tokenSuper, body: corpo });
+    assert.equal(relato.status, 400);
+    assert.equal(relato.corpo.erro, "título e descrição devem ser texto");
+  }
+  const titulo = "a".repeat(139) + "😀";
+  const relato = await chamar("/relatos", { method: "POST", token: tokenSuper, body: { titulo, descricao: "descrição suficiente" } });
+  assert.equal(relato.status, 200);
+  assert.equal(relato.corpo.relato.titulo, "a".repeat(139), "a character is never cut in half");
+});
