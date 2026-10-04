@@ -453,7 +453,10 @@ function conectarDispositivo({ sala, mac, viaCredencial, deviceId, ip, credencia
     try {
       const credenciaisService = require("./esp32CredenciaisService");
       if (entrada.credencialExpiraEm) credenciaisService.reentregarAtual(sala);
-      else credenciaisService.entregarPendente(sala);
+      else {
+        credenciaisService.pendenteNaoGuardado(sala);
+        credenciaisService.entregarPendente(sala);
+      }
     } catch (erro) {
       logger.warn("device-ws-credencial-pendente-falhou", { sala, mensagem: erro.message });
     }
@@ -506,6 +509,9 @@ function processarMensagem(sala, entrada, msg, salaAtual) {
         ? msg.valor
         : undefined;
       salasService.registrarComandoDispositivo(sala, msg.cmd, valor);
+      if (msg.cmd === "credencial" && valor === "falha_nvs" && entrada.viaCredencial) {
+        require("./esp32CredenciaisService").pendenteNaoGuardado(sala);
+      }
     }
   } else if (msg.tipo === "modo_alterado") {
     entrada.modo = MODOS_VALIDOS.has(msg.modo) ? msg.modo : entrada.modo;
