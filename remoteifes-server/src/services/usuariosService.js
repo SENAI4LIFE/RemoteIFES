@@ -74,6 +74,10 @@ function loginEmUso(login, ignorarId = null) {
   return !!linha;
 }
 
+function avisarMudancaDeAcesso() {
+  require("./salasService").eventos.emit("mudanca");
+}
+
 function buscarPorId(id) {
   return db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(id);
 }
@@ -165,6 +169,7 @@ function atualizarPermissoes(id, dados, requisitante) {
   if (ativo === false) removerSessoesDoUsuario(id);
 
   logger.info("usuario-permissoes-alteradas", { alvo: id, podeControlar, ativo, isAdmin, por: requisitante ? requisitante.id : null });
+  avisarMudancaDeAcesso();
   return paraSaida(buscarPorId(id));
 }
 
@@ -214,6 +219,7 @@ function trocarSenha(id, novaSenha, requisitante) {
   db.prepare(`UPDATE usuarios SET senhaHash = ? WHERE id = ?`).run(senhaHash, id);
   removerSessoesDoUsuario(id);
   logger.info("usuario-senha-alterada", { alvo: id, por: requisitante ? requisitante.id : null });
+  avisarMudancaDeAcesso();
 }
 
 function remover(id, requisitante) {
@@ -237,6 +243,7 @@ function remover(id, requisitante) {
     throw erro;
   }
   logger.info("usuario-removido", { alvo: id, usuario: usuario.usuario, por: requisitante ? requisitante.id : null });
+  avisarMudancaDeAcesso();
 }
 
 module.exports = {

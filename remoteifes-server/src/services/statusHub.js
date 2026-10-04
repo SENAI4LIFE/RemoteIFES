@@ -113,11 +113,15 @@ function revalidarCliente(ws, atualizarUso = false, cfg = null, validadas = null
   return true;
 }
 
+function bloqueadoPorManutencao(usuario, cfg) {
+  return usuario.nivel < NIVEL_ADMIN && configuracoesService.modoManutencaoAtivo(cfg);
+}
+
 function notificarCliente(ws, contexto = null, validadas = null) {
   const ctx = contexto || salasService.contextoBroadcast();
   if (!revalidarCliente(ws, false, ctx.cfg, validadas)) return;
   enviarStatusServidor(ws, ctx.cfg);
-  if (!ws.usuario) return;
+  if (!ws.usuario || bloqueadoPorManutencao(ws.usuario, ctx.cfg)) return;
   enviar(ws, { tipo: "salas", salas: montarSalas(ws.usuario, ctx) });
   const sala = salaObservadaPorCliente.get(ws);
   if (sala) {
@@ -153,7 +157,7 @@ function notificarObservadoresDaSala({ sala }) {
   const contexto = salasService.contextoBroadcast();
   const validadas = validarTokens(observadores.map((ws) => ws.token), { cfg: contexto.cfg });
   observadores.forEach((ws) => {
-    if (!revalidarCliente(ws, false, contexto.cfg, validadas) || !ws.usuario) return;
+    if (!revalidarCliente(ws, false, contexto.cfg, validadas) || !ws.usuario || bloqueadoPorManutencao(ws.usuario, contexto.cfg)) return;
     const status = salasService.statusCompleto(sala, ws.usuario, contexto);
     if (status) enviar(ws, { tipo: "status", status });
   });
@@ -308,6 +312,7 @@ function iniciar(server) {
   salasService.eventos.on("mudanca-sala", notificarObservadoresDaSala);
   salasService.eventos.on("cadastro-dispositivo", notificarCadastroDeDispositivo);
   configuracoesService.eventos.on("mudanca-manutencao", notificarStatusServidorParaTodos);
+  configuracoesService.eventos.on("mudanca-manutencao", agendarNotificarTodos);
 }
 
 function encerrar() {
@@ -327,6 +332,7 @@ function encerrar() {
   salasService.eventos.removeListener("mudanca-sala", notificarObservadoresDaSala);
   salasService.eventos.removeListener("cadastro-dispositivo", notificarCadastroDeDispositivo);
   configuracoesService.eventos.removeListener("mudanca-manutencao", notificarStatusServidorParaTodos);
+  configuracoesService.eventos.removeListener("mudanca-manutencao", agendarNotificarTodos);
   if (wss) {
     wss.clients.forEach((ws) => {
       try {
