@@ -150,16 +150,17 @@ function notificarObservadoresDaSala({ sala }) {
   });
 }
 
+function superAdministradorValidado(ws) {
+  return ws.usuario?.nivel === NIVEL_SUPERADMIN && revalidarCliente(ws) && ws.usuario?.nivel === NIVEL_SUPERADMIN;
+}
+
 function notificarSuperAdministradores(payload) {
   if (!wss) return;
   wss.clients.forEach((ws) => {
-    if (!revalidarCliente(ws)) return;
-    if (ws.usuario && ws.usuario.nivel === NIVEL_SUPERADMIN) enviar(ws, payload);
+    if (superAdministradorValidado(ws)) enviar(ws, payload);
   });
 }
 
-// Device registration (MAC, board address) is the superadministrator's: only the Cadastro screen
-// listens for it, and level 2 does not see MACs anywhere else (GET /admin/salas omits them).
 function notificarCadastroDeDispositivo({ sala }) {
   const cadastro = salasService.buscarAdministrativo(sala);
   if (!cadastro) return;
@@ -201,9 +202,6 @@ function iniciar(server) {
   });
 
   wss.on("connection", (ws, req) => {
-    // First, before any rejection: a refused socket stays open while it closes, and a malformed
-    // frame from the client in that window emits "error". Without a listener that is an uncaught
-    // exception, and server.js exits on those, so anyone who can reach /ws could stop the server.
     ws.on("error", () => {
       try {
         ws.terminate();
@@ -340,8 +338,7 @@ function fecharConexoes(codigo = 1001, motivo = "conexão encerrada para teste")
 function notificarObservadoresDeDispositivo(sala, payload) {
   if (!wss) return;
   wss.clients.forEach((ws) => {
-    if (!revalidarCliente(ws)) return;
-    if (ws.usuario?.nivel === NIVEL_SUPERADMIN && dispositivosObservadosPorCliente.get(ws)?.has(sala)) enviar(ws, payload);
+    if (dispositivosObservadosPorCliente.get(ws)?.has(sala) && superAdministradorValidado(ws)) enviar(ws, payload);
   });
 }
 
@@ -360,8 +357,7 @@ deviceHub.eventos.on("ota", ({ sala, estado }) => {
 deviceHub.eventos.on("ota-rollout", ({ rollout }) => {
   if (!wss) return;
   wss.clients.forEach((ws) => {
-    if (!revalidarCliente(ws)) return;
-    if (ws.usuario?.nivel === NIVEL_SUPERADMIN) enviar(ws, { tipo: "dispositivo_rollout", rollout });
+    if (superAdministradorValidado(ws)) enviar(ws, { tipo: "dispositivo_rollout", rollout });
   });
 });
 
