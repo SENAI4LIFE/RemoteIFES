@@ -1,4 +1,4 @@
-const FRONTEND_VERSION = "2026.09.27.1";
+const FRONTEND_VERSION = "2026.10.04.1";
 const CACHE_PREFIX = "remoteifes-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${FRONTEND_VERSION}`;
 const VERSION_QUERY = `v=${encodeURIComponent(FRONTEND_VERSION)}`;

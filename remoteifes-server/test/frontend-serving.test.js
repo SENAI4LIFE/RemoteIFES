@@ -33,6 +33,21 @@ test("the CSP does not allow inline JavaScript", async () => {
   assert.equal(csp.includes("script-src 'self' 'unsafe-inline'"), false);
 });
 
+test("the CSP admits the inline outdated-browser guard by its hash, so it runs in production", async () => {
+  const crypto = require("crypto");
+  const fs = require("fs");
+  const html = fs.readFileSync(process.env.FRONTEND_DIR + "/index.html", "utf8");
+  const embutidos = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(embutidos.length >= 1);
+  const csp = (await fetch(baseUrl)).headers.get("content-security-policy");
+  const scriptSrc = csp.split(";").find((d) => d.trim().startsWith("script-src"));
+  for (const texto of embutidos) {
+    const hash = crypto.createHash("sha256").update(texto.replace(/\r\n?/g, "\n")).digest("base64");
+    assert.ok(scriptSrc.includes(`'sha256-${hash}'`), scriptSrc);
+  }
+  assert.doesNotMatch(scriptSrc, /unsafe-inline/);
+});
+
 test("GET / serves the frontend index.html on the same origin", async () => {
   const resp = await fetch(`${baseUrl}/`);
   assert.equal(resp.status, 200);
