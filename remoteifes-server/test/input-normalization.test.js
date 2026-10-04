@@ -267,3 +267,25 @@ test("a device-reported address is stored only when it is an IP literal; userAge
     db.prepare("DELETE FROM esp_detectados").run();
   }
 });
+
+test("a command answer carries the board's MAC and address only for the superadministrator", async () => {
+  db.prepare("UPDATE salas SET mac = 'AA:BB:CC:DD:EE:01', ipEsp32 = '10.0.0.51' WHERE sala = 'A-107'").run();
+  try {
+    usuariosService.criar({ usuario: "norm-cmd-usuario", senha: "senhaSegura123", nome: "Comando", podeControlar: true }, { nivel: 3 });
+    usuariosService.criar({ usuario: "norm-cmd-admin", senha: "senhaSegura123", nome: "Admin", podeControlar: true, isAdmin: true }, { nivel: 3 });
+    for (const conta of ["norm-cmd-usuario", "norm-cmd-admin"]) {
+      const token = (await login(conta, "senhaSegura123")).corpo.token;
+      const resp = await chamar("/comando", { method: "POST", token, body: { sala: "A-107", cmd: "ligar" } });
+      assert.equal(resp.status, 200, conta);
+      assert.equal(resp.corpo.sala.ligado, 1);
+      assert.equal("canalComandos" in resp.corpo.sala, true);
+      assert.equal("mac" in resp.corpo.sala, false, conta);
+      assert.equal("ipEsp32" in resp.corpo.sala, false, conta);
+    }
+    const resp = await chamar("/comando", { method: "POST", token: tokenSuper, body: { sala: "A-107", cmd: "desligar" } });
+    assert.equal(resp.corpo.sala.mac, "AA:BB:CC:DD:EE:01");
+    assert.equal(resp.corpo.sala.ipEsp32, "10.0.0.51");
+  } finally {
+    db.prepare("UPDATE salas SET mac = NULL, ipEsp32 = NULL WHERE sala = 'A-107'").run();
+  }
+});
