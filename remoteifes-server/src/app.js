@@ -65,8 +65,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Before CORS and the body parser, so the responses they end early (origin refused, malformed or
-// oversized body) carry the same headers as every other response.
 app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
@@ -103,8 +101,6 @@ app.get("/health", (req, res) => {
 
 app.use(require("./routes/dispositivoRoutes"));
 
-// Operations Console readiness: loopback plus shared secret, mounted before the network restriction
-// because it is not user access. Without the secret file it answers 404.
 app.use(require("./routes/prontidaoRoutes"));
 
 if (frontendDisponivel) {
@@ -151,10 +147,7 @@ app.use((err, req, res, next) => {
   if (err && err.message === "origem não permitida pelo CORS") {
     return res.status(403).json({ ok: false, erro: "origem não permitida" });
   }
-  // Other body-parser errors (unsupported charset/encoding, aborted body) already carry a 4xx
-  // status:
-  // they are client errors and warrant neither a 500 nor an internal error log.
-  if (err && typeof err.type === "string" && Number.isInteger(err.status) && err.status >= 400 && err.status < 500) {
+  if (err && Number.isInteger(err.status) && err.status >= 400 && err.status < 500) {
     return res.status(err.status).json({ ok: false, erro: "requisição inválida" });
   }
   logger.error("erro-nao-tratado", { requestId: req.id, metodo: req.method, rota: req.originalUrl, mensagem: err && err.message });
