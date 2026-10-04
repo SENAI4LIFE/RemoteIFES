@@ -648,7 +648,8 @@ function aplicarComando(sala, cmd, valor, { usuario, origem, registrarNaTransaca
 
   const salaAtualizada = buscar(sala);
   const enviadoAoDispositivo = enviarAoDispositivo ? enviarEstadoIRParaDispositivo(salaAtualizada) : false;
-  eventos.emit("mudanca");
+  if (!!salaAtualizada.ligado !== !!salaRow.ligado) eventos.emit("mudanca");
+  else eventos.emit("mudanca-sala", { sala });
 
   return {
     ...salaAtualizada,
