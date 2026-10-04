@@ -69,6 +69,10 @@ function marcarPendenteEntregue(sala) {
   db.prepare(`UPDATE esp_credenciais SET pendenteEntregueEm = datetime('now') WHERE sala = ? AND segredoHashPendente IS NOT NULL`).run(sala);
 }
 
+function pendenteNaoGuardado(sala) {
+  db.prepare(`UPDATE esp_credenciais SET pendenteEntregueEm = NULL WHERE sala = ? AND segredoHashPendente IS NOT NULL AND pendenteEntregueEm IS NOT NULL`).run(sala);
+}
+
 function entregarPendente(sala) {
   const guardado = segredosPendentesEmMemoria.get(sala);
   const linha = buscarLinha(sala);
@@ -375,6 +379,7 @@ module.exports = {
   provisionar,
   rotacionar,
   entregarPendente,
+  pendenteNaoGuardado,
   reentregarAtual,
   substituir,
   revogar,

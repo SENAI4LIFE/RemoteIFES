@@ -252,6 +252,21 @@ test("a second rotation is refused while the board holds a delivered pending sec
   assert.equal(g2.pendente, true, "after activation a new rotation is accepted again");
 });
 
+test("a board that could not store the delivered secret can be rotated again remotely", async () => {
+  sala("ROT-NVS", "AA:CC:11:00:00:2E");
+  const g0 = credenciais.provisionar("ROT-NVS");
+  const placa = await conectar(g0.deviceId, g0.segredo);
+  credenciais.rotacionar("ROT-NVS");
+  assert.ok(await ate(() => placa.pushes().length === 1));
+  assert.throws(() => credenciais.rotacionar("ROT-NVS"), (erro) => erro.conflito === true);
+
+  placa.ws.send(JSON.stringify({ tipo: "comando", cmd: "credencial", valor: "falha_nvs" }));
+  assert.ok(await ate(() => linha("ROT-NVS").pendenteEntregueEm === null));
+  const g2 = credenciais.rotacionar("ROT-NVS");
+  assert.ok(await ate(() => placa.pushes().length === 2), "the new secret reaches the board on its open connection");
+  assert.equal(placa.pushes()[1].segredo, g2.segredo);
+});
+
 test("replace and revoke discard the pending generation", async () => {
   sala("ROT-6", "AA:CC:11:00:00:06");
   credenciais.provisionar("ROT-6");
