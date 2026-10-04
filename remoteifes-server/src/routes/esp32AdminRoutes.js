@@ -139,7 +139,7 @@ function responderCredencial(req, res, fn, tipo, descricao) {
     auditar({ tipo, ator: req.usuario, alvoTipo: "esp32", alvoId: req.params.sala, alvoRotulo: req.params.sala, descricao });
     res.json({ ok: true, ...resultado, aviso: "copie o segredo agora — ele não será exibido novamente" });
   } catch (err) {
-    res.status(400).json({ ok: false, erro: err.message });
+    res.status(err.conflito ? 409 : 400).json({ ok: false, erro: err.message });
   }
 }
 
