@@ -61,6 +61,29 @@ test("a body above the limit receives 413 on any JSON route without an internal 
   assert.equal(malformado.corpo.erro, "corpo da requisição inválido");
 });
 
+test("a corrupt compressed body or an undecodable path parameter is a 400, not an internal error", async () => {
+  const erros = [];
+  const original = console.error;
+  console.error = (...partes) => erros.push(partes.join(" "));
+  try {
+    for (const codificacao of ["gzip", "deflate"]) {
+      const resp = await fetch(`${baseUrl}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Encoding": codificacao },
+        body: "isto não está comprimido",
+      });
+      assert.equal(resp.status, 400, codificacao);
+      assert.deepEqual(await resp.json(), { ok: false, erro: "requisição inválida" });
+    }
+    const parametro = await chamar("/salas/%ZZ/proprietario/acesso");
+    assert.equal(parametro.status, 400);
+    assert.deepEqual(parametro.corpo, { ok: false, erro: "requisição inválida" });
+  } finally {
+    console.error = original;
+  }
+  assert.deepEqual(erros.filter((linha) => linha.includes("erro-nao-tratado")), []);
+});
+
 test("GET /agendamentos requires a scalar sala: array, repeated key and object receive 400", async () => {
   for (const consulta of ["sala[]=x", "sala=x&sala=y", "sala[a]=b"]) {
     const resp = await chamar(`/agendamentos?${consulta}`, { token: tokenSuper });
