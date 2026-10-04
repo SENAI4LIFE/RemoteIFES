@@ -35,8 +35,20 @@ if (SERVIR_FRONTEND && !frontendDisponivel) {
 }
 
 const CSP_API = "default-src 'none'; frame-ancestors 'none'";
+
+function hashesDosScriptsEmbutidos() {
+  try {
+    const html = fs.readFileSync(path.join(FRONTEND_DIR, "index.html"), "utf8");
+    return [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+      .map((m) => ` 'sha256-${crypto.createHash("sha256").update(m[1].replace(/\r\n?/g, "\n")).digest("base64")}'`)
+      .join("");
+  } catch (erro) {
+    return "";
+  }
+}
+
 const CSP_APP =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+  `default-src 'self'; script-src 'self'${frontendDisponivel ? hashesDosScriptsEmbutidos() : ""}; style-src 'self' 'unsafe-inline'; ` +
   "img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; " +
   "base-uri 'none'; object-src 'none'; frame-ancestors 'none'";
 

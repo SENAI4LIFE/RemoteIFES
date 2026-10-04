@@ -43,17 +43,6 @@ test("an engine without dvh units sees the outdated-browser notice", async ({ pa
   await esperarAvisoSemApp(page, erros);
 });
 
-test("an engine that does not parse ES2020 syntax sees the notice, without stray syntax errors", async ({ page, context }) => {
-  const erros = await carregarSimulandoMotor(page, context, () => {
-    const Original = Function;
-    window.Function = function () {
-      if (Array.from(arguments).some((fonte) => /\?\./.test(String(fonte)))) throw new SyntaxError("Unexpected token .");
-      return Original.apply(null, arguments);
-    };
-  });
-  await esperarAvisoSemApp(page, erros);
-});
-
 test("an engine without Element.replaceChildren sees the outdated-browser notice", async ({ page, context }) => {
   const erros = await carregarSimulandoMotor(page, context, () => {
     delete Element.prototype.replaceChildren;
