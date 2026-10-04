@@ -341,3 +341,15 @@ test("a login that differs from an existing one only in letter case is refused",
   assert.equal(propria.status, 200);
   assert.equal(usuariosService.buscarPorId(original.id).usuario, "Norm-Caixa");
 });
+
+test("the command log keeps only the validated value, never an arbitrary client payload", async () => {
+  const grande = "x".repeat(90 * 1024);
+  for (const cmd of ["ligar", "desligar"]) {
+    const resp = await chamar("/comando", { method: "POST", token: tokenSuper, body: { sala: "A-104", cmd, valor: grande } });
+    assert.equal(resp.status, 200, cmd);
+  }
+  assert.equal((await chamar("/comando", { method: "POST", token: tokenSuper, body: { sala: "A-104", cmd: "temperatura", valor: "24" } })).status, 200);
+  assert.equal((await chamar("/comando", { method: "POST", token: tokenSuper, body: { sala: "A-104", cmd: "turbo", valor: true } })).status, 200);
+  const valores = db.prepare("SELECT cmd, valor FROM comandos_log WHERE sala = 'A-104' AND origem = 'manual' ORDER BY id").all().map((l) => `${l.cmd}=${l.valor}`);
+  assert.deepEqual(valores, ["ligar=null", "desligar=null", "ligar=automatico", "temperatura=24", "turbo=true"]);
+});

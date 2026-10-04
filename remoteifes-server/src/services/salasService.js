@@ -634,7 +634,7 @@ function aplicarComando(sala, cmd, valor, { usuario, origem, registrarNaTransaca
       usuario: usuario ? usuario.usuario : null,
       sala,
       cmd,
-      valor,
+      valor: cmd === "temperatura" ? temp : cmd === "turbo" ? valor : undefined,
       origem,
     });
     if (registrarNaTransacao) registrarNaTransacao();
