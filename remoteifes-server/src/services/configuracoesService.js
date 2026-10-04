@@ -19,8 +19,6 @@ const PADROES = {
   redesAutorizadas: [],
   modoManutencao: false,
   espCredenciaisObrigatorias: process.env.NODE_ENV !== "test",
-  // Policy for the ESP32 local access point (RemoteIFES-Setup). Unrelated to device authentication
-  // on the server, which remains in espCredenciaisObrigatorias.
   espApExigirCredencial: false,
   desligamentoDiario: { ativo: false, hora: "00:00", escopo: "todas", salas: [], vigenteDesde: null },
 };
@@ -40,8 +38,6 @@ function normalizarDesligamentoDiario(valor) {
   };
 }
 
-// The effective-since instant is set by the server whenever the shutdown is enabled or its time or
-// scope changes, so a change never applies retroactively to an occurrence already due.
 function validarDesligamentoDiario(entrada, atual) {
   if (!entrada || typeof entrada !== "object" || Array.isArray(entrada)) {
     throw new Error("desligamentoDiario deve ser um objeto");
@@ -89,14 +85,17 @@ function validarDesligamentoDiario(entrada, atual) {
 const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
 
 const CHAVES_NUMERICAS = ["timeoutInatividadeMinutos", "timeoutInatividadeAdminMinutos", "retencaoAuditoriaDias", "popupAvisoSegundos", "limiarOnlineMinutos"];
+const LIMITES_NUMERICOS = {
+  timeoutInatividadeMinutos: [1, 10080],
+  timeoutInatividadeAdminMinutos: [1, 10080],
+  popupAvisoSegundos: [10, Infinity],
+  limiarOnlineMinutos: [1, Infinity],
+};
 const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias", "espApExigirCredencial", "autoLigar"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
 const CHAVES_TEXTO_CRITICAS = ["turboFuncaoExtra"];
 const CHAVES_OBJETO = ["desligamentoDiario"];
-// Network exposure policy is infrastructure: only the Operations Console and the terminal CLI change
-// it. A website session may resend the current values (an older cached frontend does), but never
-// change them.
 const CHAVES_INFRAESTRUTURA = ["modoTeste", "redesAutorizadas"];
 
 function normalizarRedes(lista) {
@@ -172,13 +171,6 @@ function modoManutencaoAtivo(cfg = null) {
   return !!(cfg || obter()).modoManutencao;
 }
 
-/**
- * @param {object} patch
- * @param {object} requisitante
- * @param {object} [opcoes]
- * @param {boolean} [opcoes.infraestrutura] true only for the Operations Console runner and the
- *   terminal CLI, which may change the network exposure keys.
- */
 function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {}) {
   const souSuperAdmin = !!requisitante && requisitante.nivel === 3;
   if (!souSuperAdmin) {
@@ -210,8 +202,15 @@ function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {})
       if (chave === "retencaoAuditoriaDias" && (!Number.isInteger(n) || n < 1 || n > 365)) {
         throw new Error("retencaoAuditoriaDias deve ser um inteiro entre 1 e 365");
       }
+      if (typeof patch[chave] !== "number" && typeof patch[chave] !== "string") {
+        throw new Error(`${chave} deve ser um número`);
+      }
       if (!Number.isFinite(n) || n <= 0) {
         throw new Error(`${chave} deve ser um número maior que zero`);
+      }
+      const [minimo, maximo] = LIMITES_NUMERICOS[chave] || [0, Infinity];
+      if (n < minimo || n > maximo) {
+        throw new Error(maximo === Infinity ? `${chave} deve ser no mínimo ${minimo}` : `${chave} deve estar entre ${minimo} e ${maximo}`);
       }
       proximo[chave] = n;
     }
@@ -219,7 +218,8 @@ function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {})
 
   for (const chave of CHAVES_BOOLEANAS_CRITICAS) {
     if (Object.prototype.hasOwnProperty.call(patch, chave)) {
-      proximo[chave] = !!patch[chave];
+      if (typeof patch[chave] !== "boolean") throw new Error(`${chave} deve ser verdadeiro ou falso`);
+      proximo[chave] = patch[chave];
     }
   }
 
@@ -273,8 +273,6 @@ function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {})
     ...CHAVES_TEXTO_CRITICAS,
     ...CHAVES_OBJETO,
   ].filter((chave) => infraestrutura || !CHAVES_INFRAESTRUTURA.includes(chave));
-  // A website save does not rewrite the network keys at all: rewriting them from the snapshot read
-  // above would undo a Console change committed in between.
   const estadoIRAlterado = proximo.temperaturaMinima !== atual.temperaturaMinima
     || proximo.temperaturaMaxima !== atual.temperaturaMaxima
     || proximo.turboFuncaoExtra !== atual.turboFuncaoExtra;
@@ -300,8 +298,6 @@ function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {})
         )
       )
     `).run(proximo.temperaturaMinima, proximo.temperaturaMaxima);
-    // The rooms' desired state changes together with these limits/functions: the version advances
-    // in the same transaction, so an echo of the previous version never confirms the new state.
     if (estadoIRAlterado) db.prepare(`UPDATE salas SET estadoVersao = estadoVersao + 1 WHERE irProtocolo IS NOT NULL`).run();
     db.exec("COMMIT");
   } catch (erro) {
