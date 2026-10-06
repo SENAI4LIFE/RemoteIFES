@@ -47,15 +47,29 @@ Inicie o servidor e o Console de Operações:
 
 Linux/macOS (inclui Raspberry Pi OS de 32 ou 64 bits):
 
+Servidor:
+
 ```bash
 ./server.sh
+```
+
+Console de Operações:
+
+```bash
 ./console.sh
 ```
 
 Windows PowerShell:
 
+Servidor:
+
 ```powershell
 .\server.bat
+```
+
+Console de Operações:
+
+```powershell
 .\console.bat
 ```
 
