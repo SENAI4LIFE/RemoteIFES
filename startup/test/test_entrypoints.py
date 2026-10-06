@@ -105,6 +105,9 @@ class ServerFlowTest(Harness):
         self.patch(server, "owning_service_state", side_effect=lambda plat: self.service)
         self.execs = []
         self.patch(c, "exec_or_wait", side_effect=lambda cmd, cwd, env: self.execs.append((cmd, cwd, env)) or 0)
+        # The simulated Linux flows run setup.sh through bash; never depend on the host having one.
+        real_which = shutil.which
+        self.patch(shutil, "which", side_effect=lambda name, mode=os.F_OK | os.X_OK, path=None: "/bin/bash" if name == "bash" else real_which(name, mode, path))
         self.env = {"PATH": os.pathsep.join(["/usr/bin", "/bin"])}
 
     def fake_select(self, minimum, plat, env):
@@ -199,7 +202,7 @@ class ServerFlowTest(Harness):
         self.assertEqual(call["cmd"][0], "bash")
         self.assertEqual(c.path_entries(call["env"])[0], "/usr/local/bin")
         self.assertIn("pode pedir a senha do sudo", self.output())
-        self.assertIn("ignorado: /usr/bin/node (18.19.0 é anterior ao mínimo 22.13.0)", self.output())
+        self.assertIn("ignorado: %s (18.19.0 é anterior ao mínimo 22.13.0)" % os.path.abspath("/usr/bin/node"), self.output())
         self.assertEqual(len(self.execs), 1)
 
     def test_armv6_without_node_fails_before_touching_anything(self):
@@ -229,6 +232,12 @@ class ServerFlowTest(Harness):
         self.assertEqual(self.main(), 1)
         self.assertIn("curl, xz", self.err.getvalue())
         self.assertEqual(self.commands, [])
+
+    def test_missing_bash_stops_before_setup(self):
+        with mock.patch.object(shutil, "which", return_value=None):
+            self.assertEqual(self.main(), 1)
+        self.assertEqual(self.commands, [])
+        self.assertIn("bash não encontrado", self.err.getvalue())
 
     def test_setup_failure_is_concise_and_stops(self):
         self.run_results = [3]

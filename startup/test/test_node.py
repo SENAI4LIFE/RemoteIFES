@@ -55,8 +55,8 @@ class SelectionTest(unittest.TestCase):
             "/usr/local/bin/node": ("22.20.0", "arm", "linux", None),
         })
         selection = c.select_node(MINIMUM, LINUX_ARM, {}, probe=probe, candidates=["/usr/bin/node", "/usr/local/bin/node"])
-        self.assertEqual(selection.node.path, "/usr/local/bin/node")
-        self.assertEqual([r.path for r in selection.rejected], ["/usr/bin/node"])
+        self.assertEqual(selection.node.path, os.path.abspath("/usr/local/bin/node"))
+        self.assertEqual([r.path for r in selection.rejected], [os.path.abspath("/usr/bin/node")])
         self.assertIn("anterior ao mínimo 22.13.0", selection.rejected[0].problem(MINIMUM, LINUX_ARM))
 
     def test_first_suitable_node_wins_and_later_ones_are_not_probed(self):
@@ -67,7 +67,7 @@ class SelectionTest(unittest.TestCase):
             return c.NodeCandidate(path, (22, 20, 0), "x64", "linux")
 
         selection = c.select_node(MINIMUM, LINUX_X64, {}, probe=probe, candidates=["/a/node", "/b/node"])
-        self.assertEqual(selection.node.path, "/a/node")
+        self.assertEqual(selection.node.path, os.path.abspath("/a/node"))
         self.assertEqual(probed, ["/a/node"])
 
     def test_wrong_build_or_platform_is_rejected(self):
@@ -93,7 +93,7 @@ class SelectionTest(unittest.TestCase):
         self.assertIn("REMOTEIFES_NODE", c.node_missing_error(MINIMUM, selection, []).message)
 
         probe = fake_probe({"/pinned/node": ("22.13.0", "arm", "linux", None)})
-        self.assertEqual(c.select_node(MINIMUM, LINUX_ARM, env, probe=probe).node.path, "/pinned/node")
+        self.assertEqual(c.select_node(MINIMUM, LINUX_ARM, env, probe=probe).node.path, os.path.abspath("/pinned/node"))
 
     def test_armv7_node_is_accepted_with_its_support_horizon(self):
         out = io.StringIO()
