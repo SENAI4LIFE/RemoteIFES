@@ -4,6 +4,9 @@
 // sequence.
 const congelar = (lista) => Object.freeze(lista);
 
+// Normal startup: the root entrypoints run setup.sh or the Console installer only when something is
+// missing, then start the server or open the Console.
+const inicioRapido = congelar(["./server.sh", "./console.sh", "server.bat", "console.bat"]);
 const instalacao = congelar(["cd remoteifes-server", "bash setup.sh", "npm start"]);
 const iniciar = congelar(["cd remoteifes-server", "npm start"]);
 const desenvolvimento = congelar(["npm run dev"]);
@@ -89,6 +92,7 @@ const gitSincronizar = congelar(["python3 export.py", "python3 import.py"]);
 const gitRecriar = congelar(["python3 clear.py"]);
 
 module.exports = Object.freeze({
+  inicioRapido,
   instalacao,
   consoleInstalar,
   consoleAcesso,
