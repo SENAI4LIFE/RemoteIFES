@@ -59,3 +59,31 @@ test("the archive check accepts only the exact published SHA-256, and fails clos
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("the Node build follows the userland: armv7l under a 64-bit kernel with 32-bit Raspberry Pi OS", { skip: !temBash || process.platform === "win32" }, () => {
+  const m = SETUP.match(/^resolve_node_arch\(\) \{\n[\s\S]*?\n\}\n/m);
+  assert.ok(m, "setup.sh must define resolve_node_arch");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-node-arch-"));
+  try {
+    const resolver = (machine, bits) => {
+      fs.writeFileSync(path.join(dir, "uname"), `#!/bin/sh\necho ${machine}\n`, { mode: 0o755 });
+      fs.writeFileSync(path.join(dir, "getconf"), `#!/bin/sh\necho ${bits}\n`, { mode: 0o755 });
+      const r = spawnSync("bash", ["-c", `set -e\n${m[0]}arch=$(resolve_node_arch)\necho "[$arch]"`], {
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}` },
+      });
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    assert.equal(resolver("x86_64", 64), "[x64]");
+    assert.equal(resolver("aarch64", 64), "[arm64]");
+    assert.equal(resolver("aarch64", 32), "[armv7l]", "Pi 3/4 booting the 64-bit kernel under 32-bit Raspberry Pi OS");
+    assert.equal(resolver("armv7l", 32), "[armv7l]");
+    assert.equal(resolver("armv8l", 32), "[armv7l]");
+    assert.equal(resolver("armv6l", 32), "[]", "no official Node 22 build runs on ARMv6");
+    assert.equal(resolver("x86_64", 32), "[]", "a 32-bit x86 userland cannot run the x64 build");
+    assert.equal(resolver("i686", 32), "[]");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

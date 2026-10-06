@@ -19,11 +19,15 @@ node_ok() {
   return 1
 }
 
+# The build follows the userland, not the kernel: a Raspberry Pi can boot a 64-bit kernel (aarch64)
+# under 32-bit Raspberry Pi OS, where only armv7l runs. nodejs.org publishes no Node 22 for ARMv6.
 resolve_node_arch() {
+  local bits
+  bits=$(getconf LONG_BIT 2>/dev/null || echo 64)
   case "$(uname -m)" in
-    x86_64|amd64) echo "x64" ;;
-    aarch64|arm64) echo "arm64" ;;
-    armv7l|armv6l) echo "armv7l" ;;
+    x86_64|amd64) if [ "$bits" = "32" ]; then echo ""; else echo "x64"; fi ;;
+    aarch64|arm64) if [ "$bits" = "32" ]; then echo "armv7l"; else echo "arm64"; fi ;;
+    armv7l|armv8l) echo "armv7l" ;;
     *) echo "" ;;
   esac
 }
