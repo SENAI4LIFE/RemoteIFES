@@ -19,14 +19,47 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 
 ## Início rápido
 
-Na raiz do checkout:
+**Git** só precisa ser instalado se ainda não estiver (`git --version` responde quando já está):
 
-| Sistema | Servidor | Console de Operações |
-|---|---|---|
-| Linux, Raspberry Pi OS (32 ou 64 bits) e macOS | `./server.sh` | `./console.sh` |
-| Windows (no PowerShell, com `.\` antes) | `server.bat` | `console.bat` |
+Windows PowerShell:
 
-`server.sh` prepara o que faltar (Node.js, dependências, `.env`), inicia o servidor e mostra os endereços: **`http://localhost:8080`** e o da rede local. `console.sh` instala o [Console de Operações](#console-de-operações) na primeira vez e depois só o abre; no Linux com systemd, `sudo ./console.sh` instala também o socket e o auxiliar privilegiado. Rodar de novo não reinstala nem duplica nada. `--verificar` só confere; `--ajuda` lista as opções.
+```powershell
+winget install --id Git.Git -e
+```
+
+Linux (Debian, Ubuntu, Raspberry Pi OS):
+
+```bash
+sudo apt update && sudo apt install -y git
+```
+
+Baixe o repositório e entre na pasta:
+
+```bash
+git clone https://github.com/SENAI4LIFE/RemoteIFES.git
+```
+
+```bash
+cd RemoteIFES
+```
+
+Inicie o servidor e o Console de Operações:
+
+Linux/macOS (inclui Raspberry Pi OS de 32 ou 64 bits):
+
+```bash
+./server.sh
+./console.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\server.bat
+.\console.bat
+```
+
+`server.sh` prepara o que faltar (Node.js, dependências, `.env`), inicia o servidor em primeiro plano (`Ctrl+C` encerra; rode o console em outro terminal) e mostra os endereços: **`http://localhost:8080`** e o da rede local. `console.sh` instala o [Console de Operações](#console-de-operações) na primeira vez e depois só o abre; no Linux com systemd, `sudo ./console.sh` instala também o socket e o auxiliar privilegiado. Rodar de novo não reinstala nem duplica nada. `--verificar` só confere; `--ajuda` lista as opções.
 
 Requer Python 3.7+. O Node.js 22.13+ é instalado quando falta no Linux (x64, ARM64 ou ARMv7) e no macOS com Homebrew; no Windows, instale antes o [Node.js 22 LTS](https://nodejs.org/en/download).
 
