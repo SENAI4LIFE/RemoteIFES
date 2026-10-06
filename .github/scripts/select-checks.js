@@ -20,6 +20,8 @@ const LINUX_ARM = "ubuntu-24.04-arm";
 const SERVER_OS = [LINUX_ARM, "windows-latest", "macos-latest"];
 const PACKAGES_OS = [...ALL_OS, LINUX_ARM];
 const CORDOVA_OS = ["ubuntu-latest", "windows-latest"];
+// The root entrypoints: x64 Linux with the minimum Node, ARM64 Linux, Windows (.bat) and macOS.
+const STARTUP_OS = [...ALL_OS, LINUX_ARM];
 const ZERO_SHA = /^0+$/;
 
 // First match wins.
@@ -38,6 +40,7 @@ const PATH_RULES = [
   [/^e2e\//, "e2eHarness"],
   [/^remoteifes-cordova\//, "mobile"],
   [/^remoteifes-esp32\//, "firmware"],
+  [/^(server|console)\.(sh|bat|py)$|^startup\//, "startup"],
   [/^(README\.md|export\.py|import\.py|clear\.py)$|^docs\//, "docs"],
 ];
 
@@ -53,7 +56,7 @@ const E2E_TARGETS = [
   { os: "macos-latest", browser: "chromium", channel: "chrome", shards: 3 },
 ];
 
-const JOBS = ["server", "console", "packages", "deployment", "e2e", "safari", "cordova", "firmware", "android", "ios"];
+const JOBS = ["server", "console", "packages", "deployment", "e2e", "safari", "cordova", "firmware", "android", "ios", "startup"];
 
 function classify(paths) {
   const areas = new Set();
@@ -109,6 +112,8 @@ function selectChecks({ areas, fullDepth, allScope }) {
     firmware: has("firmware"),
     android: mobile,
     ios: mobile,
+    // The entrypoints drive setup.sh, the server start script and the Console installer and launcher.
+    startup: has("startup") || serverChanged || consoleChanged ? STARTUP_OS : [],
   };
 
   return {
@@ -221,6 +226,7 @@ function writeOutputs(plan, outputFile) {
     `firmware=${plan.jobs.firmware}`,
     `android=${plan.jobs.android}`,
     `ios=${plan.jobs.ios}`,
+    `startup_os=${JSON.stringify(plan.jobs.startup)}`,
   ];
   if (outputFile) fs.appendFileSync(outputFile, lines.join("\n") + "\n");
 }
