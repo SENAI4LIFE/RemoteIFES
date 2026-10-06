@@ -1,0 +1,40 @@
+name: Raspberry Pi OS armhf userland
+# The Raspberry Pi 3's 32-bit userland (Raspberry Pi OS Lite armhf) under qemu-user on x64: ./server.sh
+# installs Node armv7l through setup.sh, then the server runs with simulated boards, backup, restore and
+# restart. Called from ci.yml and from Virtual Hardware Validation. The kernel is always the runner's.
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  armhf:
+    name: Pi 3, 32-bit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      LAB_HOST_DESCARTAVEL: "1"
+      RAIZ_RASPIOS: ${{ github.workspace }}/../raspios
+    steps:
+      # No credential stays in the checkout: the repository is copied into the Raspberry Pi OS container.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Cache the pinned image
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/../raspios/armhf/imagem.img.xz
+          key: raspios-${{ hashFiles('virtual-lab/host/raspios.json') }}-armhf
+      - name: 32-bit ARM user-mode emulation (Ubuntu's qemu-user-static)
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-user-static
+      - run: bash virtual-lab/host/importar-raspios.sh armhf
+      - run: bash virtual-lab/host/raspios-armhf.sh "$RUNNER_TEMP/resultados"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: virtual-lab-raspios-armhf
+          path: ${{ runner.temp }}/resultados
+          if-no-files-found: warn
+          retention-days: 14

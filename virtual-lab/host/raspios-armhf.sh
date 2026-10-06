@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Raspberry Pi OS Lite (armhf: the 32-bit userland a Raspberry Pi 3 runs) under qemu-user on an x64
-# runner, without systemd. The project's setup.sh installs Node for armv7l; the server then runs with
-# simulated boards that receive and confirm commands; a backup is taken with it running, restored with it
-# stopped, and the data verified after a restart.
+# runner, without systemd. ./server.sh (and through it setup.sh) installs Node for armv7l; the server then
+# runs with simulated boards that receive and confirm commands; a backup is taken with it running, restored
+# with it stopped, and the data verified after a restart.
 #
 #   LAB_HOST_DESCARTAVEL=1 bash virtual-lab/host/raspios-armhf.sh <results dir>
 #
@@ -20,14 +20,16 @@ docker run --rm --platform linux/arm/v7 --memory=1g --memory-swap=1g \
   -v "$RAIZ_REPO:/src:ro" -v "$SAIDA:/saida" raspios-lite:armhf bash -euo pipefail -c '
     export DEBIAN_FRONTEND=noninteractive
     faltam=""
-    for c in curl xz tar; do command -v "$c" >/dev/null || faltam="$faltam $c"; done
+    for c in curl xz tar python3; do command -v "$c" >/dev/null || faltam="$faltam $c"; done
     if [ -n "$faltam" ]; then
-      apt-get -o Acquire::Retries=5 update -qq && apt-get -o Acquire::Retries=5 install -y -qq curl ca-certificates xz-utils >/dev/null
+      apt-get -o Acquire::Retries=5 update -qq && apt-get -o Acquire::Retries=5 install -y -qq curl ca-certificates xz-utils python3 >/dev/null
     fi
     { grep -E "^(PRETTY_NAME|VERSION_CODENAME)=" /etc/os-release; uname -m; getconf LONG_BIT; } | tee /saida/sistema.txt
     cp -a /src /opt/RemoteIFES
-    cd /opt/RemoteIFES/remoteifes-server
-    bash setup.sh 2>&1 | tail -20
+    cd /opt/RemoteIFES
+    ./server.sh --preparar 2>&1 | tail -25
+    ./server.sh --verificar | tail -3
+    cd remoteifes-server
     node -e "console.log(process.version, process.arch, process.platform)" | tee -a /saida/sistema.txt
     [ "$(node -p process.arch)" = "arm" ] || { echo "Node is not the 32-bit ARM build"; exit 1; }
 

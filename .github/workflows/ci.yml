@@ -41,6 +41,10 @@ jobs:
     name: Select checks
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read finds the last passing CI run, the diff base of a push.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       plan: ${{ steps.select.outputs.plan }}
       server_os: ${{ steps.select.outputs.server_os }}
@@ -54,6 +58,7 @@ jobs:
       android: ${{ steps.select.outputs.android }}
       ios: ${{ steps.select.outputs.ios }}
       startup_os: ${{ steps.select.outputs.startup_os }}
+      pi32: ${{ steps.select.outputs.pi32 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,8 +75,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           REF: ${{ github.ref }}
           HEAD_SHA: ${{ github.sha }}
-          BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
 
   server:
@@ -179,6 +184,16 @@ jobs:
         run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} -m unittest discover -s startup/test -t . -v
         env:
           PYTHONDONTWRITEBYTECODE: "1"
+      # The declared minimum, Python 3.7, is what Raspberry Pi OS Buster ships.
+      - name: Entrypoint tests on Python 3.7
+        if: matrix.os == 'ubuntu-latest'
+        run: docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD:/src:ro" -w /src python:3.7-slim@sha256:b53f496ca43e5af6994f8e316cf03af31050bf7944e0e4a308ad86c001cf028b python -m unittest discover -s startup/test -t . -v
+
+  pi32:
+    name: Raspberry Pi OS armhf
+    needs: changes
+    if: needs.changes.outputs.pi32 == 'true'
+    uses: ./.github/workflows/raspios-armhf.yml
 
   packages:
     name: Console package install (${{ matrix.os }})
@@ -674,7 +689,7 @@ jobs:
   result:
     name: CI result
     if: always()
-    needs: [changes, server, console, packages, deployment, e2e, safari, cordova, firmware, android, ios, startup]
+    needs: [changes, server, console, packages, deployment, e2e, safari, cordova, firmware, android, ios, startup, pi32]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

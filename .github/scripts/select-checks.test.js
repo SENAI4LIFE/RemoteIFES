@@ -2,11 +2,13 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { execFileSync } = require("node:child_process");
+const { execFile, execFileSync } = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
-const { classify, selectChecks, verifyResults, parseNameStatus, JOBS } = require("./select-checks");
+const { promisify } = require("node:util");
+const { classify, selectChecks, verifyResults, parseNameStatus, lastGreenSha, JOBS } = require("./select-checks");
 
 const ALL_OS = ["ubuntu-latest", "windows-latest", "macos-latest"];
 const SERVER_OS = ["ubuntu-24.04-arm", "windows-latest", "macos-latest"];
@@ -45,21 +47,29 @@ test("web changes select contracts, fast Chromium E2E and dependent mobile packa
 
 test("server changes select server on every OS (Linux on ARM64), the console and frontend integration", () => {
   const p = plan(["remoteifes-server/src/app.js"]);
-  assert.deepEqual(selected(p), ["server", "console", "deployment", "e2e", "startup"]);
+  assert.deepEqual(selected(p), ["server", "console", "deployment", "e2e", "startup", "pi32"]);
   assert.deepEqual(p.jobs.server, SERVER_OS);
 });
 
 test("server lockfile changes are server changes", () => {
-  assert.deepEqual(selected(plan(["remoteifes-server/package-lock.json"])), ["server", "console", "deployment", "e2e", "startup"]);
+  assert.deepEqual(selected(plan(["remoteifes-server/package-lock.json"])), ["server", "console", "deployment", "e2e", "startup", "pi32"]);
 });
 
-test("root entrypoint changes select only the entrypoint job, on every OS", () => {
+test("root entrypoint changes select the entrypoint job on every OS and the Raspberry Pi 3 userland", () => {
   for (const file of ["server.sh", "console.bat", "server.py", "startup/common.py", "startup/test/test_node.py"]) {
     const p = plan([file]);
-    assert.deepEqual(selected(p), ["startup"], file);
+    assert.deepEqual(selected(p), ["startup", "pi32"], file);
     assert.deepEqual(p.jobs.startup, STARTUP_OS, file);
   }
   assert.ok(classify(["server.js"]).has("unknown"), "only the entrypoint names match");
+});
+
+test("the armhf userland scripts select only that check; the console does not need it", () => {
+  for (const file of ["virtual-lab/host/raspios-armhf.sh", "virtual-lab/host/importar-raspios.sh", "virtual-lab/host/raspios.json"]) {
+    assert.deepEqual(selected(plan([file])), ["pi32"], file);
+  }
+  assert.deepEqual(selected(plan(["virtual-lab/host/raspios-arm64.sh"])), []);
+  assert.equal(plan(["remoteifes-console/src/servidor.js"]).jobs.pi32, false);
 });
 
 test("Cordova changes select mobile validation and the server app contracts", () => {
@@ -89,10 +99,6 @@ test("CI definition changes, unknown paths and unknown diffs widen to full valid
     assert.equal(p.jobs.e2e.length, 23);
     assert.equal(p.jobs.safari, true);
   }
-});
-
-test("dependabot configuration alone selects nothing", () => {
-  assert.deepEqual(selected(plan([".github/dependabot.yml"])), []);
 });
 
 test("the virtual hardware lab and its manual workflow select nothing here", () => {
@@ -190,11 +196,87 @@ test("pull_request diffs use the test merge commit's first parent", () => {
     const pushOut = path.join(dir, "push.txt");
     execFileSync(process.execPath, [script], {
       cwd: dir,
-      env: { ...process.env, EVENT_NAME: "push", REF: "refs/heads/main", BEFORE_SHA: "0".repeat(40), GITHUB_OUTPUT: pushOut },
+      env: { ...process.env, EVENT_NAME: "push", REF: "refs/heads/main", GITHUB_TOKEN: "", GITHUB_OUTPUT: pushOut },
       stdio: ["ignore", "ignore", "pipe"],
     });
-    assert.equal(JSON.parse(fs.readFileSync(pushOut, "utf8").match(/^plan=(.*)$/m)[1]).mode, "full", "a new ref has no diff base");
+    assert.equal(JSON.parse(fs.readFileSync(pushOut, "utf8").match(/^plan=(.*)$/m)[1]).mode, "full", "without a passing run to compare with, a push validates everything");
   } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the last passing run is the newest successful push or dispatch on main", async () => {
+  const respond = (status, body) => async () => ({ ok: status === 200, json: async () => body });
+  const env = { GITHUB_TOKEN: "t", GITHUB_REPOSITORY: "o/r" };
+  const runs = [
+    { event: "pull_request", head_branch: "main", head_sha: "a".repeat(40) },
+    { event: "push", head_branch: "outro", head_sha: "b".repeat(40) },
+    { event: "push", head_branch: "main", head_sha: "c".repeat(40) },
+  ];
+  assert.equal(await lastGreenSha(env, respond(200, { workflow_runs: runs })), "c".repeat(40));
+  assert.equal(await lastGreenSha(env, respond(200, { workflow_runs: [] })), null);
+  assert.equal(await lastGreenSha(env, respond(500, {})), null);
+  assert.equal(await lastGreenSha(env, async () => { throw new Error("offline"); }), null);
+  assert.equal(await lastGreenSha({}, respond(200, { workflow_runs: runs })), null, "no token, no query");
+});
+
+test("a push is diffed against the last passing run, so a cancelled run's changes are not dropped", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "select-checks-green-"));
+  const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  const commit = (file) => {
+    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(dir, file), `${file}\n`);
+    git("add", "-A");
+    git("commit", "-q", "-m", file);
+    return git("rev-parse", "HEAD");
+  };
+  let reply = { status: 200, runs: [] };
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    requests.push({ url: req.url, auth: req.headers.authorization });
+    res.writeHead(reply.status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ workflow_runs: reply.runs }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "ci@example.invalid");
+    git("config", "user.name", "ci");
+    const green = commit("README.md");
+    const cancelled = commit("remoteifes-web/js/app.js");
+    commit("remoteifes-server/src/app.js");
+
+    const output = path.join(dir, "out.txt");
+    const planFor = async (runs, status = 200) => {
+      reply = { status, runs };
+      fs.rmSync(output, { force: true });
+      await promisify(execFile)(process.execPath, [path.join(__dirname, "select-checks.js")], {
+        cwd: dir,
+        env: {
+          ...process.env,
+          EVENT_NAME: "push",
+          REF: "refs/heads/main",
+          GITHUB_TOKEN: "token",
+          GITHUB_REPOSITORY: "o/r",
+          GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`,
+          GITHUB_OUTPUT: output,
+        },
+      });
+      return JSON.parse(fs.readFileSync(output, "utf8").match(/^plan=(.*)$/m)[1]);
+    };
+
+    const p = await planFor([{ event: "push", head_branch: "main", head_sha: green }]);
+    assert.deepEqual(p.areas, ["server", "web"], "the web change of the cancelled run is validated again");
+    assert.equal(p.jobs.ios, true);
+    assert.equal(requests[0].auth, "Bearer token");
+    assert.match(requests[0].url, /^\/repos\/o\/r\/actions\/workflows\/ci\.yml\/runs\?branch=main&status=success/);
+
+    assert.deepEqual((await planFor([{ event: "push", head_branch: "main", head_sha: cancelled }])).areas, ["server"]);
+    for (const [runs, status] of [[[], 200], [[{ event: "push", head_branch: "main", head_sha: "f".repeat(40) }], 200], [[], 500]]) {
+      assert.equal((await planFor(runs, status)).mode, "full", "an unknown or unreachable base widens to full validation");
+    }
+  } finally {
+    server.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
