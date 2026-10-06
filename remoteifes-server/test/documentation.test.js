@@ -74,7 +74,7 @@ test("the public catalog covers the common functions and contains no broken link
 // repeat those tutorials; it points to the Console path.
 test("critical commands keep a single canonical form in the README", () => {
   const grupos = [
-    "instalacao", "iniciar", "backupCriar", "backupRestaurar", "deployAtualizar", "deployReverter", "release", "firmwareOta",
+    "inicioRapido", "instalacao", "iniciar", "backupCriar", "backupRestaurar", "deployAtualizar", "deployReverter", "release", "firmwareOta",
     "credenciaisConsultar", "credenciaisEmitir", "credenciaisDerrubar", "recuperacaoConta", "carga",
     "androidVersao", "androidRede", "androidPublicacao", "testes", "gitSincronizar", "gitRecriar",
     "consoleInstalar", "consoleAcesso", "consoleReparo",

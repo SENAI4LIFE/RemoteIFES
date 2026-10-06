@@ -17,11 +17,26 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
   <img src="docs/readme-assets/screenshots/room-panel-mobile.png" width="204" alt="Painel da sala A-108 no celular: ar-condicionado ligado a 23 °C, placa online, botões de temperatura, Power e Turbo.">
 </p>
 
+## Início rápido
+
+Na raiz do checkout:
+
+| Sistema | Servidor | Console de Operações |
+|---|---|---|
+| Linux, Raspberry Pi OS (32 ou 64 bits) e macOS | `./server.sh` | `./console.sh` |
+| Windows (no PowerShell, com `.\` antes) | `server.bat` | `console.bat` |
+
+`server.sh` prepara o que faltar (Node.js, dependências, `.env`), inicia o servidor e mostra os endereços: **`http://localhost:8080`** e o da rede local. `console.sh` instala o [Console de Operações](#console-de-operações) na primeira vez e depois só o abre; no Linux com systemd, `sudo ./console.sh` instala também o socket e o auxiliar privilegiado. Rodar de novo não reinstala nem duplica nada. `--verificar` só confere; `--ajuda` lista as opções.
+
+Requer Python 3.7+. O Node.js 22.13+ é instalado quando falta no Linux (x64, ARM64 ou ARMv7) e no macOS com Homebrew; no Windows, instale antes o [Node.js 22 LTS](https://nodejs.org/en/download).
+
+Sem `SENHA_ADMIN_INICIAL`, o primeiro acesso é `superadmin`/`admin`, e o `.env` inicial é de desenvolvimento, sem restrição de rede. Produção, comandos manuais e detalhes: [referência técnica](#referência-técnica-inicialização-manual-e-produção).
+
 ## Acesso rápido
 
 | Preciso… | Vá para |
 |---|---|
-| instalar pela primeira vez | [Instalação Rápida](#instalação-rápida) e [Inicialização e implantação](#inicialização-e-implantação-referência-canônica) |
+| instalar e iniciar | [Início rápido](#início-rápido) (`./server.sh`, `./console.sh`) |
 | operar em produção (serviço, proxy, redes autorizadas) | [Deploy](#deploy) e [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) |
 | manter o servidor, o host e a infraestrutura | [Console de Operações](#console-de-operações) |
 | atualizar ou reverter uma versão | [Console de Operações](#console-de-operações) e [Atualização, versões e reversão](#atualização-versões-e-reversão) |
@@ -34,6 +49,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 
 ## Sumário
 
+- [Início rápido](#início-rápido)
 - [Visão Geral](#visão-geral)
 - [Papéis e Permissões](#papéis-e-permissões)
 - [Navegação e Seleção de Salas](#navegação-e-seleção-de-salas)
@@ -52,8 +68,7 @@ Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web 
 - [Acessibilidade](#acessibilidade)
 - [Ajuda e Manual no App](#ajuda-e-manual-no-app)
 - [Requisitos](#requisitos)
-- [Instalação Rápida](#instalação-rápida)
-- [Inicialização e implantação (referência canônica)](#inicialização-e-implantação-referência-canônica)
+- [Referência técnica: inicialização manual e produção](#referência-técnica-inicialização-manual-e-produção)
 - [Configuração](#configuração)
 - [Deploy](#deploy)
 - [Console de Operações](#console-de-operações)
@@ -436,19 +451,31 @@ A divisão entre os dois documentos é deliberada: este README é a referência 
 ### Software
 
 - Navegador ou WebView com Chromium 108+, Safari 15.4+ (iOS 15.4+) ou Firefox 121+ para o frontend (site, PWA e aplicativo Cordova); abaixo disso a página mostra **Navegador desatualizado** em vez de carregar — veja [Cordova (Android/iOS)](#cordova-androidios)
-- Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental) — em Linux (incluindo Raspberry Pi OS), `remoteifes-server/setup.sh` instala automaticamente a versão correta caso não esteja presente, sem depender do pacote do sistema
+- Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental) — em Linux (incluindo Raspberry Pi OS), `./server.sh` o instala pelo `remoteifes-server/setup.sh` quando falta, sem depender do pacote do sistema
+- Python 3.7 ou superior para os scripts de início, só com a biblioteca padrão
 - [PlatformIO](https://platformio.org/) (Core CLI ou a extensão para VS Code), com a plataforma `espressif32`, para compilar e gravar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do PlatformIO Core (prefere `pipx`, com fallback para `pip --user`) e chama `pio run` para compilar, gravar o sistema de arquivos `data/` (LittleFS) e o firmware
 - Bibliotecas do firmware, resolvidas pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini` com versões fixadas: plataforma `espressif32@7.0.1`, [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) 2.9.0, `WebSockets` (Links2004) 2.7.3, `ArduinoJson` 7.4.3, `DHT sensor library` 1.4.7 e `Adafruit Unified Sensor` 1.1.15. O servidor só atribui a uma sala os protocolos que o `IRac` dessa versão sabe transmitir; uma captura com outro identificador fica como sinal RAW genérico
 
 ### Hardware
 
-- Um servidor para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32 — de uma VM a um **Raspberry Pi** (3, 4, 5 ou Zero 2 W); como o `node:sqlite` é nativo do próprio Node.js, não há compilação de dependências nem ferramentas extras a instalar no Pi, veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
+- Um servidor para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32 — de uma VM a um **Raspberry Pi** (3, 4, 5 ou Zero 2 W, inclusive com Raspberry Pi OS de 32 bits); veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
 - Um ESP32 com emissor infravermelho (GPIO 4) por sala (ou por par de salas adjacentes, quando um único equipamento cobre as duas), um switch momentâneo no GPIO 26, um buzzer ativo no GPIO 27 e um sensor DHT opcional (GPIO 14) para leitura de temperatura
 - Uma única placa adicional (ou uma das placas de sala) com **receptor infravermelho no GPIO 15**, definida como clonador oficial em `Administração > Dispositivos > Protocolos IR`
 
-## Instalação Rápida
+## Referência técnica: inicialização manual e produção
 
-**macOS/Linux (inclui Raspberry Pi):**
+Os scripts do [Início rápido](#início-rápido) só encadeiam os mecanismos abaixo; esta seção é a referência para produção, reparo e uso sem eles. [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) e [Deploy](#deploy) apontam para cá.
+
+### O que os scripts de início conferem
+
+- **Arquitetura** pelo userland, não pelo kernel: um Pi com kernel de 64 bits e Raspberry Pi OS de 32 bits usa o Node armv7l, como o `setup.sh`. Sem Node utilizável, ARMv6 e x86 de 32 bits, que não têm Node.js 22 oficial, são recusados antes de qualquer download.
+- **Node.js**: o primeiro 22.13+ (de `engines` no `package.json`) que executa no host, mesmo atrás de um mais antigo no `PATH`; só nesta execução ele vai à frente do `PATH`, para o npm e o `setup.sh` também. `REMOTEIFES_NODE=<caminho>` fixa um binário. Nada usa `--force`/`--forcar`.
+- **Preparação** só do que falta: `setup.sh` (no Windows, `npm install` e cópia do `.env.example`); no console, `npm ci --omit=dev` (como o dono do checkout, sob `sudo`) e `instalacao/instalar.js` apenas sem instalação, que nunca é rebaixada pelo checkout.
+- **Partida**: o script `start` do `package.json` direto no Node, que substitui o processo do script no Linux e no macOS. Não inicia com o RemoteIFES já no ar, com outro programa na porta ou num checkout do `remoteifes.service`. Sem interface gráfica ou como root, `console.sh` usa `--iniciar`; as outras opções do lançador passam direto.
+
+### Comandos manuais
+
+macOS/Linux:
 
 ```bash
 cd remoteifes-server
@@ -456,15 +483,7 @@ bash setup.sh
 npm start
 ```
 
-Abra **`http://localhost:8080`** no próprio servidor ou **`http://IP_DO_SERVIDOR:8080`** de outro dispositivo da rede: o Node/Express entrega o frontend, a API e o WebSocket na mesma origem, sem etapa de build e sem Live Server.
-
-`setup.sh` instala o Node.js 22.13+ quando falta (Linux x64, ARM64 ou ARMv7, o que cobre qualquer Raspberry Pi, conferindo o SHA-256 publicado pelo nodejs.org antes de extrair; e macOS via Homebrew), instala as dependências e cria o `.env` a partir de `.env.example` sem sobrescrever um existente. Com o Node já instalado, `npm run setup` faz o mesmo.
-
-Isto é o **modo de desenvolvimento** do `.env.example` (`NODE_ENV=development`): sem restrição de rede, com CORS aberto a qualquer origem e, sem `SENHA_ADMIN_INICIAL`, com a conta `superadmin`/`admin`. Não deixe o servidor assim numa rede compartilhada; produção, `systemd`, proxy reverso e frontend separado ficam na [referência canônica de inicialização e implantação](#inicialização-e-implantação-referência-canônica).
-
-**Windows (PowerShell/CMD):**
-
-O `setup.sh` usa `bash` e não roda no Windows. Nesse caso, faça manualmente:
+Windows:
 
 ```powershell
 cd remoteifes-server
@@ -473,30 +492,13 @@ copy .env.example .env
 npm start
 ```
 
-**Em ambos os casos**, o banco de dados SQLite é criado e populado automaticamente na primeira execução do servidor (`npm start`), incluindo:
+`setup.sh` instala o Node.js 22.13+ quando falta (no Linux, o binário oficial x64, ARM64 ou ARMv7, conferido pelo SHA-256 publicado pelo nodejs.org antes de extrair; no macOS, pelo Homebrew), instala as dependências e cria o `.env` a partir de `.env.example` sem sobrescrever um existente; com o Node já instalado, `npm run setup` faz o mesmo. Depois, a partida é só `npm start`; rode o `setup.sh` de novo quando as dependências mudarem. `npm run dev` reinicia o processo ao alterar o servidor; não deixe os dois sobre o mesmo banco. O `.env.example` é o **modo de desenvolvimento** (`NODE_ENV=development`): sem restrição de rede, com CORS aberto a qualquer origem e, sem `SENHA_ADMIN_INICIAL`, com a conta `superadmin`/`admin`; não deixe o servidor assim numa rede compartilhada.
 
-- 86 salas reais do campus, extraídas da planta baixa (Bloco A e B, todos os pavimentos), todas offline até que os ESP32 correspondentes comecem a reportar
-- Um superadministrador inicial `superadmin` com senha `admin` quando `SENHA_ADMIN_INICIAL` não for definida. O acesso permanece funcional e um aviso persistente, visível somente ao superadministrador autenticado, leva à troca da senha
-- Limites globais de temperatura de 23 °C a 25 °C e Turbo sem função adicional
-
-## Inicialização e implantação (referência canônica)
-
-Esta é a referência canônica de startup; [Instalação Rápida](#instalação-rápida), [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi) e [Deploy](#deploy) apontam para cá.
-
-### Desenvolvimento integrado
-
-Depois da primeira instalação, o startup normal é só:
-
-```bash
-cd remoteifes-server
-npm start
-```
-
-Rode `bash setup.sh` de novo apenas quando as dependências mudarem. `npm run dev` é a alternativa com reinício automático ao alterar o servidor; não deixe os dois rodando sobre o mesmo banco. Banco e migrações são aplicados na partida, sem comando separado.
+Banco e migrações são aplicados na partida, sem comando separado. A primeira cria as 86 salas do campus (offline até os ESP32 reportarem), os [limites globais](#configurações-globais-banco-de-dados-via-administração--sistema--configurações) e, sem `SENHA_ADMIN_INICIAL`, o superadministrador `superadmin`/`admin`, com um aviso persistente que leva à troca da senha.
 
 ### Produção
 
-Antes do primeiro startup, revise o `.env`: `NODE_ENV=production`, `SERVIR_FRONTEND=true`, `SENHA_ADMIN_INICIAL` e as redes autorizadas. `npm start` à mão serve só para validação ou operação supervisionada; o frontend usa a URL pela qual foi aberto, então nada depende de `localhost`. Veja [Configuração](#configuração) e [Deploy](#deploy).
+Antes do primeiro startup, revise o `.env`: `NODE_ENV=production`, `SERVIR_FRONTEND=true`, `SENHA_ADMIN_INICIAL` e as redes autorizadas. `./server.sh` ou `npm start` à mão servem só para validação ou operação supervisionada; o frontend usa a URL pela qual foi aberto, então nada depende de `localhost`. Veja [Configuração](#configuração) e [Deploy](#deploy).
 
 ### Linux com systemd
 
@@ -738,7 +740,7 @@ O layout é o mesmo nos três sistemas:
 
 ### Instalar
 
-O instalador é o mesmo nos três sistemas e só exige o Node 22.13+ que o RemoteIFES já pede. No **Windows**, `remoteifes-console-<versão>-windows-<arco>-instalador.exe` é um instalador comum, por usuário e sem elevação (com atalho opcional e entrada em Programas e Recursos); executá-lo de novo repara a instalação. Para instalar em silêncio ou para todos os usuários, ou pelo `.zip` portátil:
+No checkout, use `./console.sh` ([Início rápido](#início-rápido)). Por baixo está o instalador portátil, o mesmo nos três sistemas, que só exige o Node 22.13+. Sem checkout, pelos artefatos do release: no **Windows**, `remoteifes-console-<versão>-windows-<arco>-instalador.exe` instala por usuário, sem elevação, e repara a instalação se executado de novo; em silêncio, para todos os usuários ou pelo `.zip`:
 
 ```powershell
 remoteifes-console-<versão>-windows-x64-instalador.exe /S /D=C:\Programas\RemoteIFES Console
@@ -746,7 +748,7 @@ remoteifes-console-<versão>-windows-x64-instalador.exe /S /D=C:\Programas\Remot
 .\instalar.ps1 -Escopo sistema     # todos os usuários, em console elevado
 ```
 
-No **Linux** e no **macOS**, o instalador portátil é chamado direto:
+Chamado direto, depois de `npm ci --omit=dev` em `remoteifes-console` (o `console.sh` faz os dois):
 
 ```bash
 cd remoteifes-console
@@ -754,7 +756,7 @@ sudo node instalacao/instalar.js --escopo sistema     # Linux com systemd
 node instalacao/instalar.js                           # macOS, ou Linux por usuário
 ```
 
-O progresso segue etapas reais (pré-requisitos, programa, estado e primeiro acesso, integração, verificação), e a instalação só termina depois de carregar o lançador instalado; se ele não carrega, ela falha e mostra o comando de reparo. No Linux com `--escopo sistema`, o instalador grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket` e `.service`. Em todos os sistemas cria o atalho e um segredo de instalação de uso único, `bootstrap-token`, no diretório de estado, legível só por quem administra o host.
+A instalação só termina depois de carregar o lançador instalado; se ele não carrega, falha e mostra o comando de reparo. No Linux com `--escopo sistema`, grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket` e `.service`. Em todos os sistemas cria o atalho e o segredo de uso único `bootstrap-token` no diretório de estado, legível só por quem administra o host.
 
 #### Pelo pacote `.deb`
 
@@ -768,13 +770,7 @@ Sem o checkout, a instalação prepara estado e segredo e imprime o único coman
 
 #### Primeiro operador
 
-Com interface gráfica, abra o console pelo atalho, com a conta que administra o host: o lançador troca o segredo por um convite de uso único, válido por 10 minutos, e abre o navegador no formulário de primeiro acesso, sem que o convite passe por argumento de processo ou fique no histórico. Sem interface gráfica, o caso normal de um Pi por SSH, crie o operador no próprio host; nome e senha são pedidos no terminal:
-
-```bash
-sudo node /opt/remoteifes-console/launcher-bootstrap.js --criar-operador
-```
-
-A tela de primeiro acesso também aceita o segredo digitado de `bootstrap-token`, e a instalação manual, fora do pacote, o exibe uma vez no terminal. Criado o operador, segredo e convites deixam de valer; reparar ou reinstalar preserva os operadores.
+Com interface gráfica, abra o console com `./console.sh` ou o atalho, com a conta que administra o host: o lançador troca o segredo por um convite de uso único, válido por 10 minutos, e abre o formulário de primeiro acesso sem que o convite passe por argumento de processo ou histórico. Sem interface gráfica, o caso normal de um Pi por SSH, use `sudo ./console.sh --criar-operador` (sem checkout: `sudo node /opt/remoteifes-console/launcher-bootstrap.js --criar-operador`); nome e senha são pedidos no terminal. A tela de primeiro acesso também aceita o segredo digitado de `bootstrap-token`, e a instalação manual, fora do pacote, o exibe uma vez no terminal. Criado o operador, segredo e convites deixam de valer; reparar ou reinstalar preserva os operadores.
 
 #### Remover
 
@@ -795,15 +791,15 @@ O console escuta só em loopback (`CONSOLE_BIND` aceita apenas `127.0.0.1` ou `:
 ssh -L 8099:127.0.0.1:8099 <usuario>@<host-do-pi>
 ```
 
-Feito o túnel, abra `http://127.0.0.1:8099`; o socket do systemd sobe o console na primeira conexão. No próprio host, use o atalho ou o lançador:
+Feito o túnel, abra `http://127.0.0.1:8099`; o socket do systemd sobe o console na primeira conexão. No próprio host:
 
 ```bash
-node <raiz>/launcher-bootstrap.js            # abre o console no navegador padrão
-node <raiz>/launcher-bootstrap.js --iniciar  # sobe o console e sai, sem abrir navegador
-node <raiz>/launcher-bootstrap.js --status   # estado do console, da aplicação e da versão do programa
+./console.sh            # abre o console (sem interface gráfica, só o inicia e mostra o túnel)
+./console.sh --iniciar  # sobe o console e sai, sem abrir navegador
+./console.sh --status   # estado do console, da aplicação e da versão do programa
 ```
 
-`--iniciar` serve um host sem interface gráfica e é o caminho que a CI exercita. Antes de abrir o navegador, o lançador desafia quem responde na porta e exige a resposta HMAC derivada do segredo que só o console em execução conhece; se outro processo tomou a porta, nada é aberto. Nenhuma credencial reutilizável viaja em URL, argumento ou atalho.
+Sem o checkout, as mesmas opções valem para `node <raiz>/launcher-bootstrap.js`; `--iniciar` é o caminho que a CI exercita. Antes de abrir o navegador, o lançador desafia quem responde na porta e exige a resposta HMAC derivada do segredo que só o console em execução conhece; se outro processo tomou a porta, nada é aberto. Nenhuma credencial reutilizável viaja em URL, argumento ou atalho.
 
 ### Atualizar o programa
 
@@ -940,9 +936,9 @@ Reinstalar o console não toca no `remoteifes.service` nem no banco. Para remov�
 
 ## Hospedagem em Raspberry Pi
 
-Um Raspberry Pi 3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits, basta para o servidor: o `node:sqlite` é nativo do Node.js, então nada é compilado no Pi, e `bash setup.sh` instala o Node.js 22.13+ dos binários oficiais (ARM64 ou ARMv7), conferidos pelo SHA-256 publicado, quando o do sistema falta ou é antigo. Nenhum runner de CI é um Pi físico; o que a CI e o workflow manual cobrem está em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados).
+Um Raspberry Pi 3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits, basta para o servidor: o `node:sqlite` é nativo do Node.js, então nada é compilado no Pi. Nenhum runner de CI é um Pi físico; o que a CI e o workflow manual cobrem está em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados).
 
-Clone o repositório e siga [Linux com systemd](#linux-com-systemd) e, se quiser Nginx, [Proxy reverso](#proxy-reverso). Defina `REMOTEIFES_DATA_DIR=/var/lib/remoteifes` no `.env` antes do primeiro boot, para manter os dados fora do checkout. Depois, a rotina é pelo [Console de Operações](#console-de-operações): redes autorizadas, reinício após editar o `.env` (ou `systemctl restart`), e [atualizações e reversões](#atualização-versões-e-reversão), que funcionam também sem rede (`--offline`). O Pi hospeda só o servidor; cada sala continua com o próprio ESP32.
+Clone o repositório, valide com `./server.sh` (que instala o Node.js ARMv7 ou ARM64 oficial quando falta) e siga [Linux com systemd](#linux-com-systemd) e, se quiser Nginx, [Proxy reverso](#proxy-reverso). Defina `REMOTEIFES_DATA_DIR=/var/lib/remoteifes` no `.env` antes do primeiro boot, para manter os dados fora do checkout. Depois, a rotina é pelo [Console de Operações](#console-de-operações): redes autorizadas, reinício após editar o `.env` (ou `systemctl restart`), e [atualizações e reversões](#atualização-versões-e-reversão), que funcionam também sem rede (`--offline`). O Pi hospeda só o servidor; cada sala continua com o próprio ESP32.
 
 ### Antes de deixar o Pi exposto sem supervisão
 
@@ -958,15 +954,7 @@ Um Pi alcançável pela Internet e sem ninguém observando é um alvo permanente
 
 ### Frontend no GitHub Pages (opcional, para demonstração)
 
-Em produção o próprio servidor entrega o `remoteifes-web`; o GitHub Pages serve só como vitrine pública, publicada pelo workflow `.github/workflows/pages.yml` (a publicação direta de uma branch só aceita a raiz ou `/docs`). Passo a passo:
-
-1. Envie o projeto para um repositório no GitHub (`git push` para a branch `main`), caso ainda não tenha feito isso.
-2. O frontend fala com a origem da própria página (`servidorPadraoDoNavegador()` em `remoteifes-web/js/config.js`), que no GitHub Pages é o endereço `github.io`, não o servidor. Para a demonstração, troque na linha `const serverUrl = …` esse valor pela origem HTTPS do servidor central e inclua a origem do Pages em `CORS_ORIGIN`. O mesmo arquivo é entregue pelo servidor em produção, então aponte-o só para o próprio servidor e avance a versão do frontend.
-3. Faça commit e push dessa alteração na branch `main`.
-4. No repositório, vá em **Settings > Pages**.
-5. Em "Build and deployment", campo "Source", selecione **GitHub Actions**.
-6. Abra **Actions > Pages**, execute o workflow manualmente se necessário e acompanhe a implantação. Depois disso, cada push em `main` que alterar `remoteifes-web` ou o próprio workflow republica o site.
-7. Quando a publicação terminar, o endereço aparece em **Settings > Pages** (`https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`). Cada push que altere `remoteifes-web` o republica.
+Em produção o próprio servidor entrega o `remoteifes-web`; o GitHub Pages é só vitrine, publicada pelo workflow `.github/workflows/pages.yml` a cada push em `main` que altere `remoteifes-web`. Ative-o em **Settings > Pages > Source: GitHub Actions** (a primeira publicação pode exigir rodar **Actions > Pages** à mão); o endereço (`https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/`) aparece ali. Como o frontend fala com a origem da própria página (`servidorPadraoDoNavegador()` em `remoteifes-web/js/config.js`), a demonstração exige trocar `const serverUrl = …` pela origem HTTPS do servidor e incluir a origem do Pages em `CORS_ORIGIN`; o mesmo arquivo é entregue pelo servidor em produção, então aponte-o só para o próprio servidor e avance a versão do frontend.
 
 ## Domínio Próprio e HTTPS
 
@@ -1452,6 +1440,7 @@ Todos os comandos rodam a partir da raiz do projeto, salvo indicação em contr�
 
 | Alvo | Comando | O que cobre |
 |---|---|---|
+| Scripts de início | `python3 -m unittest discover -s startup/test -t .` | arquitetura (Pi com kernel de 64 bits e userland de 32), conflito de `PATH` do Node.js, wrappers em sh, dash, bash e busybox, `.bat`, repetição, falhas e uma partida real com banco descartável |
 | Servidor (API + banco) | `cd remoteifes-server && npm test` | `node:test`, sem dependências extras: sessões e permissões, `/comando`, limites, agendamentos e desligamento diário, notificações, WebSocket, backup e restauração, `/health`, OTA, credenciais, monitoramento, protocolos IR, Auto-ON, acesso de rede, transporte da malha, injeção de falhas e reinício com placas simuladas no nível do protocolo (`test/device-fault-injection.test.js`, `test/device-restart.test.js`), uma rodada curta do ensaio de crescimento (`test/device-soak-smoke.test.js`), migração do esquema, contratos do frontend, do Cordova e da documentação, e o contrato do firmware (`test/firmware-contract.test.js`: GPIOs, switch, buzzer, NVS, AP). Valida servidor e protocolo, não o hardware |
 | Ensaio de implantação | `sudo env ENSAIO_HOST_DESCARTAVEL=1 PATH="$PATH" bash remoteifes-server/ensaio-implantacao.sh` | só num Linux **descartável** com systemd, porque instala unidades, nginx e o pacote do console e altera `/etc`. A partir de um clone limpo, com placas simuladas: `setup.sh`, `install-service.sh`, reinício, parada e partida com dados preservados, uma atualização, uma atualização que cai ao iniciar e é revertida, `rollback.sh`, backup no ar e restauração parada, `lan-setup.sh` com as placas atravessando o proxy, `https-setup.sh` até a emissão do certificado (que **não é exercida**, por exigir domínio público) e o `.deb` do console, da ativação por socket ao purge |
 | Frontend end-to-end | `cd remoteifes-server && npm ci && cd ../e2e && npm ci && npx playwright install chromium && npx playwright test` | Playwright contra a API real, o frontend estático e um ESP32 simulado: layouts de celular a desktop largo, autenticação e permissões, salas e controlador, relatos, notificações, queda de WebSocket, navegação por endereço (`navigation.spec.js`), manual (`manual.spec.js`), hub (`home.spec.js`), Protocolos IR (`ir-protocols.spec.js`), Auto-ON (`auto-on.spec.js`) e a tela de navegador desatualizado (`compat-guard.spec.js`) |
@@ -1469,8 +1458,9 @@ No end-to-end, `npx playwright install chromium` baixa o navegador (numa imagem 
 
 | Mudança em | Validação rápida | Validação completa acrescenta |
 |---|---|---|
-| `remoteifes-server/` | servidor em Linux ARM64, Windows e macOS; Console de Operações; ensaio de implantação; end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
-| `remoteifes-console/` | Console de Operações nos três sistemas; instalação do pacote em Linux x64 e ARM64, Windows e macOS; ensaio de implantação | — |
+| `remoteifes-server/` | servidor em Linux ARM64, Windows e macOS; Console de Operações; ensaio de implantação; end-to-end Chromium; scripts de início | end-to-end em todos os navegadores; Safari nativo |
+| `remoteifes-console/` | Console de Operações nos três sistemas; instalação do pacote em Linux x64 e ARM64, Windows e macOS; ensaio de implantação; scripts de início | — |
+| `server.sh`, `console.sh`, `server.bat`, `console.bat`, `server.py`, `console.py`, `startup/` | scripts de início em Linux x64 e ARM64, Windows e macOS | — |
 | `remoteifes-web/` | contratos do frontend nos testes do servidor (Linux ARM64); end-to-end Chromium; Cordova; builds Android e iOS | end-to-end em todos os navegadores; Safari nativo |
 | `remoteifes-cordova/` | contratos do app nos testes do servidor; Cordova; builds Android e iOS | — |
 | `remoteifes-esp32/` | build do firmware; contratos de dispositivo nos testes do servidor | — |
@@ -1487,6 +1477,7 @@ Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também.
 | Servidor (`npm test` + health check), com os contratos do frontend, do Cordova, do firmware e da documentação | Linux ARM64 com o Node mínimo (22.13.0); Windows e macOS com o 22.x mais recente |
 | Console de Operações (`npm test` + medição de recursos) | Ubuntu (Node 22.13.0), Windows e macOS |
 | Pacote do console: build, procedência, instalação do artefato, execução pelo lançador sem ferramentas de desenvolvimento, `.deb`, desinstalação preservando o estado | Linux x64 e ARM64, Windows e macOS |
+| Scripts de início (`--preparar`, `--verificar` e `startup/test`) | Ubuntu x64 com o Node mínimo (22.13.0) e ARM64, Windows e macOS |
 | Ensaio de implantação (`ensaio-implantacao.sh`) | Ubuntu 22.04 x64 com o Node mínimo e Ubuntu 24.04 ARM64 |
 | End-to-end (Playwright), em shards com harness próprio | Ubuntu com Chromium, Firefox e WebKit; Windows com o Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox; macOS com o Chrome do sistema |
 | Safari nativo (`e2e/harness/safari-smoke.js`, pelo `safaridriver`, sem dependência npm; o WebKit do Playwright não conta como Safari). O smoke no iOS Simulator só roda com `ios_safari` no **Run workflow**, como diagnóstico | macOS |
@@ -1650,6 +1641,9 @@ Nenhum dos dois é pré-requisito de operação: sem rede, o console continua ad
 ## Estrutura de Pastas
 
 ```
+server.sh, console.sh     início no Linux e no macOS; server.bat e console.bat no Windows. Chamam server.py e console.py
+startup/                  código comum dos scripts de início (common.py, só biblioteca padrão do Python) e os testes em test/
+
 remoteifes-server/        servidor central (Node.js + Express + SQLite)
   server.js               ponto de entrada: HTTP, os dois WebSocket (/ws e /ws/dispositivo) e o agendador
   setup.sh, install-service.sh, lan-setup.sh, https-setup.sh     instalação, systemd e proxy reverso
@@ -1712,10 +1706,11 @@ Cada item segue a mesma leitura: **sintoma** (o que se vê) → o que **verifica
 
 ### Servidor, rede e serviço
 
-- **`EADDRINUSE` / porta 8080 ocupada**: descubra o processo com `ss -ltnp 'sport = :8080'` (use `sudo ss -ltnp 'sport = :8080'` se o nome/PID não aparecer). Se já for uma instância do RemoteIFES, use-a ou pare-a pelo mesmo método com que foi iniciada; não abra uma segunda instância sobre o mesmo banco. Confirme depois com `curl -fsS http://localhost:8080/health` ou `npm run health`.
+- **`EADDRINUSE` / porta 8080 ocupada**: o `server.sh` já distingue o RemoteIFES no ar (só mostra os endereços) de outro programa na porta. Descubra o processo com `sudo ss -ltnp 'sport = :8080'`; se for uma instância do RemoteIFES, use-a ou pare-a pelo mesmo método com que foi iniciada, sem abrir uma segunda sobre o mesmo banco.
 - **Servidor parece iniciado, mas a tela não abre**: `curl -fsS http://localhost:8080/health` deve retornar JSON com `"ok":true`, e `curl -I http://localhost:8080/` deve indicar conteúdo HTML. Confira também `ss -ltnp 'sport = :8080'`. Se `/health` funciona mas `/` não é HTML, confirme `SERVIR_FRONTEND=true` e reinicie o processo.
-- **Servidor não inicia por causa do `node:sqlite`**: confirme que o Node.js instalado é 22.13 ou superior (`node -v`); versões anteriores não têm o módulo nativo `node:sqlite` usado pelo projeto.
-- **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org` e o confere pelo `SHASUMS256.txt` da versão; um arquivo que não confere não é instalado); em arquiteturas fora de x64/ARM64/ARMv7, ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `bash setup.sh` novamente.
+- **`server.sh` ignora o Node.js ou não o encontra** (sem Node.js 22.13+ o servidor não tem o `node:sqlite`): cada `[WARN] ignorado:` dá o motivo (versão anterior a 22.13.0, binário de outra arquitetura, Node de outro sistema). Um Node antigo no `PATH` pode ficar; instale o Node.js 22 LTS ou aponte `REMOTEIFES_NODE=/caminho/do/node`. Sob `sudo` o `PATH` muda: `sudo env "PATH=$PATH" ./console.sh`. Sem Python 3.7+, instale o `python3` ou use os [comandos manuais](#comandos-manuais).
+- **`server.sh` diz que o checkout é o do `remoteifes.service`**: o systemd é quem inicia esse servidor, e uma segunda instância disputaria banco e porta; use o Console de Operações ou `sudo systemctl start remoteifes.service`.
+- **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org` e o confere pelo `SHASUMS256.txt` da versão; um arquivo que não confere não é instalado); em arquiteturas fora de x64/ARM64/ARMv7 (ARMv6, como Pi 1, Zero e Zero W, não tem Node.js 22 oficial), ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `./server.sh` novamente.
 - **`install-service.sh` falha com "systemd não encontrado"**: o script só funciona em Linux com `systemd` (padrão no Raspberry Pi OS); em outras distribuições, use um gerenciador de processo alternativo como `pm2`.
 - **Serviço `remoteifes.service` não inicia**: rode `sudo journalctl -u remoteifes.service -f` para ver o erro; confira se `remoteifes-server/.env` existe e está com as variáveis esperadas (veja [Configuração](#configuração)), e rode `sudo systemctl restart remoteifes.service` após qualquer correção.
 - **Perda temporária ou endereço incorreto**: uma queda momentânea mostra “Reconectando automaticamente…” e a interface recupera sozinha quando HTTP/WebSocket voltam. Falha persistente desde a abertura, `/health` inacessível pelo mesmo dispositivo ou acesso por um IP antigo indica endereço, porta, firewall, proxy ou rede autorizada incorretos. No fluxo integrado, abra novamente `http://IP_DO_SERVIDOR:8080`; não troque a configuração por causa de uma interrupção breve.
