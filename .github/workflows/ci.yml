@@ -53,6 +53,7 @@ jobs:
       firmware: ${{ steps.select.outputs.firmware }}
       android: ${{ steps.select.outputs.android }}
       ios: ${{ steps.select.outputs.ios }}
+      startup_os: ${{ steps.select.outputs.startup_os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -144,6 +145,37 @@ jobs:
       - name: Resource measurement (records runner figures)
         run: node test/measure-resources.js
         working-directory: remoteifes-console
+
+  startup:
+    name: Startup entrypoints (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.startup_os != '[]'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.changes.outputs.startup_os) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The x64 Linux leg runs the minimum Node the project declares; the others the newest 22.x.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.os == 'ubuntu-latest' && '22.13.0' || '22' }}
+          cache: npm
+          cache-dependency-path: remoteifes-server/package-lock.json
+      - name: Prepare and check through the entrypoint (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: ./server.sh --preparar && ./server.sh --verificar
+      - name: Prepare and check through the entrypoint (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call server.bat --preparar && call server.bat --verificar
+      # Includes a real start through server.sh / server.bat with a throwaway database.
+      - name: Entrypoint tests
+        run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} -m unittest discover -s startup/test -t . -v
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
 
   packages:
     name: Console package install (${{ matrix.os }})
@@ -639,7 +671,7 @@ jobs:
   result:
     name: CI result
     if: always()
-    needs: [changes, server, console, packages, deployment, e2e, safari, cordova, firmware, android, ios]
+    needs: [changes, server, console, packages, deployment, e2e, safari, cordova, firmware, android, ios, startup]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

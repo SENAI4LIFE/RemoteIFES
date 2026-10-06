@@ -11,6 +11,7 @@ const { classify, selectChecks, verifyResults, parseNameStatus, JOBS } = require
 const ALL_OS = ["ubuntu-latest", "windows-latest", "macos-latest"];
 const SERVER_OS = ["ubuntu-24.04-arm", "windows-latest", "macos-latest"];
 const PACKAGES_OS = [...ALL_OS, "ubuntu-24.04-arm"];
+const STARTUP_OS = [...ALL_OS, "ubuntu-24.04-arm"];
 
 function plan(paths, { fullDepth = false, allScope = false } = {}) {
   return selectChecks({ areas: paths === null ? null : classify(paths), fullDepth, allScope });
@@ -22,7 +23,7 @@ function selected(p) {
 
 test("console changes select console tests and native package checks only", () => {
   const p = plan(["remoteifes-console/src/servidor.js"]);
-  assert.deepEqual(selected(p), ["console", "packages", "deployment"]);
+  assert.deepEqual(selected(p), ["console", "packages", "deployment", "startup"]);
   assert.deepEqual(p.jobs.console, ALL_OS);
   assert.deepEqual(p.jobs.packages, PACKAGES_OS);
 });
@@ -44,12 +45,21 @@ test("web changes select contracts, fast Chromium E2E and dependent mobile packa
 
 test("server changes select server on every OS (Linux on ARM64), the console and frontend integration", () => {
   const p = plan(["remoteifes-server/src/app.js"]);
-  assert.deepEqual(selected(p), ["server", "console", "deployment", "e2e"]);
+  assert.deepEqual(selected(p), ["server", "console", "deployment", "e2e", "startup"]);
   assert.deepEqual(p.jobs.server, SERVER_OS);
 });
 
 test("server lockfile changes are server changes", () => {
-  assert.deepEqual(selected(plan(["remoteifes-server/package-lock.json"])), ["server", "console", "deployment", "e2e"]);
+  assert.deepEqual(selected(plan(["remoteifes-server/package-lock.json"])), ["server", "console", "deployment", "e2e", "startup"]);
+});
+
+test("root entrypoint changes select only the entrypoint job, on every OS", () => {
+  for (const file of ["server.sh", "console.bat", "server.py", "startup/common.py", "startup/test/test_node.py"]) {
+    const p = plan([file]);
+    assert.deepEqual(selected(p), ["startup"], file);
+    assert.deepEqual(p.jobs.startup, STARTUP_OS, file);
+  }
+  assert.ok(classify(["server.js"]).has("unknown"), "only the entrypoint names match");
 });
 
 test("Cordova changes select mobile validation and the server app contracts", () => {
@@ -120,7 +130,7 @@ test("E2E shards cover 1..n exactly once per target", () => {
 test("verification accepts selected-success and unselected-skipped only", () => {
   const p = plan(["remoteifes-console/src/servidor.js"]);
   const needs = { changes: { result: "success" } };
-  for (const job of JOBS) needs[job] = { result: ["console", "packages", "deployment"].includes(job) ? "success" : "skipped" };
+  for (const job of JOBS) needs[job] = { result: ["console", "packages", "deployment", "startup"].includes(job) ? "success" : "skipped" };
   assert.deepEqual(verifyResults(p, needs), []);
 
   assert.match(verifyResults(p, { ...needs, console: { result: "skipped" } }).join(), /console: expected success, got skipped/);

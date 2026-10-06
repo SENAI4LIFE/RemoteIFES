@@ -37,6 +37,7 @@ Thumbs.db
 *.temp
 *.swp
 *.swo
+__pycache__/
 .vscode/
 .idea/
 *.code-workspace

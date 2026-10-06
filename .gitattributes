@@ -1,3 +1,4 @@
 *.sh text eol=lf
+*.bat text eol=crlf
 # Real release files are checked byte for byte (SHA-256 against their attestation).
 remoteifes-console/test/fixtures/** -text
