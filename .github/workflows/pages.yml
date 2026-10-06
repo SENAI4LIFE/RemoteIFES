@@ -1,31 +1,78 @@
 name: Pages
 
+# Publishes remoteifes-web only after CI passed on main for that exact commit, and only when the
+# changes that CI run validated touched the site or this workflow. Kept out of ci.yml so a newer push
+# never cancels a deployment in progress. A manual dispatch publishes the selected ref.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    paths:
-      - "remoteifes-web/**"
-      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# A deployment in progress is never cancelled; a newer push waits and then publishes.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Validated site changes
+    # Pull-request runs never qualify: only CI runs of pushes to (or dispatches on) main.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'workflow_run'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      # The previous passing CI commit on main is where the validated changes of this run start.
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "workflow_run" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=20" \
+            --jq "[.workflow_runs[] | select(.id != $RUN_ID and (.event == \"push\" or .event == \"workflow_dispatch\"))][0].head_sha // \"\"") || base=""
+          if [ -n "$base" ] && git merge-base --is-ancestor "$base" "$HEAD_SHA" 2>/dev/null \
+            && git diff --quiet "$base" "$HEAD_SHA" -- remoteifes-web .github/workflows/pages.yml; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy:
+    name: Deploy
+    needs: changes
+    if: needs.changes.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
