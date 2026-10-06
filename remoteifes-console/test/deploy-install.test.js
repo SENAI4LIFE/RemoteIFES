@@ -786,6 +786,108 @@ test("the Windows shortcut uses the .vbs extension, because wscript picks the en
   assert.match(fonte, /CreateObject\("WScript\.Shell"\)/);
 });
 
+test("the Windows shortcuts quote every path for PowerShell and open the launcher script", () => {
+  const { comandoDeAtalhoWindows } = require(path.join(ajuda.RAIZ, "instalacao", "instalar.js"));
+  const raiz = "C:\\Users\\O'Brien\\AppData\\Local\\Programs\\RemoteIFES Console";
+  const comando = comandoDeAtalhoWindows("C:\\Users\\O'Brien\\Desktop\\Console de Operações RemoteIFES.lnk", `${raiz}\\abrir-console.vbs`, raiz);
+
+  assert.ok(comando.includes("$w.CreateShortcut('C:\\Users\\O''Brien\\Desktop\\Console de Operações RemoteIFES.lnk')"), comando);
+  assert.ok(comando.includes("$s.TargetPath = 'wscript.exe'"));
+  assert.ok(comando.includes(`$s.Arguments = '"C:\\Users\\O''Brien\\AppData\\Local\\Programs\\RemoteIFES Console\\abrir-console.vbs"'`));
+  assert.ok(comando.includes("$s.WorkingDirectory = 'C:\\Users\\O''Brien\\AppData\\Local\\Programs\\RemoteIFES Console'"));
+  assert.ok(!/https?:\/\//.test(comando), "the shortcut never fixes an address");
+});
+
+test("the desktop entry quotes the launcher path the way the Desktop Entry spec requires", { skip: process.platform === "win32" && "Linux desktop entries take POSIX paths" }, () => {
+  const { entradaDesktop } = require(path.join(ajuda.RAIZ, "instalacao", "instalar.js"));
+  const entrada = entradaDesktop('/opt/dir com espaço/$HOME%x\\y"z');
+  const exec = entrada.split("\n").find((linha) => linha.startsWith("Exec="));
+  assert.equal(
+    exec,
+    `Exec="${process.execPath.replace(/["`$\\]/g, "\\$&").replace(/\\/g, "\\\\")}" "/opt/dir com espaço/\\\\$HOME%%x\\\\\\\\y\\\\"z/launcher-bootstrap.js"`
+  );
+  assert.throws(() => entradaDesktop("/opt/linha\nquebrada"), /quebra de linha/);
+});
+
+test("the Linux desktop icon is the menu entry itself, only where a desktop exists, and leaves with the program", { skip: (process.platform !== "linux" && "Linux desktop entries") || (process.getuid() === 0 && "the icon is never created as root") }, async (t) => {
+  const base = ajuda.dirTemporario("console-mesa-");
+  const casa = path.join(base, "casa");
+  const raiz = path.join(base, "programa com espaço");
+  const estadoDir = path.join(base, "estado");
+  const mesa = path.join(casa, "Área de Trabalho");
+  fs.mkdirSync(path.join(casa, ".config"), { recursive: true });
+  fs.writeFileSync(path.join(casa, ".config", "user-dirs.dirs"), 'XDG_DESKTOP_DIR="$HOME/Área de Trabalho"\n');
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const env = { HOME: casa, XDG_CONFIG_HOME: undefined, XDG_DATA_HOME: undefined, XDG_STATE_HOME: undefined, XDG_CACHE_HOME: undefined };
+  const argumentos = ["--escopo", "usuario", "--raiz", raiz, "--estado", estadoDir, "--atalho-area-de-trabalho"];
+  const menu = path.join(casa, ".local", "share", "applications", "remoteifes-console.desktop");
+  const icone = path.join(mesa, "remoteifes-console.desktop");
+
+  const semMesa = await instalar(argumentos, env);
+  assert.equal(semMesa.codigo, 0, semMesa.saida);
+  assert.ok(fs.existsSync(menu), "the menu entry is still created");
+  assert.ok(!fs.existsSync(mesa), "a missing desktop folder is not created");
+  assert.match(semMesa.saida, /Ícone na área de trabalho não criado/);
+
+  fs.mkdirSync(mesa);
+  const alheio = path.join(base, "arquivo-alheio");
+  fs.writeFileSync(alheio, "intocado\n");
+  fs.symlinkSync(alheio, icone);
+  const comMesa = await instalar(argumentos, env);
+  assert.equal(comMesa.codigo, 0, comMesa.saida);
+  assert.equal(fs.readFileSync(alheio, "utf8"), "intocado\n", "a link at the icon's name is replaced, never written through");
+  assert.ok(fs.lstatSync(icone).isFile());
+  assert.deepEqual(fs.readdirSync(mesa), ["remoteifes-console.desktop"], "no temporary file is left on the desktop");
+
+  const entrada = fs.readFileSync(menu, "utf8");
+  assert.equal(fs.readFileSync(icone, "utf8"), entrada, "the icon is the same launcher entry as the menu");
+  assert.ok(entrada.split("\n").includes(`Exec="${process.execPath}" "${path.join(raiz, "launcher-bootstrap.js")}"`), entrada);
+  assert.ok(!/https?:\/\//.test(entrada), "the address comes from the launcher's configuration, not the icon");
+  assert.equal(fs.statSync(menu).mode & 0o111, 0, "the menu entry stays a plain configuration file");
+  assert.ok(fs.statSync(icone).mode & 0o100, "file managers launch a desktop icon only when it is executable");
+  assert.equal(fs.statSync(icone).mode & 0o022, 0, "nobody else can rewrite what the icon runs");
+
+  const r = rodarNode([path.join(raiz, "versoes", require(path.join(ajuda.RAIZ, "package.json")).version, "instalacao", "desinstalar.js"), "--raiz", raiz, "--estado", estadoDir, "--sim"], env);
+  assert.equal(r.codigo, 0, r.saida);
+  assert.ok(!fs.existsSync(menu), "the menu entry leaves with the program");
+  assert.ok(!fs.existsSync(icone), "the desktop icon leaves with the program");
+  assert.equal(fs.readFileSync(alheio, "utf8"), "intocado\n");
+});
+
+test("uninstall removes a desktop icon only when it is a file that opens this installation", (t) => {
+  const { removerAtalhoDestaInstalacao } = require(path.join(ajuda.RAIZ, "instalacao", "desinstalar.js"));
+  const mesa = ajuda.dirTemporario("console-mesa-remocao-");
+  t.after(() => fs.rmSync(mesa, { recursive: true, force: true }));
+  const marca = Buffer.from("/opt/remoteifes-console/launcher-bootstrap.js");
+  const icone = path.join(mesa, "remoteifes-console.desktop");
+
+  fs.writeFileSync(icone, 'Exec="/usr/bin/node" "/home/outro/remoteifes-console/launcher-bootstrap.js"\n');
+  assert.equal(removerAtalhoDestaInstalacao(icone, marca, { simular: false }), false);
+  assert.ok(fs.existsSync(icone), "another installation's icon stays");
+
+  fs.rmSync(icone);
+  fs.mkdirSync(icone);
+  fs.writeFileSync(path.join(icone, "dado"), "/opt/remoteifes-console/launcher-bootstrap.js");
+  assert.equal(removerAtalhoDestaInstalacao(icone, marca, { simular: false }), false);
+  assert.ok(fs.existsSync(path.join(icone, "dado")), "a folder with the icon's name is never removed");
+  fs.rmSync(icone, { recursive: true });
+
+  const alvo = path.join(mesa, "alvo.desktop");
+  fs.writeFileSync(alvo, 'Exec="/usr/bin/node" "/opt/remoteifes-console/launcher-bootstrap.js"\n');
+  if (process.platform !== "win32") {
+    fs.symlinkSync(alvo, icone);
+    assert.equal(removerAtalhoDestaInstalacao(icone, marca, { simular: false }), false);
+    assert.ok(fs.existsSync(alvo), "a link is not followed to remove what it points to");
+    fs.rmSync(icone);
+  }
+
+  fs.renameSync(alvo, icone);
+  assert.equal(removerAtalhoDestaInstalacao(icone, marca, { simular: true }), true);
+  assert.ok(fs.existsSync(icone), "the simulation removes nothing");
+  assert.equal(removerAtalhoDestaInstalacao(icone, marca, { simular: false }), true);
+  assert.ok(!fs.existsSync(icone));
+});
+
 test("rollback refuses a dirty tree and does not discard local work", async (t) => {
   // `reverter()` must consult the checkout state before `reset --hard`/`checkout --force`, as
   // `implantar()` does. Both operations swap code the same way, so "never discards local work" must

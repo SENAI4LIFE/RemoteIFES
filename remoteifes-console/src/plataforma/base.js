@@ -1,6 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawn } = require("child_process");
 const config = require("../config");
 const processos = require("../processos");
 
@@ -262,6 +263,54 @@ async function abrirNavegador(url) {
   return recurso(ESTADO.NAO_SUPORTADO, "abertura de navegador não implementada nesta plataforma", { url });
 }
 
+const ESPERA_ABRIDOR_MS = 5000;
+
+// Not processos.executar: the browser needs the session environment that its fixed list drops
+// (DISPLAY, WAYLAND_DISPLAY, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, SystemRoot), and a browser
+// started in the foreground would hold its pipes open until it closes.
+function iniciarAbridor({ executavel, args, opcoes = {} }, esperaMs) {
+  return new Promise((resolver) => {
+    let filho;
+    try {
+      filho = spawn(executavel, args, { stdio: "ignore", detached: true, windowsHide: true, ...opcoes });
+    } catch (erro) {
+      resolver({ ok: false, ausente: erro.code === "ENOENT", motivo: erro.message });
+      return;
+    }
+    const relogio = setTimeout(() => {
+      filho.unref();
+      resolver({ ok: true, emAndamento: true });
+    }, esperaMs);
+    filho.once("error", (erro) => {
+      clearTimeout(relogio);
+      resolver({ ok: false, ausente: erro.code === "ENOENT", motivo: `${executavel}: ${erro.code || erro.message}` });
+    });
+    filho.once("exit", (codigo, sinal) => {
+      clearTimeout(relogio);
+      if (codigo === 0) resolver({ ok: true });
+      else resolver({ ok: false, motivo: `${executavel} terminou com ${sinal ? `o sinal ${sinal}` : `o código ${codigo}`}` });
+    });
+  });
+}
+
+// An opener still running after `esperaMs` may be holding the browser it started (generic xdg-open
+// waits for it), so it is not retried with the next opener; it is reported as still opening.
+async function abrirComAbridores(url, abridores, { esperaMs = ESPERA_ABRIDOR_MS } = {}) {
+  const falhas = [];
+  let instalado = false;
+  for (const abridor of abridores) {
+    const r = await iniciarAbridor(abridor, esperaMs);
+    if (r.ok) return { ...recurso(ESTADO.SUPORTADO), url, abridor: abridor.executavel, emAndamento: !!r.emAndamento };
+    instalado = instalado || !r.ausente;
+    falhas.push(r.ausente ? `${abridor.executavel} não encontrado` : r.motivo);
+  }
+  return recurso(instalado ? ESTADO.INDISPONIVEL : ESTADO.NAO_INSTALADO, falhas.join("; "), { url });
+}
+
+function areaDeTrabalho() {
+  return null;
+}
+
 /**
  * Protects a file so only its owner reads it. POSIX uses the mode; Windows overrides with an ACL.
  */
@@ -344,6 +393,8 @@ module.exports = {
   iniciarConsoleGerenciado,
   opcoesDeGrupo,
   abrirNavegador,
+  abrirComAbridores,
+  areaDeTrabalho,
   protegerArquivo,
   permissaoRestrita,
   diretoriosPadrao,

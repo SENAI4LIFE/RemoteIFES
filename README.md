@@ -73,7 +73,7 @@ Console de Operações:
 .\console.bat
 ```
 
-`server.sh` prepara o que faltar (Node.js, dependências, `.env`), inicia o servidor em primeiro plano (`Ctrl+C` encerra; rode o console em outro terminal) e mostra os endereços: **`http://localhost:8080`** e o da rede local. `console.sh` instala o [Console de Operações](#console-de-operações) na primeira vez e depois só o abre; no Linux com systemd, `sudo ./console.sh` instala também o socket e o auxiliar privilegiado. Rodar de novo não reinstala nem duplica nada. `--verificar` só confere; `--ajuda` lista as opções.
+`server.sh` prepara o que faltar (Node.js, dependências, `.env`), inicia o servidor em primeiro plano (`Ctrl+C` encerra; rode o console em outro terminal) e mostra os endereços: **`http://localhost:8080`** e o da rede local. `console.sh` instala o [Console de Operações](#console-de-operações) na primeira vez, com um ícone na área de trabalho quando ela existe, e depois só o abre; no Linux com systemd, `sudo ./console.sh` instala também o socket e o auxiliar privilegiado. Rodar de novo não reinstala nem duplica nada. `--verificar` só confere; `--ajuda` lista as opções.
 
 Requer Python 3.7+. O Node.js 22.13+ é instalado quando falta no Linux (x64, ARM64 ou ARMv7) e no macOS com Homebrew; no Windows, instale antes o [Node.js 22 LTS](https://nodejs.org/en/download).
 
@@ -518,7 +518,7 @@ Os scripts do [Início rápido](#início-rápido) só encadeiam os mecanismos ab
 - **Arquitetura** pelo userland, não pelo kernel: um Pi com kernel de 64 bits e Raspberry Pi OS de 32 bits usa o Node armv7l, como o `setup.sh`. Sem Node utilizável, ARMv6 e x86 de 32 bits, que não têm Node.js 22 oficial, são recusados antes de qualquer download.
 - **Node.js**: o primeiro 22.13+ (de `engines` no `package.json`) que executa no host, mesmo atrás de um mais antigo no `PATH`; só nesta execução ele vai à frente do `PATH`, para o npm e o `setup.sh` também. `REMOTEIFES_NODE=<caminho>` fixa um binário. Nada usa `--force`/`--forcar`.
 - **Preparação** só do que falta: `setup.sh` (no Windows, `npm install` e cópia do `.env.example`); no console, `npm ci --omit=dev` (como o dono do checkout, sob `sudo`) e `instalacao/instalar.js` apenas sem instalação, que nunca é rebaixada pelo checkout.
-- **Partida**: o script `start` do `package.json` direto no Node, que substitui o processo do script no Linux e no macOS. Não inicia com o RemoteIFES já no ar, com outro programa na porta ou num checkout do `remoteifes.service`. Sem interface gráfica ou como root, `console.sh` usa `--iniciar`; as outras opções do lançador passam direto.
+- **Partida**: o script `start` do `package.json` direto no Node, que substitui o processo do script no Linux e no macOS. Não inicia com o RemoteIFES já no ar, com outro programa na porta ou num checkout do `remoteifes.service`. Sem interface gráfica, numa sessão SSH no macOS ou no Windows, ou como root, `console.sh` usa `--iniciar` e mostra o endereço e o túnel; as outras opções do lançador passam direto.
 
 ### Comandos manuais
 
@@ -804,7 +804,7 @@ sudo node instalacao/instalar.js --escopo sistema     # Linux com systemd
 node instalacao/instalar.js                           # macOS, ou Linux por usuário
 ```
 
-A instalação só termina depois de carregar o lançador instalado; se ele não carrega, falha e mostra o comando de reparo. No Linux com `--escopo sistema`, grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket` e `.service`. Em todos os sistemas cria o atalho e o segredo de uso único `bootstrap-token` no diretório de estado, legível só por quem administra o host.
+A instalação só termina depois de carregar o lançador instalado; se ele não carrega, falha e mostra o comando de reparo. No Linux com `--escopo sistema`, grava o auxiliar privilegiado como `root:root`, uma regra de `sudo` restrita a ele (validada com `visudo`) e as unidades `remoteifes-console.socket` e `.service`. Em todos os sistemas cria o atalho e o segredo de uso único `bootstrap-token` no diretório de estado, legível só por quem administra o host. Com `--atalho-area-de-trabalho`, que o `console.sh` passa, cria também o ícone na área de trabalho do usuário, no Linux e no Windows, se a pasta já existir e a instalação não rodar como root; no macOS o atalho é o app em Aplicativos. Ícone e atalho rodam o lançador instalado, nunca um endereço fixo: porta e domínio vêm da configuração a cada abertura, e a desinstalação remove os dois.
 
 #### Pelo pacote `.deb`
 
@@ -847,7 +847,7 @@ Feito o túnel, abra `http://127.0.0.1:8099`; o socket do systemd sobe o console
 ./console.sh --status   # estado do console, da aplicação e da versão do programa
 ```
 
-Sem o checkout, as mesmas opções valem para `node <raiz>/launcher-bootstrap.js`; `--iniciar` é o caminho que a CI exercita. Antes de abrir o navegador, o lançador desafia quem responde na porta e exige a resposta HMAC derivada do segredo que só o console em execução conhece; se outro processo tomou a porta, nada é aberto. Nenhuma credencial reutilizável viaja em URL, argumento ou atalho.
+Sem o checkout, as mesmas opções valem para `node <raiz>/launcher-bootstrap.js`; `--iniciar` é o caminho que a CI exercita. Se o navegador não abre, o lançador mostra o endereço para abrir à mão (no primeiro acesso, também o arquivo do segredo e `--criar-operador`). Antes de abrir o navegador, o lançador desafia quem responde na porta e exige a resposta HMAC derivada do segredo que só o console em execução conhece; se outro processo tomou a porta, nada é aberto. Nenhuma credencial reutilizável viaja em URL, argumento ou atalho.
 
 ### Atualizar o programa
 

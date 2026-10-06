@@ -274,6 +274,7 @@ async function abrir(url) {
     log(`Abra manualmente: ${validada.toString()}`);
     return { ok: true, manual: true };
   }
+  if (r.emAndamento) log(`O navegador ainda está abrindo; se ele não aparecer, abra manualmente: ${validada.toString()}`);
   return { ok: true };
 }
 
@@ -321,6 +322,11 @@ function paginaDeRedirecionamento(destino) {
   ].join("\n");
 }
 
+function orientarPrimeiroAcessoManual(contrato) {
+  log(`Abra manualmente: ${urlDoConsole(contrato)} e informe o segredo de ${path.join(config.DIR_ESTADO, "bootstrap-token")}`);
+  log("Ou crie o primeiro operador pelo terminal, com a opção --criar-operador.");
+}
+
 /**
  * Opens the first-access page. `abrirNavegador` is injectable for tests; by default it is the
  * platform's.
@@ -343,8 +349,12 @@ async function abrirPrimeiroAcesso(contrato, { abrirNavegador = (u) => plataform
     const abertura = await abrirNavegador(require("url").pathToFileURL(pagina).toString());
     if (!abertura || !abertura.disponivel) {
       log(`Não foi possível abrir o navegador automaticamente (${(abertura && abertura.motivo) || "motivo desconhecido"}).`);
-      log("Para criar o primeiro operador sem navegador, use: --criar-operador");
-      return { ok: false, manual: true };
+      orientarPrimeiroAcessoManual(contrato);
+      return { ok: true, manual: true };
+    }
+    if (abertura.emAndamento) {
+      log("O navegador ainda está abrindo. Se ele não aparecer:");
+      orientarPrimeiroAcessoManual(contrato);
     }
     // The browser reads the page asynchronously; it is deleted once it had time to load.
     if (esperaMs > 0) {

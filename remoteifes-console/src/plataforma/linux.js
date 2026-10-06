@@ -280,14 +280,37 @@ async function portasEmEscuta() {
   return recurso(ESTADO.INDISPONIVEL, "ss não está disponível neste host");
 }
 
-async function abrirNavegador(url) {
-  // xdg-open respects the user's graphical session. A headless host has no browser, and this is
-  // stated instead of failing silently.
+async function abrirNavegador(url, opcoes) {
+  if (typeof process.getuid === "function" && process.getuid() === 0) {
+    return recurso(ESTADO.NAO_APLICAVEL, "o navegador não é aberto como root; abra o endereço com a sua conta", { url });
+  }
   if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
     return recurso(ESTADO.NAO_APLICAVEL, "este host não tem sessão gráfica; abra o endereço a partir da sua máquina por túnel SSH", { url });
   }
-  const r = await processos.executar("xdg-open", [url], { timeoutMs: 10_000 });
-  return r.ok ? { ...recurso(ESTADO.SUPORTADO), url } : recurso(ESTADO.INDISPONIVEL, r.erro || "xdg-open falhou", { url });
+  return base.abrirComAbridores(
+    url,
+    [
+      { executavel: "xdg-open", args: [url] },
+      { executavel: "gio", args: ["open", url] },
+    ],
+    opcoes
+  );
+}
+
+function areaDeTrabalho() {
+  const casa = os.homedir();
+  const configuracao = process.env.XDG_CONFIG_HOME || path.join(casa, ".config");
+  let pasta = path.join(casa, "Desktop");
+  try {
+    const declarada = /^XDG_DESKTOP_DIR="([^"]+)"/m.exec(fs.readFileSync(path.join(configuracao, "user-dirs.dirs"), "utf8"));
+    if (declarada) pasta = declarada[1].replace(/^\$HOME(?=\/|$)/, casa);
+  } catch {}
+  if (!path.isAbsolute(pasta) || path.resolve(pasta) === path.resolve(casa)) return null;
+  try {
+    return fs.statSync(pasta).isDirectory() ? pasta : null;
+  } catch {
+    return null;
+  }
 }
 
 function diretoriosPadrao({ escopo = "sistema" } = {}) {
@@ -461,6 +484,7 @@ module.exports = {
   pacotesPendentes,
   portasEmEscuta,
   abrirNavegador,
+  areaDeTrabalho,
   diretoriosPadrao,
   registrarInicializacao,
   removerInicializacao,

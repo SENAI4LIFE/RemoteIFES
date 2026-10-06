@@ -363,12 +363,36 @@ function opcoesDeGrupo() {
   return { detached: true, windowsHide: true };
 }
 
-async function abrirNavegador(url) {
-  // cmd's `start` resolves the user's default browser. The empty first argument is the window
-  // title:
-  // without it, a quoted URL would become the title and nothing would open.
-  const r = await processos.executar("cmd.exe", ["/d", "/s", "/c", "start", "", url], { timeoutMs: 15_000 });
-  return r.ok ? { ...recurso(ESTADO.SUPORTADO), url } : recurso(ESTADO.INDISPONIVEL, r.erro || "não foi possível abrir o navegador", { url });
+// cmd expands %NAME% anywhere in its command line, quotes included, so the URL travels in a variable
+// read with delayed expansion, whose value cmd never parses. The empty argument is start's window
+// title: without it, the quoted URL would become the title and nothing would open.
+function abridorDoCmd(url) {
+  return {
+    executavel: "cmd.exe",
+    args: ["/d", "/v:on", "/s", "/c", '"start "" "!REMOTEIFES_ENDERECO!""'],
+    opcoes: { windowsVerbatimArguments: true, env: { ...process.env, REMOTEIFES_ENDERECO: url } },
+  };
+}
+
+async function abrirNavegador(url, opcoes) {
+  if (/["\r\n]/.test(url)) return recurso(ESTADO.INDISPONIVEL, "endereço com aspas ou quebra de linha não é aberto", { url });
+  return base.abrirComAbridores(url, [abridorDoCmd(url)], opcoes);
+}
+
+function areaDeTrabalho() {
+  try {
+    const pasta = require("child_process")
+      .execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "[Environment]::GetFolderPath('Desktop')"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 30_000,
+        windowsHide: true,
+      })
+      .trim();
+    return pasta && path.isAbsolute(pasta) && fs.statSync(pasta).isDirectory() ? pasta : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -502,6 +526,8 @@ module.exports = {
   encerrarArvore,
   opcoesDeGrupo,
   abrirNavegador,
+  abridorDoCmd,
+  areaDeTrabalho,
   protegerArquivo,
   permissaoRestrita,
   diretoriosPadrao,

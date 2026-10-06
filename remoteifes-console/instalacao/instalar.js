@@ -22,7 +22,7 @@ const { listarDependencias } = require("./dependencias");
 // Usage:
 //   node instalacao/instalar.js [--escopo usuario|sistema] [--raiz <dir>] [--estado <dir>]
 //                              [--checkout <dir>] [--porta <n>] [--sem-servico] [--forcar]
-//                              [--usuario <nome>] [--pacote]
+//                              [--usuario <nome>] [--pacote] [--atalho-area-de-trabalho]
 //
 // `--pacote` is the provisioning step of the Linux package (the .deb postinst runs it). dpkg has
 // already placed the stable layer and the package's payload, so nothing dpkg owns is written; the
@@ -456,6 +456,63 @@ async function integrarComPlataforma({ plataforma, raiz, dirEstado, dirLogs, esc
   };
 }
 
+const NOME_ATALHO_WINDOWS = "Console de Operações RemoteIFES.lnk";
+
+function argumentoDesktop(valor) {
+  if (/[\n\r]/.test(valor)) throw new Error(`caminho com quebra de linha não cabe num atalho: ${JSON.stringify(valor)}`);
+  return `"${valor.replace(/["`$\\]/g, "\\$&").replace(/\\/g, "\\\\").replace(/%/g, "%%")}"`;
+}
+
+function entradaDesktop(raiz) {
+  return [
+    "[Desktop Entry]",
+    "Type=Application",
+    "Name=Console de Operações RemoteIFES",
+    "Comment=Manutenção do servidor, do host e da infraestrutura do RemoteIFES",
+    `Exec=${argumentoDesktop(process.execPath)} ${argumentoDesktop(path.join(raiz, "launcher-bootstrap.js"))}`,
+    "Terminal=false",
+    "Categories=System;Settings;",
+    "StartupNotify=true",
+    "",
+  ].join("\n");
+}
+
+function criarIconeLinux({ plataforma, entrada, log }) {
+  if (ehAdministrador()) {
+    log("== Ícone na área de trabalho não criado: a instalação roda como root");
+    return null;
+  }
+  const mesa = plataforma.areaDeTrabalho();
+  if (!mesa) {
+    log("== Ícone na área de trabalho não criado: este usuário não tem pasta de área de trabalho");
+    return null;
+  }
+  const icone = path.join(mesa, "remoteifes-console.desktop");
+  const temporario = path.join(mesa, `.remoteifes-console-${crypto.randomBytes(6).toString("hex")}.tmp`);
+  try {
+    // File managers only launch a desktop entry from the desktop when it is executable. The rename
+    // replaces a link at that name instead of writing through it.
+    fs.writeFileSync(temporario, entrada, { mode: 0o755, flag: "wx" });
+    fs.renameSync(temporario, icone);
+  } catch (erro) {
+    fs.rmSync(temporario, { force: true });
+    log(`== Ícone na área de trabalho não criado (${erro.message})`);
+    return null;
+  }
+  log(`== Ícone criado na área de trabalho: ${icone}`);
+  log("   Se a área de trabalho pedir, autorize a execução pelo menu do ícone na primeira vez.");
+  return icone;
+}
+
+function comandoDeAtalhoWindows(destino, script, raiz) {
+  const literal = (valor) => `'${valor.replace(/'/g, "''")}'`;
+  return (
+    `$w = New-Object -ComObject WScript.Shell; $s = $w.CreateShortcut(${literal(destino)}); ` +
+    `$s.TargetPath = 'wscript.exe'; $s.Arguments = ${literal(`"${script}"`)}; $s.WorkingDirectory = ${literal(raiz)}; ` +
+    `$s.Description = 'Console de Operações RemoteIFES'; $s.Save()`
+  );
+}
+
 function criarAtalho({ plataforma, raiz, log }) {
   const padroes = plataforma.diretoriosPadrao({ escopo: "usuario" });
   if (!padroes.atalhos) return null;
@@ -467,23 +524,11 @@ function criarAtalho({ plataforma, raiz, log }) {
 
   if (plataforma.nome === "linux") {
     const arquivo = path.join(padroes.atalhos, "remoteifes-console.desktop");
+    const entrada = entradaDesktop(raiz);
     // A desktop entry is a configuration file, not a script: no shebang, no +x.
-    fs.writeFileSync(
-      arquivo,
-      [
-        "[Desktop Entry]",
-        "Type=Application",
-        "Name=Console de Operações RemoteIFES",
-        "Comment=Manutenção do servidor, do host e da infraestrutura do RemoteIFES",
-        `Exec=${process.execPath} ${path.join(raiz, "launcher-bootstrap.js")}`,
-        "Terminal=false",
-        "Categories=System;Settings;",
-        "StartupNotify=true",
-        "",
-      ].join("\n"),
-      { mode: 0o644 }
-    );
+    fs.writeFileSync(arquivo, entrada, { mode: 0o644 });
     log(`== Atalho criado: ${arquivo}`);
+    if (temFlag("atalho-area-de-trabalho")) criarIconeLinux({ plataforma, entrada, log });
     return arquivo;
   }
 
@@ -503,26 +548,35 @@ function criarAtalho({ plataforma, raiz, log }) {
         "",
       ].join("\r\n")
     );
-    const arquivo = path.join(padroes.atalhos, "Console de Operações RemoteIFES.lnk");
+    const arquivo = path.join(padroes.atalhos, NOME_ATALHO_WINDOWS);
     try {
-      execFileSync(
-        "powershell.exe",
-        [
-          "-NoProfile",
-          "-NonInteractive",
-          "-Command",
-          `$w = New-Object -ComObject WScript.Shell; $s = $w.CreateShortcut('${arquivo.replace(/'/g, "''")}'); ` +
-            `$s.TargetPath = 'wscript.exe'; $s.Arguments = '\"${oculto}\"'; $s.WorkingDirectory = '${raiz}'; ` +
-            `$s.Description = 'Console de Operações RemoteIFES'; $s.Save()`,
-        ],
-        { stdio: "ignore", timeout: 30_000 }
-      );
+      execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", comandoDeAtalhoWindows(arquivo, oculto, raiz)], {
+        stdio: "ignore",
+        timeout: 30_000,
+      });
       log(`== Atalho criado: ${arquivo}`);
-      return arquivo;
     } catch (erro) {
       log(`== Atalho não criado (${erro.message})`);
       return null;
     }
+    if (temFlag("atalho-area-de-trabalho")) {
+      const mesa = plataforma.areaDeTrabalho();
+      if (!mesa) {
+        log("== Ícone na área de trabalho não criado: a pasta da área de trabalho não foi encontrada");
+      } else {
+        const icone = path.join(mesa, NOME_ATALHO_WINDOWS);
+        try {
+          execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", comandoDeAtalhoWindows(icone, oculto, raiz)], {
+            stdio: "ignore",
+            timeout: 30_000,
+          });
+          log(`== Ícone criado na área de trabalho: ${icone}`);
+        } catch (erro) {
+          log(`== Ícone na área de trabalho não criado (${erro.message})`);
+        }
+      }
+    }
+    return arquivo;
   }
 
   if (plataforma.nome === "macos") {
@@ -559,6 +613,7 @@ function criarAtalho({ plataforma, raiz, log }) {
       { mode: 0o755 }
     );
     log(`== Bundle criado: ${bundle}`);
+    if (temFlag("atalho-area-de-trabalho")) log("   No macOS o atalho é o app em Aplicativos (Launchpad, Spotlight ou Dock).");
     return bundle;
   }
 
@@ -700,4 +755,4 @@ if (require.main === module) {
   main().catch((erro) => falhar(`falha na instalação: ${erro && erro.stack ? erro.stack : erro}`));
 }
 
-module.exports = { migrarLayoutAntigo, copiarArvore, comandoDoLancador, compararVersoes, usuarioDoConsole };
+module.exports = { migrarLayoutAntigo, copiarArvore, comandoDoLancador, compararVersoes, usuarioDoConsole, entradaDesktop, comandoDeAtalhoWindows };

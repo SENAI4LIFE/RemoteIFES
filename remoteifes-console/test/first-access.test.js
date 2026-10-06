@@ -104,6 +104,71 @@ test("the launcher opens the first access through a private page and never puts 
   assert.equal(criado.status, 201);
 });
 
+test("when no browser opens, first access shows the manual way in and is not an error", async (t) => {
+  const { amb } = await consoleSemOperador(t);
+  const lancador = require(path.join(ajuda.RAIZ, "launcher.js"));
+  const contrato = lancador.lerContrato();
+
+  let pagina = null;
+  let saida = "";
+  const escrever = process.stdout.write;
+  process.stdout.write = function (texto, ...resto) {
+    saida += String(texto);
+    return escrever.call(this, texto, ...resto);
+  };
+  let r;
+  try {
+    r = await lancador.abrirPrimeiroAcesso(contrato, {
+      esperaMs: 0,
+      abrirNavegador: async (url) => {
+        pagina = require("url").fileURLToPath(url);
+        return { disponivel: false, motivo: "nenhum abridor de navegador encontrado" };
+      },
+    });
+  } finally {
+    process.stdout.write = escrever;
+  }
+  assert.deepEqual(r, { ok: true, manual: true });
+  assert.ok(saida.includes(`Abra manualmente: http://127.0.0.1:${contrato.porta}/ `), saida);
+  assert.ok(saida.includes(path.join(amb.estadoDir, "bootstrap-token")), "says where the secret is");
+  assert.match(saida, /--criar-operador/);
+  assert.ok(!saida.includes(SEGREDO), "the secret itself is never printed");
+  assert.ok(!saida.includes("primeiro-acesso="), "neither is the invitation");
+  assert.ok(!fs.existsSync(pagina), "the private page is deleted");
+});
+
+test("a browser still opening keeps the private page available and shows the manual way in", async (t) => {
+  const { amb } = await consoleSemOperador(t);
+  const lancador = require(path.join(ajuda.RAIZ, "launcher.js"));
+  const contrato = lancador.lerContrato();
+
+  let pagina = null;
+  let saida = "";
+  const escrever = process.stdout.write;
+  process.stdout.write = function (texto, ...resto) {
+    saida += String(texto);
+    return escrever.call(this, texto, ...resto);
+  };
+  let r;
+  try {
+    r = await lancador.abrirPrimeiroAcesso(contrato, {
+      esperaMs: 0,
+      abrirNavegador: async (url) => {
+        pagina = require("url").fileURLToPath(url);
+        return { disponivel: true, emAndamento: true };
+      },
+    });
+  } finally {
+    process.stdout.write = escrever;
+  }
+  assert.deepEqual(r, { ok: true, primeiroAcesso: true });
+  assert.match(saida, /ainda está abrindo/);
+  assert.ok(saida.includes(`Abra manualmente: http://127.0.0.1:${contrato.porta}/ `), saida);
+  assert.ok(saida.includes(path.join(amb.estadoDir, "bootstrap-token")));
+  assert.ok(!saida.includes(SEGREDO) && !saida.includes("primeiro-acesso="));
+  assert.ok(!fs.existsSync(pagina), "the private page is still deleted after the wait");
+});
+
 test("without read access to the secret the launcher opens the ordinary page", async (t) => {
   const { amb } = await consoleSemOperador(t);
   fs.rmSync(path.join(amb.estadoDir, "bootstrap-token"));
