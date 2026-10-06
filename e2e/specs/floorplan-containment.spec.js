@@ -28,13 +28,26 @@ async function abrirPlanta(page, context, tamanho) {
     const plan = document.querySelector("#fpScaleInner .fp-section:not(.hidden) .plan");
     return !!(plan && plan.style.transform);
   });
-  // The page column animates its width when switching screens; the plan is refitted during the
-  // animation, so wait for the scale to settle before measuring.
-  await page.waitForFunction(() => new Promise((resolve) => {
-    const plan = document.querySelector("#fpScaleInner .fp-section:not(.hidden) .plan");
-    const antes = plan.style.transform;
-    setTimeout(() => resolve(plan.style.transform === antes), 350);
-  }));
+  // The page column animates its max-width when switching screens and a ResizeObserver refits the
+  // plan, which only happens in rendered frames. A predicate returning a Promise is not re-polled by
+  // waitForFunction, so this one is synchronous: polled once per frame, it passes after 20 frames with
+  // no running animation around the plan and no refit, however long a slow runner takes to render.
+  await page.evaluate(() => { delete window.__plantaEstavel; });
+  await page.waitForFunction(() => {
+    const secao = document.querySelector("#fpScaleInner .fp-section:not(.hidden)");
+    const wrap = secao.querySelector(".plan-wrap");
+    const transform = secao.querySelector(".plan").style.transform;
+    const animando = document.getAnimations().some((animacao) => {
+      const alvo = animacao.effect && animacao.effect.target;
+      return animacao.playState === "running" && alvo && typeof alvo.contains === "function" && alvo.contains(wrap);
+    });
+    const estado = window.__plantaEstavel;
+    if (animando || !estado || estado.transform !== transform) {
+      window.__plantaEstavel = { transform, quadros: 0 };
+      return false;
+    }
+    return ++estado.quadros >= 20;
+  });
 }
 
 function medirPlanta() {
