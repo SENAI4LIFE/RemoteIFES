@@ -710,8 +710,9 @@ Suportado não é o mesmo que executado na CI. O que a CI instala e roda, e o qu
 | Linux arm64 | **instalado e executado** | testes do servidor, pacotes do console e o ensaio de implantação com systemd num runner Ubuntu 24.04 ARM64 |
 | Linux x64 | **instalado e executado** | testes do console, pacotes, o servidor sob os testes E2E e o ensaio de implantação num Ubuntu 22.04 com o Node mínimo |
 | Windows x64, macOS arm64 | **instalado e executado** | testes do servidor e do console, instalação e execução dos pacotes |
-| Linux armv7, Windows arm64, macOS x64 | construído, **não executado** | o payload é o mesmo JavaScript das outras arquiteturas; só o Node do host muda |
-| Userland do Raspberry Pi OS Lite (64 e 32 bits) | **executado sob demanda** | workflow manual *Virtual Hardware Validation*: o ensaio de implantação completo no userland de 64 bits num runner ARM64 nativo (contêiner com systemd, 1 GiB, 2 CPUs), e `setup.sh`, servidor, backup e restauração no userland de 32 bits (armhf, armv7) sob emulação de userland; o kernel é sempre o do runner |
+| Pacote do console em Linux armv7, Windows arm64 e macOS x64 | construído, **não executado** | o payload é o mesmo JavaScript das outras arquiteturas; só o Node do host muda |
+| Userland armhf do Raspberry Pi OS Lite (Pi 3, 32 bits) | **instalado e executado** | a cada mudança do servidor ou dos scripts de início: `./server.sh` instala o Node armv7l pelo `setup.sh`, e o servidor roda com placas simuladas, backup e restauração, sob emulação de userland (qemu-user); o kernel é o do runner |
+| Userland arm64 do Raspberry Pi OS Lite | **executado sob demanda** | workflow manual *Virtual Hardware Validation*: o ensaio de implantação completo num runner ARM64 nativo (contêiner com systemd, 1 GiB, 2 CPUs) |
 | Raspberry Pi físico com Raspberry Pi OS | **não executado** | nenhum runner é um Pi: kernel, boot, cartão SD, energia e desempenho de um Pi não são exercidos |
 
 O Node mínimo declarado (22.13.0) roda nos testes Linux do servidor e do console e no ensaio de implantação mais antigo; os demais usam o 22.x mais recente.
@@ -1458,26 +1459,28 @@ No end-to-end, `npx playwright install chromium` baixa o navegador (numa imagem 
 
 | Mudança em | Validação rápida | Validação completa acrescenta |
 |---|---|---|
-| `remoteifes-server/` | servidor em Linux ARM64, Windows e macOS; Console de Operações; ensaio de implantação; end-to-end Chromium; scripts de início | end-to-end em todos os navegadores; Safari nativo |
+| `remoteifes-server/` | servidor em Linux ARM64, Windows e macOS; Console de Operações; ensaio de implantação; end-to-end Chromium; scripts de início; userland armhf do Raspberry Pi OS | end-to-end em todos os navegadores; Safari nativo |
 | `remoteifes-console/` | Console de Operações nos três sistemas; instalação do pacote em Linux x64 e ARM64, Windows e macOS; ensaio de implantação; scripts de início | — |
-| `server.sh`, `console.sh`, `server.bat`, `console.bat`, `server.py`, `console.py`, `startup/` | scripts de início em Linux x64 e ARM64, Windows e macOS | — |
+| `server.sh`, `console.sh`, `server.bat`, `console.bat`, `server.py`, `console.py`, `startup/` | scripts de início em Linux x64 e ARM64, Windows e macOS; userland armhf do Raspberry Pi OS | — |
 | `remoteifes-web/` | contratos do frontend nos testes do servidor (Linux ARM64); end-to-end Chromium; Cordova; builds Android e iOS | end-to-end em todos os navegadores; Safari nativo |
 | `remoteifes-cordova/` | contratos do app nos testes do servidor; Cordova; builds Android e iOS | — |
 | `remoteifes-esp32/` | build do firmware; contratos de dispositivo nos testes do servidor | — |
 | `e2e/specs/` | end-to-end Chromium | end-to-end em todos os navegadores; Safari nativo |
 | `e2e/` (harness, configuração, lockfile) | end-to-end em todos os navegadores; Safari nativo | — |
 | `README.md`, `docs/`, scripts Git da raiz | servidor em Linux ARM64 (a suíte completa, que inclui os contratos da documentação, e o health check) | — |
-| `virtual-lab/`, `.github/workflows/virtual-hardware.yml` | nenhum job (o laboratório tem o próprio workflow manual; veja [Laboratório de hardware virtual](#laboratório-de-hardware-virtual)) | — |
+| `virtual-lab/host/importar-raspios.sh`, `raspios-armhf.sh`, `raspios.json` | userland armhf do Raspberry Pi OS | — |
+| o resto de `virtual-lab/`, `.github/workflows/virtual-hardware.yml` | nenhum job (o laboratório tem o próprio workflow manual; veja [Laboratório de hardware virtual](#laboratório-de-hardware-virtual)) | — |
 | `.github/workflows/`, `.github/scripts/`, caminho não mapeado ou diff indeterminável | validação completa de tudo | — |
 
-Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também. As regras ficam em `.github/scripts/select-checks.js`, testadas por `select-checks.test.js` no próprio job de seleção. Uma execução nova no mesmo ramo cancela a anterior, mas um **Run workflow** nunca é cancelado por um push, e o deploy do GitHub Pages nunca é interrompido no meio.
+Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também. As regras ficam em `.github/scripts/select-checks.js`, testadas por `select-checks.test.js` no próprio job de seleção. Uma execução nova no mesmo ramo cancela a anterior, mas um **Run workflow** nunca é cancelado por um push, e o deploy do GitHub Pages nunca é interrompido no meio. Um push é comparado com o último commit da `main` cuja CI passou, não com o push anterior: o que uma execução cancelada ou reprovada deixou de validar entra na seguinte, e sem esse commit a validação é completa.
 
 | Job | Onde roda |
 |---|---|
 | Servidor (`npm test` + health check), com os contratos do frontend, do Cordova, do firmware e da documentação | Linux ARM64 com o Node mínimo (22.13.0); Windows e macOS com o 22.x mais recente |
 | Console de Operações (`npm test` + medição de recursos) | Ubuntu (Node 22.13.0), Windows e macOS |
 | Pacote do console: build, procedência, instalação do artefato, execução pelo lançador sem ferramentas de desenvolvimento, `.deb`, desinstalação preservando o estado | Linux x64 e ARM64, Windows e macOS |
-| Scripts de início (`--preparar`, `--verificar` e `startup/test`) | Ubuntu x64 com o Node mínimo (22.13.0) e ARM64, Windows e macOS |
+| Scripts de início (`--preparar`, `--verificar` e `startup/test`, este também no Python 3.7 mínimo, em contêiner) | Ubuntu x64 com o Node mínimo (22.13.0) e ARM64, Windows e macOS |
+| Userland armhf do Raspberry Pi OS (`raspios-armhf.yml`, o mesmo que o laboratório chama) | Ubuntu 24.04 x64, sob qemu-user |
 | Ensaio de implantação (`ensaio-implantacao.sh`) | Ubuntu 22.04 x64 com o Node mínimo e Ubuntu 24.04 ARM64 |
 | End-to-end (Playwright), em shards com harness próprio | Ubuntu com Chromium, Firefox e WebKit; Windows com o Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox; macOS com o Chrome do sistema |
 | Safari nativo (`e2e/harness/safari-smoke.js`, pelo `safaridriver`, sem dependência npm; o WebKit do Playwright não conta como Safari). O smoke no iOS Simulator só roda com `ios_safari` no **Run workflow**, como diagnóstico | macOS |

@@ -22,16 +22,16 @@ const PACKAGES_OS = [...ALL_OS, LINUX_ARM];
 const CORDOVA_OS = ["ubuntu-latest", "windows-latest"];
 // The root entrypoints: x64 Linux with the minimum Node, ARM64 Linux, Windows (.bat) and macOS.
 const STARTUP_OS = [...ALL_OS, LINUX_ARM];
-const ZERO_SHA = /^0+$/;
 
 // First match wins.
 const PATH_RULES = [
-  // The virtual hardware lab is development-only and has its own manual workflow; nothing it contains
-  // ships or changes what this CI builds.
+  // The Raspberry Pi 3 (armhf) userland check runs in this CI too (raspios-armhf.yml).
+  [/^virtual-lab\/host\/(importar-raspios\.sh|raspios-armhf\.sh|raspios\.json)$/, "pi32"],
+  // The rest of the virtual hardware lab is development-only and has its own manual workflow; nothing
+  // in it ships or changes what this CI builds.
   [/^\.github\/workflows\/virtual-hardware\.yml$/, "none"],
   [/^virtual-lab\//, "none"],
   [/^\.github\/(workflows|scripts)\//, "ci"],
-  [/^\.github\/dependabot\.yml$/, "none"],
   [/^remoteifes-server\//, "server"],
   [/^remoteifes-console\//, "console"],
   [/^remoteifes-web\//, "web"],
@@ -56,7 +56,7 @@ const E2E_TARGETS = [
   { os: "macos-latest", browser: "chromium", channel: "chrome", shards: 3 },
 ];
 
-const JOBS = ["server", "console", "packages", "deployment", "e2e", "safari", "cordova", "firmware", "android", "ios", "startup"];
+const JOBS = ["server", "console", "packages", "deployment", "e2e", "safari", "cordova", "firmware", "android", "ios", "startup", "pi32"];
 
 function classify(paths) {
   const areas = new Set();
@@ -114,6 +114,8 @@ function selectChecks({ areas, fullDepth, allScope }) {
     ios: mobile,
     // The entrypoints drive setup.sh, the server start script and the Console installer and launcher.
     startup: has("startup") || serverChanged || consoleChanged ? STARTUP_OS : [],
+    // The only real 32-bit ARM run: ./server.sh installs the armv7l Node and serves under qemu-user.
+    pi32: serverChanged || has("startup") || has("pi32"),
   };
 
   return {
@@ -156,6 +158,33 @@ function commitExists(sha) {
   }
 }
 
+function isAncestor(ancestor, descendant) {
+  try {
+    git(["merge-base", "--is-ancestor", ancestor, descendant]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Head commit of the newest successful CI run of main (push or dispatch), or null. */
+async function lastGreenSha(env, fetchImpl = globalThis.fetch) {
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) return null;
+  const api = env.GITHUB_API_URL || "https://api.github.com";
+  try {
+    const res = await fetchImpl(`${api}/repos/${env.GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=50`, {
+      headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const runs = (await res.json()).workflow_runs || [];
+    const run = runs.find((r) => r.head_branch === "main" && (r.event === "push" || r.event === "workflow_dispatch"));
+    return run ? run.head_sha : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Parses `git diff --name-status` output; renames and copies contribute both paths. */
 function parseNameStatus(output) {
   const paths = [];
@@ -168,7 +197,7 @@ function parseNameStatus(output) {
 }
 
 /** Returns the diff base for the event, or null when the change set cannot be determined. */
-function diffBase(env) {
+async function diffBase(env) {
   if (env.EVENT_NAME === "pull_request") {
     // On pull_request the checkout is the test merge commit; its first parent is the base tip
     // the change was merged onto, so the diff is exactly what merging would introduce.
@@ -178,16 +207,17 @@ function diffBase(env) {
     return null;
   }
   if (env.EVENT_NAME === "push") {
-    const before = env.BEFORE_SHA || "";
-    if (!before || ZERO_SHA.test(before) || !commitExists(before)) return null;
-    return before;
+    // Not the previous push: a run cancelled by a newer push, or one that failed, would leave its
+    // changes unvalidated while later runs pass. Everything since the last passing run is checked.
+    const green = await lastGreenSha(env);
+    return green && commitExists(green) && isAncestor(green, "HEAD") ? green : null;
   }
   return null;
 }
 
-function changedPaths(env) {
+async function changedPaths(env) {
   try {
-    const base = diffBase(env);
+    const base = await diffBase(env);
     if (!base) return null;
     return parseNameStatus(git(["diff", "--name-status", "-M", "--no-color", base, "HEAD"]));
   } catch (err) {
@@ -196,12 +226,12 @@ function changedPaths(env) {
   }
 }
 
-function planFromEnvironment(env) {
+async function planFromEnvironment(env) {
   const dispatch = env.EVENT_NAME === "workflow_dispatch";
   if (dispatch && env.EXPECTED_SHA && env.EXPECTED_SHA !== env.HEAD_SHA) {
     throw new Error(`expected_sha ${env.EXPECTED_SHA} does not match the checked-out ${env.HEAD_SHA}; the ref moved`);
   }
-  const paths = dispatch ? null : changedPaths(env);
+  const paths = dispatch ? null : await changedPaths(env);
   const pushToMain = env.EVENT_NAME === "push" && env.REF === "refs/heads/main";
   const plan = selectChecks({
     areas: paths === null ? null : classify(paths),
@@ -227,11 +257,12 @@ function writeOutputs(plan, outputFile) {
     `android=${plan.jobs.android}`,
     `ios=${plan.jobs.ios}`,
     `startup_os=${JSON.stringify(plan.jobs.startup)}`,
+    `pi32=${plan.jobs.pi32}`,
   ];
   if (outputFile) fs.appendFileSync(outputFile, lines.join("\n") + "\n");
 }
 
-function main() {
+async function main() {
   if (process.argv.includes("--verify")) {
     const plan = JSON.parse(process.env.PLAN || "null");
     const needs = JSON.parse(process.env.NEEDS || "{}");
@@ -248,18 +279,16 @@ function main() {
     console.log(`all selected jobs passed (${plan.mode})`);
     return;
   }
-  const plan = planFromEnvironment(process.env);
+  const plan = await planFromEnvironment(process.env);
   console.log(JSON.stringify(plan, null, 2));
   writeOutputs(plan, process.env.GITHUB_OUTPUT);
 }
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (err) {
+  main().catch((err) => {
     console.error(err.message);
     process.exit(1);
-  }
+  });
 }
 
-module.exports = { classify, selectChecks, verifyResults, parseNameStatus, e2eMatrix, JOBS, E2E_TARGETS };
+module.exports = { classify, selectChecks, verifyResults, parseNameStatus, e2eMatrix, lastGreenSha, JOBS, E2E_TARGETS };

@@ -290,36 +290,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  # The Raspberry Pi 3's 32-bit userland (Raspberry Pi OS Lite armhf) under qemu-user on x64: install
-  # with setup.sh (Node armv7l), the server with simulated boards, backup, restore and restart.
+  # The Raspberry Pi 3's 32-bit userland; the same workflow ci.yml runs for server and startup changes.
   host-raspios-armhf:
-    name: Raspberry Pi OS armhf userland (Pi 3, 32-bit)
+    name: Raspberry Pi OS armhf userland
     if: ${{ !inputs.suite || inputs.suite == 'full' || inputs.suite == 'host' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    env:
-      LAB_HOST_DESCARTAVEL: "1"
-      RAIZ_RASPIOS: ${{ github.workspace }}/../raspios
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-      - name: Cache the pinned image
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ github.workspace }}/../raspios/armhf/imagem.img.xz
-          key: raspios-${{ hashFiles('virtual-lab/host/raspios.json') }}-armhf
-      - name: 32-bit ARM user-mode emulation (Ubuntu's qemu-user-static)
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-user-static
-      - run: bash virtual-lab/host/importar-raspios.sh armhf
-      - run: bash virtual-lab/host/raspios-armhf.sh "$RUNNER_TEMP/resultados"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always()
-        with:
-          name: virtual-lab-raspios-armhf
-          path: ${{ runner.temp }}/resultados
-          if-no-files-found: warn
-          retention-days: 14
+    uses: ./.github/workflows/raspios-armhf.yml
