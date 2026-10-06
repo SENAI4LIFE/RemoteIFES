@@ -413,6 +413,32 @@ class ConsoleFlowTest(Harness):
         self.assertEqual(self.commands[0]["cmd"][-1], "--iniciar")
         self.assertNotIn("--criar-operador", self.output())
 
+    def test_ssh_session_on_macos_and_windows_starts_without_a_browser_and_shows_the_tunnel(self):
+        self.install()
+        self.env["SSH_CONNECTION"] = "10.0.0.5 50122 10.0.0.9 22"
+        for system, entry in (("darwin", "./console.sh"), ("windows", "console.bat")):
+            self.platform = c.Platform(system, "x86_64", 64)
+            self.commands = []
+            self.out.seek(0)
+            self.out.truncate()
+            self.assertEqual(self.main(), 0)
+            self.assertEqual(self.commands[0]["cmd"][-1], "--iniciar", system)
+            self.assertIn("ssh -L 8123:127.0.0.1:8123", self.output())
+            self.assertIn("%s --criar-operador" % entry, self.output())
+
+    def test_local_desktop_session_opens_the_browser(self):
+        self.install()
+        for system in ("darwin", "windows"):
+            self.platform = c.Platform(system, "x86_64", 64)
+            self.commands = []
+            self.assertEqual(self.main(), 0)
+            self.assertEqual(self.commands[0]["cmd"], [self.node.path, os.path.join(self.root, "launcher-bootstrap.js")], system)
+        self.platform = c.Platform("linux", "aarch64", 64)
+        self.env.update({"DISPLAY": "localhost:10.0", "SSH_CONNECTION": "10.0.0.5 50122 10.0.0.9 22"})
+        self.commands = []
+        self.assertEqual(self.main(), 0)
+        self.assertEqual(len(self.commands[0]["cmd"]), 2, "X11 forwarding keeps opening the browser on Linux")
+
     def test_root_uses_iniciar_and_sudo_hint_for_system_scope(self):
         self.install(scope="sistema")
         self.env["DISPLAY"] = ":0"
@@ -426,7 +452,7 @@ class ConsoleFlowTest(Harness):
         self.assertEqual(self.main(), 0)
         cmds = [entry["cmd"] for entry in self.commands]
         self.assertEqual(cmds[0][1:], ["ci", "--omit=dev"])
-        self.assertEqual(cmds[1], [self.node.path, os.path.join(self.console_dir, "instalacao", "instalar.js")])
+        self.assertEqual(cmds[1], [self.node.path, os.path.join(self.console_dir, "instalacao", "instalar.js"), "--atalho-area-de-trabalho"])
         self.assertEqual(cmds[2][:2], [self.node.path, os.path.join(self.root, "launcher-bootstrap.js")])
         if os.path.isdir("/run/systemd/system"):
             self.assertIn("instalação por usuário", self.output())

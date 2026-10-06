@@ -25,8 +25,9 @@ ROOTS_QUERY = (
 
 USAGE = """uso: ./console.sh [--verificar | opção do lançador]      (Windows: console.bat)
 
-  sem opção          instala o Console de Operações na primeira vez e o abre no navegador
-                     (sem interface gráfica ou como root: só o inicia, como --iniciar)
+  sem opção          instala o Console de Operações na primeira vez, com ícone na área de
+                     trabalho, e o abre no navegador (sem interface gráfica, como numa sessão
+                     SSH, ou como root: só o inicia, como --iniciar, e mostra o endereço)
   --verificar        só confere o Node.js e a instalação; não instala nem abre nada
   --status           estado do console, da aplicação e da versão do programa
   --iniciar          inicia o console sem abrir o navegador
@@ -129,17 +130,22 @@ def install(term, plat, node, child):
     if plat.system == "linux" and not c.is_root() and os.path.isdir("/run/systemd/system"):
         term.warn("instalação por usuário: sem o socket do systemd e o auxiliar privilegiado (controle do serviço indisponível)")
         term.detail("para instalá-los: sudo ./console.sh")
-    code = c.run([node.path, INSTALLER], cwd=CONSOLE_DIR, env=child)
+    code = c.run([node.path, INSTALLER, "--atalho-area-de-trabalho"], cwd=CONSOLE_DIR, env=child)
     if code != 0:
         raise c.StartupError("o instalador terminou com código %d; veja a saída acima." % code)
+
+
+def ssh_session(env):
+    return any(env.get(name) for name in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"))
 
 
 def default_launcher_args(plat, env):
     if c.is_root():
         return ["--iniciar"]
-    if plat.system == "linux" and not env.get("DISPLAY") and not env.get("WAYLAND_DISPLAY"):
-        return ["--iniciar"]
-    return []
+    if plat.system == "linux":
+        has_display = env.get("DISPLAY") or env.get("WAYLAND_DISPLAY")
+        return [] if has_display else ["--iniciar"]
+    return ["--iniciar"] if ssh_session(env) else []
 
 
 def print_urls(term, plat, installation, env):
@@ -148,7 +154,7 @@ def print_urls(term, plat, installation, env):
     term.say("")
     term.say("Console de Operações:")
     term.field("Neste host", url)
-    if plat.system != "windows":
+    if plat.system != "windows" or ssh_session(env):
         tunnel = "ssh -L %d:127.0.0.1:%d %s@%s" % (installation.port, installation.port, c.invoking_user(env), socket.gethostname())
         term.field("De outra máquina", "%s  e abra %s" % (tunnel, url))
     if installation.state_dir and os.path.exists(os.path.join(installation.state_dir, "bootstrap-token")):

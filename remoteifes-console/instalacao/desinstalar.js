@@ -151,6 +151,26 @@ function removerArquivo(caminho, { simular }) {
   return true;
 }
 
+function removerAtalhoDestaInstalacao(caminho, marca, { simular }) {
+  let info;
+  try {
+    info = fs.lstatSync(caminho);
+  } catch {
+    return false;
+  }
+  if (!info.isFile() || !fs.readFileSync(caminho).includes(marca)) {
+    log(`   mantido: ${caminho} (não abre esta instalação)`);
+    return false;
+  }
+  if (simular) {
+    log(`   [simulação] removeria ${caminho}`);
+    return true;
+  }
+  fs.unlinkSync(caminho);
+  log(`   removido: ${caminho}`);
+  return true;
+}
+
 /**
  * If the uninstaller runs from INSIDE the installation it will delete, it copies itself to a
  * temporary directory and restarts from there.
@@ -424,11 +444,16 @@ async function main() {
   log("== Removendo atalhos");
   let removeuAtalho = false;
   const atalhos = plataforma.diretoriosPadrao({ escopo: "usuario" }).atalhos;
-  if (plataforma.nome === "linux" && atalhos) {
-    removeuAtalho = removerArquivo(path.join(atalhos, "remoteifes-console.desktop"), { simular }) || removeuAtalho;
+  const atalho = {
+    linux: { nome: "remoteifes-console.desktop", marca: Buffer.from(path.join(raiz, "launcher-bootstrap.js")) },
+    windows: { nome: "Console de Operações RemoteIFES.lnk", marca: Buffer.from(path.join(raiz, "abrir-console.vbs"), "utf16le") },
+  }[plataforma.nome];
+  if (atalho && atalhos) {
+    removeuAtalho = removerArquivo(path.join(atalhos, atalho.nome), { simular }) || removeuAtalho;
   }
-  if (plataforma.nome === "windows" && atalhos) {
-    removeuAtalho = removerArquivo(path.join(atalhos, "Console de Operações RemoteIFES.lnk"), { simular }) || removeuAtalho;
+  const mesa = atalho && plataforma.areaDeTrabalho();
+  if (mesa) {
+    removeuAtalho = removerAtalhoDestaInstalacao(path.join(mesa, atalho.nome), atalho.marca, { simular }) || removeuAtalho;
   }
   if (plataforma.nome === "macos") {
     // On macOS the bundle **is** the program: it goes with the root, just below.
@@ -509,4 +534,4 @@ if (require.main === module) {
   main().catch((erro) => falhar(`  Falha na desinstalação: ${erro.message}`));
 }
 
-module.exports = { autorizarRemocao };
+module.exports = { autorizarRemocao, removerAtalhoDestaInstalacao };

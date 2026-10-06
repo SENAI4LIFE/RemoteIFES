@@ -22,7 +22,7 @@ test("every platform has an adapter and the contract is the same", (t) => {
     "portasEmEscuta", "pacotesPendentes", "abrirNavegador", "protegerArquivo",
     "permissaoRestrita", "diretoriosPadrao", "encerrarArvore", "opcoesDeGrupo",
     "registrarInicializacao", "removerInicializacao", "estadoDaInicializacao",
-    "classificarArquitetura", "runtimeAtual", "ferramentas",
+    "classificarArquitetura", "runtimeAtual", "ferramentas", "areaDeTrabalho",
   ];
   for (const alvo of ["linux", "win32", "darwin"]) {
     process.env.CONSOLE_PLATAFORMA = alvo;
@@ -374,6 +374,249 @@ test("the launcher opens only validated HTTP(S) addresses", async (t) => {
     const r = await launcher.abrir(ruim);
     assert.equal(r.ok, false, `should refuse ${ruim}`);
   }
+});
+
+// --- Browser opening -----------------------------------------------------------------------------
+
+const SEM_SHELL_POSIX = process.platform === "win32" && "POSIX shell script as the opener";
+
+function abridoresFalsos(t, scripts, env = {}) {
+  const bin = ajuda.dirTemporario("console-abridor-");
+  for (const [nome, corpo] of Object.entries(scripts)) fs.writeFileSync(path.join(bin, nome), `#!/bin/sh\n${corpo}\n`, { mode: 0o755 });
+  const amb = ajuda.ambiente({ env: { PATH: `${bin}${path.delimiter}${process.env.PATH}`, ...env } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(bin, { recursive: true, force: true });
+  });
+  return { bin, plataforma: amb.plataforma };
+}
+
+const SESSAO_GRAFICA = {
+  CONSOLE_PLATAFORMA: "linux",
+  DISPLAY: ":0",
+  WAYLAND_DISPLAY: "wayland-0",
+  XDG_RUNTIME_DIR: "/run/user/1000",
+  DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/1000/bus",
+};
+
+test("the Linux opener receives the graphical session and does not wait for the browser it started", { skip: SEM_SHELL_POSIX }, async (t) => {
+  const registro = path.join(ajuda.dirTemporario("console-abridor-reg-"), "registro");
+  const { plataforma } = abridoresFalsos(t, { "xdg-open": `env > "${registro}"\nsleep 10 &\necho $! >> "${registro}.pid"` }, SESSAO_GRAFICA);
+  t.after(() => {
+    try {
+      process.kill(Number(fs.readFileSync(`${registro}.pid`, "utf8")), "SIGKILL");
+    } catch {}
+    fs.rmSync(path.dirname(registro), { recursive: true, force: true });
+  });
+
+  const inicio = Date.now();
+  const r = await plataforma.abrirNavegador("http://127.0.0.1:8099/");
+  assert.equal(r.disponivel, true, r.motivo);
+  assert.ok(Date.now() - inicio < 3000, "a browser left running by the opener does not hold the launcher");
+  const ambiente = fs.readFileSync(registro, "utf8");
+  for (const [chave, valor] of Object.entries(SESSAO_GRAFICA).filter(([k]) => k !== "CONSOLE_PLATAFORMA")) {
+    assert.ok(ambiente.split("\n").includes(`${chave}=${valor}`), `${chave} must reach the opener`);
+  }
+});
+
+test("an opener still holding the browser in the foreground counts as opened and is left running", { skip: SEM_SHELL_POSIX }, async (t) => {
+  const pid = path.join(ajuda.dirTemporario("console-abridor-pid-"), "pid");
+  const { plataforma } = abridoresFalsos(t, { "xdg-open": `echo $$ > "${pid}"\nexec sleep 10` }, SESSAO_GRAFICA);
+  t.after(() => {
+    try {
+      process.kill(Number(fs.readFileSync(pid, "utf8")), "SIGKILL");
+    } catch {}
+    fs.rmSync(path.dirname(pid), { recursive: true, force: true });
+  });
+
+  const r = await plataforma.abrirNavegador("http://127.0.0.1:8099/", { esperaMs: 500 });
+  assert.equal(r.disponivel, true, r.motivo);
+  assert.equal(r.emAndamento, true, "the launcher is told the browser may still be opening");
+  assert.doesNotThrow(() => process.kill(Number(fs.readFileSync(pid, "utf8")), 0), "the browser is not killed with the opener");
+});
+
+test("while the browser is still opening, the launcher also shows the address to open by hand", async (t) => {
+  const amb = ajuda.ambiente();
+  const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
+  const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
+  const original = plataforma.abrirNavegador;
+  let saida = "";
+  const escrever = process.stdout.write;
+  t.after(() => {
+    plataforma.abrirNavegador = original;
+    process.stdout.write = escrever;
+    amb.restaurar();
+  });
+  process.stdout.write = function (texto, ...resto) {
+    saida += String(texto);
+    return escrever.call(this, texto, ...resto);
+  };
+
+  plataforma.abrirNavegador = async (url) => ({ estado: "suportado", disponivel: true, url });
+  assert.deepEqual(await launcher.abrir("http://127.0.0.1:8099/"), { ok: true });
+  assert.equal(saida, "", "an opened browser needs no instructions");
+
+  plataforma.abrirNavegador = async (url) => ({ estado: "suportado", disponivel: true, url, emAndamento: true });
+  assert.deepEqual(await launcher.abrir("http://127.0.0.1:8099/"), { ok: true });
+  assert.match(saida, /ainda está abrindo; se ele não aparecer, abra manualmente: http:\/\/127\.0\.0\.1:8099\//);
+});
+
+test("the Linux opener falls back to gio when xdg-open is missing or fails, and reports every failure", { skip: SEM_SHELL_POSIX }, async (t) => {
+  const bin = ajuda.dirTemporario("console-abridor-so-");
+  const registro = path.join(bin, "argumentos");
+  fs.writeFileSync(path.join(bin, "gio"), `#!/bin/sh\nprintf '%s\\n' "$@" > "${registro}"\n`, { mode: 0o755 });
+  const sessao = ajuda.ambiente({ env: { ...SESSAO_GRAFICA, PATH: bin } });
+  t.after(() => {
+    sessao.restaurar();
+    fs.rmSync(bin, { recursive: true, force: true });
+  });
+  const url = "http://127.0.0.1:8099/";
+
+  const semXdg = await sessao.plataforma.abrirNavegador(url);
+  assert.equal(semXdg.disponivel, true, semXdg.motivo);
+  assert.equal(semXdg.abridor, "gio");
+  assert.equal(fs.readFileSync(registro, "utf8"), `open\n${url}\n`);
+
+  fs.writeFileSync(path.join(bin, "xdg-open"), "#!/bin/sh\nexit 3\n", { mode: 0o755 });
+  fs.rmSync(registro);
+  const xdgFalhou = await sessao.plataforma.abrirNavegador(url);
+  assert.equal(xdgFalhou.abridor, "gio", "a failing xdg-open does not hide a working gio");
+  assert.ok(fs.existsSync(registro));
+
+  fs.writeFileSync(path.join(bin, "gio"), "#!/bin/sh\nexit 4\n", { mode: 0o755 });
+  const ambosFalharam = await sessao.plataforma.abrirNavegador(url);
+  assert.equal(ambosFalharam.estado, "indisponivel");
+  assert.match(ambosFalharam.motivo, /xdg-open terminou com o código 3; gio terminou com o código 4/);
+
+  fs.rmSync(path.join(bin, "xdg-open"));
+  fs.rmSync(path.join(bin, "gio"));
+  const nenhum = await sessao.plataforma.abrirNavegador(url);
+  assert.equal(nenhum.estado, "nao-instalado");
+  assert.match(nenhum.motivo, /xdg-open não encontrado; gio não encontrado/);
+});
+
+test("the Linux opener never starts a browser as root", { skip: SEM_SHELL_POSIX }, async (t) => {
+  const marca = path.join(ajuda.dirTemporario("console-abridor-root-"), "chamado");
+  const { plataforma } = abridoresFalsos(t, { "xdg-open": `touch "${marca}"` }, SESSAO_GRAFICA);
+  const getuid = process.getuid;
+  process.getuid = () => 0;
+  t.after(() => {
+    process.getuid = getuid;
+    fs.rmSync(path.dirname(marca), { recursive: true, force: true });
+  });
+
+  const r = await plataforma.abrirNavegador("http://127.0.0.1:8099/");
+  assert.equal(r.estado, "nao-aplicavel");
+  assert.match(r.motivo, /como root/);
+  assert.ok(!fs.existsSync(marca));
+});
+
+test("a Linux host without a graphical session starts no opener", { skip: SEM_SHELL_POSIX }, async (t) => {
+  const marca = path.join(ajuda.dirTemporario("console-abridor-marca-"), "chamado");
+  const { plataforma } = abridoresFalsos(t, { "xdg-open": `touch "${marca}"`, gio: `touch "${marca}"` }, {
+    CONSOLE_PLATAFORMA: "linux",
+    DISPLAY: undefined,
+    WAYLAND_DISPLAY: undefined,
+  });
+  t.after(() => fs.rmSync(path.dirname(marca), { recursive: true, force: true }));
+
+  const r = await plataforma.abrirNavegador("http://127.0.0.1:8099/");
+  assert.equal(r.estado, "nao-aplicavel");
+  assert.match(r.motivo, /túnel SSH/);
+  assert.ok(!fs.existsSync(marca));
+});
+
+const URL_HOSTIL_AO_CMD = "file:///C:/Users/Jo%CD%80o%PATH%/R&D^!x!|y/AppData/Local/Temp/remoteifes-console-x/primeiro-acesso.html";
+
+test("on Windows the URL reaches cmd only through a variable, with the session environment", { skip: SEM_SHELL_POSIX }, async (t) => {
+  const registro = path.join(ajuda.dirTemporario("console-abridor-cmd-"), "argumentos");
+  const { plataforma } = abridoresFalsos(t, { "cmd.exe": `printf '%s\\n' "$@" "$SystemRoot" "$REMOTEIFES_ENDERECO" > "${registro}"` }, {
+    CONSOLE_PLATAFORMA: "win32",
+    SystemRoot: "C:\\Windows",
+  });
+  t.after(() => fs.rmSync(path.dirname(registro), { recursive: true, force: true }));
+
+  const r = await plataforma.abrirNavegador(URL_HOSTIL_AO_CMD);
+  assert.equal(r.disponivel, true, r.motivo);
+  assert.deepEqual(fs.readFileSync(registro, "utf8").split("\n").slice(0, -1), [
+    "/d",
+    "/v:on",
+    "/s",
+    "/c",
+    '"start "" "!REMOTEIFES_ENDERECO!""',
+    "C:\\Windows",
+    URL_HOSTIL_AO_CMD,
+  ]);
+
+  fs.rmSync(registro);
+  const recusado = await plataforma.abrirNavegador('http://127.0.0.1:8099/"&calc');
+  assert.equal(recusado.disponivel, false);
+  assert.ok(!fs.existsSync(registro), "an address that could close the quotes never reaches cmd");
+});
+
+test("the real cmd passes the URL through untouched", { skip: process.platform !== "win32" && "needs cmd.exe" }, () => {
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+  const { executavel, args, opcoes } = windows.abridorDoCmd(URL_HOSTIL_AO_CMD);
+  const eco = args.map((arg) => arg.replace(/^"start /, '"echo '));
+  assert.notDeepEqual(eco, args);
+  const r = require("child_process").spawnSync(executavel, eco, { ...opcoes, encoding: "utf8", windowsHide: true });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), `"" "${URL_HOSTIL_AO_CMD}"`);
+});
+
+test("on macOS the URL goes to open with the session environment", { skip: SEM_SHELL_POSIX }, async (t) => {
+  const registro = path.join(ajuda.dirTemporario("console-abridor-open-"), "argumentos");
+  const { plataforma } = abridoresFalsos(t, { open: `printf '%s\\n' "$@" "$__CF_USER_TEXT_ENCODING" > "${registro}"` }, {
+    CONSOLE_PLATAFORMA: "darwin",
+    __CF_USER_TEXT_ENCODING: "0x1F5:0x0:0x0",
+  });
+  t.after(() => fs.rmSync(path.dirname(registro), { recursive: true, force: true }));
+
+  const r = await plataforma.abrirNavegador("http://127.0.0.1:8099/");
+  assert.equal(r.disponivel, true, r.motivo);
+  assert.equal(fs.readFileSync(registro, "utf8"), "http://127.0.0.1:8099/\n0x1F5:0x0:0x0\n");
+});
+
+test("the Linux desktop folder follows user-dirs.dirs and is never created", { skip: process.platform === "win32" && "HOME does not move the Windows home" }, (t) => {
+  const casa = ajuda.dirTemporario("console-casa-mesa-");
+  const amb = ajuda.ambiente({ env: { CONSOLE_PLATAFORMA: "linux", HOME: casa, XDG_CONFIG_HOME: undefined } });
+  t.after(() => {
+    amb.restaurar();
+    fs.rmSync(casa, { recursive: true, force: true });
+  });
+  const linux = require(path.join(ajuda.RAIZ, "src", "plataforma", "linux.js"));
+
+  assert.equal(linux.areaDeTrabalho(), null);
+  assert.ok(!fs.existsSync(path.join(casa, "Desktop")), "a missing desktop is not created");
+  fs.mkdirSync(path.join(casa, "Desktop"));
+  assert.equal(linux.areaDeTrabalho(), path.join(casa, "Desktop"));
+
+  const dirs = path.join(casa, ".config", "user-dirs.dirs");
+  fs.mkdirSync(path.dirname(dirs));
+  fs.writeFileSync(dirs, '# xdg-user-dirs\nXDG_DOWNLOAD_DIR="$HOME/Downloads"\nXDG_DESKTOP_DIR="$HOME/Área de Trabalho"\n');
+  assert.equal(linux.areaDeTrabalho(), null, "the declared folder wins, and it does not exist yet");
+  fs.mkdirSync(path.join(casa, "Área de Trabalho"));
+  assert.equal(linux.areaDeTrabalho(), path.join(casa, "Área de Trabalho"));
+
+  fs.writeFileSync(dirs, 'XDG_DESKTOP_DIR="$HOME/"\n');
+  assert.equal(linux.areaDeTrabalho(), null, "a desktop disabled as $HOME is not the home folder");
+});
+
+test("the Windows desktop folder is the one the shell reports, only when it exists", async (t) => {
+  if (process.platform === "win32") {
+    const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+    const mesa = windows.areaDeTrabalho();
+    assert.ok(mesa === null || fs.statSync(mesa).isDirectory(), String(mesa));
+    return;
+  }
+  const mesa = ajuda.dirTemporario("console-mesa-win-");
+  const { bin } = abridoresFalsos(t, { "powershell.exe": `printf '%s\\r\\n' "${mesa}"` }, { CONSOLE_PLATAFORMA: "win32" });
+  t.after(() => fs.rmSync(mesa, { recursive: true, force: true }));
+  const windows = require(path.join(ajuda.RAIZ, "src", "plataforma", "windows.js"));
+
+  assert.equal(windows.areaDeTrabalho(), mesa);
+  fs.writeFileSync(path.join(bin, "powershell.exe"), `#!/bin/sh\nprintf '%s\\r\\n' "${mesa}-inexistente"\n`, { mode: 0o755 });
+  assert.equal(windows.areaDeTrabalho(), null);
 });
 
 test("the application URL comes from the real configuration, not a fixed port", (t) => {

@@ -244,9 +244,8 @@ async function pacotesPendentes() {
   return { ...recurso(ESTADO.SUPORTADO), pendentes: n, observacao: "Consulta ao softwareupdate; instalar atualizações continua sendo decisão humana." };
 }
 
-async function abrirNavegador(url) {
-  const r = await processos.executar("open", [url], { timeoutMs: 15_000 });
-  return r.ok ? { ...recurso(ESTADO.SUPORTADO), url } : recurso(ESTADO.INDISPONIVEL, r.erro || "open falhou", { url });
+async function abrirNavegador(url, opcoes) {
+  return base.abrirComAbridores(url, [{ executavel: "open", args: [url] }], opcoes);
 }
 
 // The program lives inside the bundle, in Contents/Resources, where macOS expects a .app's content.
