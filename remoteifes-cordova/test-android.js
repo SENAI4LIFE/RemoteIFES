@@ -29,7 +29,10 @@ async function main() {
     try {
       const { stdout } = await execFile(tool('adb'), ['-s', serial, ...args], { timeout: 60000, maxBuffer: 32 * 1024 * 1024 });
       return stdout.trim();
-    } catch (e) { throw new Error(`ADB ${args.slice(0, 3).join(' ')} failed: ${e.message}`); }
+    } catch (e) {
+      const stdout = String(e.stdout || '').trim();
+      throw new Error(`ADB ${args.slice(0, 3).join(' ')} failed: ${e.message}${stdout ? `\n${stdout}` : ''}`);
+    }
   };
   const shell = (...args) => adb('shell', ...args);
   const dir = path.join(__dirname, 'build', `android-test-${Date.now()}`);
@@ -66,7 +69,9 @@ async function main() {
       }
     }
     report.size = await shell('wm', 'size'); report.density = await shell('wm', 'density');
-    report.install = await adb('install', '-r', path.resolve(apk));
+    // Incremental install, adb's default on Android 11+, keeps serving the APK from the host and
+    // intermittently failed on a freshly booted emulator; a streamed install copies it whole.
+    report.install = await adb('install', '--no-incremental', '-r', path.resolve(apk));
     await adb('logcat', '-c');
     const launch = () => shell('am', 'start', '-n', `${pkg}/.MainActivity`);
     await shell('am', 'force-stop', pkg);
