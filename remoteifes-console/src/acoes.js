@@ -545,6 +545,195 @@ const ACOES = [
   },
 
   {
+    id: "console.simular-desinstalacao",
+    rotulo: "Simular a desinstalação do Console",
+    grupo: "console",
+    proposito:
+      "Roda o desinstalador do console em modo de simulação e mostra exatamente o que seria removido e o que ficaria. " +
+      "Nada é alterado.",
+    impacto: "Nenhum: é só leitura. O RemoteIFES e o console continuam como estão.",
+    exigeElevacao: false,
+    confirmacao: null,
+    prontidao: {},
+    async validacaoExtra() {
+      const s = require("./desinstalacao").situacao();
+      return s.simulavel ? null : s.motivo;
+    },
+    montar({ operador }) {
+      return {
+        acao: "console.simular-desinstalacao",
+        rotulo: "Simular a desinstalação do Console",
+        operador,
+        executavel: nodeExecutavel(),
+        argumentos: require("./desinstalacao").argumentosDoDesinstalador("--simular"),
+        cwd: config.RAIZ_CONSOLE,
+        exigeTrava: false,
+        timeoutMs: 2 * 60 * 1000,
+        verificar: async ({ estadoFinal }) =>
+          estadoFinal === execucao.ESTADOS.CONCLUIDO ? { ok: true, resumo: "simulação concluída; nada foi alterado" } : null,
+      };
+    },
+  },
+
+  {
+    id: "console.desinstalar",
+    rotulo: "Desinstalar o Console de Operações",
+    grupo: "console",
+    proposito:
+      "Remove o programa do Console de Operações deste computador com o desinstalador do próprio console: encerra o console, " +
+      "retira o registro de inicialização e os atalhos e apaga as versões instaladas.",
+    impacto:
+      "Esta página perde a conexão e o console deixa de existir até ser instalado de novo. O RemoteIFES NÃO é removido: " +
+      "a aplicação, o serviço, o banco e os backups continuam funcionando. Operadores, auditoria e histórico ficam " +
+      "preservados no diretório de estado.",
+    exigeElevacao: true,
+    confirmacao: "desinstalar",
+    prontidao: {},
+    async validacaoExtra() {
+      const s = require("./desinstalacao").situacao();
+      if (s.modo === "console") return null;
+      return s.comando ? `${s.motivo} Comando: ${s.comando}` : s.motivo;
+    },
+    montar({ operador }) {
+      return {
+        acao: "console.desinstalar",
+        rotulo: "Desinstalar o Console de Operações",
+        operador,
+        executavel: nodeExecutavel(),
+        argumentos: require("./desinstalacao").argumentosDoDesinstalador("--sim"),
+        cwd: config.RAIZ_CONSOLE,
+        exigeTrava: false,
+        timeoutMs: 10 * 60 * 1000,
+        cancelavel: false,
+        faseInicial: "removendo a integração",
+        detectarFase: (texto) => {
+          if (texto.includes("Encerrando o console")) return "encerrando o console";
+          if (texto.includes("Removendo atalhos")) return "removendo atalhos";
+          if (texto.includes("Removendo o programa")) return "removendo o programa";
+          if (texto.includes("Desinstalação concluída")) return "concluída";
+          return null;
+        },
+        faseIrreversivel: (texto) => texto.includes("Removendo a integração"),
+      };
+    },
+  },
+
+  {
+    id: "ci.disparar",
+    rotulo: "Iniciar um workflow no GitHub Actions",
+    grupo: "ci",
+    proposito:
+      "Pede ao GitHub Actions uma nova execução do workflow escolhido no ramo main e passa a acompanhá-la aqui. " +
+      "A compilação roda nos executores do GitHub, nunca neste host.",
+    impacto:
+      "Consome minutos de Actions do repositório. A publicação do GitHub Pages substitui a demonstração publicada; " +
+      "nenhum workflow altera este servidor nem o APK que ele entrega.",
+    exigeElevacao: true,
+    confirmacao: null,
+    esquema: {
+      workflow: { tipo: "texto", regex: /^(ci|android|ios|pages)$/, obrigatorio: true },
+      commit: { tipo: "texto", regex: /^[0-9a-f]{40}$/, obrigatorio: false },
+      matrizAmpla: { tipo: "booleano", padrao: false, obrigatorio: false },
+      safariIos: { tipo: "booleano", padrao: false, obrigatorio: false },
+    },
+    async validacaoExtra({ argumentos }) {
+      if (!require("./github").temToken()) return "grave antes uma credencial do GitHub em Aplicativos e CI > Credencial do GitHub.";
+      if (argumentos.commit && argumentos.workflow !== "ci") return "só a validação (CI) confere um commit esperado.";
+      if (argumentos.safariIos && argumentos.workflow !== "ci") return "o smoke do Safari no simulador iOS faz parte da validação (CI).";
+      if (argumentos.matrizAmpla && !["ci", "android"].includes(argumentos.workflow)) return "a matriz ampla de APIs Android só existe na validação (CI) e no build Android.";
+      return null;
+    },
+    imediata: true,
+    async executarImediata({ argumentos }) {
+      const entradas = {};
+      if (argumentos.workflow === "ci") {
+        if (argumentos.commit) entradas.expected_sha = argumentos.commit;
+        if (argumentos.matrizAmpla) entradas.android_broad_matrix = true;
+        if (argumentos.safariIos) entradas.ios_safari = true;
+      }
+      if (argumentos.workflow === "android" && argumentos.matrizAmpla) entradas.broad_matrix = true;
+      const r = await require("./github").dispararWorkflow(argumentos.workflow, { ramo: "main", entradas });
+      return { ...r, ok: !!r.ok && !r.ambiguo && !r.indeterminado };
+    },
+  },
+
+  {
+    id: "ci.reexecutar",
+    rotulo: "Repetir uma execução da CI",
+    grupo: "ci",
+    proposito: "Pede ao GitHub Actions para repetir os jobs que falharam (ou todos) de uma execução já concluída.",
+    impacto: "Consome minutos de Actions. A execução repetida mantém o mesmo commit; nada muda neste servidor.",
+    exigeElevacao: true,
+    confirmacao: null,
+    esquema: {
+      run: { tipo: "texto", regex: /^[1-9]\d{0,15}$/, obrigatorio: true },
+      tudo: { tipo: "booleano", padrao: false, obrigatorio: false },
+    },
+    imediata: true,
+    async executarImediata({ argumentos }) {
+      return require("./github").reexecutarRun(Number(argumentos.run), { soFalhas: !argumentos.tudo });
+    },
+  },
+
+  {
+    id: "ci.cancelar",
+    rotulo: "Cancelar uma execução da CI",
+    grupo: "ci",
+    proposito: "Pede ao GitHub Actions para cancelar uma execução em andamento.",
+    impacto: "Os jobs em curso são interrompidos e a execução termina como cancelada. Nada muda neste servidor.",
+    exigeElevacao: true,
+    confirmacao: null,
+    esquema: {
+      run: { tipo: "texto", regex: /^[1-9]\d{0,15}$/, obrigatorio: true },
+    },
+    imediata: true,
+    async executarImediata({ argumentos }) {
+      return require("./github").cancelarRun(Number(argumentos.run));
+    },
+  },
+
+  {
+    id: "github.credencial",
+    rotulo: "Gravar a credencial do GitHub",
+    grupo: "ci",
+    proposito:
+      "Guarda no estado do console o token que acompanha, dispara, repete e cancela execuções do GitHub Actions e baixa artefatos. " +
+      "O valor nunca volta por API, log ou auditoria.",
+    impacto: "Substitui a credencial anterior, se houver. A operação do RemoteIFES não depende dela.",
+    exigeElevacao: true,
+    confirmacao: null,
+    esquema: {
+      token: { tipo: "segredo", obrigatorio: true, minimo: 20, maximo: 500 },
+    },
+    imediata: true,
+    async executarImediata({ argumentos }) {
+      const github = require("./github");
+      try {
+        github.gravarToken(argumentos.token);
+      } catch (erro) {
+        return { ok: false, erro: erro.message };
+      }
+      const conferencia = await github.conferirToken();
+      return { ok: true, conferencia };
+    },
+  },
+
+  {
+    id: "github.remover-credencial",
+    rotulo: "Remover a credencial do GitHub",
+    grupo: "ci",
+    proposito: "Apaga o token do GitHub guardado pelo console.",
+    impacto: "O acompanhamento e as ações da CI ficam indisponíveis até uma nova credencial. Nada mais muda.",
+    exigeElevacao: true,
+    confirmacao: null,
+    imediata: true,
+    async executarImediata() {
+      require("./github").gravarToken(null);
+      return { ok: true };
+    },
+  },
+
+  {
     id: "manutencao.remover-trava",
     rotulo: "Remover trava de manutenção residual",
     grupo: "recuperacao",

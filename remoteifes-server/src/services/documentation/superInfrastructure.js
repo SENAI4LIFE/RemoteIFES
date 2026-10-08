@@ -53,17 +53,17 @@ module.exports = [
     corpo: [
       { t: "p", texto: "O console é um serviço local que administra <strong>o RemoteIFES, o host e a infraestrutura</strong>. Ele tem identidade própria: a conta do console não é a do Superadministrador da aplicação, porque a autenticação da aplicação depende do banco e é encerrada a cada reinício — justamente quando a recuperação é necessária." },
       { t: "tabela", cabecalho: ["Área do console", "O que resolve"], linhas: [
-        ["Visão geral", "estado da aplicação, do serviço, do watchdog e do host, com o que exige atenção em primeiro lugar"],
-        ["Serviço", "reiniciar, parar e iniciar o RemoteIFES; ler o journal das unidades"],
-        ["Atualizações", "comparar versão em execução, checkout e origin; implantar um commit revisado; reverter"],
-        ["Dados e recuperação", "backup verificado, restauração com o serviço parado e recuperação da senha do Superadministrador"],
-        ["Aplicativo e CI", "versões de servidor, PWA, Cordova e Android, APK publicado e estado das execuções do GitHub"],
-        ["Rede e domínio", "interfaces, rotas, resolvedor, portas em escuta, proxy, DNS e validade do certificado"],
-        ["Programa", "versão do próprio console, atualização e reversão do programa, capacidades da plataforma e onde a instalação mora"],
-        ["Avançado", "elevação, auditoria do console, histórico de operações e Terminal Expert"],
+        ["Início", "o que exige atenção em primeiro lugar, com a ação que resolve, e as tarefas mais frequentes"],
+        ["Serviço e registros", "reiniciar, parar e iniciar o RemoteIFES; watchdog de saúde; ler o journal das unidades"],
+        ["Backups e recuperação", "backup verificado, restauração com o serviço parado e recuperação da senha do Superadministrador"],
+        ["Rede e acesso", "modo de teste e redes autorizadas; diagnóstico de interfaces, proxy, DNS e validade do certificado"],
+        ["Atualizações", "RemoteIFES e Console em separado: comparar com origin, implantar um commit revisado ou a versão publicada do console, e reverter"],
+        ["Aplicativos e CI", "site e PWA, APK publicado (download e integridade), builds e execuções do GitHub Actions disparadas, acompanhadas e repetidas pelo console, e a credencial do GitHub"],
+        ["Console instalado", "versão do próprio console, capacidades da plataforma, onde a instalação mora e a desinstalação"],
+        ["Segurança e auditoria", "sessão, elevação, histórico de operações, auditoria do console e Terminal Expert"],
       ] },
       { t: "comando", titulo: "Instalar o console (uma vez, no host)", comandos: C.consoleInstalar, quando: "Primeiro provisionamento, depois de o RemoteIFES já estar instalado.", preRequisitos: "Acesso root no host; Node 22.13+ no PATH; checkout completo.", resultado: "Instala o programa em /opt/remoteifes-console — camada estável mais versoes/&lt;versao&gt; —, o auxiliar privilegiado como root, a regra de sudo restrita (validada com visudo) e as unidades systemd. Exibe uma única vez o segredo para criar o primeiro operador.", risco: "Reexecutar refaz unidades e instala a versão de novo; o estado (operadores, auditoria, histórico) é preservado." },
-      { t: "p", texto: "No uso normal, <code>./console.sh</code> (<code>console.bat</code> no Windows) faz esta instalação na primeira vez — por usuário, ou com <code>sudo</code> no Linux para o socket do systemd e o auxiliar — e depois só abre o console. O mesmo instalador serve Linux, Windows e macOS. No Windows e no macOS não há serviço residente: o console é aberto pelo lançador, que confere a identidade de quem responde na porta antes de abrir o navegador, e sai sozinho depois de ficar ocioso. As capacidades que não existem em cada sistema aparecem na aba <strong>Programa</strong> com o motivo exato, e o servidor recusa a operação de verdade — não é só o botão que fica apagado." },
+      { t: "p", texto: "No uso normal, <code>./console.sh</code> (<code>console.bat</code> no Windows) faz esta instalação na primeira vez — por usuário, ou com <code>sudo</code> no Linux para o socket do systemd e o auxiliar — e depois só abre o console. O mesmo instalador serve Linux, Windows e macOS. No Windows e no macOS não há serviço residente: o console é aberto pelo lançador, que confere a identidade de quem responde na porta antes de abrir o navegador, e sai sozinho depois de ficar ocioso. As capacidades que não existem em cada sistema aparecem em <strong>Console instalado</strong> com o motivo exato, e o servidor recusa a operação de verdade — não é só o botão que fica apagado." },
       { t: "comando", titulo: "Abrir de outra máquina", comandos: C.consoleAcesso, quando: "Sempre que a manutenção não for feita no próprio Pi.", preRequisitos: "Acesso SSH ao host.", resultado: "Encaminha a porta local do console; abra então http://127.0.0.1:8099 no seu navegador.", risco: "O <code>localhost</code> do seu computador não é o do Pi: sem o túnel, o endereço aponta para a sua própria máquina. O console escuta apenas no loopback do host." },
       { t: "passos", itens: [
         "Entre com o operador do console; operações sensíveis pedem a senha de novo e valem por poucos minutos.",
@@ -112,7 +112,7 @@ module.exports = [
       ] },
       { t: "p", texto: "O health é um indicador mínimo: HTTP 200 com banco ok. ESP32 offline <strong>não</strong> derruba o health, então valide dispositivos separadamente em Status. Uma parada do serviço, por si só, não é uma parada durável: sem desligar o timer de saúde, o watchdog reinicia a aplicação após 3 falhas seguidas em intervalos de 2 minutos." },
       { t: "passos", itens: [
-        "Em incidente, abra a Visão geral do console: ela lista primeiro o que exige atenção.",
+        "Em incidente, abra o Início do console: ele lista primeiro o que exige atenção.",
         "Leia os registros da unidade envolvida antes de reiniciar; corrija a causa (.env, porta, banco, permissão ou disco) em vez de reiniciar repetidamente.",
         "Após o restart, confirme health, login, WebSocket/status de salas e Monitoramento nesta aplicação.",
       ] },
@@ -155,7 +155,7 @@ module.exports = [
     categoria: "super_infra",
     tags: ["backup", "restore", "SQLite", "WAL", "pre-restauração", "console"],
     corpo: [
-      { t: "p", texto: "Criar backup, listar e restaurar ficam em <strong>Console de Operações &gt; Dados e recuperação</strong>. O backup roda com o servidor no ar; a restauração é destrutiva, exige reautenticação e digitar a confirmação." },
+      { t: "p", texto: "Criar backup, listar e restaurar ficam em <strong>Console de Operações &gt; Backups e recuperação</strong>. O backup roda com o servidor no ar; a restauração é destrutiva, exige reautenticação e digitar a confirmação." },
       { t: "tabela", cabecalho: ["Operação no console", "Garantias"], linhas: [
         ["Criar backup", "snapshot consistente com VACUUM INTO (sem copiar arquivo ativo), verificação de integridade e de chaves estrangeiras, permissão restrita e rotação"],
         ["Restaurar", "valida o candidato antes de tocar em qualquer coisa, desliga o watchdog, para a aplicação, confirma que o /health parou de responder, preserva o banco atual como pre-restauração, instala e revalida"],
@@ -224,7 +224,7 @@ module.exports = [
     categoria: "super_infra",
     tags: ["reset-admin", "senha", "sessões", "console"],
     corpo: [
-      { t: "p", texto: "Em <strong>Console de Operações &gt; Dados e recuperação</strong>, a ação <em>Redefinir a senha do superadministrador</em> instala uma nova senha na conta de nível 3 desta aplicação. A senha é enviada no corpo da requisição e entregue ao processo por entrada padrão: não aparece em linha de comando, em <code>ps</code>, em log nem na auditoria." },
+      { t: "p", texto: "Em <strong>Console de Operações &gt; Backups e recuperação</strong>, a ação <em>Redefinir a senha do superadministrador</em> instala uma nova senha na conta de nível 3 desta aplicação. A senha é enviada no corpo da requisição e entregue ao processo por entrada padrão: não aparece em linha de comando, em <code>ps</code>, em log nem na auditoria." },
       { t: "p", texto: "A conta é escolhida pelo <strong>nível</strong>, não pelo nome: o login padrão mudou de <code>admin</code> para <code>superadmin</code> e pode ter sido renomeado. Só as sessões <strong>dessa conta</strong> são encerradas; as demais continuam válidas — um reinício do serviço é que encerra todas." },
       { t: "nota", nivel: "seguranca", texto: "A recuperação pelo console exige operador autenticado e reautenticação. Ela não define senha padrão: um valor conhecido como <code>admin</code> é recusado." },
       { t: "comando", titulo: "Redefinir pelo terminal (emergência)", comandos: C.recuperacaoConta, quando: "Console indisponível ou aplicação sem login utilizável.", preRequisitos: "Acesso autorizado ao host e ao mesmo .env/banco; execute em remoteifes-server.", resultado: "Define a senha lida da entrada padrão (fora da linha de comando, do histórico e do ps) ou, sem argumento, restaura admin; nenhuma senha é impressa e as sessões da conta são encerradas. Uma entrada vazia ou inválida não altera nada.", risco: "Sem argumento volta a uma senha pública e fraca. Entre imediatamente, troque-a e verifique o acesso ao host. A senha como argumento (npm run reset-admin -- <senha>) ainda é aceita, mas fica no histórico e no ps. O caminho do console não tem o fallback para admin." },

@@ -23,10 +23,12 @@ function selected(p) {
   return JOBS.filter((job) => (Array.isArray(p.jobs[job]) ? p.jobs[job].length > 0 : p.jobs[job]));
 }
 
-test("console changes select console tests and native package checks only", () => {
+test("console changes select console tests, native package checks and the browser tests of its interface", () => {
   const p = plan(["remoteifes-console/src/servidor.js"]);
-  assert.deepEqual(selected(p), ["console", "packages", "deployment", "startup"]);
+  assert.deepEqual(selected(p), ["console", "packages", "deployment", "e2e", "startup"]);
   assert.deepEqual(p.jobs.console, ALL_OS);
+  assert.equal(p.jobs.e2e.length, 4, "pull requests run the browser tests on Chromium only");
+  assert.equal(p.jobs.safari, false, "native Safari covers the application, not the Console");
   assert.deepEqual(p.jobs.packages, PACKAGES_OS);
 });
 
@@ -136,12 +138,12 @@ test("E2E shards cover 1..n exactly once per target", () => {
 test("verification accepts selected-success and unselected-skipped only", () => {
   const p = plan(["remoteifes-console/src/servidor.js"]);
   const needs = { changes: { result: "success" } };
-  for (const job of JOBS) needs[job] = { result: ["console", "packages", "deployment", "startup"].includes(job) ? "success" : "skipped" };
+  for (const job of JOBS) needs[job] = { result: ["console", "packages", "deployment", "e2e", "startup"].includes(job) ? "success" : "skipped" };
   assert.deepEqual(verifyResults(p, needs), []);
 
   assert.match(verifyResults(p, { ...needs, console: { result: "skipped" } }).join(), /console: expected success, got skipped/);
   assert.match(verifyResults(p, { ...needs, packages: { result: "cancelled" } }).join(), /packages: expected success/);
-  assert.match(verifyResults(p, { ...needs, e2e: { result: "failure" } }).join(), /e2e: expected skipped, got failure/);
+  assert.match(verifyResults(p, { ...needs, android: { result: "failure" } }).join(), /android: expected skipped, got failure/);
   assert.match(verifyResults(p, { ...needs, changes: { result: "failure" } }).join(), /changes: expected success/);
   const missing = { ...needs };
   delete missing.firmware;
