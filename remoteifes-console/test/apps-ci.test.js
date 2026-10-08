@@ -376,7 +376,8 @@ function situacaoInstalada(t, registro, { estadoDoProcesso } = {}) {
 test("a user installation is uninstalled by the Console with the uninstaller pinned to its root, state and scope", (t) => {
   const r = situacaoInstalada(t, (estado) => ({ escopo: "usuario", estado }));
   assert.equal(r.situacao.modo, "console");
-  assert.deepEqual(r.args, [path.join(r.payload, "instalacao", "desinstalar.js"), "--raiz", r.raiz, "--estado", r.estado, "--escopo", "usuario", "--sim"]);
+  const real = (c) => fs.realpathSync(c);
+  assert.deepEqual(r.args, [path.join(real(r.payload), "instalacao", "desinstalar.js"), "--raiz", real(r.raiz), "--estado", r.estado, "--escopo", "usuario", "--sim"]);
 });
 
 test("an installation whose record names another state directory is never uninstalled from the Console", (t) => {

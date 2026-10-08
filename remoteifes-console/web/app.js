@@ -1250,8 +1250,16 @@
 
   // --- Console updates -----------------------------------------------------------------------
 
+  function consultando(caixa, texto) {
+    limpar(caixa).appendChild(cartao({}, [vazio("i-relogio", "tom-info", texto, "Na primeira abertura o console consulta a plataforma; num host lento isso leva alguns segundos.")]));
+  }
+
   function carregarAtualizacaoConsole(comRede) {
     var caixa = document.querySelector('[data-subpainel="console"]');
+    if (!comRede) {
+      if (estado.programa) renderAtualizacaoConsole(estado.programa, false);
+      else consultando(caixa, "Consultando a versão do console…");
+    }
     if (comRede) {
       var b = caixa.querySelector("[data-verificar-console]");
       if (b) { b.disabled = true; b.lastChild.textContent = "Verificando…"; }
@@ -1956,6 +1964,8 @@
   };
 
   function carregarConsole() {
+    if (estado.programa) renderConsole(estado.programa, estado.desinstalacao);
+    else consultando($("consoleConteudo"), "Consultando o programa e a plataforma…");
     Promise.all([api("/api/programa"), api("/api/desinstalacao")]).then(function (rs) {
       if (rs[0].ok) estado.programa = rs[0].corpo;
       if (rs[1].ok) estado.desinstalacao = rs[1].corpo;

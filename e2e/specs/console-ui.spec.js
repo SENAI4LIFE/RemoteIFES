@@ -6,6 +6,8 @@ const H = require("../harness/console-harness");
 const OPERADOR = "operador";
 const SENHA = "senha-de-teste-12345";
 const PORTA_APP = Number(process.env.E2E_API_PORT || 8791);
+// /api/programa probes the platform's tools; on hosted Windows runners that alone can take minutes.
+const PROGRAMA_MS = 120_000;
 
 test.describe.configure({ mode: "serial" });
 
@@ -86,7 +88,7 @@ test.describe("installed console", () => {
   });
 
   test("every area renders on desktop and on a phone without horizontal scrolling", async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(300_000);
     const erros = [];
     page.on("pageerror", (e) => erros.push(e.message));
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -114,6 +116,7 @@ test.describe("installed console", () => {
   });
 
   test("RemoteIFES and Console updates are separate, and the Console update carries its version", async ({ page }) => {
+    test.setTimeout(240_000);
     await entrar(page, consoleUi.url);
     await page.goto(`${consoleUi.url}/#/atualizacoes/remoteifes`);
     const remoteifes = page.locator('[data-subpainel="remoteifes"]');
@@ -128,7 +131,7 @@ test.describe("installed console", () => {
 
     await page.getByRole("tab", { name: /Console de Operações/ }).click();
     const consolePainel = page.locator('[data-subpainel="console"]');
-    await expect(consolePainel).toContainText("Console 1.1.0 disponível");
+    await expect(consolePainel).toContainText("Console 1.1.0 disponível", { timeout: PROGRAMA_MS });
     await expect(consolePainel.getByRole("button", { name: /^Atualizar para / })).toHaveCount(0);
     const preparo = page.waitForRequest((r) => r.url().endsWith("/api/acoes/console.atualizar/preparar"));
     await consolePainel.getByRole("button", { name: "Atualizar o Console para 1.1.0" }).click();
@@ -244,7 +247,7 @@ test.describe("installed console", () => {
     await entrar(page, consoleUi.url);
     await page.goto(`${consoleUi.url}/#/console`);
     const area = page.locator('[data-painel="console"]');
-    await expect(area).toContainText("Remove apenas o Console de Operações");
+    await expect(area).toContainText("Remove apenas o Console de Operações", { timeout: PROGRAMA_MS });
     await area.getByRole("button", { name: "Desinstalar o Console…" }).click();
     const dlg = page.locator("#dlgAcao");
     await expect(dlg).toContainText("O RemoteIFES NÃO é removido");
