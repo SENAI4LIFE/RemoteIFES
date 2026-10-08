@@ -15,7 +15,7 @@ O RemoteIFES continua operando o prédio.
 | Atualização, rollback, versões em execução | Usuários, permissões, propriedade de sala |
 | Backup, restauração, quarentena de banco | Cadastro/OTA/credenciais/IR dos ESP32 |
 | Rede, domínio, TLS, proxy (diagnóstico); política de acesso de rede da aplicação (modo de teste e CIDR autorizados) | Demais configurações da aplicação, relatos, auditoria |
-| Mobile/CI: release publicado e execuções da CI, só consulta | Página Aplicativo e download do APK pelo usuário |
+| Aplicativos e CI: APK publicado (download e conferência do SHA-256), roteiro de publicação; workflows do GitHub Actions disparados, acompanhados, repetidos e cancelados, artefatos baixados, credencial do GitHub | Página Aplicativo e download do APK pelo usuário |
 | Recuperação de conta e do próprio console | Monitoramento e mapas operacionais |
 
 O console **resume** a saúde da aplicação e oferece links profundos; não recria editores que já
@@ -137,7 +137,8 @@ alvo fixo. Não existe endpoint `/exec` genérico.
 
 * **Terminal Expert** é capacidade separada, com destravamento, reautenticação e relock.
 * Builds Android/iOS pesados ficam na CI ou na máquina de desenvolvimento. O Pi não ganha SDK,
-  JDK nem Gradle.
+  JDK nem Gradle: o console dispara e acompanha os builds no GitHub Actions, e a publicação de
+  produção do APK, que exige a chave e o `apksigner`, continua na máquina com o SDK.
 * `export.py`, `import.py` e `clear.py` são ferramentas de histórico Git do desenvolvedor.
   **Não** viram botões.
 * `release.sh` cria commit e tag: é autoria de versão, não implantação. Fora do console nesta

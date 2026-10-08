@@ -106,7 +106,7 @@ function selectChecks({ areas, fullDepth, allScope }) {
     // Installs the server and the Console package on disposable systemd hosts (Linux only): an
     // older host with the minimum Node on x64, and a current one on ARM64.
     deployment: serverChanged || consoleChanged,
-    e2e: frontend ? e2eMatrix(e2eFull) : [],
+    e2e: frontend || consoleChanged ? e2eMatrix(e2eFull) : [],
     safari: (frontend && e2eFull) || has("safari"),
     cordova: mobile ? CORDOVA_OS : [],
     firmware: has("firmware"),

@@ -12,6 +12,7 @@ const repositorio = require("./repositorio");
 const prontidao = require("./prontidao");
 const rede = require("./rede");
 const mobile = require("./mobile");
+const github = require("./github");
 const terminal = require("./terminal");
 const identidade = require("./identidade");
 const plataforma = require("./plataforma");
@@ -575,8 +576,38 @@ async function rotear(req, res, url, params) {
     return responderJson(res, 200, await mobile.situacao());
   }
 
-  if (caminho === "/api/mobile/ci" && metodo === "GET") {
+  if ((caminho === "/api/mobile/ci" || caminho === "/api/ci") && metodo === "GET") {
     return responderJson(res, 200, await mobile.estadoCI());
+  }
+
+  const runDetalhe = /^\/api\/ci\/runs\/([1-9]\d{0,15})$/.exec(caminho);
+  if (runDetalhe && metodo === "GET") {
+    const r = await github.detalharRun(Number(runDetalhe[1]));
+    if (!r.ok) return responderErro(res, statusDoGitHub(r), r.erro, { semCredencial: !!r.semCredencial });
+    return responderJson(res, 200, r);
+  }
+
+  const artefato = /^\/api\/ci\/runs\/([1-9]\d{0,15})\/artefatos\/([1-9]\d{0,15})$/.exec(caminho);
+  if (artefato && metodo === "GET") {
+    return transmitirArtefato(req, res, sessao, Number(artefato[1]), Number(artefato[2]));
+  }
+
+  if (caminho === "/api/github/conferir" && metodo === "GET") {
+    const r = await github.conferirToken();
+    estado.auditar("github-token-conferido", { operador: sessao.operador, ok: !!r.ok });
+    return responderJson(res, 200, r);
+  }
+
+  if (caminho === "/api/mobile/apk" && metodo === "GET") {
+    return transmitirApk(res, sessao);
+  }
+
+  if (caminho === "/api/mobile/apk/conferir" && metodo === "GET") {
+    return responderJson(res, 200, await mobile.conferirApkPublicado());
+  }
+
+  if (caminho === "/api/desinstalacao" && metodo === "GET") {
+    return responderJson(res, 200, require("./desinstalacao").situacao());
   }
 
   // --- Actions -----------------------------------------------------------------------------------
@@ -674,6 +705,104 @@ async function rotear(req, res, url, params) {
   }
 
   return responderErro(res, 404, "rota não encontrada");
+}
+
+// --- Downloads ----------------------------------------------------------------------------------
+
+function statusDoGitHub(r) {
+  if (r.semCredencial) return 409;
+  return r.status && r.status >= 400 && r.status < 500 ? r.status : 502;
+}
+
+function nomeDeArquivo(nome, padrao) {
+  const limpo = String(nome || "").replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^[._]+/, "").slice(0, 100);
+  return limpo || padrao;
+}
+
+function iniciarDownload(res, tipo, nome, tamanho) {
+  cabecalhosBase(res);
+  res.writeHead(200, {
+    "Content-Type": tipo,
+    "Content-Disposition": `attachment; filename="${nome}"`,
+    ...(Number.isSafeInteger(tamanho) ? { "Content-Length": tamanho } : {}),
+  });
+}
+
+/**
+ * A CI artifact passes through to the operator's browser without touching the host's disk. The size
+ * limit is enforced on the bytes actually received, not on what the API declared.
+ */
+async function transmitirArtefato(req, res, sessao, runId, artefatoId) {
+  const r = await github.abrirArtefato(runId, artefatoId);
+  if (!r.ok) return responderErro(res, statusDoGitHub(r), r.erro);
+  estado.auditar("artefato-baixado", { operador: sessao.operador, run: runId, artefato: artefatoId, nome: r.meta.nome });
+  iniciarDownload(res, "application/zip", `${nomeDeArquivo(r.meta.nome, "artefato")}.zip`, null);
+  let bytes = 0;
+  r.resposta.on("data", (d) => {
+    bytes += d.length;
+    if (bytes > github.LIMITE_ARTEFATO) {
+      r.encerrar();
+      res.destroy();
+    }
+  });
+  r.resposta.on("error", () => res.destroy());
+  res.on("close", () => {
+    if (!r.resposta.complete) r.encerrar();
+  });
+  r.resposta.pipe(res);
+  return undefined;
+}
+
+/**
+ * Streams from one open descriptor and hashes the same bytes it sends, holding the last chunk back
+ * until the SHA-256 matches release.json: a file replaced or rewritten after the check never reaches
+ * the browser complete.
+ */
+async function transmitirApk(res, sessao) {
+  const { release, arquivo, erro } = await mobile.apkServivel();
+  if (!arquivo) return responderErro(res, release.publicado ? 409 : 404, erro);
+  let fd;
+  let info;
+  try {
+    fd = fs.openSync(arquivo, "r");
+    info = fs.fstatSync(fd);
+  } catch {
+    if (fd !== undefined) fs.closeSync(fd);
+    return responderErro(res, 404, "o APK publicado não pôde ser lido");
+  }
+  if (!info.isFile()) {
+    fs.closeSync(fd);
+    return responderErro(res, 409, "o APK citado em release.json não é um arquivo regular");
+  }
+  estado.auditar("apk-baixado", { operador: sessao.operador, versao: release.versao, build: release.build });
+  iniciarDownload(
+    res,
+    "application/vnd.android.package-archive",
+    nomeDeArquivo(`RemoteIFES-${release.versao || "android"}-${release.build || "build"}.apk`, "RemoteIFES.apk"),
+    info.size
+  );
+  const hash = crypto.createHash("sha256");
+  let retido = null;
+  const fluxo = fs.createReadStream(null, { fd, start: 0, autoClose: true });
+  fluxo.on("data", (pedaco) => {
+    hash.update(pedaco);
+    if (retido && !res.write(retido)) {
+      fluxo.pause();
+      res.once("drain", () => fluxo.resume());
+    }
+    retido = pedaco;
+  });
+  fluxo.on("end", () => {
+    if (hash.digest("hex") !== String(release.sha256).toLowerCase()) {
+      estado.auditar("apk-divergente-no-envio", { operador: sessao.operador, versao: release.versao, build: release.build });
+      res.destroy();
+      return;
+    }
+    res.end(retido || undefined);
+  });
+  fluxo.on("error", () => res.destroy());
+  res.on("close", () => fluxo.destroy());
+  return undefined;
 }
 
 // --- SSE ----------------------------------------------------------------------------------------

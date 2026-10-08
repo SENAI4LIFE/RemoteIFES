@@ -179,18 +179,20 @@ test("a dispatch that returns the run id uses that id, without guessing", async 
   assert.match(r.correlacao, /id devolvido/);
 });
 
-test("a dispatch without a body (204) is correlated by time window, not by 'the most recent'", async (t) => {
+test("a dispatch answered without a run id lists the new runs instead of guessing which is its own", async (t) => {
   const criado = new Date().toISOString();
+  let disparado = false;
   const falso = await servidorFalso({
     [`POST ${BASE_REPO}/actions/workflows/ci.yml/dispatches`]: (req, res) => {
+      disparado = true;
       res.writeHead(204);
       res.end();
     },
     [`GET ${BASE_REPO}/actions/workflows/ci.yml/runs`]: (req, res) =>
       json(res, 200, {
-        workflow_runs: [
-          { id: 4242, name: "CI", path: ".github/workflows/ci.yml", status: "queued", conclusion: null, head_sha: "b".repeat(40), head_branch: "main", run_number: 9, run_attempt: 1, created_at: criado, updated_at: criado, html_url: "https://exemplo", event: "workflow_dispatch" },
-        ],
+        workflow_runs: disparado
+          ? [{ id: 4242, name: "CI", path: ".github/workflows/ci.yml", status: "queued", conclusion: null, head_sha: "b".repeat(40), head_branch: "main", run_number: 9, run_attempt: 1, created_at: criado, updated_at: criado, html_url: "https://exemplo", event: "workflow_dispatch" }]
+          : [],
       }),
   });
   const amb = ajuda.ambiente({ githubApi: falso.base });
@@ -202,19 +204,22 @@ test("a dispatch without a body (204) is correlated by time window, not by 'the 
   amb.github.gravarToken("ghp_tokenfalsoparateste000000000000000");
   const r = await amb.github.dispararWorkflow("ci", { ramo: "main" });
   assert.equal(r.ok, true);
-  assert.equal(r.run.id, 4242);
-  assert.match(r.correlacao, /janela de tempo/);
+  assert.equal(r.indeterminado, true);
+  assert.equal(r.run, undefined, "timing never proves which run a dispatch created");
+  assert.deepEqual(r.candidatos.map((c) => c.id), [4242]);
 });
 
-test("several dispatches in the same window are declared ambiguous instead of guessed", async (t) => {
+test("several new runs in the same window are listed, never picked", async (t) => {
   const criado = new Date().toISOString();
   const run = (id) => ({ id, name: "CI", path: ".github/workflows/ci.yml", status: "queued", conclusion: null, head_sha: "c".repeat(40), head_branch: "main", run_number: id, run_attempt: 1, created_at: criado, updated_at: criado, html_url: "https://exemplo", event: "workflow_dispatch" });
+  let disparado = false;
   const falso = await servidorFalso({
     [`POST ${BASE_REPO}/actions/workflows/ci.yml/dispatches`]: (req, res) => {
+      disparado = true;
       res.writeHead(204);
       res.end();
     },
-    [`GET ${BASE_REPO}/actions/workflows/ci.yml/runs`]: (req, res) => json(res, 200, { workflow_runs: [run(1), run(2)] }),
+    [`GET ${BASE_REPO}/actions/workflows/ci.yml/runs`]: (req, res) => json(res, 200, { workflow_runs: disparado ? [run(1), run(2)] : [] }),
   });
   const amb = ajuda.ambiente({ githubApi: falso.base });
   t.after(async () => {
@@ -224,9 +229,61 @@ test("several dispatches in the same window are declared ambiguous instead of gu
 
   amb.github.gravarToken("ghp_tokenfalsoparateste000000000000000");
   const r = await amb.github.dispararWorkflow("ci", { ramo: "main" });
-  assert.equal(r.ambiguo, true);
-  assert.match(r.erro, /não é possível afirmar qual é a sua/);
+  assert.equal(r.indeterminado, true);
+  assert.match(r.erro, /não informou qual execução/);
   assert.equal(r.candidatos.length, 2);
+});
+
+test("a run that already existed before the dispatch is never taken for the new one", async (t) => {
+  const criado = new Date().toISOString();
+  const run = (id) => ({ id, name: "CI", path: ".github/workflows/ci.yml", status: "in_progress", conclusion: null, head_sha: "d".repeat(40), head_branch: "main", run_number: id, run_attempt: 1, created_at: criado, updated_at: criado, html_url: "https://exemplo", event: "workflow_dispatch" });
+  let consultasDepois = 0;
+  let disparado = false;
+  const falso = await servidorFalso({
+    [`POST ${BASE_REPO}/actions/workflows/ci.yml/dispatches`]: (req, res) => {
+      disparado = true;
+      res.writeHead(204);
+      res.end();
+    },
+    [`GET ${BASE_REPO}/actions/workflows/ci.yml/runs`]: (req, res) => {
+      if (disparado) consultasDepois += 1;
+      json(res, 200, { workflow_runs: disparado && consultasDepois > 1 ? [run(72), run(71)] : [run(71)] });
+    },
+  });
+  const amb = ajuda.ambiente({ githubApi: falso.base });
+  t.after(async () => {
+    await falso.fechar();
+    amb.restaurar();
+  });
+
+  amb.github.gravarToken("ghp_tokenfalsoparateste000000000000000");
+  const r = await amb.github.dispararWorkflow("ci", { ramo: "main" });
+  assert.equal(r.indeterminado, true);
+  assert.deepEqual(r.candidatos.map((c) => c.id), [72], "the run visible before the dispatch belongs to someone else");
+});
+
+test("the dispatch asks for the run id and retries without the field only when GitHub rejects it", async (t) => {
+  const corpos = [];
+  const falso = await servidorFalso({
+    [`POST ${BASE_REPO}/actions/workflows/ios.yml/dispatches`]: (req, res, corpo) => {
+      corpos.push(JSON.parse(corpo));
+      if (JSON.parse(corpo).return_run_details) return json(res, 422, { message: 'Invalid request. "return_run_details" is not a permitted key.' });
+      res.writeHead(204);
+      res.end();
+    },
+    [`GET ${BASE_REPO}/actions/workflows/ios.yml/runs`]: (req, res) => json(res, 200, { workflow_runs: [] }),
+  });
+  const amb = ajuda.ambiente({ githubApi: falso.base });
+  t.after(async () => {
+    await falso.fechar();
+    amb.restaurar();
+  });
+
+  amb.github.gravarToken("ghp_tokenfalsoparateste000000000000000");
+  const r = await amb.github.dispararWorkflow("ios", { ramo: "main" });
+  assert.equal(r.ok, true);
+  assert.equal(r.indeterminado, true);
+  assert.deepEqual(corpos, [{ ref: "main", inputs: {}, return_run_details: true }, { ref: "main", inputs: {} }]);
 });
 
 test("an expired artifact is not downloaded", async (t) => {

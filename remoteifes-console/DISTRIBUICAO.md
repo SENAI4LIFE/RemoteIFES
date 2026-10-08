@@ -203,6 +203,21 @@ raiz da instalação. Sem ela, duas operações simultâneas podiam instalar ver
 podar a que a outra estava a ponto de ativar, deixando o ponteiro apontando para um diretório
 inexistente. Uma trava de processo morto é recuperada e auditada.
 
+**Pelo console.** Em **Console instalado > Desinstalar o Console**, o próprio console roda este
+desinstalador como trabalho supervisionado, com elevação e a palavra `desinstalar`, preservando o
+estado. Os argumentos `--raiz`, `--estado` e `--escopo` são passados explicitamente: o console só
+se considera instalado quando o código em execução está em `<raiz>/versoes/<versao>`, e sem esses
+argumentos um desinstalador fora da raiz registrada cairia no padrão da plataforma, que seria outra
+instalação. O supervisor roda em grupo de processos próprio, então sobrevive ao encerramento do
+console que o desinstalador faz. Isso vale só onde a conta do console conclui tudo sozinha: a
+instalação de usuário no Linux e no macOS. Na instalação de sistema do Linux as unidades, a regra de
+sudo e o auxiliar são do root e o serviço roda com `/etc` e `/usr` somente leitura; removê-los dali
+exigiria que o root executasse código que a conta do console pode reescrever, justamente o que o
+desenho do auxiliar proíbe. No pacote `.deb` os arquivos são do dpkg, e no Windows o `taskkill /T`
+que encerra o console encerraria também o desinstalador iniciado por ele. Nesses casos o console
+mostra o motivo, o comando exato e a simulação (`--simular`), que roda pelo console em todos eles,
+exceto no pacote.
+
 O desinstalador mora dentro do que apaga, então ele se copia para um diretório temporário e
 recomeça de lá. Sem isso, no Windows o arquivo em execução mantém um handle aberto e a raiz
 ficava para trás com `EPERM` depois de todo o conteúdo já ter sido removido — o pior dos dois
@@ -315,7 +330,7 @@ Sem Internet, nada disso é falha:
   consulta explícita do operador fazem isso, e o status do lançador lê apenas o estado local;
 * não há sonda de conectividade: a tentativa agendada é a própria tentativa, e é pela falha dela
   que o console sabe que não há rede agora;
-* a versão instalada fica intocada, e a aba **Programa** mostra o resultado como "Última consulta",
+* a versão instalada fica intocada, e **Atualizações > Console de Operações** mostra o resultado como "Verificação automática",
   separado da última publicação observada com sucesso, que uma falha não apaga;
 * as novas tentativas esperam cada vez mais — 30 min, 1 h, 2 h e assim por diante até um dia, com
   variação aleatória de ±20% —, e esse recuo fica no estado, então reiniciar o console não o zera.
@@ -349,8 +364,8 @@ resultados sejam idênticos byte a byte, atesta todos os arquivos, confere o rel
 código do console e uma raiz do Sigstore recém-atualizada, e só então o publica. Uma etiqueta num
 commit que ainda não está na `main` vira pré-release, que os consoles não descobrem sozinhos. O
 console consulta `releases/latest/download`, então a publicação do console precisa ser o release
-mais recente do repositório. Enquanto nenhuma existir, a aba **Programa** informa que não há
-publicação.
+mais recente do repositório. Enquanto nenhuma existir, **Atualizações > Console de Operações** informa que
+nenhuma publicação foi observada.
 
 Quem quiser conferir um arquivo fora do console pode usar
 `gh attestation verify <arquivo> --repo SENAI4LIFE/RemoteIFES --signer-workflow SENAI4LIFE/RemoteIFES/.github/workflows/console-release.yml`.

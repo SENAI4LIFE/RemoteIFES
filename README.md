@@ -410,7 +410,7 @@ O banco inteiro é um único arquivo SQLite (`remoteifes-server/data/remoteifes.
 
 - **Automático** (ligado por padrão só em produção; fora dela, `BACKUP_AUTOMATICO=true`): na partida e a cada `BACKUP_INTERVALO_HORAS`, em `BACKUP_DIR`, mantendo os `BACKUP_RETENCAO` mais recentes. `data/` está no `.gitignore`.
 - **Manual**: em `remoteifes-server`, `npm run backup` grava um backup verificado e imprime o caminho; aceita um rótulo, `npm run backup -- pre-migracao`.
-- **Restauração**: normalmente pelo [Console de Operações](#console-de-operações), em **Dados e recuperação**, que para o serviço, restaura e religa. Pelo terminal, com o servidor parado, `npm run restore` lista os backups e `npm run restore -- <arquivo>` restaura um deles (nome em `BACKUP_DIR` ou caminho completo; `--sim` pula a confirmação). O comando recusa se o servidor ainda responder, verifica o backup, guarda uma cópia do banco atual (`pre-restauracao-<data>.db`) e revalida o resultado.
+- **Restauração**: normalmente pelo [Console de Operações](#console-de-operações), em **Backups e recuperação**, que para o serviço, restaura e religa. Pelo terminal, com o servidor parado, `npm run restore` lista os backups e `npm run restore -- <arquivo>` restaura um deles (nome em `BACKUP_DIR` ou caminho completo; `--sim` pula a confirmação). O comando recusa se o servidor ainda responder, verifica o backup, guarda uma cópia do banco atual (`pre-restauracao-<data>.db`) e revalida o resultado.
 - **Banco atual corrompido**: a restauração normal é recusada sem tocar em nada; use `npm run restore -- <arquivo> --recuperar-corrompido`. O banco danificado e seus `-wal` e `-shm` são renomeados para `remoteifes.db.corrompido-<data>-<id>`, nunca apagados, e um banco íntegro nunca vai para quarentena.
 
 Durante a troca, o aviso `remoteifes.db.restauracao`, com o PID da restauração, impede qualquer processo do RemoteIFES de abrir o banco: um servidor que suba nesse intervalo termina com "restauração do banco em andamento" e o serviço volta sozinho depois. Um aviso órfão (processo inexistente ou mais de 30 minutos) é ignorado. Pelo console, a restauração também confirma pelo lock exclusivo do SQLite que nenhum escritor está aberto.
@@ -689,13 +689,13 @@ O sistema passa a responder em `http://<ip-do-servidor>:<PORTA>/` (padrão 8080)
 
 ### Atualização, versões e reversão
 
-<img src="docs/readme-assets/flows/update-recovery.svg" width="800" alt="Três faixas. 1, instalar, pelo terminal e uma vez: bash setup.sh, sudo bash install-service.sh e o instalador do Console de Operações com o primeiro operador. 2, operar pelo Console de Operações: nas abas Serviço, Atualizações e Dados e recuperação; a atualização faz backup verificado, aplica o código novo com npm ci só se o package mudou, reinicia o serviço e consulta o /health até 20 vezes, a cada 2 s, até ele informar o commit. Se informar, a implantação fica verificada em deploy.log; se não, há reversão automática à versão anterior com a mesma verificação. Restaurar o banco é outra decisão, com o serviço parado e nunca automática. 3, sem o console, no terminal de desenvolvimento ou emergência: bash deploy.sh e bash rollback.sh, com a mesma trava .deploy-lock, backup, recusa de alterações locais e confirmação pelo /health, e npm run restore, que restaura o banco com o serviço parado.">
+<img src="docs/readme-assets/flows/update-recovery.svg" width="800" alt="Três faixas. 1, instalar, pelo terminal e uma vez: bash setup.sh, sudo bash install-service.sh e o instalador do Console de Operações com o primeiro operador. 2, operar pelo Console de Operações: nas áreas Serviço, Atualizações e Backups; a atualização faz backup verificado, aplica o código novo com npm ci só se o package mudou, reinicia o serviço e consulta o /health até 20 vezes, a cada 2 s, até ele informar o commit. Se informar, a implantação fica verificada em deploy.log; se não, há reversão automática à versão anterior com a mesma verificação. Restaurar o banco é outra decisão, com o serviço parado e nunca automática. 3, sem o console, no terminal de desenvolvimento ou emergência: bash deploy.sh e bash rollback.sh, com a mesma trava .deploy-lock, backup, recusa de alterações locais e confirmação pelo /health, e npm run restore, que restaura o banco com o serviço parado.">
 
-A atualização de rotina é pelo [Console de Operações](#console-de-operações), em **Atualizações**. O GitHub é a origem do código, mas nada depende de Actions nem do Pages; os comandos de terminal equivalentes estão em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal).
+A atualização de rotina é pelo [Console de Operações](#console-de-operações), em **Atualizações > RemoteIFES**. O GitHub é a origem do código, mas nada depende de Actions nem do Pages; os comandos de terminal equivalentes estão em [Recuperação de emergência por terminal](#recuperação-de-emergência-por-terminal).
 
-<img src="docs/readme-assets/screenshots/console-updates.png" width="700" alt="Aba Atualizações do Console de Operações, em Situação das versões: commit do processo em execução, HEAD e descrição do checkout, ramo local main, upstream origin/main, checkout limpo, remoto origin no GitHub, último origin/main observado com a hora, comparação indicando que o checkout está no commit observado e última implantação verificada.">
+<img src="docs/readme-assets/screenshots/console-updates.png" width="700" alt="Console de Operações em Atualizações, aba RemoteIFES, com a barra lateral das áreas Início, Serviço e registros, Backups e recuperação, Rede e acesso, Atualizações, Aplicativos e CI, Console instalado e Segurança e auditoria. O cartão principal diz 1 commit novo em origin/main, atualização disponível: em execução 3540ef0b, disponível eb4aa507, verificado agora, nenhuma implantação verificada ainda, e os botões Procurar atualizações e Atualizar para eb4aa507. Abaixo, O que muda: 1 commit e 1 arquivo, na parte Frontend e PWA, com o assunto do commit. Captura de um ambiente de teste.">
 
-O console mostra separadamente o que um número de versão esconderia: o commit do processo em execução (lido do `/health`, não do disco), o HEAD do checkout e se há alterações locais, o ramo e o upstream, o último `origin/main` observado e a última implantação verificada em `deploy.log`.
+O console mostra primeiro o que importa para decidir: se há commits novos em `origin/main`, o que muda e as ações **Procurar atualizações**, **Atualizar** e **Reverter**. Por trás estão os fatos que um número de versão esconderia: o commit do processo em execução (lido do `/health`, não do disco), o HEAD do checkout e se há alterações locais, o ramo e o upstream e a última implantação verificada em `deploy.log`, nos detalhes técnicos. O próprio console é atualizado à parte, em **Atualizações > Console de Operações**.
 
 O console usa a própria implementação, em JavaScript (`remoteifes-console/src/implantacao.js`), que roda também no Windows e no macOS. `deploy.sh`, `rollback.sh` e `verificar-versao.sh` ficam no servidor como o caminho de emergência por terminal, que funciona sem o console. Os dois usam a mesma trava `.deploy-lock` e resolvem dados e banco pelo mesmo `src/config/paths.js` do servidor, e ambos:
 
@@ -730,10 +730,10 @@ O **Console de Operações** (`remoteifes-console/`) é um serviço local, separ
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme-assets/composed/management-boundaries-dark.png">
-  <img src="docs/readme-assets/composed/management-boundaries-light.png" width="800" alt="Quem altera o quê. O Site RemoteIFES opera o prédio, por papel de usuário: salas e ar-condicionado, agendamentos e grade, usuários, papéis e proprietários, ESP32 com cadastro, credenciais, OTA e IR, monitoramento, alertas e topologia, relatos, logs e auditoria e configurações da aplicação. O Console de Operações opera o host e o software, com operador próprio: serviço e registros do host, atualizar e reverter a aplicação, backup, restauração e senha do superadmin, acesso de rede da aplicação, que o site só exibe, programa do console e reinício do host. Em modo somente leitura, o console consulta rede, proxy, DNS e TLS e também aplicativo e CI. Fora das duas interfaces, no terminal do servidor, ficam a instalação do servidor, o proxy com HTTPS e a recuperação de emergência. Cada valor tem um único dono.">
+  <img src="docs/readme-assets/composed/management-boundaries-light.png" width="800" alt="Quem altera o quê. O Site RemoteIFES opera o prédio, por papel de usuário: salas e ar-condicionado, agendamentos e grade, usuários, papéis e proprietários, ESP32 com cadastro, credenciais, OTA e IR, monitoramento, alertas e topologia, relatos, logs e auditoria e configurações da aplicação. O Console de Operações opera o host e o software, com operador próprio: serviço e registros do host, atualizar e reverter a aplicação, backup, restauração e senha do superadmin, acesso de rede da aplicação, que o site só exibe, aplicativos e CI com builds, artefatos e o APK, versão e remoção do próprio console e reinício do host. Em modo somente leitura, o console consulta rede, proxy, DNS e TLS. Fora das duas interfaces, no terminal do servidor, ficam a instalação do servidor, o proxy com HTTPS e a recuperação de emergência. Cada valor tem um único dono.">
 </picture>
 
-A política de acesso de rede (modo de teste e faixas autorizadas) é a exceção: decide quem alcança o site, então só se edita aqui e no terminal ([Restrição de Rede](#restrição-de-rede)). **Rede e domínio** e **Aplicativo e CI** só consultam; `lan-setup.sh` e `https-setup.sh` continuam como procedimento de terminal, com decisão humana, porque instalam pacotes e reescrevem o Nginx e o `.env`. Abrir o console não inicia nem reinicia o servidor: ele só reinicia a aplicação quando a operação exige e o operador aceita o impacto.
+A política de acesso de rede (modo de teste e faixas autorizadas) é a exceção: decide quem alcança o site, então só se edita aqui e no terminal ([Restrição de Rede](#restrição-de-rede)). **Rede e acesso** só consulta o restante da rede; `lan-setup.sh` e `https-setup.sh` continuam como procedimento de terminal, com decisão humana, porque instalam pacotes e reescrevem o Nginx e o `.env`. Abrir o console não inicia nem reinicia o servidor: ele só reinicia a aplicação quando a operação exige e o operador aceita o impacto.
 
 ### Por que é um serviço separado
 
@@ -764,7 +764,7 @@ Suportado não é o mesmo que executado na CI. O que a CI instala e roda, e o qu
 
 O Node mínimo declarado (22.13.0) roda nos testes Linux do servidor e do console e no ensaio de implantação mais antigo; os demais usam o 22.x mais recente.
 
-Onde uma capacidade falta, a aba **Programa** diz por quê ("não instalado", "sem permissão", "indisponível", "não se aplica" ou "não suportado aqui"), e o servidor do console recusa a operação de verdade. O artefato é escolhido por `process.arch`, não por `uname -m`: um Pi 3 pode ter kernel de 64 bits e userland de 32, e o console mostra hardware, kernel, userland e runtime separados. Um Pi 3 com sistema de 32 bits (armv7/armhf) segue suportado enquanto o Node 22 tiver suporte, até **2027-04-30**; depois, migre para 64 bits. O console exibe esse horizonte.
+Onde uma capacidade falta, a área **Console instalado** diz por quê ("não instalado", "sem permissão", "indisponível", "não se aplica" ou "não suportado aqui"), e o servidor do console recusa a operação de verdade. O artefato é escolhido por `process.arch`, não por `uname -m`: um Pi 3 pode ter kernel de 64 bits e userland de 32, e o console mostra hardware, kernel, userland e runtime separados. Um Pi 3 com sistema de 32 bits (armv7/armhf) segue suportado enquanto o Node 22 tiver suporte, até **2027-04-30**; depois, migre para 64 bits. O console exibe esse horizonte.
 
 ### Onde a instalação mora
 
@@ -829,6 +829,8 @@ node instalacao/desinstalar.js --simular   # mostra o que sairia, sem mutar nada
 node instalacao/desinstalar.js --sim
 ```
 
+Pelo console, **Console instalado > Desinstalar o Console** roda esse mesmo desinstalador com a senha do operador e a palavra de confirmação, preservando o estado, quando a conta do console pode concluir a remoção sozinha (instalação de usuário no Linux e no macOS). Na instalação de sistema do Linux, no pacote `.deb` e no Windows, a remoção precisa de root, do dpkg ou do desinstalador do sistema: o console mostra o motivo, o comando exato e a simulação.
+
 Sem `--apagar-estado`, operadores, auditoria e histórico ficam. A remoção encerra o console em execução pela prova de identidade (não pelo PID, que é reciclado), recusa qualquer caminho que não prove ser uma instalação do console e nunca toca no checkout do RemoteIFES.
 
 ### Acessar
@@ -855,7 +857,7 @@ A versão do console é independente do commit do RemoteIFES. O console se atual
 
 Sem Internet, a versão instalada fica como está e as tentativas se espaçam até uma por dia; um campus isolado importa a pasta do release de uma mídia com `node bin/atualizar-console.js --importar <pasta>`, com a mesma verificação.
 
-Uma versão que nem carrega é descartada na hora. Uma que carrega e cai fica em observação até se manter 20 s no ar; se iniciar duas vezes sem confirmar, a terceira partida volta à anterior e a aba **Programa** mostra "Atualização revertida automaticamente". Uma versão saudável interrompida duas vezes por reinícios do host também seria revertida, e depois de confirmada uma falha é relatada, não revertida.
+Uma versão que nem carrega é descartada na hora. Uma que carrega e cai fica em observação até se manter 20 s no ar; se iniciar duas vezes sem confirmar, a terceira partida volta à anterior e **Atualizações > Console de Operações** mostra "Atualização revertida automaticamente". Uma versão saudável interrompida duas vezes por reinícios do host também seria revertida, e depois de confirmada uma falha é relatada, não revertida.
 
 **Proveniência.** Não existe chave de assinatura. Um release é aceito porque o workflow `.github/workflows/console-release.yml`, na etiqueta `console-v<versão>`, atestou os bytes de cada arquivo pelo Sigstore; o console confere com `@sigstore/verify` o repositório e o dono, o workflow, a etiqueta, o commit do manifesto, o gatilho `push`, o executor hospedado e o ambiente `console-release`. Publicar é subir a versão em `remoteifes-console/package.json` na `main` e enviar a etiqueta; o workflow testa, constrói em Linux e Windows exigindo resultados idênticos, atesta, confere e publica. Os executáveis ainda não têm assinatura de código Windows nem notarização Apple (`assinaturaDeCodigo: false` em `proveniencia.json`), então o SmartScreen avisa ao abrir o instalador. O modelo completo está em [`remoteifes-console/DISTRIBUICAO.md`](remoteifes-console/DISTRIBUICAO.md#5-confiança-da-atualização).
 
@@ -863,14 +865,16 @@ Uma versão que nem carrega é descartada na hora. Uma que carrega e cai fica em
 
 | Área | Operações |
 |---|---|
-| **Visão geral** | estado da aplicação, do serviço, do watchdog e do host, com o que exige atenção em primeiro lugar |
-| **Serviço** | reiniciar, parar (desligando o watchdog junto) e iniciar o RemoteIFES; ler o journal das unidades |
-| **Atualizações** | comparar versão em execução, checkout e `origin`; implantar um commit revisado; reverter |
-| **Dados e recuperação** | backup verificado, restauração com o serviço parado e senha do superadministrador |
-| **Aplicativo e CI** | consulta: versões de servidor, PWA, Cordova e Android, APK publicado e execuções do GitHub Actions |
-| **Rede e domínio** | acesso à aplicação (modo de teste e faixas autorizadas, único editor desses valores); consulta de interfaces, rotas, resolvedor, portas em escuta, proxy, DNS e validade do certificado |
-| **Programa** | versão do próprio console, atualização e reversão do programa, capacidades da plataforma com o motivo de cada indisponibilidade, e onde a instalação mora |
-| **Avançado** | elevação, auditoria do console, histórico de operações e Terminal Expert |
+| **Início** | o que exige atenção em primeiro lugar, cada item com a ação que o resolve, e as tarefas mais frequentes |
+| **Serviço e registros** | reiniciar, parar (desligando o watchdog junto) e iniciar o RemoteIFES; ler o journal das unidades |
+| **Backups e recuperação** | backup verificado, restauração com o serviço parado, senha do superadministrador e trava de manutenção residual |
+| **Rede e acesso** | acesso à aplicação (modo de teste e faixas autorizadas, único editor desses valores); consulta de interfaces, rotas, portas em escuta, proxy, DNS e validade do certificado |
+| **Atualizações** | em abas separadas: o RemoteIFES (procurar, revisar o que muda, implantar um commit, reverter) e o próprio console (versão publicada, atualizar, reverter) |
+| **Aplicativos e CI** | site e PWA (endereço, instalabilidade, publicação no Pages); APK publicado (download e conferência do SHA-256, só quando a própria aplicação o ofereceria: manifesto válido, origem desta instalação e bytes conferidos) e o roteiro de publicação com os valores desta instalação; builds e execuções do GitHub Actions disparadas, acompanhadas por job, repetidas, canceladas e com artefatos baixados pelo console; a credencial do GitHub |
+| **Console instalado** | versão do próprio console, capacidades da plataforma com o motivo de cada indisponibilidade, onde a instalação mora, simulação e desinstalação |
+| **Segurança e auditoria** | sessão, elevação, troca de senha do operador, histórico de operações, auditoria do console, Terminal Expert e reinício do host |
+
+Ajuda contextual, o manual do console (com busca e funcionamento offline) e o painel de acessibilidade ficam nos botões flutuantes, como no RemoteIFES.
 
 Antes de uma operação que interrompa o serviço, o console avalia o impacto, de novo no instante da execução: bloqueia com OTA em qualquer fase ativa (inclusive `validando`), rollout ativo, outra manutenção ou disco insuficiente, e avisa quando não consegue observar a atividade dos ESP32 em vez de supor que é zero.
 
@@ -1507,7 +1511,7 @@ No end-to-end, `npx playwright install chromium` baixa o navegador (numa imagem 
 | Mudança em | Validação rápida | Validação completa acrescenta |
 |---|---|---|
 | `remoteifes-server/` | servidor em Linux ARM64, Windows e macOS; Console de Operações; ensaio de implantação; end-to-end Chromium; scripts de início; userland armhf do Raspberry Pi OS | end-to-end em todos os navegadores; Safari nativo |
-| `remoteifes-console/` | Console de Operações nos três sistemas; instalação do pacote em Linux x64 e ARM64, Windows e macOS; ensaio de implantação; scripts de início | — |
+| `remoteifes-console/` | Console de Operações nos três sistemas; instalação do pacote em Linux x64 e ARM64, Windows e macOS; ensaio de implantação; scripts de início; end-to-end Chromium, que inclui a interface do console | end-to-end em todos os navegadores |
 | `server.sh`, `console.sh`, `server.bat`, `console.bat`, `server.py`, `console.py`, `startup/` | scripts de início em Linux x64 e ARM64, Windows e macOS; userland armhf do Raspberry Pi OS | — |
 | `remoteifes-web/` | contratos do frontend nos testes do servidor (Linux ARM64); end-to-end Chromium; Cordova; builds Android e iOS | end-to-end em todos os navegadores; Safari nativo |
 | `remoteifes-cordova/` | contratos do app nos testes do servidor; Cordova; builds Android e iOS | — |
@@ -1666,14 +1670,14 @@ O navegador é o mesmo de `compor.js`. As duas portas precisam estar livres: ocu
 
 Os cartões de status acima dos gráficos ficam fora do recorte, porque mostram o disco e o caminho do banco temporário da máquina que roda o harness.
 
-As quatro capturas anteriores foram feitas à mão, com o mesmo harness:
+As capturas abaixo foram feitas à mão, com o mesmo harness, exceto a do console, que tem script próprio:
 
 | Arquivo | Como foi capturado | Largura final |
 |---|---|---|
 | `home.png` | conta `e2e_admin`, `#/inicio`, janela de 1000 × 1100 a 2×, corte do topo com 760 px | 1160 px |
 | `room-panel-mobile.png` | conta `e2e_user`, sala A-108 ligada por `POST /comando`, janela de 390 × 844 a 2× | 408 px |
 | `topology.png` | superadmin com a senha padrão trocada no banco temporário; A-110 direta por credencial, gateway B-204 e nós B-206 e B-208 pelo protocolo real (`remoteifes-server/test/support/mesh-reference.js`); janela de 1280 px a 2×, B-206 selecionada, corte do diagrama e do painel | 1600 px |
-| `console-updates.png` | console rodando do checkout com `CONSOLE_SEM_PRIVILEGIO=1` e estado temporário, apontado para um clone limpo com origin no GitHub, o harness na porta 8080 no papel da aplicação; aba Atualizações depois de **Verificar origin**; janela de 900 px a 2× | 1240 px |
+| `console-updates.png` | `node docs/readme-assets/src/capturar-console.js`: o console instalado em diretório temporário, sobre um clone deste repositório um commit atrás da própria origem local, com o harness no papel da aplicação e um GitHub falso (`e2e/harness/console-harness.js`, o mesmo dos testes de navegador); Atualizações > RemoteIFES depois de **Procurar atualizações**; janela de 1120 px a 2× | 1400 px |
 
 O acabamento é o mesmo em todas: largura final de 2× a exibida, cantos de 10 px e borda de 1 px `#c8d1cb` na largura exibida. Antes de commitar, confira que não aparece senha, token, segredo, IP privado, nome de máquina ou caminho de usuário. Os MAC `AA:BB:CC:E2:E2:xx` e os `deviceId` que aparecem são das placas simuladas.
 
@@ -1683,7 +1687,7 @@ O **RemoteIFES** não depende da API do GitHub em tempo de execução: nenhuma o
 
 O **Console de Operações** é a exceção, e é uma exceção deliberada e sob demanda:
 
-- a aba *Aplicativo e CI* consulta a API do GitHub **somente quando alguém clica**, para mostrar o estado das execuções de CI. A credencial fica no estado do console, nunca volta por API e não acompanha redirecionamento para outro host;
+- a área *Aplicativos e CI* usa a API do GitHub **só enquanto o operador a usa**: lista as execuções ao abrir as abas, acompanha uma execução a cada 10 s enquanto ela está aberta e em andamento, e dispara, repete ou cancela workflows e baixa artefatos quando o operador pede, com a senha dele para tudo o que muda algo. Só os workflows `ci.yml`, `android.yml`, `ios.yml` e `pages.yml` são acionáveis (`console-release.yml` só é acompanhado), sempre no ramo `main`. O token recomendado é fine-grained, restrito a este repositório, com **Actions: leitura e escrita** e **Metadata: leitura**. Ele fica no estado do console, nunca volta por API, log ou auditoria e não acompanha redirecionamento para outro host; os artefatos passam pelo console direto para o navegador, sem serem gravados no host;
 - a atualização do **programa console** busca o manifesto, a atestação e o artefato de release por HTTPS, e a raiz de confiança do Sigstore, **sem enviar credencial alguma** em nenhum salto. Ela só aceita o que a atestação de proveniência do GitHub e o digest confirmarem. Roda em segundo plano, em horário próprio e com recuo crescente quando não há rede, e nunca dentro de uma página, de uma requisição ou da partida.
 
 Nenhum dos dois é pré-requisito de operação: sem rede, o console continua administrando o host, e a aplicação continua operando o prédio.

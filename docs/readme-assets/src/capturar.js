@@ -494,9 +494,13 @@ async function main() {
   }
 }
 
-main()
-  .catch((erro) => {
-    console.error(erro.message || erro);
-    process.exitCode = 1;
-  })
-  .finally(encerrarTudo);
+if (require.main === module) {
+  main()
+    .catch((erro) => {
+      console.error(erro.message || erro);
+      process.exitCode = 1;
+    })
+    .finally(encerrarTudo);
+}
+
+module.exports = { acabamento, otimizar, abrirNavegador, exigirPortaLivre };

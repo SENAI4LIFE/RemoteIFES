@@ -45,7 +45,7 @@
     <text class="corpo" x="18" y="163">iniciar, parar, reiniciar</text>
     <text class="titulo" x="18" y="188">Atualizações</text>
     <text class="corpo" x="18" y="203">implantar ou reverter</text>
-    <text class="titulo" x="18" y="228">Dados e recuperação</text>
+    <text class="titulo" x="18" y="228">Backups</text>
     <text class="corpo" x="18" y="243">backup e restauração</text>
 
     <!-- Update pipeline (the Console's implantacao.js; deploy.sh does the same from the terminal) -->
