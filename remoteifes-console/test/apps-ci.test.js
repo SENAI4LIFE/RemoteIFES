@@ -114,8 +114,6 @@ test("runs of workflows the Console does not administer are neither shown, repea
 });
 
 test("loopback origins are recognised in every form an APK manifest can carry", (t) => {
-  const amb = ajuda.ambiente();
-  t.after(() => amb.restaurar());
   const checkout = checkoutComApk(t).checkout;
   const amb2 = ajuda.ambiente({ checkout });
   t.after(() => amb2.restaurar());
@@ -128,7 +126,6 @@ test("loopback origins are recognised in every form an APK manifest can carry", 
     assert.equal(rel.valido, false, origem);
     assert.ok(rel.problemas.some((p) => /loopback/.test(p)), origem);
   }
-  assert.ok(amb);
 });
 
 test("a run is followed with its jobs and artifacts, repeated only when finished and cancelled only while running", async (t) => {
@@ -252,10 +249,11 @@ function baixar(s, sessao, caminho) {
   return new Promise((resolve) => {
     const req = http.get({ host: "127.0.0.1", port: s.porta, path: caminho, headers: { Host: s.host, Cookie: sessao.cookie } }, (res) => {
       const partes = [];
+      const fim = () => resolve({ status: res.statusCode, completo: res.complete, dados: Buffer.concat(partes) });
       res.on("data", (d) => partes.push(d));
-      res.on("end", () => resolve({ status: res.statusCode, completo: true, tamanho: Number(res.headers["content-length"]), dados: Buffer.concat(partes) }));
-      res.on("error", () => resolve({ status: res.statusCode, completo: false, dados: Buffer.concat(partes) }));
-      res.on("aborted", () => resolve({ status: res.statusCode, completo: false, dados: Buffer.concat(partes) }));
+      res.on("end", fim);
+      res.on("close", fim);
+      res.on("error", fim);
     });
     req.on("error", () => resolve({ status: null, completo: false, dados: Buffer.alloc(0) }));
   });
