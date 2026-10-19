@@ -599,6 +599,88 @@ test("a protocol already stored with an old identifier is still transmitted as b
   db.prepare("UPDATE salas SET irProtocolo = NULL WHERE sala = 'TX-2'").run();
 });
 
+test("user commands always ask for swing, and an administrative IR test sends only the swing it was given", async () => {
+  const token = await tokenSuperAdmin();
+  db.prepare("UPDATE salas SET irProtocolo = 16, ligado = 0, turboAtivo = 0 WHERE sala = 'TX-2'").run();
+  require("../src/services/configuracoesService").validarEAtualizar({ turboFuncaoExtra: "nenhuma" }, { id: 1, nivel: 3 });
+  const tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2");
+  assert.equal(salasService.comandoEstadoIR(salasService.buscar("TX-2")).swing, true, "swing is on without turbo and without the turbo extra function");
+
+  tx.mensagens.length = 0;
+  salasService.aplicarComando("TX-2", "ligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true, nivel: 3 }, origem: "manual" });
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.restauracao !== true)));
+  assert.equal(tx.mensagens.find((m) => m.tipo === "send_known_state" && m.restauracao !== true).swing, true, "a user command asks for swing");
+
+  for (const swing of [undefined, false, true]) {
+    tx.mensagens.length = 0;
+    const corpo = { protocol: 16, temp: 24, power: true, ...(swing === undefined ? {} : { swing }) };
+    const resp = await auth("/admin/esp32/TX-2/teste/estado", token, { method: "POST", body: JSON.stringify(corpo) });
+    assert.equal(resp.status, 200);
+    assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state")));
+    assert.equal(tx.mensagens.find((m) => m.tipo === "send_known_state").swing, swing === true, `administrative test with swing ${swing}`);
+  }
+  await fecharEEsperar(tx.ws);
+  db.prepare("UPDATE salas SET irProtocolo = NULL, ligado = 0 WHERE sala = 'TX-2'").run();
+});
+
+test("an administrative IR test that changes only swing keeps the intent unconfirmed, also after the board reconnects", async () => {
+  const token = await tokenSuperAdmin();
+  const admin = { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true, nivel: 3 }, origem: "manual" };
+  db.prepare("UPDATE salas SET irProtocolo = 16, ligado = 1, temperaturaAlvo = 23, turboAtivo = 0 WHERE sala = 'TX-2'").run();
+  const relato = { tipo: "known_state", protocol: 16, temp: 23, power: true, turbo: false };
+  let tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2", { fw: "4.4.0" });
+  salasService.aplicarComando("TX-2", "ligar", undefined, admin);
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.restauracao !== true)));
+  const versao = tx.mensagens.find((m) => m.tipo === "send_known_state" && m.restauracao !== true).versao;
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.4.0", modo: "operation", ligado: true, versao, ultimoComando: { ...relato, swing: true } }));
+  assert.ok(await ate(() => deviceHub.estadoPublico("TX-2").estadoConfirmado === true));
+
+  const resp = await auth("/admin/esp32/TX-2/teste/estado", token, { method: "POST", body: JSON.stringify({ protocol: 16, temp: 23, power: true, swing: false }) });
+  assert.equal(resp.status, 200);
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.4.0", modo: "operation", ligado: true, versao, ultimoComando: { ...relato, swing: false } }));
+  await esperar(80);
+  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "a test that changed only swing does not confirm the intent");
+
+  await fecharEEsperar(tx.ws);
+  tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2", { fw: "4.4.0" });
+  tx.ws.send(JSON.stringify({ tipo: "info", fw: "4.4.0", failsafeConfigurado: false, failsafePulsos: 0, failsafeCarrierHz: 0, failsafeProtocolRecordId: -1, ligado: true, versao }));
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.4.0", modo: "operation", ligado: true, versao, ultimoComando: { ...relato, swing: false } }));
+  await esperar(80);
+  assert.equal(deviceHub.estadoPublico("TX-2").estadoConfirmado, false, "after reconnecting, the echo of the version before the test still does not confirm it");
+
+  salasService.aplicarComando("TX-2", "temperatura", 24, admin);
+  assert.ok(await ate(() => tx.mensagens.some((m) => m.tipo === "send_known_state" && m.restauracao !== true && m.temp === 24)));
+  const nova = tx.mensagens.find((m) => m.tipo === "send_known_state" && m.restauracao !== true && m.temp === 24).versao;
+  assert.ok(nova > versao);
+  tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.4.0", modo: "operation", ligado: true, versao: nova }));
+  assert.ok(await ate(() => deviceHub.estadoPublico("TX-2").estadoConfirmado === true), "a new intent confirms again");
+  await fecharEEsperar(tx.ws);
+  db.prepare("UPDATE salas SET irProtocolo = NULL, ligado = 0, temperaturaAlvo = 23 WHERE sala = 'TX-2'").run();
+});
+
+test("a report without a version confirms only a last command that repeats every transmitted field, and never right after an administrative test", async () => {
+  const token = await tokenSuperAdmin();
+  sala("TX-3", "AA:BB:CC:DD:EE:D3");
+  db.prepare("UPDATE salas SET irProtocolo = 16, ligado = 1, temperaturaAlvo = 23, turboAtivo = 0 WHERE sala = 'TX-3'").run();
+  const intencao = { tipo: "known_state", protocol: 16, temp: 23, power: true, turbo: false };
+  const tx = await conectar("TX-3", "AA:BB:CC:DD:EE:D3", { fw: "4.4.0" });
+  const relatar = async (ultimoComando) => {
+    tx.ws.send(JSON.stringify({ tipo: "telemetria", fw: "4.4.0", modo: "operation", ligado: !!ultimoComando.power, ultimoComando }));
+    await esperar(80);
+    return deviceHub.estadoPublico("TX-3").estadoConfirmado;
+  };
+  assert.equal(await relatar({ ...intencao, swing: false }), false, "a last command without swing does not match an intent that asks for it");
+  assert.equal(await relatar({ ...intencao, swing: true, fan: "alto" }), false, "a last command with another fan speed does not match");
+  assert.equal(await relatar({ ...intencao, power: false, swing: true }), false, "an override the server does not remember, as after its own restart, is not confirmed");
+  assert.equal(await relatar({ ...intencao, swing: true }), true, "a last command that repeats every transmitted field confirms");
+
+  const resp = await auth("/admin/esp32/TX-3/teste/estado", token, { method: "POST", body: JSON.stringify({ protocol: 16, temp: 23, power: true, swing: true }) });
+  assert.equal(resp.status, 200);
+  assert.equal(await relatar({ ...intencao, swing: true }), false, "right after an administrative test, not even an identical last command confirms");
+  await fecharEEsperar(tx.ws);
+  db.prepare("UPDATE salas SET irProtocolo = NULL, ligado = 0 WHERE sala = 'TX-3'").run();
+});
+
 test("a capture the board recognized with an identifier unknown to the server becomes a generic RAW signal, still savable", async () => {
   const token = await tokenSuperAdmin();
   const resp = await auth("/admin/protocolos-ir/clonador", token, { method: "PUT", body: JSON.stringify({ sala: "CLONE-1" }) });

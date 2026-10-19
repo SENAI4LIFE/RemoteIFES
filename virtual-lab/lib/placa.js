@@ -40,7 +40,7 @@ const GPIO_BASE = 0x3ff44000;
 // Every RemoteIFES pin is RTC-capable, so ESP-IDF sets its pulls in the RTC IO pad register (bits
 // RUE 27 / RDE 28), not in IO_MUX: GPIO 4 = TOUCH_PAD0, 14 = TOUCH_PAD6, 15 = TOUCH_PAD3,
 // 26 = PAD_DAC2, 27 = TOUCH_PAD7.
-const RTCIO_PAD = { 4: 0x3ff48494, 14: 0x3ff484ac, 15: 0x3ff484a0, 26: 0x3ff48488, 27: 0x3ff484b0 };
+const RTCIO_PAD = { 4: 0x3ff48494, 14: 0x3ff484ac, 15: 0x3ff484a0, 25: 0x3ff48484, 26: 0x3ff48488, 27: 0x3ff484b0 };
 
 function portaLivre() {
   return new Promise((resolve, reject) => {
@@ -325,6 +325,35 @@ class PlacaVirtual extends EventEmitter {
 
   bordasDe(pino, desde = 0) {
     return this.bordas.slice(desde).filter((b) => b.pino === pino);
+  }
+
+  async comRelogioFino(acao) {
+    let ativo = true;
+    let maiorPassoUs = 0;
+    let erroDoLeitor = null;
+    const leitor = (async () => {
+      let anterior = await this.agoraUs();
+      while (ativo && this.processo) {
+        const agora = await this.agoraUs();
+        maiorPassoUs = Math.max(maiorPassoUs, agora - anterior);
+        anterior = agora;
+      }
+    })().catch((erro) => { erroDoLeitor = erro; });
+    try {
+      await acao();
+    } finally {
+      ativo = false;
+      await leitor;
+    }
+    if (erroDoLeitor) throw new Error(`${this.nome}: the board clock could not be read during the measurement: ${erroDoLeitor.message}`);
+    return maiorPassoUs;
+  }
+
+  antecedenciaDoBuzzer(desde = 0) {
+    const bordas = this.bordas.slice(desde);
+    const ir = bordas.findIndex((b) => b.pino === 4);
+    const buzzer = ir < 0 ? -1 : bordas.slice(0, ir).findLastIndex((b) => b.pino === 27 && b.nivel === 1);
+    return { buzzerAntesDoIr: buzzer >= 0, us: buzzer >= 0 ? bordas[ir].us - bordas[buzzer].us : null };
   }
 
   async definirEntrada(pino, nivel) {

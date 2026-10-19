@@ -514,7 +514,6 @@ function registrarLog({ usuario, sala, cmd, valor, origem }) {
 
 function comandoEstadoIR(salaAtualizada) {
   if (!Number.isInteger(salaAtualizada?.irProtocolo)) return null;
-  const swing = configuracoesService.turboFuncaoExtra() === "swing" && !!salaAtualizada.turboAtivo;
   return {
     tipo: "send_known_state",
     versao: salaAtualizada.estadoVersao,
@@ -523,7 +522,7 @@ function comandoEstadoIR(salaAtualizada) {
     power: !!salaAtualizada.ligado,
     turbo: !!salaAtualizada.turboAtivo,
     fan: "",
-    swing,
+    swing: true,
   };
 }
 

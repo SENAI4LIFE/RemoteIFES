@@ -11,9 +11,19 @@ function reinicios(placa, desde = 0) {
   return placa.contarSerial(/rst:0x/, desde);
 }
 
-/** After a reset the board reconnects once and the server confirms the current intent again. */
+/** After a reset the board reconnects once without IR, and only an explicit command confirms the intent again. */
 async function recupera(lab, placa, sala, desde, { ligado }) {
   await placa.aguardarSerial(/--- RemoteIFES IR System Initializing/, { desde });
+  const boot = placa.momentoDoSerial(/--- RemoteIFES IR System Initializing/, desde);
+  await lab.aguardarConectada(sala, { limiteMs: 300_000 });
+  await placa.aguardarSerial(/Sincronizacao do servidor recebida sem transmissao IR/, { desde });
+  await placa.aguardarVirtual(5000);
+  const irAposReset = placa.bordas.filter((b) => b.pino === 4 && b.ms >= boot).length;
+  const semComando = await lab.estado(sala);
+  lab.observar("aposReset", { bordasIr: irAposReset, confirmado: semComando.dispositivo.estadoConfirmado });
+  assert.equal(irAposReset, 0, "no IR from the boot, the reconnection or the synchronization");
+  assert.equal(semComando.dispositivo.estadoConfirmado, false, "an intent the board did not transmit after the reset is not confirmed");
+  assert.equal((await lab.api("POST", "/comando", { sala, cmd: ligado ? "ligar" : "desligar" })).status, 200);
   const { estado } = await lab.aguardarIntencaoAplicada(sala, ligado);
   assert.equal(reinicios(placa, desde), 1, "one reset, no loop");
   return estado;
@@ -55,9 +65,9 @@ for (const p of pontos) {
   cenario(p.nome, {
     inicial: "Placa conectada, intenção ligada confirmada (exceto quando o próprio comando é o gatilho)",
     falha: p.falha,
-    exigido: ["a placa reinicia uma vez, reconecta e o servidor volta a confirmar a intenção vigente", ...(p.ledApagado ? ["o LED IR (GPIO 4) fica apagado depois do reset"] : [])],
-    proibido: ["laço de reinícios", "estado confirmado diferente da intenção", "sessão duplicada"],
-    recuperacao: "estado confirmado igual à intenção",
+    exigido: ["a placa reinicia uma vez e reconecta sem transmitir IR", "a intenção fica sem confirmação até um comando explícito, que a confirma", ...(p.ledApagado ? ["o LED IR (GPIO 4) fica apagado depois do reset"] : [])],
+    proibido: ["laço de reinícios", "IR no boot, na reconexão ou na sincronização", "estado confirmado sem transmissão", "estado confirmado diferente da intenção", "sessão duplicada"],
+    recuperacao: "estado confirmado igual à intenção depois do comando explícito",
   }, async (lab) => {
     const via = await lab.intermediario();
     const { placa, sala } = await lab.placaEmOperacao({ via });

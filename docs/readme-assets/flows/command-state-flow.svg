@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="258" viewBox="0 0 800 258" role="img" aria-labelledby="t d">
   <title id="t">Do pedido ao ar-condicionado</title>
-  <desc id="d">Cinco etapas: pedido; o servidor grava o estado desejado e avança a versão (ok: true); envia ao socket da placa ou, na malha, ao gateway (enviadoAoDispositivo), e sem canal o estado fica salvo para a reconexão; a placa transmite o infravermelho e ecoa a versão (dispositivoConfirmou); a recepção pelo aparelho não é medida.</desc>
+  <desc id="d">Cinco etapas: pedido; o servidor grava o estado desejado e avança a versão (ok: true); envia ao socket da placa ou, na malha, ao gateway (enviadoAoDispositivo), e sem canal o estado fica salvo, mas a reconexão não o transmite (firmware 4.4.0); a placa transmite o infravermelho e ecoa a versão (dispositivoConfirmou); a recepção pelo aparelho não é medida.</desc>
   <!-- Theme-neutral: every text sits on an opaque card or pill, and lines use mid-tones that keep
        3:1 on white and on GitHub dark. Each stage is one <g>; edit text in place. -->
   <style>
@@ -60,7 +60,7 @@
     <text class="corpo" x="344" y="110">ou, na malha, ao</text>
     <text class="corpo" x="344" y="126">gateway</text>
     <text class="fraco" x="344" y="148">sem canal: fica salvo</text>
-    <text class="fraco" x="344" y="163">e vai na reconexão</text>
+    <text class="fraco" x="344" y="163">até um novo comando</text>
     <rect x="342" y="174" width="128" height="22" rx="6" fill="#e3f3e8"/><text class="mono" x="406" y="189" text-anchor="middle" fill="#124a29">enviadoAoDispositivo</text>
   </g>
 

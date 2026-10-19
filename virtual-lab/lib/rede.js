@@ -177,6 +177,8 @@ class Intermediario {
         if (fim < 0) return;
         cabecalhoPronto = true;
         let head = cabecalho.subarray(0, fim + 4);
+        c.respostaEm = Date.now();
+        c.resposta = head.subarray(0, head.indexOf("\r\n")).toString("latin1");
         const resto = cabecalho.subarray(fim + 4);
         const declarado = /Content-Length: (\d+)/i.exec(head.toString("latin1"));
         if (declarado) c.tamanhoCorpo = Number(declarado[1]);

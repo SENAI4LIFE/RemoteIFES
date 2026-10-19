@@ -29,16 +29,21 @@ function bloco(nome) {
   throw new Error(`${nome} block not closed`);
 }
 
-test("the reference hardware GPIOs are the validated ones: receiver 15, emitter 4, switch 26 and buzzer 27", () => {
+test("the reference hardware GPIOs are the validated ones: receiver 15, emitter 4, switch 26, buzzer 27 and network LED 25", () => {
   assert.match(ino, /#define IR_RECV_PIN 15\b/);
   assert.match(ino, /#define IR_SEND_PIN 4\b/);
   assert.match(ino, /#define ACTION_SWITCH_PIN 26\b/);
   assert.match(ino, /#define BUZZER_PIN 27\b/);
+  assert.match(ino, /#define NETWORK_LED_PIN 25\b/);
   assert.match(ino, /#define ACTION_SWITCH_ACTIVE_LEVEL LOW\b/);
+  assert.match(ino, /#define NETWORK_LED_ACTIVE_LEVEL HIGH\b/);
   assert.match(ino, /#define DHTPIN 14\b/);
-  for (const pino of ["IR_RECV_PIN", "IR_SEND_PIN", "ACTION_SWITCH_PIN", "BUZZER_PIN", "DHTPIN"]) {
+  const numeros = [];
+  for (const pino of ["IR_RECV_PIN", "IR_SEND_PIN", "ACTION_SWITCH_PIN", "BUZZER_PIN", "NETWORK_LED_PIN", "DHTPIN"]) {
     assert.equal((ino.match(new RegExp(`#define ${pino} `, "g")) || []).length, 1, `${pino} defined more than once`);
+    numeros.push(Number(ino.match(new RegExp(`#define ${pino} (\\d+)\\b`))[1]));
   }
+  assert.equal(new Set(numeros).size, numeros.length, `two functions share a GPIO: ${numeros.join(", ")}`);
 });
 
 test("the firmware version advanced from 4.0.0 and is what the server uses to choose enter_clone", () => {
@@ -50,15 +55,16 @@ test("the firmware version advanced from 4.0.0 and is what the server uses to ch
   assert.ok(compararVersoes(versao[1], limiar[1]) >= 0, "the published firmware must understand enter_clone");
 });
 
-test("the switch uses the internal pull-up, active low, 40 ms debounce and 5 s for the failsafe", () => {
+test("the switch uses the internal pull-up, active low, 40 ms debounce and 5 s for the setup AP", () => {
   assert.match(ino, /const unsigned long ACTION_SWITCH_DEBOUNCE_MS = 40;/);
-  assert.match(ino, /const unsigned long FAILSAFE_SWITCH_HOLD_MS = 5000;/);
+  assert.match(ino, /const unsigned long AP_SWITCH_HOLD_MS = 5000;/);
+  assert.doesNotMatch(ino, /FAILSAFE_SWITCH_HOLD_MS/, "the 5 s hold no longer sends the failsafe");
   assert.match(ino, /pinMode\(ACTION_SWITCH_PIN, INPUT_PULLUP\)/);
   assert.match(ino, /digitalRead\(ACTION_SWITCH_PIN\) == ACTION_SWITCH_ACTIVE_LEVEL/);
   const amostrar = bloco("void amostrarSwitchAcao");
   assert.match(amostrar, /agora - actionSwitchLastChangeMs < ACTION_SWITCH_DEBOUNCE_MS\) return;/);
-  assert.match(amostrar, /if \(!foiPressaoLonga\) sinalizarSwitchAcao\(false\);/, "releasing after the failsafe must not open the AP");
-  assert.match(amostrar, /actionSwitchLongPressConsumed = true;\s*sinalizarSwitchAcao\(true\);/, "the failsafe fires once per press");
+  assert.match(amostrar, /if \(!foiPressaoLonga\) sinalizarSwitchAcao\(false\);/, "releasing after the 5 s hold must not send the failsafe");
+  assert.match(amostrar, /if \(agora - actionSwitchPressedSinceMs >= AP_SWITCH_HOLD_MS\) \{\s*actionSwitchLongPressConsumed = true;\s*sinalizarSwitchAcao\(true\);/, "the setup AP opens once per press, after 5 s");
   assert.match(amostrar, /if \(!actionSwitchStableActive \|\| actionSwitchLongPressConsumed \|\| actionSwitchPressedSinceMs == 0\) return;/);
   assert.doesNotMatch(amostrar, /transmitirFailsafeSalvo|abrirApTemporario|Serial\./, "the sampler only records the press; the loop acts on it");
   assert.match(ino, /void loop\(\) \{\s*processarSwitchAcao\(\);/, "presses are acted on every cycle, including in AP mode");
@@ -80,7 +86,10 @@ test("the switch is sampled by a periodic timer, so blocking network calls canno
   const processar = bloco("void processarSwitchAcao");
   assert.match(processar, /if \(!timerSwitchAcao\) amostrarSwitchAcao\(nullptr\);/, "without the timer the loop samples as before");
   assert.match(processar, /portENTER_CRITICAL\(&muxSwitchAcao\);[\s\S]*switchToqueLongoPendente = false;\s*switchToqueCurtoPendente = false;\s*portEXIT_CRITICAL\(&muxSwitchAcao\);/, "presses are taken atomically");
-  assert.match(processar, /if \(longo\) transmitirFailsafeSalvo\(\);\s*if \(curto\) abrirApTemporario\(\);/);
+  assert.match(processar, /if \(longo\) abrirApTemporario\(\);\s*if \(curto\) transmitirFailsafeSalvo\(\);/, "a short press sends the failsafe and a 5 s hold opens the setup AP");
+  const chamadas = (nome) => ino.split("\n").filter((l) => l.includes(`${nome}()`) && !new RegExp(`^(void|bool) ${nome}\\(`).test(l)).length;
+  assert.equal(chamadas("transmitirFailsafeSalvo"), 1, "the switch is the only caller of the local failsafe");
+  assert.equal(chamadas("abrirApTemporario"), 1, "the switch is the only caller of the temporary AP");
   const sinalizar = bloco("void sinalizarSwitchAcao");
   assert.match(sinalizar, /portENTER_CRITICAL\(&muxSwitchAcao\);/);
 });
@@ -158,7 +167,8 @@ test("an accepted OTA offer is downloaded from loop(), outside the WebSocket cal
 test("during OTA the physical switch and buzzer are still serviced and the download has a total deadline", () => {
   const ota = bloco("void executarOtaPendente");
   const laco = ota.slice(ota.indexOf("while (recebido < tamanho)"));
-  assert.match(laco, /^\s*while \(recebido < tamanho\) \{\s*processarSwitchAcao\(\);\s*atualizarBuzzer\(\);/);
+  assert.match(laco, /^\s*while \(recebido < tamanho\) \{\s*processarSwitchAcao\(\);\s*atualizarBuzzer\(\);\s*atualizarLedRede\(\);/);
+  assert.doesNotMatch(ota, /atualizarApAutomatico|aplicarPontoDeAcesso/, "the automatic setup AP is not opened while a firmware download is under way; the switch still is");
   assert.match(laco, /OTA_TOTAL_TIMEOUT_MS/);
   assert.match(ino, /const unsigned long OTA_TOTAL_TIMEOUT_MS = 600000;/);
 });
@@ -189,7 +199,7 @@ test("the role comes from the server: only the cloner enters clone or capture mo
   assert.doesNotMatch(setupHtml, /clonador/i);
 });
 
-test("the access point stays off in operation and only returns without configuration, after reset or through the switch", () => {
+test("the access point stays off while the server is reachable and only returns without configuration, after reset, through the switch or when the server stays unreachable", () => {
   assert.match(bloco("void setup"), /WiFi\.mode\(WIFI_STA\);\s*WiFi\.softAPdisconnect\(true\);/);
   assert.doesNotMatch(bloco("void setup"), /aplicarPontoDeAcesso\(/, "a configured boot does not start the AP");
   assert.match(bloco("void startAPMode"), /aplicarPontoDeAcesso\(false\)/);
@@ -197,34 +207,65 @@ test("the access point stays off in operation and only returns without configura
   assert.match(ino, /const unsigned long AP_TEMPORARIO_TIMEOUT_MS = 600000;/);
   assert.match(bloco("void loop"), /if \(apTemporarioAte != 0 && \(long\)\(millis\(\) - apTemporarioAte\) >= 0\) encerrarApTemporario\(\);/);
   assert.match(bloco("void encerrarApTemporario"), /WiFi\.softAPdisconnect\(true\);\s*WiFi\.mode\(WIFI_STA\);/);
+
+  assert.match(ino, /const unsigned long INTERVALO_RECONEXAO_WIFI_MS = 30000;/);
+  assert.match(ino, /const unsigned long AP_AUTOMATICO_CARENCIA_MS = 3 \* INTERVALO_RECONEXAO_WIFI_MS;/, "the grace period spans several reconnection cycles, so a normal reconnection never opens the AP");
+  assert.match(bloco("bool servidorIndisponivelAlemDaCarencia"), /return servidorIndisponivelDesde != 0 && millis\(\) - servidorIndisponivelDesde >= AP_AUTOMATICO_CARENCIA_MS;/);
+  const automatico = bloco("void atualizarApAutomatico");
+  assert.match(automatico, /if \(canalServidorAberto\(\)\) \{\s*servidorIndisponivelDesde = 0;\s*if \(apAberturaAutomatica\) \{\s*Serial\.println\("[^"]*"\);\s*encerrarApTemporario\(\);\s*\}\s*return;\s*\}/, "the server channel coming back closes only an AP the firmware opened by itself");
+  assert.match(automatico, /if \(apIniciado \|\| !servidorIndisponivelAlemDaCarencia\(\)\) return;\s*aplicarPontoDeAcesso\(true\);/, "the AP opens only after the grace period, keeps the station retrying and never takes over an AP already open");
+  assert.match(automatico, /if \(!apIniciado\) \{\s*servidorIndisponivelDesde = agora;\s*return;\s*\}/, "a failed AP start waits another grace period instead of retrying every pass");
+  assert.match(automatico, /registrarPortal\(\);\s*server\.begin\(\);\s*apAberturaAutomatica = true;/);
+  assert.match(automatico, /if \(meshModo\(\) != MESH_MODO_DIRETO\) apTemporarioAte = agora \+ AP_TEMPORARIO_TIMEOUT_MS;/, "on the mesh the automatic AP replaces the mesh AP, so it has the switch's window and its end restarts the board");
+  assert.match(bloco("void abrirApTemporario"), /if \(apModeActive\) return;\s*bool jaAberto = apIniciado;\s*apAberturaAutomatica = false;/, "a switch hold makes the AP the user's: the server coming back does not close it");
+  const encerrar = bloco("void encerrarApTemporario");
+  assert.match(encerrar, /if \(meshModo\(\) == MESH_MODO_DIRETO && servidorIndisponivelAlemDaCarencia\(\)\) \{\s*apAberturaAutomatica = true;\s*Serial\.println\("[^"]*"\);\s*return;\s*\}\s*apAberturaAutomatica = false;\s*server\.stop\(\);/, "a direct board whose window ends with no server keeps the AP, now automatic");
+  assert.match(encerrar, /if \(meshModo\(\) != MESH_MODO_DIRETO\) \{\s*reportComando\("setup_ap", "encerrado"\);[\s\S]*?agendarReinicio\(1000\);\s*return;\s*\}/, "on the mesh closing still restarts the board to bring the mesh back");
+  const loop = bloco("void loop");
+  assert.ok(loop.indexOf("if (apModeActive) {") < loop.indexOf("atualizarApAutomatico();"), "the provisioning AP is never touched");
+  assert.ok(loop.indexOf("wsCliente.loop();") < loop.indexOf("atualizarApAutomatico();") && loop.indexOf("meshProcessar();") < loop.indexOf("atualizarApAutomatico();"), "the decision uses this pass's channel state");
   assert.match(bloco("void loop"), /if \(apIniciado\) \{\s*dnsServer\.processNextRequest\(\);\s*server\.handleClient\(\);/);
   assert.equal(fs.existsSync(path.join(ESP, "data", "status.html")), false, "the local status page no longer exists");
   assert.doesNotMatch(ino, /handleRoot|handleInfo|status\.html|reportAccess/);
   assert.match(ino, /strcmp\(tipo, "reset_wifi"\) == 0/);
 });
 
-test("the buzzer follows every IR transmission without a blocking delay", () => {
-  assert.match(bloco("void sendRawIR"), /iniciarAvisoBuzzer\(\);\s*irsend\.sendRaw\(rawData, length, frequency\);\s*atualizarBuzzer\(\);/);
-  assert.match(bloco("void sendKnownACState"), /iniciarAvisoBuzzer\(\);\s*universalAC\.sendAc\(\);\s*atualizarBuzzer\(\);/);
+test("every IR transmission is preceded by the buzzer for at least 100 ms, and loop() switches the buzzer off", () => {
+  assert.match(ino, /const unsigned long BUZZER_ANTECEDENCIA_IR_MS = 100;/);
+  assert.match(bloco("void avisarAntesDoIr"), /^void avisarAntesDoIr\(\) \{\s*iniciarAvisoBuzzer\(\);\s*const unsigned long inicio = micros\(\);\s*while \(micros\(\) - inicio < BUZZER_ANTECEDENCIA_IR_MS \* 1000UL\) delay\(1\);\s*\}$/, "the buzzer starts first and the wait is measured from it, never shorter than 100 ms");
+  assert.match(bloco("void sendRawIR"), /^void sendRawIR\([^)]*\) \{\s*avisarAntesDoIr\(\);\s*irsend\.sendRaw\(rawData, length, frequency\);\s*atualizarBuzzer\(\);\s*\}$/);
+  const conhecido = bloco("void sendKnownACState");
+  assert.match(conhecido, /avisarAntesDoIr\(\);\s*universalAC\.sendAc\(\);\s*atualizarBuzzer\(\);\s*\}$/);
+  assert.ok(conhecido.indexOf("if (!universalAC.isProtocolSupported(protocol)) return;") < conhecido.indexOf("avisarAntesDoIr();"), "a protocol the library cannot send sounds nothing");
+  assert.equal((ino.match(/irsend\.send|universalAC\.send/g) || []).length, 2, "every IR transmission goes through sendRawIR or sendKnownACState");
+  assert.equal((ino.match(/avisarAntesDoIr\(\);/g) || []).length, 3, "declared once and called right before each of the two transmissions");
   assert.doesNotMatch(bloco("void iniciarAvisoBuzzer"), /delay\(/);
   assert.doesNotMatch(bloco("void atualizarBuzzer"), /delay\(/);
   assert.match(bloco("void loop"), /atualizarBuzzer\(\);/);
   assert.match(ino, /const unsigned long BUZZER_MIN_MS = 60;/);
 });
 
-test("the board echoes the desired state version and does not treat automatic restoration as an explicit command", () => {
+test("the board echoes the desired state version and never transmits the server's automatic restoration", () => {
   const versao = platformio.match(/-DFW_VERSAO=\\"(\d+\.\d+\.\d+)\\"/);
   assert.ok(compararVersoes(versao[1], "4.3.0") >= 0, "version echo and restoration refusal exist from 4.3.0");
+  assert.ok(compararVersoes(versao[1], "4.4.0") >= 0, "a restoration transmits nothing from 4.4.0");
   assert.match(ino, /uint32_t ultimaVersaoEstado = 0;/);
   assert.match(ino, /bool versaoEstadoConhecida = false;/);
-  assert.match(bloco("void preencherVersaoEstado"), /if \(versaoEstadoConhecida\) doc\["versao"\] = ultimaVersaoEstado;/);
+  assert.match(bloco("void preencherVersaoEstado"), /^void preencherVersaoEstado\(JsonDocument& doc\) \{\s*if \(failsafeLatched && versaoRecebidaConhecida\) doc\["versao"\] = ultimaVersaoRecebida;\s*else if \(versaoEstadoConhecida\) doc\["versao"\] = ultimaVersaoEstado;\s*\}$/, "only a board latched in local OFF echoes a version it received without transmitting, so the server can adopt that OFF; otherwise the echo is the version it transmitted");
+  assert.equal((ino.match(/ultimaVersaoRecebida/g) || []).length, 3, "the received version is declared, written once and read only by the latched echo");
   for (const fn of ["void enviarInfoDispositivo", "void enviarTelemetriaWs", "void enviarStatusFailsafe"]) {
     assert.match(bloco(fn), /preencherVersaoEstado\(doc\);/, `${fn} must echo the version`);
   }
   const processar = bloco("void processarComandoServidor");
   const conhecido = processar.slice(processar.indexOf('"send_known_state"'), processar.indexOf('"failsafe_raw_set"'));
   assert.match(conhecido, /bool restauracao = doc\["restauracao"\] \| false;/);
-  assert.match(conhecido, /if \(doc\["versao"\]\.is<uint32_t>\(\)\) \{\s*ultimaVersaoEstado = doc\["versao"\]\.as<uint32_t>\(\);\s*versaoEstadoConhecida = true;\s*\}/, "the version is recorded even when the restoration is refused");
+  assert.match(conhecido, /if \(protocolo >= 0\) \{\s*if \(doc\["versao"\]\.is<uint32_t>\(\)\) \{\s*ultimaVersaoRecebida = doc\["versao"\]\.as<uint32_t>\(\);\s*versaoRecebidaConhecida = true;\s*\}\s*if \(restauracao && !failsafeLatched\) \{\s*Serial\.println\("[^"]*"\);\s*return;\s*\}/, "a restoration on an unlatched board transmits nothing and reports nothing new; only the version it received is kept");
+  const semTrava = conhecido.indexOf("if (restauracao && !failsafeLatched)");
+  for (const depois of ['ultimaVersaoEstado = doc["versao"]', "sendKnownACState(", "lastKnownPower = power;", "definirFailsafeLatch(false)", "ultimoComando = UltimoComandoIR();", "enviarTelemetriaWs();"]) {
+    assert.ok(semTrava >= 0 && semTrava < conhecido.indexOf(depois), `the untransmitted restoration returns before ${depois}: the server never sees it confirmed`);
+  }
+  assert.match(conhecido, /if \(doc\["versao"\]\.is<uint32_t>\(\)\) \{\s*ultimaVersaoEstado = doc\["versao"\]\.as<uint32_t>\(\);\s*versaoEstadoConhecida = true;\s*\} else \{\s*versaoEstadoConhecida = false;\s*\}/, "a latched board records the version of the restoration it refuses, so the server can adopt the local OFF; a transmission without a version (an administrative test) stops the echo, also across a server restart");
+  assert.match(processar.slice(processar.indexOf('"send_raw"'), processar.indexOf('"send_known_state"')), /definirFailsafeLatch\(false\);\s*versaoEstadoConhecida = false;/, "after a RAW transmission the board no longer echoes an intent it may have overridden");
   assert.match(conhecido, /if \(restauracao && failsafeLatched\) \{\s*reportComando\("controle_nativo", "ignorado_failsafe_latch"\);\s*enviarStatusFailsafe\(\);\s*return;\s*\}/, "a board latched in local OFF ignores the restoration and answers with failsafe_status");
   assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("sendKnownACState("), "the refusal comes before any IR transmission");
   assert.ok(conhecido.indexOf("if (restauracao && failsafeLatched)") < conhecido.indexOf("definirFailsafeLatch(false)"), "the refusal comes before clearing the latch");
@@ -263,11 +304,54 @@ test("a temporary setup AP never shares the station's subnet", () => {
   assert.match(endereco, /return IPAddress\(192, 168, mesmaSubrede \? 5 : 4, 1\);/);
   const aplicar = bloco("void aplicarPontoDeAcesso");
   assert.ok(aplicar.indexOf("IPAddress apIP = enderecoDoPontoDeAcesso(manterSta);") < aplicar.indexOf("WiFi.mode("), "the address is chosen from the station before the mode changes");
+  assert.match(aplicar, /IPAddress apIP = enderecoDoPontoDeAcesso\(manterSta\);\s*if \(apIniciado && senhaAlvo == apPasswordAtiva && WiFi\.softAPIP\(\) == apIP\) return;/, "an open AP is reapplied when its subnet has to change");
+  assert.match(bloco("void gerenciarConexaoWifi"), /ultimaIdentificacao = 0;\s*if \(apIniciado && !apModeActive\) aplicarPontoDeAcesso\(true\);\s*\}/, "a station that joins a 192.168.4.x network while the AP is open moves the AP out of its subnet");
   assert.match(aplicar, /WiFi\.softAPConfig\(apIP, apIP, IPAddress\(255, 255, 255, 0\)\);/);
   assert.match(aplicar, /if \(apIniciado\) dnsServer\.stop\(\);\s*dnsServer\.start\(53, "\*", apIP\);/, "the captive DNS answers with the AP's current address, also when a policy change reapplies the AP");
   assert.doesNotMatch(ino, /IPAddress apIP\(192, 168, 4, 1\)/);
   assert.doesNotMatch(ino, /Serial\.println\("[^"]*192\.168\.4\.1/, "messages print the AP's real address");
   assert.match(bloco("bool requisicaoPortalPermitida"), /server\.client\(\)\.localIP\(\) == WiFi\.softAPIP\(\)/);
+});
+
+test("the network LED on GPIO 25 shows the server channel in every transport mode and the provisioning AP", () => {
+  assert.match(ino, /const unsigned long WIFI_TENTATIVA_DURACAO_MS = 15000;/);
+  assert.match(ino, /const unsigned long NETWORK_LED_SHORT_BLINK_MS = 200;/);
+  assert.match(ino, /const unsigned long NETWORK_LED_LONG_BLINK_MS = 1200;/);
+  assert.match(bloco("void setup"), /pinMode\(NETWORK_LED_PIN, OUTPUT\);\s*escreverLedRede\(true\);/, "lit from power-on until the server channel opens");
+  assert.match(bloco("void loop"), /^void loop\(\) \{\s*processarSwitchAcao\(\);\s*atualizarBuzzer\(\);\s*atualizarLedRede\(\);/, "updated every pass, also in the provisioning AP");
+  assert.match(bloco("NetworkLedState estadoDaRedeParaLed"), /if \(apModeActive\) return NETWORK_LED_SEM_REDE;\s*if \(canalServidorAberto\(\)\) return NETWORK_LED_SERVIDOR_CONECTADO;\s*if \(meshNoAtivo\(\)\) return NETWORK_LED_CONECTANDO;\s*if \(estadoWifi == WIFI_ESTADO_CONECTADO\) return NETWORK_LED_SERVIDOR_INDISPONIVEL;\s*if \(ultimaTentativaReconexao != 0 && agora - ultimaTentativaReconexao < WIFI_TENTATIVA_DURACAO_MS\) return NETWORK_LED_CONECTANDO;\s*return NETWORK_LED_SEM_REDE;/, "the server channel decides for direct boards, gateways and mesh nodes alike");
+  const atualizar = bloco("void atualizarLedRede");
+  assert.match(atualizar, /if \(estadoLedRede == NETWORK_LED_SERVIDOR_CONECTADO\) \{\s*escreverLedRede\(false\);\s*\} else if \(estadoLedRede == NETWORK_LED_SEM_REDE\) \{\s*escreverLedRede\(true\);/, "off with the server, steady without a network");
+  assert.match(atualizar, /estadoLedRede == NETWORK_LED_CONECTANDO \? NETWORK_LED_SHORT_BLINK_MS : NETWORK_LED_LONG_BLINK_MS;/, "fast blink while connecting, slow blink while the network is up and the server is not");
+  const escrever = bloco("void escreverLedRede");
+  assert.match(escrever, /if \(nivel == nivelLedRede\) return;/, "the pin is written only when its level changes");
+  assert.match(escrever, /digitalWrite\(NETWORK_LED_PIN, aceso \? NETWORK_LED_ACTIVE_LEVEL : !NETWORK_LED_ACTIVE_LEVEL\);/);
+  assert.equal((ino.match(/digitalWrite\(NETWORK_LED_PIN/g) || []).length, 1, "one writer for the LED");
+  assert.doesNotMatch(atualizar + escrever, /delay\(/);
+});
+
+test("connecting, reconnecting and synchronizing never transmit IR: the buzzer alone signals the session", () => {
+  const evento = bloco("void handleWsServidorEvent");
+  const conectado = evento.slice(evento.indexOf("case WStype_CONNECTED:"), evento.indexOf("case WStype_TEXT:"));
+  assert.match(conectado, /Serial\.println\("WS servidor: conectado\."\);\s*enviarInfoDispositivo\(\);\s*iniciarAvisoBuzzer\(\);\s*break;/, "the beep comes after the session is logged and announced");
+  assert.match(bloco("void loop"), /if \(canalMalhaAnterior\) \{\s*enviarInfoDispositivo\(\);\s*iniciarAvisoBuzzer\(\);\s*\}/, "a mesh node beeps when its session with the server opens");
+  for (const fn of ["void setup", "void handleWsServidorEvent", "void enviarInfoDispositivo", "void gerenciarConexaoWifi", "void conectarWsServidor", "void identificarSalaNoServidor", "void configurarMalha", "void atualizarApAutomatico", "void carregarFailsafeCache"]) {
+    assert.doesNotMatch(bloco(fn), /sendRawIR|sendKnownACState|transmitirFailsafeSalvo|avisarAntesDoIr|irsend\.send|universalAC\.send/, `${fn} never transmits IR`);
+  }
+});
+
+test("the cloner ignores captures the IR library cannot transmit as an air-conditioner state", () => {
+  const captura = bloco("void handleIRCapture");
+  assert.match(captura, /bool isKnownAC = universalAC\.isProtocolSupported\(results\.decode_type\);\s*if \(!isKnownAC\) \{\s*reportComando\("sinal_ignorado", "protocolo=" \+ protocolName \+ ";hex=" \+ hexValue\);\s*if \(isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE\) irrecv\.resume\(\);\s*return;\s*\}/, "an unsupported capture is reported as ignored and the receiver keeps listening");
+  const ignorar = captura.indexOf("if (!isKnownAC)");
+  assert.ok(ignorar < captura.indexOf("resultToRawArray("), "nothing is allocated for an ignored capture");
+  assert.ok(ignorar < captura.indexOf('doc["tipo"] = "captura";'), "an ignored capture never reaches the server");
+});
+
+test("swing is on unless a command explicitly turns it off", () => {
+  const conhecido = bloco("void processarComandoServidor").slice(bloco("void processarComandoServidor").indexOf('"send_known_state"'));
+  assert.match(conhecido, /bool swing = doc\["swing"\] \| true;/);
+  assert.match(bloco("void sendKnownACState"), /universalAC\.next\.swingv = swing \? stdAc::swingv_t::kAuto : stdAc::swingv_t::kOff;/);
 });
 
 test("the firmware carries no code comments", () => {

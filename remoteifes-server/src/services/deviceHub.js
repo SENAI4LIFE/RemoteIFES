@@ -14,6 +14,7 @@ const MODOS_VALIDOS = new Set(["operation", "config_idle", "config_clone"]);
 
 const conexoes = new Map();
 const capturasPorSala = new Map();
+const invalidacoesPorSala = new Map();
 const eventos = new EventEmitter();
 let wss = null;
 let intervaloPing = null;
@@ -203,6 +204,7 @@ function enviarTesteIR(sala, payload) {
   if (entrada && salaRow) {
     entrada.versaoConfirmada = null;
     entrada.versaoInvalidadaAte = salaRow.estadoVersao;
+    invalidacoesPorSala.set(sala, salaRow.estadoVersao);
     salasService.eventos.emit("mudanca-sala", { sala });
   }
   return true;
@@ -276,7 +278,9 @@ function relatoCondizComIntencao(salaRow, ultimoComando) {
   return ultimoComando.protocol === salaRow.irProtocolo
     && !!ultimoComando.power === !!salaRow.ligado
     && Number(ultimoComando.temp) === Number(salaRow.temperaturaAlvo)
-    && !!ultimoComando.turbo === !!salaRow.turboAtivo;
+    && !!ultimoComando.turbo === !!salaRow.turboAtivo
+    && ultimoComando.swing !== false
+    && !ultimoComando.fan;
 }
 
 function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
@@ -288,7 +292,7 @@ function reconciliarRelato(sala, entrada, msg, { inicial = false } = {}) {
   const reflete = versaoReportada !== null
     ? versaoReportada === versaoAtual
     : entrada.versaoConfirmada === versaoAtual || relatoCondizComIntencao(salaRow, msg.ultimoComando);
-  const ecoInvalidado = versaoReportada !== null && entrada.versaoInvalidadaAte !== null && versaoAtual <= entrada.versaoInvalidadaAte;
+  const ecoInvalidado = entrada.versaoInvalidadaAte !== null && versaoAtual <= entrada.versaoInvalidadaAte;
   const latched = msg.failsafeLatched === true;
   if (latched && (inicial || reflete) && (salaRow.ligado || salaRow.turboAtivo)) {
     try {
@@ -428,7 +432,7 @@ function conectarDispositivo({ sala, mac, viaCredencial, deviceId, ip, credencia
     versaoConfirmada: null,
     versaoEstadoReportada: null,
     versaoEnviada: null,
-    versaoInvalidadaAte: null,
+    versaoInvalidadaAte: invalidacoesPorSala.has(sala) ? invalidacoesPorSala.get(sala) : null,
   };
   conexoes.set(sala, entrada);
 

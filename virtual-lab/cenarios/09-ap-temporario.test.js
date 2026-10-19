@@ -1,6 +1,6 @@
 "use strict";
 
-// The temporary setup AP (a short press on the switch) while the board stays connected (AP+STA).
+// The temporary setup AP (the switch held for 5 s) while the board stays connected (AP+STA).
 //
 // The lab's Wi-Fi network is 192.168.4.0/24, the subnet the firmware gives its factory setup AP, so this is
 // also a site whose network already uses 192.168.4.x. Firmware up to 4.3.0 opened the temporary AP in that
@@ -19,7 +19,7 @@ function reinicios(placa, desde = 0) {
 async function abrirApTemporario(lab) {
   const ctx = await lab.placaEmOperacao();
   const desde = ctx.placa.marca();
-  await ctx.placa.pressionarBotao(300);
+  await ctx.placa.pressionarBotao(6000);
   const m = await ctx.placa.aguardarSerial(/Switch: RemoteIFES-Setup aberto temporariamente em (\S+);/, { desde });
   lab.observar("enderecoDoApTemporario", m[1]);
   await ctx.placa.aguardarVirtual(5_000);
@@ -28,7 +28,7 @@ async function abrirApTemporario(lab) {
 
 cenario("Com o AP temporário aberto, a sessão existente continua e atende comandos", {
   inicial: "Placa em operação, conectada, numa rede 192.168.4.0/24",
-  falha: "toque curto no switch: o AP RemoteIFES-Setup abre com a placa conectada",
+  falha: "switch mantido por 6 s: o AP RemoteIFES-Setup abre com a placa conectada",
   exigido: ["a sessão aberta antes do AP continua", "um comando é aplicado e confirmado com o AP aberto"],
   proibido: ["sessão perdida", "reinício"],
   recuperacao: "não se aplica",

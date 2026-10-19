@@ -31,29 +31,43 @@ async function taxaPorMinuto(lab, via, placa, msVirtuais) {
 cenario("Servidor fora do ar quando a placa liga", {
   inicial: "Placa configurada e já vinculada; servidor inalcançável (conexões recusadas)",
   falha: "a placa é religada com o servidor fora do ar e fica 3 minutos (tempo da placa) sem resposta",
-  exigido: ["tentativas continuam, espaçadas: no máximo 8 por minuto", "nenhum reinício ou travamento", "quando o servidor volta, a placa conecta em até 30 s"],
-  proibido: ["laço de tentativas sem espera", "desistência definitiva", "reinícios em série"],
-  recuperacao: "sessão aberta e comando confirmado",
+  exigido: [
+    "tentativas continuam, espaçadas: no máximo 8 por minuto",
+    "nenhum reinício ou travamento",
+    "o RemoteIFES-Setup abre sozinho depois da carência, fora da sub-rede da estação, e a estação continua tentando",
+    "quando o servidor volta, a placa conecta em até 30 s e fecha o AP que abriu",
+  ],
+  proibido: ["laço de tentativas sem espera", "desistência definitiva", "reinícios em série", "AP aberto antes da carência", "IR no boot ou na reconexão"],
+  recuperacao: "sessão aberta, AP fechado e comando confirmado",
 }, async (lab) => {
   const via = await lab.intermediario();
   const { placa, sala } = await lab.placaEmOperacao({ via });
   await placa.desligar();
   via.modo = "recusar";
   const marca = placa.marca();
+  const bordas = placa.bordas.length;
   await placa.ligar();
   await placa.aguardarSerial(/IP: 192\.168\.4\.15/, { desde: marca });
+  const dentroDaCarencia = placa.aguardarVirtual(60_000).then(() => placa.contarSerial(/RemoteIFES-Setup aberto automaticamente/, marca));
   const taxa = await taxaPorMinuto(lab, via, placa, 180_000);
   lab.observar("comServidorFora", taxa);
+  assert.equal(await dentroDaCarencia, 0, "no setup AP inside the grace period");
   assert.ok(taxa.porMinuto <= 8, `${taxa.porMinuto.toFixed(1)} attempts per minute of board time`);
-  assert.ok(taxa.porMinuto >= 2, "the board kept trying");
+  assert.ok(taxa.porMinuto >= 2, "the board kept trying with the AP open");
+  assert.equal(placa.contarSerial(/Sem conexao com o servidor: RemoteIFES-Setup aberto automaticamente em 192\.168\.5\.1;/, marca), 1, "the AP opened once, out of the station's 192.168.4.0/24 subnet");
   assert.equal(reinicios(placa, marca), 1, "only the power-on");
   assert.equal(travamentos(placa, marca), 0);
   via.modo = "normal";
   const volta = await placa.agoraMs();
+  const voltaSerial = placa.marca();
   await lab.aguardarConectada(sala, { limiteMs: 300_000 });
   const esperaMs = (await placa.agoraMs()) - volta;
   lab.observar("reconexaoMsVirtual", Math.round(esperaMs));
   assert.ok(esperaMs <= 30_000, `connected ${Math.round(esperaMs)} ms (board time) after the server came back`);
+  await placa.aguardarSerial(/RemoteIFES-Setup encerrado; operacao normal sem ponto de acesso/, { desde: voltaSerial });
+  await placa.aguardarSerial(/Sincronizacao do servidor recebida sem transmissao IR/, { desde: voltaSerial });
+  assert.equal(placa.bordasDe(4, bordas).length, 0, "no IR from the power-on, the outage or the reconnection");
+  assert.equal(reinicios(placa, marca), 1, "closing the AP on a direct board does not restart it");
   assert.equal((await lab.api("POST", "/comando", { sala, cmd: "ligar" })).status, 200);
   await lab.aguardarConfirmada(sala);
 });
@@ -64,16 +78,18 @@ cenario("Servidor some com a placa conectada e volta; cortes repetidos", {
   exigido: [
     "tentativas espaçadas: no máximo 20 por minuto",
     "a placa não reinicia",
-    "ao voltar, recebe a intenção atual (restauração) e a confirma",
+    "ao voltar, recebe a intenção atual como sincronização, sem transmitir IR, e o servidor não a dá por confirmada",
+    "um comando explícito aplica e confirma a intenção",
     "depois dos cortes em série, uma única sessão",
   ],
-  proibido: ["sessões duplicadas", "estado confirmado divergente da intenção", "reinícios"],
+  proibido: ["sessões duplicadas", "IR na reconexão ou na sincronização", "estado confirmado sem transmissão", "estado confirmado divergente da intenção", "reinícios"],
   recuperacao: "sessão única, estado confirmado igual à intenção",
 }, async (lab) => {
   const via = await lab.intermediario();
   const { placa, sala } = await lab.placaEmOperacao({ via });
   await lab.aguardarConfirmada(sala);
   const marca = placa.marca();
+  const bordas = placa.bordas.length;
   via.modo = "recusar";
   via.cortarTudo();
   await lab.aguardarDesconectada(sala);
@@ -84,7 +100,16 @@ cenario("Servidor some com a placa conectada e volta; cortes repetidos", {
   assert.ok(taxa.porMinuto <= 20, `${taxa.porMinuto.toFixed(1)} attempts per minute of board time`);
   assert.ok(taxa.porMinuto >= 3);
   via.modo = "normal";
-  await lab.aguardarIntencaoAplicada(sala, true); // the intent given during the outage reached the board
+  const volta = placa.marca();
+  await lab.aguardarConectada(sala, { limiteMs: 300_000 });
+  await placa.aguardarSerial(/Sincronizacao do servidor recebida sem transmissao IR/, { desde: volta });
+  await placa.aguardarVirtual(5000);
+  const aposVolta = await lab.estado(sala);
+  lab.observar("aposAVolta", { confirmado: aposVolta.dispositivo.estadoConfirmado, bordasIr: placa.bordasDe(4, bordas).length });
+  assert.equal(placa.bordasDe(4, bordas).length, 0, "the intent given during the outage was not transmitted on reconnection");
+  assert.equal(aposVolta.dispositivo.estadoConfirmado, false, "the server does not take an untransmitted intent as confirmed");
+  assert.equal((await lab.api("POST", "/comando", { sala, cmd: "ligar" })).status, 200);
+  await lab.aguardarIntencaoAplicada(sala, true);
   for (let i = 0; i < 3; i++) {
     via.cortarTudo();
     await placa.aguardarVirtual(1500);
@@ -101,29 +126,31 @@ cenario("Servidor some com a placa conectada e volta; cortes repetidos", {
 cenario("Servidor morto (SIGKILL) e religado com a placa conectada", {
   inicial: "Placa conectada; intenção ligada confirmada",
   falha: "o processo do servidor é morto com SIGKILL e religado na mesma porta",
-  exigido: ["a placa reconecta sozinha", "a intenção persistida é restaurada e confirmada"],
-  proibido: ["intenção perdida", "reinício da placa"],
+  exigido: ["a placa reconecta sozinha", "a intenção persistida volta a ser confirmada pelo eco da versão que a placa já tinha aplicado, sem nova transmissão IR"],
+  proibido: ["intenção perdida", "reinício da placa", "IR na reconexão ou na sincronização"],
   recuperacao: "estado confirmado igual à intenção anterior à queda",
 }, async (lab) => {
   const { placa, sala } = await lab.placaEmOperacao();
   assert.equal((await lab.api("POST", "/comando", { sala, cmd: "ligar" })).status, 200);
   await lab.aguardarConfirmada(sala);
+  await lab.aguardar(() => placa.bordas.filter((b) => b.pino === 27).at(-1)?.nivel === 0, { descricao: "buzzer off after the command", limiteMs: 60_000, intervaloMs: 100 });
   const marca = placa.marca();
+  const bordas = placa.bordas.length;
   await lab.servidor.parar("SIGKILL");
   await placa.aguardarSerial(/WS servidor: desconectado/, { desde: marca });
   await lab.servidor.subir();
   const { estado, relato } = await lab.aguardarIntencaoAplicada(sala, true);
-  lab.observar("aposReinicioDoServidor", { relato, versao: estado.dispositivo.versaoEstadoReportada });
+  lab.observar("aposReinicioDoServidor", { relato, versao: estado.dispositivo.versaoEstadoReportada, bordasIr: placa.bordasDe(4, bordas).length });
+  assert.equal(placa.bordasDe(4, bordas).length, 0, "no IR from the reconnection or the synchronization");
   assert.equal(reinicios(placa, marca), 0);
 });
 
 cenario("Conexão cortada logo depois de o comando chegar à placa", {
   inicial: "Placa conectada e confirmada desligada",
   falha: "a conexão cai no instante seguinte à entrega de um send_known_state (ligar): a placa recebe o comando, a resposta não chega",
-  // The IR frame carries the whole state, so the restoration the server sends on the new session repeats
-  // the same state rather than toggling anything; how many times it went out is recorded.
-  exigido: ["a placa transmite o comando", "ao reconectar, o servidor e a placa convergem: estado confirmado = intenção (ligado)"],
-  proibido: ["servidor confirmando sem relato da placa", "divergência permanente", "reinício"],
+  // The restoration the server sends on the new session transmits nothing, so the command goes out once.
+  exigido: ["a placa transmite o comando uma única vez", "ao reconectar, o servidor e a placa convergem: estado confirmado = intenção (ligado)"],
+  proibido: ["servidor confirmando sem relato da placa", "divergência permanente", "IR da restauração", "reinício"],
   recuperacao: "estado confirmado ligado",
 }, async (lab) => {
   const via = await lab.intermediario();
@@ -144,9 +171,12 @@ cenario("Conexão cortada logo depois de o comando chegar à placa", {
   lab.observar("logoAposOCorte", { confirmado: antes.dispositivo.estadoConfirmado, conectado: antes.dispositivo.conectado });
   await lab.aguardarIntencaoAplicada(sala, true);
   const ir = placa.bordasDe(4, bordas).length;
-  const transmissoes = placa.bordasDe(27, bordas).filter((b) => b.nivel === 1).length;
-  lab.observar("transmissoes", { bordasIr: ir, buzzer: transmissoes });
+  const sinais = placa.bordas.slice(bordas).filter((b) => b.pino === 4 || b.pino === 27);
+  const bipes = sinais.filter((b) => b.pino === 27 && b.nivel === 1).length;
+  const transmissoes = sinais.filter((b, i) => b.pino === 27 && b.nivel === 1 && sinais.slice(i + 1).find((p) => p.pino === 4 || (p.pino === 27 && p.nivel === 1))?.pino === 4).length;
+  lab.observar("transmissoes", { bordasIr: ir, bipes, transmissoes });
   assert.ok(ir > 1000, "the command was transmitted");
+  assert.equal(transmissoes, 1, "the command went out once; the restoration on the new session transmitted nothing");
   assert.equal(reinicios(placa, marca), 0);
 });
 

@@ -97,7 +97,9 @@ test("the manual describes the AP only as a provisioning portal, without a perma
   }
   assert.ok(/criada apenas no modo AP de provisionamento/.test(README), "the README must say RemoteIFES-Setup only exists during provisioning");
   assert.ok(/encerra o AP e não serve frontend local durante a operação normal/.test(README), "the README must make clear the local frontend is turned off after setup");
-  assert.ok(/clique curto no switch físico/.test(README), "the README must document the switch click that reopens the portal");
+  assert.ok(/manter o switch físico pressionado por 5 s/.test(README), "the README must document the 5 s switch hold that reopens the portal");
+  assert.ok(/90 s sem conexão com o servidor/.test(README), "the README must document that the portal opens by itself without the server");
+  assert.ok(!/clique curto no switch físico/.test(README), "a short click no longer opens the portal");
   assert.ok(/Exigir senha na rede de configuração dos ESP32/.test(README), "the README must document the global option");
   const superadmin = JSON.stringify(service._superSections);
   assert.ok(/RemoteIFES-Setup/.test(superadmin) && /Exigir senha na rede de configuração dos ESP32/.test(superadmin));

@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="tema.css">
 <style>
   /* Signal pins only, as remoteifes-esp32/src/main.ino defines them (DHTPIN, IR_RECV_PIN,
-     IR_SEND_PIN, BUZZER_PIN, ACTION_SWITCH_PIN). Power, resistors and the LED drive are not
+     IR_SEND_PIN, BUZZER_PIN, NETWORK_LED_PIN, ACTION_SWITCH_PIN). Power, resistors and the LED drive are not
      defined in the repository and are deliberately not drawn. */
   .bancada { display: grid; grid-template-columns: 232px 1fr 246px; align-items: center; }
   .coluna { display: flex; flex-direction: column; gap: 16px; }
@@ -43,7 +43,10 @@
       </div>
       <div class="cartao tom-petroleo peca" id="buzzer">
         <img class="modulo" src="../modules/buzzer.png" alt="">
-        <div><div class="titulo">Buzzer ativo</div><div class="sub">soa a cada transmissão IR</div><span class="pino">GPIO 27 · saída</span></div>
+        <div><div class="titulo">Buzzer ativo</div><div class="sub">soa antes de cada transmissão IR e ao conectar</div><span class="pino">GPIO 27 · saída</span></div>
+      </div>
+      <div class="cartao tom-petroleo peca" id="ledrede">
+        <div><div class="titulo">LED de conexão</div><div class="sub">apagado com o servidor conectado; pisca ou acende sem ele</div><span class="pino">GPIO 25 · saída</span></div>
       </div>
     </div>
 
@@ -81,6 +84,7 @@
   window.CONECTORES = [
     { de: "#led", para: "#placa", lados: ["direita", "esquerda"], reto: true, pontas: "inicio", tom: "petroleo" },
     { de: "#buzzer", para: "#placa", lados: ["direita", "esquerda"], reto: true, pontas: "inicio", tom: "petroleo" },
+    { de: "#ledrede", para: "#placa", lados: ["direita", "esquerda"], reto: true, pontas: "inicio", tom: "petroleo" },
     { de: "#led", para: "#ac", lados: ["topo", "base"], em: [0.14, 0.14], reto: true, estilo: "radio", tom: "petroleo" },
     { de: "#botao", para: "#placa", lados: ["esquerda", "direita"], reto: true, tom: "verde" },
     { de: "#dht", para: "#placa", lados: ["esquerda", "direita"], reto: true, estilo: "tracejado", tom: "verde" },

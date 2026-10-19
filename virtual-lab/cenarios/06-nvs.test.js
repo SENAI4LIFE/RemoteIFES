@@ -121,7 +121,7 @@ cenario("Modo de transporte desconhecido na NVS não desliga a verificação do 
 cenario("Registro do failsafe corrompido na NVS nunca é transmitido", {
   inicial: "Placa com failsafe OFF gravado (registro fsRec com CRC próprio)",
   falha: "um byte do RAW dentro de fsRec é alterado (CRC da NVS refeito, CRC do registro não); a placa liga sem servidor",
-  exigido: ["a placa descarta o registro (CRC do firmware) e o segurar do botão não transmite nada", "com o servidor de volta, o failsafe é reenviado e volta a valer"],
+  exigido: ["a placa descarta o registro (CRC do firmware) e o clique no botão não transmite nada", "com o servidor de volta, o failsafe é reenviado e volta a valer"],
   proibido: ["IR transmitido a partir de um registro corrompido"],
   recuperacao: "failsafe válido de novo e transmitido pelo botão",
 }, async (lab) => {
@@ -136,13 +136,13 @@ cenario("Registro do failsafe corrompido na NVS nunca é transmitido", {
   await placa.ligar();
   await placa.aguardarSerial(/Registro de failsafe invalido na NVS/, { desde });
   const bordas = placa.bordas.length;
-  await placa.pressionarBotao(6000);
+  await placa.pressionarBotao(300);
   await placa.aguardarSerial(/Failsafe ignorado: nenhum RAW OFF salvo na NVS/, { desde });
   assert.equal(placa.bordasDe(4, bordas).length, 0, "nothing was transmitted from the damaged record");
   via.modo = "normal";
   await lab.aguardar(async () => (await lab.estado(sala)).dispositivo.failsafe.configurado === true, { descricao: "failsafe re-sent and stored", limiteMs: 300_000 });
   const antes = placa.bordas.length;
-  await placa.pressionarBotao(6000);
+  await placa.pressionarBotao(300);
   await placa.aguardarSerial(/Failsafe OFF transmitido localmente/, { desde });
   const ir = placa.bordasDe(4, antes).length;
   lab.observar("bordasIrFailsafeValido", ir);
@@ -176,7 +176,7 @@ cenario("Energia cortada no meio da gravação do failsafe na NVS", {
   const pulsos = m[1] ? Number(m[1]) : null;
   assert.ok(pulsos === a.length || pulsos === b.length, `the record after the cut is A or B, whole (${m[0]})`);
   const antes = placa.bordas.length;
-  await placa.pressionarBotao(6000);
+  await placa.pressionarBotao(300);
   await placa.aguardarSerial(/Failsafe OFF transmitido localmente/, { desde });
   assert.ok(placa.bordasDe(4, antes).length > 0);
   assert.equal(reinicios(placa, desde), 1);
@@ -187,10 +187,10 @@ cenario("Energia cortada no meio da gravação do failsafe na NVS", {
 // The recovery itself (a visit: the portal, reached by joining the setup AP, with a new credential) is
 // out of reach here: while the board is a station, this emulator's radio carries no second link for a
 // device joined to its AP (see cenarios/09). What the lab shows is that the way to it opens.
-cenario("Credencial pela metade na NVS: sem segredo a placa não entra, não reinicia em laço e abre o portal com um toque", {
+cenario("Credencial pela metade na NVS: sem segredo a placa não entra, não reinicia em laço e abre o portal com o botão", {
   inicial: "Placa configurada com credencial; credencial obrigatória no servidor",
   falha: "a chave devSec é apagada; devId continua",
-  exigido: ["o servidor recusa a placa sem credencial completa", "a placa não reinicia em laço", "um toque no botão abre o RemoteIFES-Setup"],
+  exigido: ["o servidor recusa a placa sem credencial completa", "a placa não reinicia em laço", "segurar o botão por 5 s abre o RemoteIFES-Setup"],
   proibido: ["sessão sem credencial", "placa sem caminho de recuperação local"],
   recuperacao: "reconfiguração pelo portal: só em hardware físico (README, O que ainda não foi validado)",
 }, async (lab) => {
@@ -203,7 +203,8 @@ cenario("Credencial pela metade na NVS: sem segredo a placa não entra, não rei
   const semCredencial = via.conexoes.filter((c) => c.cabecalhos && !c.cabecalhos["x-device-secret"]).length;
   lab.observar("tentativasSemSegredo", semCredencial);
   assert.equal(reinicios(placa, desde), 1);
-  await placa.pressionarBotao(300);
+  assert.equal(placa.contarSerial(/RemoteIFES-Setup aberto automaticamente/, desde), 0, "inside the grace period the AP is still closed");
+  await placa.pressionarBotao(6000);
   await placa.aguardarSerial(/Switch: RemoteIFES-Setup aberto temporariamente/, { desde });
   assert.equal(reinicios(placa, desde), 1, "opening the portal does not restart the board");
 });

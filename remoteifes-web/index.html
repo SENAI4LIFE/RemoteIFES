@@ -1452,7 +1452,7 @@
                   <label class="checkbox-label">
                     <input type="checkbox" id="cfgEspApExigirCredencial" /> Exigir senha na rede de configuração dos ESP32 (RemoteIFES-Setup)
                   </label>
-                  <p class="hint">A rede local <code>RemoteIFES-Setup</code> só existe enquanto o ESP32 está sem configuração, após Resetar Wi-Fi ou por alguns minutos depois de um clique curto no switch físico; em operação normal ela fica desligada. Desativado (padrão), a rede de configuração é aberta. Ativado, passa a exigir a senha padrão do firmware. Não afeta a autenticação do ESP32 no servidor, configurada acima.</p>
+                  <p class="hint">A rede local <code>RemoteIFES-Setup</code> só existe enquanto o ESP32 está sem configuração, após Resetar Wi-Fi, por alguns minutos depois de manter o switch físico pressionado por 5 s ou enquanto o ESP32 está há mais de 90 s sem conexão com o servidor; em operação normal ela fica desligada. Desativado (padrão), a rede de configuração é aberta. Ativado, passa a exigir a senha padrão do firmware. Não afeta a autenticação do ESP32 no servidor, configurada acima.</p>
 
                   <label for="cfgRetencaoAuditoria">Retenção de auditoria e indisponibilidade (dias)</label>
                   <input type="number" id="cfgRetencaoAuditoria" min="1" max="365" value="7" />

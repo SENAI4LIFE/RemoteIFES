@@ -19,7 +19,7 @@ module.exports = [
         ["Redes autorizadas", "somente leitura aqui: faixas CIDR liberadas em produção, alteradas no Console de Operações ou com npm run redes"],
         ["Modo de manutenção", "bloqueia login e uso de usuários comuns; administradores continuam"],
         ["Credenciais obrigatórias", "recusa todo ESP32 que ainda se autentique somente por MAC"],
-        ["Senha na rede RemoteIFES-Setup", "desligada por padrão: o AP de configuração do ESP32, que só existe durante o provisionamento ou após o clique no switch, fica aberto. Ligada, ele passa a exigir a senha padrão do firmware. Só afeta o Wi-Fi local, não a autenticação no servidor"],
+        ["Senha na rede RemoteIFES-Setup", "desligada por padrão: o AP de configuração do ESP32, que só existe durante o provisionamento, depois de segurar o switch por 5 s ou enquanto a placa está há mais de 90 s sem servidor, fica aberto. Ligada, ele passa a exigir a senha padrão do firmware. Só afeta o Wi-Fi local, não a autenticação no servidor"],
         ["Retenção", "1–365 dias para auditoria e indisponibilidade; limpeza é automática"],
       ] },
       { t: "passos", itens: [

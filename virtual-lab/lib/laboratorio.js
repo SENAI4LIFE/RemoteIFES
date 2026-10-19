@@ -383,9 +383,9 @@ class Laboratorio {
   /**
    * A board in normal operation: factory image, configured through the portal with a fresh credential
    * for `sala`, connected over the WebSocket. `via` is an Intermediario when faults will be injected.
-   * With a protocol assigned, the server restores the room's state by IR right after the session opens;
-   * the board is handed over only after it confirmed that restoration, so what a scenario observes
-   * afterwards (edges, buzzer, serial) is its own doing.
+   * With a protocol assigned, an explicit command (off) gives the room a confirmed state, since the
+   * restoration sent when the session opens transmits nothing; what a scenario observes afterwards
+   * (edges, buzzer, serial) is then its own doing.
    */
   async placaEmOperacao({ sala = "A-103a", via = null, variante = "producao", protocolo = 16, nome = "placa" } = {}) {
     const credencial = await this.prepararSala(sala, { protocolo });
@@ -395,6 +395,8 @@ class Laboratorio {
     await this.configurarPeloPortal(placa, { credencial });
     let estado = await this.aguardarConectada(sala, { limiteMs: 240_000 });
     if (protocolo !== null && protocolo !== undefined) {
+      const desligar = await this.api("POST", "/comando", { sala, cmd: "desligar" });
+      if (desligar.status !== 200) throw new Error(`the explicit command that sets ${sala}'s initial state failed: HTTP ${desligar.status} ${JSON.stringify(desligar.corpo)}`);
       estado = await this.aguardarConfirmada(sala, { limiteMs: 240_000 });
       await placa.aguardarVirtual(500);
     }

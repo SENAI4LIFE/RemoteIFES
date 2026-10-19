@@ -35,6 +35,8 @@
 #define BUZZER_PIN 27
 #define ACTION_SWITCH_PIN 26
 #define ACTION_SWITCH_ACTIVE_LEVEL LOW
+#define NETWORK_LED_PIN 25
+#define NETWORK_LED_ACTIVE_LEVEL HIGH
 
 #define CAPTURE_BUFFER_SIZE 1024
 #define IR_CAPTURE_TIMEOUT_MS 50
@@ -52,6 +54,10 @@ const unsigned long WS_RECONNECT_INTERVAL_MS = 5000;
 const unsigned long IDENTIFICACAO_INTERVAL_MS = 60000;
 const unsigned long IDENTIFICACAO_PENDENTE_INTERVAL_MS = 15000;
 const unsigned long INTERVALO_RECONEXAO_WIFI_MS = 30000;
+const unsigned long WIFI_TENTATIVA_DURACAO_MS = 15000;
+const unsigned long NETWORK_LED_SHORT_BLINK_MS = 200;
+const unsigned long NETWORK_LED_LONG_BLINK_MS = 1200;
+const unsigned long AP_AUTOMATICO_CARENCIA_MS = 3 * INTERVALO_RECONEXAO_WIFI_MS;
 const char SERVER_IDENTIFICACAO_PATH[] = "/dispositivo/identificar";
 const char SERVER_HEARTBEAT_PATH[] = "/dispositivo/heartbeat";
 const char DEVICE_WS_PATH[] = "/ws/dispositivo";
@@ -60,9 +66,10 @@ const char MESH_ID_PADRAO[] = "52454d494645";
 
 const unsigned long ACTION_SWITCH_DEBOUNCE_MS = 40;
 const uint64_t ACTION_SWITCH_AMOSTRA_US = 10000;
-const unsigned long FAILSAFE_SWITCH_HOLD_MS = 5000;
+const unsigned long AP_SWITCH_HOLD_MS = 5000;
 const unsigned long AP_TEMPORARIO_TIMEOUT_MS = 600000;
 const unsigned long BUZZER_MIN_MS = 60;
+const unsigned long BUZZER_ANTECEDENCIA_IR_MS = 100;
 const uint32_t FAILSAFE_CARRIER_MIN_HZ = 20000;
 const uint32_t FAILSAFE_CARRIER_MAX_HZ = 60000;
 const char DEVICE_ROLE_TRANSMITTER[] = "transmitter";
@@ -88,6 +95,13 @@ enum WifiState {
 enum ServerWsState {
   WS_ESTADO_DESCONECTADO = 0,
   WS_ESTADO_CONECTADO = 1
+};
+
+enum NetworkLedState {
+  NETWORK_LED_SEM_REDE = 0,
+  NETWORK_LED_CONECTANDO = 1,
+  NETWORK_LED_SERVIDOR_INDISPONIVEL = 2,
+  NETWORK_LED_SERVIDOR_CONECTADO = 3
 };
 
 const uint32_t FAILSAFE_REC_MAGIC = 0x53464952UL;
@@ -147,6 +161,8 @@ bool apIniciado = false;
 bool apExigirCredencial = false;
 bool portalRegistrado = false;
 unsigned long apTemporarioAte = 0;
+bool apAberturaAutomatica = false;
+unsigned long servidorIndisponivelDesde = 0;
 String apPasswordAtiva;
 String deviceRole = DEVICE_ROLE_TRANSMITTER;
 bool actionSwitchRawActive = false;
@@ -162,6 +178,9 @@ unsigned long buzzerDesligarEm = 0;
 RuntimeMode runtimeMode = RUNTIME_OPERATION;
 WifiState estadoWifi = WIFI_ESTADO_DESCONECTADO;
 ServerWsState estadoWsServidor = WS_ESTADO_DESCONECTADO;
+NetworkLedState estadoLedRede = NETWORK_LED_SEM_REDE;
+unsigned long estadoLedRedeAlteradoEm = 0;
+int8_t nivelLedRede = -1;
 
 unsigned long lastSensorRead = 0;
 unsigned long lastHeartbeat = 0;
@@ -170,6 +189,8 @@ bool lastKnownPower = false;
 bool powerConhecido = false;
 uint32_t ultimaVersaoEstado = 0;
 bool versaoEstadoConhecida = false;
+uint32_t ultimaVersaoRecebida = 0;
+bool versaoRecebidaConhecida = false;
 UltimoComandoIR ultimoComando;
 
 float ultimaLeituraTemp = NAN;
@@ -220,6 +241,8 @@ void restaurarChaveNvs(const char* chave, const String& valor);
 void registrarPortal();
 void abrirApTemporario();
 void encerrarApTemporario();
+void atualizarApAutomatico();
+bool servidorIndisponivelAlemDaCarencia();
 void handleSetup();
 void handleSaveSetup();
 bool requisicaoPortalPermitida();
@@ -234,6 +257,9 @@ bool sendHttpPost(const String& url, const String& payload);
 void sendHeartbeat();
 void reportComando(const String& cmd, const String& valor);
 void gerenciarConexaoWifi();
+void atualizarLedRede();
+NetworkLedState estadoDaRedeParaLed(unsigned long agora);
+void escreverLedRede(bool aceso);
 bool configuracaoValida();
 bool comandoPermitidoAgora();
 void conectarWsServidor();
@@ -264,6 +290,7 @@ void aplicarPapelDoServidor(JsonDocument& doc);
 void entrarModoClone();
 void sairModoClone();
 void iniciarAvisoBuzzer();
+void avisarAntesDoIr();
 void atualizarBuzzer();
 bool failsafeConfigurado();
 uint16_t failsafePulsosSalvos();
@@ -314,6 +341,8 @@ void setup() {
   irsend.begin();
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
+  pinMode(NETWORK_LED_PIN, OUTPUT);
+  escreverLedRede(true);
   configurarSwitchAcao();
 
   preferences.begin("remoteifes", false);
@@ -358,7 +387,7 @@ void setup() {
     WiFi.softAPdisconnect(true);
     WiFi.persistent(false);
     if (meshIniciar(motivoMalha)) {
-      Serial.println("Modo no da malha: sem Wi-Fi de infraestrutura (clique no switch para abrir o RemoteIFES-Setup).");
+      Serial.println("Modo no da malha: sem Wi-Fi de infraestrutura (mantenha o switch pressionado por 5 s para abrir o RemoteIFES-Setup).");
     } else {
       Serial.println("Malha nao iniciou (" + motivoMalha + "); abrindo o portal de configuracao.");
       startAPMode();
@@ -375,7 +404,7 @@ void setup() {
     WiFi.setAutoReconnect(true);
     WiFi.persistent(false);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
-    Serial.println("Modo operacional: ponto de acesso e portal local desligados (clique no switch para abrir o RemoteIFES-Setup).");
+    Serial.println("Modo operacional: ponto de acesso e portal local desligados (mantenha o switch pressionado por 5 s para abrir o RemoteIFES-Setup).");
     if (meshGatewayAtivo() && !meshIniciar(motivoMalha)) {
       Serial.println("Malha nao iniciou no gateway (" + motivoMalha + "); a operacao direta continua.");
     }
@@ -387,6 +416,7 @@ void setup() {
 void loop() {
   processarSwitchAcao();
   atualizarBuzzer();
+  atualizarLedRede();
 
   if (apIniciado) {
     dnsServer.processNextRequest();
@@ -404,7 +434,10 @@ void loop() {
     meshProcessar();
     if (meshNoConectado() != canalMalhaAnterior) {
       canalMalhaAnterior = meshNoConectado();
-      if (canalMalhaAnterior) enviarInfoDispositivo();
+      if (canalMalhaAnterior) {
+        enviarInfoDispositivo();
+        iniciarAvisoBuzzer();
+      }
     }
   } else {
     gerenciarConexaoWifi();
@@ -414,6 +447,7 @@ void loop() {
       escoarMalhaParaServidor();
     }
   }
+  atualizarApAutomatico();
 
   if (otaPendenteValidacao) verificarValidacaoOta();
   if (ofertaOta.pendente) executarOtaPendente();
@@ -527,6 +561,7 @@ void gerenciarConexaoWifi() {
       Serial.print("IP: ");
       Serial.println(WiFi.localIP());
       ultimaIdentificacao = 0;
+      if (apIniciado && !apModeActive) aplicarPontoDeAcesso(true);
     }
     wifiConectadoAnteriormente = true;
     estadoWifi = WIFI_ESTADO_CONECTADO;
@@ -547,6 +582,39 @@ void gerenciarConexaoWifi() {
     Serial.println("Tentando WiFi.reconnect()...");
     WiFi.reconnect();
   }
+}
+
+NetworkLedState estadoDaRedeParaLed(unsigned long agora) {
+  if (apModeActive) return NETWORK_LED_SEM_REDE;
+  if (canalServidorAberto()) return NETWORK_LED_SERVIDOR_CONECTADO;
+  if (meshNoAtivo()) return NETWORK_LED_CONECTANDO;
+  if (estadoWifi == WIFI_ESTADO_CONECTADO) return NETWORK_LED_SERVIDOR_INDISPONIVEL;
+  if (ultimaTentativaReconexao != 0 && agora - ultimaTentativaReconexao < WIFI_TENTATIVA_DURACAO_MS) return NETWORK_LED_CONECTANDO;
+  return NETWORK_LED_SEM_REDE;
+}
+
+void atualizarLedRede() {
+  const unsigned long agora = millis();
+  const NetworkLedState novoEstado = estadoDaRedeParaLed(agora);
+  if (novoEstado != estadoLedRede) {
+    estadoLedRede = novoEstado;
+    estadoLedRedeAlteradoEm = agora;
+  }
+  if (estadoLedRede == NETWORK_LED_SERVIDOR_CONECTADO) {
+    escreverLedRede(false);
+  } else if (estadoLedRede == NETWORK_LED_SEM_REDE) {
+    escreverLedRede(true);
+  } else {
+    const unsigned long intervalo = estadoLedRede == NETWORK_LED_CONECTANDO ? NETWORK_LED_SHORT_BLINK_MS : NETWORK_LED_LONG_BLINK_MS;
+    escreverLedRede(((agora - estadoLedRedeAlteradoEm) / intervalo) % 2 == 0);
+  }
+}
+
+void escreverLedRede(bool aceso) {
+  const int8_t nivel = aceso ? 1 : 0;
+  if (nivel == nivelLedRede) return;
+  nivelLedRede = nivel;
+  digitalWrite(NETWORK_LED_PIN, aceso ? NETWORK_LED_ACTIVE_LEVEL : !NETWORK_LED_ACTIVE_LEVEL);
 }
 
 void handleSetup() {
@@ -673,9 +741,9 @@ IPAddress enderecoDoPontoDeAcesso(bool manterSta) {
 
 void aplicarPontoDeAcesso(bool manterSta) {
   String senhaAlvo = apExigirCredencial ? apPassword : String("");
-  if (apIniciado && senhaAlvo == apPasswordAtiva) return;
-
   IPAddress apIP = enderecoDoPontoDeAcesso(manterSta);
+  if (apIniciado && senhaAlvo == apPasswordAtiva && WiFi.softAPIP() == apIP) return;
+
   WiFi.mode(manterSta ? WIFI_AP_STA : WIFI_AP);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   if (!WiFi.softAP("RemoteIFES-Setup", senhaAlvo.length() > 0 ? senhaAlvo.c_str() : NULL)) {
@@ -738,6 +806,7 @@ void startAPMode() {
 void abrirApTemporario() {
   if (apModeActive) return;
   bool jaAberto = apIniciado;
+  apAberturaAutomatica = false;
   apTemporarioAte = millis() + AP_TEMPORARIO_TIMEOUT_MS;
   if (jaAberto) {
     Serial.println("Switch: janela do RemoteIFES-Setup prorrogada.");
@@ -753,6 +822,12 @@ void abrirApTemporario() {
 void encerrarApTemporario() {
   apTemporarioAte = 0;
   if (!apIniciado || apModeActive) return;
+  if (meshModo() == MESH_MODO_DIRETO && servidorIndisponivelAlemDaCarencia()) {
+    apAberturaAutomatica = true;
+    Serial.println("Janela do RemoteIFES-Setup encerrada sem conexao com o servidor: o ponto de acesso continua aberto.");
+    return;
+  }
+  apAberturaAutomatica = false;
   server.stop();
   dnsServer.stop();
   if (meshModo() != MESH_MODO_DIRETO) {
@@ -767,6 +842,34 @@ void encerrarApTemporario() {
   apPasswordAtiva = "";
   reportComando("setup_ap", "encerrado");
   Serial.println("RemoteIFES-Setup encerrado; operacao normal sem ponto de acesso.");
+}
+
+bool servidorIndisponivelAlemDaCarencia() {
+  return servidorIndisponivelDesde != 0 && millis() - servidorIndisponivelDesde >= AP_AUTOMATICO_CARENCIA_MS;
+}
+
+void atualizarApAutomatico() {
+  const unsigned long agora = millis();
+  if (canalServidorAberto()) {
+    servidorIndisponivelDesde = 0;
+    if (apAberturaAutomatica) {
+      Serial.println("Conexao com o servidor restabelecida: encerrando o RemoteIFES-Setup aberto automaticamente.");
+      encerrarApTemporario();
+    }
+    return;
+  }
+  if (servidorIndisponivelDesde == 0) servidorIndisponivelDesde = agora;
+  if (apIniciado || !servidorIndisponivelAlemDaCarencia()) return;
+  aplicarPontoDeAcesso(true);
+  if (!apIniciado) {
+    servidorIndisponivelDesde = agora;
+    return;
+  }
+  registrarPortal();
+  server.begin();
+  apAberturaAutomatica = true;
+  if (meshModo() != MESH_MODO_DIRETO) apTemporarioAte = agora + AP_TEMPORARIO_TIMEOUT_MS;
+  Serial.println("Sem conexao com o servidor: RemoteIFES-Setup aberto automaticamente em " + WiFi.softAPIP().toString() + "; a placa continua tentando conectar.");
 }
 
 void conectarWsServidor() {
@@ -803,6 +906,7 @@ void handleWsServidorEvent(WStype_t type, uint8_t* payload, size_t length) {
       estadoWsServidor = WS_ESTADO_CONECTADO;
       Serial.println("WS servidor: conectado.");
       enviarInfoDispositivo();
+      iniciarAvisoBuzzer();
       break;
     case WStype_TEXT:
       processarComandoServidor(payload, length);
@@ -903,6 +1007,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     sendRawIR(rawData, i, carrierHz / 1000);
     delete[] rawData;
     definirFailsafeLatch(false);
+    versaoEstadoConhecida = false;
 
     ultimoComando = UltimoComandoIR();
     ultimoComando.valido = true;
@@ -916,14 +1021,24 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     float temp = doc["temp"] | 24.0;
     bool power = doc["power"] | false;
     bool turbo = doc["turbo"] | false;
-    bool swing = doc["swing"] | false;
+    bool swing = doc["swing"] | true;
     bool restauracao = doc["restauracao"] | false;
     String fan = doc["fan"] | "";
 
     if (protocolo >= 0) {
       if (doc["versao"].is<uint32_t>()) {
+        ultimaVersaoRecebida = doc["versao"].as<uint32_t>();
+        versaoRecebidaConhecida = true;
+      }
+      if (restauracao && !failsafeLatched) {
+        Serial.println("Sincronizacao do servidor recebida sem transmissao IR.");
+        return;
+      }
+      if (doc["versao"].is<uint32_t>()) {
         ultimaVersaoEstado = doc["versao"].as<uint32_t>();
         versaoEstadoConhecida = true;
+      } else {
+        versaoEstadoConhecida = false;
       }
       if (restauracao && failsafeLatched) {
         reportComando("controle_nativo", "ignorado_failsafe_latch");
@@ -1038,7 +1153,8 @@ void enviarInfoDispositivo() {
 }
 
 void preencherVersaoEstado(JsonDocument& doc) {
-  if (versaoEstadoConhecida) doc["versao"] = ultimaVersaoEstado;
+  if (failsafeLatched && versaoRecebidaConhecida) doc["versao"] = ultimaVersaoRecebida;
+  else if (versaoEstadoConhecida) doc["versao"] = ultimaVersaoEstado;
 }
 
 void reportarOtaValidado() {
@@ -1105,6 +1221,11 @@ void handleIRCapture() {
   String protocolName = typeToString(results.decode_type);
   String hexValue = resultToHexidecimal(&results);
   bool isKnownAC = universalAC.isProtocolSupported(results.decode_type);
+  if (!isKnownAC) {
+    reportComando("sinal_ignorado", "protocolo=" + protocolName + ";hex=" + hexValue);
+    if (isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE) irrecv.resume();
+    return;
+  }
 
   uint16_t* rawArray = resultToRawArray(&results);
   uint16_t length = getCorrectedRawLength(&results);
@@ -1163,6 +1284,12 @@ void sairModoClone() {
 void iniciarAvisoBuzzer() {
   digitalWrite(BUZZER_PIN, HIGH);
   buzzerDesligarEm = millis() + BUZZER_MIN_MS;
+}
+
+void avisarAntesDoIr() {
+  iniciarAvisoBuzzer();
+  const unsigned long inicio = micros();
+  while (micros() - inicio < BUZZER_ANTECEDENCIA_IR_MS * 1000UL) delay(1);
 }
 
 void atualizarBuzzer() {
@@ -1468,7 +1595,7 @@ void amostrarSwitchAcao(void* arg) {
   }
 
   if (!actionSwitchStableActive || actionSwitchLongPressConsumed || actionSwitchPressedSinceMs == 0) return;
-  if (agora - actionSwitchPressedSinceMs >= FAILSAFE_SWITCH_HOLD_MS) {
+  if (agora - actionSwitchPressedSinceMs >= AP_SWITCH_HOLD_MS) {
     actionSwitchLongPressConsumed = true;
     sinalizarSwitchAcao(true);
   }
@@ -1489,12 +1616,12 @@ void processarSwitchAcao() {
   switchToqueLongoPendente = false;
   switchToqueCurtoPendente = false;
   portEXIT_CRITICAL(&muxSwitchAcao);
-  if (longo) transmitirFailsafeSalvo();
-  if (curto) abrirApTemporario();
+  if (longo) abrirApTemporario();
+  if (curto) transmitirFailsafeSalvo();
 }
 
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency) {
-  iniciarAvisoBuzzer();
+  avisarAntesDoIr();
   irsend.sendRaw(rawData, length, frequency);
   atualizarBuzzer();
 }
@@ -1517,7 +1644,7 @@ void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo
 
   universalAC.next.swingv = swing ? stdAc::swingv_t::kAuto : stdAc::swingv_t::kOff;
 
-  iniciarAvisoBuzzer();
+  avisarAntesDoIr();
   universalAC.sendAc();
   atualizarBuzzer();
 }
@@ -1832,6 +1959,7 @@ void executarOtaPendente() {
   while (recebido < tamanho) {
     processarSwitchAcao();
     atualizarBuzzer();
+    atualizarLedRede();
     if ((long)(millis() - inicioDownload) > (long)OTA_TOTAL_TIMEOUT_MS) {
       falhou = true;
       erro = "download excedeu o tempo maximo total";
