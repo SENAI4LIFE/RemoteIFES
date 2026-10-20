@@ -327,33 +327,10 @@ class PlacaVirtual extends EventEmitter {
     return this.bordas.slice(desde).filter((b) => b.pino === pino);
   }
 
-  async comRelogioFino(acao) {
-    let ativo = true;
-    let maiorPassoUs = 0;
-    let erroDoLeitor = null;
-    const leitor = (async () => {
-      let anterior = await this.agoraUs();
-      while (ativo && this.processo) {
-        const agora = await this.agoraUs();
-        maiorPassoUs = Math.max(maiorPassoUs, agora - anterior);
-        anterior = agora;
-      }
-    })().catch((erro) => { erroDoLeitor = erro; });
-    try {
-      await acao();
-    } finally {
-      ativo = false;
-      await leitor;
-    }
-    if (erroDoLeitor) throw new Error(`${this.nome}: the board clock could not be read during the measurement: ${erroDoLeitor.message}`);
-    return maiorPassoUs;
-  }
-
-  antecedenciaDoBuzzer(desde = 0) {
+  buzzerAntesDoIr(desde = 0) {
     const bordas = this.bordas.slice(desde);
     const ir = bordas.findIndex((b) => b.pino === 4);
-    const buzzer = ir < 0 ? -1 : bordas.slice(0, ir).findLastIndex((b) => b.pino === 27 && b.nivel === 1);
-    return { buzzerAntesDoIr: buzzer >= 0, us: buzzer >= 0 ? bordas[ir].us - bordas[buzzer].us : null };
+    return ir > 0 && bordas.slice(0, ir).some((b) => b.pino === 27 && b.nivel === 1);
   }
 
   async definirEntrada(pino, nivel) {
@@ -457,6 +434,43 @@ class PlacaVirtual extends EventEmitter {
       this.gdbs.delete(gdb);
       if (!gdb.fechado) gdb.soquete.destroy();
       if (this.processo && this.qmp) await this.qmp.executar("human-monitor-command", { "command-line": "gdbserver none" }).catch(() => {});
+    }
+  }
+
+  async tempoEntreTrechos(trechoA, trechoB, acao, { limiteMs = ESPERA_PADRAO_MS * 3 } = {}) {
+    let gdb = null;
+    let disparo = null;
+    try {
+      const portaGdb = await portaLivre();
+      await this.qmp.executar("human-monitor-command", { "command-line": `gdbserver tcp:127.0.0.1:${portaGdb}` });
+      gdb = await ClienteGdb.conectar(portaGdb);
+      this.gdbs.add(gdb);
+      await gdb.preparar();
+      const instantes = [];
+      for (const trecho of [trechoA, trechoB]) {
+        const pontos = [];
+        for (const e of enderecosDaLinha(this.firmware.elf, this.linhaDoTrecho(trecho))) pontos.push([await gdb.quebrar(e), e]);
+        const parada = gdb.continuarAteParar(limiteMs);
+        if (!disparo) {
+          disparo = Promise.resolve().then(acao);
+          disparo.catch(() => {});
+        }
+        await parada;
+        instantes.push(await this.agoraUs());
+        for (const [tipo, e] of pontos) await gdb.retirar(tipo, e);
+      }
+      return instantes[1] - instantes[0];
+    } finally {
+      if (gdb) {
+        this.gdbs.delete(gdb);
+        if (!gdb.fechado) await gdb.desconectar();
+      }
+      if (this.processo && this.qmp) {
+        await this.qmp.executar("human-monitor-command", { "command-line": "gdbserver none" }).catch(() => {});
+        const estado = await this.qmp.executar("query-status").catch(() => null);
+        if (estado && !estado.running) await this.qmp.executar("cont").catch(() => {});
+      }
+      if (disparo) await disparo;
     }
   }
 }

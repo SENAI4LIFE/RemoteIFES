@@ -74,7 +74,7 @@ cenario("Fábrica, portal, Wi-Fi, credencial, comando e confirmação", {
   // One command from the panel.
   const antes = placa.bordas.length;
   let confirmado;
-  const passoUs = await placa.comRelogioFino(async () => {
+  const antecedenciaUs = await placa.tempoEntreTrechos("const unsigned long inicio = micros();", "universalAC.sendAc();", async () => {
     const cmd = await lab.api("POST", "/comando", { sala: "A-103a", cmd: "ligar" });
     assert.equal(cmd.status, 200, JSON.stringify(cmd.corpo));
     confirmado = await lab.aguardarConfirmada("A-103a", { limiteMs: 120_000 });
@@ -83,14 +83,12 @@ cenario("Fábrica, portal, Wi-Fi, credencial, comando e confirmação", {
   });
   const ir = placa.bordasDe(4, antes);
   const buzzer = placa.bordasDe(27, antes);
-  const aviso = placa.antecedenciaDoBuzzer(antes);
-  lab.observar("comando", { bordasIr: ir.length, buzzer: buzzer.map((b) => b.nivel), buzzerAntesDoIrUs: aviso.us, passoDoRelogioUs: passoUs });
+  lab.observar("comando", { bordasIr: ir.length, buzzer: buzzer.map((b) => b.nivel), buzzerAntesDoIrUs: antecedenciaUs });
   assert.ok(ir.length > 1000, `a modulated IR frame on GPIO 4 (${ir.length} edges)`);
   assert.equal(ir.filter((b) => b.nivel === 1).length, ir.filter((b) => b.nivel === 0).length, "the carrier ends low");
   assert.deepEqual(buzzer.map((b) => b.nivel).slice(0, 2), [1, 0], "the buzzer sounds and stops");
-  assert.ok(aviso.buzzerAntesDoIr, "the buzzer rises before the first IR edge");
-  assert.ok(passoUs < 20_000, `the board clock was read every ${passoUs} µs at most`);
-  assert.ok(aviso.us >= 100_000 - 2 * passoUs, `the buzzer led the IR by ${aviso.us} µs of board time (clock step ${passoUs} µs)`);
+  assert.ok(placa.buzzerAntesDoIr(antes), "the buzzer rises before the first IR edge");
+  assert.ok(antecedenciaUs >= 100_000 - 10, `the IR went out ${antecedenciaUs} µs of board time after the buzzer turned on (chip stopped at each point; 10 µs for the resolution of the two timers)`);
   assert.equal(confirmado.dispositivo.estadoConfirmado, true);
   const { relato } = await lab.aguardarIntencaoAplicada("A-103a", true);
   lab.observar("relatoDaPlaca", relato);

@@ -136,6 +136,7 @@ cenario("Registro do failsafe corrompido na NVS nunca é transmitido", {
   await placa.ligar();
   await placa.aguardarSerial(/Registro de failsafe invalido na NVS/, { desde });
   const bordas = placa.bordas.length;
+  await placa.aguardarSerial(/IP: 192\.168\.4\.15/, { desde });
   await placa.pressionarBotao(300);
   await placa.aguardarSerial(/Failsafe ignorado: nenhum RAW OFF salvo na NVS/, { desde });
   assert.equal(placa.bordasDe(4, bordas).length, 0, "nothing was transmitted from the damaged record");
@@ -175,6 +176,7 @@ cenario("Energia cortada no meio da gravação do failsafe na NVS", {
   lab.observar("lidoAposCorte", m[0]);
   const pulsos = m[1] ? Number(m[1]) : null;
   assert.ok(pulsos === a.length || pulsos === b.length, `the record after the cut is A or B, whole (${m[0]})`);
+  await placa.aguardarSerial(/IP: 192\.168\.4\.15/, { desde });
   const antes = placa.bordas.length;
   await placa.pressionarBotao(300);
   await placa.aguardarSerial(/Failsafe OFF transmitido localmente/, { desde });

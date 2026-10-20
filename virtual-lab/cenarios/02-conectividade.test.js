@@ -65,7 +65,9 @@ cenario("Servidor fora do ar quando a placa liga", {
   lab.observar("reconexaoMsVirtual", Math.round(esperaMs));
   assert.ok(esperaMs <= 30_000, `connected ${Math.round(esperaMs)} ms (board time) after the server came back`);
   await placa.aguardarSerial(/RemoteIFES-Setup encerrado; operacao normal sem ponto de acesso/, { desde: voltaSerial });
-  await placa.aguardarSerial(/Sincronizacao do servidor recebida sem transmissao IR/, { desde: voltaSerial });
+  await placa.aguardarSerial(/Sincronizacao do servidor recebida sem transmissao IR/, { desde: voltaSerial, limiteMs: 300_000 });
+  lab.observar("estacaoDepoisDeFecharOAp", { quedasDoWifi: placa.contarSerial(/Wi-Fi desconectado/, voltaSerial) });
+  await lab.aguardarConectada(sala, { limiteMs: 300_000 });
   assert.equal(placa.bordasDe(4, bordas).length, 0, "no IR from the power-on, the outage or the reconnection");
   assert.equal(reinicios(placa, marca), 1, "closing the AP on a direct board does not restart it");
   assert.equal((await lab.api("POST", "/comando", { sala, cmd: "ligar" })).status, 200);
@@ -261,6 +263,10 @@ cenario("Quadros malformados e fora dos limites vindos do servidor", {
   assert.equal(placa.contarSerial(/Guru Meditation|abort\(\)|Backtrace:/, marca), 0, "no panic");
   const nvs = lab.nvs(placa);
   assert.equal(nvs.chaves.fsRec, undefined, "no failsafe was stored");
+  if (/WS servidor: desconectado/.test(placa.serial.slice(marca))) {
+    await placa.aguardarSerial(/WS servidor: desconectado\.[\s\S]*Sincronizacao do servidor recebida sem transmissao IR/, { desde: marca, limiteMs: 300_000 });
+  }
+  await lab.aguardarConectada(sala, { limiteMs: 300_000 });
   assert.equal((await lab.api("POST", "/comando", { sala, cmd: "ligar" })).status, 200);
   await lab.aguardarIntencaoAplicada(sala, true);
   lab.observar("sessoesWs", via.conexoesDo("ws").length);

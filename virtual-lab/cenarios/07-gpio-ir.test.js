@@ -109,7 +109,7 @@ cenario("Failsafe local: transmissão, trava persistente, restauração recusada
   await lab.aguardar(async () => (await lab.estado(sala)).dispositivo.failsafe.configurado === true, { descricao: "failsafe stored" });
   const desde = placa.marca();
   const antes = placa.bordas.length;
-  const passoUs = await placa.comRelogioFino(async () => {
+  const antecedenciaUs = await placa.tempoEntreTrechos("const unsigned long inicio = micros();", "irsend.sendRaw(rawData, length, frequency);", async () => {
     await placa.pressionarBotao(300);
     await placa.aguardarSerial(/Failsafe OFF transmitido localmente/, { desde });
     // loop() switches the buzzer off a moment after the frame.
@@ -117,13 +117,11 @@ cenario("Failsafe local: transmissão, trava persistente, restauração recusada
   });
   const ir = placa.bordasDe(4, antes).length;
   const esperado = bordasEsperadas(RAW_FAILSAFE, 38000);
-  const aviso = placa.antecedenciaDoBuzzer(antes);
-  lab.observar("failsafe", { bordas: ir, esperado, buzzer: placa.bordasDe(27, antes).map((b) => b.nivel), buzzerAntesDoIrUs: aviso.us, passoDoRelogioUs: passoUs });
+  lab.observar("failsafe", { bordas: ir, esperado, buzzer: placa.bordasDe(27, antes).map((b) => b.nivel), buzzerAntesDoIrUs: antecedenciaUs });
   assert.ok(Math.abs(ir - esperado) <= esperado * 0.15, `${ir} carrier edges, ${esperado} expected from the RAW`);
   assert.deepEqual(placa.bordasDe(27, antes).map((b) => b.nivel).slice(0, 2), [1, 0]);
-  assert.ok(aviso.buzzerAntesDoIr, "the buzzer rises before the first IR edge");
-  assert.ok(passoUs < 20_000, `the board clock was read every ${passoUs} µs at most`);
-  assert.ok(aviso.us >= 100_000 - 2 * passoUs, `the buzzer led the failsafe by ${aviso.us} µs of board time (clock step ${passoUs} µs)`);
+  assert.ok(placa.buzzerAntesDoIr(antes), "the buzzer rises before the first IR edge");
+  assert.ok(antecedenciaUs >= 100_000 - 10, `the failsafe went out ${antecedenciaUs} µs of board time after the buzzer turned on (chip stopped at each point; 10 µs for the resolution of the two timers)`);
   assert.equal(lab.nvs(placa).chaves.fsLatch.valor, 1, "latch written to NVS");
   await lab.aguardar(async () => (await lab.estado(sala)).dispositivo.failsafe.latched === true, { descricao: "server sees the latch" });
 
@@ -172,19 +170,18 @@ cenario("Portadora do RAW chega ao pino: 38 kHz e 56 kHz", {
   for (const hz of [38000, 56000]) {
     await placa.aguardarVirtual(1000);
     const antes = placa.bordas.length;
-    const passoUs = await placa.comRelogioFino(async () => {
+    const antecedenciaUs = await placa.tempoEntreTrechos("const unsigned long inicio = micros();", "irsend.sendRaw(rawData, length, frequency);", async () => {
       const r = await lab.api("POST", `/admin/esp32/${encodeURIComponent(sala)}/teste/raw`, { raw, carrierHz: hz });
       assert.equal(r.status, 200, JSON.stringify(r.corpo));
       await lab.aguardar(() => placa.bordasDe(27, antes).some((b) => b.nivel === 0), { descricao: "transmission finished (buzzer off)" });
     });
-    const aviso = placa.antecedenciaDoBuzzer(antes);
-    medidas[hz] = { bordas: placa.bordasDe(4, antes).length, esperado: bordasEsperadas(raw, hz), buzzerAntesDoIrUs: aviso.us, passoDoRelogioUs: passoUs, buzzerAntesDoIr: aviso.buzzerAntesDoIr };
+    medidas[hz] = { bordas: placa.bordasDe(4, antes).length, esperado: bordasEsperadas(raw, hz), buzzerAntesDoIrUs: antecedenciaUs, buzzerAntesDoIr: placa.buzzerAntesDoIr(antes) };
   }
   lab.observar("portadoras", medidas);
   for (const m of Object.values(medidas)) {
     assert.ok(Math.abs(m.bordas - m.esperado) <= m.esperado * 0.15, JSON.stringify(m));
     assert.ok(m.buzzerAntesDoIr, `the buzzer rises before the first IR edge: ${JSON.stringify(m)}`);
-    assert.ok(m.passoDoRelogioUs < 20_000 && m.buzzerAntesDoIrUs >= 100_000 - 2 * m.passoDoRelogioUs, `the buzzer leads the IR by at least 100 ms of board time: ${JSON.stringify(m)}`);
+    assert.ok(m.buzzerAntesDoIrUs >= 100_000 - 10, `the IR goes out at least 100 ms of board time after the buzzer (chip stopped at each point; 10 µs for the resolution of the two timers): ${JSON.stringify(m)}`);
   }
   const razao = medidas[56000].bordas / medidas[38000].bordas;
   assert.ok(Math.abs(razao - 56 / 38) < 0.12, `edge ratio ${razao.toFixed(3)} for a carrier ratio of ${(56 / 38).toFixed(3)}`);
