@@ -13,12 +13,13 @@ const README = ler("README.md");
 const ASSETS = "docs/readme-assets";
 // The README section that documents how its own figures and screenshots are made.
 const SECAO_FIGURAS = "## Figuras e capturas do README";
-const NOTA = (() => {
-  const inicio = README.indexOf(`\n${SECAO_FIGURAS}\n`);
-  assert.ok(inicio >= 0, `README section missing: ${SECAO_FIGURAS}`);
+function secaoDoReadme(titulo) {
+  const inicio = README.indexOf(`\n${titulo}\n`);
+  assert.ok(inicio >= 0, `README section missing: ${titulo}`);
   const fim = README.indexOf("\n## ", inicio + 1);
   return README.slice(inicio, fim < 0 ? undefined : fim);
-})();
+}
+const NOTA = secaoDoReadme(SECAO_FIGURAS);
 // Code blocks hold commands and folder trees, not links.
 const semCodigo = (texto) => texto.replace(/```[\s\S]*?```/g, "");
 
@@ -176,11 +177,11 @@ test("retired claims stay out of the maintained documentation", () => {
   const casos = [
     ["README.md", [/senha aleatória no arquivo local/, /Sessões inativas por mais de 24h/, /interface local de status/, /gitignored fora de commits/]],
     // The Console only lists CI runs (GET /api/mobile/ci); no route dispatches a workflow.
+    ["README.md, seção Console de Operações", [/disparo/i, /Modo LAN explícito/], secaoDoReadme("## Console de Operações")],
     ["remoteifes-console/web/app.js", [/disparar a CI/]],
     ["remoteifes-console/src/mobile.js", [/disparar workflows/]],
   ];
-  for (const [arquivo, proibidos] of casos) {
-    const texto = ler(arquivo);
+  for (const [arquivo, proibidos, texto = ler(arquivo)] of casos) {
     for (const padrao of proibidos) assert.ok(!padrao.test(texto), `${arquivo} still says: ${padrao}`);
   }
   const rotasMobile = [...ler("remoteifes-console/src/servidor.js").matchAll(/caminho === "\/api\/mobile[^"]*" && metodo === "(\w+)"/g)].map((m) => m[1]);

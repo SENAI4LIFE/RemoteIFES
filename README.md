@@ -788,7 +788,7 @@ O layout é o mesmo nos três sistemas:
 
 ### Instalar
 
-No checkout, use `./console.sh` ([Início rápido](#início-rápido)). Por baixo está o instalador portátil, o mesmo nos três sistemas, que só exige o Node 22.13+. Sem checkout, pelos artefatos do release: no **Windows**, `remoteifes-console-<versão>-windows-<arco>-instalador.exe` instala por usuário, sem elevação, e repara a instalação se executado de novo; em silêncio, para todos os usuários ou pelo `.zip`:
+No checkout, use `./console.sh` ([Início rápido](#início-rápido)). Por baixo está o instalador portátil, o mesmo nos três sistemas, que só exige o Node 22.13+. É o Node do sistema, sem runtime embutido, porque backup, restauração e recuperação de conta carregam módulos do checkout administrado; sem ele, ou com uma versão antiga, o instalador recusa com mensagem precisa. Sem checkout, pelos artefatos do release: no **Windows**, `remoteifes-console-<versão>-windows-<arco>-instalador.exe` instala por usuário, sem elevação, e repara a instalação se executado de novo; em silêncio, para todos os usuários ou pelo `.zip`:
 
 ```powershell
 remoteifes-console-<versão>-windows-x64-instalador.exe /S /D=C:\Programas\RemoteIFES Console
@@ -831,7 +831,7 @@ node instalacao/desinstalar.js --sim
 
 Pelo console, **Console instalado > Desinstalar o Console** roda esse mesmo desinstalador com a senha do operador e a palavra de confirmação, preservando o estado, quando a conta do console pode concluir a remoção sozinha (instalação de usuário no Linux e no macOS). Na instalação de sistema do Linux, no pacote `.deb` e no Windows, a remoção precisa de root, do dpkg ou do desinstalador do sistema: o console mostra o motivo, o comando exato e a simulação.
 
-Sem `--apagar-estado`, operadores, auditoria e histórico ficam. A remoção encerra o console em execução pela prova de identidade (não pelo PID, que é reciclado), recusa qualquer caminho que não prove ser uma instalação do console e nunca toca no checkout do RemoteIFES.
+Sem `--apagar-estado`, operadores, auditoria e histórico ficam. A remoção encerra o console em execução pela prova de identidade (não pelo PID, que é reciclado), só apaga recursivamente uma pasta com as marcas de uma instalação do console, profundidade mínima e dono igual a quem desinstala, que não seja raiz de disco nem a home e não esteja dentro de um checkout, e nunca toca no checkout do RemoteIFES.
 
 ### Acessar
 
@@ -855,11 +855,23 @@ Sem o checkout, as mesmas opções valem para `node <raiz>/launcher-bootstrap.js
 
 A versão do console é independente do commit do RemoteIFES. O console se atualiza sozinho, em segundo plano, duas vezes por dia (ou na hora, por **Atualizar o Console de Operações**): baixa o release, confere a atestação de proveniência do GitHub e o SHA-256, instala ao lado da versão atual e troca o ponteiro, que vale no próximo início. Reverter é voltar o ponteiro, sem rede. Nada disso usa `git` nem o checkout da aplicação.
 
-Sem Internet, a versão instalada fica como está e as tentativas se espaçam até uma por dia; um campus isolado importa a pasta do release de uma mídia com `node bin/atualizar-console.js --importar <pasta>`, com a mesma verificação.
+Sem Internet, a versão instalada fica como está e as tentativas se espaçam de 30 min até uma por dia, com variação de ±20% e um recuo gravado no estado, que reiniciar o console não zera; um campus isolado importa a pasta do release de uma mídia com `node bin/atualizar-console.js --importar <pasta>`, com a mesma verificação e a raiz local do Sigstore. A pasta precisa ter ao menos `manifesto.json`, `atestacao.sigstore.json` e o payload do alvo, que também podem ser nomeados: `--importar manifesto.json atestacao.sigstore.json <payload>.tar.gz`.
+
+Nada local espera pela rede: abrir as páginas do console não consulta GitHub nem Sigstore, não há sonda de conectividade, e a primeira verificação automática só acontece 2 min depois de o console subir. Cada transferência tem prazo total (30 s para manifesto e atestação, 15 min para o payload, 10 s por requisição à raiz do Sigstore). Para se atualizar sozinho, o host precisa alcançar por HTTPS `github.com`, `release-assets.githubusercontent.com`, `objects.githubusercontent.com` e `tuf-repo-cdn.sigstore.dev`.
 
 Uma versão que nem carrega é descartada na hora. Uma que carrega e cai fica em observação até se manter 20 s no ar; se iniciar duas vezes sem confirmar, a terceira partida volta à anterior e **Atualizações > Console de Operações** mostra "Atualização revertida automaticamente". Uma versão saudável interrompida duas vezes por reinícios do host também seria revertida, e depois de confirmada uma falha é relatada, não revertida.
 
 **Proveniência.** Não existe chave de assinatura. Um release é aceito porque o workflow `.github/workflows/console-release.yml`, na etiqueta `console-v<versão>`, atestou os bytes de cada arquivo pelo Sigstore; o console confere com `@sigstore/verify` o repositório e o dono, o workflow, a etiqueta, o commit do manifesto, o gatilho `push`, o executor hospedado e o ambiente `console-release`. Publicar é subir a versão em `remoteifes-console/package.json` na `main` e enviar a etiqueta; o workflow testa, constrói em Linux e Windows exigindo resultados idênticos, atesta, confere e publica. Os executáveis ainda não têm assinatura de código Windows nem notarização Apple (`assinaturaDeCodigo: false` em `proveniencia.json`), então o SmartScreen avisa ao abrir o instalador.
+
+A identidade vem do certificado, nunca do conteúdo da declaração, e cada valor é comparado por igualdade exata, sem padrão nem prefixo: emissor `https://token.actions.githubusercontent.com`, repositório `https://github.com/SENAI4LIFE/RemoteIFES` (id `1313157228`), dono `https://github.com/SENAI4LIFE` (id `211847016`), o workflow como assinante e como workflow de nível superior e a etiqueta `refs/tags/console-v<versão do manifesto>`. Os ids impedem que um repositório renomeado ou recriado com o mesmo nome herde a confiança, e nenhuma variável, arquivo ou opção troca a identidade aceita. A declaração, proveniência SLSA v1, precisa cobrir o SHA-256 exato do `manifesto.json` e de cada payload que ele lista; o nome de cada payload é fixo por versão e alvo, então um release antigo reapresentado como novo, ou o payload de outro alvo, não passa.
+
+A verificação é fechada por padrão: o payload só é baixado depois de atestação, identidade e política de versão conferirem, e só é extraído depois de o SHA-256 dele bater com o manifesto atestado; qualquer falha deixa o diretório ativo intocado. Tetos do próprio console, que o manifesto não amplia, limitam bytes comprimidos, bytes descomprimidos e quantidade de arquivos, e um `minimoParaAtualizar` presente mas malformado é recusado. Nenhum download de release leva credencial. Downgrade só acontece pela reversão explícita, com a cópia local já verificada; a versão de referência é a mais nova entre a que está em execução e a que o ponteiro nomeia.
+
+A raiz de confiança do Sigstore chega por TUF (`tuf-repo-cdn.sigstore.dev`): o console parte da raiz embutida em `@sigstore/tuf`, a atualiza a cada verificação online e guarda a cópia conferida em `<estado>/sigstore/`. Sem rede, usa a última cópia conferida neste host, ou a embutida, e não fica sabendo de uma chave revogada depois dela.
+
+Uma etiqueta num commit que ainda não está na `main` vira pré-release, que os consoles não descobrem sozinhos, e como o console consulta `releases/latest/download`, a publicação do console precisa ser o release mais recente do repositório. Fora do console, um arquivo se confere com `gh attestation verify <arquivo> --repo SENAI4LIFE/RemoteIFES --signer-workflow SENAI4LIFE/RemoteIFES/.github/workflows/console-release.yml`. O modelo não cobre quem tem escrita no repositório, que pode criar uma etiqueta e fazer o workflow atestar o que estiver nela: a proteção está em quem pode escrever e criar etiquetas `console-v*`, no ambiente `console-release`, que só aceita essas etiquetas, e no log público do Sigstore. Um comprometimento do GitHub Actions ou do Sigstore fica fora do alcance do console.
+
+Atualizar, importar e reverter tomam uma trava exclusiva na raiz da instalação; a trava de um processo morto é recuperada e auditada. A troca do ponteiro nunca toca em arquivo registrado pelo gerenciador de pacotes: o `.deb` é dono só da camada estável, da primeira versão e da entrada de menu, e as unidades do systemd apontam para `console-bootstrap.js`, nunca para uma versão.
 
 ### O que o console faz
 
@@ -880,13 +892,16 @@ Antes de uma operação que interrompa o serviço, o console avalia o impacto, d
 
 ### Operações longas
 
-Cada operação longa roda sob um supervisor próprio, em grupo de processos separado, que guarda a saída em arquivo, aplica o prazo máximo, mantém a trava de manutenção e grava o código de saída. Se o console cair, sair por ociosidade ou for atualizado no meio de uma restauração ou implantação, a operação continua (`KillMode=process`), e o console seguinte a acompanha ou lê o desfecho gravado. Um supervisor que sumiu sem gravar desfecho fica como desfecho desconhecido, nunca como sucesso.
+Cada operação longa roda sob um supervisor próprio, em grupo de processos separado, que guarda a saída em arquivo, aplica o prazo máximo, mantém a trava de manutenção e grava o código de saída. Se o console cair, sair por ociosidade ou for atualizado no meio de uma restauração ou implantação, a operação continua (`KillMode=process`), e o console seguinte a acompanha ou lê o desfecho gravado. Um supervisor que sumiu sem gravar desfecho fica como desfecho desconhecido, nunca como sucesso. Na partida, um desfecho gravado vale pelo código de saída real, com o efeito marcado como não verificado automaticamente, e a trava de um trabalho concluído sem acompanhamento é liberada.
 
 ### Modelo de segurança do console
 
 - **Identidade própria**, com senha `scrypt` guardada em `/var/lib/remoteifes-console/operadores.json`. Nunca reutiliza `SENHA_ADMIN_INICIAL` nem `superadmin/admin`.
-- **Sessão** em cookie `HttpOnly`, `SameSite=Strict`, com prazo absoluto e de ociosidade. Operações sensíveis exigem reautenticação, válida por poucos minutos e revogada no logout e na troca de senha.
-- **CSRF** por token em cabeçalho próprio, `Origin` exato e `Host` conferido contra lista fechada, o que fecha DNS rebinding. `CONSOLE_HOSTS` só amplia essa lista e não expõe o console na rede. CORS não é tratado como defesa. Portas não isolam cookies, por isso a sessão não vale nada sem o cabeçalho.
+- **Sessão** em cookie `HttpOnly`, `SameSite=Strict`, com prazo absoluto de 8 h e de ociosidade de 30 min por padrão. Operações sensíveis exigem reautenticação, válida por 5 min e revogada no logout e na troca de senha.
+- **CSRF** por token em cabeçalho próprio, `Origin` exato e `Host` conferido contra lista fechada, o que fecha DNS rebinding: outro `Host` recebe `421`, e um `GET` não tem efeito colateral. `CONSOLE_HOSTS` só amplia essa lista e não expõe o console na rede. CORS não é tratado como defesa. Portas não isolam cookies, por isso a sessão não vale nada sem o cabeçalho.
+- **Exposição**: um `CONSOLE_BIND` fora do loopback, um curinga ou um nome fazem o console recusar a partida antes de escutar ou gravar estado, e o socket herdado do systemd passa pela mesma conferência antes da primeira requisição.
+- **Execução** sem shell, por `execFile`/`spawn` com vetor de argumentos: cada ação valida as próprias opções, e caminhos são resolvidos por `realpath` e conferidos contra a raiz permitida.
+- **Navegador**: o console não registra service worker, envia `Clear-Site-Data` no logout e exibe registros, Git e nomes de arquivo por `textContent`, com sequências de controle filtradas. `remoteifes-console/` não entra no que o Pages publica nem no `www` do Cordova, e um teste confere isso.
 - **Privilégio** por um único auxiliar `root` em `/usr/local/lib/remoteifes/console-helper.sh`, com verbos fixos e alvo fixo. Não há git, npm, shell, unidade, caminho ou ambiente arbitrários, e não existe endpoint genérico de comando. O auxiliar recusa executar se ele ou qualquer diretório acima dele for gravável por quem não é root.
 - **Segredos** como o token do GitHub e senhas nunca voltam por API, log, auditoria ou diagnóstico. O console informa presença e validade, jamais o valor.
 - O serviço do console não usa `NoNewPrivileges=yes`, ao contrário de `remoteifes.service`, porque isso quebraria o `sudo` do auxiliar. O endurecimento aplicado está no arquivo de unidade e é explícito sobre esse ponto.
@@ -896,6 +911,10 @@ Um operador autorizado que use `sudo` tem o alcance que o host lhe der, inclusiv
 ### Terminal Expert
 
 O terminal do console exige destravamento explícito e reautenticação, tem autorização curta, relock automático, limite de sessões e limpeza da árvore de processos, e é auditado só por metadados, sem transcrição. Ele depende do módulo nativo `node-pty`, que não vem instalado: sem ele, o console declara o terminal indisponível e mostra como habilitá-lo, sem oferecer substituto (um terminal sem PTY real quebra em `vim`, `less` e `htop`), e o shell continua sendo por SSH. A saída não é filtrada: um arquivo com credenciais aberto no terminal aparece na tela.
+
+### O que fica fora do console
+
+Builds Android e iOS rodam na CI ou na máquina de desenvolvimento: o Pi não ganha SDK, JDK nem Gradle, e a publicação de produção do APK, que exige a chave e o `apksigner`, continua na máquina com o SDK. `export.py`, `import.py` e `clear.py` são ferramentas de Git do desenvolvedor, e `release.sh` cria commit e tag, o que é autoria de versão, não implantação: nenhum deles vira botão. Os procedimentos físicos do ESP32 (gravação por USB, switch, serial) seguem neste README.
 
 ### Custo de recursos e testes
 
@@ -1286,6 +1305,31 @@ O gateway é um mensageiro, nunca uma identidade:
 - credenciais criadas antes desta versão passam a servir à malha depois que a placa se conectar uma vez diretamente com o segredo atual. A chave derivada fica no banco e, portanto, no backup. Quem obtiver o banco pode se passar pela placa na malha, então trate os backups como sigilosos;
 - filas, retransmissões, número de nós por gateway e o cache da topologia são limitados, no servidor e no firmware.
 
+### Protocolo e limites
+
+O ESP-WIFI-MESH é usado como transporte de aplicação: nada é roteado por IP através da malha. O gateway é a raiz fixa e usa a conexão Wi-Fi que já tem; um nó nunca vira raiz e nunca chama `WiFi.begin`. A malha inteira fica no canal do roteador do gateway. Um modo de malha inutilizável (identificador inválido, senha curta, falta de credencial) volta para `direto`, com o motivo no console serial. O gateway declara `gateway: true` em `info`, mas o servidor só o trata como gateway quando ele de fato retransmite.
+
+As mensagens dos nós trafegam como JSON no WebSocket autenticado do gateway (`/ws/dispositivo`):
+
+- **Chaves**: `K = HMAC-SHA256(segredo da placa, "remoteifes-mesh-v1")`, guardada por geração de credencial (atual, pendente e anterior durante a carência de 24 h), e a chave de sessão `Ks = HMAC-SHA256(K, "sessao|" + ns + "|" + nn)`. O gateway nunca tem `K` nem o segredo.
+- **Aperto de mão**: o servidor manda ao nó anunciado um desafio `ns` de 16 bytes, válido por 15 s; o nó responde com `nn` e uma prova que amarra o próprio deviceId, o do gateway que retransmitiu, `ns` e `nn`; o servidor devolve a prova dele, que o nó confere antes de usar a sessão. Prova errada, desafio vencido, credencial desconhecida ou revogada, ou excesso de apertos pendentes geram só `mesh_recusado` ao gateway, e o nó espera 30 s. Uma prova feita com a geração pendente ativa a rotação, como numa conexão direta.
+- **Quadros**: AES-256-GCM com `Ks`; o nonce leva o byte de direção e `seq` em 64 bits, a AAD é o deviceId do nó e a tag tem sempre 16 bytes. `seq` começa em 1 por direção e por sessão e só cresce: quadro repetido ou antigo é contado e descartado, e o firmware avança `seq` mesmo quando o rádio recusa o quadro, para nunca repetir o nonce. O nó confirma cada quadro do servidor com um `mesh_ack` selado.
+- **Rota**: pai, saltos (1 a 15) e RSSI informados pelo gateway servem só à topologia, nunca à autorização. Com a sessão aberta, só o gateway dela atualiza a rota; outro gateway que anuncie o nó inicia um novo aperto de mão, e os quadros pelo gateway antigo passam a ser recusados.
+
+| Limite | Valor |
+|---|---|
+| Nós autenticados por gateway | 32 |
+| Apertos de mão pendentes por gateway | 8 |
+| Quadros na fila de descida por nó | 8; um `send_known_state` mais novo substitui o anterior não confirmado |
+| Retransmissões de um quadro não confirmado | 2, a cada 3 s |
+| Nó sem quadro autenticado | inalcançável depois de 90 s, com a sala offline |
+| Cache da topologia | 256 nós observados; os inalcançáveis saem depois de 10 min |
+| Mensagens por gateway | 120 a cada 10 s, mais 120 por nó autenticado, até 2 400 |
+| Filhos por placa e camadas da malha | 6 e 6 |
+| Mensagem no rádio | 1 200 bytes; uma maior é descartada e contada |
+| Fila de subida no gateway | 12; a mais antiga sai quando o WebSocket está fora |
+| Novo anúncio de um nó sem sessão | a cada 10 s; 30 s depois de um `mesh_recusado` |
+
 ### Regras que continuam valendo
 
 Estar ligado ao gateway não prova que a placa está conectada: só a autenticação da própria placa prova isso. Se o gateway cai, as placas atrás dele ficam offline.
@@ -1312,7 +1356,7 @@ Um nó informa a quantidade de saltos e o sinal do enlace com o pai, mas nomeia 
 
 ### O que ainda não foi validado
 
-O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Do lado do servidor, testes com gateways e nós simulados cobrem várias topologias, troca de gateway, reinícios, gerações de credencial, quadros adulterados, truncados ou repetidos, os limites e um gateway que se comporta mal (`test/mesh-adversarial.test.js`). Nada disso envolve rádio: alcance, interferência, eleição real de pai e raiz, recuperação do rádio após perda do pai ou da raiz, estabilidade em vários saltos, latência de RF e a rotação de credencial pela malha em placas reais continuam pendentes.
+O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Do lado do servidor, testes com gateways e nós simulados cobrem várias topologias, troca de gateway, reinícios, gerações de credencial, quadros adulterados, truncados ou repetidos, os limites e um gateway que se comporta mal (`test/mesh-adversarial.test.js`). Nada disso envolve rádio: alcance, interferência, eleição real de pai e raiz, recuperação do rádio após perda do pai ou da raiz, estabilidade em vários saltos, latência de RF, a rotação de credencial pela malha em placas reais e a volta de um nó ao pai enquanto o portal ocupa o ponto de acesso dele continuam pendentes.
 
 Nada disso, nem o resto da placa (IR, GPIO, switch, buzzer, DHT11, NVS com queda de energia, flash, OTA A/B no ESP32 real, Wi-Fi, alcance, latência de RF e heap em longa duração), foi validado em hardware ainda. Para cada item, a evidência que existe hoje é de software: testes no host, o [laboratório de hardware virtual](#laboratório-de-hardware-virtual) (o firmware real num ESP32 emulado, que prova a lógica do firmware e nada elétrico ou de rádio) ou CI em ARM64 nativo.
 
@@ -1570,7 +1614,7 @@ Cada execução passa só se passarem os três veredictos: **validação funcion
 Limites do emulador que moldam os cenários:
 
 - O rádio carrega um único enlace. O portal de uma placa de fábrica é alcançado como um celular o alcançaria, pelo AP da própria placa. Depois que a placa vira estação, nada consegue entrar no AP temporário que o switch mantido por 5 s ou a falta de servidor abrem, então a resposta desse portal durante a operação fica para o hardware físico.
-- Fechar o AP que a falta de servidor abriu (de AP+STA para só STA) derruba a estação emulada, que não volta a se associar (`wifi:sta is connecting`), e o laboratório não distingue se uma placa real faria o mesmo. Nos cenários em que o servidor some por mais que a carência de 90 s, o que vem depois de o AP fechar falha no emulador; numa placa real, falta comprovar que a estação continua conectada, ou volta no ciclo seguinte de reconexão, e que a sessão e um comando explícito funcionam.
+- Em algumas execuções, fechar o AP que a falta de servidor abriu (de AP+STA para só STA) derrubou a estação emulada, que não voltou a se associar (`wifi:sta is connecting`); em outras, a estação seguiu conectada. Quando isso acontece, o que vem depois de o AP fechar falha no emulador, e o laboratório não distingue se uma placa real faria o mesmo: numa placa real, falta comprovar que a estação continua conectada, ou volta no ciclo seguinte de reconexão, e que a sessão e um comando explícito funcionam.
 - A rede Wi-Fi emulada é 192.168.4.0/24, a sub-rede do AP de fábrica do firmware: o laboratório também é um local cuja rede já usa 192.168.4.x (`09-ap-temporario`).
 - Um processo de servidor morto ainda tem entregue pelo kernel o que já tinha escrito, e em loopback isso pode ser uma imagem de firmware inteira. Por isso os downloads de firmware passam por um enlace cadenciado (32 KiB/s), e o cenário "servidor morto" derruba a conexão junto com o processo, como quando a máquina cai.
 
