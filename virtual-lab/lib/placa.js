@@ -97,6 +97,7 @@ class PlacaVirtual extends EventEmitter {
     this.processo = null;
     this.deslocamentoUs = 0;
     this.ultimoUs = 0;
+    this.filaRelogio = Promise.resolve();
     this.leitorRelogio = null;
     this.gdbs = new Set();
   }
@@ -182,6 +183,7 @@ class PlacaVirtual extends EventEmitter {
     // The emulator ignores the internal pull-up. The action switch (GPIO 26, INPUT_PULLUP, active
     // low) therefore starts released, as the resistor holds it on real hardware.
     await this.definirEntrada(26, 1);
+    this.deslocamentoUs = this.ultimoUs;
     await this.armarRelogio();
     await this.qmp.executar("cont");
     this.leitorRelogio = setInterval(() => { this.agoraUs().catch(() => {}); }, 250);
@@ -231,7 +233,13 @@ class PlacaVirtual extends EventEmitter {
    * Virtual microseconds since this board object was first powered, monotonic across resets and
    * power cycles (a reset clears the timer; the lab re-arms it and carries the offset).
    */
-  async agoraUs() {
+  agoraUs() {
+    const leitura = this.filaRelogio.then(() => this.lerRelogio());
+    this.filaRelogio = leitura.catch(() => {});
+    return leitura;
+  }
+
+  async lerRelogio() {
     if (!this.processo) return this.ultimoUs;
     const config = parseInt((await this.qt.comando(`readl 0x${TIMG1.toString(16)}`)).split(" ")[1], 16);
     if ((config >>> 0) !== TIMG_CONFIG) {

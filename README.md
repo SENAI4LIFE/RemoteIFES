@@ -1570,6 +1570,7 @@ Cada execução passa só se passarem os três veredictos: **validação funcion
 Limites do emulador que moldam os cenários:
 
 - O rádio carrega um único enlace. O portal de uma placa de fábrica é alcançado como um celular o alcançaria, pelo AP da própria placa. Depois que a placa vira estação, nada consegue entrar no AP temporário que o switch mantido por 5 s ou a falta de servidor abrem, então a resposta desse portal durante a operação fica para o hardware físico.
+- Fechar o AP que a falta de servidor abriu (de AP+STA para só STA) derruba a estação emulada, que não volta a se associar (`wifi:sta is connecting`), e o laboratório não distingue se uma placa real faria o mesmo. Nos cenários em que o servidor some por mais que a carência de 90 s, o que vem depois de o AP fechar falha no emulador; numa placa real, falta comprovar que a estação continua conectada, ou volta no ciclo seguinte de reconexão, e que a sessão e um comando explícito funcionam.
 - A rede Wi-Fi emulada é 192.168.4.0/24, a sub-rede do AP de fábrica do firmware: o laboratório também é um local cuja rede já usa 192.168.4.x (`09-ap-temporario`).
 - Um processo de servidor morto ainda tem entregue pelo kernel o que já tinha escrito, e em loopback isso pode ser uma imagem de firmware inteira. Por isso os downloads de firmware passam por um enlace cadenciado (32 KiB/s), e o cenário "servidor morto" derruba a conexão junto com o processo, como quando a máquina cai.
 
