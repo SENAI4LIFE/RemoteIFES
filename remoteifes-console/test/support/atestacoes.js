@@ -128,17 +128,19 @@ async function criarAutoridade({ relogio = new Date(Date.now() + 2000) } = {}) {
    *   adulterar     "assinatura" (a signature over other bytes, logged as is), "promessa" (a
    *                 corrupted inclusion promise) or "payload" (the envelope changed after logging)
    */
-  async function atestar({ sujeitos, versao, commit, identidade, omitir, tipoPredicado, atrasoDoLogMs = 0, adulterar = null }) {
+  async function atestar({ sujeitos, versao, commit, identidade, omitir, tipoPredicado, atrasoDoLogMs = 0, adulterar = null, chavesAssinante = null }) {
     const ext = extensoesDe({ versao, commit, identidade, omitir });
-    const { assinante, certificado } = await emitirEstavel(async () => {
-      const chaves = par();
+    const emitir = async (chaves) => {
       const der = await ca.issueCertificate({
         publicKey: chaves.publicKey.export({ format: "der", type: "spki" }),
         subjectAltName: ext.san,
         extensions: ext.extensoes,
       });
       return { assinante: chaves, certificado: Buffer.from(der) };
-    }, (e) => e.certificado);
+    };
+    const { assinante, certificado } = chavesAssinante
+      ? await emitir(chavesAssinante)
+      : await emitirEstavel(() => emitir(par()), (e) => e.certificado);
     const declaracao = declaracaoDe({ sujeitos, ref: ext.ref, repositorio: ext.repositorio, workflow: ext.workflow, commit, tipoPredicado });
     const payload = Buffer.from(JSON.stringify(declaracao));
     const assinado = adulterar === "assinatura" ? Buffer.concat([payload, Buffer.from(" ")]) : payload;

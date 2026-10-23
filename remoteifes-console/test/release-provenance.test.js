@@ -266,6 +266,115 @@ test("extension values are read only as exact DER UTF8Strings", () => {
   assert.equal(atestacao.textoDer(Buffer.concat([Buffer.from([0x0c, 0x81, 200]), Buffer.from(longo)])), longo);
 });
 
+const DER_ESTRITO = path.join(__dirname, "fixtures", "der-estrito");
+const ASSINANTE_SKI_REENCODADO = {
+  kty: "EC",
+  crv: "P-256",
+  x: "5ZETs667XlDmDJTK4AbciQ3TAiidHvkIHfOYnKcoGrQ",
+  y: "pY1juGsn5ELOseazoRIhIY-leLi23GdtipDopW8nn00",
+  d: "--N0XyPMb0SL6zxDb6LARsnAKpmPgJEm7xXT_Hgczus",
+};
+const SIGSTORE_CORE_SEM_CORRECAO = `
+const path = require("path");
+const fs = require("fs");
+const core = require(require.resolve("@sigstore/core", { paths: [path.dirname(require.resolve("@sigstore/verify"))] }));
+const [folha, emissor] = process.argv.slice(1).map((arquivo) => fs.readFileSync(arquivo));
+process.stdout.write(JSON.stringify({
+  reencodaIgual: core.ASN1Obj.parseBuffer(folha).toDER().equals(folha),
+  verifica: core.X509Certificate.parse(folha).verify(core.X509Certificate.parse(emissor)),
+}));
+`;
+
+function sigstoreCore() {
+  return require(require.resolve("@sigstore/core", { paths: [path.dirname(require.resolve("@sigstore/verify"))] }));
+}
+
+function semCorrecao(folha, emissor) {
+  const dir = fs.mkdtempSync(path.join(require("os").tmpdir(), "der-estrito-"));
+  try {
+    fs.writeFileSync(path.join(dir, "folha.der"), folha);
+    fs.writeFileSync(path.join(dir, "emissor.der"), emissor);
+    const saida = require("child_process").execFileSync(process.execPath, ["-e", SIGSTORE_CORE_SEM_CORRECAO, path.join(dir, "folha.der"), path.join(dir, "emissor.der")], {
+      cwd: path.join(__dirname, ".."),
+      encoding: "utf8",
+    });
+    return JSON.parse(saida);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function lerTlv(der, pos) {
+  const primeiro = der[pos + 1];
+  const bytes = primeiro < 0x80 ? 0 : primeiro & 0x7f;
+  const inicio = pos + 2 + bytes;
+  const tamanho = bytes ? der.readUIntBE(pos + 2, bytes) : primeiro;
+  return { inicio, fim: inicio + tamanho };
+}
+
+test("a certificate whose subject key identifier @sigstore/core 3 re-encodes differently is verified over its original bytes", () => {
+  const folha = fs.readFileSync(path.join(DER_ESTRITO, "ski-reencodado.der"));
+  const emissor = fs.readFileSync(path.join(DER_ESTRITO, "emissor.der"));
+  assert.equal(new crypto.X509Certificate(folha).verify(new crypto.X509Certificate(emissor).publicKey), true);
+  assert.deepEqual(semCorrecao(folha, emissor), { reencodaIgual: false, verifica: false }, "the fixture reproduces the re-encoding defect");
+
+  atestacao.exigirDerEstrito();
+  const { ASN1Obj, X509Certificate } = sigstoreCore();
+  assert.ok(ASN1Obj.parseBuffer(folha).toDER().equals(folha));
+  assert.equal(X509Certificate.parse(folha).verify(X509Certificate.parse(emissor)), true);
+  const outroEmissor = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" }).publicKey.export({ format: "der", type: "spki" });
+  assert.equal(X509Certificate.parse(folha).verify({ publicKey: outroEmissor }), false);
+  const adulterada = Buffer.from(folha);
+  adulterada[adulterada.length - 70] ^= 1;
+  assert.equal(X509Certificate.parse(adulterada).verify(X509Certificate.parse(emissor)), false);
+});
+
+test("a certificate with a non-minimal DER length in its structure is refused, although its original bytes carry a valid signature", () => {
+  const certificado = fs.readFileSync(path.join(DER_ESTRITO, "comprimento-nao-minimo.der"));
+  const emissor = new crypto.X509Certificate(fs.readFileSync(path.join(DER_ESTRITO, "emissor.der")));
+  const externo = lerTlv(certificado, 0);
+  const tbs = lerTlv(certificado, externo.inicio);
+  const algoritmo = lerTlv(certificado, tbs.fim);
+  const assinatura = lerTlv(certificado, algoritmo.fim);
+  const bytesTbs = certificado.subarray(externo.inicio, tbs.fim);
+  assert.ok(bytesTbs.includes(Buffer.from([0x30, 0x81, 0x1e, 0x17])), "the validity is written with a long-form length");
+  assert.equal(crypto.verify("sha384", bytesTbs, emissor.publicKey, certificado.subarray(assinatura.inicio + 1, assinatura.fim)), true);
+
+  atestacao.exigirDerEstrito();
+  const { X509Certificate } = sigstoreCore();
+  assert.throws(() => X509Certificate.parse(certificado), /non-minimal length encoding/);
+});
+
+test("a certificate altered after signing to a length @sigstore/core 3 normalizes back is refused", () => {
+  const original = fs.readFileSync(path.join(DER_ESTRITO, "original-do-maleavel.der"));
+  const alterado = fs.readFileSync(path.join(DER_ESTRITO, "maleavel.der"));
+  const emissor = fs.readFileSync(path.join(DER_ESTRITO, "emissor.der"));
+  assert.notDeepEqual(alterado, original);
+  assert.equal(new crypto.X509Certificate(original).verify(new crypto.X509Certificate(emissor).publicKey), true);
+  assert.deepEqual(semCorrecao(alterado, emissor), { reencodaIgual: false, verifica: true }, "without the correction the altered certificate is accepted");
+
+  atestacao.exigirDerEstrito();
+  const { X509Certificate } = sigstoreCore();
+  assert.equal(X509Certificate.parse(original).verify(X509Certificate.parse(emissor)), true);
+  assert.equal(X509Certificate.parse(alterado).verify(X509Certificate.parse(emissor)), false);
+});
+
+test("an attestation whose certificate @sigstore/core 3 re-encodes differently is accepted", async () => {
+  const chavesAssinante = {
+    privateKey: crypto.createPrivateKey({ key: ASSINANTE_SKI_REENCODADO, format: "jwk" }),
+    publicKey: crypto.createPublicKey({ key: ASSINANTE_SKI_REENCODADO, format: "jwk" }),
+  };
+  const r = novaRelease();
+  const bundle = await atestada(r, { chavesAssinante });
+  const folha = Buffer.from(JSON.parse(bundle.toString("utf8")).verificationMaterial.certificate.rawBytes, "base64");
+  const emissor = Buffer.from(autoridade.raizJson.certificateAuthorities[0].certChain.certificates[0].rawBytes, "base64");
+  assert.deepEqual(semCorrecao(folha, emissor), { reencodaIgual: false, verifica: false }, "the issued certificate reproduces the re-encoding defect");
+
+  const v = verificar(r, bundle);
+  assert.equal(v.ok, true, v.motivo);
+  assert.equal(v.manifesto.versao, r.versao);
+});
+
 // --- A real attestation ------------------------------------------------------------------------
 
 test("a real release attested by this repository's release workflow is accepted, with no network", async () => {
