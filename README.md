@@ -1797,7 +1797,7 @@ virtual-lab/              laboratório de hardware virtual, só de desenvolvimen
 
 e2e/                      testes end-to-end (Playwright): specs/ e harness/ (API real, estático, ESP32 simulado, smoke do Safari)
 .github/workflows/        ci.yml (chama android.yml e ios.yml), pages.yml, console-release.yml e virtual-hardware.yml
-docs/                     material de apoio; readme-assets/ tem as figuras deste README e suas fontes
+docs/readme-assets/       figuras deste README e suas fontes
 export.py, import.py, clear.py   scripts auxiliares de Git
 ```
 

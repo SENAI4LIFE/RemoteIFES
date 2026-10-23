@@ -79,7 +79,7 @@ test("Cordova changes select mobile validation and the server app contracts", ()
 });
 
 test("documentation changes select only the documentation contract tests", () => {
-  const p = plan(["README.md", "docs/Projeto_AC.pdf"]);
+  const p = plan(["README.md", "docs/readme-assets/composed/device-networking-light.png"]);
   assert.deepEqual(selected(p), ["server"]);
   assert.deepEqual(p.jobs.server, ["ubuntu-24.04-arm"]);
 });
