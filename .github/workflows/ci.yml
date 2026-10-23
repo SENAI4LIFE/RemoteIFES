@@ -563,10 +563,21 @@ jobs:
             ~/Library/Caches/ms-playwright
             ~/AppData/Local/ms-playwright
           key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('e2e/package-lock.json') }}
-      - if: ${{ !matrix.channel && runner.os == 'Linux' }}
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Install the browser's system dependencies
+        if: ${{ !matrix.channel && runner.os == 'Linux' }}
+        timeout-minutes: 11
         working-directory: e2e
-      - if: ${{ !matrix.channel && runner.os != 'Linux' }}
+        run: |
+          printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\nDPkg::Lock::Timeout "120";\n' | sudo tee /etc/apt/apt.conf.d/99-e2e-deps > /dev/null
+          for tentativa in 1 2 3; do
+            if timeout --kill-after=20s 180s npx playwright install-deps ${{ matrix.browser }}; then
+              exit 0
+            fi
+            echo "::warning::system dependency install attempt $tentativa failed or timed out"
+            sudo dpkg --configure -a || true
+          done
+          exit 1
+      - if: ${{ !matrix.channel }}
         run: npx playwright install ${{ matrix.browser }}
         working-directory: e2e
       - run: npx playwright test --shard=${{ matrix.shard }}/${{ matrix.shards }}
