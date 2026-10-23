@@ -614,7 +614,7 @@ Depois de salvar, o servidor detecta o MAC para o superadministrador vinculá-lo
 
 #### Versão e partições
 
-A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.4.0`) e é reportada ao servidor na telemetria e no heartbeat.
+A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.4.1`) e é reportada ao servidor na telemetria e no heartbeat.
 
 A partição `min_spiffs.csv` tem dois slots de aplicação de cerca de 1,9 MB; o firmware ocupa cerca de 76% de um, com a malha incluída, e o outro fica ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32). A gravação por USB é o caminho de recuperação: regrava o slot ativo sem depender do estado do OTA.
 
@@ -1152,7 +1152,7 @@ O firmware é atualizado pela rede no modelo **A/B com reversão automática**: 
 ```bash
 pio run -d ../remoteifes-esp32                         # gera .pio/build/esp32dev/firmware.bin
 npm run firmware                                        # mostra a imagem publicada, se houver
-npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.4.0 "nota opcional"
+npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.4.1 "nota opcional"
 ```
 
 A imagem é validada (byte mágico `0xE9`, tamanho plausível) e gravada com seu SHA-256 em `<REMOTEIFES_DATA_DIR>/firmware/`, com um `manifesto.json`; só uma fica publicada. O número de versão tem de ser o `-DFW_VERSAO` compilado nela, e o servidor não confere isso: com outro número, a placa roda a imagem mas volta com uma versão inesperada e a OTA termina como falha. Uma oferta em andamento continua servindo a imagem ofertada em `/dispositivo/firmware`, mesmo que outra versão seja publicada no meio; o binário antigo só sai do disco quando nenhuma transferência o usa. Republicar a **mesma** versão com outro conteúdo é recusado durante uma oferta dela.

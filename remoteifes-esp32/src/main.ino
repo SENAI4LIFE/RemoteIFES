@@ -23,6 +23,7 @@
 
 #include "root_ca.h"
 #include "mesh.h"
+#include "reconexao_wifi.h"
 
 #ifndef FW_VERSAO
 #define FW_VERSAO "0.0.0-dev"
@@ -257,6 +258,7 @@ bool sendHttpPost(const String& url, const String& payload);
 void sendHeartbeat();
 void reportComando(const String& cmd, const String& valor);
 void gerenciarConexaoWifi();
+void reemitirConexaoWifi(unsigned long semAssociacaoMs);
 void atualizarLedRede();
 NetworkLedState estadoDaRedeParaLed(unsigned long agora);
 void escreverLedRede(bool aceso);
@@ -579,9 +581,31 @@ void gerenciarConexaoWifi() {
 
   if (ultimaTentativaReconexao == 0 || agora - ultimaTentativaReconexao >= INTERVALO_RECONEXAO_WIFI_MS) {
     ultimaTentativaReconexao = agora;
+    if (deveReemitirConexaoWifi(agora, wifiDesconectadoDesde, INTERVALO_RECONEXAO_WIFI_MS, meshModo() == MESH_MODO_DIRETO)) {
+      reemitirConexaoWifi(agora - wifiDesconectadoDesde);
+    } else {
+      Serial.println("Tentando WiFi.reconnect()...");
+      WiFi.reconnect();
+    }
+  }
+}
+
+void reemitirConexaoWifi(unsigned long semAssociacaoMs) {
+  const String ssid = preferences.isKey("ssid") ? preferences.getString("ssid", "") : "";
+  if (ssid.length() == 0) {
     Serial.println("Tentando WiFi.reconnect()...");
     WiFi.reconnect();
+    return;
   }
+  const String senha = preferences.isKey("pass") ? preferences.getString("pass", "") : "";
+  Serial.printf("Wi-Fi sem associacao ha %lu s: reiniciando a conexao da estacao.\n", semAssociacaoMs / 1000);
+  if (apIniciado) {
+    WiFi.disconnect(false, false);
+  } else {
+    WiFi.disconnect(true, false);
+    WiFi.mode(WIFI_STA);
+  }
+  WiFi.begin(ssid.c_str(), senha.c_str());
 }
 
 NetworkLedState estadoDaRedeParaLed(unsigned long agora) {
