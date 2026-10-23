@@ -4,7 +4,7 @@
   "description": "Servidor (API + banco de dados) do projeto RemoteIFES",
   "main": "server.js",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.2"
   },
   "scripts": {
     "setup": "bash setup.sh",

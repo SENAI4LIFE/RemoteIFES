@@ -95,17 +95,18 @@ async function classificarArquitetura() {
 /**
  * Node used by the Console to launch its own runners.
  */
-function runtimeAtual() {
-  const bruto = process.versions.node;
-  const [maior, menor] = bruto.split(".").map(Number);
-  const minimo = { maior: 22, menor: 13 };
-  const atende = maior > minimo.maior || (maior === minimo.maior && menor >= minimo.menor);
+function runtimeAtual(bruto = process.versions.node) {
+  const versao = bruto.split(".").map((parte) => parseInt(parte, 10) || 0);
+  const minimo = [22, 22, 2];
+  const diferenca = [0, 1, 2].map((i) => (versao[i] || 0) - minimo[i]).find((d) => d !== 0) || 0;
+  const atende = diferenca >= 0;
+  const minimoExigido = minimo.join(".");
   return {
     versao: bruto,
     executavel: process.execPath,
-    minimoExigido: `${minimo.maior}.${minimo.menor}.0`,
+    minimoExigido,
     atende,
-    motivo: atende ? null : `Node ${bruto} é anterior ao mínimo ${minimo.maior}.${minimo.menor}.0 exigido pelo RemoteIFES`,
+    motivo: atende ? null : `Node ${bruto} é anterior ao mínimo ${minimoExigido} exigido pelo RemoteIFES`,
   };
 }
 

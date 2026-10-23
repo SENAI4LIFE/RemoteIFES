@@ -91,11 +91,11 @@ jobs:
         os: ${{ fromJSON(needs.changes.outputs.server_os) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The Linux leg runs the minimum Node the project declares (engines: >=22.13.0), so a newer
+      # The Linux leg runs the minimum Node the project declares (engines: >=22.22.2), so a newer
       # API cannot slip in unnoticed; the other legs run the newest 22.x.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ startsWith(matrix.os, 'ubuntu') && '22.13.0' || '22' }}
+          node-version: ${{ startsWith(matrix.os, 'ubuntu') && '22.22.2' || '22' }}
           cache: npm
           cache-dependency-path: remoteifes-server/package-lock.json
       - run: npm ci
@@ -133,7 +133,7 @@ jobs:
       # As in the server job: the minimum supported Node on Linux, the newest 22.x elsewhere.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ startsWith(matrix.os, 'ubuntu') && '22.13.0' || '22' }}
+          node-version: ${{ startsWith(matrix.os, 'ubuntu') && '22.22.2' || '22' }}
           cache: npm
           cache-dependency-path: |
             remoteifes-server/package-lock.json
@@ -169,7 +169,7 @@ jobs:
       # The x64 Linux leg runs the minimum Node the project declares; the others the newest 22.x.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ matrix.os == 'ubuntu-latest' && '22.13.0' || '22' }}
+          node-version: ${{ matrix.os == 'ubuntu-latest' && '22.22.2' || '22' }}
           cache: npm
           cache-dependency-path: remoteifes-server/package-lock.json
       - name: Prepare and check through the entrypoint (Linux/macOS)
@@ -516,7 +516,7 @@ jobs:
         include:
           # An older supported host (systemd 249) with the minimum Node, on x64; and a current one
           # on ARM64, the Raspberry Pi 64-bit architecture, with the newest 22.x.
-          - { os: ubuntu-22.04, node: "22.13.0" }
+          - { os: ubuntu-22.04, node: "22.22.2" }
           - { os: ubuntu-24.04-arm, node: "22" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

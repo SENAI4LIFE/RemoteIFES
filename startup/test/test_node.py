@@ -10,7 +10,7 @@ from startup import common as c
 
 LINUX_ARM = c.Platform("linux", "aarch64", 32)
 LINUX_X64 = c.Platform("linux", "x86_64", 64)
-MINIMUM = (22, 13, 0)
+MINIMUM = (22, 22, 2)
 POSIX = os.name == "posix"
 
 
@@ -24,12 +24,13 @@ def fake_probe(table):
 
 class VersionTest(unittest.TestCase):
     def test_parsing(self):
-        self.assertEqual(c.parse_version("v22.13.0"), (22, 13, 0))
+        self.assertEqual(c.parse_version("v22.22.2"), (22, 22, 2))
         self.assertEqual(c.parse_version("24.1.0-nightly20250101"), (24, 1, 0))
         self.assertIsNone(c.parse_version("22"))
         self.assertIsNone(c.parse_version(None))
-        self.assertLess(c.parse_version("22.12.9"), MINIMUM)
-        self.assertGreaterEqual(c.parse_version("22.13.0"), MINIMUM)
+        self.assertLess(c.parse_version("22.22.1"), MINIMUM)
+        self.assertLess(c.parse_version("22.21.9"), MINIMUM)
+        self.assertGreaterEqual(c.parse_version("22.22.2"), MINIMUM)
 
     def test_minimum_comes_from_package_json_engines(self):
         self.assertEqual(c.minimum_node_version(os.path.join(c.SERVER_DIR, "package.json")), MINIMUM)
@@ -52,19 +53,19 @@ class SelectionTest(unittest.TestCase):
     def test_old_node_first_on_path_is_skipped_for_a_newer_one(self):
         probe = fake_probe({
             "/usr/bin/node": ("18.19.0", "arm", "linux", None),
-            "/usr/local/bin/node": ("22.20.0", "arm", "linux", None),
+            "/usr/local/bin/node": ("22.23.0", "arm", "linux", None),
         })
         selection = c.select_node(MINIMUM, LINUX_ARM, {}, probe=probe, candidates=["/usr/bin/node", "/usr/local/bin/node"])
         self.assertEqual(selection.node.path, os.path.abspath("/usr/local/bin/node"))
         self.assertEqual([r.path for r in selection.rejected], [os.path.abspath("/usr/bin/node")])
-        self.assertIn("anterior ao mínimo 22.13.0", selection.rejected[0].problem(MINIMUM, LINUX_ARM))
+        self.assertIn("anterior ao mínimo 22.22.2", selection.rejected[0].problem(MINIMUM, LINUX_ARM))
 
     def test_first_suitable_node_wins_and_later_ones_are_not_probed(self):
         probed = []
 
         def probe(path):
             probed.append(path)
-            return c.NodeCandidate(path, (22, 20, 0), "x64", "linux")
+            return c.NodeCandidate(path, (22, 23, 0), "x64", "linux")
 
         selection = c.select_node(MINIMUM, LINUX_X64, {}, probe=probe, candidates=["/a/node", "/b/node"])
         self.assertEqual(selection.node.path, os.path.abspath("/a/node"))
@@ -73,7 +74,7 @@ class SelectionTest(unittest.TestCase):
     def test_wrong_build_or_platform_is_rejected(self):
         probe = fake_probe({
             "/opt/arm64/node": (None, None, None, "não executa neste sistema (No such file or directory; binário de outra arquitetura?)"),
-            "/mnt/c/node": ("22.20.0", "x64", "win32", None),
+            "/mnt/c/node": ("22.23.0", "x64", "win32", None),
         })
         selection = c.select_node(MINIMUM, LINUX_ARM, {}, probe=probe, candidates=["/opt/arm64/node", "/mnt/c/node"])
         self.assertIsNone(selection.node)
@@ -84,7 +85,7 @@ class SelectionTest(unittest.TestCase):
     def test_pinned_node_is_never_replaced(self):
         probe = fake_probe({
             "/pinned/node": ("20.11.0", "arm", "linux", None),
-            "/usr/local/bin/node": ("22.20.0", "arm", "linux", None),
+            "/usr/local/bin/node": ("22.23.0", "arm", "linux", None),
         })
         env = {"REMOTEIFES_NODE": "/pinned/node"}
         selection = c.select_node(MINIMUM, LINUX_ARM, env, probe=probe, candidates=["/usr/local/bin/node"])
@@ -92,15 +93,15 @@ class SelectionTest(unittest.TestCase):
         self.assertTrue(selection.override)
         self.assertIn("REMOTEIFES_NODE", c.node_missing_error(MINIMUM, selection, []).message)
 
-        probe = fake_probe({"/pinned/node": ("22.13.0", "arm", "linux", None)})
+        probe = fake_probe({"/pinned/node": ("22.22.2", "arm", "linux", None)})
         self.assertEqual(c.select_node(MINIMUM, LINUX_ARM, env, probe=probe).node.path, os.path.abspath("/pinned/node"))
 
     def test_armv7_node_is_accepted_with_its_support_horizon(self):
         out = io.StringIO()
         term = c.Terminal(out=out, err=out, env={}, system="linux")
-        node = c.NodeCandidate("/usr/local/bin/node", (22, 20, 0), "arm", "linux")
+        node = c.NodeCandidate("/usr/local/bin/node", (22, 23, 0), "arm", "linux")
         c.report_node(term, c.NodeSelection(node, []), MINIMUM, LINUX_ARM)
-        self.assertIn("[OK]    Node.js 22.20.0 (arm)", out.getvalue())
+        self.assertIn("[OK]    Node.js 22.23.0 (arm)", out.getvalue())
         self.assertIn("2027-04-30", out.getvalue())
         self.assertNotIn("experimental", out.getvalue())
 
@@ -112,8 +113,8 @@ class SelectionTest(unittest.TestCase):
 
     def test_child_processes_get_the_selected_node_first_on_path(self):
         env = {"PATH": os.pathsep.join(["/usr/bin", "/bin"])}
-        child = c.child_env(env, "/usr/local/lib/nodejs/node-v22.20.0/bin/node")
-        self.assertEqual(c.path_entries(child)[0], os.path.abspath("/usr/local/lib/nodejs/node-v22.20.0/bin"))
+        child = c.child_env(env, "/usr/local/lib/nodejs/node-v22.23.0/bin/node")
+        self.assertEqual(c.path_entries(child)[0], os.path.abspath("/usr/local/lib/nodejs/node-v22.23.0/bin"))
         self.assertEqual(env["PATH"], os.pathsep.join(["/usr/bin", "/bin"]), "the caller's environment is untouched")
         already = {"PATH": os.pathsep.join([os.path.abspath("/opt/node/bin"), "/usr/bin"])}
         self.assertEqual(c.child_env(already, "/opt/node/bin/node")["PATH"], already["PATH"])
@@ -134,13 +135,13 @@ class WindowsUserInstallTest(unittest.TestCase):
 
     def test_official_zip_extracted_without_administrator_is_found_newest_first(self):
         nodejs = os.path.join(self.dir, "Programs", "nodejs")
-        for folder in ("node-v22.9.0-win-x64", "node-v22.23.4-win-x64", "outra", "node-v22.13.0-win-arm64"):
+        for folder in ("node-v22.9.0-win-x64", "node-v22.23.4-win-x64", "outra", "node-v22.22.2-win-arm64"):
             os.makedirs(os.path.join(nodejs, folder))
             write_executable(os.path.join(nodejs, folder, "node.exe"), "")
         write_executable(os.path.join(nodejs, "node.exe"), "")
         windows = c.Platform("windows", "AMD64", 64)
         found = c.node_candidates(windows, {"LOCALAPPDATA": self.dir, "PATH": ""})
-        newest_first = [os.path.join(nodejs, f, "node.exe") for f in ("node-v22.23.4-win-x64", "node-v22.13.0-win-arm64", "node-v22.9.0-win-x64")]
+        newest_first = [os.path.join(nodejs, f, "node.exe") for f in ("node-v22.23.4-win-x64", "node-v22.22.2-win-arm64", "node-v22.9.0-win-x64")]
         self.assertEqual(found, [os.path.join(nodejs, "node.exe")] + newest_first)
 
         probe = fake_probe({
@@ -161,7 +162,7 @@ class RealPathConflictTest(unittest.TestCase):
         self.old = os.path.join(self.dir, "old")
         self.new = os.path.join(self.dir, "new")
         self.broken = os.path.join(self.dir, "broken")
-        for folder, version in ((self.old, "18.19.0"), (self.new, "22.20.0")):
+        for folder, version in ((self.old, "18.19.0"), (self.new, "22.23.0")):
             os.mkdir(folder)
             write_executable(os.path.join(folder, "node"), "#!/bin/sh\nprintf '%s arm linux'\n" % version)
             write_executable(os.path.join(folder, "npm"), "#!/bin/sh\nexit 0\n")

@@ -5,7 +5,7 @@
   "description": "Console de Operações do RemoteIFES: serviço local de manutenção do host, do ciclo de vida do software e da infraestrutura",
   "main": "console.js",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.22.2"
   },
   "scripts": {
     "start": "node console.js",

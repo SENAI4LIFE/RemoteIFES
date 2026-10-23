@@ -70,7 +70,7 @@ Var Checkout
 
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "${NOME}"
-!define MUI_WELCOMEPAGE_TEXT "Este instalador prepara o console que cuida do servidor RemoteIFES: serviço, configuração de infraestrutura, atualização, backup e diagnóstico do host.$\r$\n$\r$\nA operação do prédio (salas, agendamentos, usuários e ESP32) continua no aplicativo RemoteIFES.$\r$\n$\r$\nÉ necessário o Node.js 22.13 ou mais novo, o mesmo runtime que o RemoteIFES exige."
+!define MUI_WELCOMEPAGE_TEXT "Este instalador prepara o console que cuida do servidor RemoteIFES: serviço, configuração de infraestrutura, atualização, backup e diagnóstico do host.$\r$\n$\r$\nA operação do prédio (salas, agendamentos, usuários e ESP32) continua no aplicativo RemoteIFES.$\r$\n$\r$\nÉ necessário o Node.js 22.22.2 ou mais novo, o mesmo runtime que o RemoteIFES exige."
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION AbrirConsole
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir o console agora"
@@ -178,9 +178,9 @@ Section "Console" SecConsole
   SetDetailsPrint both
   Call ResolverNode
   ${If} $Node == ""
-    DetailPrint "Node.js 22.13 ou mais novo não foi encontrado; instale-o de https://nodejs.org/."
+    DetailPrint "Node.js 22.22.2 ou mais novo não foi encontrado; instale-o de https://nodejs.org/."
     ${IfNot} ${Silent}
-      MessageBox MB_OK|MB_ICONSTOP "O Node.js 22.13 ou mais novo não foi encontrado.$\r$\n$\r$\nInstale-o de https://nodejs.org/ e execute este instalador novamente. O console usa o mesmo runtime que o RemoteIFES exige."
+      MessageBox MB_OK|MB_ICONSTOP "O Node.js 22.22.2 ou mais novo não foi encontrado.$\r$\n$\r$\nInstale-o de https://nodejs.org/ e execute este instalador novamente. O console usa o mesmo runtime que o RemoteIFES exige."
     ${EndIf}
     Abort "Node.js não encontrado."
   ${EndIf}

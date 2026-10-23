@@ -87,3 +87,31 @@ test("the Node build follows the userland: armv7l under a 64-bit kernel with 32-
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("setup.sh accepts exactly the Node versions engines allows, and falls back to one of them", { skip: !temBash || process.platform === "win32" }, () => {
+  const minimo = require("../package.json").engines.node.match(/^>=(\d+)\.(\d+)\.(\d+)$/).slice(1).map(Number);
+  const valor = (nome) => Number(SETUP.match(new RegExp(`^${nome}=(\\d+)$`, "m"))[1]);
+  assert.deepEqual([valor("REQUIRED_MAJOR"), valor("REQUIRED_MINOR"), valor("REQUIRED_PATCH")], minimo);
+  const reserva = SETUP.match(/^NODE_FALLBACK_VERSION="(\d+)\.(\d+)\.(\d+)"$/m).slice(1).map(Number);
+  assert.ok(reserva[0] === minimo[0] && (reserva[1] > minimo[1] || (reserva[1] === minimo[1] && reserva[2] >= minimo[2])), "the fallback download meets the minimum");
+
+  const m = SETUP.match(/^REQUIRED_MAJOR=[\s\S]*?^node_ok\(\) \{\n[\s\S]*?\n\}\n/m);
+  assert.ok(m, "setup.sh must define node_ok");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-node-ok-"));
+  try {
+    const aceita = (versao) => {
+      fs.writeFileSync(path.join(dir, "node"), `#!/bin/sh\necho v${versao}\n`, { mode: 0o755 });
+      const r = spawnSync("bash", ["-c", `${m[0]}node_ok && echo sim || echo nao`], {
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}` },
+      });
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim() === "sim";
+    };
+    const [a, b, c] = minimo;
+    for (const versao of [`${a}.${b}.${c}`, `${a}.${b}.${c + 8}`, `${a}.${b + 1}.0`, `${a + 2}.0.0`]) assert.equal(aceita(versao), true, versao);
+    for (const versao of [`${a}.${b}.${c - 1}`, `${a}.${b - 1}.99`, `${a}.9.0`, `${a - 2}.99.0`]) assert.equal(aceita(versao), false, versao);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

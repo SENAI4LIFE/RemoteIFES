@@ -14,7 +14,7 @@ from startup import common as c
 
 ROOT = c.ROOT
 POSIX = os.name == "posix"
-MINIMUM = (22, 13, 0)
+MINIMUM = (22, 22, 2)
 
 
 def write(path, text):
@@ -23,7 +23,7 @@ def write(path, text):
         handle.write(text)
 
 
-def node_at(folder, arch="x64", version=(22, 20, 0), platform_name="linux"):
+def node_at(folder, arch="x64", version=(22, 23, 0), platform_name="linux"):
     path = os.path.join(folder, "node")
     write(path, "")
     write(os.path.join(folder, "npm"), "")
@@ -202,7 +202,7 @@ class ServerFlowTest(Harness):
         self.assertEqual(call["cmd"][0], "bash")
         self.assertEqual(c.path_entries(call["env"])[0], "/usr/local/bin")
         self.assertIn("pode pedir a senha do sudo", self.output())
-        self.assertIn("ignorado: %s (18.19.0 é anterior ao mínimo 22.13.0)" % os.path.abspath("/usr/bin/node"), self.output())
+        self.assertIn("ignorado: %s (18.19.0 é anterior ao mínimo 22.22.2)" % os.path.abspath("/usr/bin/node"), self.output())
         self.assertEqual(len(self.execs), 1)
 
     def test_armv6_without_node_fails_before_touching_anything(self):

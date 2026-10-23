@@ -208,9 +208,9 @@ class ProjectStateTest(unittest.TestCase):
     def test_env_file_parsing_agrees_with_node(self):
         import subprocess
 
-        selection = c.select_node((22, 13, 0), c.detect_platform(), os.environ)
+        selection = c.select_node((22, 22, 2), c.detect_platform(), os.environ)
         if selection.node is None:
-            self.skipTest("no Node.js 22.13+ on this host")
+            self.skipTest("no Node.js 22.22.2+ on this host")
         self.write(".env", self.ENV_SAMPLE)
         keys = ["NODE_ENV", "PORTA", "CORS_ORIGIN", "X", "BIND_ADDR", "VAZIA"]
         env = {k: v for k, v in os.environ.items() if k not in keys}

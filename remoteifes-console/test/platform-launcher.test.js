@@ -80,9 +80,15 @@ test("the minimum runtime is checked against what RemoteIFES requires", (t) => {
   const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma", "index.js"));
 
   const r = plataforma.runtimeAtual();
-  assert.equal(r.minimoExigido, "22.13.0");
+  assert.equal(r.minimoExigido, "22.22.2");
   assert.equal(r.executavel, process.execPath);
   assert.equal(typeof r.atende, "boolean");
+  for (const versao of ["22.22.2", "22.22.10", "22.23.0", "24.0.0"]) assert.equal(plataforma.runtimeAtual(versao).atende, true, versao);
+  for (const versao of ["22.22.1", "22.21.9", "22.9.9", "20.19.0"]) {
+    const recusado = plataforma.runtimeAtual(versao);
+    assert.equal(recusado.atende, false, versao);
+    assert.match(recusado.motivo, /anterior ao mínimo 22\.22\.2/);
+  }
 });
 
 test("directories follow each system's convention, not a dotfolder for all", (t) => {
@@ -933,7 +939,7 @@ test("the launcher checks the Node version before starting anything", async (t) 
   t.after(() => amb.restaurar());
   const plataforma = require(path.join(ajuda.RAIZ, "src", "plataforma"));
   const launcher = require(path.join(ajuda.RAIZ, "launcher.js"));
-  plataforma.runtimeAtual = () => ({ atende: false, versao: "20.0.0", minimoExigido: "22.13.0", motivo: "Node 20.0.0 abaixo do mínimo" });
+  plataforma.runtimeAtual = () => ({ atende: false, versao: "20.0.0", minimoExigido: "22.22.2", motivo: "Node 20.0.0 abaixo do mínimo" });
   let tentou = false;
   plataforma.iniciarConsoleGerenciado = async () => {
     tentou = true;
@@ -941,6 +947,6 @@ test("the launcher checks the Node version before starting anything", async (t) 
   };
   const r = await launcher.garantirBackend();
   assert.equal(r.ok, false);
-  assert.match(r.motivo, /exigem Node 22\.13\.0/);
+  assert.match(r.motivo, /exigem Node 22\.22\.2/);
   assert.equal(tentou, false, "nothing is started with an unsupported runtime");
 });

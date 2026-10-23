@@ -318,7 +318,7 @@ function montarDeb(saida) {
     `Architecture: all`,
     // Node is a prerequisite of what the Console manages; declaring the dependency is better than
     // installing something that would not start.
-    `Depends: nodejs (>= 22.13.0)`,
+    `Depends: nodejs (>= 22.22.2)`,
     `Maintainer: RemoteIFES <brunoalexandersenai@gmail.com>`,
     `Description: Console de Operacoes do RemoteIFES`,
     ` Manutencao do servidor, do host e da infraestrutura do RemoteIFES:`,
@@ -333,7 +333,7 @@ function montarDeb(saida) {
     'if [ "$1" = "configure" ]; then',
     '  NODE="$(command -v node || true)"',
     '  if [ -z "$NODE" ]; then',
-    '    echo "remoteifes-console: Node não encontrado no PATH; instale o Node 22.13+ e rode: sudo dpkg-reconfigure remoteifes-console" >&2',
+    '    echo "remoteifes-console: Node não encontrado no PATH; instale o Node 22.22.2+ e rode: sudo dpkg-reconfigure remoteifes-console" >&2',
     "    exit 1",
     "  fi",
     `  "$NODE" "${payload}/instalacao/instalar.js" --pacote --raiz "/${raizPacote}"`,

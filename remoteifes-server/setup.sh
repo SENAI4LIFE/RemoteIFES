@@ -4,18 +4,22 @@ set -e
 cd "$(dirname "$0")"
 
 REQUIRED_MAJOR=22
-REQUIRED_MINOR=13
-NODE_FALLBACK_VERSION="22.20.0"
+REQUIRED_MINOR=22
+REQUIRED_PATCH=2
+NODE_FALLBACK_VERSION="22.23.4"
 NODE_DIST_BASE="https://nodejs.org/dist"
 
 node_ok() {
   command -v node >/dev/null 2>&1 || return 1
-  local version major minor
+  local version major minor patch
   version=$(node -v | sed 's/^v//')
   major=$(echo "$version" | cut -d. -f1)
   minor=$(echo "$version" | cut -d. -f2)
+  patch=$(echo "$version" | cut -d. -f3 | sed 's/[^0-9].*//')
   [ "$major" -gt "$REQUIRED_MAJOR" ] && return 0
-  [ "$major" -eq "$REQUIRED_MAJOR" ] && [ "$minor" -ge "$REQUIRED_MINOR" ] && return 0
+  [ "$major" -eq "$REQUIRED_MAJOR" ] || return 1
+  [ "$minor" -gt "$REQUIRED_MINOR" ] && return 0
+  [ "$minor" -eq "$REQUIRED_MINOR" ] && [ "${patch:-0}" -ge "$REQUIRED_PATCH" ] && return 0
   return 1
 }
 
@@ -62,7 +66,7 @@ install_node_linux() {
 
   node_arch=$(resolve_node_arch)
   if [ -z "$node_arch" ]; then
-    echo "Arquitetura $(uname -m) não suportada pela instalação automática. Instale o Node.js $REQUIRED_MAJOR.$REQUIRED_MINOR+ manualmente: https://nodejs.org/en/download"
+    echo "Arquitetura $(uname -m) não suportada pela instalação automática. Instale o Node.js $REQUIRED_MAJOR.$REQUIRED_MINOR.$REQUIRED_PATCH+ manualmente: https://nodejs.org/en/download"
     exit 1
   fi
 
@@ -98,7 +102,7 @@ install_node_macos() {
     echo "Instalando Node.js via Homebrew..."
     brew install node
   else
-    echo "Homebrew não encontrado. Instale o Node.js $REQUIRED_MAJOR.$REQUIRED_MINOR+ manualmente: https://nodejs.org/en/download"
+    echo "Homebrew não encontrado. Instale o Node.js $REQUIRED_MAJOR.$REQUIRED_MINOR.$REQUIRED_PATCH+ manualmente: https://nodejs.org/en/download"
     exit 1
   fi
 }
@@ -108,7 +112,7 @@ if ! node_ok; then
     Linux) install_node_linux ;;
     Darwin) install_node_macos ;;
     *)
-      echo "Instale manualmente o Node.js $REQUIRED_MAJOR.$REQUIRED_MINOR ou superior: https://nodejs.org/en/download"
+      echo "Instale manualmente o Node.js $REQUIRED_MAJOR.$REQUIRED_MINOR.$REQUIRED_PATCH ou superior: https://nodejs.org/en/download"
       exit 1
       ;;
   esac

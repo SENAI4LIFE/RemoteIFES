@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SERVER_DIR = os.path.join(ROOT, "remoteifes-server")
 CONSOLE_DIR = os.path.join(ROOT, "remoteifes-console")
 
-FALLBACK_NODE_MINIMUM = (22, 13, 0)
+FALLBACK_NODE_MINIMUM = (22, 22, 2)
 NODE_PLATFORM = {"linux": "linux", "darwin": "darwin", "windows": "win32"}
 SYSTEM_LABEL = {"linux": "Linux", "darwin": "macOS", "windows": "Windows"}
 # Builds setup.sh can install (nodejs.org publishes no official Node 22 for ARMv6 or 32-bit x86).
@@ -271,7 +271,7 @@ def report_platform(term, plat):
     if not plat.supported:
         raise StartupError(
             "sistema %s não suportado; o RemoteIFES roda em Linux, macOS e Windows." % plat.label,
-            ["Instale o Node.js 22.13+ e use os comandos manuais do README (seção Referência técnica)."],
+            ["Instale o Node.js 22.22.2+ e use os comandos manuais do README (seção Referência técnica)."],
         )
 
 
@@ -322,7 +322,7 @@ def read_json(path):
 
 
 def minimum_node_version(package_json):
-    """Lower bound of engines.node (">=22.13.0"): package.json stays the single source of truth."""
+    """Lower bound of engines.node (">=22.22.2"): package.json stays the single source of truth."""
     try:
         engines = read_json(package_json).get("engines", {}).get("node", "")
     except (OSError, ValueError, AttributeError):

@@ -10,7 +10,7 @@ import unittest
 import server
 from startup import common as c
 
-MINIMUM = (22, 13, 0)
+MINIMUM = (22, 22, 2)
 
 
 def free_port():

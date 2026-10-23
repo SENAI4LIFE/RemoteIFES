@@ -58,7 +58,7 @@ if ($null -eq $node) {
     Write-Host ""
     Write-Host "  Node.js nao encontrado." -ForegroundColor Red
     Write-Host ""
-    Write-Host "  O console usa o mesmo runtime que o RemoteIFES exige (Node 22.13 ou mais novo)."
+    Write-Host "  O console usa o mesmo runtime que o RemoteIFES exige (Node 22.22.2 ou mais novo)."
     Write-Host "  Instale-o de https://nodejs.org/ e repita este script."
     Write-Host ""
     exit 1

@@ -2,7 +2,7 @@
 
 Sistema de controle remoto de ar-condicionado para as salas do IFES: painel web acessível, agendamento diário, integração ESP32 por MAC ou credencial por dispositivo (com atualização de firmware por OTA), monitoramento operacional local e um servidor central em Node.js.
 
-![Node.js 22.13+](https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=node.js)
+![Node.js 22.22.2+](https://img.shields.io/badge/Node.js-22.22.2%2B-339933?logo=node.js)
 ![Express e SQLite](https://img.shields.io/badge/Express-SQLite-003B57?logo=sqlite)
 ![WebSocket](https://img.shields.io/badge/Tempo%20real-WebSocket-010101?logo=websocket)
 ![PWA](https://img.shields.io/badge/PWA-Instal%C3%A1vel-5A0FC8?logo=pwa)
@@ -75,7 +75,7 @@ Console de Operações:
 
 `server.sh` prepara o que faltar (Node.js, dependências, `.env`), inicia o servidor em primeiro plano (`Ctrl+C` encerra; rode o console em outro terminal) e mostra os endereços: **`http://localhost:8080`** e o da rede local. `console.sh` instala o [Console de Operações](#console-de-operações) na primeira vez, com um ícone na área de trabalho quando ela existe, e depois só o abre; no Linux com systemd, `sudo ./console.sh` instala também o socket e o auxiliar privilegiado. Rodar de novo não reinstala nem duplica nada. `--verificar` só confere; `--ajuda` lista as opções.
 
-Requer Python 3.7+. O Node.js 22.13+ é instalado quando falta no Linux (x64, ARM64 ou ARMv7) e no macOS com Homebrew; no Windows, instale antes o [Node.js 22 LTS](https://nodejs.org/en/download). O instalador pede administrador; sem ele, extraia o `.zip` oficial do Node.js 22 em `%LOCALAPPDATA%\Programs\nodejs`, onde o `server.bat` o encontra sem mudar o `PATH`.
+Requer Python 3.7+. O Node.js 22.22.2+ é instalado quando falta no Linux (x64, ARM64 ou ARMv7) e no macOS com Homebrew; no Windows, instale antes o [Node.js 22 LTS](https://nodejs.org/en/download). O instalador pede administrador; sem ele, extraia o `.zip` oficial do Node.js 22 em `%LOCALAPPDATA%\Programs\nodejs`, onde o `server.bat` o encontra sem mudar o `PATH`.
 
 Sem `SENHA_ADMIN_INICIAL`, o primeiro acesso é `superadmin`/`admin`, e o `.env` inicial é de desenvolvimento, sem restrição de rede. Produção, comandos manuais e detalhes: [referência técnica](#referência-técnica-inicialização-manual-e-produção).
 
@@ -498,7 +498,7 @@ A divisão entre os dois documentos é deliberada: este README é a referência 
 ### Software
 
 - Navegador ou WebView com Chromium 108+, Safari 15.4+ (iOS 15.4+) ou Firefox 121+ para o frontend (site, PWA e aplicativo Cordova); abaixo disso a página mostra **Navegador desatualizado** em vez de carregar — veja [Cordova (Android/iOS)](#cordova-androidios)
-- Node.js 22.13 ou superior (usa o módulo `node:sqlite` nativo, ainda experimental) — em Linux (incluindo Raspberry Pi OS), `./server.sh` o instala pelo `remoteifes-server/setup.sh` quando falta, sem depender do pacote do sistema
+- Node.js 22.22.2 ou superior (o servidor usa o módulo `node:sqlite` nativo, ainda experimental, e o verificador de releases do Console, `@sigstore/verify` 4, exige 22.22.2) — em Linux (incluindo Raspberry Pi OS), `./server.sh` o instala pelo `remoteifes-server/setup.sh` quando falta, sem depender do pacote do sistema
 - Python 3.7 ou superior para os scripts de início, só com a biblioteca padrão
 - [PlatformIO](https://platformio.org/) (Core CLI ou a extensão para VS Code), com a plataforma `espressif32`, para compilar e gravar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do PlatformIO Core (prefere `pipx`, com fallback para `pip --user`) e chama `pio run` para compilar, gravar o sistema de arquivos `data/` (LittleFS) e o firmware
 - Bibliotecas do firmware, resolvidas pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini` com versões fixadas: plataforma `espressif32@7.0.1`, [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) 2.9.0, `WebSockets` (Links2004) 2.7.3, `ArduinoJson` 7.4.3, `DHT sensor library` 1.4.7 e `Adafruit Unified Sensor` 1.1.15. O servidor só atribui a uma sala os protocolos que o `IRac` dessa versão sabe transmitir; uma captura com outro identificador fica como sinal RAW genérico
@@ -516,7 +516,7 @@ Os scripts do [Início rápido](#início-rápido) só encadeiam os mecanismos ab
 ### O que os scripts de início conferem
 
 - **Arquitetura** pelo userland, não pelo kernel: um Pi com kernel de 64 bits e Raspberry Pi OS de 32 bits usa o Node armv7l, como o `setup.sh`. Sem Node utilizável, ARMv6 e x86 de 32 bits, que não têm Node.js 22 oficial, são recusados antes de qualquer download.
-- **Node.js**: o primeiro 22.13+ (de `engines` no `package.json`) que executa no host, mesmo atrás de um mais antigo no `PATH` (no Windows, também em `Program Files\nodejs` e em `%LOCALAPPDATA%\Programs\nodejs`, inclusive o `.zip` oficial extraído ali); só nesta execução ele vai à frente do `PATH`, para o npm e o `setup.sh` também. `REMOTEIFES_NODE=<caminho>` fixa um binário. Nada usa `--force`/`--forcar`.
+- **Node.js**: o primeiro 22.22.2+ (de `engines` no `package.json`) que executa no host, mesmo atrás de um mais antigo no `PATH` (no Windows, também em `Program Files\nodejs` e em `%LOCALAPPDATA%\Programs\nodejs`, inclusive o `.zip` oficial extraído ali); só nesta execução ele vai à frente do `PATH`, para o npm e o `setup.sh` também. `REMOTEIFES_NODE=<caminho>` fixa um binário. Nada usa `--force`/`--forcar`.
 - **Preparação** só do que falta: `setup.sh` (no Windows, `npm install` e cópia do `.env.example`); no console, `npm ci --omit=dev` (como o dono do checkout, sob `sudo`) e `instalacao/instalar.js` apenas sem instalação, que nunca é rebaixada pelo checkout.
 - **Partida**: o script `start` do `package.json` direto no Node, que substitui o processo do script no Linux e no macOS. Não inicia com o RemoteIFES já no ar, com outro programa na porta ou num checkout do `remoteifes.service`. Sem interface gráfica, numa sessão SSH no macOS ou no Windows, ou como root, `console.sh` usa `--iniciar` e mostra o endereço e o túnel; as outras opções do lançador passam direto.
 
@@ -539,7 +539,7 @@ copy .env.example .env
 npm start
 ```
 
-`setup.sh` instala o Node.js 22.13+ quando falta (no Linux, o binário oficial x64, ARM64 ou ARMv7, conferido pelo SHA-256 publicado pelo nodejs.org antes de extrair; no macOS, pelo Homebrew), instala as dependências e cria o `.env` a partir de `.env.example` sem sobrescrever um existente; com o Node já instalado, `npm run setup` faz o mesmo. Depois, a partida é só `npm start`; rode o `setup.sh` de novo quando as dependências mudarem. `npm run dev` reinicia o processo ao alterar o servidor; não deixe os dois sobre o mesmo banco. O `.env.example` é o **modo de desenvolvimento** (`NODE_ENV=development`): sem restrição de rede, com CORS aberto a qualquer origem e, sem `SENHA_ADMIN_INICIAL`, com a conta `superadmin`/`admin`; não deixe o servidor assim numa rede compartilhada.
+`setup.sh` instala o Node.js 22.22.2+ quando falta (no Linux, o binário oficial x64, ARM64 ou ARMv7, conferido pelo SHA-256 publicado pelo nodejs.org antes de extrair; no macOS, pelo Homebrew), instala as dependências e cria o `.env` a partir de `.env.example` sem sobrescrever um existente; com o Node já instalado, `npm run setup` faz o mesmo. Depois, a partida é só `npm start`; rode o `setup.sh` de novo quando as dependências mudarem. `npm run dev` reinicia o processo ao alterar o servidor; não deixe os dois sobre o mesmo banco. O `.env.example` é o **modo de desenvolvimento** (`NODE_ENV=development`): sem restrição de rede, com CORS aberto a qualquer origem e, sem `SENHA_ADMIN_INICIAL`, com a conta `superadmin`/`admin`; não deixe o servidor assim numa rede compartilhada.
 
 Banco e migrações são aplicados na partida, sem comando separado. A primeira cria as 86 salas do campus (offline até os ESP32 reportarem), os [limites globais](#configurações-globais-banco-de-dados-via-administração--sistema--configurações) e, sem `SENHA_ADMIN_INICIAL`, o superadministrador `superadmin`/`admin`, com um aviso persistente que leva à troca da senha.
 
@@ -762,7 +762,7 @@ Suportado não é o mesmo que executado na CI. O que a CI instala e roda, e o qu
 | Userland arm64 do Raspberry Pi OS Lite | **executado sob demanda** | workflow manual *Virtual Hardware Validation*: o ensaio de implantação completo num runner ARM64 nativo (contêiner com systemd, 1 GiB, 2 CPUs) |
 | Raspberry Pi físico com Raspberry Pi OS | **não executado** | nenhum runner é um Pi: kernel, boot, cartão SD, energia e desempenho de um Pi não são exercidos |
 
-O Node mínimo declarado (22.13.0) roda nos testes Linux do servidor e do console e no ensaio de implantação mais antigo; os demais usam o 22.x mais recente.
+O Node mínimo declarado (22.22.2) roda nos testes Linux do servidor e do console e no ensaio de implantação mais antigo; os demais usam o 22.x mais recente.
 
 Onde uma capacidade falta, a área **Console instalado** diz por quê ("não instalado", "sem permissão", "indisponível", "não se aplica" ou "não suportado aqui"), e o servidor do console recusa a operação de verdade. O artefato é escolhido por `process.arch`, não por `uname -m`: um Pi 3 pode ter kernel de 64 bits e userland de 32, e o console mostra hardware, kernel, userland e runtime separados. Um Pi 3 com sistema de 32 bits (armv7/armhf) segue suportado enquanto o Node 22 tiver suporte, até **2027-04-30**; depois, migre para 64 bits. O console exibe esse horizonte.
 
@@ -788,7 +788,7 @@ O layout é o mesmo nos três sistemas:
 
 ### Instalar
 
-No checkout, use `./console.sh` ([Início rápido](#início-rápido)). Por baixo está o instalador portátil, o mesmo nos três sistemas, que só exige o Node 22.13+. É o Node do sistema, sem runtime embutido, porque backup, restauração e recuperação de conta carregam módulos do checkout administrado; sem ele, ou com uma versão antiga, o instalador recusa com mensagem precisa. Sem checkout, pelos artefatos do release: no **Windows**, `remoteifes-console-<versão>-windows-<arco>-instalador.exe` instala por usuário, sem elevação, e repara a instalação se executado de novo; em silêncio, para todos os usuários ou pelo `.zip`:
+No checkout, use `./console.sh` ([Início rápido](#início-rápido)). Por baixo está o instalador portátil, o mesmo nos três sistemas, que só exige o Node 22.22.2+. É o Node do sistema, sem runtime embutido, porque backup, restauração e recuperação de conta carregam módulos do checkout administrado; sem ele, ou com uma versão antiga, o instalador recusa com mensagem precisa. Sem checkout, pelos artefatos do release: no **Windows**, `remoteifes-console-<versão>-windows-<arco>-instalador.exe` instala por usuário, sem elevação, e repara a instalação se executado de novo; em silêncio, para todos os usuários ou pelo `.zip`:
 
 ```powershell
 remoteifes-console-<versão>-windows-x64-instalador.exe /S /D=C:\Programas\RemoteIFES Console
@@ -1561,10 +1561,10 @@ Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também.
 
 | Job | Onde roda |
 |---|---|
-| Servidor (`npm test` + health check), com os contratos do frontend, do Cordova, do firmware e da documentação | Linux ARM64 com o Node mínimo (22.13.0); Windows e macOS com o 22.x mais recente |
-| Console de Operações (`npm test` + medição de recursos) | Ubuntu (Node 22.13.0), Windows e macOS |
+| Servidor (`npm test` + health check), com os contratos do frontend, do Cordova, do firmware e da documentação | Linux ARM64 com o Node mínimo (22.22.2); Windows e macOS com o 22.x mais recente |
+| Console de Operações (`npm test` + medição de recursos) | Ubuntu (Node 22.22.2), Windows e macOS |
 | Pacote do console: build, procedência, instalação do artefato, execução pelo lançador sem ferramentas de desenvolvimento, `.deb`, desinstalação preservando o estado | Linux x64 e ARM64, Windows e macOS |
-| Scripts de início (`--preparar`, `--verificar` e `startup/test`, este também no Python 3.7 mínimo, em contêiner) | Ubuntu x64 com o Node mínimo (22.13.0) e ARM64, Windows e macOS |
+| Scripts de início (`--preparar`, `--verificar` e `startup/test`, este também no Python 3.7 mínimo, em contêiner) | Ubuntu x64 com o Node mínimo (22.22.2) e ARM64, Windows e macOS |
 | Userland armhf do Raspberry Pi OS (`raspios-armhf.yml`, o mesmo que o laboratório chama) | Ubuntu 24.04 x64, sob qemu-user |
 | Ensaio de implantação (`ensaio-implantacao.sh`) | Ubuntu 22.04 x64 com o Node mínimo e Ubuntu 24.04 ARM64 |
 | End-to-end (Playwright), em shards com harness próprio | Ubuntu com Chromium, Firefox e WebKit, dentro da imagem oficial do Playwright da versão do `e2e/package-lock.json` (fixada por digest), que já traz os navegadores e as bibliotecas do sistema, sem depender de um espelho do Ubuntu; Windows com o Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox; macOS com o Chrome do sistema |
@@ -1796,7 +1796,7 @@ Cada item segue a mesma leitura: **sintoma** (o que se vê) → o que **verifica
 
 - **`EADDRINUSE` / porta 8080 ocupada**: o `server.sh` já distingue o RemoteIFES no ar (só mostra os endereços) de outro programa na porta. Descubra o processo com `sudo ss -ltnp 'sport = :8080'`; se for uma instância do RemoteIFES, use-a ou pare-a pelo mesmo método com que foi iniciada, sem abrir uma segunda sobre o mesmo banco.
 - **Servidor parece iniciado, mas a tela não abre**: `curl -fsS http://localhost:8080/health` deve retornar JSON com `"ok":true`, e `curl -I http://localhost:8080/` deve indicar conteúdo HTML. Confira também `ss -ltnp 'sport = :8080'`. Se `/health` funciona mas `/` não é HTML, confirme `SERVIR_FRONTEND=true` e reinicie o processo.
-- **`server.sh` ignora o Node.js ou não o encontra** (sem Node.js 22.13+ o servidor não tem o `node:sqlite`): cada `[WARN] ignorado:` dá o motivo (versão anterior a 22.13.0, binário de outra arquitetura, Node de outro sistema). Um Node antigo no `PATH` pode ficar; instale o Node.js 22 LTS ou aponte `REMOTEIFES_NODE=/caminho/do/node`. Sob `sudo` o `PATH` muda: `sudo env "PATH=$PATH" ./console.sh`. Sem Python 3.7+, instale o `python3` ou use os [comandos manuais](#comandos-manuais).
+- **`server.sh` ignora o Node.js ou não o encontra** (o RemoteIFES exige o Node.js 22.22.2+, o mínimo de `engines` no `package.json`): cada `[WARN] ignorado:` dá o motivo (versão anterior a 22.22.2, binário de outra arquitetura, Node de outro sistema). Um Node antigo no `PATH` pode ficar; instale o Node.js 22 LTS ou aponte `REMOTEIFES_NODE=/caminho/do/node`. Sob `sudo` o `PATH` muda: `sudo env "PATH=$PATH" ./console.sh`. Sem Python 3.7+, instale o `python3` ou use os [comandos manuais](#comandos-manuais).
 - **`server.sh` diz que o checkout é o do `remoteifes.service`**: o systemd é quem inicia esse servidor, e uma segunda instância disputaria banco e porta; use o Console de Operações ou `sudo systemctl start remoteifes.service`.
 - **`setup.sh` não consegue instalar o Node.js automaticamente**: confirme a conexão com a internet (o script baixa o binário oficial de `nodejs.org` e o confere pelo `SHASUMS256.txt` da versão; um arquivo que não confere não é instalado); em arquiteturas fora de x64/ARM64/ARMv7 (ARMv6, como Pi 1, Zero e Zero W, não tem Node.js 22 oficial), ou caso o download falhe, instale manualmente em https://nodejs.org/en/download e rode `./server.sh` novamente.
 - **`install-service.sh` falha com "systemd não encontrado"**: o script só funciona em Linux com `systemd` (padrão no Raspberry Pi OS); em outras distribuições, use um gerenciador de processo alternativo como `pm2`.
