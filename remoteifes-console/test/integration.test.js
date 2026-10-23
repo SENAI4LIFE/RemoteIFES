@@ -221,8 +221,9 @@ test("the Console's only dependency is the release verifier: pinned, small, pure
   // the one the attestation model needs, and nothing else gets in beside it.
   const pacote = JSON.parse(fs.readFileSync(path.join(ajuda.RAIZ, "package.json"), "utf8"));
   assert.deepEqual(Object.keys(pacote.dependencies).sort(), ["@sigstore/bundle", "@sigstore/protobuf-specs", "@sigstore/tuf", "@sigstore/verify"]);
-  assert.deepEqual(Object.keys(pacote.devDependencies), ["@sigstore/mock"], "the mock that issues test attestations is the only development dependency");
-  for (const versao of [...Object.values(pacote.dependencies), ...Object.values(pacote.devDependencies), ...Object.values(pacote.overrides)]) {
+  assert.deepEqual(Object.keys(pacote.devDependencies).sort(), ["@sigstore/mock", "sigstore-core-3"], "development dependencies: the mock that issues test attestations, and @sigstore/core 3 to show the DER fixtures reproduce its defect");
+  assert.equal(pacote.devDependencies["sigstore-core-3"], "npm:@sigstore/core@3.2.1");
+  for (const versao of [...Object.values(pacote.dependencies), pacote.devDependencies["@sigstore/mock"], ...Object.values(pacote.overrides || {})]) {
     assert.match(versao, /^\d+\.\d+\.\d+$/, "exact versions, no ranges");
   }
   assert.match(pacote.engines.node, /22/);

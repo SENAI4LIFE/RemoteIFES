@@ -275,9 +275,8 @@ const ASSINANTE_SKI_REENCODADO = {
   d: "--N0XyPMb0SL6zxDb6LARsnAKpmPgJEm7xXT_Hgczus",
 };
 const SIGSTORE_CORE_SEM_CORRECAO = `
-const path = require("path");
 const fs = require("fs");
-const core = require(require.resolve("@sigstore/core", { paths: [path.dirname(require.resolve("@sigstore/verify"))] }));
+const core = require("sigstore-core-3");
 const [folha, emissor] = process.argv.slice(1).map((arquivo) => fs.readFileSync(arquivo));
 process.stdout.write(JSON.stringify({
   reencodaIgual: core.ASN1Obj.parseBuffer(folha).toDER().equals(folha),
@@ -318,7 +317,6 @@ test("a certificate whose subject key identifier @sigstore/core 3 re-encodes dif
   assert.equal(new crypto.X509Certificate(folha).verify(new crypto.X509Certificate(emissor).publicKey), true);
   assert.deepEqual(semCorrecao(folha, emissor), { reencodaIgual: false, verifica: false }, "the fixture reproduces the re-encoding defect");
 
-  atestacao.exigirDerEstrito();
   const { ASN1Obj, X509Certificate } = sigstoreCore();
   assert.ok(ASN1Obj.parseBuffer(folha).toDER().equals(folha));
   assert.equal(X509Certificate.parse(folha).verify(X509Certificate.parse(emissor)), true);
@@ -340,7 +338,6 @@ test("a certificate with a non-minimal DER length in its structure is refused, a
   assert.ok(bytesTbs.includes(Buffer.from([0x30, 0x81, 0x1e, 0x17])), "the validity is written with a long-form length");
   assert.equal(crypto.verify("sha384", bytesTbs, emissor.publicKey, certificado.subarray(assinatura.inicio + 1, assinatura.fim)), true);
 
-  atestacao.exigirDerEstrito();
   const { X509Certificate } = sigstoreCore();
   assert.throws(() => X509Certificate.parse(certificado), /non-minimal length encoding/);
 });
@@ -353,7 +350,6 @@ test("a certificate altered after signing to a length @sigstore/core 3 normalize
   assert.equal(new crypto.X509Certificate(original).verify(new crypto.X509Certificate(emissor).publicKey), true);
   assert.deepEqual(semCorrecao(alterado, emissor), { reencodaIgual: false, verifica: true }, "without the correction the altered certificate is accepted");
 
-  atestacao.exigirDerEstrito();
   const { X509Certificate } = sigstoreCore();
   assert.equal(X509Certificate.parse(original).verify(X509Certificate.parse(emissor)), true);
   assert.equal(X509Certificate.parse(alterado).verify(X509Certificate.parse(emissor)), false);

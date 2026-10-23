@@ -17,8 +17,7 @@ const release = require("./release");
 //   1. the bundle is well formed and holds a DSSE envelope with an in-toto statement;
 //   2. cryptography, by @sigstore/verify against the Sigstore trusted root: certificate chain to
 //      Fulcio at the signing time, certificate transparency, transparency log inclusion and the
-//      envelope signature. Nothing of this is implemented here, except that certificates must use
-//      minimal DER lengths and their signatures are checked over their original bytes;
+//      envelope signature. Nothing of this is implemented here;
 //   3. identity, from the CERTIFICATE only: issuer, repository and owner (by name and by numeric
 //      id, so a renamed or recreated repository does not inherit the trust), the release workflow
 //      at the release tag, the push trigger, a GitHub-hosted runner and the release environment;
@@ -296,49 +295,6 @@ function conferirPredicado(declaracao, { versao, commit }, oficial = IDENTIDADE_
 
 // --- Verification ------------------------------------------------------------------------------
 
-const DER_ESTRITO = Symbol.for("remoteifes.derEstrito");
-
-function moduloSigstoreCore(...partes) {
-  const indice = require.resolve("@sigstore/core", { paths: [path.dirname(require.resolve("@sigstore/verify"))] });
-  return require(path.join(path.dirname(indice), ...partes));
-}
-
-function bytesOriginais(obj, comprimento) {
-  const valor = obj.value;
-  const cabecalho = Buffer.concat([Buffer.from([obj.tag.toDER()]), comprimento.encodeLength(valor.length)]);
-  const inicio = valor.byteOffset - cabecalho.length;
-  if (inicio < 0) throw new Error("certificado sem os bytes originais do tbsCertificate");
-  const bytes = Buffer.from(valor.buffer, inicio, cabecalho.length + valor.length);
-  if (!bytes.subarray(0, cabecalho.length).equals(cabecalho)) throw new Error("certificado sem os bytes originais do tbsCertificate");
-  return bytes;
-}
-
-function exigirDerEstrito() {
-  const comprimento = moduloSigstoreCore("asn1", "length.js");
-  if (comprimento[DER_ESTRITO]) return;
-  const { ASN1ParseError } = moduloSigstoreCore("asn1", "error.js");
-  const { X509Certificate } = moduloSigstoreCore("x509", "cert.js");
-  const cripto = moduloSigstoreCore("crypto.js");
-  if (typeof comprimento.decodeLength !== "function" || typeof comprimento.encodeLength !== "function"
-      || typeof X509Certificate !== "function" || typeof cripto.verify !== "function" || typeof cripto.createPublicKey !== "function") {
-    throw new Error("@sigstore/core não tem a forma esperada");
-  }
-  const decodificar = comprimento.decodeLength;
-  comprimento.decodeLength = function decodeLength(stream) {
-    const inicio = stream.position;
-    const tamanho = decodificar(stream);
-    if (stream.position - inicio !== comprimento.encodeLength(tamanho).length) {
-      throw new ASN1ParseError("non-minimal length encoding");
-    }
-    return tamanho;
-  };
-  X509Certificate.prototype.verify = function verify(issuerCertificate) {
-    const chave = cripto.createPublicKey(issuerCertificate?.publicKey || this.publicKey);
-    return cripto.verify(bytesOriginais(this.tbsCertificateObj, comprimento), chave, this.signatureValue, this.signatureAlgorithm);
-  };
-  comprimento[DER_ESTRITO] = true;
-}
-
 /**
  * Parses and cryptographically verifies a bundle. Returns the identity and the statement; the
  * policy is applied by the caller, which knows what the release claims to be.
@@ -362,7 +318,6 @@ function verificarAssinatura(bytesAtestacao, raiz) {
 
   let assinante;
   try {
-    exigirDerEstrito();
     const verificador = new Verifier(toTrustMaterial(raiz), { tlogThreshold: 1, ctlogThreshold: 1, timestampThreshold: 1 });
     assinante = verificador.verify(toSignedEntity(bundle));
   } catch (erro) {
@@ -441,7 +396,6 @@ const modulo = {
   assinanteDaVersao,
   raizDeConfianca,
   textoDer,
-  exigirDerEstrito,
   conferirIdentidade,
   verificarAssinatura,
   verificarPublicacao,
