@@ -289,16 +289,49 @@ test("every intent change advances the state version and resends it with the com
   assert.equal(linha("REL-10").estadoVersao, v0 + 6);
   const configuracoes = require("../src/services/configuracoesService");
   const limitesAntes = configuracoes.limitesTemperatura();
-  configuracoes.validarEAtualizar({ turboFuncaoExtra: configuracoes.turboFuncaoExtra() === "swing" ? "nenhuma" : "swing" }, ADMIN.usuario);
+  const limitesNovos = { ...limitesAntes, maxima: limitesAntes.maxima < 30 ? limitesAntes.maxima + 1 : limitesAntes.maxima - 1 };
+  configuracoes.validarEAtualizar({ temperaturaMaxima: limitesNovos.maxima }, ADMIN.usuario);
   assert.equal(linha("REL-10").estadoVersao, v0 + 7, "a global setting that changes the IR state advances the version");
   assert.equal(salasService.comandoEstadoIR(salasService.buscar("REL-10")).versao, v0 + 7);
   salasService.reenviarEstadoIRParaTodas();
   assert.equal(linha("REL-10").estadoVersao, v0 + 7, "resending the same state is not new intent");
   configuracoes.validarEAtualizar({ modoManutencao: false }, ADMIN.usuario);
   assert.equal(linha("REL-10").estadoVersao, v0 + 7, "a setting that does not touch the IR state does not advance the version");
-  assert.deepEqual(configuracoes.limitesTemperatura(), limitesAntes);
+  assert.deepEqual(configuracoes.limitesTemperatura(), limitesNovos);
   salasService.adotarDesligamentoLocal("REL-10");
   assert.equal(linha("REL-10").estadoVersao, v0 + 7, "adopting the local OFF is not new intent");
+  configuracoes.validarEAtualizar({ temperaturaMaxima: limitesAntes.maxima }, ADMIN.usuario);
+  assert.deepEqual(configuracoes.limitesTemperatura(), limitesAntes);
+});
+
+test("a stored turboFuncaoExtra from an older release still loads and saves without touching the IR state", () => {
+  sala("REL-COMPAT-1", "AA:BB:CC:E1:00:C1", false);
+  const configuracoes = require("../src/services/configuracoesService");
+  db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('turboFuncaoExtra', ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor").run(JSON.stringify("swing"));
+  const v0 = linha("REL-COMPAT-1").estadoVersao;
+  const antes = configuracoes.obter();
+  const salvo = configuracoes.validarEAtualizar({ popupAvisoSegundos: antes.popupAvisoSegundos + 1 }, ADMIN.usuario);
+  assert.equal(salvo.popupAvisoSegundos, antes.popupAvisoSegundos + 1);
+  assert.equal(configuracoes.obter().popupAvisoSegundos, antes.popupAvisoSegundos + 1);
+  assert.equal(linha("REL-COMPAT-1").estadoVersao, v0, "the stored key no longer changes the IR state");
+  assert.equal(salasService.comandoEstadoIR(salasService.buscar("REL-COMPAT-1")).swing, true);
+  configuracoes.validarEAtualizar({ popupAvisoSegundos: antes.popupAvisoSegundos }, ADMIN.usuario);
+  db.prepare("DELETE FROM configuracoes WHERE chave = 'turboFuncaoExtra'").run();
+});
+
+test("a turboFuncaoExtra sent by a cached PWA or an installed app is accepted, ignored and never stored", () => {
+  sala("REL-COMPAT-2", "AA:BB:CC:E1:00:C2", false);
+  const configuracoes = require("../src/services/configuracoesService");
+  db.prepare("DELETE FROM configuracoes WHERE chave = 'turboFuncaoExtra'").run();
+  const v0 = linha("REL-COMPAT-2").estadoVersao;
+  const antes = configuracoes.obter();
+  for (const valor of ["swing", "nenhuma", "desconhecida"]) {
+    const salvo = configuracoes.validarEAtualizar({ temperaturaMinima: antes.temperaturaMinima, temperaturaMaxima: antes.temperaturaMaxima, turboFuncaoExtra: valor }, ADMIN.usuario);
+    assert.equal(Object.prototype.hasOwnProperty.call(salvo, "turboFuncaoExtra"), false, valor);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM configuracoes WHERE chave = 'turboFuncaoExtra'").get().n, 0, valor);
+    assert.equal(linha("REL-COMPAT-2").estadoVersao, v0, valor);
+  }
+  assert.deepEqual(configuracoes.limitesTemperatura(), { minima: antes.temperaturaMinima, maxima: antes.temperaturaMaxima });
 });
 
 test("an explicit command sent before the late initial info is not erased by the old latch, and the board confirms it", async () => {

@@ -49,7 +49,6 @@ test("temperature commands respect the room's effective limits", () => {
 test("turbo requires a boolean and preserves the configured state", () => {
   novaSala("teste-turbo");
   const configuracoesService = require("../src/services/configuracoesService");
-  configuracoesService.validarEAtualizar({ turboFuncaoExtra: "swing" }, { id: 1, nivel: 3 });
   salasService.aplicarComando("teste-turbo", "turbo", true, { usuario: { isAdmin: true }, origem: "manual" });
   assert.equal(salasService.buscar("teste-turbo").turboAtivo, 1);
   db.prepare(`UPDATE salas SET irProtocolo = 5 WHERE sala = ?`).run("teste-turbo");

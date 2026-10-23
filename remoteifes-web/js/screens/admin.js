@@ -462,7 +462,6 @@ const Admin = {
     document.getElementById("cfgLimiarOnline").value = cfg.limiarOnlineMinutos;
     document.getElementById("cfgTemperaturaMinima").value = cfg.temperaturaMinima;
     document.getElementById("cfgTemperaturaMaxima").value = cfg.temperaturaMaxima;
-    document.getElementById("cfgTurboFuncaoExtra").value = cfg.turboFuncaoExtra || "nenhuma";
     document.getElementById("cfgAutoLigar").checked = cfg.autoLigar !== false;
     // Network access is shown read-only: the Operations Console owns it and the server refuses
     // changes from the website.
@@ -1242,7 +1241,6 @@ document.getElementById("salvarConfigBtn").addEventListener("click", async () =>
     limiarOnlineMinutos: Number(document.getElementById("cfgLimiarOnline").value),
     temperaturaMinima: Number(document.getElementById("cfgTemperaturaMinima").value),
     temperaturaMaxima: Number(document.getElementById("cfgTemperaturaMaxima").value),
-    turboFuncaoExtra: document.getElementById("cfgTurboFuncaoExtra").value,
     autoLigar: document.getElementById("cfgAutoLigar").checked,
     modoManutencao: document.getElementById("cfgModoManutencao").checked,
     espCredenciaisObrigatorias: document.getElementById("cfgEspCredenciaisObrigatorias").checked,

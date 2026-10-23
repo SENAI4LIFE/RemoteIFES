@@ -13,7 +13,6 @@ const PADROES = {
   limiarOnlineMinutos: 5,
   temperaturaMinima: 23,
   temperaturaMaxima: 25,
-  turboFuncaoExtra: "nenhuma",
   autoLigar: true,
   modoTeste: process.env.NODE_ENV !== "production",
   redesAutorizadas: [],
@@ -82,8 +81,6 @@ function validarDesligamentoDiario(entrada, atual) {
   return proximo;
 }
 
-const TURBO_FUNCOES_EXTRAS_VALIDAS = ["nenhuma", "swing"];
-
 const CHAVES_NUMERICAS = ["timeoutInatividadeMinutos", "timeoutInatividadeAdminMinutos", "retencaoAuditoriaDias", "popupAvisoSegundos", "limiarOnlineMinutos"];
 const LIMITES_NUMERICOS = {
   timeoutInatividadeMinutos: [1, 10080],
@@ -94,7 +91,6 @@ const LIMITES_NUMERICOS = {
 const CHAVES_BOOLEANAS_CRITICAS = ["modoTeste", "modoManutencao", "espCredenciaisObrigatorias", "espApExigirCredencial", "autoLigar"];
 const CHAVES_NUMERICAS_CRITICAS = ["temperaturaMinima", "temperaturaMaxima"];
 const CHAVES_LISTA_CRITICAS = ["redesAutorizadas"];
-const CHAVES_TEXTO_CRITICAS = ["turboFuncaoExtra"];
 const CHAVES_OBJETO = ["desligamentoDiario"];
 const CHAVES_INFRAESTRUTURA = ["modoTeste", "redesAutorizadas"];
 
@@ -148,10 +144,6 @@ function limitesEfetivosDaSala(salaRow, cfg = null) {
     minima: Number.isFinite(salaRow?.temperaturaMinima) ? salaRow.temperaturaMinima : minima,
     maxima: Number.isFinite(salaRow?.temperaturaMaxima) ? salaRow.temperaturaMaxima : maxima,
   };
-}
-
-function turboFuncaoExtra() {
-  return obter().turboFuncaoExtra;
 }
 
 function autoLigarAtivo(cfg = null) {
@@ -245,13 +237,6 @@ function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {})
     proximo.desligamentoDiario = validarDesligamentoDiario(patch.desligamentoDiario, atual.desligamentoDiario);
   }
 
-  if (Object.prototype.hasOwnProperty.call(patch, "turboFuncaoExtra")) {
-    if (!TURBO_FUNCOES_EXTRAS_VALIDAS.includes(patch.turboFuncaoExtra)) {
-      throw new Error(`turboFuncaoExtra deve ser um de: ${TURBO_FUNCOES_EXTRAS_VALIDAS.join(", ")}`);
-    }
-    proximo.turboFuncaoExtra = patch.turboFuncaoExtra;
-  }
-
   const salasComLimitesInvalidos = db.prepare(`
     SELECT sala FROM salas
     WHERE COALESCE(temperaturaMinima, ?) >= COALESCE(temperaturaMaxima, ?)
@@ -270,12 +255,10 @@ function validarEAtualizar(patch, requisitante, { infraestrutura = false } = {})
     ...CHAVES_BOOLEANAS_CRITICAS,
     ...CHAVES_NUMERICAS_CRITICAS,
     ...CHAVES_LISTA_CRITICAS,
-    ...CHAVES_TEXTO_CRITICAS,
     ...CHAVES_OBJETO,
   ].filter((chave) => infraestrutura || !CHAVES_INFRAESTRUTURA.includes(chave));
   const estadoIRAlterado = proximo.temperaturaMinima !== atual.temperaturaMinima
-    || proximo.temperaturaMaxima !== atual.temperaturaMaxima
-    || proximo.turboFuncaoExtra !== atual.turboFuncaoExtra;
+    || proximo.temperaturaMaxima !== atual.temperaturaMaxima;
   db.exec("BEGIN");
   try {
     for (const chave of chavesArmazenaveis) {
@@ -332,7 +315,6 @@ module.exports = {
   timeoutEfetivoParaUsuario,
   limitesTemperatura,
   limitesEfetivosDaSala,
-  turboFuncaoExtra,
   autoLigarAtivo,
   politicaApDispositivo,
   acessoRestritoAtivo,

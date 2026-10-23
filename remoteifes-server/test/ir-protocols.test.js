@@ -602,9 +602,8 @@ test("a protocol already stored with an old identifier is still transmitted as b
 test("user commands always ask for swing, and an administrative IR test sends only the swing it was given", async () => {
   const token = await tokenSuperAdmin();
   db.prepare("UPDATE salas SET irProtocolo = 16, ligado = 0, turboAtivo = 0 WHERE sala = 'TX-2'").run();
-  require("../src/services/configuracoesService").validarEAtualizar({ turboFuncaoExtra: "nenhuma" }, { id: 1, nivel: 3 });
   const tx = await conectar("TX-2", "AA:BB:CC:DD:EE:D2");
-  assert.equal(salasService.comandoEstadoIR(salasService.buscar("TX-2")).swing, true, "swing is on without turbo and without the turbo extra function");
+  assert.equal(salasService.comandoEstadoIR(salasService.buscar("TX-2")).swing, true, "swing is on without turbo");
 
   tx.mensagens.length = 0;
   salasService.aplicarComando("TX-2", "ligar", undefined, { usuario: { id: 1, usuario: "superadmin", isAdmin: true, podeControlar: true, nivel: 3 }, origem: "manual" });

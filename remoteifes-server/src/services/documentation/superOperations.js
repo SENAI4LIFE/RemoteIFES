@@ -12,7 +12,6 @@ module.exports = [
         ["Sessão por inatividade", "prazos distintos para usuários e administradores e antecedência do aviso"],
         ["Presença online", "tempo sem uso ainda classificado como online em Sistema > Status > Usuários ativos"],
         ["Limite de temperatura", "faixa global 16–30 °C; alvos e agendas fora da nova faixa são ajustados"],
-        ["Função adicional do Turbo", "nenhuma ou Oscilação vertical (Swing), aplicada junto do Turbo"],
         ["Auto-ON", "ligado por padrão: ajustar a temperatura ou ativar o Turbo em um aparelho desligado o liga e aplica o ajuste; desligado, a temperatura só é guardada e o Turbo exige aparelho ligado"],
         ["Desligamento diário automático", "desativado por padrão: no horário escolhido (Brasília), desliga uma vez por dia as salas do escopo que estiverem ligadas; religar depois vale até o dia seguinte, um horário perdido com o servidor parado é aplicado uma vez ao voltar e salas com agendamento em curso são poupadas"],
         ["Modo de teste", "somente leitura aqui: desativa temporariamente a restrição de rede em produção e é alterado no Console de Operações (Rede e domínio &gt; Acesso à aplicação) ou pelo terminal"],
@@ -25,7 +24,7 @@ module.exports = [
       { t: "passos", itens: [
         "Confirme a janela operacional e o impacto nos usuários/dispositivos.",
         "Altere apenas o grupo necessário e use <strong>Salvar configurações</strong>.",
-        "Espere <strong>Configurações salvas</strong>. Mudanças de temperatura/Turbo propagam o estado desejado aos dispositivos configurados; Auto-ON vale imediatamente para todos os painéis; sessões recebem o novo prazo.",
+        "Espere <strong>Configurações salvas</strong>. Mudanças de limite de temperatura propagam o estado desejado aos dispositivos configurados; Auto-ON vale imediatamente para todos os painéis; sessões recebem o novo prazo.",
         "Valide Início, uma sala piloto, <strong>Sistema &gt; Status &gt; Usuários ativos</strong> e <strong>Sistema &gt; Status &gt; Sistema</strong>. Em falha, restaure os valores registrados e salve novamente.",
       ] },
       { t: "nota", nivel: "seguranca", texto: "Modo de teste pode expor o sistema fora das redes autorizadas; use apenas durante um teste supervisionado e desligue em seguida pelo Console de Operações. Não ative credenciais obrigatórias enquanto o Status ainda mostrar salas Só MAC. A senha do RemoteIFES-Setup é um controle separado: ative-a onde o acesso físico às salas não for controlado." },
