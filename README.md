@@ -505,7 +505,7 @@ A divisão entre os dois documentos é deliberada: este README é a referência 
 
 ### Hardware
 
-- Um servidor para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32 — de uma VM a um **Raspberry Pi** (3, 4, 5 ou Zero 2 W, inclusive com Raspberry Pi OS de 32 bits); veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
+- Um servidor para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32 — de uma VM a um **Raspberry Pi** (3, 4, 5 ou Zero 2 W; o Node.js exige Raspberry Pi OS de 64 bits a partir do Buster ou de 32 bits a partir do Bullseye, e a placa pode exigir um mais novo, como o Bookworm no Pi 5); veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
 - Um ESP32 com emissor infravermelho (GPIO 4) por sala (ou por par de salas adjacentes, quando um único equipamento cobre as duas), um switch momentâneo no GPIO 26, um buzzer ativo no GPIO 27, um LED de conexão no GPIO 25 e um sensor de temperatura e umidade, um por placa: o DHT11 no GPIO 14 ou um AHT10 por I2C. O firmware só define o DHT11 (`DHTTYPE`)
 - Uma única placa adicional (ou uma das placas de sala) com **receptor infravermelho no GPIO 15**, definida como clonador oficial em `Administração > Dispositivos > Protocolos IR`
 
@@ -1007,7 +1007,7 @@ Reinstalar o console não toca no `remoteifes.service` nem no banco. Para remov�
 
 ## Hospedagem em Raspberry Pi
 
-Um Raspberry Pi 3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits, basta para o servidor: o `node:sqlite` é nativo do Node.js, então nada é compilado no Pi. Nenhum runner de CI é um Pi físico; o que a CI e o workflow manual cobrem está em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados).
+Um Raspberry Pi 3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits, basta para o servidor: o `node:sqlite` é nativo do Node.js, então nada é compilado no Pi. O mínimo do sistema vem do Node.js 22 oficial, segundo o `BUILDING.md` da versão: o binário ARM64 exige glibc 2.28 e a libstdc++ `GLIBCXX_3.4.25` (Debian 10), então o Raspberry Pi OS de 64 bits serve a partir do **Buster**; o binário ARMv7 exige glibc 2.28 e `GLIBCXX_3.4.28` (Debian 11), que o Buster de 32 bits não tem, então o de 32 bits serve só a partir do **Bullseye**. Num Buster de 32 bits, nenhum Node.js 22 oficial executa. Esse é o mínimo do Node.js; a placa tem o seu, e o Pi 5 só inicia com o Bookworm ou posterior. A CI roda o userland do Raspberry Pi OS Trixie nas duas arquiteturas. Nenhum runner de CI é um Pi físico; o que a CI e o workflow manual cobrem está em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados).
 
 Clone o repositório, valide com `./server.sh` (que instala o Node.js ARMv7 ou ARM64 oficial quando falta) e siga [Linux com systemd](#linux-com-systemd) e, se quiser Nginx, [Proxy reverso](#proxy-reverso). Defina `REMOTEIFES_DATA_DIR=/var/lib/remoteifes` no `.env` antes do primeiro boot, para manter os dados fora do checkout. Depois, a rotina é pelo [Console de Operações](#console-de-operações): redes autorizadas, reinício após editar o `.env` (ou `systemctl restart`), e [atualizações e reversões](#atualização-versões-e-reversão), que funcionam também sem rede (`--offline`). O Pi hospeda só o servidor; cada sala continua com o próprio ESP32.
 

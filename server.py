@@ -77,7 +77,7 @@ def check_node_install_prerequisites(plat, env, minimum, selection):
     if plat.libc is not None and plat.libc < c.NODE_GLIBC_MINIMUM:
         raise c.StartupError(
             "glibc %s: o Node.js 22 oficial exige glibc 2.28 ou mais nova." % c.format_version(plat.libc),
-            ["Atualize o sistema (Raspberry Pi OS Buster ou posterior)."],
+            ["Atualize o sistema: Raspberry Pi OS Buster ou posterior em 64 bits, Bullseye ou posterior em 32 bits."],
         )
     missing = [tool for tool in ("bash", "curl", "tar", "xz") if not shutil.which(tool, path=env.get("PATH"))]
     if not (shutil.which("sha256sum", path=env.get("PATH")) or shutil.which("shasum", path=env.get("PATH"))):
