@@ -7,7 +7,7 @@
 // interact with that protocol when the chip stops at the worst moment.
 
 const assert = require("node:assert/strict");
-const { cenario } = require("../lib/laboratorio");
+const { cenario, MAC_PLACA } = require("../lib/laboratorio");
 const { registrarSegredo } = require("../lib/ambiente");
 
 const LINHA_GRAVACAO = 'bool gravado = gravarChaveNvsVerificada("devId", novoId) && gravarChaveNvsVerificada("devSec", novoSegredo);';
@@ -160,9 +160,9 @@ cenario("Credencial malformada entregue pela conexão não é gravada", {
 cenario("Provisionamento pela conexão interrompido entre as duas gravações da NVS", {
   inicial: "Migração: credencial não obrigatória, placa conectada só pelo MAC, sala sem credencial",
   falha: "o administrador provisiona a credencial; a placa grava devId, e perde energia enquanto o relê, antes de gravar devSec",
-  exigido: ["a placa volta a operar sem intervenção no local, ou continua alcançável e recuperável pelo servidor"],
-  proibido: ["placa que não autentica mais e só volta com visita ao local"],
-  recuperacao: "a placa conecta com uma credencial válida",
+  exigido: ["a placa volta pelo MAC, que o servidor ainda aceita porque ela não apresentou a credencial", "o servidor reentrega a credencial pela conexão", "a placa grava as duas chaves e reconecta com a credencial, e só então o MAC deixa de valer"],
+  proibido: ["placa que não autentica mais e só volta com visita ao local", "MAC aceito depois de a placa apresentar a credencial"],
+  recuperacao: "a placa conecta com a credencial provisionada",
 }, async (lab) => {
   const via = await lab.intermediario();
   const cfg = await lab.api("PATCH", "/admin/configuracoes", { espCredenciaisObrigatorias: false });
@@ -195,4 +195,24 @@ cenario("Provisionamento pela conexão interrompido entre as duas gravações da
   lab.observar("conexoesAposReligar", tentativas.slice(0, 12));
   lab.observar("recuperouSemVisita", recuperou);
   assert.ok(recuperou, "after a power cut between the two NVS writes the board could not authenticate again without a site visit");
+  await lab.aguardar(async () => segredoNaNvs(lab, placa).segredo === prov.corpo.segredo, { descricao: "the provisioned secret written to NVS after re-delivery", limiteMs: 300_000 });
+  assert.deepEqual(segredoNaNvs(lab, placa), { deviceId: prov.corpo.deviceId, segredo: prov.corpo.segredo });
+  await lab.aguardar(() => ultimoSegredoApresentado(via, desde) === prov.corpo.segredo, { descricao: "a session opened with the provisioned credential", limiteMs: 300_000 });
+  await lab.aguardarConectada("A-103a", { limiteMs: 300_000 });
+  const sessoes = via.conexoesDo("ws", desde).filter((c) => c.cabecalhos);
+  lab.observar("credenciaisApresentadasAposReligar", sessoes.map((c) => (c.cabecalhos["x-device-secret"] === prov.corpo.segredo ? "provisionada" : c.cabecalhos["x-device-id"] ? "outra" : "so-mac")));
+  assert.equal(sessoes[0].cabecalhos["x-device-id"], undefined, "the board came back by MAC, the only identity it could present");
+  assert.equal(sessoes[sessoes.length - 1].cabecalhos["x-device-id"], prov.corpo.deviceId);
+  const final = await lab.aguardar(async () => {
+    const c = await credencialNoServidor(lab, "A-103a");
+    return c.provisionamentoPendente === false ? c : false;
+  }, { descricao: "provisioning confirmed", limiteMs: 300_000 });
+  lab.observar("servidorFinal", { provisionamentoPendente: final.provisionamentoPendente, deviceId: final.deviceId === prov.corpo.deviceId ? "provisionado" : "outro" });
+  const soMac = await fetch(`http://127.0.0.1:${lab.servidor.porta}/dispositivo/heartbeat`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-device-mac": MAC_PLACA },
+    body: JSON.stringify({ sala: "A-103a", mac: MAC_PLACA, ligado: false }),
+  });
+  lab.observar("heartbeatSoMacAposConfirmar", soMac.status);
+  assert.equal(soMac.status, 401, "once the board presented the credential the MAC alone is refused");
 });

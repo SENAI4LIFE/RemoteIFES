@@ -7,6 +7,7 @@ const RE_DEVICE_ID = /^esp_[0-9a-f]{16}$/;
 const GRACE_ROTACAO_MS = 24 * 60 * 60 * 1000;
 const segredosPendentesEmMemoria = new Map();
 const segredosAtivadosEmMemoria = new Map();
+const segredosProvisionadosEmMemoria = new Map();
 
 function gerarDeviceId() {
   return `esp_${crypto.randomBytes(8).toString("hex")}`;
@@ -47,6 +48,30 @@ function novoDeviceId() {
     if (deviceIdDisponivel(candidato)) return candidato;
   }
   throw new Error("não foi possível gerar um deviceId único");
+}
+
+function instanteSql(texto) {
+  return texto ? new Date(texto.replace(" ", "T") + "Z").getTime() : NaN;
+}
+
+function provisionamentoAguardando(linha) {
+  if (!linha || linha.revogadoEm || !linha.provisionamentoPendenteAte) return false;
+  const ate = instanteSql(linha.provisionamentoPendenteAte);
+  return Number.isFinite(ate) && ate > Date.now();
+}
+
+function macAceitoPeloProvisionamento(linha) {
+  return provisionamentoAguardando(linha) && !configuracoesService.obter().espCredenciaisObrigatorias;
+}
+
+function sessaoSoPorMac(sala) {
+  try {
+    const deviceHub = require("./deviceHub");
+    const entrada = deviceHub.conexaoDaSala(sala);
+    return !!entrada && !entrada.viaCredencial && deviceHub.dispositivoConectado(sala);
+  } catch {
+    return false;
+  }
 }
 
 function exigirSala(sala) {
@@ -125,14 +150,19 @@ function deviceIdAtivoPara(sala, deviceId) {
 function provisionar(sala) {
   exigirSala(sala);
   const existente = buscarLinha(sala);
-  if (existente && !existente.revogadoEm) {
+  const refeito = !!existente && provisionamentoAguardando(existente) && !segredosProvisionadosEmMemoria.has(sala) && sessaoSoPorMac(sala);
+  if (existente && !existente.revogadoEm && !refeito) {
     throw new Error("esta sala já tem uma credencial ativa — use rotacionar ou substituir");
   }
+  const porMac = !existente && sessaoSoPorMac(sala);
+  const ate = refeito
+    ? existente.provisionamentoPendenteAte
+    : porMac ? new Date(Date.now() + GRACE_ROTACAO_MS).toISOString().slice(0, 19).replace("T", " ") : null;
   const deviceId = novoDeviceId();
   const segredo = gerarSegredo();
   db.prepare(`
-    INSERT INTO esp_credenciais (sala, deviceId, segredoHash, chaveMesh, criadoEm)
-    VALUES (?, ?, ?, ?, datetime('now'))
+    INSERT INTO esp_credenciais (sala, deviceId, segredoHash, chaveMesh, criadoEm, provisionamentoPendenteAte)
+    VALUES (?, ?, ?, ?, datetime('now'), ?)
     ON CONFLICT(sala) DO UPDATE SET
       deviceId = excluded.deviceId,
       segredoHash = excluded.segredoHash,
@@ -147,19 +177,62 @@ function provisionar(sala) {
       criadoEm = datetime('now'),
       rotacionadoEm = NULL,
       ultimoUsoEm = NULL,
-      revogadoEm = NULL
-  `).run(sala, deviceId, hash(segredo), chaveMeshDe(segredo));
+      revogadoEm = NULL,
+      provisionamentoPendenteAte = excluded.provisionamentoPendenteAte
+  `).run(sala, deviceId, hash(segredo), chaveMeshDe(segredo), ate);
   limparPendente(sala);
   limparAtivado(sala);
+  segredosProvisionadosEmMemoria.delete(sala);
   logger.info("credencial-provisionada", { sala, deviceId });
+  if (ate) segredosProvisionadosEmMemoria.set(sala, { deviceId, segredo });
   const enviadoAoDispositivo = notificarDispositivo(sala, "credencial_provisionar", deviceId, segredo);
+  if (porMac && !enviadoAoDispositivo) {
+    db.prepare(`UPDATE esp_credenciais SET provisionamentoPendenteAte = NULL WHERE sala = ? AND deviceId = ?`).run(sala, deviceId);
+    segredosProvisionadosEmMemoria.delete(sala);
+  } else if (ate) {
+    logger.info("credencial-provisionamento-pendente", { sala, deviceId, macAceitoAte: ate });
+  }
   return { deviceId, segredo, enviadoAoDispositivo };
+}
+
+function entregarProvisionamentoPendente(sala) {
+  const guardado = segredosProvisionadosEmMemoria.get(sala);
+  const linha = buscarLinha(sala);
+  if (!guardado || !provisionamentoAguardando(linha) || linha.deviceId !== guardado.deviceId
+      || !iguaisConstante(hash(guardado.segredo), linha.segredoHash)) {
+    segredosProvisionadosEmMemoria.delete(sala);
+    return false;
+  }
+  logger.info("credencial-provisionamento-reentregue", { sala, deviceId: linha.deviceId });
+  return notificarDispositivo(sala, "credencial_provisionar", linha.deviceId, guardado.segredo);
+}
+
+function prazoDoMacProvisionado(sala) {
+  const linha = buscarLinha(sala);
+  return macAceitoPeloProvisionamento(linha) ? new Date(instanteSql(linha.provisionamentoPendenteAte)).toISOString() : null;
+}
+
+function confirmarProvisionamento(linha) {
+  const r = db.prepare(`UPDATE esp_credenciais SET provisionamentoPendenteAte = NULL WHERE deviceId = ? AND provisionamentoPendenteAte IS NOT NULL`).run(linha.deviceId);
+  segredosProvisionadosEmMemoria.delete(linha.sala);
+  if (!r.changes) return;
+  logger.info("credencial-provisionamento-confirmado", { sala: linha.sala, deviceId: linha.deviceId });
+  try {
+    require("./deviceHub").encerrarSessaoSoPorMac(linha.sala);
+  } catch (erro) {
+    logger.warn("credencial-provisionamento-encerrar-mac-falhou", { sala: linha.sala, mensagem: erro.message });
+  }
 }
 
 function rotacionar(sala) {
   const linha = buscarLinha(sala);
   if (!linha || linha.revogadoEm) {
     throw new Error("não há credencial ativa para rotacionar — provisione uma primeiro");
+  }
+  if (provisionamentoAguardando(linha)) {
+    const erro = new Error("a placa ainda não se conectou com a credencial provisionada: aguarde a reconexão ou use substituir/revogar");
+    erro.conflito = true;
+    throw erro;
   }
   if (linha.segredoHashPendente && linha.pendenteEntregueEm) {
     const erro = new Error("a placa já recebeu a credencial rotacionada e ainda não se conectou com ela: aguarde a reconexão ou use substituir/revogar");
@@ -231,11 +304,13 @@ function substituir(sala) {
       criadoEm = datetime('now'),
       rotacionadoEm = NULL,
       ultimoUsoEm = NULL,
-      revogadoEm = NULL
+      revogadoEm = NULL,
+      provisionamentoPendenteAte = NULL
     WHERE sala = ?
   `).run(deviceId, hash(segredo), chaveMeshDe(segredo), sala);
   limparPendente(sala);
   limparAtivado(sala);
+  segredosProvisionadosEmMemoria.delete(sala);
   logger.info("credencial-substituida", { sala, deviceId });
   try {
     require("./deviceHub").desconectarSala(sala);
@@ -251,11 +326,12 @@ function revogar(sala) {
   db.prepare(`
     UPDATE esp_credenciais SET revogadoEm = datetime('now'), segredoHashAnterior = NULL, anteriorExpiraEm = NULL,
       segredoHashPendente = NULL, pendenteCriadoEm = NULL, pendenteEntregueEm = NULL,
-      chaveMesh = NULL, chaveMeshPendente = NULL, chaveMeshAnterior = NULL
+      chaveMesh = NULL, chaveMeshPendente = NULL, chaveMeshAnterior = NULL, provisionamentoPendenteAte = NULL
     WHERE sala = ?
   `).run(sala);
   limparPendente(sala);
   limparAtivado(sala);
+  segredosProvisionadosEmMemoria.delete(sala);
   logger.info("credencial-revogada", { sala, deviceId: linha.deviceId });
   try {
     require("./deviceHub").desconectarSala(sala);
@@ -283,6 +359,7 @@ function verificar(deviceId, segredo) {
     const chave = chaveMeshDe(segredo);
     db.prepare(`UPDATE esp_credenciais SET chaveMesh = ? WHERE deviceId = ? AND segredoHash = ? AND (chaveMesh IS NULL OR chaveMesh <> ?)`)
       .run(chave, deviceId, alvo, chave);
+    if (linha.provisionamentoPendenteAte) confirmarProvisionamento(linha);
   }
   if (!ok && linha.segredoHashAnterior && linha.anteriorExpiraEm) {
     const expiraMs = new Date(linha.anteriorExpiraEm.replace(" ", "T") + "Z").getTime();
@@ -320,6 +397,8 @@ function ativarPendentePorMesh(deviceId) {
 
 function registrarUsoMesh(deviceId) {
   db.prepare(`UPDATE esp_credenciais SET ultimoUsoEm = datetime('now') WHERE deviceId = ?`).run(deviceId);
+  const linha = db.prepare(`SELECT * FROM esp_credenciais WHERE deviceId = ? AND revogadoEm IS NULL`).get(deviceId);
+  if (linha && linha.provisionamentoPendenteAte) confirmarProvisionamento(linha);
 }
 
 function estado(sala) {
@@ -341,14 +420,17 @@ function estado(sala) {
     pendenteDesde: linha.segredoHashPendente ? linha.pendenteCriadoEm : null,
     pendenteEntregueEm: linha.segredoHashPendente ? linha.pendenteEntregueEm || null : null,
     pendenteReentregavel: !!linha.segredoHashPendente && segredosPendentesEmMemoria.has(sala),
+    provisionamentoPendente: provisionamentoAguardando(linha),
+    macAceitoAte: macAceitoPeloProvisionamento(linha) ? linha.provisionamentoPendenteAte : null,
+    provisionamentoReentregavel: macAceitoPeloProvisionamento(linha) && segredosProvisionadosEmMemoria.has(sala),
   };
 }
 
 function exigidoPara(salaRow) {
   if (!salaRow) return false;
   if (configuracoesService.obter().espCredenciaisObrigatorias) return true;
-  const linha = db.prepare(`SELECT 1 FROM esp_credenciais WHERE sala = ?`).get(salaRow.sala);
-  return !!linha;
+  const linha = db.prepare(`SELECT revogadoEm, provisionamentoPendenteAte FROM esp_credenciais WHERE sala = ?`).get(salaRow.sala);
+  return !!linha && !macAceitoPeloProvisionamento(linha);
 }
 
 function resumoMigracao() {
@@ -379,6 +461,8 @@ module.exports = {
   provisionar,
   rotacionar,
   entregarPendente,
+  entregarProvisionamentoPendente,
+  prazoDoMacProvisionado,
   pendenteNaoGuardado,
   reentregarAtual,
   substituir,

@@ -322,6 +322,7 @@ function migrarColunasEspCredenciais() {
     ["chaveMesh", "TEXT"],
     ["chaveMeshPendente", "TEXT"],
     ["chaveMeshAnterior", "TEXT"],
+    ["provisionamentoPendenteAte", "TEXT"],
   ]) {
     if (!colunas.includes(coluna)) db.exec(`ALTER TABLE esp_credenciais ADD COLUMN ${coluna} ${tipo}`);
   }

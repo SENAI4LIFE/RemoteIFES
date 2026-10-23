@@ -74,6 +74,7 @@ const Esp32Admin = (() => {
     let badge;
     if (!c.provisionado) badge = `<span class="esp32-conn-badge off">sem credencial (só MAC)</span>`;
     else if (c.revogado) badge = `<span class="esp32-conn-badge off">credencial revogada</span>`;
+    else if (c.provisionamentoPendente) badge = `<span class="esp32-conn-badge modo">${!c.macAceitoAte ? "provisionada: aguardando a placa se conectar com a credencial" : c.provisionamentoReentregavel ? `provisionada: o MAC vale até a placa se conectar com a credencial (no máximo até ${escapeHtml(c.macAceitoAte)})` : "provisionada sem reentrega: provisione de novo com a placa conectada pelo MAC"}</span>`;
     else if (c.rotacaoPendente) badge = `<span class="esp32-conn-badge modo">${c.pendenteEntregueEm ? "rotação entregue, aguardando a placa confirmar" : c.pendenteReentregavel ? "rotação pendente: será entregue quando a placa conectar" : "rotação pendente não entregue: rotacione de novo com a placa conectada"}</span>`;
     else if (c.graceRotacaoAtivo) badge = `<span class="esp32-conn-badge modo">rotação: tolerância ativa</span>`;
     else badge = `<span class="esp32-conn-badge on">credencial ativa</span>`;
@@ -89,6 +90,7 @@ const Esp32Admin = (() => {
       botoes = `<button type="button" class="btn btn-on cred-provisionar-btn">Provisionar credencial</button>`;
     } else {
       botoes = `
+        ${c.macAceitoAte && !c.provisionamentoReentregavel ? `<button type="button" class="btn btn-on cred-provisionar-btn">Provisionar de novo</button>` : ""}
         <button type="button" class="btn btn-off cred-rotacionar-btn">Rotacionar</button>
         <button type="button" class="btn btn-off cred-substituir-btn">Substituir (troca de hardware)</button>
         <button type="button" class="link-btn danger cred-revogar-btn">Revogar</button>
@@ -241,7 +243,7 @@ const Esp32Admin = (() => {
     if (credProvBtn) credProvBtn.addEventListener("click", async () => {
       const ok = await Dialog.confirmar({
         titulo: "Provisionar credencial",
-        mensagem: `Gerar uma credencial exclusiva para o ESP32 da sala ${d.sala}? A partir daí a sala passa a exigir essa credencial (o MAC sozinho deixa de ser aceito). Se o dispositivo estiver conectado agora, ele recebe a credencial automaticamente.`,
+        mensagem: `Gerar uma credencial exclusiva para o ESP32 da sala ${d.sala}? Se o dispositivo estiver conectado agora só pelo MAC, ele recebe a credencial pela conexão, e o MAC continua aceito até ele se conectar com ela, por no máximo 24 horas; senão, a sala passa a exigir a credencial na hora, e ela precisa ser informada no setup do dispositivo.`,
         confirmarTexto: "Provisionar",
       });
       if (!ok) return;

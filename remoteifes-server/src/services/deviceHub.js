@@ -170,8 +170,9 @@ function enviarAtualizacaoCredencial(sala, payload) {
   const entrada = conexoes.get(sala);
   if (!canalAberto(entrada) || !salasService.buscar(sala)) return false;
   entrada.canal.enviar(payload);
+  const provisionadaPorMac = payload.tipo === "credencial_provisionar" && !entrada.viaCredencial;
   const timer = setTimeout(() => {
-    if (conexoes.get(sala) === entrada && !vinculoValido(salasService.buscar(sala), entrada)) {
+    if (conexoes.get(sala) === entrada && (provisionadaPorMac || !vinculoValido(salasService.buscar(sala), entrada))) {
       entrada.canal.fechar(4001, "credencial do dispositivo alterada");
     }
   }, 1000);
@@ -224,6 +225,13 @@ function dispositivoConectado(sala) {
   const entrada = conexoes.get(sala);
   if (!canalAberto(entrada)) return false;
   return vinculoValido(salasService.buscar(sala), entrada);
+}
+
+function encerrarSessaoSoPorMac(sala) {
+  const entrada = conexoes.get(sala);
+  if (!entrada || entrada.viaCredencial) return false;
+  entrada.canal.fechar(4001, "a placa confirmou a credencial; o MAC sozinho não vale mais");
+  return true;
 }
 
 function desconectarSala(sala) {
@@ -463,6 +471,14 @@ function conectarDispositivo({ sala, mac, viaCredencial, deviceId, ip, credencia
       }
     } catch (erro) {
       logger.warn("device-ws-credencial-pendente-falhou", { sala, mensagem: erro.message });
+    }
+  } else {
+    try {
+      const credenciaisService = require("./esp32CredenciaisService");
+      entrada.credencialExpiraEm = credenciaisService.prazoDoMacProvisionado(sala);
+      if (entrada.credencialExpiraEm) credenciaisService.entregarProvisionamentoPendente(sala);
+    } catch (erro) {
+      logger.warn("device-ws-provisionamento-pendente-falhou", { sala, mensagem: erro.message });
     }
   }
   try {
@@ -737,6 +753,7 @@ module.exports = {
   limparCapturas,
   enviarAtualizacaoCredencial,
   encerrarCredenciaisExpiradas,
+  encerrarSessaoSoPorMac,
   prazoParaSessaoDaGeracaoAnterior,
   difundirPoliticaAp,
   dispositivoConectado,

@@ -42,6 +42,8 @@ try {
       console.log(`  rotacionada:  ${estado.rotacionadoEm || "nunca"}`);
       console.log(`  último uso:   ${estado.ultimoUsoEm || "nunca"}`);
       console.log(`  revogada:     ${estado.revogado ? estado.revogadoEm : "não"}`);
+      console.log(`  aguardando:   ${estado.provisionamentoPendente ? "sim (a placa recebeu a credencial pela conexão só MAC e ainda não se conectou com ela)" : "não"}`);
+      console.log(`  MAC aceito:   ${estado.macAceitoAte ? `até ${estado.macAceitoAte}` : "não"}`);
       console.log(`  grace ativo:  ${estado.graceRotacaoAtivo ? "sim (segredo anterior ainda aceito)" : "não"}`);
       console.log(`  pendente:     ${estado.rotacaoPendente ? `desde ${estado.pendenteDesde}${estado.pendenteEntregueEm ? ", entregue à placa, aguardando prova" : estado.pendenteReentregavel ? ", será entregue quando a placa conectar" : ", não entregue (rotacione de novo com a placa conectada)"}` : "não"}`);
     }
