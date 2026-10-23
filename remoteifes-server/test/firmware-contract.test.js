@@ -38,8 +38,10 @@ test("the reference hardware GPIOs are the validated ones: receiver 15, emitter 
   assert.match(ino, /#define ACTION_SWITCH_ACTIVE_LEVEL LOW\b/);
   assert.match(ino, /#define NETWORK_LED_ACTIVE_LEVEL HIGH\b/);
   assert.match(ino, /#define DHTPIN 14\b/);
+  assert.match(ino, /#define AHT10_SDA_PIN 21\b/);
+  assert.match(ino, /#define AHT10_SCL_PIN 22\b/);
   const numeros = [];
-  for (const pino of ["IR_RECV_PIN", "IR_SEND_PIN", "ACTION_SWITCH_PIN", "BUZZER_PIN", "NETWORK_LED_PIN", "DHTPIN"]) {
+  for (const pino of ["IR_RECV_PIN", "IR_SEND_PIN", "ACTION_SWITCH_PIN", "BUZZER_PIN", "NETWORK_LED_PIN", "DHTPIN", "AHT10_SDA_PIN", "AHT10_SCL_PIN"]) {
     assert.equal((ino.match(new RegExp(`#define ${pino} `, "g")) || []).length, 1, `${pino} defined more than once`);
     numeros.push(Number(ino.match(new RegExp(`#define ${pino} (\\d+)\\b`))[1]));
   }

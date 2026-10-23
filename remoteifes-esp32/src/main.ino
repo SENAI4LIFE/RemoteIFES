@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include <WebSocketsClient.h>
 #include <DHT.h>
+#include <Wire.h>
 #include <IRremoteESP8266.h>
 #include <IRrecv.h>
 #include <IRsend.h>
@@ -24,6 +25,7 @@
 #include "root_ca.h"
 #include "mesh.h"
 #include "reconexao_wifi.h"
+#include "aht10.h"
 
 #ifndef FW_VERSAO
 #define FW_VERSAO "0.0.0-dev"
@@ -31,6 +33,8 @@
 
 #define DHTPIN 14
 #define DHTTYPE DHT11
+#define AHT10_SDA_PIN 21
+#define AHT10_SCL_PIN 22
 #define IR_RECV_PIN 15
 #define IR_SEND_PIN 4
 #define BUZZER_PIN 27
@@ -51,6 +55,8 @@ const float AC_TEMP_MAX = 30.0;
 const unsigned long SERVER_HEARTBEAT_INTERVAL = 30000;
 const unsigned long TELEMETRY_WS_INTERVAL = 10000;
 const unsigned long SENSOR_READ_INTERVAL = 2500;
+const unsigned long AHT10_ESPERA_MEDICAO_MS = 80;
+const uint16_t AHT10_I2C_TIMEOUT_MS = 10;
 const unsigned long WS_RECONNECT_INTERVAL_MS = 5000;
 const unsigned long IDENTIFICACAO_INTERVAL_MS = 60000;
 const unsigned long IDENTIFICACAO_PENDENTE_INTERVAL_MS = 15000;
@@ -196,6 +202,9 @@ UltimoComandoIR ultimoComando;
 
 float ultimaLeituraTemp = NAN;
 float ultimaLeituraHum = NAN;
+bool aht10Presente = false;
+bool aht10MedicaoPendente = false;
+unsigned long aht10MedicaoDisparadaEm = 0;
 
 bool wifiConectadoAnteriormente = false;
 unsigned long ultimaTentativaReconexao = 0;
@@ -252,6 +261,9 @@ void handleIRCapture();
 void sendRawIR(const uint16_t* rawData, uint16_t length, uint16_t frequency);
 void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo, const String& fan, bool swing);
 void atualizarLeituraSensores();
+bool iniciarAht10();
+bool escreverComandoAht10(const uint8_t comando[3]);
+void concluirMedicaoAht10();
 String urlServidor(const char* path);
 int executarHttpPost(const String& url, const String& payload, String& resposta);
 bool sendHttpPost(const String& url, const String& payload);
@@ -339,7 +351,12 @@ void setup() {
     Serial.println("Firmware recem-instalado aguardando autovalidacao (rollback automatico se falhar).");
   }
 
-  dht.begin();
+  aht10Presente = iniciarAht10();
+  if (aht10Presente) {
+    Serial.println("Sensor AHT10 encontrado no I2C (0x38).");
+  } else {
+    dht.begin();
+  }
   irsend.begin();
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW);
@@ -462,7 +479,9 @@ void loop() {
   }
 
   unsigned long agora = millis();
-  if (agora - lastSensorRead >= SENSOR_READ_INTERVAL) {
+  if (aht10MedicaoPendente && aht10MedicaoPronta(agora, aht10MedicaoDisparadaEm, AHT10_ESPERA_MEDICAO_MS)) {
+    concluirMedicaoAht10();
+  } else if (agora - lastSensorRead >= SENSOR_READ_INTERVAL) {
     lastSensorRead = agora;
     atualizarLeituraSensores();
   }
@@ -1674,8 +1693,47 @@ void sendKnownACState(decode_type_t protocol, float temp, bool power, bool turbo
 }
 
 void atualizarLeituraSensores() {
+  if (aht10Presente) {
+    aht10MedicaoPendente = escreverComandoAht10(AHT10_COMANDO_MEDIR);
+    aht10MedicaoDisparadaEm = millis();
+    if (!aht10MedicaoPendente) {
+      ultimaLeituraTemp = NAN;
+      ultimaLeituraHum = NAN;
+    }
+    return;
+  }
   ultimaLeituraTemp = dht.readTemperature();
   ultimaLeituraHum = dht.readHumidity();
+}
+
+bool iniciarAht10() {
+  Wire.setTimeOut(AHT10_I2C_TIMEOUT_MS);
+  if (!Wire.begin(AHT10_SDA_PIN, AHT10_SCL_PIN)) return false;
+  Wire.beginTransmission(AHT10_ENDERECO);
+  if (Wire.endTransmission() == 0 && escreverComandoAht10(AHT10_COMANDO_INICIAR)) return true;
+  Wire.end();
+  return false;
+}
+
+bool escreverComandoAht10(const uint8_t comando[3]) {
+  Wire.beginTransmission(AHT10_ENDERECO);
+  Wire.write(comando, 3);
+  return Wire.endTransmission() == 0;
+}
+
+void concluirMedicaoAht10() {
+  aht10MedicaoPendente = false;
+  uint8_t dados[6];
+  float temperatura = NAN;
+  float umidade = NAN;
+  if (Wire.requestFrom(AHT10_ENDERECO, (uint8_t)6) == 6) {
+    for (uint8_t i = 0; i < 6; i++) dados[i] = Wire.read();
+    aht10Converter(dados, &temperatura, &umidade);
+  } else {
+    while (Wire.available()) Wire.read();
+  }
+  ultimaLeituraTemp = temperatura;
+  ultimaLeituraHum = umidade;
 }
 
 String urlServidor(const char* path) {

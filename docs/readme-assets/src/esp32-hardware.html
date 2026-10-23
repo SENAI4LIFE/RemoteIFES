@@ -5,9 +5,10 @@
 <title>esp32-hardware</title>
 <link rel="stylesheet" href="tema.css">
 <style>
-  /* Signal pins only, as remoteifes-esp32/src/main.ino defines them (DHTPIN, IR_RECV_PIN,
-     IR_SEND_PIN, BUZZER_PIN, NETWORK_LED_PIN, ACTION_SWITCH_PIN). Power, resistors and the LED drive are not
-     defined in the repository and are deliberately not drawn. */
+  /* Signal pins only, as remoteifes-esp32/src/main.ino defines them (DHTPIN, AHT10_SDA_PIN,
+     AHT10_SCL_PIN, IR_RECV_PIN, IR_SEND_PIN, BUZZER_PIN, NETWORK_LED_PIN, ACTION_SWITCH_PIN).
+     Power, resistors and the LED drive are not defined in the repository and are deliberately
+     not drawn. */
   .bancada { display: grid; grid-template-columns: 232px 1fr 246px; align-items: center; }
   .coluna { display: flex; flex-direction: column; gap: 16px; }
   .peca { padding: 6px 10px 6px 6px; gap: 8px; }
@@ -30,6 +31,9 @@
   .par { display: flex; flex: none; }
   .par .modulo { width: 46px; height: 46px; }
   .par .modulo + .modulo { margin-left: -10px; }
+  #dht { flex-wrap: wrap; row-gap: 0; }
+  #dht .par + div { flex: 1 1 0; }
+  #dht .pinos { flex-basis: 100%; }
 </style>
 </head>
 <body>
@@ -66,7 +70,8 @@
       </div>
       <div class="cartao tom-verde peca" id="dht">
         <div class="par"><img class="modulo" src="../modules/dht11.png" alt=""><img class="modulo" src="../modules/aht10.png" alt=""></div>
-        <div><div class="titulo">DHT11 / AHT10</div><div class="sub">temperatura e umidade da telemetria; um dos dois por placa</div><span class="pino">DHT11 · GPIO 14</span><br><span class="pino">AHT10 · I2C</span></div>
+        <div><div class="titulo">DHT11 / AHT10</div><div class="sub">temperatura e umidade da telemetria; um dos dois por placa</div></div>
+        <div class="pinos"><span class="pino">DHT11 · GPIO 14</span><br><span class="pino">AHT10 · SDA 21 · SCL 22</span></div>
       </div>
       <div class="cartao tom-ambar peca" id="receptor">
         <img class="modulo" src="../modules/ir-receiver.png" alt="">
