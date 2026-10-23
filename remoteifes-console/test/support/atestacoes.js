@@ -3,6 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { initializeCA, initializeCTLog, initializeTLog } = require("@sigstore/mock");
 const { TrustedRoot } = require("@sigstore/protobuf-specs");
+const { ASN1Obj } = require(require.resolve("@sigstore/core", { paths: [path.dirname(require.resolve("@sigstore/verify"))] }));
 const atestacao = require("../../src/atestacao");
 
 // Test attestations: a private Sigstore made of @sigstore/mock parts (a Fulcio-like CA with its
@@ -18,6 +19,14 @@ const MINUTO = 60_000;
 
 const par = () => crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
 const sha256 = (dados) => crypto.createHash("sha256").update(dados).digest("hex");
+const derEstavel = (der) => ASN1Obj.parseBuffer(der).toDER().equals(der);
+async function emitirEstavel(emitir, der) {
+  for (let tentativa = 0; tentativa < 8; tentativa++) {
+    const emitido = await emitir();
+    if (derEstavel(der(emitido))) return emitido;
+  }
+  throw new Error("the test authority issued 8 certificates in a row that @sigstore/core does not re-encode byte for byte");
+}
 const pae = (tipo, corpo) => Buffer.concat([Buffer.from(`DSSEv1 ${Buffer.byteLength(tipo)} ${tipo} ${corpo.length} `), corpo]);
 
 /**
@@ -75,9 +84,8 @@ function declaracaoDe({ sujeitos, ref, repositorio, workflow, commit, tipoPredic
 async function criarAutoridade({ relogio = new Date(Date.now() + 2000) } = {}) {
   const chavesCt = par();
   const chavesLog = par();
-  const chavesCa = par();
   const ct = await initializeCTLog(chavesCt, relogio);
-  const ca = await initializeCA(chavesCa, ct, relogio);
+  const ca = await emitirEstavel(() => initializeCA(par(), ct, relogio), (c) => Buffer.from(c.rootCertificate));
   const log = await initializeTLog("https://rekor.sigstore.dev", chavesLog, relogio);
   const inicio = new Date(relogio.getTime() - 86_400_000).toISOString();
 
@@ -121,15 +129,16 @@ async function criarAutoridade({ relogio = new Date(Date.now() + 2000) } = {}) {
    *                 corrupted inclusion promise) or "payload" (the envelope changed after logging)
    */
   async function atestar({ sujeitos, versao, commit, identidade, omitir, tipoPredicado, atrasoDoLogMs = 0, adulterar = null }) {
-    const assinante = par();
     const ext = extensoesDe({ versao, commit, identidade, omitir });
-    const certificado = Buffer.from(
-      await ca.issueCertificate({
-        publicKey: assinante.publicKey.export({ format: "der", type: "spki" }),
+    const { assinante, certificado } = await emitirEstavel(async () => {
+      const chaves = par();
+      const der = await ca.issueCertificate({
+        publicKey: chaves.publicKey.export({ format: "der", type: "spki" }),
         subjectAltName: ext.san,
         extensions: ext.extensoes,
-      })
-    );
+      });
+      return { assinante: chaves, certificado: Buffer.from(der) };
+    }, (e) => e.certificado);
     const declaracao = declaracaoDe({ sujeitos, ref: ext.ref, repositorio: ext.repositorio, workflow: ext.workflow, commit, tipoPredicado });
     const payload = Buffer.from(JSON.stringify(declaracao));
     const assinado = adulterar === "assinatura" ? Buffer.concat([payload, Buffer.from(" ")]) : payload;
