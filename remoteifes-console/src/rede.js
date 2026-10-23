@@ -67,7 +67,7 @@ async function escutas() {
   return { suportado: true, comProcesso: true, linhas: r.saida.split("\n").filter(Boolean).slice(0, 40) };
 }
 
-const DONO_ACESSO = "Console de Operações (Rede e domínio > Acesso à aplicação)";
+const DONO_ACESSO = "Console de Operações (Rede e acesso > Acesso à aplicação)";
 
 function lerJson(conexao, chave) {
   const linha = conexao.prepare("SELECT valor FROM configuracoes WHERE chave = ?").get(chave);

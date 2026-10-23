@@ -14,7 +14,7 @@ module.exports = [
         ["Limite de temperatura", "faixa global 16–30 °C; alvos e agendas fora da nova faixa são ajustados"],
         ["Auto-ON", "ligado por padrão: ajustar a temperatura ou ativar o Turbo em um aparelho desligado o liga e aplica o ajuste; desligado, a temperatura só é guardada e o Turbo exige aparelho ligado"],
         ["Desligamento diário automático", "desativado por padrão: no horário escolhido (Brasília), desliga uma vez por dia as salas do escopo que estiverem ligadas; religar depois vale até o dia seguinte, um horário perdido com o servidor parado é aplicado uma vez ao voltar e salas com agendamento em curso são poupadas"],
-        ["Modo de teste", "somente leitura aqui: desativa temporariamente a restrição de rede em produção e é alterado no Console de Operações (Rede e domínio &gt; Acesso à aplicação) ou pelo terminal"],
+        ["Modo de teste", "somente leitura aqui: desativa temporariamente a restrição de rede em produção e é alterado no Console de Operações (Rede e acesso &gt; Acesso à aplicação) ou pelo terminal"],
         ["Redes autorizadas", "somente leitura aqui: faixas CIDR liberadas em produção, alteradas no Console de Operações ou com npm run redes"],
         ["Modo de manutenção", "bloqueia login e uso de usuários comuns; administradores continuam"],
         ["Credenciais obrigatórias", "recusa todo ESP32 que ainda se autentique somente por MAC"],
