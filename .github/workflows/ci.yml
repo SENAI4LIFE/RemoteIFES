@@ -570,7 +570,7 @@ jobs:
         run: |
           printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\nDPkg::Lock::Timeout "120";\n' | sudo tee /etc/apt/apt.conf.d/99-e2e-deps > /dev/null
           for tentativa in 1 2 3; do
-            if timeout --kill-after=20s 180s npx playwright install-deps ${{ matrix.browser }}; then
+            if sudo timeout --kill-after=20s 180s env "PATH=$PATH" ./node_modules/.bin/playwright install-deps ${{ matrix.browser }}; then
               exit 0
             fi
             echo "::warning::system dependency install attempt $tentativa failed or timed out"
