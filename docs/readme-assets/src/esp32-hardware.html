@@ -27,6 +27,9 @@
   #ac { margin-bottom: 24px; }
   #ac .modulo { width: 58px; height: 58px; }
   .tag-clonadora { margin-top: 4px; }
+  .par { display: flex; flex: none; }
+  .par .modulo { width: 46px; height: 46px; }
+  .par .modulo + .modulo { margin-left: -10px; }
 </style>
 </head>
 <body>
@@ -62,8 +65,8 @@
         <div><div class="titulo">Botão momentâneo</div><div class="sub">entre o pino e o GND; pull-up interno, sem resistor externo</div><span class="pino">GPIO 26 · entrada</span></div>
       </div>
       <div class="cartao tom-verde peca" id="dht">
-        <img class="modulo" src="../modules/dht11.png" alt="">
-        <div><div class="titulo">DHT11 · opcional</div><div class="sub">temperatura e umidade da telemetria</div><span class="pino">GPIO 14 · dados</span></div>
+        <div class="par"><img class="modulo" src="../modules/dht11.png" alt=""><img class="modulo" src="../modules/aht10.png" alt=""></div>
+        <div><div class="titulo">DHT11 / AHT10</div><div class="sub">temperatura e umidade da telemetria; um dos dois por placa</div><span class="pino">DHT11 · GPIO 14</span><br><span class="pino">AHT10 · I2C</span></div>
       </div>
       <div class="cartao tom-ambar peca" id="receptor">
         <img class="modulo" src="../modules/ir-receiver.png" alt="">
@@ -87,7 +90,7 @@
     { de: "#ledrede", para: "#placa", lados: ["direita", "esquerda"], reto: true, pontas: "inicio", tom: "petroleo" },
     { de: "#led", para: "#ac", lados: ["topo", "base"], em: [0.14, 0.14], reto: true, estilo: "radio", tom: "petroleo" },
     { de: "#botao", para: "#placa", lados: ["esquerda", "direita"], reto: true, tom: "verde" },
-    { de: "#dht", para: "#placa", lados: ["esquerda", "direita"], reto: true, estilo: "tracejado", tom: "verde" },
+    { de: "#dht", para: "#placa", lados: ["esquerda", "direita"], reto: true, tom: "verde" },
     { de: "#receptor", para: "#placa", lados: ["esquerda", "direita"], reto: true, estilo: "tracejado", tom: "ambar" },
   ];
 </script>
