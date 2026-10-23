@@ -55,7 +55,11 @@ def check_node_install_prerequisites(plat, env, minimum, selection):
         raise c.node_missing_error(
             minimum,
             selection,
-            ["Instale o Node.js 22 LTS: https://nodejs.org/en/download (ou: winget install OpenJS.NodeJS.LTS)", "Depois abra um novo terminal e rode server.bat de novo."],
+            [
+                "Instale o Node.js 22 LTS: https://nodejs.org/en/download (ou: winget install OpenJS.NodeJS.LTS)",
+                "Sem administrador: extraia o .zip oficial do Node.js 22 em %LOCALAPPDATA%\\Programs\\nodejs; o server.bat o encontra lá.",
+                "Depois abra um novo terminal e rode server.bat de novo.",
+            ],
         )
     search = os.pathsep.join(NODE_INSTALL_BIN["darwin"] + c.path_entries(env))
     if plat.system == "darwin":

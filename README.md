@@ -75,7 +75,7 @@ Console de Operações:
 
 `server.sh` prepara o que faltar (Node.js, dependências, `.env`), inicia o servidor em primeiro plano (`Ctrl+C` encerra; rode o console em outro terminal) e mostra os endereços: **`http://localhost:8080`** e o da rede local. `console.sh` instala o [Console de Operações](#console-de-operações) na primeira vez, com um ícone na área de trabalho quando ela existe, e depois só o abre; no Linux com systemd, `sudo ./console.sh` instala também o socket e o auxiliar privilegiado. Rodar de novo não reinstala nem duplica nada. `--verificar` só confere; `--ajuda` lista as opções.
 
-Requer Python 3.7+. O Node.js 22.13+ é instalado quando falta no Linux (x64, ARM64 ou ARMv7) e no macOS com Homebrew; no Windows, instale antes o [Node.js 22 LTS](https://nodejs.org/en/download).
+Requer Python 3.7+. O Node.js 22.13+ é instalado quando falta no Linux (x64, ARM64 ou ARMv7) e no macOS com Homebrew; no Windows, instale antes o [Node.js 22 LTS](https://nodejs.org/en/download). O instalador pede administrador; sem ele, extraia o `.zip` oficial do Node.js 22 em `%LOCALAPPDATA%\Programs\nodejs`, onde o `server.bat` o encontra sem mudar o `PATH`.
 
 Sem `SENHA_ADMIN_INICIAL`, o primeiro acesso é `superadmin`/`admin`, e o `.env` inicial é de desenvolvimento, sem restrição de rede. Produção, comandos manuais e detalhes: [referência técnica](#referência-técnica-inicialização-manual-e-produção).
 
@@ -516,7 +516,7 @@ Os scripts do [Início rápido](#início-rápido) só encadeiam os mecanismos ab
 ### O que os scripts de início conferem
 
 - **Arquitetura** pelo userland, não pelo kernel: um Pi com kernel de 64 bits e Raspberry Pi OS de 32 bits usa o Node armv7l, como o `setup.sh`. Sem Node utilizável, ARMv6 e x86 de 32 bits, que não têm Node.js 22 oficial, são recusados antes de qualquer download.
-- **Node.js**: o primeiro 22.13+ (de `engines` no `package.json`) que executa no host, mesmo atrás de um mais antigo no `PATH`; só nesta execução ele vai à frente do `PATH`, para o npm e o `setup.sh` também. `REMOTEIFES_NODE=<caminho>` fixa um binário. Nada usa `--force`/`--forcar`.
+- **Node.js**: o primeiro 22.13+ (de `engines` no `package.json`) que executa no host, mesmo atrás de um mais antigo no `PATH` (no Windows, também em `Program Files\nodejs` e em `%LOCALAPPDATA%\Programs\nodejs`, inclusive o `.zip` oficial extraído ali); só nesta execução ele vai à frente do `PATH`, para o npm e o `setup.sh` também. `REMOTEIFES_NODE=<caminho>` fixa um binário. Nada usa `--force`/`--forcar`.
 - **Preparação** só do que falta: `setup.sh` (no Windows, `npm install` e cópia do `.env.example`); no console, `npm ci --omit=dev` (como o dono do checkout, sob `sudo`) e `instalacao/instalar.js` apenas sem instalação, que nunca é rebaixada pelo checkout.
 - **Partida**: o script `start` do `package.json` direto no Node, que substitui o processo do script no Linux e no macOS. Não inicia com o RemoteIFES já no ar, com outro programa na porta ou num checkout do `remoteifes.service`. Sem interface gráfica, numa sessão SSH no macOS ou no Windows, ou como root, `console.sh` usa `--iniciar` e mostra o endereço e o túnel; as outras opções do lançador passam direto.
 

@@ -125,6 +125,32 @@ def write_executable(path, text):
     os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
+class WindowsUserInstallTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="Ana[1]-")
+
+    def tearDown(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_official_zip_extracted_without_administrator_is_found_newest_first(self):
+        nodejs = os.path.join(self.dir, "Programs", "nodejs")
+        for folder in ("node-v22.9.0-win-x64", "node-v22.23.4-win-x64", "outra", "node-v22.13.0-win-arm64"):
+            os.makedirs(os.path.join(nodejs, folder))
+            write_executable(os.path.join(nodejs, folder, "node.exe"), "")
+        write_executable(os.path.join(nodejs, "node.exe"), "")
+        windows = c.Platform("windows", "AMD64", 64)
+        found = c.node_candidates(windows, {"LOCALAPPDATA": self.dir, "PATH": ""})
+        newest_first = [os.path.join(nodejs, f, "node.exe") for f in ("node-v22.23.4-win-x64", "node-v22.13.0-win-arm64", "node-v22.9.0-win-x64")]
+        self.assertEqual(found, [os.path.join(nodejs, "node.exe")] + newest_first)
+
+        probe = fake_probe({
+            os.path.join(nodejs, "node.exe"): ("20.11.0", "x64", "win32", None),
+            os.path.join(nodejs, "node-v22.23.4-win-x64", "node.exe"): ("22.23.4", "x64", "win32", None),
+        })
+        selection = c.select_node(MINIMUM, windows, {}, probe=probe, candidates=found)
+        self.assertEqual(selection.node.path, os.path.join(nodejs, "node-v22.23.4-win-x64", "node.exe"))
+
+
 @unittest.skipUnless(POSIX, "fake node scripts need a POSIX shell")
 class RealPathConflictTest(unittest.TestCase):
     """Real executables on a real PATH: an old Node shadowing a new one, and a binary this system

@@ -260,6 +260,7 @@ class ServerFlowTest(Harness):
         self.selections = [c.NodeSelection(None, [])]
         self.assertEqual(self.main(), 1)
         self.assertIn("winget install OpenJS.NodeJS.LTS", self.err.getvalue())
+        self.assertIn("Sem administrador: extraia o .zip oficial do Node.js 22 em %LOCALAPPDATA%\\Programs\\nodejs", self.err.getvalue())
         self.assertEqual(self.commands, [])
 
     def test_windows_prepares_with_npm_install_and_env_copy(self):

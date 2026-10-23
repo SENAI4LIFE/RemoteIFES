@@ -405,7 +405,11 @@ def node_candidates(plat, env):
             if base:
                 paths.append(os.path.join(base, "nodejs", exe))
         if env.get("LOCALAPPDATA"):
-            paths.append(os.path.join(env["LOCALAPPDATA"], "Programs", "nodejs", exe))
+            user_nodejs = os.path.join(env["LOCALAPPDATA"], "Programs", "nodejs")
+            paths.append(os.path.join(user_nodejs, exe))
+            extracted = glob.glob(os.path.join(glob.escape(user_nodejs), "node-v*-win-*", exe))
+            extracted.sort(key=lambda p: parse_version(os.path.basename(os.path.dirname(p))[len("node-"):]) or (0, 0, 0), reverse=True)
+            paths.extend(extracted)
         if env.get("NVM_SYMLINK"):
             paths.append(os.path.join(env["NVM_SYMLINK"], exe))
     else:
