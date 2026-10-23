@@ -1567,7 +1567,7 @@ Arquivos renomeados contam pelo caminho antigo e pelo novo, e removidos também.
 | Scripts de início (`--preparar`, `--verificar` e `startup/test`, este também no Python 3.7 mínimo, em contêiner) | Ubuntu x64 com o Node mínimo (22.13.0) e ARM64, Windows e macOS |
 | Userland armhf do Raspberry Pi OS (`raspios-armhf.yml`, o mesmo que o laboratório chama) | Ubuntu 24.04 x64, sob qemu-user |
 | Ensaio de implantação (`ensaio-implantacao.sh`) | Ubuntu 22.04 x64 com o Node mínimo e Ubuntu 24.04 ARM64 |
-| End-to-end (Playwright), em shards com harness próprio | Ubuntu com Chromium, Firefox e WebKit; Windows com o Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox; macOS com o Chrome do sistema |
+| End-to-end (Playwright), em shards com harness próprio | Ubuntu com Chromium, Firefox e WebKit, dentro da imagem oficial do Playwright da versão do `e2e/package-lock.json` (fixada por digest), que já traz os navegadores e as bibliotecas do sistema, sem depender de um espelho do Ubuntu; Windows com o Edge do sistema (`E2E_BROWSER_CHANNEL=msedge`) e Firefox; macOS com o Chrome do sistema |
 | Safari nativo (`e2e/harness/safari-smoke.js`, pelo `safaridriver`, sem dependência npm; o WebKit do Playwright não conta como Safari). O smoke no iOS Simulator só roda com `ios_safari` no **Run workflow**, como diagnóstico | macOS |
 | Validação Cordova (o checkout CRLF do Windows exercita a restauração byte a byte de `harden-config.js`) | Ubuntu e Windows |
 | Build do firmware ESP32 | Ubuntu |
