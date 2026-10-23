@@ -129,7 +129,6 @@ Sem `SENHA_ADMIN_INICIAL`, o primeiro acesso é `superadmin`/`admin`, e o `.env`
 - [Mapa de Calor Operacional](#mapa-de-calor-operacional)
 - [Rede Mesh Opcional e Topologia](#rede-mesh-opcional-e-topologia)
 - [Empacotamento como PWA e Aplicativo Nativo (Cordova)](#empacotamento-como-pwa-e-aplicativo-nativo-cordova)
-- [Scripts Auxiliares](#scripts-auxiliares)
 - [Testes e Integração Contínua](#testes-e-integração-contínua)
 - [Figuras e capturas do README](#figuras-e-capturas-do-readme)
 - [Uso da API do GitHub](#uso-da-api-do-github)
@@ -453,6 +452,7 @@ Resumo das medidas do servidor central; os detalhes ficam nas seções indicadas
 - **CORS**: em produção, só a própria origem e as listadas em `CORS_ORIGIN`. As duas origens de exemplo que o `.env.example` antigo trazia ativas (`https://exemplo.com` e `https://outro-exemplo.com`) são ignoradas, com aviso no log, mesmo que ainda estejam no `.env`; o Console de Operações também não as usa como endereço nem como domínio da aplicação.
 - **Rede**: [Restrição de Rede](#restrição-de-rede); na [malha](#rede-mesh-opcional-e-topologia), cada placa se autentica com a própria credencial e o tráfego vai cifrado de ponta a ponta.
 - **HTTP sem TLS na rede local**: é suportado (`lan-setup.sh`), mas senhas, tokens de sessão e credenciais dos ESP32 trafegam sem cifra; a confidencialidade passa a depender da rede local. Fora de uma rede administrada, use HTTPS ([Domínio Próprio e HTTPS](#domínio-próprio-e-https)).
+- **Segredos fora do Git**: o `.gitignore` da raiz já ignora `remoteifes-server/.env` e `remoteifes-server/data/`, para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco. Numa cópia antiga em que `.env` ou o banco chegaram a ser commitados, rode `git rm --cached` neles antes de publicar.
 
 ## Tempo Real (WebSocket)
 
@@ -914,7 +914,7 @@ O terminal do console exige destravamento explícito e reautenticação, tem aut
 
 ### O que fica fora do console
 
-Builds Android e iOS rodam na CI ou na máquina de desenvolvimento: o Pi não ganha SDK, JDK nem Gradle, e a publicação de produção do APK, que exige a chave e o `apksigner`, continua na máquina com o SDK. `export.py`, `import.py` e `clear.py` são ferramentas de Git do desenvolvedor, e `release.sh` cria commit e tag, o que é autoria de versão, não implantação: nenhum deles vira botão. Os procedimentos físicos do ESP32 (gravação por USB, switch, serial) seguem neste README.
+Builds Android e iOS rodam na CI ou na máquina de desenvolvimento: o Pi não ganha SDK, JDK nem Gradle, e a publicação de produção do APK, que exige a chave e o `apksigner`, continua na máquina com o SDK. `release.sh` cria commit e tag, o que é autoria de versão, não implantação, e não vira botão. Os procedimentos físicos do ESP32 (gravação por USB, switch, serial) seguem neste README.
 
 ### Custo de recursos e testes
 
@@ -1520,18 +1520,6 @@ No macOS, com o Xcode (e seus simuladores) e as Command Line Tools: `npm run pre
 
 `test-ios` prova a casca nativa (instalação, cold start, terminate/relaunch, partida da WKWebView, nenhuma falha de carregamento ou crash), não o conteúdo da página. O caminho previsto para o frontend no WebKit do iOS é o smoke do Safari no iOS Simulator (`cd e2e && SAFARI_PLATFORM=ios npm run test:safari`), que nos runners hospedados ainda não passou do portal ([Testes e Integração Contínua](#testes-e-integração-contínua)); por ora, a interface no iOS é validada à mão, num iPhone ou no Simulator. O `deployment-target` é 15.4, o mínimo do frontend, para que um iOS anterior recuse a instalação. Os fontes de ícone e splash ficam em `remoteifes-cordova/resources/` (`icon.png` 1024×1024 e `splash.png` 2732×2732); o preparo gera os recursos nativos, e variantes podem ser copiadas com `cordova-res`, instalado à parte.
 
-## Scripts Auxiliares
-
-Três scripts Python 3 na raiz auxiliam o fluxo com Git (com `git` no `PATH`):
-
-| Comando | Função |
-|---|---|
-| `python3 export.py` | Adiciona todas as alterações (`git add -A`), pede uma mensagem de commit (ou usa `update` como padrão) e envia (`git push origin main`) |
-| `python3 import.py` | Atualiza a cópia local a partir do remoto (`git pull origin main`) |
-| `python3 clear.py` | Recria o histórico num único commit (`checkout --orphan`) e, com confirmação explícita, sobrescreve o remoto (`push -f`), apagando todo o histórico anterior. Como o ruleset de `main` bloqueia push forçado, só passa se um administrador desativar a regra temporariamente em **Settings > Rules > Rulesets** |
-
-O `.gitignore` da raiz já ignora `remoteifes-server/.env` e `remoteifes-server/data/`, para não versionar segredos (como `SENHA_ADMIN_INICIAL`) nem o banco. Numa cópia antiga em que `.env` ou o banco chegaram a ser commitados, rode `git rm --cached` neles antes de publicar.
-
 ## Testes e Integração Contínua
 
 Todos os comandos rodam a partir da raiz do projeto, salvo indicação em contrário.
@@ -1798,7 +1786,6 @@ virtual-lab/              laboratório de hardware virtual, só de desenvolvimen
 e2e/                      testes end-to-end (Playwright): specs/ e harness/ (API real, estático, ESP32 simulado, smoke do Safari)
 .github/workflows/        ci.yml (chama android.yml e ios.yml), pages.yml, console-release.yml e virtual-hardware.yml
 docs/readme-assets/       figuras deste README e suas fontes
-export.py, import.py, clear.py   scripts auxiliares de Git
 ```
 
 ## Solução de Problemas

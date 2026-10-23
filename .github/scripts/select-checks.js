@@ -41,7 +41,7 @@ const PATH_RULES = [
   [/^remoteifes-cordova\//, "mobile"],
   [/^remoteifes-esp32\//, "firmware"],
   [/^(server|console)\.(sh|bat|py)$|^startup\//, "startup"],
-  [/^(README\.md|export\.py|import\.py|clear\.py)$|^docs\//, "docs"],
+  [/^README\.md$|^docs\//, "docs"],
 ];
 
 // Browser E2E coverage. Fast validation runs only the first entry; full validation runs all.

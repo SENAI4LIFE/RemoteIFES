@@ -76,7 +76,7 @@ test("critical commands keep a single canonical form in the README", () => {
   const grupos = [
     "inicioRapido", "instalacao", "iniciar", "backupCriar", "backupRestaurar", "deployAtualizar", "deployReverter", "release", "firmwareOta",
     "credenciaisConsultar", "credenciaisEmitir", "credenciaisDerrubar", "recuperacaoConta", "carga",
-    "androidVersao", "androidRede", "androidPublicacao", "testes", "gitSincronizar", "gitRecriar",
+    "androidVersao", "androidRede", "androidPublicacao", "testes",
     "consoleInstalar", "consoleAcesso", "consoleReparo",
   ];
   for (const grupo of grupos) {
@@ -148,11 +148,11 @@ test("manual and README document IR Protocols, the board-bound cloner, the physi
 
 test("restricted procedures stay out of the Administrator set", () => {
   const admin = JSON.stringify(service._adminSections);
-  for (const trecho of ["deploy.sh", "npm run restore", "python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE", "instalacao/instalar.js", "console-helper.sh"]) {
+  for (const trecho of ["deploy.sh", "npm run restore", "REMOTEIFES_ANDROID_KEYSTORE", "instalacao/instalar.js", "console-helper.sh"]) {
     assert.ok(!admin.includes(trecho), `admin recebeu procedimento restrito: ${trecho}`);
   }
   const superadmin = JSON.stringify(service._superSections);
-  for (const trecho of ["python3 clear.py", "REMOTEIFES_ANDROID_KEYSTORE"]) {
+  for (const trecho of ["REMOTEIFES_ANDROID_KEYSTORE"]) {
     assert.ok(superadmin.includes(trecho), `superadministrator did not receive: ${trecho}`);
   }
 });

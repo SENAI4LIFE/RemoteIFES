@@ -67,16 +67,4 @@ module.exports = [
       { t: "p", texto: "Em falha: reproduza no menor alvo, registre saída sem segredos, confira health/journalctl e compare com a última versão boa. A CI roda servidor, E2E, Cordova e firmware em push/PR para main, mas não tem o hardware nem a rede do campus." },
     ],
   },
-  {
-    id: "repositorio-git",
-    titulo: "Scripts de repositório e transferência",
-    papel: "superadmin",
-    categoria: "super_infra",
-    tags: ["export.py", "import.py", "clear.py", "git", "push"],
-    corpo: [
-      { t: "comando", titulo: "Sincronizar com o remoto", comandos: C.gitSincronizar, quando: "Na raiz do repositório: export para adicionar, commitar e enviar; import para atualizar a partir de origin/main.", preRequisitos: "Git instalado, remoto e branch main corretos; árvore e diff revisados; autorização para push.", resultado: "export usa git add -A, cria o commit e envia origin/main; import faz pull.", risco: "export inclui todas as mudanças rastreáveis, inclusive arquivos soltos na raiz: revise o diff antes." },
-      { t: "comando", titulo: "Recriar todo o histórico (destrutivo, à parte)", comandos: C.gitRecriar, quando: "Somente para recriar deliberadamente o repositório do zero.", preRequisitos: "Decisão registrada; backup do clone; ninguém dependendo do histórico atual.", resultado: "Cria um histórico órfão e força o remoto após confirmação.", risco: "Apaga permanentemente todo o histórico anterior e faz push -f: nunca em operação normal, deploy ou limpeza local." },
-      { t: "nota", nivel: "seguranca", texto: "Antes de exportar, confirme que .env, banco, backups, releases, keystores e segredos continuam ignorados. Se algo sensível já foi commitado, removê-lo do arquivo atual não revoga nem apaga o histórico." },
-    ],
-  },
 ];

@@ -88,9 +88,6 @@ const testes = congelar([
   "python3 remoteifes-esp32/tools/serial-smoke.py /dev/ttyUSB0",
 ]);
 
-const gitSincronizar = congelar(["python3 export.py", "python3 import.py"]);
-const gitRecriar = congelar(["python3 clear.py"]);
-
 module.exports = Object.freeze({
   inicioRapido,
   instalacao,
@@ -128,6 +125,4 @@ module.exports = Object.freeze({
   androidRecursos,
   androidPublicacao,
   testes,
-  gitSincronizar,
-  gitRecriar,
 });

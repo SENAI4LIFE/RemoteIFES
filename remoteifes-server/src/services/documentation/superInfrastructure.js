@@ -24,7 +24,7 @@ module.exports = [
       { t: "tabela", cabecalho: ["Classe", "Onde fica e disciplina"], linhas: [
         ["Operação normal", "nesta aplicação: status/health, logs, notificações e controle das salas"],
         ["Manutenção", "Console de Operações: serviço, backup, atualização, dependências e configuração em janela"],
-        ["Destrutivo/reset", "restauração de banco e reinício de host no console, com reautenticação; erase, exclusões e clear.py seguem no terminal"],
+        ["Destrutivo/reset", "restauração de banco e reinício de host no console, com reautenticação; erase e exclusões seguem no terminal"],
         ["Release/deploy", "implantação e rollback no console; criar uma versão (tag) continua na máquina de desenvolvimento"],
       ] },
       { t: "fluxo", titulo: "Mudança segura", itens: [
