@@ -506,7 +506,7 @@ A divisão entre os dois documentos é deliberada: este README é a referência 
 ### Hardware
 
 - Um servidor para rodar `remoteifes-server`, acessível pela rede do IFES e pelos ESP32 — de uma VM a um **Raspberry Pi** (3, 4, 5 ou Zero 2 W; o Node.js exige Raspberry Pi OS de 64 bits a partir do Buster ou de 32 bits a partir do Bullseye, e a placa pode exigir um mais novo, como o Bookworm no Pi 5); veja [Hospedagem em Raspberry Pi](#hospedagem-em-raspberry-pi)
-- Um ESP32 com emissor infravermelho (GPIO 4) por sala (ou por par de salas adjacentes, quando um único equipamento cobre as duas), um switch momentâneo no GPIO 26, um buzzer ativo no GPIO 27, um LED de conexão no GPIO 25 e um sensor de temperatura e umidade, um por placa: o DHT11 no GPIO 14 ou um AHT10 por I2C (SDA no GPIO 21, SCL no GPIO 22). O mesmo firmware atende os dois: na inicialização procura o AHT10 no endereço I2C 0x38 e, sem resposta, lê o DHT11
+- Um ESP32U (placa ESP32 com conector U.FL para antena externa) com emissor infravermelho (GPIO 4) por sala (ou por par de salas adjacentes, quando um único equipamento cobre as duas), um switch momentâneo no GPIO 26, um buzzer ativo no GPIO 27, um LED de conexão no GPIO 25 e um sensor de temperatura e umidade, um por placa: o DHT11 no GPIO 14 ou um AHT10 por I2C (SDA no GPIO 21, SCL no GPIO 22). O mesmo firmware atende os dois: na inicialização procura o AHT10 no endereço I2C 0x38 e, sem resposta, lê o DHT11
 - Uma única placa adicional (ou uma das placas de sala) com **receptor infravermelho no GPIO 15**, definida como clonador oficial em `Administração > Dispositivos > Protocolos IR`
 
 ## Referência técnica: inicialização manual e produção
@@ -1668,7 +1668,7 @@ O script gera `-light.png` e `-dark.png` a 2× a largura exibida (800 px), escol
 
 **Módulos.** `docs/readme-assets/modules/*.png` são ilustrações de 256 px com fundo transparente, cada uma com um único objeto:
 
-- hardware real, desenhado de forma realista e simplificada: `server.png` é um Raspberry Pi e `esp32.png` uma placa de desenvolvimento ESP32;
+- hardware real, desenhado de forma realista e simplificada: `server.png` é um Raspberry Pi e `esp32.png` uma placa de desenvolvimento ESP32U, com o conector U.FL da antena externa no lugar da antena de PCB;
 - `wifi-ap.png` é o mesmo `esp32.png`, menor, com o símbolo de Wi-Fi (três arcos e um ponto, `#2a78d4`) acima da placa, fora dela. Representa o ESP32 como raiz da malha, no cartão do gateway; ao trocar `esp32.png`, refaça os dois juntos;
 - peças da placa: `ir-led.png` (LED infravermelho de 5 mm), `ir-receiver.png` (receptor IR de três terminais), `push-button.png` (botão tátil), `buzzer.png`, `dht11.png`, `aht10.png` (placa do AHT10 com conector de quatro pinos) e `remote-control.png` (controle remoto do aparelho). Ilustram o tipo de peça, não um modelo ou fabricante: o firmware procura primeiro o AHT10 no I2C (endereço 0x38, SDA no GPIO 21, SCL no GPIO 22) e, sem resposta, lê o DHT11 (`DHTTYPE`) no GPIO 14;
 - conceitos, no estilo de ícone de produto: navegador, celular, banco, console e ar-condicionado.
