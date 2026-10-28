@@ -34,7 +34,9 @@ var MANUAL_CONSOLE = [
         "Sem interface gráfica (um Raspberry Pi por SSH), crie o operador no terminal: sudo ./console.sh --criar-operador.",
         "Também é possível digitar o segredo de instalação, guardado em bootstrap-token no diretório de estado e legível só pelo administrador."
       ] },
-      { t: "aviso", nivel: "info", texto: "Criado o primeiro operador, o segredo e os convites deixam de valer. Reinstalar ou reparar o console preserva os operadores." }
+      { t: "aviso", nivel: "info", texto: "Criado o primeiro operador, o segredo e os convites deixam de valer. Reinstalar ou reparar o console preserva os operadores." },
+      { t: "h", texto: "Senha do operador esquecida" },
+      { t: "p", texto: "Os operadores ficam no diretório de estado, fora do checkout: clonar o repositório de novo, reinstalar ou desinstalar o console mantém a mesma conta e a mesma senha. No host, redefina-a pelo terminal: sudo ./console.sh --redefinir-senha-operador. O comando pede nome e nova senha e encerra as sessões daquele operador." }
     ]
   },
   {
