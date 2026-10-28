@@ -113,6 +113,22 @@ function trocarSenha(nome, senhaAtual, novaSenha) {
   revogarSessoesDoOperador(nome);
 }
 
+// Recovery of a forgotten password from the host. There is no current password to check: the
+// authorization is write access to the state directory, the same that reading the installation
+// secret requires (launcher --redefinir-senha-operador).
+function redefinirSenha(nome, novaSenha) {
+  const dados = lerOperadores();
+  const operador = dados.operadores.find((o) => o.nome === nome);
+  if (!operador) throw new Error("operador não encontrado");
+  const problema = validarForcaDaSenha(novaSenha);
+  if (problema) throw new Error(problema);
+  operador.senhaHash = hashDeSenha(novaSenha);
+  operador.trocaObrigatoria = false;
+  gravarOperadores(dados);
+  estado.auditar("operador-senha-redefinida", { nome, via: "terminal" });
+  revogarSessoesDoOperador(nome);
+}
+
 function autenticar(nome, senha) {
   const dados = lerOperadores();
   const operador = dados.operadores.find((o) => o.nome === nome);
@@ -335,6 +351,7 @@ module.exports = {
   existeOperador,
   criarOperador,
   trocarSenha,
+  redefinirSenha,
   autenticar,
   criarSessao,
   validarSessao,

@@ -200,3 +200,26 @@ test("the terminal path creates the operator from stdin, never from arguments", 
 
   assert.equal(await lancador.criarOperadorPeloTerminal({ entrada: Readable.from(["outro\nsenha-bem-longa-000\n"]) }), 1, "only while there is no operator");
 });
+
+test("a forgotten operator password is reset from the terminal and the old sessions stop working", async (t) => {
+  const { amb, s } = await consoleSemOperador(t);
+  const lancador = require(path.join(ajuda.RAIZ, "launcher.js"));
+  const entrar = (senha) => ajuda.pedir(s.porta, "/api/sessao", { metodo: "POST", corpo: { nome: "operador.cli", senha }, origem: s.base });
+
+  assert.equal(
+    await lancador.redefinirSenhaDoOperadorPeloTerminal({ entrada: Readable.from(["operador.cli\nsenha-bem-longa-789\n"]) }),
+    1,
+    "without an operator there is nothing to reset"
+  );
+  assert.equal(await lancador.criarOperadorPeloTerminal({ entrada: Readable.from(["operador.cli\nsenha-esquecida-123\n"]) }), 0);
+  const { token } = amb.auth.criarSessao("operador.cli");
+
+  assert.equal(await lancador.redefinirSenhaDoOperadorPeloTerminal({ entrada: Readable.from(["outro\nsenha-bem-longa-789\n"]) }), 1);
+  assert.equal(await lancador.redefinirSenhaDoOperadorPeloTerminal({ entrada: Readable.from(["operador.cli\ncurta\n"]) }), 1);
+  assert.equal(await lancador.redefinirSenhaDoOperadorPeloTerminal({ entrada: Readable.from(["operador.cli\nsenha-nova-bem-longa-456\n"]) }), 0);
+
+  assert.equal((await entrar("senha-esquecida-123")).status, 401);
+  assert.equal((await entrar("senha-nova-bem-longa-456")).status, 200);
+  assert.equal(amb.auth.validarSessao(token), null, "sessions opened with the old password are revoked");
+  assert.match(fs.readFileSync(path.join(amb.estadoDir, "auditoria.log"), "utf8"), /operador-senha-redefinida/);
+});

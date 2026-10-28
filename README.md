@@ -1004,6 +1004,14 @@ sudo node /opt/remoteifes-console/versoes/<versao>/instalacao/instalar.js --esco
 
 Reinstalar o console não toca no `remoteifes.service` nem no banco. Para removê-lo sem afetar o RemoteIFES, rode `sudo node /opt/remoteifes-console/versoes/<versao>/instalacao/desinstalar.js --sim`. O estado em `/var/lib/remoteifes-console` é preservado.
 
+**Senha do operador do console esquecida.** Os operadores ficam em `/var/lib/remoteifes-console/operadores.json` (instalação por usuário: `~/.local/state/remoteifes-console/`), fora do checkout e fora do programa: apagar e clonar de novo o repositório, reinstalar ou desinstalar o console sem `--apagar-estado` mantém a mesma conta e a mesma senha, e a tela seguinte é a de login, não a de primeiro acesso. Para redefini-la, com o console no ar ou parado:
+
+```bash
+sudo ./console.sh --redefinir-senha-operador
+```
+
+Sem checkout: `sudo node /opt/remoteifes-console/launcher-bootstrap.js --redefinir-senha-operador`. O comando lista os operadores, pede nome e nova senha no terminal (nunca em argumentos), encerra as sessões daquele operador e registra o evento na auditoria. Enquanto o console instalado for de uma versão anterior a essa opção, rode o lançador do checkout atualizado: `sudo node remoteifes-console/launcher.js --redefinir-senha-operador`.
+
 ## Hospedagem em Raspberry Pi
 
 Um Raspberry Pi 3, 4, 5 ou Zero 2 W, com Raspberry Pi OS de 32 ou 64 bits, basta para o servidor: o `node:sqlite` é nativo do Node.js, então nada é compilado no Pi. O mínimo do sistema vem do Node.js 22 oficial, segundo o `BUILDING.md` da versão: o binário ARM64 exige glibc 2.28 e a libstdc++ `GLIBCXX_3.4.25` (Debian 10), então o Raspberry Pi OS de 64 bits serve a partir do **Buster**; o binário ARMv7 exige glibc 2.28 e `GLIBCXX_3.4.28` (Debian 11), que o Buster de 32 bits não tem, então o de 32 bits serve só a partir do **Bullseye**. Num Buster de 32 bits, nenhum Node.js 22 oficial executa. Esse é o mínimo do Node.js; a placa tem o seu, e o Pi 5 só inicia com o Bookworm ou posterior. A CI roda o userland do Raspberry Pi OS Trixie nas duas arquiteturas. Nenhum runner de CI é um Pi físico; o que a CI e o workflow manual cobrem está em [Sistemas e arquiteturas suportados](#sistemas-e-arquiteturas-suportados).

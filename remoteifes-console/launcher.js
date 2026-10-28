@@ -447,6 +447,58 @@ async function criarOperadorPeloTerminal({ entrada = process.stdin } = {}) {
   return 1;
 }
 
+/**
+ * Forgotten operator password. Works with the Console stopped and without the backend: the state
+ * directory outlives the program and any RemoteIFES checkout (uninstalling and recloning keep it),
+ * so the only way back in otherwise is deleting operadores.json by hand. Authorization is write
+ * access to that directory, which in the system scope means `sudo`.
+ */
+async function redefinirSenhaDoOperadorPeloTerminal({ entrada = process.stdin } = {}) {
+  const auth = require(path.join(raiz, "src", "auth"));
+  const arquivos = [config.ARQUIVO_OPERADORES, config.ARQUIVO_SESSOES, config.ARQUIVO_AUDITORIA, `${config.ARQUIVO_AUDITORIA}.1`];
+  try {
+    fs.accessSync(config.DIR_ESTADO, fs.constants.R_OK | fs.constants.W_OK);
+    if (fs.existsSync(config.ARQUIVO_OPERADORES)) fs.accessSync(config.ARQUIVO_OPERADORES, fs.constants.R_OK | fs.constants.W_OK);
+  } catch (e) {
+    erro(`Sem acesso ao estado do console em ${config.DIR_ESTADO} (${e.code || e.message}).`);
+    erro("Use a conta que administra o host: sudo ./console.sh --redefinir-senha-operador");
+    return 1;
+  }
+  if (!auth.existeOperador()) {
+    erro(`O console ainda não tem operador em ${config.DIR_ESTADO}; crie o primeiro com --criar-operador.`);
+    return 1;
+  }
+  const nomes = require(path.join(raiz, "src", "estado")).lerJson(config.ARQUIVO_OPERADORES, { operadores: [] }).operadores.map((o) => o.nome);
+  log(`Operadores cadastrados: ${nomes.join(", ")}`);
+  const credenciais = await lerCredenciais(entrada);
+  if (credenciais.erro) {
+    erro(`Senha não redefinida: ${credenciais.erro}.`);
+    return 1;
+  }
+  try {
+    auth.redefinirSenha(credenciais.nome, credenciais.senha);
+  } catch (e) {
+    erro(`Senha não redefinida: ${e.message}.`);
+    return 1;
+  }
+  // Written by root through a rename, the files would become root's and the service, which runs as
+  // the account the installation chose, would stop reading its operators. They go back to the
+  // directory's owner.
+  if (typeof process.getuid === "function" && process.getuid() === 0) {
+    const dono = fs.statSync(config.DIR_ESTADO);
+    if (dono.uid !== 0) {
+      for (const arquivo of arquivos) {
+        try {
+          fs.chownSync(arquivo, dono.uid, dono.gid);
+        } catch {}
+      }
+    }
+  }
+  log(`Senha do operador "${credenciais.nome}" redefinida; as sessões dele foram encerradas.`);
+  log("Se o login estiver bloqueado por tentativas, aguarde 15 minutos ou encerre o console (--menu, opção 5).");
+  return 0;
+}
+
 // --- Status -----------------------------------------------------------------------------------
 
 async function coletarStatus() {
@@ -570,10 +622,11 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.includes("--ajuda") || args.includes("-h")) {
-    log("uso: launcher.js [--menu|--status|--iniciar|--criar-operador|--abrir-app|--abrir-console]");
+    log("uso: launcher.js [--menu|--status|--iniciar|--criar-operador|--redefinir-senha-operador|--abrir-app|--abrir-console]");
     log("  sem argumento: sobe o console se necessário, verifica a identidade e abre o navegador");
     log("  --iniciar: sobe o console e sai, sem abrir navegador (host sem interface gráfica)");
     log("  --criar-operador: cria o primeiro operador pelo terminal (nome e senha pedidos, nunca em argumentos)");
+    log("  --redefinir-senha-operador: redefine a senha esquecida de um operador (exige acesso ao estado, em geral sudo)");
     return 0;
   }
 
@@ -598,6 +651,10 @@ async function main() {
 
   if (args.includes("--criar-operador")) {
     return criarOperadorPeloTerminal();
+  }
+
+  if (args.includes("--redefinir-senha-operador")) {
+    return redefinirSenhaDoOperadorPeloTerminal();
   }
 
   if (args.includes("--abrir-app")) {
@@ -655,4 +712,5 @@ module.exports = {
   abrir,
   abrirPrimeiroAcesso,
   criarOperadorPeloTerminal,
+  redefinirSenhaDoOperadorPeloTerminal,
 };

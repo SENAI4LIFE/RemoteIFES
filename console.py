@@ -15,7 +15,7 @@ from startup import common as c
 CONSOLE_DIR = c.CONSOLE_DIR
 INSTALLER = os.path.join(CONSOLE_DIR, "instalacao", "instalar.js")
 PACKAGE_JSON = os.path.join(CONSOLE_DIR, "package.json")
-LAUNCHER_OPTIONS = ("--status", "--iniciar", "--criar-operador", "--menu", "--abrir-app")
+LAUNCHER_OPTIONS = ("--status", "--iniciar", "--criar-operador", "--redefinir-senha-operador", "--menu", "--abrir-app")
 DEFAULT_PORT = 8099
 # The installation roots come from the Console's own platform adapters (scopes, XDG, %LOCALAPPDATA%).
 ROOTS_QUERY = (
@@ -32,6 +32,8 @@ USAGE = """uso: ./console.sh [--verificar | opção do lançador]      (Windows:
   --status           estado do console, da aplicação e da versão do programa
   --iniciar          inicia o console sem abrir o navegador
   --criar-operador   cria o primeiro operador pelo terminal
+  --redefinir-senha-operador
+                     redefine a senha esquecida de um operador (use sudo)
   --menu             menu interativo do lançador
   --abrir-app        abre o RemoteIFES no navegador
 
