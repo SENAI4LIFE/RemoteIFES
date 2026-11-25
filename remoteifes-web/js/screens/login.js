@@ -116,7 +116,19 @@ async function restaurarSessaoSalva() {
     abrirAjudaSemSessao();
     return false;
   }
-  const resp = await Api.me();
+  const token = Api.obterToken();
+  let espera = 1000;
+  let resp = await Api.me();
+  while (resp.semResposta && !state.usuario && Api.obterToken() === token) {
+    await new Promise((resolve) => setTimeout(resolve, espera));
+    if (state.usuario || Api.obterToken() !== token) return false;
+    espera = Math.min(15000, espera * 2);
+    if (ServerStatus.estaConectado()) resp = await Api.me();
+  }
+  if (state.usuario || Api.obterToken() !== token) {
+    if (!Api.temTokenSalvo()) abrirAjudaSemSessao();
+    return false;
+  }
   if (!resp.ok) {
     if (resp.manutencao) await Api.logout();
     abrirAjudaSemSessao();

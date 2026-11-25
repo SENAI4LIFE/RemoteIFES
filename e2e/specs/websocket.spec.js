@@ -321,3 +321,48 @@ test("in the packaged app (Cordova) the PWA service worker is not registered; on
   expect(await empacotada.evaluate(() => window.__swRegistros), "no sw.js registration in the packaged context").toEqual([]);
   await empacotada.close();
 });
+
+test("a saved session recovers after the first profile request loses its response", async ({ page, context }) => {
+  const { injetarSessao } = require("../harness/fixtures");
+  await injetarSessao(context, "user");
+  let consultas = 0;
+  await page.route("**/me", async (rota) => {
+    consultas += 1;
+    if (consultas === 1) await rota.abort("failed");
+    else await rota.continue();
+  });
+  await page.goto("/");
+  await expect(page.locator("#mainApp")).toBeVisible({ timeout: 15000 });
+  expect(consultas).toBe(2);
+});
+
+test("a stalled handshake and an early close recover without reloading the page", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    const nativo = window.WebSocket;
+    const inicios = [];
+    window.__iniciosWs = inicios;
+    window.WebSocket = new Proxy(nativo, {
+      construct(alvo, args) {
+        inicios.push(performance.now());
+        if (inicios.length > 2) return Reflect.construct(alvo, args);
+        const socket = new EventTarget();
+        socket.readyState = nativo.CONNECTING;
+        socket.close = () => { socket.readyState = nativo.CLOSED; };
+        if (inicios.length === 2) {
+          setTimeout(() => {
+            socket.readyState = nativo.OPEN;
+            socket.dispatchEvent(new Event("open"));
+            socket.close();
+            socket.dispatchEvent(new CloseEvent("close", { code: 1006 }));
+          }, 0);
+        }
+        return socket;
+      },
+    });
+  });
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => window.__iniciosWs.length), { timeout: 30000 }).toBe(3);
+  await expect(page.locator("#screen-server-status")).toBeHidden();
+  const inicios = await page.evaluate(() => window.__iniciosWs);
+  expect(inicios[2] - inicios[1]).toBeGreaterThanOrEqual(1900);
+});

@@ -81,3 +81,23 @@ test("the call deadline covers reading the body, and an intact response passes u
   const r2 = await integra.enviarComando("A-101", "ligar");
   assert.deepEqual(r2, { ok: true, sala: { sala: "A-101", ligado: true } });
 });
+
+test("a delayed unauthorized response expires only the session that sent the request", async () => {
+  const pendente = Promise.withResolvers();
+  let numero = 0;
+  const api = carregarApi(async (url) => {
+    if (url.endsWith("/login")) {
+      numero += 1;
+      return respostaCom(200, async () => ({ ok: true, token: String(numero) }));
+    }
+    return pendente.promise;
+  });
+  await api.login("fixture", "fixture");
+  const anterior = api.me();
+  await api.login("fixture", "fixture");
+  pendente.resolve(respostaCom(401, async () => ({ ok: false })));
+  await anterior;
+  assert.equal(api.obterToken(), "2");
+  await api.me();
+  assert.equal(api.obterToken(), null);
+});

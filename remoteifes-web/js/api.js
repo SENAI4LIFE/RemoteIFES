@@ -84,9 +84,9 @@ async function chamar(path, options = {}) {
     } catch (err) {
       return semResposta(opcoesFetch, tempoEsgotado);
     }
-    if (res.status === 401 && authToken) {
+    if (res.status === 401 && authToken && opcoesFetch.headers?.Authorization === `Bearer ${authToken}`) {
+      if (lerTokenArmazenado() === authToken) gravarTokenArmazenado(null);
       authToken = null;
-      gravarTokenArmazenado(null);
       window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
     }
     try {

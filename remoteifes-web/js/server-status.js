@@ -181,6 +181,7 @@ const ServerStatus = (() => {
       ouvintesMensagem.forEach((cb) => cb(msg));
       return;
     }
+    if (msg.online === true) tentativas = 0;
     limparEstadoConectandoAgendado();
     if (msg.manutencao) {
       definirManutencao(true);
@@ -223,9 +224,16 @@ const ServerStatus = (() => {
       return;
     }
 
+    const prazoAbertura = setTimeout(() => {
+      if (idConexao !== conexaoId || ws !== socket || socket.readyState !== WebSocket.CONNECTING) return;
+      ws = null;
+      socket.close();
+      agendarReconexao();
+    }, 15000);
+
     socket.addEventListener("open", () => {
+      clearTimeout(prazoAbertura);
       if (idConexao !== conexaoId || ws !== socket) return;
-      tentativas = 0;
       registrarTrafego();
       ouvintesConectado.forEach((cb) => cb());
     });
@@ -243,10 +251,11 @@ const ServerStatus = (() => {
     });
 
     socket.addEventListener("close", (event) => {
+      clearTimeout(prazoAbertura);
       if (idConexao !== conexaoId || ws !== socket) return;
       ws = null;
       limparSonda();
-      if (event.code === 4001 && token) {
+      if (event.code === 4001 && token && token === wsToken()) {
         if (typeof Api !== "undefined") Api.limparSessaoLocal();
         if (typeof state !== "undefined" && state.usuario) {
           window.dispatchEvent(new CustomEvent("app:sessao-expirada"));
@@ -260,6 +269,7 @@ const ServerStatus = (() => {
     });
 
     socket.addEventListener("error", () => {
+      clearTimeout(prazoAbertura);
       if (idConexao !== conexaoId || ws !== socket) return;
       if (socket.readyState === WebSocket.OPEN) {
         socket.close();
@@ -289,7 +299,8 @@ const ServerStatus = (() => {
 
   function agendarReconexao() {
     if (reconectarTimeoutId) clearTimeout(reconectarTimeoutId);
-    const espera = Math.min(15000, 1000 * tentativas);
+    const teto = Math.min(15000, 1000 * 2 ** Math.max(1, tentativas));
+    const espera = teto * (0.5 + Math.random() / 2);
     reconectarTimeoutId = setTimeout(conectar, espera);
   }
 
