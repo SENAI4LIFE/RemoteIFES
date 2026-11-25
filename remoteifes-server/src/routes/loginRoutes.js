@@ -13,20 +13,28 @@ const router = express.Router();
 const limitarLogin = criarLimitador({ janelaMs: 15 * 60 * 1000, maxTentativas: 20, contarApenasFalhas: true });
 const HASH_COMPARACAO_INVALIDA = senhas.gerarHash("credencial-invalida-para-comparacao");
 
-router.post("/login", limitarLogin, (req, res) => {
+router.post("/login", limitarLogin, (req, res, next) => {
+  autenticar(req, res).catch(next);
+});
+
+async function autenticar(req, res) {
   const { usuario, senha } = req.body || {};
 
   if (typeof usuario !== "string" || typeof senha !== "string" || !usuario.trim() || !senha) {
     return res.status(400).json({ ok: false, erro: "usuário e senha são obrigatórios" });
   }
-  if (usuario.length > usuariosService.LOGIN_MAX || senha.length > usuariosService.SENHA_MAX) {
-    senhas.conferir("credencial-invalida", HASH_COMPARACAO_INVALIDA);
-    return res.status(401).json({ ok: false, erro: "usuario ou senha invalidos" });
+  const excedeuLimite = usuario.length > usuariosService.LOGIN_MAX || senha.length > usuariosService.SENHA_MAX;
+  const conta = excedeuLimite ? null : usuariosService.buscarPorUsuario(usuario);
+  const verificacao = senhas.conferirLogin(excedeuLimite ? "credencial-invalida" : senha, conta ? conta.senhaHash : HASH_COMPARACAO_INVALIDA);
+  if (!verificacao) {
+    res.set("Retry-After", "1");
+    return res.status(503).json({ ok: false, erro: "login ocupado, tente novamente em instantes" });
   }
+  const senhaValida = await verificacao;
+  if (excedeuLimite) return res.status(401).json({ ok: false, erro: "usuario ou senha invalidos" });
 
-  const registro = usuariosService.buscarPorUsuario(usuario);
-  const senhaValida = senhas.conferir(senha, registro ? registro.senhaHash : HASH_COMPARACAO_INVALIDA);
-  if (!registro || !registro.ativo || !senhaValida) {
+  const registro = conta && senhaValida && usuariosService.buscarPorUsuario(usuario);
+  if (!registro || !registro.ativo || registro.id !== conta.id || registro.senhaHash !== conta.senhaHash) {
     logger.warn("login-falhou", { usuario, ip: req.ip });
     return res.status(401).json({ ok: false, erro: "usuário ou senha inválidos" });
   }
@@ -58,7 +66,7 @@ router.post("/login", limitarLogin, (req, res) => {
     sessaoExpiraEm: sessao.sessaoExpiraEm,
     servidorAgora: sessao.servidorAgora,
   });
-});
+}
 
 router.get("/me", exigirLogin, (req, res) => {
   const usuario = req.usuario;

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { Worker, parentPort } = require("node:worker_threads");
 const bcrypt = require("bcryptjs");
 
 // Account password hashes.
@@ -33,4 +34,47 @@ function conferir(senha, hash) {
   return bcrypt.compareSync(reduzir(senha, hashBcrypt.slice(0, 29)), hashBcrypt);
 }
 
-module.exports = { gerarHash, conferir, LIMITE_BCRYPT, PREFIXO_LONGA };
+const verificadores = [];
+const MAX_VERIFICADORES = 2;
+const MAX_PENDENTES_POR_VERIFICADOR = 10;
+
+function criarVerificador() {
+  const worker = new Worker(__filename);
+  const pendentes = [];
+  const verificador = { worker, pendentes };
+  verificadores.push(verificador);
+
+  worker.on("message", (valida) => {
+    pendentes.shift().resolve(valida);
+    if (!pendentes.length) worker.unref();
+  });
+  function encerrar(erro) {
+    const indice = verificadores.indexOf(verificador);
+    if (indice < 0) return;
+    verificadores.splice(indice, 1);
+    for (const pedido of pendentes.splice(0)) pedido.reject(erro);
+  }
+  worker.once("error", encerrar);
+  worker.once("exit", () => encerrar(new Error("verificador de senha encerrado")));
+  return verificador;
+}
+
+function conferirLogin(senha, hash) {
+  let verificador = verificadores.reduce((menor, atual) =>
+    !menor || atual.pendentes.length < menor.pendentes.length ? atual : menor, null);
+  if (!verificador || (verificador.pendentes.length && verificadores.length < MAX_VERIFICADORES)) {
+    verificador = criarVerificador();
+  }
+  if (verificador.pendentes.length >= MAX_PENDENTES_POR_VERIFICADOR) return null;
+  return new Promise((resolve, reject) => {
+    verificador.worker.postMessage({ senha, hash });
+    verificador.pendentes.push({ resolve, reject });
+    verificador.worker.ref();
+  });
+}
+
+if (require.main === module && parentPort) {
+  parentPort.on("message", ({ senha, hash }) => parentPort.postMessage(conferir(senha, hash)));
+}
+
+module.exports = { gerarHash, conferir, conferirLogin, LIMITE_BCRYPT, PREFIXO_LONGA };

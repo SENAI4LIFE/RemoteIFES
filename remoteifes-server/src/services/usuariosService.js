@@ -82,10 +82,14 @@ function buscarPorId(id) {
   return db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(id);
 }
 
+let verificacaoPadrao = null;
+
 function senhaPadraoAtiva(usuario) {
-  return !!usuario
-    && usuario.nivel === NIVEL_SUPERADMIN
-    && senhas.conferir("admin", usuario.senhaHash);
+  if (!usuario || usuario.nivel !== NIVEL_SUPERADMIN) return false;
+  if (!verificacaoPadrao || verificacaoPadrao.hash !== usuario.senhaHash) {
+    verificacaoPadrao = { hash: usuario.senhaHash, ativa: senhas.conferir("admin", usuario.senhaHash) };
+  }
+  return verificacaoPadrao.ativa;
 }
 
 function criar({ usuario, senha, nome, podeControlar, isAdmin }, requisitante) {

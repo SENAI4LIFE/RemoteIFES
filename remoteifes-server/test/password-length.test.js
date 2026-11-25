@@ -87,6 +87,41 @@ test("an account with a long password logs in only with the whole password, when
   assert.equal(await login("frase-longa", longa), 401);
 });
 
+test("concurrent logins keep independent sessions and the event loop available", async () => {
+  const admin = usuariosService.buscarPorUsuario("superadmin");
+  const senha = "senha-concorrente";
+  const logins = ["paralelo-a", "paralelo-b"];
+  for (const usuario of logins) usuariosService.criar({ usuario, nome: usuario, senha }, admin);
+  const respostas = await Promise.all(logins.map((usuario) => fetch(`${baseUrl}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuario, senha }),
+  }).then((res) => res.json())));
+  for (const [i, resposta] of respostas.entries()) {
+    assert.ok(resposta.token);
+    const me = await fetch(`${baseUrl}/me`, { headers: { Authorization: `Bearer ${resposta.token}` } });
+    assert.equal((await me.json()).usuario, logins[i]);
+  }
+  const hash = usuariosService.buscarPorUsuario(logins[0]).senhaHash;
+  let cedeu = false;
+  setImmediate(() => { cedeu = true; });
+  assert.equal(await senhas.conferirLogin(senha, hash), true);
+  assert.equal(cedeu, true);
+});
+
+test("a password changed during verification cannot issue a session", async (t) => {
+  const admin = usuariosService.buscarPorUsuario("superadmin");
+  const senha = "senha-antes-da-troca";
+  const conta = usuariosService.criar({ usuario: "troca-durante-login", nome: "Troca", senha }, admin);
+  const conferirLogin = senhas.conferirLogin;
+  t.mock.method(senhas, "conferirLogin", (...args) => {
+    const resultado = conferirLogin(...args);
+    usuariosService.trocarSenha(conta.id, "senha-depois-da-troca", admin);
+    return resultado;
+  });
+  assert.equal(await login(conta.usuario, senha), 401);
+});
+
 test("reset-admin stores a long password in full", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-senha-longa-"));
   try {
