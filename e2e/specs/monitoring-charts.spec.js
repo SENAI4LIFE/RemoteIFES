@@ -21,8 +21,8 @@ async function abrirMonitoramento(page, context, papel = "superadmin", tamanho =
     for (const [chave, valor] of Object.entries(valores)) localStorage.setItem(chave, valor);
   }, armazenamento);
   await page.setViewportSize(tamanho);
-  await page.goto("/#/admin/monitoramento");
-  await page.reload();
+  if (new URL(page.url()).hash === "#/admin/monitoramento") await page.reload();
+  else await page.goto("/#/admin/monitoramento");
   await expect(page.locator("#mainApp")).toBeVisible({ timeout: 20_000 });
 }
 
