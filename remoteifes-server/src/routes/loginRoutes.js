@@ -31,11 +31,12 @@ async function autenticar(req, res) {
     return res.status(503).json({ ok: false, erro: "login ocupado, tente novamente em instantes" });
   }
   const senhaValida = await verificacao;
+  if (res.destroyed) return;
   if (excedeuLimite) return res.status(401).json({ ok: false, erro: "usuario ou senha invalidos" });
 
   const registro = conta && senhaValida && usuariosService.buscarPorUsuario(usuario);
   if (!registro || !registro.ativo || registro.id !== conta.id || registro.senhaHash !== conta.senhaHash) {
-    logger.warn("login-falhou", { usuario, ip: req.ip });
+    logger.warn("login-falhou", { requestId: req.id });
     return res.status(401).json({ ok: false, erro: "usuário ou senha inválidos" });
   }
 

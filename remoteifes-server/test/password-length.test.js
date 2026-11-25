@@ -122,6 +122,35 @@ test("a password changed during verification cannot issue a session", async (t) 
   assert.equal(await login(conta.usuario, senha), 401);
 });
 
+test("disconnecting during password verification does not create a session", async (t) => {
+  const admin = usuariosService.buscarPorUsuario("superadmin");
+  const senha = "senha-login-interrompido";
+  const conta = usuariosService.criar({ usuario: "login-interrompido", nome: "Teste", senha }, admin);
+  const iniciou = Promise.withResolvers();
+  const verificacao = Promise.withResolvers();
+  t.mock.method(senhas, "conferirLogin", () => {
+    iniciou.resolve();
+    return verificacao.promise;
+  });
+  const desconectou = new Promise((resolve) => {
+    server.prependOnceListener("request", (req, res) => res.once("close", resolve));
+  });
+  const controle = new AbortController();
+  const pedido = fetch(`${baseUrl}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usuario: conta.usuario, senha }),
+    signal: controle.signal,
+  });
+  await iniciou.promise;
+  controle.abort();
+  await assert.rejects(pedido, { name: "AbortError" });
+  await desconectou;
+  verificacao.resolve(true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(db.prepare("SELECT COUNT(*) AS total FROM sessoes WHERE usuarioId = ?").get(conta.id).total, 0);
+});
+
 test("reset-admin stores a long password in full", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remoteifes-senha-longa-"));
   try {
