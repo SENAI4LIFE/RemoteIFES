@@ -9,7 +9,7 @@ const db = require("../src/config/database");
 const app = require("../src/app");
 const usuariosService = require("../src/services/usuariosService");
 const tokenService = require("../src/services/tokenService");
-const { criarLimitador } = require("../src/utils/rateLimiter");
+const { criarLimitador, limitarLogin } = require("../src/utils/rateLimiter");
 
 let server;
 let baseUrl;
@@ -89,6 +89,31 @@ test("without an identified principal the limit falls on the IP, as before", () 
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.4")).seguiu, true);
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.4")).seguiu, true);
   assert.equal(passa(limitar, requisicaoFalsa("10.0.0.4")).seguiu, false);
+});
+
+test("pending logins reserve the remaining failure budget with a short retry", async () => {
+  const fila = [];
+  const limitar = limitarLogin({ janelaMs: 900000, maxTentativas: 2 }, async (req, res) => {
+    const status = await new Promise((resolve) => fila.push(resolve));
+    res.status(status);
+  });
+  const entrar = (res) => limitar(requisicaoFalsa("campus"), res, assert.fail);
+  const primeiro = entrar(respostaFalsa());
+  const segundo = entrar(respostaFalsa());
+  const ocupado = respostaFalsa();
+  await entrar(ocupado);
+  assert.equal(ocupado.codigo, 503);
+  assert.equal(ocupado.cabecalhos["Retry-After"], "1");
+  fila.shift()(200);
+  await primeiro;
+  const terceiro = entrar(respostaFalsa());
+  fila.shift()(401);
+  fila.shift()(401);
+  await Promise.all([segundo, terceiro]);
+  const bloqueado = respostaFalsa();
+  await entrar(bloqueado);
+  assert.equal(bloqueado.codigo, 429);
+  assert.ok(Number(bloqueado.cabecalhos["Retry-After"]) > 1);
 });
 
 test("the login limit counts failures per IP: successful logins from a whole campus do not exhaust the budget, but 20 failures block", async () => {

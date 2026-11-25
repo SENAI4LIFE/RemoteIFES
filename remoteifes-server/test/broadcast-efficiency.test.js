@@ -91,6 +91,21 @@ test.after(async () => {
   await new Promise((r) => server.close(r));
 });
 
+test("signed-out browsers receive availability without loading the room context", async (t) => {
+  const contexto = t.mock.method(salasService, "contextoBroadcast");
+  const ws = new WebSocket(`ws://127.0.0.1:${porta}/ws`);
+  t.after(() => ws.terminate());
+  const mensagem = () => new Promise((resolve, reject) => {
+    ws.once("message", (dados) => resolve(JSON.parse(dados)));
+    ws.once("error", reject);
+  });
+  assert.equal((await mensagem()).tipo, "servidor");
+  const observacao = mensagem();
+  ws.send(JSON.stringify({ tipo: "observar", sala: "A-108" }));
+  assert.equal((await observacao).tipo, "servidor");
+  assert.equal(contexto.mock.callCount(), 0);
+});
+
 test("the query cost of a rebroadcast does not grow with the number of connected browsers", async () => {
   const conexoes = [];
   for (let i = 0; i < 12; i += 1) {

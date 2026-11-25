@@ -117,11 +117,11 @@ function bloqueadoPorManutencao(usuario, cfg) {
   return usuario.nivel < NIVEL_ADMIN && configuracoesService.modoManutencaoAtivo(cfg);
 }
 
-function notificarCliente(ws, contexto = null, validadas = null) {
+function notificarCliente(ws, contexto = null) {
+  if (!ws.usuario) return enviarStatusServidor(ws);
   const ctx = contexto || salasService.contextoBroadcast();
-  if (!revalidarCliente(ws, false, ctx.cfg, validadas)) return;
   enviarStatusServidor(ws, ctx.cfg);
-  if (!ws.usuario || bloqueadoPorManutencao(ws.usuario, ctx.cfg)) return;
+  if (bloqueadoPorManutencao(ws.usuario, ctx.cfg)) return;
   enviar(ws, { tipo: "salas", salas: montarSalas(ws.usuario, ctx) });
   const sala = salaObservadaPorCliente.get(ws);
   if (sala) {
@@ -139,7 +139,9 @@ function notificarTodos() {
   contexto.precarregarAcessos(
     [...validadas.values()].filter((u) => u && !u.isAdmin && u.podeControlar).map((u) => u.id)
   );
-  destinatarios.forEach((ws) => notificarCliente(ws, contexto, validadas));
+  destinatarios.forEach((ws) => {
+    if (revalidarCliente(ws, false, contexto.cfg, validadas)) notificarCliente(ws, contexto);
+  });
 }
 
 function agendarNotificarTodos() {
@@ -240,11 +242,12 @@ function iniciar(server) {
     });
 
     ws.on("message", (dados) => {
-      if (!revalidarCliente(ws, true)) return;
+      if (ws.readyState !== ws.OPEN) return;
       if (limiteDeMensagensExcedido(ws)) {
         ws.close(4008, "limite de mensagens excedido");
         return;
       }
+      if (!revalidarCliente(ws, true)) return;
       let msg;
       try {
         msg = JSON.parse(dados.toString());
