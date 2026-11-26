@@ -163,7 +163,9 @@ cenario("Energia cortada no meio da gravação do failsafe na NVS", {
   const b = [8000, 4000, 600, 600, 600, 1600, 600, 1600, 600, 600, 600];
   await lab.definirFailsafe(sala, { raw: a });
   await lab.aguardar(async () => (await lab.estado(sala)).dispositivo.failsafe.pulsos === a.length, { descricao: "failsafe A stored" });
-  const parada = placa.pararEm(null, { funcao: "nvs::Page::eraseItem", acao: "desligar" });
+  // The old copy is erased in nvs::Page::eraseEntryAndSpan: ESP-IDF 4.4 reaches it through
+  // Page::eraseItem, ESP-IDF 5.5 (Arduino core 3) calls it directly from Storage.
+  const parada = placa.pararEm(null, { funcao: "nvs::Page::eraseEntryAndSpan", acao: "desligar" });
   await new Promise((r) => setTimeout(r, 1500));
   await lab.definirFailsafe(sala, { raw: b });
   await parada;
