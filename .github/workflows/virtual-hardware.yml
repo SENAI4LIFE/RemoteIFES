@@ -108,7 +108,7 @@ jobs:
           BIN=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).binario)' "$RUNNER_TEMP/preparo.json")
           if ldd "$BIN" | grep "not found"; then echo "the emulator is missing shared libraries"; exit 1; fi
           "$BIN" --version
-          "$HOME/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-objdump" --version | head -1
+          "$(node -e 'console.log(require("./virtual-lab/lib/paradas").ferramenta("objdump"))')" --version | head -1
 
   esp32:
     name: Virtual ESP32 (${{ matrix.grupo }})
@@ -183,7 +183,7 @@ jobs:
           BIN=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).binario)' "$RUNNER_TEMP/preparo.json")
           if ldd "$BIN" | grep "not found"; then echo "the emulator is missing shared libraries"; exit 1; fi
           "$BIN" --version
-          "$HOME/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-objdump" --version | head -1
+          "$(node -e 'console.log(require("./virtual-lab/lib/paradas").ferramenta("objdump"))')" --version | head -1
       - name: Run the scenarios
         shell: bash
         run: |
