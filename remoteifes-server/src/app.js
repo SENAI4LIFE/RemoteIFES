@@ -68,7 +68,7 @@ function resolverCorsProducao(req, callback) {
   const permitido =
     !origin || origensPermitidas.includes(origin) || mesmaOrigem(req);
   if (!permitido) return callback(new Error("origem não permitida pelo CORS"));
-  callback(null, { origin: true, credentials: false });
+  callback(null, { origin: true, credentials: false, exposedHeaders: ["Retry-After"] });
 }
 
 app.use((req, res, next) => {
@@ -89,7 +89,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(NODE_ENV === "production" ? cors(resolverCorsProducao) : cors());
+app.use(NODE_ENV === "production" ? cors(resolverCorsProducao) : cors({ exposedHeaders: ["Retry-After"] }));
 app.use(express.json({ limit: "100kb" }));
 
 app.get("/health", (req, res) => {

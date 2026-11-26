@@ -366,3 +366,75 @@ test("a stalled handshake and an early close recover without reloading the page"
   const inicios = await page.evaluate(() => window.__iniciosWs);
   expect(inicios[2] - inicios[1]).toBeGreaterThanOrEqual(1900);
 });
+
+test("resuming the packaged app keeps a live connection and replaces a dead one", async ({ page, context, sessaoComo }) => {
+  await context.addInitScript(() => {
+    const WebSocketNativo = window.WebSocket;
+    window.__e2eConexoes = 0;
+    window.__e2eCongelar = null;
+    window.WebSocket = new Proxy(WebSocketNativo, {
+      construct(Alvo, argumentos) {
+        window.__e2eConexoes += 1;
+        const real = Reflect.construct(Alvo, argumentos);
+        let congelado = false;
+        const fantasma = new Proxy(real, {
+          get(alvo, prop) {
+            if (prop === "readyState") return congelado ? WebSocketNativo.OPEN : alvo.readyState;
+            if (prop === "addEventListener") {
+              return (tipo, fn, opcoes) =>
+                alvo.addEventListener(tipo, (evento) => { if (!congelado) fn(evento); }, opcoes);
+            }
+            if (prop === "send") return (dados) => { if (!congelado) alvo.send(dados); };
+            const valor = alvo[prop];
+            return typeof valor === "function" ? valor.bind(alvo) : valor;
+          },
+          set(alvo, prop, valor) { alvo[prop] = valor; return true; },
+        });
+        window.__e2eCongelar = () => { congelado = true; real.close(); };
+        return fantasma;
+      },
+    });
+  });
+
+  await sessaoComo("user");
+  await expect.poll(() => page.evaluate(() => window.__e2eConexoes)).toBe(1);
+
+  await page.evaluate(() => document.dispatchEvent(new Event("resume")));
+  await page.waitForTimeout(6500);
+  expect(await page.evaluate(() => window.__e2eConexoes), "a live socket survives the resume").toBe(1);
+  await expect(page.locator("#screen-server-status")).toBeHidden();
+
+  await page.evaluate(() => window.__e2eCongelar());
+  await page.evaluate(() => document.dispatchEvent(new Event("resume")));
+  await expect.poll(() => page.evaluate(() => window.__e2eConexoes), { timeout: 15_000 }).toBeGreaterThan(1);
+  await expect(page.locator("#mainApp")).toBeVisible();
+  await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 20_000 });
+});
+
+test("a connection the server refuses explains the refusal and recovers when it is accepted", async ({ page, context }) => {
+  await context.addInitScript(() => {
+    const nativo = window.WebSocket;
+    window.__e2eTentativas = 0;
+    window.WebSocket = new Proxy(nativo, {
+      construct(alvo, args) {
+        window.__e2eTentativas += 1;
+        if (window.__e2eTentativas > 1) return Reflect.construct(alvo, args);
+        const socket = new EventTarget();
+        socket.readyState = nativo.CONNECTING;
+        socket.close = () => { socket.readyState = nativo.CLOSED; };
+        setTimeout(() => {
+          socket.readyState = nativo.OPEN;
+          socket.dispatchEvent(new Event("open"));
+          socket.readyState = nativo.CLOSED;
+          socket.dispatchEvent(new CloseEvent("close", { code: 4003 }));
+        }, 0);
+        return socket;
+      },
+    });
+  });
+  await page.goto("/");
+  await expect(page.locator("#serverStatusTitulo")).toHaveText("Acesso ao servidor recusado", { timeout: 5_000 });
+  await expect(page.locator("#serverStatusDesc")).toContainText("desta rede ou deste aplicativo");
+  await expect(page.locator("#screen-server-status")).toBeHidden({ timeout: 15_000 });
+  await expect(page.locator("#screen-portal")).toBeVisible();
+});

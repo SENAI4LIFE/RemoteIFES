@@ -100,6 +100,10 @@ async function chamar(path, options = {}) {
   }
   if (res.status === 503 && data && data.manutencao) {
     window.dispatchEvent(new CustomEvent("app:manutencao-ativa"));
+  } else if (res.status === 503 && data && typeof data === "object") {
+    const segundos = Number(res.headers && typeof res.headers.get === "function" ? res.headers.get("Retry-After") : NaN);
+    data.ocupado = true;
+    data.tentarAposMs = Number.isFinite(segundos) && segundos > 0 ? Math.min(segundos, 5) * 1000 : 1000;
   }
   return data;
 }
@@ -162,11 +166,16 @@ const Api = {
   },
 
   async login(usuario, senha) {
-    const data = await chamar("/login", {
+    const pedir = () => chamar("/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ usuario, senha }),
     });
+    let data = await pedir();
+    for (let repeticao = 0; repeticao < 2 && data.ocupado; repeticao += 1) {
+      await new Promise((resolve) => setTimeout(resolve, data.tentarAposMs));
+      data = await pedir();
+    }
     if (data.ok) {
       authToken = data.token;
       gravarTokenArmazenado(data.token);

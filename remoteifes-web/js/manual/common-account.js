@@ -23,6 +23,7 @@ ManualContent.registrar([
     corpo: [
       { t: "tabela", cabecalho: ["Mensagem ou estado", "O que significa"], linhas: [
         ["Sem conexão com o servidor", "o website não alcança a API; a reconexão é automática"],
+        ["Acesso ao servidor recusado", "o servidor alcançado não aceita esta rede ou este aplicativo; a tentativa se repete sozinha, mas só a rede autorizada ou um APK desta instalação resolvem"],
         ["Sala offline", "somente o controlador daquela sala não está conectado"],
         ["Sistema em manutenção", "o acesso de usuário comum está temporariamente bloqueado"],
         ["Conectar este aplicativo", "o Cordova ainda não conhece a origem do servidor"],

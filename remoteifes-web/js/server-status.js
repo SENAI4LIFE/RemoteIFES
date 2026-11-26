@@ -21,6 +21,7 @@ const ServerStatus = (() => {
   let confirmado = false;
   let acessoManualLiberado = false;
   let manutencaoAtiva = false;
+  let acessoRecusado = false;
   const ouvintesPronto = new Set();
   const ouvintesMensagem = new Set();
   const ouvintesConectado = new Set();
@@ -120,8 +121,10 @@ const ServerStatus = (() => {
     acessoAdminBtn.classList.add("hidden");
     mostrarSpinner();
     aplicarChip("offline", "Offline");
-    titulo.textContent = "Sem conexão com o servidor";
-    desc.textContent = "Reconectando automaticamente…";
+    titulo.textContent = acessoRecusado ? "Acesso ao servidor recusado" : "Sem conexão com o servidor";
+    desc.textContent = acessoRecusado
+      ? "O servidor não aceita conexões desta rede ou deste aplicativo. Tentando novamente automaticamente…"
+      : "Reconectando automaticamente…";
   }
 
   function aplicarEstadoConfiguracao() {
@@ -181,7 +184,10 @@ const ServerStatus = (() => {
       ouvintesMensagem.forEach((cb) => cb(msg));
       return;
     }
-    if (msg.online === true) tentativas = 0;
+    if (msg.online === true) {
+      tentativas = 0;
+      acessoRecusado = false;
+    }
     limparEstadoConectandoAgendado();
     if (msg.manutencao) {
       definirManutencao(true);
@@ -265,6 +271,11 @@ const ServerStatus = (() => {
         reconectarComTokenAtual();
         return;
       }
+      acessoRecusado = event.code === 4003;
+      if (acessoRecusado) {
+        limparEstadoConectandoAgendado();
+        aplicarEstadoConectando();
+      }
       agendarReconexao();
     });
 
@@ -277,6 +288,7 @@ const ServerStatus = (() => {
       }
       if (socket.readyState !== WebSocket.CLOSED) socket.close();
       ws = null;
+      acessoRecusado = false;
       limparSonda();
       agendarReconexao();
     });
@@ -416,9 +428,17 @@ const ServerStatus = (() => {
     conectar();
   }
   function reconectarAoRetomar() {
-    if (document.visibilityState === "visible" && servidorConfigurado()) {
-      reconectarComTokenAtual();
+    if (document.visibilityState !== "visible" || !servidorConfigurado()) return;
+    if (estaConectado()) {
+      sondarConexao();
+      return;
     }
+    if (reconectarTimeoutId) {
+      clearTimeout(reconectarTimeoutId);
+      reconectarTimeoutId = null;
+    }
+    tentativas = 0;
+    conectar();
   }
   document.addEventListener("visibilitychange", reconectarSeVisivelEDesconectado);
   document.addEventListener("resume", reconectarAoRetomar);

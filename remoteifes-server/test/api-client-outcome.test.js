@@ -101,3 +101,42 @@ test("a delayed unauthorized response expires only the session that sent the req
   await api.me();
   assert.equal(api.obterToken(), null);
 });
+
+test("a busy login is retried after the advertised delay and a maintenance refusal is not", async () => {
+  const chamadas = [];
+  const ocupada = carregarApi(async (url) => {
+    chamadas.push(url);
+    if (chamadas.length === 1) {
+      return { ...respostaCom(503, async () => ({ ok: false, erro: "login ocupado, tente novamente em instantes" })), headers: { get: (nome) => (nome === "Retry-After" ? "1" : null) } };
+    }
+    return respostaCom(200, async () => ({ ok: true, token: "novo" }));
+  });
+  const inicio = Date.now();
+  const r1 = await ocupada.login("fixture", "fixture");
+  assert.equal(r1.ok, true);
+  assert.equal(chamadas.length, 2);
+  assert.ok(Date.now() - inicio >= 900, "the retry waits for Retry-After");
+  assert.equal(ocupada.obterToken(), "novo");
+
+  let tentativas = 0;
+  const manutencao = carregarApi(async () => {
+    tentativas += 1;
+    return respostaCom(503, async () => ({ ok: false, erro: "sistema em manutenção", manutencao: true }));
+  });
+  const r2 = await manutencao.login("fixture", "fixture");
+  assert.equal(r2.manutencao, true);
+  assert.equal(tentativas, 1);
+});
+
+test("a login that stays busy gives up after two retries", async () => {
+  let tentativas = 0;
+  const api = carregarApi(async () => {
+    tentativas += 1;
+    return respostaCom(503, async () => ({ ok: false, erro: "login ocupado, tente novamente em instantes" }));
+  });
+  const resultado = await api.login("fixture", "fixture");
+  assert.equal(resultado.ok, false);
+  assert.equal(resultado.ocupado, true);
+  assert.equal(tentativas, 3);
+  assert.equal(api.obterToken(), null);
+});
