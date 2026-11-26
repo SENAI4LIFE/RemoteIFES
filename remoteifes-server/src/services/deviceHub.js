@@ -260,6 +260,21 @@ function registrarVersaoFirmware(sala, entrada, fw) {
   }
 }
 
+const CAMPOS_DIAGNOSTICO = ["uptimeS", "heapLivre", "heapMinimo", "heapMaiorBloco", "quedasWifi", "motivoWifi", "quedasWs"];
+
+// Logged once per device session so a reconnecting board leaves its reset reason, uptime, heap and
+// radio counters next to the server's own device-ws-desconectado entry.
+function registrarDiagnostico(sala, diagnostico) {
+  if (!diagnostico || typeof diagnostico !== "object") return;
+  const campos = {};
+  if (typeof diagnostico.reinicio === "string" && /^[a-z_]{1,32}$/.test(diagnostico.reinicio)) campos.reinicio = diagnostico.reinicio;
+  for (const campo of CAMPOS_DIAGNOSTICO) {
+    const valor = diagnostico[campo];
+    if (Number.isInteger(valor) && valor >= 0 && valor <= 0xffffffff) campos[campo] = valor;
+  }
+  if (Object.keys(campos).length) logger.info("device-ws-diagnostico", { sala, ...campos });
+}
+
 function registrarCapacidades(entrada, msg) {
   if (msg.otaValidacao === true) entrada.capacidades = { ...entrada.capacidades, validacaoOta: true };
 }
@@ -493,6 +508,7 @@ function processarMensagem(sala, entrada, msg, salaAtual) {
   if (msg.tipo === "telemetria") {
     registrarTelemetria(sala, entrada, msg);
   } else if (msg.tipo === "info") {
+    registrarDiagnostico(sala, msg.diagnostico);
     registrarCapacidades(entrada, msg);
     registrarVersaoFirmware(sala, entrada, msg.fw);
     atualizarFailsafeReportado(entrada, msg);
@@ -664,6 +680,7 @@ function iniciar(server) {
       if (entrada.canal.transporte !== "direto") return;
       const ws = entrada.canal.ws;
       if (!ws.isAlive) {
+        logger.warn("device-ws-sem-pong", { sala, limiteMs: PING_MS });
         ws.terminate();
         return;
       }

@@ -17,6 +17,7 @@
 #include <Update.h>
 #include <esp_ota_ops.h>
 #include <esp_timer.h>
+#include <esp_system.h>
 #include <mbedtls/md.h>
 #include <esp32/rom/crc.h>
 #include <string.h>
@@ -46,6 +47,7 @@
 #define CAPTURE_BUFFER_SIZE 1024
 #define IR_CAPTURE_TIMEOUT_MS 50
 #define HTTP_CLIENT_TIMEOUT_MS 2500
+#define HTTP_TLS_HANDSHAKE_TIMEOUT_S 10
 #define MAX_RAW_IR_ENTRIES CAPTURE_BUFFER_SIZE
 #define MAX_RAW_IR_DURACAO_US 2000000UL
 
@@ -207,6 +209,12 @@ bool aht10MedicaoPendente = false;
 unsigned long aht10MedicaoDisparadaEm = 0;
 
 bool wifiConectadoAnteriormente = false;
+volatile uint8_t ultimoMotivoWifi = 0;
+uint32_t quedasWifi = 0;
+uint32_t quedasWs = 0;
+int8_t ultimoRssiWifi = 0;
+unsigned long wsConectadoEm = 0;
+const char* motivoReinicio = "desconhecido";
 unsigned long ultimaTentativaReconexao = 0;
 unsigned long wifiDesconectadoDesde = 0;
 unsigned long ultimaIdentificacao = 0;
@@ -327,6 +335,9 @@ void configurarSwitchAcao();
 void amostrarSwitchAcao(void* arg);
 void sinalizarSwitchAcao(bool longo);
 void processarSwitchAcao();
+const char* textoMotivoReinicio(esp_reset_reason_t motivo);
+void registrarQuedaWifi(arduino_event_id_t evento, arduino_event_info_t info);
+void preencherDiagnostico(JsonDocument& doc);
 
 extern "C" bool verifyRollbackLater() {
   return true;
@@ -336,6 +347,8 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.printf("\n--- RemoteIFES IR System Initializing (fw %s) ---\n", FW_VERSAO);
+  motivoReinicio = textoMotivoReinicio(esp_reset_reason());
+  Serial.printf("Motivo do reinicio: %s\n", motivoReinicio);
 
   littleFsOk = LittleFS.begin(true);
   if (!littleFsOk) {
@@ -419,7 +432,9 @@ void setup() {
     } else {
       WiFi.mode(WIFI_STA);
       WiFi.softAPdisconnect(true);
+      WiFi.setSleep(false);
     }
+    WiFi.onEvent(registrarQuedaWifi, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(false);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
@@ -493,7 +508,7 @@ void loop() {
 
   if (!meshNoAtivo()) {
     const unsigned long intervaloIdentificacao = salaId.length() > 0 ? IDENTIFICACAO_INTERVAL_MS : IDENTIFICACAO_PENDENTE_INTERVAL_MS;
-    if (estadoWifi == WIFI_ESTADO_CONECTADO && (ultimaIdentificacao == 0 || agora - ultimaIdentificacao >= intervaloIdentificacao)) {
+    if (estadoWifi == WIFI_ESTADO_CONECTADO && estadoWsServidor != WS_ESTADO_CONECTADO && (ultimaIdentificacao == 0 || agora - ultimaIdentificacao >= intervaloIdentificacao)) {
       ultimaIdentificacao = agora;
       identificarSalaNoServidor();
     }
@@ -593,7 +608,9 @@ void gerenciarConexaoWifi() {
   estadoWsServidor = WS_ESTADO_DESCONECTADO;
 
   if (wifiConectadoAnteriormente) {
-    Serial.println("Wi-Fi desconectado. Tentando reconectar...");
+    quedasWifi++;
+    Serial.printf("Wi-Fi desconectado (motivo %u, ultimo RSSI %d dBm, heap %u). Tentando reconectar...\n",
+                  (unsigned)ultimoMotivoWifi, (int)ultimoRssiWifi, (unsigned)ESP.getFreeHeap());
   }
   wifiConectadoAnteriormente = false;
   if (wifiDesconectadoDesde == 0) wifiDesconectadoDesde = agora;
@@ -942,11 +959,19 @@ void conectarWsServidor() {
 void handleWsServidorEvent(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_DISCONNECTED:
+      if (estadoWsServidor == WS_ESTADO_CONECTADO) {
+        quedasWs++;
+        Serial.printf("WS servidor: desconectado. Sessao de %lu s; Wi-Fi %s, ultimo RSSI %d dBm, heap %u.\n",
+                      (millis() - wsConectadoEm) / 1000, WiFi.status() == WL_CONNECTED ? "conectado" : "desconectado",
+                      (int)ultimoRssiWifi, (unsigned)ESP.getFreeHeap());
+      } else {
+        Serial.println("WS servidor: desconectado.");
+      }
       estadoWsServidor = WS_ESTADO_DESCONECTADO;
-      Serial.println("WS servidor: desconectado.");
       break;
     case WStype_CONNECTED:
       estadoWsServidor = WS_ESTADO_CONECTADO;
+      wsConectadoEm = millis();
       Serial.println("WS servidor: conectado.");
       enviarInfoDispositivo();
       iniciarAvisoBuzzer();
@@ -1188,11 +1213,44 @@ void enviarInfoDispositivo() {
   meshNoDiagnostico(doc);
   preencherStatusFailsafe(doc);
   preencherVersaoEstado(doc);
+  if (!meshNoAtivo()) preencherDiagnostico(doc);
   if (powerConhecido) doc["ligado"] = lastKnownPower;
   String saida;
   serializeJson(doc, saida);
   enviarAoServidor(saida);
   if (!otaPendenteValidacao) reportarOtaValidado();
+}
+
+void preencherDiagnostico(JsonDocument& doc) {
+  JsonObject diag = doc["diagnostico"].to<JsonObject>();
+  diag["reinicio"] = motivoReinicio;
+  diag["uptimeS"] = (uint32_t)(esp_timer_get_time() / 1000000ULL);
+  diag["heapLivre"] = ESP.getFreeHeap();
+  diag["heapMinimo"] = ESP.getMinFreeHeap();
+  diag["heapMaiorBloco"] = ESP.getMaxAllocHeap();
+  diag["quedasWifi"] = quedasWifi;
+  diag["motivoWifi"] = (uint8_t)ultimoMotivoWifi;
+  diag["quedasWs"] = quedasWs;
+}
+
+const char* textoMotivoReinicio(esp_reset_reason_t motivo) {
+  switch (motivo) {
+    case ESP_RST_POWERON: return "energia";
+    case ESP_RST_EXT: return "pino_externo";
+    case ESP_RST_SW: return "software";
+    case ESP_RST_PANIC: return "panico";
+    case ESP_RST_INT_WDT: return "watchdog_interrupcao";
+    case ESP_RST_TASK_WDT: return "watchdog_tarefa";
+    case ESP_RST_WDT: return "watchdog";
+    case ESP_RST_DEEPSLEEP: return "deep_sleep";
+    case ESP_RST_BROWNOUT: return "brownout";
+    case ESP_RST_SDIO: return "sdio";
+    default: return "desconhecido";
+  }
+}
+
+void registrarQuedaWifi(arduino_event_id_t, arduino_event_info_t info) {
+  ultimoMotivoWifi = info.wifi_sta_disconnected.reason;
 }
 
 void preencherVersaoEstado(JsonDocument& doc) {
@@ -1227,7 +1285,8 @@ void concluirEvidenciaOta(JsonDocument& doc) {
 void enviarTelemetriaWs() {
   JsonDocument doc;
   doc["tipo"] = "telemetria";
-  doc["rssi"] = WiFi.RSSI();
+  ultimoRssiWifi = (int8_t)WiFi.RSSI();
+  doc["rssi"] = ultimoRssiWifi;
   doc["modo"] = modoAtualTexto();
   doc["fw"] = FW_VERSAO;
   meshNoDiagnostico(doc);
@@ -1750,6 +1809,7 @@ bool iniciarClienteHttp(HTTPClient& http, WiFiClientSecure& clienteSeguro, const
   } else {
     clienteSeguro.setInsecure();
   }
+  clienteSeguro.setHandshakeTimeout(HTTP_TLS_HANDSHAKE_TIMEOUT_S);
   return http.begin(clienteSeguro, url);
 }
 

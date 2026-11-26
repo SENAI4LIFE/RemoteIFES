@@ -612,9 +612,11 @@ O mesmo firmware serve para qualquer sala, para o clonador e para os modos de ma
 
 Depois de salvar, o servidor detecta o MAC para o superadministrador vinculá-lo à sala em `Administração > Dispositivos > Cadastro`. Em falhas de Wi-Fi o firmware tenta reconectar a cada 30 segundos, sem reiniciar. Se a placa passa 90 s (três ciclos de reconexão) sem conexão com o servidor, por falta de Wi-Fi, de servidor ou de vínculo com uma sala, ela abre o `RemoteIFES-Setup` sozinha (AP + STA) e continua tentando; quando a conexão volta, fecha o AP que abriu, mas nunca um aberto pelo switch. Num gateway ou num nó, o portal ocupa o AP da malha: fechá-lo reinicia a placa, e o AP aberto sozinho dura no máximo dez minutos antes de a placa reiniciar e tentar a malha de novo. Para reprovisionar uma placa em operação, prefira manter o switch pressionado por 5 s, que não derruba a operação; **Resetar Wi-Fi** apaga a rede e o endereço do servidor (preservando a credencial, o failsafe e o modo da malha) e reinicia a placa: no Wi-Fi direto ou num gateway ela volta ao portal e fica fora de operação até ser reprovisionada no local, mas um nó da malha volta direto à malha. A senha padrão do AP, quando exigida, também aparece no console serial.
 
+Com o WebSocket aberto, a placa não repete a identificação HTTP de 60 s: o servidor já encerra a sessão quando o vínculo muda, e um POST HTTPS bloqueante no laço atrasaria o pong do WebSocket, que o servidor exige a cada 15 s (`device-ws-sem-pong` no log antes de derrubar a conexão). No Wi-Fi direto o modo de economia de energia do rádio (modem sleep) fica desligado, e o handshake TLS das rotas HTTP tem limite de 10 s. A partir do firmware 4.5.1, cada `info` do Wi-Fi direto ou de um gateway leva um bloco `diagnostico` com o motivo do último reinício (`energia`, `brownout`, `panico`, `watchdog_tarefa` e outros), o tempo ligado, o heap livre, mínimo e maior bloco, as quedas de Wi-Fi e de WebSocket desde o boot e o último código de desconexão do Wi-Fi; o servidor o registra como `device-ws-diagnostico`. O monitor serial mostra o motivo do reinício no boot e, a cada queda, o código do Wi-Fi ou a duração da sessão do WebSocket.
+
 #### Versão e partições
 
-A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.5.0`) e é reportada ao servidor na telemetria e no heartbeat.
+A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.5.1`) e é reportada ao servidor na telemetria e no heartbeat.
 
 A partição `min_spiffs.csv` tem dois slots de aplicação de cerca de 1,9 MB; o firmware ocupa cerca de 76% de um, com a malha incluída, e o outro fica ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32). A gravação por USB é o caminho de recuperação: regrava o slot ativo sem depender do estado do OTA.
 
@@ -1159,7 +1161,7 @@ O firmware é atualizado pela rede no modelo **A/B com reversão automática**: 
 ```bash
 pio run -d ../remoteifes-esp32                         # gera .pio/build/esp32dev/firmware.bin
 npm run firmware                                        # mostra a imagem publicada, se houver
-npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.5.0 "nota opcional"
+npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.5.1 "nota opcional"
 ```
 
 A imagem é validada (byte mágico `0xE9`, tamanho plausível) e gravada com seu SHA-256 em `<REMOTEIFES_DATA_DIR>/firmware/`, com um `manifesto.json`; só uma fica publicada. O número de versão tem de ser o `-DFW_VERSAO` compilado nela, e o servidor não confere isso: com outro número, a placa roda a imagem mas volta com uma versão inesperada e a OTA termina como falha. Uma oferta em andamento continua servindo a imagem ofertada em `/dispositivo/firmware`, mesmo que outra versão seja publicada no meio; o binário antigo só sai do disco quando nenhuma transferência o usa. Republicar a **mesma** versão com outro conteúdo é recusado durante uma oferta dela.
