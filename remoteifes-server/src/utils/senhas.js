@@ -44,8 +44,10 @@ function criarVerificador() {
   const verificador = { worker, pendentes };
   verificadores.push(verificador);
 
-  worker.on("message", (valida) => {
-    pendentes.shift().resolve(valida);
+  worker.on("message", ({ valida, erro }) => {
+    const pedido = pendentes.shift();
+    if (erro === undefined) pedido.resolve(valida);
+    else pedido.reject(new Error(`hash de senha inválido: ${erro}`));
     if (!pendentes.length) worker.unref();
   });
   function encerrar(erro) {
@@ -74,7 +76,15 @@ function conferirLogin(senha, hash) {
 }
 
 if (require.main === module && parentPort) {
-  parentPort.on("message", ({ senha, hash }) => parentPort.postMessage(conferir(senha, hash)));
+  // A malformed stored hash makes bcrypt throw; answer only that request, so the worker keeps
+  // serving the logins queued behind it.
+  parentPort.on("message", ({ senha, hash }) => {
+    try {
+      parentPort.postMessage({ valida: conferir(senha, hash) });
+    } catch (erro) {
+      parentPort.postMessage({ erro: String(erro && erro.message) });
+    }
+  });
 }
 
 module.exports = { gerarHash, conferir, conferirLogin, LIMITE_BCRYPT, PREFIXO_LONGA };
