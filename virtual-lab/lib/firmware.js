@@ -8,6 +8,10 @@
 //   candidato          the same source with only FW_VERSAO raised by one patch level: an OTA target
 //   candidatoQueAborta the candidate with abort() as the first statement of setup(): a release that
 //                      crashes at boot, for the bootloader's rollback
+//   producaoRaizDeTeste, candidatoRaizDeTeste
+//                      producao and candidato that also trust the lab's own root CA (raizDeTeste()),
+//                      appended to the ISRG Root X1 they ship, so the verified transport (tls = ca)
+//                      reaches a server whose chain the lab issues
 //
 // Variants are built in copies under the lab cache. Each transformation must match exactly once, so a
 // change to main.ino cannot quietly produce a variant other than the intended one.
@@ -15,7 +19,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const { RAIZ, diretorioCache, nucleoPlatformio, comandoPio, removerSeguro, registrarProcesso, exigirHostDescartavel } = require("./ambiente");
 const { lerParticoes } = require("./flash");
 
@@ -23,7 +27,7 @@ const TAMANHO_FLASH = 4 * 1024 * 1024;
 const RE_VERSAO = /-DFW_VERSAO=\\"(\d+)\.(\d+)\.(\d+)\\"/;
 
 function fonte(variante) {
-  if (variante === "producao" && process.env.LAB_FIRMWARE_BASE_DIR) return process.env.LAB_FIRMWARE_BASE_DIR;
+  if (variante.startsWith("producao") && process.env.LAB_FIRMWARE_BASE_DIR) return process.env.LAB_FIRMWARE_BASE_DIR;
   return process.env.LAB_FIRMWARE_DIR || path.join(RAIZ, "remoteifes-esp32");
 }
 
@@ -54,10 +58,37 @@ function abortarNoBoot(dir) {
   fs.writeFileSync(ino, substituirUmaVez(texto, "void setup() {", "void setup() {\n  abort();", "main.ino"));
 }
 
+/**
+ * The lab's root CA, created once in the lab cache next to the builds that trust it. Its key stays in
+ * the cache; scenarios issue their intermediate and server certificates from it.
+ */
+function raizDeTeste() {
+  const dir = path.join(diretorioCache(), "raiz-de-teste");
+  const cert = path.join(dir, "raiz.pem");
+  const chave = path.join(dir, "raiz.key");
+  if (!fs.existsSync(cert) || !fs.existsSync(chave)) {
+    fs.mkdirSync(dir, { recursive: true });
+    const r = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes", "-days", "3650",
+      "-keyout", chave, "-out", cert, "-subj", "/O=RemoteIFES virtual lab/CN=RemoteIFES lab root",
+      "-addext", "basicConstraints=critical,CA:true", "-addext", "keyUsage=critical,keyCertSign,cRLSign"], { encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`openssl could not create the lab root CA: ${r.stderr}`);
+  }
+  return { cert, chave };
+}
+
+function confiarNaRaizDeTeste(dir) {
+  const h = path.join(dir, "include", "root_ca.h");
+  const raiz = fs.readFileSync(raizDeTeste().cert, "utf8").trim();
+  fs.writeFileSync(h, substituirUmaVez(fs.readFileSync(h, "utf8"), ')CERT"', `${raiz}\n)CERT"`, "root_ca.h"));
+}
+confiarNaRaizDeTeste.entrada = () => crypto.createHash("sha256").update(fs.readFileSync(raizDeTeste().cert)).digest("hex");
+
 const VARIANTES = {
   producao: [],
   candidato: [elevarVersao],
   candidatoQueAborta: [elevarVersao, abortarNoBoot],
+  producaoRaizDeTeste: [confiarNaRaizDeTeste],
+  candidatoRaizDeTeste: [elevarVersao, confiarNaRaizDeTeste],
 };
 
 function arquivosDaFonte(dir) {
@@ -74,6 +105,7 @@ function arquivosDaFonte(dir) {
 
 function impressaoDaFonte(dir, variante) {
   const h = crypto.createHash("sha256").update(`variante:${variante}\n`);
+  for (const passo of VARIANTES[variante] || []) if (passo.entrada) h.update(`entrada:${passo.entrada()}\n`);
   for (const rel of arquivosDaFonte(dir)) {
     h.update(`${rel.split(path.sep).join("/")}\n`);
     h.update(fs.readFileSync(path.join(dir, rel)).toString("utf8").replace(/\r\n/g, "\n"));
@@ -214,4 +246,4 @@ function montarImagem(build) {
   return imagem;
 }
 
-module.exports = { construir, montarImagem, versaoDe, fonte, VARIANTES };
+module.exports = { construir, montarImagem, versaoDe, fonte, raizDeTeste, VARIANTES };

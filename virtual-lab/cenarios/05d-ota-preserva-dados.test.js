@@ -62,7 +62,9 @@ cenarioOta("OTA preserva a configuração na NVS e os arquivos do LittleFS", {
   assert.equal(flash.hashParticao(lab.lerFlash(ctx.placa), { nome: "spiffs" }), fsAntes, "the LittleFS partition is unchanged by the upgrade");
   assert.equal((await lab.api("POST", "/comando", { sala: ctx.sala, cmd: "desligar" })).status, 200);
   await lab.aguardarConfirmada(ctx.sala, { limiteMs: 240_000 });
-  const heap = { [ctx.base.versao + " (producao)"]: heapAntes, [ctx.candidato.versao + " (candidato)"]: ultimoDiagnostico(lab, ctx.sala) };
+  const heapCandidato = ultimoDiagnostico(lab, ctx.sala);
+  assert.ok(heapCandidato && Number.isInteger(heapCandidato.heapLivre), "the candidate reported its own diagnostics");
+  const heap = { [ctx.base.versao + " (producao)"]: heapAntes, [ctx.candidato.versao + " (candidato)"]: heapCandidato };
   lab.observar("heap", heap);
   console.log(`heap por imagem: ${JSON.stringify(heap)}`);
 });

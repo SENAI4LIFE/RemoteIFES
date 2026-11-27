@@ -1,7 +1,7 @@
 name: Virtual Hardware Validation
 
 # The real ESP32 firmware on an emulated board (QEMU fork with ESP32 Wi-Fi), against the real server,
-# with injected faults. Manual only: about 30 minutes of wall time and 150 runner-minutes over 15 jobs,
+# with injected faults. Manual only: about 30 minutes of wall time and 160 runner-minutes over 16 jobs,
 # deep validation rather than a check for every change. It runs on ephemeral GitHub-hosted runners because it boots software
 # the lab treats as untrusted (a prebuilt emulator from a personal fork, and the guest it runs); it is
 # not run on developers' machines. No secret is used. The root README ("Laboratório de hardware virtual") says what each result can
@@ -20,7 +20,7 @@ on:
         type: string
         default: ''
       base_ref:
-        description: 'Optional: build only the installed (producao) firmware from this commit, so OTA scenarios upgrade from that release to the checkout'
+        description: 'Optional: build the installed firmware (producao variants) from this commit; the ESP32 scenarios except the deployment rehearsal boot that release, and OTA scenarios upgrade it to the checkout'
         type: string
         default: ''
       cenarios:
@@ -142,6 +142,7 @@ jobs:
           - { grupo: nvs, arquivos: "cenarios/06-nvs.test.js" }
           - { grupo: gpio-ir, arquivos: "cenarios/07-gpio-ir.test.js" }
           - { grupo: ap-temporario, arquivos: "cenarios/09-ap-temporario.test.js" }
+          - { grupo: tls-ca, arquivos: "cenarios/10-tls-ca.test.js" }
     env:
       # The runner is discarded after the job: the only kind of host the lab boots a guest on.
       LAB_HOST_DESCARTAVEL: "1"
