@@ -16,6 +16,18 @@ function namespaceComparavel(lab, placa) {
   return { existe: ns.existe, chaves, duplicadas: ns.duplicadas, corrompidas: ns.corrompidas };
 }
 
+// The heap each image reports when its session opens (device-ws-diagnostico): only the room and integers.
+function ultimoDiagnostico(lab, sala) {
+  const linhas = String(lab.servidor.saida || "").split("\n").filter((l) => l.includes("[device-ws-diagnostico]"));
+  for (const l of linhas.reverse()) {
+    try {
+      const d = JSON.parse(l.slice(l.indexOf("{")));
+      if (d.sala === sala) return { heapLivre: d.heapLivre, heapMinimo: d.heapMinimo, heapMaiorBloco: d.heapMaiorBloco, uptimeS: d.uptimeS };
+    } catch {}
+  }
+  return null;
+}
+
 cenarioOta("OTA preserva a configuração na NVS e os arquivos do LittleFS", {
   inicial: "Placa na versão instalada (producao), configurada pelo portal e conectada com a própria credencial",
   falha: "nenhuma",
@@ -33,6 +45,7 @@ cenarioOta("OTA preserva a configuração na NVS e os arquivos do LittleFS", {
   const fsAntes = flash.hashParticao(lab.lerFlash(ctx.placa), { nome: "spiffs" });
   assert.ok(antes.existe, "the installed release wrote its configuration");
   for (const k of ["ssid", "host", "porta", "devId", "devSec"]) assert.ok(k in antes.chaves, `the installed release stored ${k}`);
+  const heapAntes = ultimoDiagnostico(lab, ctx.sala);
   const desde = ctx.placa.marca();
   await otaValidoConclui(lab, ctx);
   const serial = ctx.placa.serial.slice(desde);
@@ -43,4 +56,7 @@ cenarioOta("OTA preserva a configuração na NVS e os arquivos do LittleFS", {
   assert.equal(flash.hashParticao(lab.lerFlash(ctx.placa), { nome: "spiffs" }), fsAntes, "the LittleFS partition is unchanged by the upgrade");
   assert.equal((await lab.api("POST", "/comando", { sala: ctx.sala, cmd: "desligar" })).status, 200);
   await lab.aguardarConfirmada(ctx.sala, { limiteMs: 240_000 });
+  const heap = { [ctx.base.versao + " (producao)"]: heapAntes, [ctx.candidato.versao + " (candidato)"]: ultimoDiagnostico(lab, ctx.sala) };
+  lab.observar("heap", heap);
+  console.log(`heap por imagem: ${JSON.stringify(heap)}`);
 });
