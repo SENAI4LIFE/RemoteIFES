@@ -195,14 +195,14 @@ test("the role comes from the server: only the cloner enters clone or capture mo
   assert.doesNotMatch(ino, /preferences\.putString\("role"/);
   assert.match(bloco("void handleIRCapture"), /if \(!moduloClonador\(\)\) return;/);
   assert.match(ino, /if \(modo == "clone" && moduloClonador\(\)\)/);
-  assert.match(ino, /if \(moduloClonador\(\) && runtimeMode == RUNTIME_CONFIG_CLONE\) \{\s*irrecv\.enableIRIn\(\);/);
+  assert.match(ino, /if \(moduloClonador\(\) && runtimeMode == RUNTIME_CONFIG_CLONE\) \{\s*ligarReceptorIr\(\);/);
   assert.match(bloco("void aplicarPapelDoServidor"), /if \(!moduloClonador\(\) && runtimeMode == RUNTIME_CONFIG_CLONE\) sairModoClone\(\);/);
   assert.doesNotMatch(setupHtml, /name=["']role["']/i);
   assert.doesNotMatch(setupHtml, /clonador/i);
 });
 
 test("the access point stays off while the server is reachable and only returns without configuration, after reset, through the switch or when the server stays unreachable", () => {
-  assert.match(bloco("void setup"), /WiFi\.mode\(WIFI_STA\);\s*WiFi\.softAPdisconnect\(true\);/);
+  assert.match(bloco("void setup"), /WiFi\.mode\(WIFI_STA\);\s*desligarPontoDeAcessoSeAtivo\(\);/);
   assert.doesNotMatch(bloco("void setup"), /aplicarPontoDeAcesso\(/, "a configured boot does not start the AP");
   assert.match(bloco("void startAPMode"), /aplicarPontoDeAcesso\(false\)/);
   assert.match(bloco("void abrirApTemporario"), /aplicarPontoDeAcesso\(true\)/, "the switch AP keeps the station connected");
@@ -346,7 +346,7 @@ test("the cloner ignores captures the IR library cannot transmit as an air-condi
   const captura = bloco("void handleIRCapture");
   assert.match(captura, /bool isKnownAC = universalAC\.isProtocolSupported\(results\.decode_type\);\s*if \(!isKnownAC\) \{\s*reportComando\("sinal_ignorado", "protocolo=" \+ protocolName \+ ";hex=" \+ hexValue\);\s*if \(isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE\) irrecv\.resume\(\);\s*return;\s*\}/, "an unsupported capture is reported as ignored and the receiver keeps listening");
   const ignorar = captura.indexOf("if (!isKnownAC)");
-  assert.ok(ignorar < captura.indexOf("resultToRawArray("), "nothing is allocated for an ignored capture");
+  assert.ok(ignorar < captura.indexOf("new (std::nothrow) uint16_t[length]"), "nothing is allocated for an ignored capture");
   assert.ok(ignorar < captura.indexOf('doc["tipo"] = "captura";'), "an ignored capture never reaches the server");
 });
 
@@ -359,4 +359,29 @@ test("swing is on unless a command explicitly turns it off", () => {
 test("the firmware carries no code comments", () => {
   assert.doesNotMatch(ino, /^\s*\/\//m);
   assert.doesNotMatch(ino, /\/\*/);
+});
+
+test("the IR receiver is switched only on a change of state, and its GPIO interrupt stops before its timer is freed", () => {
+  assert.equal((ino.match(/irrecv\.enableIRIn\(\)/g) || []).length, 1, "enableIRIn is called only by ligarReceptorIr");
+  assert.equal((ino.match(/irrecv\.disableIRIn\(\)/g) || []).length, 1, "disableIRIn is called only by desligarReceptorIr");
+  const ligar = bloco("void ligarReceptorIr");
+  assert.match(ligar, /if \(receptorIrLigado\) return;\s*irrecv\.enableIRIn\(\);\s*receptorIrLigado = true;/);
+  const desligar = bloco("void desligarReceptorIr");
+  assert.match(desligar, /if \(!receptorIrLigado\) return;\s*irrecv\.pause\(\);\s*irrecv\.disableIRIn\(\);\s*receptorIrLigado = false;/);
+  const captura = bloco("void handleIRCapture");
+  assert.doesNotMatch(captura, /resultToRawArray/, "the library allocates with a throwing new");
+  assert.match(captura, /new \(std::nothrow\) uint16_t\[length\]/);
+  assert.match(captura, /doc\.overflowed\(\) \|\| serializeJson\(doc, saida\) != measureJson\(doc\)/);
+});
+
+test("Arduino diagnostics stay at level 1 on core 3, whose build script defines level 0 after the project's flags", () => {
+  assert.match(platformio, /build_unflags =\s*\n\s*-DCORE_DEBUG_LEVEL=0\b/);
+  assert.match(platformio, /build_flags =\s*\n\s*-DCORE_DEBUG_LEVEL=1\b/);
+});
+
+test("Wi-Fi settings are not persisted and the access point is torn down only when it is up", () => {
+  assert.equal((ino.match(/WiFi\.persistent\(false\);/g) || []).length, 1);
+  assert.ok(ino.indexOf("WiFi.persistent(false);") < ino.indexOf("if (meshNoAtivo()) {"), "persistence is off before the first Wi-Fi call");
+  assert.match(bloco("void desligarPontoDeAcessoSeAtivo"), /if \(WiFi\.getMode\(\) & WIFI_MODE_AP\) WiFi\.softAPdisconnect\(true\);/);
+  assert.equal((ino.match(/WiFi\.softAPdisconnect\(true\);/g) || []).length, 2, "the guarded helper and the close of RemoteIFES-Setup");
 });

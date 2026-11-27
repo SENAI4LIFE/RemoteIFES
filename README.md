@@ -501,7 +501,7 @@ A divisão entre os dois documentos é deliberada: este README é a referência 
 - Node.js 22.22.2 ou superior (o servidor usa o módulo `node:sqlite` nativo, ainda experimental, e o verificador de releases do Console, `@sigstore/verify` 4, exige 22.22.2) — em Linux (incluindo Raspberry Pi OS), `./server.sh` o instala pelo `remoteifes-server/setup.sh` quando falta, sem depender do pacote do sistema
 - Python 3.7 ou superior para os scripts de início, só com a biblioteca padrão
 - [PlatformIO](https://platformio.org/) (Core CLI ou a extensão para VS Code), com a plataforma `espressif32`, para compilar e gravar o firmware — `remoteifes-esp32/flash.sh` automatiza a instalação do PlatformIO Core (prefere `pipx`, com fallback para `pip --user`) e chama `pio run` para compilar, gravar o sistema de arquivos `data/` (LittleFS) e o firmware
-- Bibliotecas do firmware, resolvidas pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini` com versões fixadas: plataforma `espressif32@7.0.1`, [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) 2.9.0, `WebSockets` (Links2004) 2.7.3, `ArduinoJson` 7.4.3, `DHT sensor library` 1.4.7 e `Adafruit Unified Sensor` 1.1.15; o AHT10 é lido pela biblioteca `Wire`, que vem com o núcleo Arduino da plataforma. O servidor só atribui a uma sala os protocolos que o `IRac` dessa versão sabe transmitir; uma captura com outro identificador fica como sinal RAW genérico
+- Bibliotecas do firmware, resolvidas pelo PlatformIO a partir de `remoteifes-esp32/platformio.ini` com versões fixadas: plataforma `espressif32@8.0.0` (núcleo Arduino 3.3.12, ESP-IDF 5.5, mbedTLS 3.6), [IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266) 2.9.0, `WebSockets` (Links2004) 2.7.3, `ArduinoJson` 7.4.3, `DHT sensor library` 1.4.7 e `Adafruit Unified Sensor` 1.1.15; o AHT10 é lido pela biblioteca `Wire`, que vem com o núcleo Arduino da plataforma. O servidor só atribui a uma sala os protocolos que o `IRac` dessa versão sabe transmitir; uma captura com outro identificador fica como sinal RAW genérico
 
 ### Hardware
 
@@ -616,9 +616,9 @@ Com o WebSocket aberto, a placa não repete a identificação HTTP de 60 s: o se
 
 #### Versão e partições
 
-A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.5.1`) e é reportada ao servidor na telemetria e no heartbeat.
+A versão do firmware é definida por `-DFW_VERSAO` em `platformio.ini` (atualmente `4.6.0`) e é reportada ao servidor na telemetria e no heartbeat. A 4.6.0 é a primeira compilada no núcleo Arduino 3.3.12; as placas em 4.5.x (núcleo 2.0.17) passam a ela por OTA, que troca só a aplicação: o bootloader e a tabela de partições gravados por USB continuam, a NVS e o LittleFS são lidos como estão, e uma candidata que falha no autoteste volta para a imagem anterior. Os transportes com TLS (`ca` e `inseguro`) negociam só TLS 1.2 (o núcleo 2.0.17 aceitava também 1.0 e 1.1); o nginx que o `https-setup.sh` configura pelo certbot oferece TLS 1.2 e 1.3. Cada versão publicada precisa de um número novo: o servidor só distingue a candidata da imagem anterior pela versão que a placa reporta depois do boot.
 
-A partição `min_spiffs.csv` tem dois slots de aplicação de cerca de 1,9 MB; o firmware ocupa cerca de 76% de um, com a malha incluída, e o outro fica ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32). A gravação por USB é o caminho de recuperação: regrava o slot ativo sem depender do estado do OTA.
+A partição `min_spiffs.csv` tem dois slots de aplicação de cerca de 1,9 MB; o firmware ocupa cerca de 86% de um, com a malha incluída, e o outro fica ocioso para a [atualização por OTA](#atualização-de-firmware-por-ota-esp32). A gravação por USB é o caminho de recuperação: regrava o slot ativo sem depender do estado do OTA.
 
 
 ## Configuração
@@ -1161,7 +1161,7 @@ O firmware é atualizado pela rede no modelo **A/B com reversão automática**: 
 ```bash
 pio run -d ../remoteifes-esp32                         # gera .pio/build/esp32dev/firmware.bin
 npm run firmware                                        # mostra a imagem publicada, se houver
-npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.5.1 "nota opcional"
+npm run firmware -- ../remoteifes-esp32/.pio/build/esp32dev/firmware.bin 4.6.0 "nota opcional"
 ```
 
 A imagem é validada (byte mágico `0xE9`, tamanho plausível) e gravada com seu SHA-256 em `<REMOTEIFES_DATA_DIR>/firmware/`, com um `manifesto.json`; só uma fica publicada. O número de versão tem de ser o `-DFW_VERSAO` compilado nela, e o servidor não confere isso: com outro número, a placa roda a imagem mas volta com uma versão inesperada e a OTA termina como falha. Uma oferta em andamento continua servindo a imagem ofertada em `/dispositivo/firmware`, mesmo que outra versão seja publicada no meio; o binário antigo só sai do disco quando nenhuma transferência o usa. Republicar a **mesma** versão com outro conteúdo é recusado durante uma oferta dela.
@@ -1365,7 +1365,7 @@ Um nó informa a quantidade de saltos e o sinal do enlace com o pai, mas nomeia 
 
 ### O que ainda não foi validado
 
-O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Do lado do servidor, testes com gateways e nós simulados cobrem várias topologias, troca de gateway, reinícios, gerações de credencial, quadros adulterados, truncados ou repetidos, os limites e um gateway que se comporta mal (`test/mesh-adversarial.test.js`). Nada disso envolve rádio: alcance, interferência, eleição real de pai e raiz, recuperação do rádio após perda do pai ou da raiz, estabilidade em vários saltos, latência de RF, a rotação de credencial pela malha em placas reais a volta de um nó ao pai enquanto o portal ocupa o ponto de acesso dele e uma malha com placas em núcleos diferentes (Arduino 2.0.17 com ESP-IDF 4.4 e 3.3 com ESP-IDF 5.5) continuam pendentes.
+O protocolo e a criptografia do firmware são verificados por um teste que roda no host contra os mesmos vetores que o servidor produz, e a integração com o rádio é verificada pela compilação. Do lado do servidor, testes com gateways e nós simulados cobrem várias topologias, troca de gateway, reinícios, gerações de credencial, quadros adulterados, truncados ou repetidos, os limites e um gateway que se comporta mal (`test/mesh-adversarial.test.js`). Nada disso envolve rádio: alcance, interferência, eleição real de pai e raiz, recuperação do rádio após perda do pai ou da raiz, estabilidade em vários saltos, latência de RF, a rotação de credencial pela malha em placas reais, a volta de um nó ao pai enquanto o portal ocupa o ponto de acesso dele e uma malha com placas em núcleos diferentes (Arduino 2.0.17 com ESP-IDF 4.4 e 3.3 com ESP-IDF 5.5) continuam pendentes.
 
 Nada disso, nem o resto da placa (IR, GPIO, switch, buzzer, DHT11 ou AHT10, NVS com queda de energia, flash, OTA A/B no ESP32 real, Wi-Fi, alcance, latência de RF e heap em longa duração), foi validado em hardware ainda. Para cada item, a evidência que existe hoje é de software: testes no host, o [laboratório de hardware virtual](#laboratório-de-hardware-virtual) (o firmware real num ESP32 emulado, que prova a lógica do firmware e nada elétrico ou de rádio) ou CI em ARM64 nativo.
 

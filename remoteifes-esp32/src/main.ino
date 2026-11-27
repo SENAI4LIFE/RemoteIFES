@@ -165,6 +165,7 @@ IRac universalAC(IR_SEND_PIN);
 decode_results results;
 
 bool isCapturing = false;
+bool receptorIrLigado = false;
 bool apModeActive = false;
 bool apIniciado = false;
 bool apExigirCredencial = false;
@@ -251,6 +252,7 @@ unsigned long lastComandoAceito = 0;
 const unsigned long INTERVALO_MINIMO_COMANDO_MS = 400;
 
 void startAPMode();
+void desligarPontoDeAcessoSeAtivo();
 void aplicarPontoDeAcesso(bool manterSta);
 IPAddress enderecoDoPontoDeAcesso(bool manterSta);
 void aplicarPoliticaApDoServidor(JsonDocument& doc);
@@ -311,6 +313,9 @@ bool moduloClonador();
 void aplicarPapelDoServidor(JsonDocument& doc);
 void entrarModoClone();
 void sairModoClone();
+void descartarCapturaSemMemoria(const String& protocolName);
+void ligarReceptorIr();
+void desligarReceptorIr();
 void iniciarAvisoBuzzer();
 void avisarAntesDoIr();
 void atualizarBuzzer();
@@ -414,10 +419,10 @@ void setup() {
   configurarMalha();
 
   String motivoMalha;
+  WiFi.persistent(false);
   if (meshNoAtivo()) {
     apModeActive = false;
-    WiFi.softAPdisconnect(true);
-    WiFi.persistent(false);
+    desligarPontoDeAcessoSeAtivo();
     if (meshIniciar(motivoMalha)) {
       Serial.println("Modo no da malha: sem Wi-Fi de infraestrutura (mantenha o switch pressionado por 5 s para abrir o RemoteIFES-Setup).");
     } else {
@@ -431,12 +436,11 @@ void setup() {
       WiFi.mode(WIFI_AP_STA);
     } else {
       WiFi.mode(WIFI_STA);
-      WiFi.softAPdisconnect(true);
+      desligarPontoDeAcessoSeAtivo();
       WiFi.setSleep(false);
     }
     WiFi.onEvent(registrarQuedaWifi, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     WiFi.setAutoReconnect(true);
-    WiFi.persistent(false);
     WiFi.begin(savedSSID.c_str(), savedPASS.c_str());
     Serial.println("Modo operacional: ponto de acesso e portal local desligados (mantenha o switch pressionado por 5 s para abrir o RemoteIFES-Setup).");
     if (meshGatewayAtivo() && !meshIniciar(motivoMalha)) {
@@ -489,7 +493,7 @@ void loop() {
   if (isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE) {
     handleIRCapture();
   } else if (isCapturing) {
-    irrecv.disableIRIn();
+    desligarReceptorIr();
     isCapturing = false;
   }
 
@@ -854,6 +858,10 @@ void registrarPortal() {
   });
 }
 
+void desligarPontoDeAcessoSeAtivo() {
+  if (WiFi.getMode() & WIFI_MODE_AP) WiFi.softAPdisconnect(true);
+}
+
 void startAPMode() {
   apModeActive = true;
   apTemporarioAte = 0;
@@ -1011,7 +1019,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     Serial.println("Modo CONFIG ativado.");
   } else if (strcmp(tipo, "exit_operation") == 0) {
     if (isCapturing) {
-      irrecv.disableIRIn();
+      desligarReceptorIr();
       isCapturing = false;
     }
     runtimeMode = RUNTIME_OPERATION;
@@ -1026,7 +1034,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       } else if (modo == "idle") {
         runtimeMode = RUNTIME_CONFIG_IDLE;
         if (isCapturing) {
-          irrecv.disableIRIn();
+          desligarReceptorIr();
           isCapturing = false;
         }
       }
@@ -1035,7 +1043,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     }
   } else if (strcmp(tipo, "start_capture") == 0) {
     if (moduloClonador() && runtimeMode == RUNTIME_CONFIG_CLONE) {
-      irrecv.enableIRIn();
+      ligarReceptorIr();
       isCapturing = true;
       reportComando("captura_ir", "iniciada");
       Serial.println("Receptor IR ativo.");
@@ -1043,7 +1051,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       Serial.println("start_capture ignorado: somente a clonadora em modo clone recebe IR.");
     }
   } else if (strcmp(tipo, "stop_capture") == 0) {
-    irrecv.disableIRIn();
+    desligarReceptorIr();
     isCapturing = false;
     reportComando("captura_ir", "parada");
   } else if (strcmp(tipo, "send_raw") == 0) {
@@ -1072,6 +1080,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       return;
     }
 
+    if (isCapturing) desligarReceptorIr();
     sendRawIR(rawData, i, carrierHz / 1000);
     delete[] rawData;
     definirFailsafeLatch(false);
@@ -1083,7 +1092,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
     ultimoComando.timestampMs = millis();
 
     reportComando("controle_raw", "carrier_hz=" + String(carrierHz));
-    if (isCapturing) irrecv.enableIRIn();
+    if (isCapturing) ligarReceptorIr();
   } else if (strcmp(tipo, "send_known_state") == 0) {
     int protocolo = doc["protocol"] | -1;
     float temp = doc["temp"] | 24.0;
@@ -1113,6 +1122,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
         enviarStatusFailsafe();
         return;
       }
+      if (isCapturing) desligarReceptorIr();
       sendKnownACState((decode_type_t)protocolo, temp, power, turbo, fan, swing);
       lastKnownPower = power;
       powerConhecido = true;
@@ -1132,7 +1142,7 @@ void processarComandoServidor(uint8_t* payload, size_t length) {
       reportComando("controle_nativo", "protocolo=" + String(protocolo) + ";temp=" + String(temp, 1) + ";power=" + String(power ? "on" : "off") + ";turbo=" + String(turbo ? "on" : "off") + (fan.length() ? (";fan=" + fan) : ""));
       lastTelemetryWs = millis();
       enviarTelemetriaWs();
-      if (isCapturing) irrecv.enableIRIn();
+      if (isCapturing) ligarReceptorIr();
     }
   } else if (strcmp(tipo, "failsafe_raw_set") == 0) {
     aplicarFailsafeDoServidor(doc);
@@ -1329,8 +1339,22 @@ void handleIRCapture() {
     return;
   }
 
-  uint16_t* rawArray = resultToRawArray(&results);
   uint16_t length = getCorrectedRawLength(&results);
+  uint16_t* rawArray = new (std::nothrow) uint16_t[length];
+  if (!rawArray) {
+    descartarCapturaSemMemoria(protocolName);
+    return;
+  }
+  uint16_t pos = 0;
+  for (uint16_t i = 1; i < results.rawlen; i++) {
+    uint32_t usecs = results.rawbuf[i] * kRawTick;
+    while (usecs > UINT16_MAX) {
+      rawArray[pos++] = UINT16_MAX;
+      rawArray[pos++] = 0;
+      usecs -= UINT16_MAX;
+    }
+    rawArray[pos++] = usecs;
+  }
 
   JsonDocument doc;
   doc["tipo"] = "captura";
@@ -1341,15 +1365,36 @@ void handleIRCapture() {
   doc["carrierHz"] = 38000;
   JsonArray raw = doc["raw"].to<JsonArray>();
   for (uint16_t i = 0; i < length; i++) raw.add(rawArray[i]);
+  delete[] rawArray;
 
   String saida;
-  serializeJson(doc, saida);
+  if (doc.overflowed() || serializeJson(doc, saida) != measureJson(doc)) {
+    descartarCapturaSemMemoria(protocolName);
+    return;
+  }
   enviarAoServidor(saida);
 
   reportComando("sinal_capturado", "protocolo=" + protocolName + ";nativo=" + String(isKnownAC ? "sim" : "nao") + ";hex=" + hexValue);
-  delete[] rawArray;
 
   if (isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE) irrecv.resume();
+}
+
+void descartarCapturaSemMemoria(const String& protocolName) {
+  reportComando("sinal_ignorado", "protocolo=" + protocolName + ";memoria_insuficiente");
+  if (isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE) irrecv.resume();
+}
+
+void ligarReceptorIr() {
+  if (receptorIrLigado) return;
+  irrecv.enableIRIn();
+  receptorIrLigado = true;
+}
+
+void desligarReceptorIr() {
+  if (!receptorIrLigado) return;
+  irrecv.pause();
+  irrecv.disableIRIn();
+  receptorIrLigado = false;
 }
 
 bool moduloClonador() {
@@ -1365,7 +1410,7 @@ void aplicarPapelDoServidor(JsonDocument& doc) {
 
 void entrarModoClone() {
   runtimeMode = RUNTIME_CONFIG_CLONE;
-  irrecv.enableIRIn();
+  ligarReceptorIr();
   isCapturing = true;
   enviarModoAlterado();
   reportComando("modo_clone", "ativo");
@@ -1374,7 +1419,7 @@ void entrarModoClone() {
 
 void sairModoClone() {
   if (isCapturing) {
-    irrecv.disableIRIn();
+    desligarReceptorIr();
     isCapturing = false;
   }
   runtimeMode = RUNTIME_OPERATION;
@@ -1616,9 +1661,9 @@ bool transmitirFailsafeSalvo() {
     return false;
   }
   bool retomarCaptura = isCapturing && runtimeMode == RUNTIME_CONFIG_CLONE;
-  if (retomarCaptura) irrecv.disableIRIn();
+  if (retomarCaptura) desligarReceptorIr();
   sendRawIR(rawData, length, failsafeCarrierHzSalvo() / 1000);
-  if (retomarCaptura) irrecv.enableIRIn();
+  if (retomarCaptura) ligarReceptorIr();
   delete[] rawData;
   lastKnownPower = false;
   powerConhecido = true;
