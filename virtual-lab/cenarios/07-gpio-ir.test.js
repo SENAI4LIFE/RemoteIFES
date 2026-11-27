@@ -268,3 +268,74 @@ cenario("Toques curtos e longos com o servidor inalcançável: nenhum se perde",
   await placa.aguardarVirtual(5000);
   assert.doesNotMatch(placa.serial.slice(volta), /RemoteIFES-Setup encerrado/, "the server coming back does not close an AP the switch holds");
 });
+
+// Arduino core 3 gives the IR receiver a new hardware timer on every enableIRIn() and frees it on
+// disableIRIn() without forgetting it, so the firmware must switch the receiver only on a change of
+// state: a repeated start would exhaust the chip's four timers and a repeated stop would free one twice.
+cenario("Clonadora: capturas e paradas repetidas e testes de envio durante a captura não reiniciam a placa", {
+  inicial: "Placa em operação, definida pelo servidor como clonadora oficial",
+  falha: "modo clone ativado; a captura é iniciada três vezes seguidas; três RAW de teste saem durante a captura; o GPIO 15 recebe bordas; a captura é parada duas vezes seguidas",
+  exigido: ["cada RAW de teste é transmitido", "depois dos envios o receptor relata o sinal que chega ao GPIO 15", "parado, o receptor não relata nada", "a captura volta a iniciar depois das paradas repetidas e relata de novo", "o modo clone encerra e a operação volta"],
+  proibido: ["reinício", "abort, assert ou corrupção de heap", "sessão com o servidor perdida"],
+  recuperacao: "a captura inicia de novo depois das paradas",
+}, async (lab) => {
+  const { placa, sala, via } = await lab.placaEmOperacao();
+  const desde = placa.marca();
+  const sessoes = via.conexoesDo("ws").length;
+  const pedir = async (metodo, rota, corpo) => {
+    const r = await lab.api(metodo, rota, corpo);
+    assert.equal(r.status, 200, `${rota}: ${JSON.stringify(r.corpo)}`);
+  };
+  const capturasIniciadas = () => placa.contarSerial(/Receptor IR ativo\./, desde);
+  // Twenty fast edges on the receiver pin: a frame no protocol decodes, which the cloner reports as
+  // an ignored signal once its 50 ms gap passes. Only a receiver that is really listening reports it.
+  const relatosDoReceptor = (antes) => via.mensagensDaPlaca({ tipo: "comando", cmd: /^sinal_(ignorado|capturado)$/ }, antes).length;
+  const sinalNoReceptor = async () => {
+    const antes = via.daPlaca.length;
+    for (let i = 0; i < 20; i++) await placa.definirEntrada(15, i % 2);
+    await placa.definirEntrada(15, 1);
+    await placa.aguardarVirtual(300);
+    return antes;
+  };
+  await pedir("PUT", "/admin/protocolos-ir/clonador", { sala });
+  await placa.aguardarSerial(/Papel definido pelo servidor: cloner/, { desde });
+  await pedir("POST", "/admin/protocolos-ir/clonador/modo-clone", { ativo: true });
+  await placa.aguardarSerial(/Modo clone ativado/, { desde });
+  for (let i = 1; i <= 3; i++) {
+    await pedir("POST", `/admin/esp32/${encodeURIComponent(sala)}/captura/iniciar`);
+    await lab.aguardar(() => capturasIniciadas() >= i, { descricao: `capture start ${i}` });
+  }
+  const raw = [3000, 1500, 500, 500, 500, 1500, 500];
+  const envios = [];
+  for (let i = 0; i < 3; i++) {
+    await placa.aguardarVirtual(600);
+    const antes = placa.bordas.length;
+    await pedir("POST", `/admin/esp32/${encodeURIComponent(sala)}/teste/raw`, { raw, carrierHz: 38000 });
+    await lab.aguardar(() => placa.bordasDe(27, antes).some((b) => b.nivel === 0), { descricao: `test RAW ${i + 1} transmitted (buzzer off)` });
+    envios.push(placa.bordasDe(4, antes).length);
+  }
+  lab.observar("bordasPorEnvio", envios);
+  assert.ok(envios.every((n) => n > 0), "every test RAW reached the IR pin");
+  const aposEnvios = await sinalNoReceptor();
+  await lab.aguardar(() => relatosDoReceptor(aposEnvios) > 0, { descricao: "the receiver reports a signal after the test sends" });
+  for (let i = 0; i < 2; i++) {
+    await pedir("POST", `/admin/esp32/${encodeURIComponent(sala)}/captura/parar`);
+    await placa.aguardarVirtual(500);
+  }
+  const parado = await sinalNoReceptor();
+  await placa.aguardarVirtual(2000);
+  assert.equal(relatosDoReceptor(parado), 0, "a stopped receiver reports nothing");
+  const antesDaRetomada = capturasIniciadas();
+  await pedir("POST", `/admin/esp32/${encodeURIComponent(sala)}/captura/iniciar`);
+  await lab.aguardar(() => capturasIniciadas() > antesDaRetomada, { descricao: "capture starts again after the repeated stops" });
+  const retomado = await sinalNoReceptor();
+  await lab.aguardar(() => relatosDoReceptor(retomado) > 0, { descricao: "the restarted receiver reports a signal" });
+  await pedir("POST", "/admin/protocolos-ir/clonador/modo-clone", { ativo: false });
+  await placa.aguardarSerial(/Modo OPERATION restaurado/, { desde });
+  await placa.aguardarVirtual(2000);
+  const serial = placa.serial.slice(desde);
+  assert.equal(reinicios(placa, desde), 0, "no restart");
+  assert.doesNotMatch(serial, /abort\(\)|assert failed|CORRUPT HEAP|Guru Meditation/);
+  assert.ok((await lab.estado(sala)).dispositivo.conectado);
+  assert.equal(via.conexoesDo("ws").length, sessoes, "the session was not interrupted");
+});

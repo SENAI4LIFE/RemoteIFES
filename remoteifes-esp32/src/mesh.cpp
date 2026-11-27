@@ -18,10 +18,11 @@
 // One radio means one channel: the mesh runs on the channel the root's router put it on. Nodes are
 // configured with channel 0 and channel switching allowed so they find the network by mesh id.
 //
-// Validated by compiling and linking against the pinned framework (espressif32@7.0.1, Arduino
-// 2.0.17, ESP-IDF 4.4.7, which ships esp_mesh.h and libmesh.a) and by the host test of the protocol
-// module. Radio behavior (joining, parent changes, root loss, partitions, range) needs hardware and
-// is recorded as pending in the README.
+// Validated by compiling and linking against the pinned framework (espressif32@8.0.0, Arduino
+// 3.3.12, ESP-IDF 5.5, which ships esp_mesh.h and libmesh.a; before it espressif32@7.0.1, Arduino
+// 2.0.17, ESP-IDF 4.4.7) and by the host test of the protocol module. Radio behavior (joining,
+// parent changes, root loss, partitions, range, nodes on different ESP-IDF versions) needs hardware
+// and is recorded as pending in the README.
 
 namespace {
 

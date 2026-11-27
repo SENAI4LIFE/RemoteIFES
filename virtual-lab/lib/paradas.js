@@ -11,10 +11,16 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const { nucleoPlatformio } = require("./ambiente");
 
+// espressif32 8 (Arduino core 3) installs the toolchain as toolchain-xtensa-esp-elf, earlier
+// platforms as toolchain-xtensa-esp32; both name the binutils xtensa-esp32-elf-*. Both are looked
+// up so a firmware_ref from before the core 3 move still builds and runs.
+const PACOTES_TOOLCHAIN = ["toolchain-xtensa-esp-elf", "toolchain-xtensa-esp32"];
+
 function ferramenta(nome) {
   const exe = process.platform === "win32" ? `${nome}.exe` : nome;
-  const caminho = path.join(nucleoPlatformio(), "packages", "toolchain-xtensa-esp32", "bin", `xtensa-esp32-elf-${exe}`);
-  if (!fs.existsSync(caminho)) throw new Error(`${caminho} not found: build the firmware first`);
+  const caminhos = PACOTES_TOOLCHAIN.map((p) => path.join(nucleoPlatformio(), "packages", p, "bin", `xtensa-esp32-elf-${exe}`));
+  const caminho = caminhos.find((c) => fs.existsSync(c));
+  if (!caminho) throw new Error(`${caminhos.join(" or ")} not found: build the firmware first`);
   return caminho;
 }
 
@@ -145,4 +151,4 @@ class ClienteGdb {
   }
 }
 
-module.exports = { enderecosDaLinha, enderecosDaFuncao, ClienteGdb };
+module.exports = { enderecosDaLinha, enderecosDaFuncao, ClienteGdb, ferramenta };
