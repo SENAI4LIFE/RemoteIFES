@@ -3,7 +3,8 @@
 // Builds the firmware the virtual board runs, from the repository source, with PlatformIO, and lays
 // it out as a 4 MB flash image.
 //
-//   producao           remoteifes-esp32 as it is (LAB_FIRMWARE_DIR points to another checkout)
+//   producao           remoteifes-esp32 as it is (LAB_FIRMWARE_DIR points to another checkout;
+//                      LAB_FIRMWARE_BASE_DIR, when set, to the installed release the boards start on)
 //   candidato          the same source with only FW_VERSAO raised by one patch level: an OTA target
 //   candidatoQueAborta the candidate with abort() as the first statement of setup(): a release that
 //                      crashes at boot, for the bootloader's rollback
@@ -21,7 +22,8 @@ const { lerParticoes } = require("./flash");
 const TAMANHO_FLASH = 4 * 1024 * 1024;
 const RE_VERSAO = /-DFW_VERSAO=\\"(\d+)\.(\d+)\.(\d+)\\"/;
 
-function fonte() {
+function fonte(variante) {
+  if (variante === "producao" && process.env.LAB_FIRMWARE_BASE_DIR) return process.env.LAB_FIRMWARE_BASE_DIR;
   return process.env.LAB_FIRMWARE_DIR || path.join(RAIZ, "remoteifes-esp32");
 }
 
@@ -124,12 +126,21 @@ async function comTrava(dir, fn) {
 
 const SAIDAS = ["bootloader.bin", "partitions.bin", "firmware.bin", "firmware.elf", "littlefs.bin"];
 
+// With two platform versions installed, PlatformIO keeps the second framework as
+// framework-arduinoespressif32@<version>; boot_app0.bin is byte-identical in core 2.0.17 and 3.x.
+function arquivoBootApp0() {
+  const pacotes = path.join(nucleoPlatformio(), "packages");
+  const nomes = fs.existsSync(pacotes) ? fs.readdirSync(pacotes).filter((n) => n === "framework-arduinoespressif32" || n.startsWith("framework-arduinoespressif32@")).sort() : [];
+  const caminhos = nomes.map((n) => path.join(pacotes, n, "tools", "partitions", "boot_app0.bin"));
+  return caminhos.find((c) => fs.existsSync(c)) || path.join(pacotes, "framework-arduinoespressif32", "tools", "partitions", "boot_app0.bin");
+}
+
 /** Builds (or reuses) a variant and returns the paths of everything a flash image needs. */
 async function construir(variante) {
   exigirHostDescartavel("building firmware for the emulator");
   const passos = VARIANTES[variante];
   if (!passos) throw new Error(`unknown firmware variant ${variante}`);
-  const origem = fonte();
+  const origem = fonte(variante);
   const destino = path.join(diretorioCache(), "firmware", variante);
   const impressao = impressaoDaFonte(origem, variante);
   const marca = path.join(destino, ".fonte");
@@ -162,7 +173,7 @@ async function construir(variante) {
   });
   let tamanho = null;
   try { tamanho = JSON.parse(fs.readFileSync(path.join(destino, ".tamanho"), "utf8")); } catch {}
-  const bootApp0 = path.join(nucleoPlatformio(), "packages", "framework-arduinoespressif32", "tools", "partitions", "boot_app0.bin");
+  const bootApp0 = arquivoBootApp0();
   return {
     variante,
     versao: versaoDe(destino),

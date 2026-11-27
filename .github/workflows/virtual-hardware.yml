@@ -1,7 +1,7 @@
 name: Virtual Hardware Validation
 
 # The real ESP32 firmware on an emulated board (QEMU fork with ESP32 Wi-Fi), against the real server,
-# with injected faults. Manual only: about 30 minutes of wall time and 140 runner-minutes over 14 jobs,
+# with injected faults. Manual only: about 30 minutes of wall time and 150 runner-minutes over 15 jobs,
 # deep validation rather than a check for every change. It runs on ephemeral GitHub-hosted runners because it boots software
 # the lab treats as untrusted (a prebuilt emulator from a personal fork, and the guest it runs); it is
 # not run on developers' machines. No secret is used. The root README ("Laboratório de hardware virtual") says what each result can
@@ -17,6 +17,10 @@ on:
         default: full
       firmware_ref:
         description: 'Optional: test remoteifes-esp32 from this commit instead of the checkout (e.g. to reproduce a fixed defect)'
+        type: string
+        default: ''
+      base_ref:
+        description: 'Optional: build only the installed (producao) firmware from this commit, so OTA scenarios upgrade from that release to the checkout'
         type: string
         default: ''
       cenarios:
@@ -61,6 +65,7 @@ jobs:
     env:
       LAB_HOST_DESCARTAVEL: "1"
       FIRMWARE_REF: ${{ inputs.firmware_ref }}
+      BASE_REF: ${{ inputs.base_ref }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -87,6 +92,13 @@ jobs:
           else
             echo "Firmware under test: remoteifes-esp32 at $(git rev-parse HEAD)"
           fi
+          if [ -n "$BASE_REF" ]; then
+            BASE=$(git rev-parse --verify --quiet "$BASE_REF^{commit}") || { echo "base_ref is not a commit of this repository"; exit 1; }
+            mkdir -p "$RUNNER_TEMP/firmware-base"
+            git archive "$BASE" remoteifes-esp32 | tar -x -C "$RUNNER_TEMP/firmware-base"
+            echo "LAB_FIRMWARE_BASE_DIR=$RUNNER_TEMP/firmware-base/remoteifes-esp32" >> "$GITHUB_ENV"
+            echo "Installed firmware (producao): remoteifes-esp32 at $BASE"
+          fi
       - name: Cache PlatformIO
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -96,7 +108,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/remoteifes-virtual-lab/cache
-          key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}
+          key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}-${{ inputs.base_ref }}
       - run: pip install platformio==6.1.19
       - name: Emulator runtime libraries
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0t64 libvte-2.91-0 libx11-6
@@ -126,6 +138,7 @@ jobs:
           - { grupo: ota-transferencia, arquivos: "cenarios/05a-ota-transferencia.test.js" }
           - { grupo: ota-recusa-e-energia, arquivos: "cenarios/05b-ota-recusa-e-energia.test.js" }
           - { grupo: ota-rollback, arquivos: "cenarios/05c-ota-rollback.test.js" }
+          - { grupo: ota-preserva-dados, arquivos: "cenarios/05d-ota-preserva-dados.test.js" }
           - { grupo: nvs, arquivos: "cenarios/06-nvs.test.js" }
           - { grupo: gpio-ir, arquivos: "cenarios/07-gpio-ir.test.js" }
           - { grupo: ap-temporario, arquivos: "cenarios/09-ap-temporario.test.js" }
@@ -133,6 +146,7 @@ jobs:
       # The runner is discarded after the job: the only kind of host the lab boots a guest on.
       LAB_HOST_DESCARTAVEL: "1"
       FIRMWARE_REF: ${{ inputs.firmware_ref }}
+      BASE_REF: ${{ inputs.base_ref }}
       CENARIOS: ${{ inputs.cenarios }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -160,6 +174,13 @@ jobs:
           else
             echo "Firmware under test: remoteifes-esp32 at $(git rev-parse HEAD)"
           fi
+          if [ -n "$BASE_REF" ]; then
+            BASE=$(git rev-parse --verify --quiet "$BASE_REF^{commit}") || { echo "base_ref is not a commit of this repository"; exit 1; }
+            mkdir -p "$RUNNER_TEMP/firmware-base"
+            git archive "$BASE" remoteifes-esp32 | tar -x -C "$RUNNER_TEMP/firmware-base"
+            echo "LAB_FIRMWARE_BASE_DIR=$RUNNER_TEMP/firmware-base/remoteifes-esp32" >> "$GITHUB_ENV"
+            echo "Installed firmware (producao): remoteifes-esp32 at $BASE"
+          fi
       - name: Cache PlatformIO
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -169,7 +190,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/remoteifes-virtual-lab/cache
-          key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}
+          key: lab-${{ runner.os }}-${{ hashFiles('virtual-lab/emulador.json', 'virtual-lab/lib/firmware.js', 'remoteifes-esp32/**') }}-${{ inputs.firmware_ref }}-${{ inputs.base_ref }}
       - run: pip install platformio==6.1.19
       - name: Emulator runtime libraries
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libslirp0 libpixman-1-0 libgcrypt20 libgtk-3-0t64 libvte-2.91-0 libx11-6
