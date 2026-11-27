@@ -6,8 +6,12 @@
 // is the upgrade a board already in the field takes. Invariant, helpers and limits: see ota-comum.js.
 
 const assert = require("node:assert/strict");
+const util = require("util");
 const flash = require("../lib/flash");
 const { cenarioOta, emOperacao, otaValidoConclui } = require("./ota-comum");
+
+// Written by the firmware itself for the OTA attempt (OTA_TENTATIVA_KEY, OTA_SHA_KEY in main.ino).
+const CHAVES_DO_OTA = ["otaTent", "otaSha"];
 
 function namespaceComparavel(lab, placa) {
   const ns = lab.nvs(placa);
@@ -33,7 +37,7 @@ cenarioOta("OTA preserva a configuração na NVS e os arquivos do LittleFS", {
   falha: "nenhuma",
   exigido: [
     "o candidato autentica com a credencial e a configuração gravadas pela versão instalada",
-    "a NVS do namespace remoteifes fica idêntica depois da atualização",
+    "cada chave da NVS gravada pela versão instalada fica idêntica; só surgem as chaves do próprio OTA",
     "o candidato monta o LittleFS gravado pela versão instalada, sem formatá-lo",
     "um comando explícito é confirmado pelo candidato",
   ],
@@ -52,7 +56,9 @@ cenarioOta("OTA preserva a configuração na NVS e os arquivos do LittleFS", {
   assert.doesNotMatch(serial, /Falha ao montar LittleFS/);
   const depois = namespaceComparavel(lab, ctx.placa);
   lab.observar("nvs", { chavesAntes: Object.keys(antes.chaves).sort(), chavesDepois: Object.keys(depois.chaves).sort(), corrompidas: depois.corrompidas, duplicadas: depois.duplicadas });
-  assert.deepEqual(depois, antes, "the remoteifes namespace is unchanged by the upgrade");
+  assert.equal(depois.corrompidas.length + depois.duplicadas.length, 0, "no corrupt or duplicate NVS entry after the upgrade");
+  for (const k of Object.keys(antes.chaves)) assert.ok(util.isDeepStrictEqual(depois.chaves[k], antes.chaves[k]), `NVS key ${k} is unchanged by the upgrade`);
+  for (const k of Object.keys(depois.chaves)) assert.ok(k in antes.chaves || CHAVES_DO_OTA.includes(k), `NVS key ${k} appeared during the upgrade`);
   assert.equal(flash.hashParticao(lab.lerFlash(ctx.placa), { nome: "spiffs" }), fsAntes, "the LittleFS partition is unchanged by the upgrade");
   assert.equal((await lab.api("POST", "/comando", { sala: ctx.sala, cmd: "desligar" })).status, 200);
   await lab.aguardarConfirmada(ctx.sala, { limiteMs: 240_000 });
